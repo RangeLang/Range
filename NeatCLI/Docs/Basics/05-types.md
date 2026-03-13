@@ -22,4 +22,5 @@ Current direction:
 - types describe member and function shapes
 - case-bearing declarations replace a separate `enum` keyword
 - array types use bracket syntax like `[Color]`
-- array literals and richer collection behavior still need to be added
+- array literals exist in expressions like `[.red, .blue]`
+- richer collection behavior still needs to be added

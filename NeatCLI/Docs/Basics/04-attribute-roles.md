@@ -16,12 +16,9 @@ Reusable declaration example:
     func title(_ text: String) -> Head
 }
 
-@Palette {
-    var colors: [Color] = [.red, .blue]
-}
-
 @Theme: Palette {
-    var accentColor: Color
+    #theme() {
+    }
 }
 
 @BackgroundStyle: StyleModifier on Renderable {

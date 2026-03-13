@@ -4,17 +4,19 @@ Neat is declaration-first.
 
 ```neat
 @Palette {
-    var colors: [Color] = [.red, .blue]
+    case light, dark
 }
 
 @Theme: Palette {
-    var accentColor: Color
+    #theme() {
+    }
 }
 ```
 
-Current direction:
+Current surface:
 
 - `@Name { ... }` defines a named declaration
 - `@Name: OtherThing { ... }` composes from other declarations
 - declarations are reusable by default
-- `Name(...)` is the usage side and should follow normal `init` rules
+- declarations can contain members, callables, cases, state, functions, and a body depending on kind
+- the parser does not use separate `protocol`, `enum`, or `namespace` keywords anymore

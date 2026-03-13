@@ -1,46 +1,48 @@
 # Members And Callables
 
-Declarations use typed members directly.
+Declarations use typed members directly, and callable entrypoints use `#name(...)`.
 
 ```neat
-@Palette {
-    var colors: [Color] = [.red, .blue]
-}
-```
-
-Composed declarations can provide stored values or builder bodies:
-
-```neat
-@Theme: Palette {
-    var colors: [Color] {
+@App {
+    var head: Head {
     }
 }
 ```
 
-Callable entrypoints are universal in Neat.
+Typed member example:
 
 ```neat
-@Palette {
-    var colors: [Color]
-
-    #colors(colors _: [Color])
-}
-```
-
-```neat
-@Theme: Palette {
-    var colors: [Color]
-
-    #colors(colors _: [Color]) {
-        self.colors = colors
+@Page {
+    var head: Head {
     }
 }
 ```
 
-Current direction:
+Callable example:
+
+```neat
+@Theme {
+    #theme() {
+    }
+}
+```
+
+Overloaded callable example:
+
+```neat
+@BackgroundStyle {
+    #background(color: Color) {
+    }
+
+    #background(color: String) {
+    }
+}
+```
+
+Current surface:
 
 - `#name(...)` defines a callable entrypoint on a declaration
 - multiple callables are allowed on the same declaration
 - duplicate exact callable signatures on the same declaration are rejected
-- required callable behavior should eventually come from composed declarations
-- member defaults may be provided directly on the declaration
+- member declarations currently parse as `var name: Type { ... }`
+- plain `init(...)` is not a special language construct

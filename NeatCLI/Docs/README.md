@@ -1,16 +1,33 @@
 # Neat Docs
 
-This folder is a working set of language notes for Neat.
+This folder describes the Neat language as it exists in `NeatSyntax` today.
 
-It starts from core syntax first, then moves into higher-level framework concepts.
-Examples are meant to be read as language notes, not treated as stable runnable code yet.
+Examples here are intentionally small. The goal is to show the real parser surface first, then the framework-level concepts built on top of it.
+
+## What Neat Supports Today
+
+- declaration-first syntax with `@Name { ... }`
+- composition with `@Name: OtherThing { ... }`
+- builtin app entry with `@main MyApp: App { ... }`
+- typed members with `var name: Type { ... }`
+- local `var` and `let` bindings inside statement blocks
+- callable entrypoints with `#name(...) { ... }`
+- `@State` for component/page state
+- arrays in type position like `[Color]`
+- array literals in expressions like `[1, 2, 3]`
+- case-bearing declarations with `case today, tomorrow`
+- `for` loops and `switch` statements in action blocks
+- `for` loops in view bodies
 
 ## Basics
 
+- [00-overview.md](./Basics/00-overview.md)
+- [01-bindings-and-state.md](./Basics/01-bindings-and-state.md)
+- [05-types.md](./Basics/05-types.md)
 - [01-declarations.md](./Basics/01-declarations.md)
 - [02-members-and-init.md](./Basics/02-members-and-init.md)
 - [04-attribute-roles.md](./Basics/04-attribute-roles.md)
-- [05-types.md](./Basics/05-types.md)
+- [03-control-flow.md](./Basics/03-control-flow.md)
 
 ## Concepts
 
@@ -18,9 +35,9 @@ Examples are meant to be read as language notes, not treated as stable runnable 
 - [02-renderable-roles.md](./Concepts/02-renderable-roles.md)
 - [03-style-modifier.md](./Concepts/03-style-modifier.md)
 
-## Direction
+## Current Boundaries
 
-- keep examples small and semantic
-- show how declarations compose
-- show which `@` forms are builtin versus dynamic
-- add richer commentary and parser snapshots later
+- there is no separate `protocol` keyword
+- there is no separate `enum` keyword
+- `namespace` is gone; `@Meta { ... }` provides scoped members instead
+- projection headers like `on Renderable` parse, but projection semantics are not fully implemented yet
