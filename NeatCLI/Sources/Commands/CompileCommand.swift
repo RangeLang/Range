@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import NeatSyntax
 
 extension NeatCLI {
     struct Compile: ParsableCommand {

@@ -1,6 +1,0 @@
-@Component CoreHero {
-  Body {
-    Text("Ship Faster")
-    Text("Build with shared core components and styling.")
-  }
-}

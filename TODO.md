@@ -1,0 +1,1 @@
+- Build a semantic component graph and use it for real-time chunking plus predictive loading (route/page chunks, hover/viewport prefetch).

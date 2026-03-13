@@ -1,0 +1,1 @@
+window.Neat = window.Neat || {};

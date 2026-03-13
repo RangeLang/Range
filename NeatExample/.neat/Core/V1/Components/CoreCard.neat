@@ -1,6 +1,0 @@
-@Component CoreCard {
-  Body {
-    Text("Core Card")
-    Text("This component is loaded from .neat/Core/V1/Components.")
-  }
-}

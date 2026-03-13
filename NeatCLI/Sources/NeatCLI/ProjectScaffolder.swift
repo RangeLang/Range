@@ -1,6 +1,7 @@
 import ArgumentParser
 import Darwin
 import Foundation
+import NeatSyntax
 
 struct ProjectScaffolder {
     private enum TerminalStyle {
@@ -326,11 +327,6 @@ struct ProjectScaffolder {
 
     private func renderApp(name: String) -> String {
         """
-        protocol App {
-          var head: Head
-          var routes: Routes
-        }
-
         @main \(name): App {
           var head: Head {
             Meta.title("\(name)")

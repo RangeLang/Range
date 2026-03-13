@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import NeatSyntax
 
 struct ProjectUpdater {
     private let path: String

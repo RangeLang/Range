@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import NeatSyntax
 
 struct ProjectCompiler {
     private let path: String
@@ -1179,7 +1180,7 @@ struct ProjectCompiler {
     }
 
     private func renderSwitchStatement(
-        expression: Expression,
+        expression: NeatSyntax.Expression,
         cases: [SwitchCase],
         defaultBody: [Statement]?,
         scope: RenderScope,
@@ -1224,7 +1225,7 @@ struct ProjectCompiler {
     }
 
     private func renderExpression(
-        _ expression: Expression,
+        _ expression: NeatSyntax.Expression,
         scope: RenderScope,
         context: HandlerRenderContext? = nil
     ) -> String {

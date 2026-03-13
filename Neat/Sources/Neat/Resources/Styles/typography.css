@@ -1,0 +1,23 @@
+.font-family {
+    font-family: var(--ff, inherit);
+}
+
+.font-size {
+    font-size: var(--fs, 1rem);
+}
+
+.font-weight {
+    font-weight: var(--fw, 400);
+}
+
+.font-italic {
+    font-style: italic;
+}
+
+.line-height {
+    line-height: var(--lh, 1);
+}
+
+.letter-spacing {
+    letter-spacing: calc(var(--ls, 0) * var(--space-unit));
+}

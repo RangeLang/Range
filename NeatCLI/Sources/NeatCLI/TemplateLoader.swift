@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import NeatSyntax
 
 enum TemplateLoader {
     private static let overrideRootEnv = "NEAT_CORE_TEMPLATE_ROOT"

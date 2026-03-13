@@ -1,4 +1,5 @@
 import Foundation
+import NeatSyntax
 
 struct NeatLanguageServer {
     private var documents: [String: DocumentState] = [:]

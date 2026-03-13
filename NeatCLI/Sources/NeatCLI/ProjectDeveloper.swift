@@ -1,6 +1,7 @@
 import ArgumentParser
 import Darwin
 import Foundation
+import NeatSyntax
 
 struct ProjectRunner {
     private let path: String

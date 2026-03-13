@@ -1,4 +1,5 @@
 import Foundation
+import NeatSyntax
 
 struct JavaScriptGenerator {
     func generate(component: ComponentNode) -> String {
@@ -567,7 +568,7 @@ struct JavaScriptGenerator {
     }
 
     private func generateSwitchStatement(
-        expression: Expression,
+        expression: NeatSyntax.Expression,
         cases: [SwitchCase],
         defaultBody: [Statement]?,
         stateNames: Set<String>,
@@ -610,7 +611,7 @@ struct JavaScriptGenerator {
     }
 
     private func generateExpression(
-        _ expression: Expression,
+        _ expression: NeatSyntax.Expression,
         stateNames: Set<String>,
         context: JSHandlerContext? = nil
     ) -> String {
