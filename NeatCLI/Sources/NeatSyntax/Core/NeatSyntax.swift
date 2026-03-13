@@ -6,7 +6,6 @@ enum NeatSyntax {
         case variable = "var"
         case constant = "let"
         case typeExtension = "extension"
-        case neatProtocol = "protocol"
         case projection = "on"
         case forLoop = "for"
         case inKeyword = "in"

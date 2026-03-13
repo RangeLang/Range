@@ -9,8 +9,6 @@ extension Parser {
                 objects.append(.neatFunction(try parseNeatFunctionDeclaration()))
             case .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
                 objects.append(.typeExtension(try parseTypeExtensionDeclaration()))
-            case .keyword(NeatSyntax.Keyword.neatProtocol.rawValue):
-                objects.append(.neatProtocol(try parseProtocolDeclaration()))
             case .atAttribute(let attr, _) where attr == "StyleModifier":
                 try skipStyleModifierDeclaration()
             default:
@@ -19,8 +17,7 @@ extension Parser {
 
             switch peek() {
             case .keyword(NeatSyntax.Keyword.function.rawValue),
-                .keyword(NeatSyntax.Keyword.typeExtension.rawValue),
-                .keyword(NeatSyntax.Keyword.neatProtocol.rawValue):
+                .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
                 continue
             case .atAttribute(let attr, _) where attr == "StyleModifier":
                 continue
@@ -97,17 +94,6 @@ extension Parser {
         }
 
         try consume(.eof)
-
-        try validateAppliedProtocol(
-            attribute: attribute,
-            conformances: conformances,
-            protocols: objects.compactMap { object in
-                guard case .neatProtocol(let declaration) = object else { return nil }
-                return declaration
-            },
-            members: members,
-            callables: callables
-        )
 
         try validateCallableDeclarations(callables)
 
@@ -187,66 +173,6 @@ extension Parser {
             try consume(.rightBrace)
         }
         return TypeExtensionDeclaration(typeName: typeName)
-    }
-
-    mutating func parseProtocolDeclaration() throws -> ProtocolDeclaration {
-        try consumeKeyword(.neatProtocol)
-        let name = try consumeTypeReference()
-        var requirements: [ProtocolRequirement] = []
-
-        if peek() == .leftBrace {
-            try consume(.leftBrace)
-            while peek() != .rightBrace {
-                requirements.append(try parseProtocolRequirement())
-            }
-            try consume(.rightBrace)
-        }
-
-        return ProtocolDeclaration(name: name, requirements: requirements)
-    }
-
-    mutating func parseProtocolRequirement() throws -> ProtocolRequirement {
-        if peek() == .keyword(NeatSyntax.Keyword.variable.rawValue) {
-            try consumeKeyword(.variable)
-            let name = try consumeIdentifier()
-            try consume(.colon)
-            let typeName = try consumeTypeReference()
-            var defaultValue: Expression?
-            if peek() == .equal {
-                try consume(.equal)
-                defaultValue = try parseExpression()
-            }
-            return .member(
-                MemberRequirement(name: name, typeName: typeName, defaultValue: defaultValue)
-            )
-        }
-
-        if peek() == .keyword(NeatSyntax.Keyword.function.rawValue) {
-            try consumeKeyword(.function)
-            let name = try consumeIdentifier()
-            let parameters = try parseFunctionParameters()
-            var returnType: String?
-            if peek() == .arrow {
-                try consume(.arrow)
-                returnType = try consumeTypeReference()
-            }
-            return .function(
-                FunctionRequirement(name: name, parameters: parameters, returnType: returnType)
-            )
-        }
-
-        if case .hashDirective = peek() {
-            let callable = try parseCallableDeclaration()
-            return .callable(
-                CallableRequirement(
-                    name: callable.name,
-                    parameters: callable.parameters,
-                    hasDefaultImplementation: callable.hasBody
-                )
-            )
-        }
-
-        throw ParseError("Expected protocol requirement.")
     }
 
     mutating func parseFunctionParameters() throws -> [NeatFunctionParameter] {
@@ -479,73 +405,6 @@ extension Parser {
             return true
         }
         return false
-    }
-
-    func validateAppliedProtocol(
-        attribute: AttributeApplication?,
-        conformances: [String],
-        protocols: [ProtocolDeclaration],
-        members: [MemberDeclaration],
-        callables: [CallableDeclaration]
-    ) throws {
-        var protocolNames = conformances
-
-        if let attribute {
-            if attribute.name == "main" {
-                protocolNames = conformances
-            } else if !protocolNames.contains(attribute.name) {
-                protocolNames.insert(attribute.name, at: 0)
-            }
-        }
-
-        guard !protocolNames.isEmpty else {
-            return
-        }
-
-        for protocolName in protocolNames {
-            guard let declaration = protocols.first(where: { $0.name == protocolName }) else {
-                if attribute?.name == "main", protocolNames.first == protocolName {
-                    throw ParseError("Unknown protocol '\(protocolName)' referenced by @main.")
-                }
-                continue
-            }
-
-            for requirement in declaration.requirements {
-                switch requirement {
-                case .member(let memberRequirement):
-                    guard let member = members.first(where: { $0.name == memberRequirement.name })
-                    else {
-                        guard memberRequirement.defaultValue != nil else {
-                            throw ParseError(
-                                "Declaration '\(protocolName)' requires member '\(memberRequirement.name): \(memberRequirement.typeName)'. Add the member explicitly or provide a protocol default."
-                            )
-                        }
-                        continue
-                    }
-
-                    guard member.typeName == memberRequirement.typeName else {
-                        throw ParseError(
-                            "Member '\(memberRequirement.name)' must be of type '\(memberRequirement.typeName)', got '\(member.typeName)'."
-                        )
-                    }
-                case .callable(let callableRequirement):
-                    guard !callableRequirement.hasDefaultImplementation else {
-                        continue
-                    }
-                    let hasMatch = callables.contains(where: {
-                        $0.name == callableRequirement.name
-                            && matches($0.parameters, callableRequirement.parameters)
-                    })
-                    guard hasMatch else {
-                        throw ParseError(
-                            "Declaration '\(protocolName)' requires callable \(renderCallableSignature(name: callableRequirement.name, parameters: callableRequirement.parameters))."
-                        )
-                    }
-                case .function:
-                    continue
-                }
-            }
-        }
     }
 
     func validateCallableDeclarations(_ callables: [CallableDeclaration]) throws {

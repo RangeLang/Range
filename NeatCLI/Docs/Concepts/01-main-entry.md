@@ -18,5 +18,5 @@ Neat currently treats `@main` as the builtin application entry marker.
 Current direction:
 
 - `@main` declares the entry and selects the entry contract with `:`
-- `App` is the entry contract name, not a separate local protocol declaration
+- `App` is the entry declaration name used for composition
 - member validation should come from the applied entry declaration, not hardcoded names

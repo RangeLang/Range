@@ -99,8 +99,6 @@ public struct EntityLowerer {
             return .neatFunction(declaration)
         case .typeExtension(let declaration):
             return .typeExtension(declaration)
-        case .neatProtocol(let declaration):
-            return .neatProtocol(declaration)
         }
     }
 }

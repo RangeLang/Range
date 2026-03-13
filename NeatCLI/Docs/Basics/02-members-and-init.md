@@ -42,5 +42,5 @@ Current direction:
 - `#name(...)` defines a callable entrypoint on a declaration
 - multiple callables are allowed on the same declaration
 - duplicate exact callable signatures on the same declaration are rejected
-- required callables should be satisfied or defaulted through composition
+- required callable behavior should eventually come from composed declarations
 - member defaults may be provided directly on the declaration

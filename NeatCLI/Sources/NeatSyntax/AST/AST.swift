@@ -9,7 +9,6 @@ public enum DeclarationKind {
 public enum ObjectType {
     case neatFunction(NeatFunctionDeclaration)
     case typeExtension(TypeExtensionDeclaration)
-    case neatProtocol(ProtocolDeclaration)
 }
 
 public struct DeclarationNode {
@@ -28,7 +27,7 @@ public struct DeclarationNode {
     public var neatFunctions: [NeatFunctionDeclaration] {
         objects.compactMap { object in
             switch object {
-            case .typeExtension, .neatProtocol:
+            case .typeExtension:
                 return nil
             case .neatFunction(let function):
                 return function
@@ -41,18 +40,7 @@ public struct DeclarationNode {
             switch object {
             case .typeExtension(let declaration):
                 return declaration
-            case .neatFunction, .neatProtocol:
-                return nil
-            }
-        }
-    }
-
-    public var protocols: [ProtocolDeclaration] {
-        objects.compactMap { object in
-            switch object {
-            case .neatProtocol(let declaration):
-                return declaration
-            case .neatFunction, .typeExtension:
+            case .neatFunction:
                 return nil
             }
         }
@@ -74,7 +62,7 @@ public struct ComponentNode {
     public var neatFunctions: [NeatFunctionDeclaration] {
         objects.compactMap { object in
             switch object {
-            case .typeExtension, .neatProtocol:
+            case .typeExtension:
                 return nil
             case .neatFunction(let function):
                 return function
@@ -87,18 +75,7 @@ public struct ComponentNode {
             switch object {
             case .typeExtension(let declaration):
                 return declaration
-            case .neatFunction, .neatProtocol:
-                return nil
-            }
-        }
-    }
-
-    public var protocols: [ProtocolDeclaration] {
-        objects.compactMap { object in
-            switch object {
-            case .neatProtocol(let declaration):
-                return declaration
-            case .neatFunction, .typeExtension:
+            case .neatFunction:
                 return nil
             }
         }
@@ -136,11 +113,6 @@ public struct TypeExtensionDeclaration {
     public let typeName: String
 }
 
-public struct ProtocolDeclaration {
-    public let name: String
-    public let requirements: [ProtocolRequirement]
-}
-
 public struct AttributeApplication {
     public let name: String
     public let argument: String?
@@ -149,30 +121,6 @@ public struct AttributeApplication {
 public struct MemberDeclaration {
     public let name: String
     public let typeName: String
-}
-
-public enum ProtocolRequirement {
-    case member(MemberRequirement)
-    case function(FunctionRequirement)
-    case callable(CallableRequirement)
-}
-
-public struct MemberRequirement {
-    public let name: String
-    public let typeName: String
-    public let defaultValue: Expression?
-}
-
-public struct FunctionRequirement {
-    public let name: String
-    public let parameters: [NeatFunctionParameter]
-    public let returnType: String?
-}
-
-public struct CallableRequirement {
-    public let name: String
-    public let parameters: [NeatFunctionParameter]
-    public let hasDefaultImplementation: Bool
 }
 
 public struct StateDeclaration {

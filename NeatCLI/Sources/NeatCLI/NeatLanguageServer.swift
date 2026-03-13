@@ -324,8 +324,6 @@ struct NeatLanguageServer {
             return "Neat style modifier"
         case .typeExtension:
             return "Neat type extension"
-        case .neatProtocol:
-            return "Neat protocol"
         case .view:
             return "Neat built-in view"
         case .modifier:
@@ -424,7 +422,7 @@ struct NeatLanguageServer {
 
     private func keywordCompletions() -> [[String: Any]] {
         [
-            "case", "extension", "func", "let", "protocol", "switch",
+            "case", "extension", "func", "let", "switch",
             "var",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
@@ -785,16 +783,6 @@ private struct DocumentIndex {
                 continue
             }
 
-            if let match = firstMatch(in: line, pattern: #"\bprotocol\s+([A-Z][A-Za-z0-9_]*)"#) {
-                let name = match[1]
-                let symbolRange = range(in: line, line: lineIndex, value: name)
-                symbols.append(
-                    Symbol(
-                        name: name, kind: .neatProtocol, detail: "protocol", uri: uri,
-                        range: symbolRange, selectionRange: symbolRange))
-                continue
-            }
-
             if let match = firstMatch(in: line, pattern: #"\bfunc\s+([a-z_][A-Za-z0-9_]*)"#) {
                 let name = match[1]
                 let symbolRange = range(in: line, line: lineIndex, value: name)
@@ -934,7 +922,6 @@ private enum SymbolKind {
     case state
     case styleModifier
     case typeExtension
-    case neatProtocol
     case view
     case modifier
     case keyword
@@ -943,7 +930,7 @@ private enum SymbolKind {
         switch self {
         case .attribute:
             return 8
-        case .app, .page, .component, .typeExtension, .neatProtocol, .view:
+        case .app, .page, .component, .typeExtension, .view:
             return 5
         case .enumType:
             return 10

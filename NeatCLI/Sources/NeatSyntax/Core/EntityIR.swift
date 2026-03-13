@@ -27,7 +27,6 @@ public struct EntityStateField {
 public enum EntityAttachment {
     case neatFunction(NeatFunctionDeclaration)
     case typeExtension(TypeExtensionDeclaration)
-    case neatProtocol(ProtocolDeclaration)
 }
 
 public struct EntityDefinition {
