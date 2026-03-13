@@ -1,5 +1,5 @@
+import NeatWeb
 import Vapor
-import Neat
 
 public enum NeatVaporBootstrap {
     public static func run<T: App>(_ appType: T.Type) async throws {

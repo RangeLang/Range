@@ -6,17 +6,17 @@ import PackageDescription
 
 let buildForWasm = ProcessInfo.processInfo.environment["NEAT_WASM"] == "1"
 
-var neatTargets: [String] = ["Neat"]
+var neatTargets: [String] = ["NeatWeb"]
 if !buildForWasm {
-    neatTargets.append("NeatVapor")
+    neatTargets.append("NeatWebVapor")
 }
 
 var products: [Product] = [
-    .library(name: "Neat", targets: neatTargets)
+    .library(name: "NeatWeb", targets: neatTargets)
 ]
 
 if !buildForWasm {
-    products.append(.library(name: "NeatVapor", targets: ["NeatVapor"]))
+    products.append(.library(name: "NeatWebVapor", targets: ["NeatWebVapor"]))
 }
 
 var dependencies: [Package.Dependency] = []
@@ -27,7 +27,7 @@ if !buildForWasm {
 
 var targets: [Target] = [
     .target(
-        name: "Neat",
+        name: "NeatWeb",
         dependencies: [],
         path: "Sources/Neat",
         resources: [.process("Resources")]
@@ -37,9 +37,9 @@ var targets: [Target] = [
 if !buildForWasm {
     targets.append(
         .target(
-            name: "NeatVapor",
+            name: "NeatWebVapor",
             dependencies: [
-                "Neat",
+                "NeatWeb",
                 .product(name: "Vapor", package: "vapor"),
             ],
             path: "Sources/LEGACY_NeatVapor"
@@ -47,7 +47,7 @@ if !buildForWasm {
     )
 }
 let package = Package(
-    name: "Neat",
+    name: "NeatWeb",
     platforms: [
         .macOS(.v13)
     ],

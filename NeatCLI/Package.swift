@@ -5,30 +5,24 @@ import PackageDescription
 
 let package = Package(
     name: "NeatCLI",
-    products: [
-        .library(name: "NeatSyntax", targets: ["NeatSyntax"])
+    platforms: [
+        .macOS(.v13)
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0")
+        .package(path: "../NeatSyntax"),
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
     ],
     targets: [
-        .target(
-            name: "NeatSyntax",
-            path: "Sources/NeatSyntax"
-        ),
         .executableTarget(
             name: "NeatCLI",
             dependencies: [
-                "NeatSyntax",
+                .product(name: "NeatSyntax", package: "NeatSyntax"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Sources",
-            exclude: [
-                "NeatSyntax"
-            ],
             resources: [
                 .process("NeatCLI/Templates")
             ]
-        ),
+        )
     ]
 )

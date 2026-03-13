@@ -1,5 +1,5 @@
+import NeatWeb
 import Vapor
-import Neat
 
 public func configure<T: App>(_ app: Application, for appType: T.Type) async throws {
     // 1. Instantiate the application's root type
@@ -41,7 +41,8 @@ public func configure<T: App>(_ app: Application, for appType: T.Type) async thr
         case "portal":
             script = ResourceLoader.load("Portal.js", subdirectory: "Resources/Primitives")
         case "scroll-area":
-            script = ResourceLoader.load("ScrollArea.js", subdirectory: "Resources/Primitives/ScrollArea")
+            script = ResourceLoader.load(
+                "ScrollArea.js", subdirectory: "Resources/Primitives/ScrollArea")
         case "list":
             script = ResourceLoader.load("List.js", subdirectory: "Resources/Primitives/List")
         default:
@@ -61,7 +62,8 @@ public func configure<T: App>(_ app: Application, for appType: T.Type) async thr
 
         let componentName = raw.hasSuffix(".css") ? String(raw.dropLast(4)) : raw
         if componentName == "scroll-area" {
-            let css = ResourceLoader.load("ScrollArea.css", subdirectory: "Resources/Primitives/ScrollArea")
+            let css = ResourceLoader.load(
+                "ScrollArea.css", subdirectory: "Resources/Primitives/ScrollArea")
             var res = Response(body: .init(string: css))
             res.headers.contentType = HTTPMediaType(type: "text", subType: "css")
             return res
@@ -105,10 +107,11 @@ public func configure<T: App>(_ app: Application, for appType: T.Type) async thr
             "layout.css",
             "root.css",
             "style.css",
-            "typography.css"
+            "typography.css",
         ]
         app.logger.debug("global.css files: \(styleFiles.joined(separator: ", "))")
-        let css = styleFiles
+        let css =
+            styleFiles
             .map { ResourceLoader.load($0, subdirectory: styleSubdirectory) }
             .filter { !$0.isEmpty }
             .joined(separator: "")

@@ -1,5 +1,5 @@
+import NeatWeb
 import Vapor
-import Neat
 
 enum VaporRouteRegistrar {
     static func register(_ nodes: [RouteNode], on routes: RoutesBuilder) {
@@ -20,7 +20,9 @@ enum VaporRouteRegistrar {
         }
     }
 
-    private static func pageHandler(makePage: @escaping () -> any Page) -> (Request) async throws -> Response {
+    private static func pageHandler(makePage: @escaping () -> any Page) -> (Request) async throws ->
+        Response
+    {
         { _ in
             Response(body: .init(string: makePage().renderHTML()))
         }

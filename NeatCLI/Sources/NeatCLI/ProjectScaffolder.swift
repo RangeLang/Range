@@ -1,9 +1,17 @@
 import ArgumentParser
 import Darwin
 import Foundation
-import NeatSyntax
 
 struct ProjectScaffolder {
+    enum ProjectKind: String, CaseIterable {
+        case web
+        case program
+
+        var label: String {
+            rawValue
+        }
+    }
+
     private enum TerminalStyle {
         static let reset = "\u{001B}[0m"
         static let dim = "\u{001B}[2m"
@@ -11,10 +19,12 @@ struct ProjectScaffolder {
         static let clearLine = "\u{001B}[2K"
     }
 
+    private let initialKind: ProjectKind?
     private let initialName: String?
     private let initialPath: String?
 
-    init(initialName: String?, initialPath: String?) {
+    init(initialKind: ProjectKind?, initialName: String?, initialPath: String?) {
+        self.initialKind = initialKind
         self.initialName = initialName
         self.initialPath = initialPath
     }
@@ -22,18 +32,42 @@ struct ProjectScaffolder {
     func run() throws {
         let currentDirectoryName = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .lastPathComponent
+        let projectKind = try resolveProjectKind()
         let projectName = try resolveProjectName(currentDirectoryName: currentDirectoryName)
         let targetDirectory = try resolveTargetDirectory(
             currentDirectoryName: currentDirectoryName,
             projectName: projectName
         )
         try createProject(
+            kind: projectKind,
             name: projectName,
             targetDirectory: targetDirectory,
             includeStarterFiles: true
         )
 
-        print("Created \(projectName) at \(targetDirectory.path)")
+        print("Created \(projectKind.label) project \(projectName) at \(targetDirectory.path)")
+    }
+
+    private func resolveProjectKind() throws -> ProjectKind {
+        if let initialKind {
+            return initialKind
+        }
+
+        let response = prompt(
+            "Project Kind",
+            placeholder: "web",
+            note: "(web/program)",
+            defaultValue: "web"
+        )
+        guard
+            let kind = ProjectKind(
+                rawValue: response.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
+        else {
+            throw ValidationError(
+                "Unknown project kind '\(response)'. Supported kinds: \(ProjectKind.allCases.map(\.rawValue).joined(separator: ", "))."
+            )
+        }
+        return kind
     }
 
     private func resolveProjectName(currentDirectoryName: String) throws -> String {
@@ -204,8 +238,29 @@ struct ProjectScaffolder {
         return !entries.isEmpty
     }
 
-    private func createProject(name: String, targetDirectory: URL, includeStarterFiles: Bool) throws
-    {
+    private func createProject(
+        kind: ProjectKind,
+        name: String,
+        targetDirectory: URL,
+        includeStarterFiles: Bool
+    ) throws {
+        switch kind {
+        case .web:
+            try createWebProject(
+                name: name,
+                targetDirectory: targetDirectory,
+                includeStarterFiles: includeStarterFiles
+            )
+        case .program:
+            try createProgramProject(name: name, targetDirectory: targetDirectory)
+        }
+    }
+
+    private func createWebProject(
+        name: String,
+        targetDirectory: URL,
+        includeStarterFiles: Bool
+    ) throws {
         let packagePath = targetDirectory.appendingPathComponent("Package.neat", isDirectory: false)
         let appPath = targetDirectory.appendingPathComponent("App.neat", isDirectory: false)
         let fontsPath = targetDirectory.appendingPathComponent("Fonts.neat", isDirectory: false)
@@ -291,6 +346,31 @@ struct ProjectScaffolder {
         try renderHeader().write(to: headerPath, atomically: true, encoding: String.Encoding.utf8)
     }
 
+    private func createProgramProject(name: String, targetDirectory: URL) throws {
+        let packagePath = targetDirectory.appendingPathComponent("Package.neat", isDirectory: false)
+        let mainPath = targetDirectory.appendingPathComponent("Main.neat", isDirectory: false)
+        let sourcesDirectory = targetDirectory.appendingPathComponent("Sources", isDirectory: true)
+
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: packagePath.path)
+            || fileManager.fileExists(atPath: mainPath.path)
+        {
+            throw ValidationError("Target already contains Package.neat or Main.neat.")
+        }
+
+        try fileManager.createDirectory(at: sourcesDirectory, withIntermediateDirectories: true)
+        try renderProgramPackage(name: name).write(
+            to: packagePath,
+            atomically: true,
+            encoding: .utf8
+        )
+        try renderProgramMain(name: name).write(
+            to: mainPath,
+            atomically: true,
+            encoding: .utf8
+        )
+    }
+
     private func ensureProjectDoesNotExist(at packagePath: URL, appPath: URL, fontsPath: URL) throws
     {
         let fileManager = FileManager.default
@@ -325,6 +405,18 @@ struct ProjectScaffolder {
         """
     }
 
+    private func renderProgramPackage(name: String) -> String {
+        """
+        Package("\(name)") {
+          Platform(.program)
+          Entry("Main.neat")
+
+          Dependencies {
+          }
+        }
+        """
+    }
+
     private func renderApp(name: String) -> String {
         """
         @main \(name): App {
@@ -340,6 +432,15 @@ struct ProjectScaffolder {
             Route("dashboard") {
               Route("settings", AboutPage)
             }
+          }
+        }
+        """
+    }
+
+    private func renderProgramMain(name: String) -> String {
+        """
+        @main \(name): Program {
+          #run() {
           }
         }
         """

@@ -1,35 +1,54 @@
 import ArgumentParser
-import NeatSyntax
 
 extension NeatCLI {
     struct Create: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Create a new .neat project."
+            abstract: "Create a new Neat project."
         )
 
-        @Argument(help: "Project name, or target path like ./MyApp.")
-        var name: String?
+        @Argument(help: "Project kind (`web`, `program`) or project name.")
+        var first: String?
+
+        @Argument(help: "Project name or target directory.")
+        var second: String?
 
         @Argument(help: "Target directory.")
-        var path: String?
+        var third: String?
 
         mutating func run() throws {
+            let resolvedKind: ProjectScaffolder.ProjectKind?
             let resolvedName: String?
             let resolvedPath: String?
 
-            if let providedPath = path {
-                resolvedName = name
-                resolvedPath = providedPath
-            } else if let first = name, looksLikePath(first) {
-                resolvedName = nil
-                resolvedPath = first
+            if let first, let kind = ProjectScaffolder.ProjectKind(rawValue: first.lowercased()) {
+                resolvedKind = kind
+                if let providedPath = third {
+                    resolvedName = second
+                    resolvedPath = providedPath
+                } else if let second, looksLikePath(second) {
+                    resolvedName = nil
+                    resolvedPath = second
+                } else {
+                    resolvedName = second
+                    resolvedPath = nil
+                }
             } else {
-                resolvedName = name
-                resolvedPath = nil
+                resolvedKind = nil
+                if let providedPath = second {
+                    resolvedName = first
+                    resolvedPath = providedPath
+                } else if let first, looksLikePath(first) {
+                    resolvedName = nil
+                    resolvedPath = first
+                } else {
+                    resolvedName = first
+                    resolvedPath = nil
+                }
             }
 
             do {
                 let scaffolder = ProjectScaffolder(
+                    initialKind: resolvedKind,
                     initialName: resolvedName,
                     initialPath: resolvedPath
                 )
