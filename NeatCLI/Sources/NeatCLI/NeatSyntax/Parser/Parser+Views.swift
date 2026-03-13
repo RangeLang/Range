@@ -1,0 +1,364 @@
+import Foundation
+
+extension Parser {
+    mutating func parseLayout() throws -> ViewNode {
+        try parseView()
+    }
+
+    mutating func parseView() throws -> ViewNode {
+        let invocation = try parseInvocation()
+        let base = try lowerInvocationToView(invocation)
+        return try parseModifiersIfPresent(for: base)
+    }
+
+    mutating func parseInvocation() throws -> Invocation {
+        let name = try consumeCallableName()
+        let arguments = try parseInvocationArgumentsIfPresent()
+        let block = try parseInvocationBlockIfPresent()
+        return Invocation(name: name, arguments: arguments, block: block)
+    }
+
+    mutating func parseInvocationArgumentsIfPresent() throws -> [InvocationArgument] {
+        guard peek() == .leftParen else { return [] }
+        try consume(.leftParen)
+        var arguments: [InvocationArgument] = []
+
+        if peek() != .rightParen {
+            while true {
+                arguments.append(try parseInvocationArgument())
+                guard peek() == .comma else { break }
+                advance()
+            }
+        }
+
+        try consume(.rightParen)
+        return arguments
+    }
+
+    mutating func parseInvocationArgument() throws -> InvocationArgument {
+        switch peek() {
+        case .stringLiteral(let value):
+            advance()
+            return .string(value)
+        case .integer(let value):
+            advance()
+            if peek() == .percent {
+                advance()
+                return .percentage(Double(value))
+            }
+            return .integer(value)
+        case .double(let value):
+            advance()
+            if peek() == .percent {
+                advance()
+                return .percentage(value)
+            }
+            return .double(value)
+        case .identifier(let value):
+            advance()
+            return .identifier(value)
+        case .dot:
+            try consume(.dot)
+            return .enumCase(try consumeIdentifier())
+        default:
+            throw ParseError("Expected invocation argument.")
+        }
+    }
+
+    mutating func parseInvocationBlockIfPresent() throws -> InvocationBlock? {
+        guard peek() == .leftBrace else { return nil }
+        try consume(.leftBrace)
+
+        if peek() == .rightBrace {
+            try consume(.rightBrace)
+            return .views([])
+        }
+
+        let block: InvocationBlock
+        if isStatementStart() {
+            var statements: [Statement] = []
+            var localBindings: [String: LocalBindingKind] = [:]
+            while peek() != .rightBrace {
+                statements.append(
+                    try parseStatement(localBindings: &localBindings)
+                )
+            }
+            block = .statements(statements)
+        } else {
+            var views: [ViewNode] = []
+            while peek() != .rightBrace {
+                views.append(try parseView())
+            }
+            block = .views(views)
+        }
+
+        try consume(.rightBrace)
+        return block
+    }
+
+    func lowerInvocationToView(_ invocation: Invocation) throws -> ViewNode {
+        switch invocation.name {
+        case "Text":
+            guard invocation.arguments.count == 1 else {
+                throw ParseError("Text requires exactly one argument.")
+            }
+            guard case .string(let content) = invocation.arguments[0] else {
+                throw ParseError("Text argument must be a string literal.")
+            }
+            guard invocation.block == nil else {
+                throw ParseError("Text does not accept a trailing block.")
+            }
+            return .text(parseInterpolatedString(content))
+        case "Button":
+            guard invocation.arguments.count == 1 else {
+                throw ParseError("Button requires exactly one argument.")
+            }
+            guard case .string(let title) = invocation.arguments[0] else {
+                throw ParseError("Button title must be a string literal.")
+            }
+            guard case .statements(let action)? = invocation.block else {
+                throw ParseError("Button requires an action block.")
+            }
+            return .button(title: title, action: action)
+        case "Div":
+            guard invocation.arguments.isEmpty else {
+                throw ParseError("Div does not accept arguments.")
+            }
+            guard case .views(let children)? = invocation.block else {
+                throw ParseError("Div requires a view block.")
+            }
+            return .element(tag: "div", children: children)
+        case "print":
+            guard invocation.arguments.count == 1 else {
+                throw ParseError("print requires exactly one argument.")
+            }
+            guard case .string(let message) = invocation.arguments[0] else {
+                throw ParseError("print argument must be a string literal.")
+            }
+            guard invocation.block == nil else {
+                throw ParseError("print does not accept a trailing block.")
+            }
+            return .debugPrint(parseInterpolatedString(message))
+        default:
+            if invocation.name == "content" {
+                guard invocation.arguments.isEmpty, invocation.block == nil else {
+                    throw ParseError("content() does not accept arguments or a block.")
+                }
+                return .slot(name: "content")
+            }
+
+            guard invocation.arguments.isEmpty else {
+                throw ParseError("Component '\(invocation.name)' does not support arguments yet.")
+            }
+            if let block = invocation.block {
+                guard case .views(let children) = block else {
+                    throw ParseError(
+                        "Component '\(invocation.name)' trailing block must contain views."
+                    )
+                }
+                return .component(name: invocation.name, children: children)
+            }
+            return .component(name: invocation.name, children: nil)
+        }
+    }
+
+    mutating func parseModifiersIfPresent(for view: ViewNode) throws -> ViewNode {
+        let modifiers = try parseModifierCalls()
+
+        if modifiers.isEmpty {
+            return view
+        }
+        return .modified(base: view, modifiers: modifiers)
+    }
+
+    mutating func parseModifierCalls() throws -> [ModifierCall] {
+        var modifiers: [ModifierCall] = []
+        while peek() == .dot {
+            try consume(.dot)
+            let name = try consumeIdentifier()
+            let arguments = try parseModifierArgumentListIfPresent()
+            modifiers.append(ModifierCall(name: name, arguments: arguments))
+        }
+        return modifiers
+    }
+
+    mutating func parseModifierArgumentListIfPresent() throws -> [ModifierCallArgument] {
+        guard peek() == .leftParen else {
+            return []
+        }
+
+        try consume(.leftParen)
+        if peek() == .rightParen {
+            try consume(.rightParen)
+            return []
+        }
+
+        var arguments: [ModifierCallArgument] = []
+        while true {
+            arguments.append(try parseModifierCallArgument())
+            guard peek() == .comma else { break }
+            advance()
+        }
+        try consume(.rightParen)
+        return arguments
+    }
+
+    mutating func parseModifierCallArgument() throws -> ModifierCallArgument {
+        if case .identifier(let label) = peek(), peek(offset: 1) == .colon {
+            advance()
+            try consume(.colon)
+            return ModifierCallArgument(label: label, value: try parseModifierArgument())
+        }
+        return ModifierCallArgument(label: nil, value: try parseModifierArgument())
+    }
+
+    mutating func parseModifierArgument() throws -> ModifierArgument {
+        switch peek() {
+        case .dot:
+            try consume(.dot)
+            let name = try consumeIdentifier()
+            if peek() == .leftParen {
+                let arguments = try parseModifierCallArguments()
+                try validateModifierFunctionCall(name: name, arguments: arguments)
+                return .enumCall(name: name, arguments: arguments)
+            }
+            return .enumCase(name)
+        case .stringLiteral(let value):
+            advance()
+            return .string(value)
+        case .integer(let value):
+            advance()
+            return .integer(value)
+        case .identifier(let value):
+            advance()
+            return .identifier(value)
+        default:
+            throw ParseError("Expected modifier argument.")
+        }
+    }
+
+    mutating func parseModifierCallArguments() throws -> [ModifierArgument] {
+        try consume(.leftParen)
+        var arguments: [ModifierArgument] = []
+
+        if peek() != .rightParen {
+            while true {
+                arguments.append(try parseModifierArgument())
+                guard peek() == .comma else { break }
+                advance()
+            }
+        }
+
+        try consume(.rightParen)
+        return arguments
+    }
+
+    func validateModifierFunctionCall(name: String, arguments: [ModifierArgument]) throws {
+        switch name.lowercased() {
+        case "rgba":
+            guard arguments.count == 4 else {
+                throw ParseError("rgba expects 4 arguments: red, green, blue, alpha.")
+            }
+            try validateRGBChannel(arguments[0], label: "red")
+            try validateRGBChannel(arguments[1], label: "green")
+            try validateRGBChannel(arguments[2], label: "blue")
+            try validateAlpha(arguments[3], function: "rgba")
+        case "rgb":
+            guard arguments.count == 3 else {
+                throw ParseError("rgb expects 3 arguments: red, green, blue.")
+            }
+            try validateRGBChannel(arguments[0], label: "red")
+            try validateRGBChannel(arguments[1], label: "green")
+            try validateRGBChannel(arguments[2], label: "blue")
+        case "hsla":
+            guard arguments.count == 4 else {
+                throw ParseError("hsla expects 4 arguments: hue, saturation, lightness, alpha.")
+            }
+            try validateAlpha(arguments[3], function: "hsla")
+        case "oklch":
+            guard (3...4).contains(arguments.count) else {
+                throw ParseError("oklch expects 3 or 4 arguments.")
+            }
+            if arguments.count == 4 {
+                try validateAlpha(arguments[3], function: "oklch")
+            }
+        default:
+            break
+        }
+    }
+
+    func validateRGBChannel(_ argument: ModifierArgument, label: String) throws {
+        let byteRange: ClosedRange<Double> = 0...255
+        let percentRange: ClosedRange<Double> = 0...100
+
+        switch argument {
+        case .integer(let value):
+            guard byteRange.contains(Double(value)) else {
+                throw ParseError("\(label) must be in 0...255.")
+            }
+        case .double(let value):
+            guard byteRange.contains(value) else {
+                throw ParseError("\(label) must be in 0...255.")
+            }
+        case .percentage(let value):
+            guard percentRange.contains(value) else {
+                throw ParseError("\(label)% must be in 0...100%.")
+            }
+        default:
+            break
+        }
+    }
+
+    func validateAlpha(_ argument: ModifierArgument, function: String) throws {
+        let unitRange: ClosedRange<Double> = 0...1
+        let percentRange: ClosedRange<Double> = 0...100
+
+        switch argument {
+        case .integer(let value):
+            let alpha = Double(value)
+            guard unitRange.contains(alpha) else {
+                throw ParseError("\(function) alpha must be in 0...1 or 0...100%.")
+            }
+        case .double(let value):
+            guard unitRange.contains(value) else {
+                throw ParseError("\(function) alpha must be in 0...1 or 0...100%.")
+            }
+        case .percentage(let value):
+            guard percentRange.contains(value) else {
+                throw ParseError("\(function) alpha% must be in 0...100%.")
+            }
+        default:
+            break
+        }
+    }
+
+    func parseInterpolatedString(_ value: String) -> InterpolatedString {
+        var segments: [StringSegment] = []
+        var cursor = value.startIndex
+
+        while let interpolationStart = value[cursor...].range(of: "\\(") {
+            let literal = String(value[cursor..<interpolationStart.lowerBound])
+            if !literal.isEmpty {
+                segments.append(.text(literal))
+            }
+
+            let expressionStart = interpolationStart.upperBound
+            guard let expressionEnd = value[expressionStart...].firstIndex(of: ")") else {
+                segments.append(.text(String(value[interpolationStart.lowerBound...])))
+                return InterpolatedString(segments: segments)
+            }
+
+            let expressionText = value[expressionStart..<expressionEnd].trimmingCharacters(
+                in: .whitespacesAndNewlines)
+            segments.append(.expression(.identifier(expressionText)))
+            cursor = value.index(after: expressionEnd)
+        }
+
+        let remaining = String(value[cursor...])
+        if !remaining.isEmpty {
+            segments.append(.text(remaining))
+        }
+
+        return InterpolatedString(segments: segments)
+    }
+}

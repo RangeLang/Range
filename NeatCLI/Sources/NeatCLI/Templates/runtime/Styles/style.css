@@ -1,0 +1,18 @@
+.bg-color {
+    background-color: var(--bg, transparent);
+}
+
+.text-color {
+    color: var(--c, inherit);
+}
+
+.corner-radius {
+    border-top-left-radius: calc(var(--cr-tl, 0) * var(--space-unit) / 5);
+    border-top-right-radius: calc(var(--cr-tr, 0) * var(--space-unit) / 5);
+    border-bottom-right-radius: calc(var(--cr-br, 0) * var(--space-unit) / 5);
+    border-bottom-left-radius: calc(var(--cr-bl, 0) * var(--space-unit) / 5);
+}
+
+.shadow {
+    box-shadow: var(--sh, none);
+}

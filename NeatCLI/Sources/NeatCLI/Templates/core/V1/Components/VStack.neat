@@ -1,0 +1,9 @@
+@Component VStack {
+
+  Body {
+    Div {
+      content()
+    }
+    .class("vstack")
+  }
+}
