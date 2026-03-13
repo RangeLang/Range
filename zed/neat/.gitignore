@@ -1,0 +1,9 @@
+target/
+extension.wasm
+grammars/*.wasm
+grammars/*/.build/
+grammars/*/build/
+grammars/*/target/
+grammars/*/node_modules/
+grammars/*/package-lock.json
+.DS_Store
