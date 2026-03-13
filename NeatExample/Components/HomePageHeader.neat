@@ -1,0 +1,6 @@
+@Component HomePageHeader {
+  VStack {
+    Text("Neat")
+    Text("Swift-shaped UI compiled for the browser.")
+  }
+}

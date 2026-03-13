@@ -1,0 +1,11 @@
+@Page AboutPage {
+  Meta {
+    Title("About")
+    Description("About the NeatExample application.")
+  }
+
+  VStack {
+    Text("About")
+    Text("This project was created with neat create.")
+  }
+}

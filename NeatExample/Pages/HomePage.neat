@@ -1,0 +1,19 @@
+@Page HomePage {
+  Meta {
+    Title("Home")
+    Description("The home page for NeatExample.")
+  }
+
+  @State var count = 0
+
+  VStack {
+    HomePageHeader()
+    CoreHero()
+    CoreCard()
+    Text("Count: \(count)")
+    .background(.blue)
+    Button("Add") {
+      count += 1
+    }
+  }
+}

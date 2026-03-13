@@ -1,0 +1,18 @@
+Package("NeatExample") {
+  Platform(.web)
+  Entry("App.neat")
+
+  Directories {
+    Pages("Pages")
+    Components("Components")
+    Assets("Public")
+  }
+
+  Dependencies {
+  }
+
+  Core {
+    CoreStylesheet(".neat/Core/V1/index.css")
+    CoreComponents(".neat/Core/V1/Components")
+  }
+}

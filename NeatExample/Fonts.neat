@@ -1,0 +1,11 @@
+Fonts {
+  Family(.geist) {
+    Name("Geist")
+    URL("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap")
+  }
+
+  Family(.geistMono) {
+    Name("Geist Mono")
+    URL("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap")
+  }
+}
