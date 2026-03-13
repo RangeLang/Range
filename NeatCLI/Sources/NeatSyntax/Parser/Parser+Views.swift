@@ -6,9 +6,28 @@ extension Parser {
     }
 
     mutating func parseView() throws -> ViewNode {
+        if peek() == .keyword(NeatSyntax.Keyword.forLoop.rawValue) {
+            return try parseViewLoop()
+        }
         let invocation = try parseInvocation()
         let base = try lowerInvocationToView(invocation)
         return try parseModifiersIfPresent(for: base)
+    }
+
+    mutating func parseViewLoop() throws -> ViewNode {
+        try consumeKeyword(.forLoop)
+        let name = try consumeIdentifier()
+        try consumeKeyword(.inKeyword)
+        let sequence = try parseExpression()
+        try consume(.leftBrace)
+
+        var body: [ViewNode] = []
+        while peek() != .rightBrace {
+            body.append(try parseView())
+        }
+
+        try consume(.rightBrace)
+        return .forEach(name: name, sequence: sequence, body: body)
     }
 
     mutating func parseInvocation() throws -> Invocation {

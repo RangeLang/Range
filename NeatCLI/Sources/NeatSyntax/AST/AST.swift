@@ -220,6 +220,7 @@ public indirect enum ViewNode {
     case button(title: String, action: [Statement])
     case component(name: String, children: [ViewNode]?)
     case element(tag: String, children: [ViewNode])
+    case forEach(name: String, sequence: Expression, body: [ViewNode])
     case slot(name: String)
     case vStack([ViewNode])
     case debugPrint(InterpolatedString)
@@ -263,6 +264,7 @@ public indirect enum Statement {
         operatorSymbol: CompoundOperator,
         expression: Expression
     )
+    case forEach(name: String, sequence: Expression, body: [Statement])
     case switchStatement(
         expression: Expression,
         cases: [SwitchCase],

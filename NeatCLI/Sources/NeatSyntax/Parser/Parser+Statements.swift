@@ -4,6 +4,10 @@ extension Parser {
     mutating func parseStatement(
         localBindings: inout [String: LocalBindingKind]
     ) throws -> Statement {
+        if case .keyword(NeatSyntax.Keyword.forLoop.rawValue) = peek() {
+            return try parseForStatement(localBindings: &localBindings)
+        }
+
         if case .keyword(NeatSyntax.Keyword.switchStatement.rawValue) = peek() {
             return try parseSwitchStatement(localBindings: &localBindings)
         }
@@ -115,6 +119,33 @@ extension Parser {
         return .switchStatement(expression: subject, cases: cases, defaultBody: defaultBody)
     }
 
+    mutating func parseForStatement(
+        localBindings: inout [String: LocalBindingKind]
+    ) throws -> Statement {
+        try consumeKeyword(.forLoop)
+        let name = try consumeIdentifier()
+        guard localBindings[name] == nil else {
+            throw ParseError("'\(name)' is already declared in this scope.")
+        }
+        guard !currentStateNames.contains(name) else {
+            throw ParseError("Loop binding '\(name)' conflicts with @State '\(name)'.")
+        }
+
+        try consumeKeyword(.inKeyword)
+        let sequence = try parseExpression()
+        try consume(.leftBrace)
+
+        var loopBindings = localBindings
+        loopBindings[name] = .constant
+        var body: [Statement] = []
+        while peek() != .rightBrace {
+            body.append(try parseStatement(localBindings: &loopBindings))
+        }
+
+        try consume(.rightBrace)
+        return .forEach(name: name, sequence: sequence, body: body)
+    }
+
     mutating func parseSwitchBodyStatements(baseLocalBindings: [String: LocalBindingKind])
         throws -> [Statement]
     {
@@ -138,6 +169,9 @@ extension Parser {
     }
 
     func isStatementStart() -> Bool {
+        if peek() == .keyword(NeatSyntax.Keyword.forLoop.rawValue) {
+            return true
+        }
         if peek() == .keyword(NeatSyntax.Keyword.switchStatement.rawValue) {
             return true
         }

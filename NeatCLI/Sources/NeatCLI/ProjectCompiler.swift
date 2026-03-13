@@ -693,7 +693,8 @@ struct ProjectCompiler {
         var context = RenderGenerationContext()
         let pageScope = RenderScope(
             prefix: page.name.lowercased(),
-            stateNames: Set(page.states.map(\.name))
+            stateNames: Set(page.states.map(\.name)),
+            localBindings: []
         )
         for state in page.states {
             context.stateDeclarations[pageScope.stateKey(state.name)] = renderExpression(
@@ -763,13 +764,32 @@ struct ProjectCompiler {
             context.nextButtonID += 1
             context.handlers.append(renderHandler(buttonID: buttonID, action: action, scope: scope))
             return "<button data-neat-click=\"\(buttonID)\">\(escapeJavaScript(title))</button>"
+        case .forEach(let name, let sequence, let body):
+            let loopScope = scope.addingLocalBinding(name)
+            let content =
+                try body
+                .map {
+                    try renderView(
+                        $0,
+                        scope: loopScope,
+                        context: &context,
+                        library: library,
+                        customModifierStyles: customModifierStyles,
+                        slots: slots
+                    )
+                }
+                .joined(separator: "\n")
+            let renderedSequence = renderExpression(sequence, scope: scope)
+            return
+                "${(\(renderedSequence) ?? []).map((\(name)) => `\(content)`).join(\"\")}"
         case .component(let name, let children):
             guard let component = library[name] else {
                 throw ValidationError("Missing component '\(name)'")
             }
             let childScope = RenderScope(
                 prefix: "\(scope.prefix)_\(name.lowercased())_\(context.nextComponentID)",
-                stateNames: Set(component.states.map(\.name))
+                stateNames: Set(component.states.map(\.name)),
+                localBindings: scope.localBindings
             )
             context.nextComponentID += 1
             for state in component.states {
@@ -1166,6 +1186,19 @@ struct ProjectCompiler {
                 return
                     "\(name) = \(name) + \(renderExpression(expression, scope: scope, context: context));"
             }
+        case .forEach(let name, let sequence, let body):
+            let sequenceValue = renderExpression(sequence, scope: scope, context: context)
+            var loopContext = context
+            loopContext.localBindings[name] = .constant
+            let statements = body.map {
+                renderStatement($0, scope: scope, context: &loopContext)
+            }
+            .joined(separator: "\n")
+            return """
+                for (const \(name) of (\(sequenceValue) ?? [])) {
+                \(indent(statements, level: 1))
+                }
+                """
         case .switchStatement(let expression, let cases, let defaultBody):
             return renderSwitchStatement(
                 expression: expression,
@@ -1237,6 +1270,9 @@ struct ProjectCompiler {
         case .boolean(let value):
             return value ? "true" : "false"
         case .identifier(let name):
+            if scope.localBindings.contains(name) {
+                return name
+            }
             if context?.localBindings[name] != nil {
                 return name
             }
@@ -1339,9 +1375,15 @@ private struct RenderGenerationContext {
 private struct RenderScope {
     let prefix: String
     let stateNames: Set<String>
+    let localBindings: Set<String>
 
     func stateKey(_ name: String) -> String {
         "\(prefix)_\(name)"
+    }
+
+    func addingLocalBinding(_ name: String) -> RenderScope {
+        RenderScope(
+            prefix: prefix, stateNames: stateNames, localBindings: localBindings.union([name]))
     }
 }
 

@@ -10,7 +10,8 @@ struct JavaScriptGenerator {
             component.body,
             indentLevel: 2,
             buttonIndex: &renderButtonIndex,
-            stateNames: stateNames
+            stateNames: stateNames,
+            localBindings: []
         )
         let debugLogs = generateDebugLogs(component.body)
         let handlers = generateHandlers(component.body, stateNames: stateNames)
@@ -70,20 +71,40 @@ struct JavaScriptGenerator {
         _ view: ViewNode,
         indentLevel: Int,
         buttonIndex: inout Int,
-        stateNames: Set<String>
+        stateNames: Set<String>,
+        localBindings: Set<String>
     ) -> String {
         let indent = String(repeating: "  ", count: indentLevel)
 
         switch view {
         case .text(let string):
             return
-                "\(indent)<span>\(generateInterpolatedString(string, stateNames: stateNames))</span>"
+                "\(indent)<span>\(generateInterpolatedString(string, stateNames: stateNames, localBindings: localBindings))</span>"
         case .debugPrint:
             return ""
         case .button(let title, _):
             let handlerName = "button_\(buttonIndex)"
             buttonIndex += 1
             return "\(indent)<button data-click=\"\(handlerName)\">\(escapeLiteral(title))</button>"
+        case .forEach(let name, let sequence, let body):
+            let loopBindings = localBindings.union([name])
+            let nested = body.map {
+                generateView(
+                    $0,
+                    indentLevel: indentLevel + 1,
+                    buttonIndex: &buttonIndex,
+                    stateNames: stateNames,
+                    localBindings: loopBindings
+                )
+            }
+            .joined(separator: "\n")
+            let sequenceValue = generateExpression(
+                sequence,
+                stateNames: stateNames,
+                localBindings: localBindings
+            )
+            return
+                "\(indent)${(\(sequenceValue) ?? []).map((\(name)) => `\n\(nested)\n\(indent)`).join(\"\")}"
         case .component(let name, let children):
             if let children {
                 let nested = children.map {
@@ -91,7 +112,8 @@ struct JavaScriptGenerator {
                         $0,
                         indentLevel: indentLevel + 1,
                         buttonIndex: &buttonIndex,
-                        stateNames: stateNames
+                        stateNames: stateNames,
+                        localBindings: localBindings
                     )
                 }
                 .joined(separator: "\n")
@@ -105,7 +127,8 @@ struct JavaScriptGenerator {
                     $0,
                     indentLevel: indentLevel + 1,
                     buttonIndex: &buttonIndex,
-                    stateNames: stateNames
+                    stateNames: stateNames,
+                    localBindings: localBindings
                 )
             }
             .joined(separator: "\n")
@@ -120,14 +143,16 @@ struct JavaScriptGenerator {
                 children,
                 indentLevel: indentLevel,
                 buttonIndex: &buttonIndex,
-                stateNames: stateNames
+                stateNames: stateNames,
+                localBindings: localBindings
             )
         case .modified(let base, let modifiers):
             let baseMarkup = generateView(
                 base,
                 indentLevel: indentLevel,
                 buttonIndex: &buttonIndex,
-                stateNames: stateNames
+                stateNames: stateNames,
+                localBindings: localBindings
             )
             return applyModifiers(baseMarkup: baseMarkup, modifiers: modifiers, indent: indent)
         }
@@ -137,7 +162,8 @@ struct JavaScriptGenerator {
         _ children: [ViewNode],
         indentLevel: Int,
         buttonIndex: inout Int,
-        stateNames: Set<String>
+        stateNames: Set<String>,
+        localBindings: Set<String>
     )
         -> String
     {
@@ -148,7 +174,8 @@ struct JavaScriptGenerator {
                 $0,
                 indentLevel: innerIndentLevel,
                 buttonIndex: &buttonIndex,
-                stateNames: stateNames
+                stateNames: stateNames,
+                localBindings: localBindings
             )
         }
         .joined(separator: "\n")
@@ -167,6 +194,7 @@ struct JavaScriptGenerator {
     private func generateInterpolatedString(
         _ string: InterpolatedString,
         stateNames: Set<String>,
+        localBindings: Set<String> = [],
         context: JSHandlerContext? = nil
     ) -> String {
         string.segments.map { segment in
@@ -175,7 +203,7 @@ struct JavaScriptGenerator {
                 return escapeLiteral(value)
             case .expression(let expression):
                 return
-                    "${\(generateExpression(expression, stateNames: stateNames, context: context))}"
+                    "${\(generateExpression(expression, stateNames: stateNames, localBindings: localBindings, context: context))}"
             }
         }.joined()
     }
@@ -224,6 +252,15 @@ struct JavaScriptGenerator {
                 });
                 """
             )
+        case .forEach(_, _, let body):
+            for child in body {
+                collectHandlers(
+                    view: child,
+                    buttonIndex: &buttonIndex,
+                    handlers: &handlers,
+                    stateNames: stateNames
+                )
+            }
         case .component(_, let children):
             if let children {
                 for child in children {
@@ -271,6 +308,11 @@ struct JavaScriptGenerator {
         case .text:
             return
         case .button:
+            return
+        case .forEach(_, _, let body):
+            for child in body {
+                collectDebugLogs(view: child, logs: &logs)
+            }
             return
         case .component(_, let children):
             if let children {
@@ -553,6 +595,20 @@ struct JavaScriptGenerator {
                         "\(name) = \(name) + \(generateExpression(expression, stateNames: stateNames, context: context));"
                 }
             }
+        case .forEach(let name, let sequence, let body):
+            let sequenceValue = generateExpression(
+                sequence, stateNames: stateNames, context: context)
+            var loopContext = context
+            loopContext.locals[name] = .constant
+            let statements = body.map {
+                generateStatement($0, stateNames: stateNames, context: &loopContext)
+            }
+            .joined(separator: "\n")
+            return """
+                for (const \(name) of (\(sequenceValue) ?? [])) {
+                \(indent(statements, level: 1))
+                }
+                """
         case .switchStatement(let expression, let cases, let defaultBody):
             return generateSwitchStatement(
                 expression: expression,
@@ -613,6 +669,7 @@ struct JavaScriptGenerator {
     private func generateExpression(
         _ expression: NeatSyntax.Expression,
         stateNames: Set<String>,
+        localBindings: Set<String> = [],
         context: JSHandlerContext? = nil
     ) -> String {
         switch expression {
@@ -623,18 +680,22 @@ struct JavaScriptGenerator {
         case .boolean(let value):
             return value ? "true" : "false"
         case .identifier(let name):
+            if localBindings.contains(name) {
+                return name
+            }
             if context?.locals[name] != nil {
                 return name
             }
             return stateNames.contains(name) ? "\(name)()" : name
         case .array(let values):
             let rendered = values.map {
-                generateExpression($0, stateNames: stateNames, context: context)
+                generateExpression(
+                    $0, stateNames: stateNames, localBindings: localBindings, context: context)
             }.joined(separator: ", ")
             return "[\(rendered)]"
         case .binary(let lhs, let operatorSymbol, let rhs):
             return
-                "\(generateExpression(lhs, stateNames: stateNames, context: context)) \(operatorSymbol.rawValue) \(generateExpression(rhs, stateNames: stateNames, context: context))"
+                "\(generateExpression(lhs, stateNames: stateNames, localBindings: localBindings, context: context)) \(operatorSymbol.rawValue) \(generateExpression(rhs, stateNames: stateNames, localBindings: localBindings, context: context))"
         }
     }
 
