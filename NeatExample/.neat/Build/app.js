@@ -1,4 +1,4 @@
-const routes = [{"page":"HomePage","path":"\/"},{"page":"AboutPage","path":"\/about"},{"path":"\/dashboard\/settings","page":"AboutPage"}];
+const routes = [{"path":"\/","page":"HomePage"},{"path":"\/about","page":"AboutPage"},{"path":"\/dashboard\/settings","page":"AboutPage"}];
 
 function create_HomePage() {
   const __state = {
@@ -15,11 +15,11 @@ function create_HomePage() {
   <span>Ship Faster</span>
   <span>Build with shared core components and styling.</span>
   </div>
-  <div class="vstack">
+  <div style="background: rgba(255, 255, 255, 0.72);"><div class="vstack">
   <span>Core Card</span>
   <span>This component is loaded from .neat/Core/V1/Components.</span>
-  </div>
-  <div style="background: #3b82f6;"><span>Count: ${__state.homepage_count}</span></div>
+  </div></div>
+  <span>Count: ${__state.homepage_count}</span>
   <button data-neat-click="button-0">Add</button>
   </div>`;
     },

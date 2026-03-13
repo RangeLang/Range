@@ -9,9 +9,8 @@
   VStack {
     HomePageHeader()
     CoreHero()
-    CoreCard()
+    CoreCard().surface.background(.rgba(255, 255, 255, "0.72"))
     Text("Count: \(count)")
-    .background(.blue)
     Button("Add") {
       count += 1
     }
