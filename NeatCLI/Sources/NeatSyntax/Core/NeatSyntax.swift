@@ -5,7 +5,6 @@ enum NeatSyntax {
         case component
         case variable = "var"
         case constant = "let"
-        case enumType = "enum"
         case typeExtension = "extension"
         case neatProtocol = "protocol"
         case projection = "on"

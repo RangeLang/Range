@@ -5,8 +5,6 @@ extension Parser {
         var objects: [ObjectType] = []
         while true {
             switch peek() {
-            case .keyword(NeatSyntax.Keyword.enumType.rawValue):
-                objects.append(.neatEnum(try parseEnumDeclaration()))
             case .keyword(NeatSyntax.Keyword.function.rawValue):
                 objects.append(.neatFunction(try parseNeatFunctionDeclaration()))
             case .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
@@ -20,8 +18,7 @@ extension Parser {
             }
 
             switch peek() {
-            case .keyword(NeatSyntax.Keyword.enumType.rawValue),
-                .keyword(NeatSyntax.Keyword.function.rawValue),
+            case .keyword(NeatSyntax.Keyword.function.rawValue),
                 .keyword(NeatSyntax.Keyword.typeExtension.rawValue),
                 .keyword(NeatSyntax.Keyword.neatProtocol.rawValue):
                 continue
@@ -41,6 +38,7 @@ extension Parser {
         let projectionTarget = header.projectionTarget
 
         var states: [StateDeclaration] = []
+        var cases: [EnumCaseDeclaration] = []
         var members: [MemberDeclaration] = []
         var callables: [CallableDeclaration] = []
         var body: ViewNode?
@@ -50,7 +48,13 @@ extension Parser {
 
             if kind == .component || kind == .page {
                 currentStateTypes = [:]
-                while peek() == .atState || isMemberDeclarationStart() || isCallableStart() {
+                while peek() == .atState || isCaseDeclarationStart() || isMemberDeclarationStart()
+                    || isCallableStart()
+                {
+                    if isCaseDeclarationStart() {
+                        cases.append(contentsOf: try parseEnumCaseLine())
+                        continue
+                    }
                     if isMemberDeclarationStart() {
                         members.append(try parseMemberDeclaration())
                         continue
@@ -72,7 +76,11 @@ extension Parser {
                 }
                 currentStateTypes = [:]
             } else {
-                while isMemberDeclarationStart() || isCallableStart() {
+                while isCaseDeclarationStart() || isMemberDeclarationStart() || isCallableStart() {
+                    if isCaseDeclarationStart() {
+                        cases.append(contentsOf: try parseEnumCaseLine())
+                        continue
+                    }
                     if isMemberDeclarationStart() {
                         members.append(try parseMemberDeclaration())
                         continue
@@ -110,25 +118,12 @@ extension Parser {
             conformances: conformances,
             projectionTarget: projectionTarget,
             objects: objects,
+            cases: cases,
             states: states,
             members: members,
             callables: callables,
             body: body
         )
-    }
-
-    mutating func parseEnumDeclaration() throws -> EnumDeclaration {
-        try consumeKeyword(.enumType)
-        let name = try consumeIdentifier()
-        try consume(.leftBrace)
-
-        var cases: [EnumCaseDeclaration] = []
-        while peek() != .rightBrace {
-            cases.append(contentsOf: try parseEnumCaseLine())
-        }
-
-        try consume(.rightBrace)
-        return EnumDeclaration(name: name, cases: cases)
     }
 
     mutating func parseNeatFunctionDeclaration() throws -> NeatFunctionDeclaration {
@@ -305,6 +300,10 @@ extension Parser {
         }
 
         return declarations
+    }
+
+    func isCaseDeclarationStart() -> Bool {
+        peek() == .keyword(NeatSyntax.Keyword.caseBranch.rawValue)
     }
 
     mutating func parseAssociatedValuesIfPresent() throws -> [AssociatedValueDeclaration] {

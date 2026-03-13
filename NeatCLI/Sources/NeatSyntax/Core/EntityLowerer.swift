@@ -95,8 +95,6 @@ public struct EntityLowerer {
 
     private func lowerAttachment(_ object: ObjectType) -> EntityAttachment {
         switch object {
-        case .neatEnum(let declaration):
-            return .neatEnum(declaration)
         case .neatFunction(let declaration):
             return .neatFunction(declaration)
         case .typeExtension(let declaration):

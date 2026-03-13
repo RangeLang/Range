@@ -7,7 +7,6 @@ public enum DeclarationKind {
 }
 
 public enum ObjectType {
-    case neatEnum(EnumDeclaration)
     case neatFunction(NeatFunctionDeclaration)
     case typeExtension(TypeExtensionDeclaration)
     case neatProtocol(ProtocolDeclaration)
@@ -20,26 +19,16 @@ public struct DeclarationNode {
     public let conformances: [String]
     public let projectionTarget: String?
     public let objects: [ObjectType]
+    public let cases: [EnumCaseDeclaration]
     public let states: [StateDeclaration]
     public let members: [MemberDeclaration]
     public let callables: [CallableDeclaration]
     public let body: ViewNode?
 
-    public var enums: [EnumDeclaration] {
-        objects.compactMap { object in
-            switch object {
-            case .neatEnum(let declaration):
-                return declaration
-            case .neatFunction, .typeExtension, .neatProtocol:
-                return nil
-            }
-        }
-    }
-
     public var neatFunctions: [NeatFunctionDeclaration] {
         objects.compactMap { object in
             switch object {
-            case .neatEnum, .typeExtension, .neatProtocol:
+            case .typeExtension, .neatProtocol:
                 return nil
             case .neatFunction(let function):
                 return function
@@ -52,7 +41,7 @@ public struct DeclarationNode {
             switch object {
             case .typeExtension(let declaration):
                 return declaration
-            case .neatEnum, .neatFunction, .neatProtocol:
+            case .neatFunction, .neatProtocol:
                 return nil
             }
         }
@@ -63,7 +52,7 @@ public struct DeclarationNode {
             switch object {
             case .neatProtocol(let declaration):
                 return declaration
-            case .neatEnum, .neatFunction, .typeExtension:
+            case .neatFunction, .typeExtension:
                 return nil
             }
         }
@@ -77,25 +66,15 @@ public struct ComponentNode {
     public let name: String
     public let conformances: [String]
     public let projectionTarget: String?
+    public let cases: [EnumCaseDeclaration]
     public let states: [StateDeclaration]
     public let callables: [CallableDeclaration]
     public let body: ViewNode
 
-    public var enums: [EnumDeclaration] {
-        objects.compactMap { object in
-            switch object {
-            case .neatEnum(let declaration):
-                return declaration
-            case .neatFunction, .typeExtension, .neatProtocol:
-                return nil
-            }
-        }
-    }
-
     public var neatFunctions: [NeatFunctionDeclaration] {
         objects.compactMap { object in
             switch object {
-            case .neatEnum, .typeExtension, .neatProtocol:
+            case .typeExtension, .neatProtocol:
                 return nil
             case .neatFunction(let function):
                 return function
@@ -108,7 +87,7 @@ public struct ComponentNode {
             switch object {
             case .typeExtension(let declaration):
                 return declaration
-            case .neatEnum, .neatFunction, .neatProtocol:
+            case .neatFunction, .neatProtocol:
                 return nil
             }
         }
@@ -119,16 +98,11 @@ public struct ComponentNode {
             switch object {
             case .neatProtocol(let declaration):
                 return declaration
-            case .neatEnum, .neatFunction, .typeExtension:
+            case .neatFunction, .typeExtension:
                 return nil
             }
         }
     }
-}
-
-public struct EnumDeclaration {
-    public let name: String
-    public let cases: [EnumCaseDeclaration]
 }
 
 public struct EnumCaseDeclaration {

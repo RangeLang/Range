@@ -629,7 +629,7 @@ struct ProjectCompiler {
             library: library,
             customModifierStyles: customModifierStyles
         )
-        let enumDecls = renderEnumDeclarations(page.enums)
+        let enumDecls = renderCaseDeclarations(name: page.name, cases: page.cases)
         let modulePrefix = enumDecls.isEmpty ? "" : "\(enumDecls)\n\n"
         return """
             \(modulePrefix)\
@@ -649,7 +649,7 @@ struct ProjectCompiler {
             library: library,
             customModifierStyles: customModifierStyles
         )
-        let enumDecls = renderEnumDeclarations(component.enums)
+        let enumDecls = renderCaseDeclarations(name: component.name, cases: component.cases)
         let modulePrefix = enumDecls.isEmpty ? "" : "\(enumDecls)\n\n"
         return """
             \(modulePrefix)\
@@ -659,12 +659,12 @@ struct ProjectCompiler {
             """
     }
 
-    private func renderEnumDeclarations(_ enums: [EnumDeclaration]) -> String {
-        enums.map(renderEnumDeclaration).joined(separator: "\n\n")
-    }
+    private func renderCaseDeclarations(name: String, cases: [EnumCaseDeclaration]) -> String {
+        guard !cases.isEmpty else {
+            return ""
+        }
 
-    private func renderEnumDeclaration(_ enumDecl: EnumDeclaration) -> String {
-        let iterableCases = enumDecl.cases.filter { $0.associatedValues.isEmpty }
+        let iterableCases = cases.filter { $0.associatedValues.isEmpty }
 
         var memberLines: [String] = []
         for caseDecl in iterableCases {
@@ -677,7 +677,7 @@ struct ProjectCompiler {
         memberLines.append("  allCases: [\(allCasesValue)],")
 
         return """
-            export const \(enumDecl.name) = Object.freeze({
+            export const \(name) = Object.freeze({
             \(memberLines.joined(separator: "\n"))
             });
             """
