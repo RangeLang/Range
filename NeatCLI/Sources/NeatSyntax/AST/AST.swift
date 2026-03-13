@@ -18,6 +18,7 @@ public struct DeclarationNode {
     public let attribute: AttributeApplication?
     public let name: String
     public let conformances: [String]
+    public let projectionTarget: String?
     public let objects: [ObjectType]
     public let states: [StateDeclaration]
     public let members: [MemberDeclaration]
@@ -75,6 +76,7 @@ public struct ComponentNode {
     public let objects: [ObjectType]
     public let name: String
     public let conformances: [String]
+    public let projectionTarget: String?
     public let states: [StateDeclaration]
     public let callables: [CallableDeclaration]
     public let body: ViewNode

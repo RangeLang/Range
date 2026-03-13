@@ -23,6 +23,11 @@ Reusable declaration example:
 @Theme: Palette {
     var accentColor: Color
 }
+
+@BackgroundStyle: StyleModifier on Renderable {
+    #background(color: Color) {
+    }
+}
 ```
 
 Current direction:
@@ -30,4 +35,5 @@ Current direction:
 - `@main` is builtin
 - other `@Name` forms can define reusable declarations directly
 - `@Name: OtherThing` composes from other reusable declarations
+- `on Target` declares a projection target on the declaration header
 - scoped members like `Meta.title(...)` come from `@Meta { ... }`

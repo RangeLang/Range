@@ -46,6 +46,7 @@ public struct Parser {
             objects: declaration.objects,
             name: declaration.name,
             conformances: declaration.conformances,
+            projectionTarget: declaration.projectionTarget,
             states: declaration.states,
             callables: declaration.callables,
             body: body

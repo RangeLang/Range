@@ -38,6 +38,7 @@ extension Parser {
         let header = try parseDeclarationHeader(after: attribute)
         let name = header.name
         let conformances = header.conformances
+        let projectionTarget = header.projectionTarget
 
         var states: [StateDeclaration] = []
         var members: [MemberDeclaration] = []
@@ -107,6 +108,7 @@ extension Parser {
             attribute: attribute,
             name: name,
             conformances: conformances,
+            projectionTarget: projectionTarget,
             objects: objects,
             states: states,
             members: members,
@@ -393,7 +395,7 @@ extension Parser {
     }
 
     mutating func parseDeclarationHeader(after attribute: AttributeApplication?) throws
-        -> (name: String, conformances: [String])
+        -> (name: String, conformances: [String], projectionTarget: String?)
     {
         guard let attribute else {
             throw ParseError("Expected declaration attribute.")
@@ -407,15 +409,19 @@ extension Parser {
                     "@main requires an entry contract, e.g. @main MyApp: App { ... }."
                 )
             }
-            return (name, conformances)
+            return (name, conformances, nil)
         }
 
-        if peek() == .colon || peek() == .leftBrace {
-            return (attribute.name, try parseConformanceListIfPresent())
+        if peek() == .colon || peek() == .keyword(NeatSyntax.Keyword.projection.rawValue)
+            || peek() == .leftBrace
+        {
+            let conformances = try parseConformanceListIfPresent()
+            let projectionTarget = try parseProjectionTargetIfPresent()
+            return (attribute.name, conformances, projectionTarget)
         }
 
         throw ParseError(
-            "Expected ':' or '{' after @\(attribute.name). Use @\(attribute.name) { ... } or @\(attribute.name): Protocol { ... }."
+            "Expected ':', 'on', or '{' after @\(attribute.name). Use @\(attribute.name) { ... }, @\(attribute.name): Protocol { ... }, or @\(attribute.name): Role on Target { ... }."
         )
     }
 
@@ -434,6 +440,15 @@ extension Parser {
         }
 
         return conformances
+    }
+
+    mutating func parseProjectionTargetIfPresent() throws -> String? {
+        guard peek() == .keyword(NeatSyntax.Keyword.projection.rawValue) else {
+            return nil
+        }
+
+        try consumeKeyword(.projection)
+        return try consumeTypeReference()
     }
 
     mutating func parseMemberDeclaration() throws -> MemberDeclaration {
