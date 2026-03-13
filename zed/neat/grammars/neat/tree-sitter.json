@@ -1,0 +1,38 @@
+{
+  "$schema": "https://tree-sitter.github.io/tree-sitter/assets/schemas/config.schema.json",
+  "grammars": [
+    {
+      "name": "neat",
+      "camelcase": "Neat",
+      "title": "Neat",
+      "scope": "source.neat",
+      "file-types": [
+        "neat"
+      ],
+      "injection-regex": "^neat$",
+      "class-name": "TreeSitterNeat"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Neat language grammar",
+    "authors": [
+      {
+        "name": "George"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/georgeneat/Neat"
+    }
+  },
+  "bindings": {
+    "c": true,
+    "go": true,
+    "node": true,
+    "python": true,
+    "rust": true,
+    "swift": true,
+    "zig": false
+  }
+}
