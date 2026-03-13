@@ -21,7 +21,7 @@ public struct DeclarationNode {
     public let objects: [ObjectType]
     public let states: [StateDeclaration]
     public let members: [MemberDeclaration]
-    public let initializers: [InitDeclaration]
+    public let callables: [CallableDeclaration]
     public let body: ViewNode?
 
     public var enums: [EnumDeclaration] {
@@ -76,7 +76,7 @@ public struct ComponentNode {
     public let name: String
     public let conformances: [String]
     public let states: [StateDeclaration]
-    public let initializers: [InitDeclaration]
+    public let callables: [CallableDeclaration]
     public let body: ViewNode
 
     public var enums: [EnumDeclaration] {
@@ -150,7 +150,8 @@ public struct NeatFunctionParameter {
     public let typeName: String?
 }
 
-public struct InitDeclaration {
+public struct CallableDeclaration {
+    public let name: String
     public let parameters: [NeatFunctionParameter]
     public let hasBody: Bool
 }
@@ -177,7 +178,7 @@ public struct MemberDeclaration {
 public enum ProtocolRequirement {
     case member(MemberRequirement)
     case function(FunctionRequirement)
-    case initializer(InitRequirement)
+    case callable(CallableRequirement)
 }
 
 public struct MemberRequirement {
@@ -192,7 +193,8 @@ public struct FunctionRequirement {
     public let returnType: String?
 }
 
-public struct InitRequirement {
+public struct CallableRequirement {
+    public let name: String
     public let parameters: [NeatFunctionParameter]
     public let hasDefaultImplementation: Bool
 }

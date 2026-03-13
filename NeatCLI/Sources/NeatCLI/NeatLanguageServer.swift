@@ -424,7 +424,7 @@ struct NeatLanguageServer {
 
     private func keywordCompletions() -> [[String: Any]] {
         [
-            "enum", "case", "extension", "func", "init", "let", "protocol", "switch",
+            "enum", "case", "extension", "func", "let", "protocol", "switch",
             "var",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
@@ -815,11 +815,12 @@ private struct DocumentIndex {
                 continue
             }
 
-            if firstMatch(in: line, pattern: #"\binit\s*\("#) != nil {
-                let symbolRange = range(in: line, line: lineIndex, value: "init")
+            if let match = firstMatch(in: line, pattern: #"#([a-z_][A-Za-z0-9_]*)\s*\("#) {
+                let symbolName = "#" + match[1]
+                let symbolRange = range(in: line, line: lineIndex, value: symbolName)
                 symbols.append(
                     Symbol(
-                        name: "init", kind: .function, detail: "init", uri: uri,
+                        name: symbolName, kind: .function, detail: "callable", uri: uri,
                         range: symbolRange, selectionRange: symbolRange))
                 continue
             }

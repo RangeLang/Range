@@ -8,7 +8,6 @@ enum NeatSyntax {
         case enumType = "enum"
         case typeExtension = "extension"
         case neatProtocol = "protocol"
-        case initializer = "init"
         case caseBranch = "case"
         case function = "func"
         case switchStatement = "switch"

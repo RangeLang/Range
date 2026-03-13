@@ -41,7 +41,7 @@ extension Parser {
 
         var states: [StateDeclaration] = []
         var members: [MemberDeclaration] = []
-        var initializers: [InitDeclaration] = []
+        var callables: [CallableDeclaration] = []
         var body: ViewNode?
 
         if peek() == .leftBrace {
@@ -49,13 +49,13 @@ extension Parser {
 
             if kind == .component || kind == .page {
                 currentStateTypes = [:]
-                while peek() == .atState || isMemberDeclarationStart() || isInitializerStart() {
+                while peek() == .atState || isMemberDeclarationStart() || isCallableStart() {
                     if isMemberDeclarationStart() {
                         members.append(try parseMemberDeclaration())
                         continue
                     }
-                    if isInitializerStart() {
-                        initializers.append(try parseInitializerDeclaration())
+                    if isCallableStart() {
+                        callables.append(try parseCallableDeclaration())
                         continue
                     }
 
@@ -71,12 +71,12 @@ extension Parser {
                 }
                 currentStateTypes = [:]
             } else {
-                while isMemberDeclarationStart() || isInitializerStart() {
+                while isMemberDeclarationStart() || isCallableStart() {
                     if isMemberDeclarationStart() {
                         members.append(try parseMemberDeclaration())
                         continue
                     }
-                    initializers.append(try parseInitializerDeclaration())
+                    callables.append(try parseCallableDeclaration())
                 }
 
                 if peek() != .rightBrace {
@@ -97,8 +97,10 @@ extension Parser {
                 return declaration
             },
             members: members,
-            initializers: initializers
+            callables: callables
         )
+
+        try validateCallableDeclarations(callables)
 
         return DeclarationNode(
             kind: kind,
@@ -108,7 +110,7 @@ extension Parser {
             objects: objects,
             states: states,
             members: members,
-            initializers: initializers,
+            callables: callables,
             body: body
         )
     }
@@ -147,8 +149,11 @@ extension Parser {
         return NeatFunctionDeclaration(name: name, parameters: parameters, returnType: returnType)
     }
 
-    mutating func parseInitializerDeclaration() throws -> InitDeclaration {
-        try consumeKeyword(.initializer)
+    mutating func parseCallableDeclaration() throws -> CallableDeclaration {
+        guard case .hashDirective(let name) = peek() else {
+            throw ParseError("Expected callable declaration.")
+        }
+        advance()
         let parameters = try parseFunctionParameters()
         let hasBody = peek() == .leftBrace
         if hasBody {
@@ -156,7 +161,7 @@ extension Parser {
             try skipUnknownBlockBody()
             try consume(.rightBrace)
         }
-        return InitDeclaration(parameters: parameters, hasBody: hasBody)
+        return CallableDeclaration(name: name, parameters: parameters, hasBody: hasBody)
     }
 
     mutating func skipStyleModifierDeclaration() throws {
@@ -233,12 +238,13 @@ extension Parser {
             )
         }
 
-        if peek() == .keyword(NeatSyntax.Keyword.initializer.rawValue) {
-            let initializer = try parseInitializerDeclaration()
-            return .initializer(
-                InitRequirement(
-                    parameters: initializer.parameters,
-                    hasDefaultImplementation: initializer.hasBody
+        if case .hashDirective = peek() {
+            let callable = try parseCallableDeclaration()
+            return .callable(
+                CallableRequirement(
+                    name: callable.name,
+                    parameters: callable.parameters,
+                    hasDefaultImplementation: callable.hasBody
                 )
             )
         }
@@ -454,8 +460,11 @@ extension Parser {
         return true
     }
 
-    func isInitializerStart() -> Bool {
-        peek() == .keyword(NeatSyntax.Keyword.initializer.rawValue)
+    func isCallableStart() -> Bool {
+        if case .hashDirective = peek() {
+            return true
+        }
+        return false
     }
 
     func validateAppliedProtocol(
@@ -463,7 +472,7 @@ extension Parser {
         conformances: [String],
         protocols: [ProtocolDeclaration],
         members: [MemberDeclaration],
-        initializers: [InitDeclaration]
+        callables: [CallableDeclaration]
     ) throws {
         var protocolNames = conformances
 
@@ -505,23 +514,35 @@ extension Parser {
                             "Member '\(memberRequirement.name)' must be of type '\(memberRequirement.typeName)', got '\(member.typeName)'."
                         )
                     }
-                case .initializer(let initRequirement):
-                    guard !initRequirement.hasDefaultImplementation else {
+                case .callable(let callableRequirement):
+                    guard !callableRequirement.hasDefaultImplementation else {
                         continue
                     }
-                    let hasMatch =
-                        initializers.contains(where: {
-                            matches($0.parameters, initRequirement.parameters)
-                        })
-                        || initRequirement.parameters.isEmpty
+                    let hasMatch = callables.contains(where: {
+                        $0.name == callableRequirement.name
+                            && matches($0.parameters, callableRequirement.parameters)
+                    })
                     guard hasMatch else {
                         throw ParseError(
-                            "Declaration '\(protocolName)' requires initializer \(renderInitializerSignature(initRequirement.parameters))."
+                            "Declaration '\(protocolName)' requires callable \(renderCallableSignature(name: callableRequirement.name, parameters: callableRequirement.parameters))."
                         )
                     }
                 case .function:
                     continue
                 }
+            }
+        }
+    }
+
+    func validateCallableDeclarations(_ callables: [CallableDeclaration]) throws {
+        var seen: Set<String> = []
+        for callable in callables {
+            let signature = callableSignatureKey(
+                name: callable.name, parameters: callable.parameters)
+            guard seen.insert(signature).inserted else {
+                throw ParseError(
+                    "Duplicate callable declaration \(renderCallableSignature(name: callable.name, parameters: callable.parameters))."
+                )
             }
         }
     }
@@ -533,12 +554,17 @@ extension Parser {
         return zip(lhs, rhs).allSatisfy { $0.typeName == $1.typeName }
     }
 
-    func renderInitializerSignature(_ parameters: [NeatFunctionParameter]) -> String {
+    func callableSignatureKey(name: String, parameters: [NeatFunctionParameter]) -> String {
+        let rendered = parameters.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
+        return "\(name)(\(rendered))"
+    }
+
+    func renderCallableSignature(name: String, parameters: [NeatFunctionParameter]) -> String {
         let rendered = parameters.map { parameter in
             let typeName = parameter.typeName ?? "_"
             return "\(parameter.name): \(typeName)"
         }.joined(separator: ", ")
-        return "init(\(rendered))"
+        return "#\(name)(\(rendered))"
     }
 
     mutating func skipUnknownBlockBody() throws {

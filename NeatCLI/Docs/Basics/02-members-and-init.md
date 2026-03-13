@@ -1,4 +1,4 @@
-# Members And Init
+# Members And Callables
 
 Declarations use typed members directly.
 
@@ -17,13 +17,13 @@ Composed declarations can provide stored values or builder bodies:
 }
 ```
 
-Initializers are universal in Neat.
+Callable entrypoints are universal in Neat.
 
 ```neat
 @Palette {
     var colors: [Color]
 
-    init(colors _: [Color])
+    #colors(colors _: [Color])
 }
 ```
 
@@ -31,7 +31,7 @@ Initializers are universal in Neat.
 @Theme: Palette {
     var colors: [Color]
 
-    init(colors _: [Color]) {
+    #colors(colors _: [Color]) {
         self.colors = colors
     }
 }
@@ -39,7 +39,8 @@ Initializers are universal in Neat.
 
 Current direction:
 
-- `init` can appear on any declaration
-- zero-argument `init()` may be synthesized by the compiler
-- required initializers should be satisfied or defaulted through composition
+- `#name(...)` defines a callable entrypoint on a declaration
+- multiple callables are allowed on the same declaration
+- duplicate exact callable signatures on the same declaration are rejected
+- required callables should be satisfied or defaulted through composition
 - member defaults may be provided directly on the declaration

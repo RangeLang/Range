@@ -74,6 +74,9 @@ struct Lexer {
                 tokens.append(.percent)
             case "\"":
                 tokens.append(.stringLiteral(try readString()))
+            case "#":
+                let identifier = try readHashIdentifier()
+                tokens.append(.hashDirective(identifier))
             case "@":
                 let identifier = try readSigilIdentifier()
                 let argument = try readSigilArgumentIfPresent()
@@ -132,6 +135,14 @@ struct Lexer {
         advance()
         guard let next = peek(), next.isLetter else {
             throw ParseError("Expected identifier after @.")
+        }
+        return readIdentifier()
+    }
+
+    private mutating func readHashIdentifier() throws -> String {
+        advance()
+        guard let next = peek(), next.isLetter else {
+            throw ParseError("Expected identifier after #.")
         }
         return readIdentifier()
     }
