@@ -3,13 +3,6 @@ import Darwin
 import Foundation
 
 struct ProjectScaffolder {
-    private enum TerminalStyle {
-        static let reset = "\u{001B}[0m"
-        static let dim = "\u{001B}[2m"
-        static let cyan = "\u{001B}[36m"
-        static let clearLine = "\u{001B}[2K"
-    }
-
     private let initialName: String?
     private let initialPath: String?
 
@@ -283,10 +276,13 @@ struct ProjectScaffolder {
     ) -> String {
         let fallback = {
             let placeholderText =
-                placeholder.map { " \(TerminalStyle.dim)\($0)\(TerminalStyle.reset)" } ?? ""
+                placeholder.map {
+                    " \(TerminalColor.dim.string)\($0)\(TerminalColor.reset.string)"
+                } ?? ""
             let noteText =
-                note.map { " \(TerminalStyle.cyan)\(TerminalStyle.dim)\($0)\(TerminalStyle.reset)" }
-                ?? ""
+                note.map {
+                    " \(TerminalColor.cyan.string)\(TerminalColor.dim.string)\($0)\(TerminalColor.reset.string)"
+                } ?? ""
             print("\(label):\(placeholderText)\(noteText) ", terminator: "")
             fflush(stdout)
             let response = readLine() ?? ""
@@ -302,8 +298,9 @@ struct ProjectScaffolder {
 
         let prefix = "\(label): "
         let noteSuffix =
-            note.map { " \(TerminalStyle.cyan)\(TerminalStyle.dim)\($0)\(TerminalStyle.reset)" }
-            ?? ""
+            note.map {
+                " \(TerminalColor.cyan.string)\(TerminalColor.dim.string)\($0)\(TerminalColor.reset.string)"
+            } ?? ""
         let noteWidth = note.map { 1 + $0.count } ?? 0
         var buffer: [Character] = []
 
@@ -365,14 +362,17 @@ struct ProjectScaffolder {
         let placeholderWidth: Int
 
         if input.isEmpty, let placeholder {
-            displayValue = "\(TerminalStyle.dim)\(placeholder)\(TerminalStyle.reset)"
+            displayValue = "\(TerminalColor.dim.string)\(placeholder)\(TerminalColor.reset.string)"
             placeholderWidth = placeholder.count
         } else {
             displayValue = input
             placeholderWidth = 0
         }
 
-        print("\r\(TerminalStyle.clearLine)\(prefix)\(displayValue)\(noteSuffix)", terminator: "")
+        print(
+            "\r\(TerminalColor.clearLine.string)\(prefix)\(displayValue)\(noteSuffix)",
+            terminator: ""
+        )
         let rewind = noteWidth + (input.isEmpty ? placeholderWidth : 0)
         if rewind > 0 {
             print("\u{001B}[\(rewind)D", terminator: "")

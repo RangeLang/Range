@@ -1,24 +1,35 @@
 import Foundation
 import NeatSyntax
 
-enum LogLevel {
+enum TerminalColor {
+    case reset
+    case bold
+    case dim
+    case gray
+    case lightGray
+    case cyan
     case error
     case warning
     case success
     case change
     case optimization
     case waiting
-}
+    case clearLine
 
-enum TerminalLog {
-    private static let reset = "\u{001B}[0m"
-    private static let bold = "\u{001B}[1m"
-    private static let dim = "\u{001B}[2m"
-    private static let gray = "\u{001B}[90m"
-    private static let lightGray = "\u{001B}[97m"
-
-    private static func color(for level: LogLevel) -> String {
-        switch level {
+    var string: String {
+        switch self {
+        case .reset:
+            return "\u{001B}[0m"
+        case .bold:
+            return "\u{001B}[1m"
+        case .dim:
+            return "\u{001B}[2m"
+        case .gray:
+            return "\u{001B}[90m"
+        case .lightGray:
+            return "\u{001B}[97m"
+        case .cyan:
+            return "\u{001B}[36m"
         case .error:
             return "\u{001B}[31m"
         case .warning:
@@ -31,28 +42,49 @@ enum TerminalLog {
             return "\u{001B}[35m"
         case .waiting:
             return "\u{001B}[33m"
+        case .clearLine:
+            return "\u{001B}[2K"
+        }
+    }
+}
+
+enum TerminalLog {
+    private static func color(for level: LogLevel) -> TerminalColor {
+        switch level {
+        case .error:
+            return .error
+        case .warning:
+            return .warning
+        case .success:
+            return .success
+        case .change:
+            return .change
+        case .optimization:
+            return .optimization
+        case .waiting:
+            return .waiting
         }
     }
 
     static func style(_ text: String, level: LogLevel, bold: Bool = false, dimmed: Bool = false)
         -> String
     {
-        var prefix = color(for: level)
+        var prefix = color(for: level).string
         if bold {
-            prefix += self.bold
+            prefix += TerminalColor.bold.string
         }
         if dimmed {
-            prefix += self.dim
+            prefix += TerminalColor.dim.string
         }
-        return "\(prefix)\(text)\(reset)"
+        return "\(prefix)\(text)\(TerminalColor.reset.string)"
     }
 
     static func subtle(_ text: String) -> String {
-        "\(dim)\(gray)\(text)\(reset)"
+        "\(TerminalColor.dim.string)\(TerminalColor.gray.string)\(text)\(TerminalColor.reset.string)"
     }
 
     static func light(_ text: String) -> String {
-        "\(lightGray)\(text)\(reset)"
+        "\(TerminalColor.lightGray.string)\(text)\(TerminalColor.reset.string)"
     }
 
     static func out(_ text: String, level: LogLevel, bold: Bool = false, dimmed: Bool = false) {
