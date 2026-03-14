@@ -55,7 +55,7 @@ Current surface:
 
 - `@name(...)` defines a callable entrypoint on a declaration
 - `Target@name(...)` defines a callable with an explicit projection target
-- `init(...)` defines an explicit initializer on a declaration
+- `init(...)` defines an explicit initializer on a declaration and must include a body
 - multiple callables are allowed on the same declaration
 - multiple initializer overloads are allowed
 - duplicate exact callable signatures on the same declaration are rejected

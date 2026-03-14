@@ -5,7 +5,7 @@ import NeatSyntax
 enum ErrorPresenter {
     static func printError(_ error: Error) {
         let message = detailMessage(for: error)
-        TerminalLog.err("An Error has Occured", level: .error, bold: true)
+        TerminalLog.err("An Error has Occurred", level: .error, bold: true)
         fputs(TerminalLog.light("[\(timestamp())] \(message)") + "\n", stderr)
     }
 

@@ -567,6 +567,12 @@ extension Parser {
     func validateInitializerDeclarations(_ initializers: [InitializerDeclaration]) throws {
         var seen: Set<String> = []
         for initializer in initializers {
+            guard initializer.body != nil else {
+                throw ParseError(
+                    "Explicit initializer \(renderInitializerSignature(parameters: initializer.parameters)) must include a body."
+                )
+            }
+
             let signatures = Set(initializerSignatureKeys(parameters: initializer.parameters))
             for signature in signatures {
                 guard seen.insert(signature).inserted else {

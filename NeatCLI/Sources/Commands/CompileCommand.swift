@@ -61,7 +61,7 @@ extension NeatCLI {
                     try validateFile(at: file)
                 }
 
-                Swift.print("Validated \(files.count) Neat source file(s).")
+                TerminalLog.out("Validated \(files.count) Neat source file(s).", level: .success)
                 return
             }
 
@@ -69,7 +69,7 @@ extension NeatCLI {
                 throw ValidationError("Expected a .neat file or project directory.")
             }
             try validateFile(at: inputURL)
-            Swift.print("Validated \(inputURL.lastPathComponent).")
+            TerminalLog.out("Validated \(inputURL.lastPathComponent).", level: .success)
         }
 
         private func validateFile(at fileURL: URL) throws {

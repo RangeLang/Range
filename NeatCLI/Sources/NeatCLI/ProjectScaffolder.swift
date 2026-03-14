@@ -21,7 +21,10 @@ struct ProjectScaffolder {
         )
         try createProject(name: projectName, targetDirectory: targetDirectory)
 
-        print("Created Neat project \(projectName) at \(targetDirectory.path)")
+        TerminalLog.out(
+            "Created Neat project \(projectName) at \(targetDirectory.path)",
+            level: .success
+        )
     }
 
     private func resolveProjectName(currentDirectoryName: String) throws -> String {

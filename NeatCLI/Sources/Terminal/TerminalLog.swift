@@ -1,5 +1,5 @@
+import Darwin
 import Foundation
-import NeatSyntax
 
 enum TerminalColor {
     case reset
@@ -49,6 +49,20 @@ enum TerminalColor {
 }
 
 enum TerminalLog {
+    private enum Stream {
+        case stdout
+        case stderr
+
+        var fileDescriptor: Int32 {
+            switch self {
+            case .stdout:
+                return STDOUT_FILENO
+            case .stderr:
+                return STDERR_FILENO
+            }
+        }
+    }
+
     private static func color(for level: LogLevel) -> TerminalColor {
         switch level {
         case .error:
@@ -66,32 +80,84 @@ enum TerminalLog {
         }
     }
 
-    static func style(_ text: String, level: LogLevel, bold: Bool = false, dimmed: Bool = false)
-        -> String
-    {
-        var prefix = color(for: level).string
-        if bold {
-            prefix += TerminalColor.bold.string
+    private static func supportsColor(on stream: Stream) -> Bool {
+        let environment = ProcessInfo.processInfo.environment
+
+        if environment["NO_COLOR"] != nil {
+            return false
         }
-        if dimmed {
-            prefix += TerminalColor.dim.string
+
+        if let force = environment["CLICOLOR_FORCE"], force != "0" {
+            return true
         }
+
+        if let term = environment["TERM"], term == "dumb" {
+            return false
+        }
+
+        if let colorTerm = environment["COLORTERM"], !colorTerm.isEmpty {
+            return true
+        }
+
+        if let cliColor = environment["CLICOLOR"], cliColor == "0" {
+            return false
+        }
+
+        return isatty(stream.fileDescriptor) == 1
+    }
+
+    private static func render(
+        _ text: String,
+        colors: [TerminalColor],
+        on stream: Stream
+    ) -> String {
+        guard supportsColor(on: stream) else {
+            return text
+        }
+
+        let prefix = colors.map(\.string).joined()
         return "\(prefix)\(text)\(TerminalColor.reset.string)"
     }
 
+    static func style(
+        _ text: String,
+        level: LogLevel,
+        bold: Bool = false,
+        dimmed: Bool = false
+    ) -> String {
+        style(text, level: level, bold: bold, dimmed: dimmed, on: .stdout)
+    }
+
+    private static func style(
+        _ text: String,
+        level: LogLevel,
+        bold: Bool = false,
+        dimmed: Bool = false,
+        on stream: Stream
+    ) -> String {
+        var colors: [TerminalColor] = [color(for: level)]
+        if bold {
+            colors.append(.bold)
+        }
+        if dimmed {
+            colors.append(.dim)
+        }
+        return render(text, colors: colors, on: stream)
+    }
+
     static func subtle(_ text: String) -> String {
-        "\(TerminalColor.dim.string)\(TerminalColor.gray.string)\(text)\(TerminalColor.reset.string)"
+        render(text, colors: [.dim, .gray], on: .stderr)
     }
 
     static func light(_ text: String) -> String {
-        "\(TerminalColor.lightGray.string)\(text)\(TerminalColor.reset.string)"
+        render(text, colors: [.lightGray], on: .stderr)
     }
 
     static func out(_ text: String, level: LogLevel, bold: Bool = false, dimmed: Bool = false) {
-        Swift.print(style(text, level: level, bold: bold, dimmed: dimmed))
+        Swift.print(style(text, level: level, bold: bold, dimmed: dimmed, on: .stdout))
     }
 
     static func err(_ text: String, level: LogLevel, bold: Bool = false, dimmed: Bool = false) {
-        fputs(style(text, level: level, bold: bold, dimmed: dimmed) + "\n", stderr)
+        fputs(style(text, level: level, bold: bold, dimmed: dimmed, on: .stderr) + "\n", stderr)
     }
 }
