@@ -84,16 +84,42 @@ extension Parser {
     }
 
     mutating func consumeTypeReference() throws -> String {
+        var result = try consumeTypeReferenceBase()
+        while peek() == .question {
+            try consume(.question)
+            result += "?"
+        }
+        return result
+    }
+
+    mutating func consumeTypeReferenceBase() throws -> String {
+        if peek() == .leftParen {
+            try consume(.leftParen)
+            var parameterTypes: [String] = []
+
+            if peek() != .rightParen {
+                while true {
+                    parameterTypes.append(try consumeTypeReference())
+                    guard peek() == .comma else { break }
+                    advance()
+                }
+            }
+
+            try consume(.rightParen)
+            guard peek() == .arrow else {
+                throw ParseError("Expected '->' in function type.")
+            }
+            try consume(.arrow)
+            let returnType = try consumeTypeReference()
+            let renderedParameters = parameterTypes.joined(separator: ", ")
+            return "(\(renderedParameters)) -> \(returnType)"
+        }
+
         if peek() == .leftBracket {
             try consume(.leftBracket)
             let elementType = try consumeTypeReference()
             try consume(.rightBracket)
-            var result = "[\(elementType)]"
-            while peek() == .question {
-                try consume(.question)
-                result += "?"
-            }
-            return result
+            return "[\(elementType)]"
         }
 
         var parts: [String] = [try consumeTypeName()]
@@ -104,10 +130,17 @@ extension Parser {
         }
 
         var result = parts.joined(separator: ".")
-        while peek() == .question {
-            try consume(.question)
-            result += "?"
+        if peek() == .less {
+            try consume(.less)
+            var genericArguments: [String] = [try consumeTypeReference()]
+            while peek() == .comma {
+                advance()
+                genericArguments.append(try consumeTypeReference())
+            }
+            try consume(.greater)
+            result += "<\(genericArguments.joined(separator: ", "))>"
         }
+
         return result
     }
 }

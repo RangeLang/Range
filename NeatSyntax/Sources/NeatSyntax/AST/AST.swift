@@ -82,6 +82,7 @@ public struct NeatFunctionParameter {
     public let localName: String
     public let externalLabel: String?
     public let typeName: String?
+    public let slotName: String?
 
     public var name: String {
         localName
@@ -96,6 +97,7 @@ public struct NeatFunctionParameter {
 public struct CallableDeclaration {
     public let targetName: String?
     public let name: String
+    public let hasExplicitParameterClause: Bool
     public let parameters: [NeatFunctionParameter]
     public let returnTypeName: String?
     public let body: [Statement]?
@@ -148,6 +150,7 @@ public indirect enum BuiltinType: Equatable {
     case string
     case bool
     case dictionary
+    case set(BuiltinType)
     case void
     case none
     case optional(BuiltinType)
@@ -162,6 +165,8 @@ public indirect enum BuiltinType: Equatable {
             return "Bool"
         case .dictionary:
             return "Dictionary"
+        case .set(let element):
+            return "Set<\(element.displayName)>"
         case .void:
             return "Void"
         case .none:
@@ -271,6 +276,7 @@ public enum AssignmentTarget {
     case state(String)
     case binding(String)
     case local(String)
+    case member(String)
 }
 
 public enum CompoundOperator: String {
@@ -288,9 +294,15 @@ public indirect enum Expression {
     case call(name: String, arguments: [CallArgument])
     case bindingReference(String)
     case array([Expression])
+    case dictionary([DictionaryElement])
     case ternary(condition: Expression, trueExpression: Expression, falseExpression: Expression)
     case unary(operatorSymbol: UnaryOperator, expression: Expression)
     case binary(lhs: Expression, operatorSymbol: BinaryOperator, rhs: Expression)
+}
+
+public struct DictionaryElement {
+    public let key: Expression
+    public let value: Expression
 }
 
 public enum UnaryOperator: String {

@@ -32,6 +32,8 @@ struct MainProgramRunner {
 
             let manifest = try PackageManifestLoader.load(from: packageFile)
             packageName = manifest.name
+            let files = try neatFiles(in: inputURL, excludingManifestAt: packageFile)
+            try ProjectSourceValidator.validatePrimaryDeclarations(in: files)
             entryFile = try discoverEntryFile(in: inputURL)
         } else {
             guard inputURL.pathExtension.lowercased() == "neat" else {
@@ -76,6 +78,28 @@ struct MainProgramRunner {
     }
 
     private func discoverEntryFile(in root: URL) throws -> URL {
+        let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
+        let files = try neatFiles(in: root, excludingManifestAt: packageFile)
+
+        let mainBlocks = try files.compactMap { fileURL -> URL? in
+            let sourceFile = try ProjectSourceValidator.parseSourceFile(at: fileURL)
+            guard case .mainBlock = sourceFile else {
+                return nil
+            }
+            return fileURL
+        }
+
+        if mainBlocks.isEmpty {
+            throw ValidationError("Missing @main block in \(root.path)")
+        }
+        if mainBlocks.count > 1 {
+            let names = mainBlocks.map(\.lastPathComponent).sorted().joined(separator: ", ")
+            throw ValidationError("Found multiple @main modules: \(names)")
+        }
+        return mainBlocks[0]
+    }
+
+    private func neatFiles(in root: URL, excludingManifestAt manifestURL: URL) throws -> [URL] {
         let fileManager = FileManager.default
         guard
             let enumerator = fileManager.enumerator(
@@ -109,28 +133,15 @@ struct MainProgramRunner {
             }
 
             let fileName = fileURL.lastPathComponent
-            if fileName == "Package.neat" || fileName == "Fonts.neat" {
+            if fileURL.standardizedFileURL == manifestURL.standardizedFileURL
+                || fileName == "Fonts.neat"
+            {
                 continue
             }
-
-            let source = try String(contentsOf: fileURL, encoding: .utf8)
-            if hasMainBlock(in: source) {
-                matches.append(fileURL)
-            }
+            matches.append(fileURL)
         }
 
-        if matches.isEmpty {
-            throw ValidationError("Missing @main block in \(root.path)")
-        }
-        if matches.count > 1 {
-            let names = matches.map(\.lastPathComponent).sorted().joined(separator: ", ")
-            throw ValidationError("Found multiple @main modules: \(names)")
-        }
-        return matches[0]
-    }
-
-    private func hasMainBlock(in source: String) -> Bool {
-        source.range(of: #"@main\s*\{"#, options: .regularExpression) != nil
+        return matches.sorted { $0.path < $1.path }
     }
 }
 
@@ -152,6 +163,7 @@ private struct MainProgramInterpreter {
         case bool(Bool)
         case none
         case array([RuntimeValue])
+        case dictionary([String: RuntimeValue])
     }
 
     private enum ControlFlow {
@@ -458,6 +470,19 @@ private struct MainProgramInterpreter {
             }
             return .array(evaluated)
 
+        case .dictionary(let elements):
+            var evaluated: [String: RuntimeValue] = [:]
+            for element in elements {
+                let keyValue = try evaluate(element.key)
+                guard case .string(let key) = keyValue else {
+                    throw ValidationError(
+                        "Dictionary literal keys must evaluate to String in \(fileName)."
+                    )
+                }
+                evaluated[key] = try evaluate(element.value)
+            }
+            return .dictionary(evaluated)
+
         case .ternary(let condition, let trueExpression, let falseExpression):
             let result = try expectBool(evaluate(condition), context: "Ternary condition")
             return try evaluate(result ? trueExpression : falseExpression)
@@ -546,6 +571,11 @@ private struct MainProgramInterpreter {
             return "none"
         case .array(let values):
             return "[" + values.map(stringify).joined(separator: ", ") + "]"
+        case .dictionary(let values):
+            let rendered = values.keys.sorted().map { key in
+                "\"\(key)\": \(stringify(values[key]!))"
+            }
+            return "{\(rendered.joined(separator: ", "))}"
         }
     }
 
@@ -636,6 +666,14 @@ private struct MainProgramInterpreter {
         case (.array(let left), .array(let right)):
             guard left.count == right.count else { return false }
             return zip(left, right).allSatisfy(valuesEqual)
+        case (.dictionary(let left), .dictionary(let right)):
+            guard left.count == right.count else { return false }
+            for (key, leftValue) in left {
+                guard let rightValue = right[key], valuesEqual(leftValue, rightValue) else {
+                    return false
+                }
+            }
+            return true
         default:
             return false
         }
@@ -671,6 +709,11 @@ private struct MainProgramInterpreter {
             throw ValidationError(
                 "Binding assignment is not supported in the main-program interpreter yet (\(name))."
             )
+
+        case .member(let name):
+            throw ValidationError(
+                "Member assignment is not supported in the main-program interpreter yet (self.\(name))."
+            )
         }
     }
 
@@ -689,6 +732,11 @@ private struct MainProgramInterpreter {
         case .binding(let name):
             throw ValidationError(
                 "Binding reads are not supported in the main-program interpreter yet (\(name)).")
+
+        case .member(let name):
+            throw ValidationError(
+                "Member reads are not supported in the main-program interpreter yet (self.\(name))."
+            )
         }
     }
 

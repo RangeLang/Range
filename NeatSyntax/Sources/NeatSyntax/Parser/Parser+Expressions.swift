@@ -146,7 +146,8 @@ extension Parser {
                 advance()
                 parts.append(nextName)
             }
-            let fullName = parts.joined(separator: ".")
+            var fullName = parts.joined(separator: ".")
+            fullName += try parseGenericArgumentClauseIfPresent()
             if peek() == .leftParen {
                 return .call(name: fullName, arguments: try parseInvocationArgumentsIfPresent())
             }
@@ -157,13 +158,14 @@ extension Parser {
         case .dot:
             advance()
             let name = try consumeIdentifier()
-            let fullName = ".\(name)"
+            var fullName = ".\(name)"
+            fullName += try parseGenericArgumentClauseIfPresent()
             if peek() == .leftParen {
                 return .call(name: fullName, arguments: try parseInvocationArgumentsIfPresent())
             }
             return .identifier(fullName)
         case .leftBracket:
-            return try parseArrayLiteral()
+            return try parseCollectionLiteral()
         case .leftParen:
             try consume(.leftParen)
             let expression = try parseExpression()
@@ -174,20 +176,57 @@ extension Parser {
         }
     }
 
-    mutating func parseArrayLiteral() throws -> Expression {
+    mutating func parseCollectionLiteral() throws -> Expression {
         try consume(.leftBracket)
 
-        var elements: [Expression] = []
-        if peek() != .rightBracket {
-            while true {
-                elements.append(try parseExpression())
-                guard peek() == .comma else { break }
+        if peek() == .rightBracket {
+            try consume(.rightBracket)
+            return .array([])
+        }
+
+        let firstExpression = try parseExpression()
+        if peek() == .colon {
+            advance()
+            let firstValue = try parseExpression()
+            var elements = [DictionaryElement(key: firstExpression, value: firstValue)]
+
+            while peek() == .comma {
                 advance()
+                guard peek() != .rightBracket else { break }
+                let key = try parseExpression()
+                try consume(.colon)
+                let value = try parseExpression()
+                elements.append(DictionaryElement(key: key, value: value))
             }
+
+            try consume(.rightBracket)
+            return .dictionary(elements)
+        }
+
+        var elements: [Expression] = [firstExpression]
+        while peek() == .comma {
+            advance()
+            guard peek() != .rightBracket else { break }
+            elements.append(try parseExpression())
         }
 
         try consume(.rightBracket)
         return .array(elements)
+    }
+
+    mutating func parseGenericArgumentClauseIfPresent() throws -> String {
+        guard peek() == .less else {
+            return ""
+        }
+
+        try consume(.less)
+        var arguments: [String] = [try consumeTypeReference()]
+        while peek() == .comma {
+            advance()
+            arguments.append(try consumeTypeReference())
+        }
+        try consume(.greater)
+        return "<\(arguments.joined(separator: ", "))>"
     }
 
     mutating func parseBuiltinType() throws -> BuiltinType {
@@ -221,8 +260,20 @@ extension Parser {
         case "Void":
             return .void
         default:
-            return nil
+            break
         }
+
+        if raw.hasPrefix("Set<"), raw.hasSuffix(">") {
+            let start = raw.index(raw.startIndex, offsetBy: 4)
+            let end = raw.index(before: raw.endIndex)
+            let innerRaw = String(raw[start..<end])
+            guard let element = builtinType(from: innerRaw) else {
+                return nil
+            }
+            return .set(element)
+        }
+
+        return nil
     }
 
     func inferType(
@@ -255,6 +306,9 @@ extension Parser {
             throw ParseError("Binding reference '$\(name)' is not valid in a state initializer.")
         case .array:
             throw ParseError("Array type inference is not supported in state initializers yet.")
+        case .dictionary:
+            throw ParseError(
+                "Dictionary type inference is not supported in state initializers yet.")
         case .ternary(let condition, let trueExpression, let falseExpression):
             let conditionType = try inferType(of: condition, stateTypes: stateTypes)
             guard conditionType == .bool else {

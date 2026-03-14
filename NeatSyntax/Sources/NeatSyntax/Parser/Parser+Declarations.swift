@@ -116,7 +116,7 @@ extension Parser {
         try consume(.eof)
 
         try validateCallableDeclarations(callables)
-        try validateInitializerDeclarations(initializers)
+        try validateInitializerDeclarations(initializers, availableCallables: callables)
 
         return DeclarationNode(
             kind: kind,
@@ -145,7 +145,8 @@ extension Parser {
             throw ParseError("Expected callable declaration.")
         }
         advance()
-        let parameters = peek() == .leftParen ? try parseCallableParameters(name: name) : []
+        let hasExplicitParameterClause = peek() == .leftParen
+        let parameters = hasExplicitParameterClause ? try parseFunctionParameters() : []
         let returnTypeName: String?
         if peek() == .arrow {
             try consume(.arrow)
@@ -161,6 +162,7 @@ extension Parser {
         return CallableDeclaration(
             targetName: targetName,
             name: name,
+            hasExplicitParameterClause: hasExplicitParameterClause,
             parameters: parameters,
             returnTypeName: returnTypeName,
             body: body
@@ -198,16 +200,23 @@ extension Parser {
                 }
 
                 var typeName: String?
+                var slotName: String?
                 if peek() == .colon {
                     try consume(.colon)
-                    typeName = try consumeTypeReference()
+                    if case .atAttribute(let slot, _) = peek() {
+                        advance()
+                        slotName = slot
+                    } else {
+                        typeName = try consumeTypeReference()
+                    }
                 }
 
                 parameters.append(
                     NeatFunctionParameter(
                         localName: localName,
                         externalLabel: externalLabel,
-                        typeName: typeName
+                        typeName: typeName,
+                        slotName: slotName
                     )
                 )
 
@@ -218,17 +227,6 @@ extension Parser {
 
         try consume(.rightParen)
         return parameters
-    }
-
-    mutating func parseCallableParameters(name: String) throws -> [NeatFunctionParameter] {
-        guard peek() == .leftParen else {
-            return []
-        }
-        guard peek(offset: 1) != .rightParen else {
-            throw ParseError(
-                "Zero-argument derived members must omit (). Use '@\(name) -> Type'.")
-        }
-        return try parseFunctionParameters()
     }
 
     mutating func parseEnumCaseLine() throws -> [EnumCaseDeclaration] {
@@ -313,10 +311,14 @@ extension Parser {
                 }
                 inferredType = explicitType
             } else {
-                inferredType = try inferType(
-                    of: initialValue,
-                    stateTypes: currentStateTypes
-                )
+                if let explicitType, case .call = initialValue {
+                    inferredType = explicitType
+                } else {
+                    inferredType = try inferType(
+                        of: initialValue,
+                        stateTypes: currentStateTypes
+                    )
+                }
             }
             storage = .stored(initialValue)
         } else if peek() == .leftBrace {
@@ -596,13 +598,43 @@ extension Parser {
         }
     }
 
-    func validateInitializerDeclarations(_ initializers: [InitializerDeclaration]) throws {
+    func validateInitializerDeclarations(
+        _ initializers: [InitializerDeclaration],
+        availableCallables: [CallableDeclaration]
+    ) throws {
+        let availableSlotNames = Set<String>(
+            availableCallables.compactMap { callable in
+                guard callable.parameters.isEmpty, callable.returnTypeName != nil else {
+                    return nil
+                }
+                return callable.name
+            }
+        )
+
         var seen: Set<String> = []
         for initializer in initializers {
             guard initializer.body != nil else {
                 throw ParseError(
                     "Explicit initializer \(renderInitializerSignature(parameters: initializer.parameters)) must include a body."
                 )
+            }
+
+            let slotParameters = initializer.parameters.compactMap(\.slotName)
+            let duplicateSlots = Dictionary(grouping: slotParameters, by: { $0 })
+                .filter { $1.count > 1 }
+                .keys
+            if let slotName = duplicateSlots.sorted().first {
+                throw ParseError(
+                    "Initializer \(renderInitializerSignature(parameters: initializer.parameters)) binds slot @\(slotName) more than once."
+                )
+            }
+
+            for slotName in slotParameters {
+                guard availableSlotNames.contains(slotName) else {
+                    throw ParseError(
+                        "Initializer \(renderInitializerSignature(parameters: initializer.parameters)) references unknown slot @\(slotName)."
+                    )
+                }
             }
 
             let signatures = Set(initializerSignatureKeys(parameters: initializer.parameters))
@@ -621,7 +653,9 @@ extension Parser {
             return false
         }
         return zip(lhs, rhs).allSatisfy {
-            $0.externalLabel == $1.externalLabel && $0.typeName == $1.typeName
+            $0.externalLabel == $1.externalLabel
+                && $0.typeName == $1.typeName
+                && $0.slotName == $1.slotName
         }
     }
 
@@ -661,12 +695,12 @@ extension Parser {
 
     func parameterSignatureKey(_ parameter: NeatFunctionParameter) -> String {
         let label = parameter.externalLabel ?? "_"
-        let typeName = parameter.typeName ?? "_"
+        let typeName = parameter.slotName.map { "@\($0)" } ?? parameter.typeName ?? "_"
         return "\(label):\(typeName)"
     }
 
     func renderParameterSignature(_ parameter: NeatFunctionParameter) -> String {
-        let typeName = parameter.typeName ?? "_"
+        let typeName = parameter.slotName.map { "@\($0)" } ?? parameter.typeName ?? "_"
         if let externalLabel = parameter.externalLabel {
             if externalLabel == parameter.localName {
                 return "\(parameter.localName): \(typeName)"

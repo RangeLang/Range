@@ -47,5 +47,5 @@ enum NeatSyntax {
 extension NeatSyntax.Keyword: CaseIterable {}
 
 extension BuiltinType {
-    static let supportedNames: [String] = ["Int", "String", "Bool", "Dictionary", "Void"]
+    static let supportedNames: [String] = ["Int", "String", "Bool", "Dictionary", "Set", "Void"]
 }

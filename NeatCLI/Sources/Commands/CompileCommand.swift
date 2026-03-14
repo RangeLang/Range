@@ -57,6 +57,8 @@ extension NeatCLI {
                     throw ValidationError("No .neat source files found in \(projectRoot.path)")
                 }
 
+                try ProjectSourceValidator.validatePrimaryDeclarations(in: files)
+
                 for file in files {
                     try validateFile(at: file)
                 }

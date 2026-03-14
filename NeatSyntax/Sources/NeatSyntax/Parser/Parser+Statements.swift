@@ -55,9 +55,7 @@ extension Parser {
             return .expression(expression)
         }
 
-        let name = try consumeIdentifier()
-
-        let target = try resolveAssignmentTarget(name: name, localBindings: localBindings)
+        let target = try parseAssignmentTarget(localBindings: localBindings)
 
         switch peek() {
         case .equal:
@@ -106,6 +104,20 @@ extension Parser {
         return .declaration(kind: kind, name: name, expression: expression)
     }
 
+    mutating func parseAssignmentTarget(
+        localBindings: [String: LocalBindingKind]
+    ) throws -> AssignmentTarget {
+        let name = try consumeIdentifier()
+
+        if name == "self", peek() == .dot {
+            try consume(.dot)
+            let memberName = try consumeIdentifier()
+            return .member(memberName)
+        }
+
+        return try resolveAssignmentTarget(name: name, localBindings: localBindings)
+    }
+
     func resolveAssignmentTarget(
         name: String,
         localBindings: [String: LocalBindingKind]
@@ -129,7 +141,7 @@ extension Parser {
             throw ParseError("Cannot assign to derived state '\(name)'.")
         }
 
-        throw ParseError("Unknown mutable symbol '\(name)'. Declare it with var/let or state.")
+        throw ParseError("Unknown mutable symbol '\(name)'. Declare it with value or state.")
     }
 
     mutating func parseSwitchStatement(

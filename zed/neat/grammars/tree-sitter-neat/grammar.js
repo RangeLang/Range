@@ -154,21 +154,39 @@ module.exports = grammar({
             field("external_name", $.identifier),
             field("name", $.identifier),
             ":",
-            field("type", $.type),
+            field("type", choice($.type, $.slot_type)),
           ),
-          seq(field("name", $.identifier), ":", field("type", $.type)),
+          seq(
+            field("name", $.identifier),
+            ":",
+            field("type", choice($.type, $.slot_type)),
+          ),
           field("type", $.type),
         ),
         optional(seq("=", field("default_value", $.expression))),
       ),
 
+    slot_type: ($) => seq("@", field("slot", $.identifier)),
+
     type: ($) =>
-      choice(
-        $.type_identifier,
-        $.array_type,
-        $.dictionary_type,
-        $.optional_type,
-        $.member_type,
+      prec.right(
+        choice(
+          $.function_type,
+          $.optional_type,
+          $.generic_type,
+          $.type_identifier,
+          $.array_type,
+          $.dictionary_type,
+          $.member_type,
+        ),
+      ),
+
+    generic_type: ($) =>
+      seq(
+        field("base", choice($.type_identifier, $.member_type)),
+        "<",
+        commaSep1(field("argument", $.type)),
+        ">",
       ),
 
     array_type: ($) => seq("[", field("element", $.type), "]"),
@@ -176,7 +194,30 @@ module.exports = grammar({
     dictionary_type: ($) =>
       seq("[", field("key", $.type), ":", field("value", $.type), "]"),
 
-    optional_type: ($) => seq(field("wrapped", $.type_identifier), "?"),
+    function_type: ($) =>
+      seq(
+        "(",
+        optional(commaSep1($.type)),
+        ")",
+        "->",
+        field("return_type", $.type),
+      ),
+
+    optional_type: ($) =>
+      seq(
+        field(
+          "wrapped",
+          choice(
+            $.function_type,
+            $.generic_type,
+            $.type_identifier,
+            $.array_type,
+            $.dictionary_type,
+            $.member_type,
+          ),
+        ),
+        "?",
+      ),
 
     member_type: ($) =>
       prec.left(
