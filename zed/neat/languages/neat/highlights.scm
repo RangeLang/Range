@@ -28,9 +28,10 @@
   "case"
   "default"
   "return"
-  "break"
-  "continue"
 ] @keyword.control
+
+(break_statement) @keyword.control
+(continue_statement) @keyword.control
 
 ; Projection keyword
 "on" @keyword
