@@ -1,0 +1,20 @@
+#Button: Component {
+  value action: () -> Void
+
+  @body -> Renderable
+
+  init(content: @body, action: () -> Void) {
+    self.action = action
+  }
+
+  init(label: String, action: () -> Void) {
+    self.action = action
+    self.body = Text(text: label)
+  }
+}
+
+extension Button {
+  value web: WebNode = WebNode.element(
+    tag: "button"
+  )
+}

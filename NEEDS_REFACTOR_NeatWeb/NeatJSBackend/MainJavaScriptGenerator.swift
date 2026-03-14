@@ -296,6 +296,26 @@ public struct MainJavaScriptGenerator {
         case .array(let values):
             return
                 "[\(values.map { generateExpression($0, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context) }.joined(separator: ", "))]"
+        case .dictionary(let elements):
+            return "{\(elements.map { element in
+                let key = generateDictionaryKey(
+                    element.key,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    localBindings: localBindings,
+                    context: context
+                )
+                let value = generateExpression(
+                    element.value,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    localBindings: localBindings,
+                    context: context
+                )
+                return "\(key): \(value)"
+            }.joined(separator: ", "))}"
         case .ternary(let condition, let trueExpression, let falseExpression):
             return
                 "\(generateExpression(condition, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context)) ? \(generateExpression(trueExpression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context)) : \(generateExpression(falseExpression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))"
@@ -313,6 +333,24 @@ public struct MainJavaScriptGenerator {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "`", with: "\\`")
             .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    private func generateDictionaryKey(
+        _ expression: NeatSyntax.Expression,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
+        localBindings: Set<String>,
+        context: JSMainContext?
+    ) -> String {
+        switch expression {
+        case .string(let value):
+            return "\"\(escapeLiteral(value))\""
+        case .identifier(let name):
+            return name
+        default:
+            return "[\(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))]"
+        }
     }
 
     private func indent(_ value: String, level: Int) -> String {

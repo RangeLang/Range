@@ -1,0 +1,10 @@
+#VStack: Component {
+  @body -> Renderable
+}
+
+extension VStack {
+  value web: WebNode = WebNode.element(
+    tag: "div",
+    classes: ["vstack"]
+  )
+}

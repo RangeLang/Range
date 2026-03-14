@@ -1,0 +1,10 @@
+#ZStack: Component {
+  @body -> Renderable
+}
+
+extension ZStack {
+  value web: WebNode = WebNode.element(
+    tag: "div",
+    classes: ["zstack"]
+  )
+}

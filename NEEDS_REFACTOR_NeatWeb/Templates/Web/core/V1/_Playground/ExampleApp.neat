@@ -1,0 +1,14 @@
+#ExampleApp: App {
+
+  @head -> Head {
+    Meta.title("My Neat App")
+    Meta.description("Very Neat!")
+    Stylesheet("./index.css")
+  }
+
+  @routes -> Routes {
+    Route("/") {
+      Route("dashboard")
+    }
+  }
+}

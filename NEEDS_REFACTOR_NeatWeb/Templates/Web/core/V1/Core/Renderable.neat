@@ -1,0 +1,3 @@
+#Renderable {
+  state webStyles: [WebStyle] = []
+}

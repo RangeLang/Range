@@ -1,0 +1,4 @@
+#Text: Primitive {
+  value text: String
+  value web: WebNode = WebNode.text(value: text)
+}

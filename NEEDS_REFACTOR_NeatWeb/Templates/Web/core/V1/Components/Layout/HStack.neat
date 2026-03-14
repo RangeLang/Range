@@ -1,0 +1,10 @@
+#HStack: Component {
+  @body -> Renderable
+}
+
+extension HStack {
+  value web: WebNode = WebNode.element(
+    tag: "div",
+    classes: ["hstack"]
+  )
+}

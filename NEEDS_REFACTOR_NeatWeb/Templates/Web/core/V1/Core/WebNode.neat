@@ -1,0 +1,11 @@
+#WebNode {
+  case element(
+    tag: String,
+    attributes: [String: String] = [:],
+    classes: [String] = [],
+    styles: [String: String] = [:],
+    children: [WebNode] = []
+  )
+
+  case text(value: String)
+}
