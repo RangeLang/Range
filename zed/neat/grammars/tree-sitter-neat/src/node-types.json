@@ -451,7 +451,7 @@
     "fields": {
       "body": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "block",
@@ -471,10 +471,10 @@
       },
       "parameters": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
-            "type": "parameter_clause",
+            "type": "callable_parameter_clause",
             "named": true
           }
         ]
@@ -503,6 +503,21 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "callable_parameter_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "parameter",
+          "named": true
+        }
+      ]
     }
   },
   {

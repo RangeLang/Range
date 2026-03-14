@@ -145,12 +145,24 @@ extension Parser {
             throw ParseError("Expected callable declaration.")
         }
         advance()
-        let parameters = try parseFunctionParameters()
+        let parameters = peek() == .leftParen ? try parseCallableParameters(name: name) : []
+        let returnTypeName: String?
+        if peek() == .arrow {
+            try consume(.arrow)
+            returnTypeName = try consumeTypeReference()
+        } else {
+            returnTypeName = nil
+        }
+        guard !parameters.isEmpty || returnTypeName != nil else {
+            throw ParseError(
+                "Callable declarations without parameters must declare an explicit return type.")
+        }
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
             targetName: targetName,
             name: name,
             parameters: parameters,
+            returnTypeName: returnTypeName,
             body: body
         )
     }
@@ -206,6 +218,17 @@ extension Parser {
 
         try consume(.rightParen)
         return parameters
+    }
+
+    mutating func parseCallableParameters(name: String) throws -> [NeatFunctionParameter] {
+        guard peek() == .leftParen else {
+            return []
+        }
+        guard peek(offset: 1) != .rightParen else {
+            throw ParseError(
+                "Zero-argument derived members must omit (). Use '@\(name) -> Type'.")
+        }
+        return try parseFunctionParameters()
     }
 
     mutating func parseEnumCaseLine() throws -> [EnumCaseDeclaration] {

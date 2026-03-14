@@ -17,7 +17,10 @@ module.exports = grammar({
 
   supertypes: ($) => [$.declaration, $.expression, $.type, $.statement],
 
-  conflicts: ($) => [[$.callable_declaration, $.expression]],
+  conflicts: ($) => [
+    [$.callable_declaration, $.expression],
+    [$.callable_declaration],
+  ],
 
   rules: {
     source_file: ($) => repeat($.declaration),
@@ -49,13 +52,41 @@ module.exports = grammar({
       ),
 
     callable_declaration: ($) =>
-      seq(
-        optional(field("receiver", seq($.type_identifier, "@"))),
-        "@",
-        field("name", $.identifier),
-        field("parameters", $.parameter_clause),
-        optional(seq("->", field("return_type", $.type))),
-        field("body", $.block),
+      choice(
+        prec.right(
+          seq(
+            optional(field("receiver", seq($.type_identifier, "@"))),
+            "@",
+            field("name", $.identifier),
+            field("parameters", $.callable_parameter_clause),
+            optional(seq("->", field("return_type", $.type))),
+            field("body", $.block),
+          ),
+        ),
+        seq(
+          optional(field("receiver", seq($.type_identifier, "@"))),
+          "@",
+          field("name", $.identifier),
+          field("parameters", $.callable_parameter_clause),
+          optional(seq("->", field("return_type", $.type))),
+        ),
+        prec.right(
+          seq(
+            optional(field("receiver", seq($.type_identifier, "@"))),
+            "@",
+            field("name", $.identifier),
+            "->",
+            field("return_type", $.type),
+            field("body", $.block),
+          ),
+        ),
+        seq(
+          optional(field("receiver", seq($.type_identifier, "@"))),
+          "@",
+          field("name", $.identifier),
+          "->",
+          field("return_type", $.type),
+        ),
       ),
 
     extension_declaration: ($) =>
@@ -113,6 +144,8 @@ module.exports = grammar({
       ),
 
     parameter_clause: ($) => seq("(", optional(commaSep1($.parameter)), ")"),
+
+    callable_parameter_clause: ($) => seq("(", commaSep1($.parameter), ")"),
 
     parameter: ($) =>
       seq(

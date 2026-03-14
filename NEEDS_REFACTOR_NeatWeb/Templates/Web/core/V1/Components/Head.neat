@@ -8,5 +8,5 @@
 }
 
 #Stylesheet: Head {
-  init(text _: String)
+  value path: String
 }

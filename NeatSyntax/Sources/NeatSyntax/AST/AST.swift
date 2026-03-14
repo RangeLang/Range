@@ -97,6 +97,7 @@ public struct CallableDeclaration {
     public let targetName: String?
     public let name: String
     public let parameters: [NeatFunctionParameter]
+    public let returnTypeName: String?
     public let body: [Statement]?
 }
 

@@ -6,9 +6,8 @@
 
   for number in numbers {
     total += number
+    Logger.log(total)
   }
 
-
-    Logger.success("sum is \(total == 10 ? "correct" : "incorrect")")
-
+  Logger.success("sum is \(total == 10 ? "correct" : "incorrect")")
 }

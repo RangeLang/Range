@@ -1,5 +1,5 @@
 #CoreCard: Component {
-  var body: Component {
+  @body -> Component {
     VStack {
       Text("Core Card")
       Text("This component is loaded from .neat/Core/V1/Components.")

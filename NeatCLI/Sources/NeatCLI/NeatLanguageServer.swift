@@ -37,7 +37,6 @@ struct NeatLanguageServer {
                         "textDocumentSync": 1,
                         "hoverProvider": true,
                         "definitionProvider": true,
-                        "referencesProvider": true,
                         "renameProvider": true,
                         "documentSymbolProvider": true,
                         "documentFormattingProvider": true,
