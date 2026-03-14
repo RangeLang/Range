@@ -20,6 +20,10 @@
         "named": true
       },
       {
+        "type": "main_block",
+        "named": true
+      },
+      {
         "type": "protocol_declaration",
         "named": true
       },
@@ -841,6 +845,22 @@
     }
   },
   {
+    "type": "main_block",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "member_declaration",
     "named": true,
     "fields": {
@@ -1534,6 +1554,10 @@
   {
     "type": "integer_literal",
     "named": true
+  },
+  {
+    "type": "main",
+    "named": false
   },
   {
     "type": "nil_literal",

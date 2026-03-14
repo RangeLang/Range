@@ -22,6 +22,7 @@ module.exports = grammar({
 
     declaration: ($) =>
       choice(
+        $.main_block,
         $.sigiled_declaration,
         $.callable_declaration,
         $.protocol_declaration,
@@ -30,6 +31,8 @@ module.exports = grammar({
         $.function_declaration,
         $.variable_declaration,
       ),
+
+    main_block: ($) => seq("@", "main", field("body", $.block)),
 
     protocol_declaration: ($) =>
       seq("protocol", field("name", $.type_identifier), field("body", $.block)),

@@ -15,6 +15,10 @@
       "members": [
         {
           "type": "SYMBOL",
+          "name": "main_block"
+        },
+        {
+          "type": "SYMBOL",
           "name": "sigiled_declaration"
         },
         {
@@ -40,6 +44,27 @@
         {
           "type": "SYMBOL",
           "name": "variable_declaration"
+        }
+      ]
+    },
+    "main_block": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "@"
+        },
+        {
+          "type": "STRING",
+          "value": "main"
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "SYMBOL",
+            "name": "block"
+          }
         }
       ]
     },
