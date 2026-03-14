@@ -5,12 +5,12 @@ Neat keeps types visible without forcing users to pick between `struct` and `cla
 Examples:
 
 ```neat
-var title: String
-var count: Int
-var isEnabled: Bool
-var selectedID: Int?
-var metadata: Dictionary
-var numbers: [Int]
+value title: String
+value count: Int
+value isEnabled: Bool
+value selectedID: Int?
+value metadata: Dictionary
+value numbers: [Int]
 
 #Day {
     case today, tomorrow

@@ -724,7 +724,7 @@ private struct DocumentIndex {
 
             if let match = firstMatch(
                 in: line,
-                pattern: #"\bvar\s+([a-z_][A-Za-z0-9_]*)\s*:\s*([A-Z][A-Za-z0-9_.]*)\s*\{"#
+                pattern: #"\bvalue\s+([a-z_][A-Za-z0-9_]*)\s*:\s*([A-Z][A-Za-z0-9_.]*)\s*\{"#
             ) {
                 let name = match[1]
                 let symbolRange = range(in: line, line: lineIndex, value: name)
@@ -767,7 +767,9 @@ private struct DocumentIndex {
                 continue
             }
 
-            if let match = firstMatch(in: line, pattern: #"\b(let|var)\s+([a-z_][A-Za-z0-9_]*)"#) {
+            if let match = firstMatch(
+                in: line, pattern: #"\b(let|var|value)\s+([a-z_][A-Za-z0-9_]*)"#)
+            {
                 let name = match[2]
                 let symbolRange = range(in: line, line: lineIndex, value: name)
                 symbols.append(

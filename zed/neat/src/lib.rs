@@ -4,6 +4,17 @@ struct NeatExtension;
 
 impl NeatExtension {
     const SERVER_BINARY_NAME: &'static str = "neat";
+    const HOMEBREW_SERVER_PATH: &'static str = "/opt/homebrew/bin/neat";
+
+    fn resolve_server_path(&self, worktree: &zed::Worktree) -> Result<String> {
+        if std::path::Path::new(Self::HOMEBREW_SERVER_PATH).exists() {
+            return Ok(Self::HOMEBREW_SERVER_PATH.to_string());
+        }
+
+        worktree.which(Self::SERVER_BINARY_NAME).ok_or_else(|| {
+            "Could not find `neat` binary on PATH. Install NeatCLI first.".to_string()
+        })
+    }
 }
 
 impl zed::Extension for NeatExtension {
@@ -17,9 +28,7 @@ impl zed::Extension for NeatExtension {
         worktree: &zed::Worktree,
     ) -> Result<zed::Command> {
         if language_server_id.as_ref() == "neat-lsp" {
-            let path = worktree.which(Self::SERVER_BINARY_NAME).ok_or_else(|| {
-                "Could not find `neat` binary on PATH. Install NeatCLI first.".to_string()
-            })?;
+            let path = self.resolve_server_path(worktree)?;
 
             return Ok(zed::Command {
                 command: path,

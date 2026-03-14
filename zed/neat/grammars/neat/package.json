@@ -1,13 +1,5 @@
 {
-  "name": "tree-sitter-neat",
+  "name": "neat",
   "version": "0.1.0",
-  "private": true,
-  "main": "grammar.js",
-  "scripts": {
-    "generate": "tree-sitter generate",
-    "test": "tree-sitter test"
-  },
-  "devDependencies": {
-    "tree-sitter-cli": "^0.25.3"
-  }
+  "private": true
 }

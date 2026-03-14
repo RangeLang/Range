@@ -120,6 +120,9 @@ extension Parser {
         case .integer(let value):
             advance()
             return .integer(value)
+        case .double(let value):
+            advance()
+            return .double(value)
         case .stringLiteral(let value):
             advance()
             return .string(value)
@@ -140,14 +143,22 @@ extension Parser {
                 advance()
                 parts.append(nextName)
             }
-            return .identifier(parts.joined(separator: "."))
+            let fullName = parts.joined(separator: ".")
+            if peek() == .leftParen {
+                return .call(name: fullName, arguments: try parseInvocationArgumentsIfPresent())
+            }
+            return .identifier(fullName)
         case .dollar:
             try consume(.dollar)
             return .bindingReference(try consumeIdentifier())
         case .dot:
             advance()
             let name = try consumeIdentifier()
-            return .identifier(".\(name)")
+            let fullName = ".\(name)"
+            if peek() == .leftParen {
+                return .call(name: fullName, arguments: try parseInvocationArgumentsIfPresent())
+            }
+            return .identifier(fullName)
         case .leftBracket:
             return try parseArrayLiteral()
         case .leftParen:
@@ -218,6 +229,9 @@ extension Parser {
         switch expression {
         case .integer:
             return .int
+        case .double:
+            throw ParseError(
+                "Floating-point type inference is not supported in state initializers yet.")
         case .string:
             return .string
         case .boolean:
@@ -229,6 +243,9 @@ extension Parser {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
             return type
+        case .call:
+            throw ParseError(
+                "Callable expressions are not supported in state initializer inference yet.")
         case .bindingReference(let name):
             throw ParseError("Binding reference '$\(name)' is not valid in a state initializer.")
         case .array:

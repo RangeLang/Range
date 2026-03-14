@@ -9,7 +9,7 @@ The focus here is the core syntax implemented in `NeatSyntax`: declarations, mem
 - declaration headers like `#Name { ... }`
 - declaration composition with `#Name: Contract { ... }`
 - projected declarations with `#Name on Target: Contract { ... }`
-- typed members with `var name: Type`
+- typed members with `value name: Type`
 - declaration state with `state name: Type = value`
 - declaration bindings with `binding name: Type`
 - local `let` and `var` bindings inside statement blocks

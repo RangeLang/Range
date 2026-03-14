@@ -13,7 +13,7 @@ Foundational Neat-provided declarations live here.
 
 `Color` currently exposes:
 
-- named colors through `case red, blue, green, white, black, gray, clear`
+- predefined named colors as `value` members on `Color`
 - RGB projection entrypoints with optional trailing `alpha`
 - HSL projection entrypoints with optional trailing `alpha`
 - OKLCH projection entrypoints with optional trailing `alpha`

@@ -1,0 +1,17 @@
+@main
+{
+  print("Neat program playground")
+
+  let values = [1, 2, 3]
+  var total = 0
+
+  for value in values {
+    total += value
+  }
+
+  if total == 6 {
+    print("sum = \(total)")
+  } else {
+    print("unexpected sum")
+  }
+}

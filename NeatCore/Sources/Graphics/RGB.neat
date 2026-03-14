@@ -1,3 +1,0 @@
-#RGB on Color {
-    @rgb(red: Int, green: Int, blue: Int, alpha: Int?)
-}

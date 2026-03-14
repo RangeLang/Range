@@ -4,6 +4,7 @@ enum NeatSyntax {
     enum Keyword: String {
         case component
         case variable = "var"
+        case value = "value"
         case constant = "let"
         case state = "state"
         case binding = "binding"

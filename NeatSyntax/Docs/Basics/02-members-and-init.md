@@ -4,7 +4,7 @@ Declarations use typed members directly, and callable entrypoints use `@name(...
 
 ```neat
 #Counter: Value {
-    var count: Int
+    value count: Int
 }
 ```
 
@@ -12,9 +12,9 @@ Typed member example:
 
 ```neat
 #Record: Value {
-    var id: Int
-    var name: String
-    var selectedID: Int?
+    value id: Int
+    value name: String
+    value selectedID: Int?
 }
 ```
 
@@ -31,7 +31,7 @@ Initializer example:
 
 ```neat
 #Counter: Value {
-    var title: String
+    value title: String
 
     init(title: String) {
         print("init \(title)")
@@ -60,4 +60,4 @@ Current surface:
 - multiple initializer overloads are allowed
 - duplicate exact callable signatures on the same declaration are rejected
 - duplicate exact initializer signatures on the same declaration are rejected
-- member declarations parse as `var name: Type` and can also use optional types like `var name: Type?`
+- member declarations parse as `value name: Type` and can also use optional types like `value name: Type?`

@@ -1,6 +1,9 @@
 target/
 extension.wasm
 grammars/*.wasm
+grammars/neat/
+grammars/_failed_*/
+grammars/_legacy_*/
 grammars/*/.build/
 grammars/*/build/
 grammars/*/target/

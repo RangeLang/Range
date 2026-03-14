@@ -1,3 +1,0 @@
-#HSL on Color {
-    @hsl(hue: Int, saturation: Int, lightness: Int, alpha: Int?)
-}

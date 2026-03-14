@@ -30,6 +30,12 @@ neat lsp
 3. Select this folder: `zed/neat`.
 4. Reload Zed if the language does not appear immediately.
 
+## Grammar Source
+
+The authored Tree-sitter grammar lives in `zed/neat/grammars/tree-sitter-neat`.
+
+Zed may create `zed/neat/grammars/neat` during dev-extension installs as a local checkout/build workspace. That directory is transient extension state, not a source directory, and should not be edited or committed.
+
 ## Notes on colors
 
 This extension provides syntax and language-server driven language support. It does not currently draw inline color swatches for Neat color values. If you want visual color chips in the editor, that will likely require a dedicated color-highlighting language server path in addition to the Neat syntax and LSP integration.

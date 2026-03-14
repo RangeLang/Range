@@ -112,6 +112,7 @@ public struct AttributeApplication {
 public struct MemberDeclaration {
     public let name: String
     public let typeName: String
+    public let value: Expression?
 }
 
 public struct BindingDeclaration {
@@ -273,10 +274,12 @@ public enum CompoundOperator: String {
 
 public indirect enum Expression {
     case integer(Int)
+    case double(Double)
     case string(String)
     case boolean(Bool)
     case none
     case identifier(String)
+    case call(name: String, arguments: [CallArgument])
     case bindingReference(String)
     case array([Expression])
     case ternary(condition: Expression, trueExpression: Expression, falseExpression: Expression)

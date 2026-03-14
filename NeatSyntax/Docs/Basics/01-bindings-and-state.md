@@ -52,7 +52,7 @@ Bindings borrow writable access to state owned elsewhere.
 #ParentCounter: Component {
     state count: Int = 0
 
-    var body: Component {
+    value body: Component {
         ChildCounter(count: $count)
     }
 }
@@ -60,7 +60,7 @@ Bindings borrow writable access to state owned elsewhere.
 #ChildCounter: Component {
     binding count: Int
 
-    var body: Component {
+    value body: Component {
         Button("Increment") {
             count += 1
         }
@@ -98,12 +98,12 @@ Current rules:
 
 ## Member Declarations
 
-Declaration members also use `var`, but they are not the same thing as local mutable bindings.
+Declaration members use `value`, but they are not the same thing as local mutable bindings.
 
 ```neat
 #Counter {
-    var step: Int
+    value step: Int
 }
 ```
 
-Here `var step: Int` means “this declaration has a typed member named `step`.” It is structural, not a statement-level mutable variable.
+Here `value step: Int` means “this declaration has a typed member named `step`.” It is structural, not a statement-level mutable variable.
