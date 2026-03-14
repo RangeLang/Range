@@ -20,11 +20,11 @@ extension Parser {
             return try parseSwitchStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(NeatSyntax.Keyword.constant.rawValue) = peek() {
+        if case .keyword(NeatSyntax.Keyword.value.rawValue) = peek() {
             advance()
             return try parseLocalDeclaration(kind: .constant, localBindings: &localBindings)
         }
-        if case .keyword(NeatSyntax.Keyword.variable.rawValue) = peek() {
+        if case .keyword(NeatSyntax.Keyword.state.rawValue) = peek() {
             advance()
             return try parseLocalDeclaration(kind: .mutable, localBindings: &localBindings)
         }
@@ -112,7 +112,7 @@ extension Parser {
     ) throws -> AssignmentTarget {
         if let localKind = localBindings[name] {
             if case .constant = localKind {
-                throw ParseError("Cannot assign to let constant '\(name)'.")
+                throw ParseError("Cannot assign to immutable value '\(name)'.")
             }
             return .local(name)
         }
@@ -283,16 +283,13 @@ extension Parser {
         if peek() == .keyword(NeatSyntax.Keyword.continueStatement.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.constant.rawValue)
-            || peek() == .keyword(NeatSyntax.Keyword.variable.rawValue)
+        if peek() == .keyword(NeatSyntax.Keyword.value.rawValue)
+            || peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
         {
             return true
         }
 
-        guard case .identifier(let name) = peek() else { return false }
-        if name == "print" && peek(offset: 1) == .leftParen {
-            return true
-        }
+        guard case .identifier = peek() else { return false }
         if isStandaloneCallExpressionStart() {
             return true
         }

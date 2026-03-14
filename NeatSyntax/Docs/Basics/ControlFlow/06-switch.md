@@ -3,13 +3,13 @@
 ```neat
 switch mode {
 case .light: {
-    print("light")
+    Logger.info("light")
 }
 case .dark: {
-    print("dark")
+    Logger.info("dark")
 }
 default: {
-    print("unknown")
+    Logger.info("unknown")
 }
 }
 ```

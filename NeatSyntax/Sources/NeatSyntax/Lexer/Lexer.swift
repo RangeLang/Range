@@ -228,9 +228,10 @@ struct Lexer {
     private mutating func readString() throws -> String {
         advance()
         var result = ""
+        var interpolationDepth = 0
 
         while let character = peek() {
-            if character == "\"" {
+            if character == "\"" && interpolationDepth == 0 {
                 advance()
                 return result
             }
@@ -242,7 +243,23 @@ struct Lexer {
                 }
                 result.append("\\")
                 result.append(escaped)
+                if escaped == "(" {
+                    interpolationDepth += 1
+                }
                 continue
+            }
+
+            if interpolationDepth > 0 {
+                if character == "\"" {
+                    result.append(try readInterpolatedStringLiteral())
+                    continue
+                }
+
+                if character == "(" {
+                    interpolationDepth += 1
+                } else if character == ")" {
+                    interpolationDepth -= 1
+                }
             }
 
             result.append(character)
@@ -250,6 +267,30 @@ struct Lexer {
         }
 
         throw ParseError("Unterminated string literal.")
+    }
+
+    private mutating func readInterpolatedStringLiteral() throws -> String {
+        var result = "\""
+        advance()
+
+        while let character = peek() {
+            result.append(character)
+            advance()
+
+            if character == "\\" {
+                guard let escaped = advance() else {
+                    throw ParseError("Unterminated escape sequence in string literal.")
+                }
+                result.append(escaped)
+                continue
+            }
+
+            if character == "\"" {
+                return result
+            }
+        }
+
+        throw ParseError("Unterminated string literal inside interpolation.")
     }
 
     private mutating func skipLineComment() {

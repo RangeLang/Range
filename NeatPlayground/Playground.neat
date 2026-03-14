@@ -1,6 +1,6 @@
 @main {
-  let numbers = [1, 2, 3, 4]
-  var total = 0
+  value numbers = [1, 2, 3, 4]
+  state total = 0
 
   Logger.info("Neat playground")
 
@@ -8,9 +8,7 @@
     total += number
   }
 
-  if total == 10 {
-    Logger.success("sum = \(total)")
-  } else {
-    Logger.warning("unexpected sum")
-  }
+
+    Logger.success("sum is \(total == 10 ? "correct" : "incorrect")")
+
 }

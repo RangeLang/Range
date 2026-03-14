@@ -12,7 +12,7 @@ The focus here is the core syntax implemented in `NeatSyntax`: declarations, mem
 - typed members with `value name: Type`
 - declaration state with `state name: Type = value`
 - declaration bindings with `binding name: Type`
-- local `let` and `var` bindings inside statement blocks
+- local `value` and `state` bindings inside statement blocks
 - callable members with `@name(...)`
 - explicit binding references with `$name`
 - optional types like `Int?` and empty optional values with `none`

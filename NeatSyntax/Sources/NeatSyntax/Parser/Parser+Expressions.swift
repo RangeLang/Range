@@ -125,6 +125,9 @@ extension Parser {
             return .double(value)
         case .stringLiteral(let value):
             advance()
+            if value.contains("\\(") {
+                return .interpolatedString(parseInterpolatedString(value))
+            }
             return .string(value)
         case .identifier(let name):
             advance()
@@ -233,6 +236,8 @@ extension Parser {
             throw ParseError(
                 "Floating-point type inference is not supported in state initializers yet.")
         case .string:
+            return .string
+        case .interpolatedString:
             return .string
         case .boolean:
             return .bool

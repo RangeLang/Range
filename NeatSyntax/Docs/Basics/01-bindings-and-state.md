@@ -1,6 +1,6 @@
 # Bindings And State
 
-Neat uses `let` and `var` in statement blocks, and `state` plus `binding` inside declarations.
+Neat uses `value` and `state` for owned bindings, plus `binding` for borrowed mutable access.
 
 ## Local Bindings
 
@@ -8,8 +8,8 @@ Inside statement blocks:
 
 ```neat
 @increment() {
-    let step = 1
-    var next = count
+    value step = 1
+    state next = count
     next += step
     count = next
 }
@@ -17,10 +17,10 @@ Inside statement blocks:
 
 Current rules:
 
-- `let` is immutable
-- `var` is mutable
-- local bindings require an initializer
-- local bindings currently appear inside statement blocks, not as top-level declarations
+- `value` is immutable
+- `state` is mutable
+- local owned bindings require an initializer
+- local owned bindings currently appear inside statement blocks, not as file-level script declarations
 
 ## State
 
@@ -98,7 +98,7 @@ Current rules:
 
 ## Member Declarations
 
-Declaration members use `value`, but they are not the same thing as local mutable bindings.
+Declaration members also use `value`, but they are not the same thing as statement-level owned bindings.
 
 ```neat
 #Counter {

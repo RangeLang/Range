@@ -9,7 +9,7 @@ The parser recognizes a small number of core ideas:
 - declarations can compose with `:`
 - declarations can expose callables with `@name(...)`
 - declarations can carry cases with `case ...`
-- statements use `let`, `var`, and control flow
+- statements use `value`, `state`, and control flow
 
 Minimal example:
 

@@ -487,14 +487,6 @@
           "members": [
             {
               "type": "STRING",
-              "value": "let"
-            },
-            {
-              "type": "STRING",
-              "value": "var"
-            },
-            {
-              "type": "STRING",
               "value": "state"
             },
             {

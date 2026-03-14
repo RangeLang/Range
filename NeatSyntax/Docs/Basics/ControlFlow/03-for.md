@@ -4,7 +4,7 @@
 
 ```neat
 for item in items {
-    print("Item: \\(item)")
+    Logger.info("Item: \\(item)")
 }
 ```
 

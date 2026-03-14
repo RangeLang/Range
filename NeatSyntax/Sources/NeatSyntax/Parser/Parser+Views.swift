@@ -147,15 +147,22 @@ extension Parser {
             guard invocation.arguments.count == 1 else {
                 throw ParseError("Text requires exactly one argument.")
             }
-            guard invocation.arguments[0].label == nil,
-                case .string(let content) = invocation.arguments[0].value
-            else {
+            guard invocation.arguments[0].label == nil else {
+                throw ParseError("Text argument must be a string literal.")
+            }
+            let content: InterpolatedString
+            switch invocation.arguments[0].value {
+            case .string(let raw):
+                content = parseInterpolatedString(raw)
+            case .interpolatedString(let string):
+                content = string
+            default:
                 throw ParseError("Text argument must be a string literal.")
             }
             guard invocation.block == nil else {
                 throw ParseError("Text does not accept a trailing block.")
             }
-            return .text(parseInterpolatedString(content))
+            return .text(content)
         case "Button":
             guard invocation.arguments.count == 1 else {
                 throw ParseError("Button requires exactly one argument.")
@@ -382,14 +389,15 @@ extension Parser {
             }
 
             let expressionStart = interpolationStart.upperBound
-            guard let expressionEnd = value[expressionStart...].firstIndex(of: ")") else {
+            guard let expressionEnd = findInterpolationEnd(in: value, startingAt: expressionStart)
+            else {
                 segments.append(.text(String(value[interpolationStart.lowerBound...])))
                 return InterpolatedString(segments: segments)
             }
 
             let expressionText = value[expressionStart..<expressionEnd].trimmingCharacters(
                 in: .whitespacesAndNewlines)
-            segments.append(.expression(.identifier(expressionText)))
+            segments.append(.expression(parseInterpolationExpression(expressionText)))
             cursor = value.index(after: expressionEnd)
         }
 
@@ -399,5 +407,62 @@ extension Parser {
         }
 
         return InterpolatedString(segments: segments)
+    }
+
+    func findInterpolationEnd(in value: String, startingAt start: String.Index) -> String.Index? {
+        var cursor = start
+        var depth = 1
+        var inString = false
+        var stringEscape = false
+
+        while cursor < value.endIndex {
+            let character = value[cursor]
+
+            if inString {
+                if stringEscape {
+                    stringEscape = false
+                } else if character == "\\" {
+                    stringEscape = true
+                } else if character == "\"" {
+                    inString = false
+                }
+
+                cursor = value.index(after: cursor)
+                continue
+            }
+
+            switch character {
+            case "\"":
+                inString = true
+            case "(":
+                depth += 1
+            case ")":
+                depth -= 1
+                if depth == 0 {
+                    return cursor
+                }
+            default:
+                break
+            }
+
+            cursor = value.index(after: cursor)
+        }
+
+        return nil
+    }
+
+    func parseInterpolationExpression(_ source: String) -> Expression {
+        guard !source.isEmpty else {
+            return .string("")
+        }
+
+        do {
+            var parser = try Parser(source: source)
+            let expression = try parser.parseExpression()
+            try parser.consume(.eof)
+            return expression
+        } catch {
+            return .identifier(source)
+        }
     }
 }

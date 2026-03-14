@@ -10,7 +10,6 @@
   "case"
   "extension"
   "func"
-  "let"
   "protocol"
   "state"
   "binding"
@@ -27,18 +26,19 @@
   "else"
   "switch"
   "default"
-  "break"
-  "continue"
   "return"
 ] @keyword.control
+
+(break_statement) @keyword.control
+(continue_statement) @keyword.control
 
 ; Projection keyword
 "on" @keyword
 
 ; ── @main entry point (special bold treatment) ───────────────────────────────
 ((callable_declaration
-  name: (identifier) @keyword.special)
- (#eq? @keyword.special "main"))
+  name: (identifier) @keyword.special
+  (#eq? @keyword.special "main")))
 
 ; ── Declarations ─────────────────────────────────────────────────────────────
 (sigiled_declaration

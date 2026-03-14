@@ -89,7 +89,7 @@ module.exports = grammar({
 
     variable_declaration: ($) =>
       seq(
-        choice("let", "var", "state", "binding", "value"),
+        choice("state", "binding", "value"),
         field("name", $.identifier),
         optional(seq(":", field("type", $.type))),
         optional(seq("=", field("value", $.expression))),
@@ -168,12 +168,7 @@ module.exports = grammar({
         "if",
         field("condition", $.expression),
         field("body", $.block),
-        optional(
-          seq(
-            "else",
-            field("else", choice($.if_statement, $.block)),
-          ),
-        ),
+        optional(seq("else", field("else", choice($.if_statement, $.block)))),
       ),
 
     for_statement: ($) =>
@@ -186,11 +181,7 @@ module.exports = grammar({
       ),
 
     while_statement: ($) =>
-      seq(
-        "while",
-        field("condition", $.expression),
-        field("body", $.block),
-      ),
+      seq("while", field("condition", $.expression), field("body", $.block)),
 
     switch_statement: ($) =>
       seq(
@@ -204,8 +195,7 @@ module.exports = grammar({
     switch_case: ($) =>
       seq("case", field("pattern", $.expression), ":", field("body", $.block)),
 
-    switch_default: ($) =>
-      seq("default", ":", field("body", $.block)),
+    switch_default: ($) => seq("default", ":", field("body", $.block)),
 
     break_statement: (_) => "break",
 
@@ -262,32 +252,41 @@ module.exports = grammar({
 
     binary_expression: ($) =>
       choice(
-        prec.left(PREC.comparison, seq(
-          field("left", $.expression),
-          field("operator", choice("==", "!=", "<", "<=", ">", ">=")),
-          field("right", $.expression),
-        )),
-        prec.left(PREC.logical, seq(
-          field("left", $.expression),
-          field("operator", choice("&&", "||")),
-          field("right", $.expression),
-        )),
+        prec.left(
+          PREC.comparison,
+          seq(
+            field("left", $.expression),
+            field("operator", choice("==", "!=", "<", "<=", ">", ">=")),
+            field("right", $.expression),
+          ),
+        ),
+        prec.left(
+          PREC.logical,
+          seq(
+            field("left", $.expression),
+            field("operator", choice("&&", "||")),
+            field("right", $.expression),
+          ),
+        ),
       ),
 
     unary_expression: ($) =>
-      prec(PREC.unary, seq(
-        field("operator", "!"),
-        field("operand", $.expression),
-      )),
+      prec(
+        PREC.unary,
+        seq(field("operator", "!"), field("operand", $.expression)),
+      ),
 
     ternary_expression: ($) =>
-      prec.right(PREC.ternary, seq(
-        field("condition", $.expression),
-        "?",
-        field("then", $.expression),
-        ":",
-        field("else", $.expression),
-      )),
+      prec.right(
+        PREC.ternary,
+        seq(
+          field("condition", $.expression),
+          "?",
+          field("then", $.expression),
+          ":",
+          field("else", $.expression),
+        ),
+      ),
 
     call_expression: ($) =>
       prec.left(

@@ -2,11 +2,11 @@
 
 ```neat
 if isPrimary {
-    print("Primary")
+    Logger.info("Primary")
 } else if isSecondary {
-    print("Secondary")
+    Logger.info("Secondary")
 } else {
-    print("Default")
+    Logger.info("Default")
 }
 ```
 
@@ -21,5 +21,5 @@ Current conditional rules:
 - ternary expressions use `condition ? whenTrue : whenFalse`
 
 ```neat
-let label = isPrimary ? "Primary" : "Secondary"
+value label = isPrimary ? "Primary" : "Secondary"
 ```

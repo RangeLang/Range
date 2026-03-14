@@ -280,6 +280,7 @@ public indirect enum Expression {
     case integer(Int)
     case double(Double)
     case string(String)
+    case interpolatedString(InterpolatedString)
     case boolean(Bool)
     case none
     case identifier(String)

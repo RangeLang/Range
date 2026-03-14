@@ -425,6 +425,9 @@ private struct MainProgramInterpreter {
         case .string(let value):
             return .string(value)
 
+        case .interpolatedString(let value):
+            return .string(render(value))
+
         case .boolean(let value):
             return .bool(value)
 
@@ -656,7 +659,7 @@ private struct MainProgramInterpreter {
                 throw ValidationError("Unknown mutable symbol '\(name)'.")
             }
             guard slot.kind == .mutable else {
-                throw ValidationError("Cannot assign to let constant '\(name)'.")
+                throw ValidationError("Cannot assign to immutable value '\(name)'.")
             }
             slot.value = value
 
