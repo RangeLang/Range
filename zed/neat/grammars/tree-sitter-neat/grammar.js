@@ -296,20 +296,25 @@ module.exports = grammar({
     call_expression: ($) =>
       prec.left(
         PREC.call,
-        seq(
-          field(
-            "function",
-            choice($.identifier, $.type_identifier, $.member_expression),
-          ),
-          choice(
-            seq(
-              field("arguments", $.argument_clause),
-              optional(field("body", $.block)),
-              repeat(field("modifier", $.modifier_call)),
+        choice(
+          seq(
+            field(
+              "function",
+              choice($.identifier, $.type_identifier, $.member_expression),
             ),
-            seq(
-              field("body", $.block),
-              repeat(field("modifier", $.modifier_call)),
+            field("arguments", $.argument_clause),
+            optional(field("body", $.block)),
+            repeat(field("modifier", $.modifier_call)),
+          ),
+          seq(
+            field("function", choice($.type_identifier, $.member_expression)),
+            field("body", $.block),
+            repeat(field("modifier", $.modifier_call)),
+          ),
+          seq(
+            field(
+              "function",
+              choice($.identifier, $.type_identifier, $.member_expression),
             ),
             repeat1(field("modifier", $.modifier_call)),
           ),
