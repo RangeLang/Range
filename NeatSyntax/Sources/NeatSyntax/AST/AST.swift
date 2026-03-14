@@ -81,6 +81,11 @@ public struct AssociatedValueDeclaration {
 public struct NeatFunctionParameter {
     public let name: String
     public let typeName: String?
+
+    public var isOptional: Bool {
+        guard let typeName else { return false }
+        return typeName.hasSuffix("?")
+    }
 }
 
 public struct CallableDeclaration {

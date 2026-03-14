@@ -52,7 +52,7 @@ extension NeatCLI {
                 }
                 _ = try PackageManifestLoader.load(from: packageFile)
 
-                let files = try neatFiles(in: projectRoot)
+                let files = try neatFiles(in: projectRoot, excludingManifestAt: packageFile)
                 guard !files.isEmpty else {
                     throw ValidationError("No .neat source files found in \(projectRoot.path)")
                 }
@@ -73,7 +73,7 @@ extension NeatCLI {
         }
 
         private func validateFile(at fileURL: URL) throws {
-            if fileURL.lastPathComponent == "Package.neat" {
+            if isPackageManifest(fileURL) {
                 _ = try PackageManifestLoader.load(from: fileURL)
                 return
             }
@@ -82,7 +82,7 @@ extension NeatCLI {
             _ = try parser.parseSourceFile()
         }
 
-        private func neatFiles(in root: URL) throws -> [URL] {
+        private func neatFiles(in root: URL, excludingManifestAt manifestURL: URL) throws -> [URL] {
             guard
                 let enumerator = FileManager.default.enumerator(
                     at: root,
@@ -112,13 +112,23 @@ extension NeatCLI {
                 guard fileURL.pathExtension.lowercased() == "neat" else {
                     continue
                 }
-                if fileURL.lastPathComponent == "Package.neat" {
+                if fileURL.standardizedFileURL == manifestURL.standardizedFileURL {
                     continue
                 }
                 files.append(fileURL)
             }
 
             return files.sorted { $0.path < $1.path }
+        }
+
+        private func isPackageManifest(_ fileURL: URL) -> Bool {
+            guard fileURL.lastPathComponent == "Package.neat" else {
+                return false
+            }
+
+            let parent = fileURL.deletingLastPathComponent()
+            let sourcesDirectory = parent.appendingPathComponent("Sources", isDirectory: true)
+            return FileManager.default.fileExists(atPath: sourcesDirectory.path)
         }
     }
 }

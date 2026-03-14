@@ -1,0 +1,3 @@
+#OKLCH on Color {
+    @oklch(lightness: Int, chroma: Int, hue: Int, alpha: Int?)
+}

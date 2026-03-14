@@ -1,0 +1,3 @@
+#Color {
+    case red, blue, green, white, black, gray, clear
+}

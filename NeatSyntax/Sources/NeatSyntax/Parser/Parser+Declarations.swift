@@ -540,15 +540,18 @@ extension Parser {
     func validateCallableDeclarations(_ callables: [CallableDeclaration]) throws {
         var seen: Set<String> = []
         for callable in callables {
-            let signature = callableSignatureKey(
+            try validateOmittableParameters(callable.parameters, context: "callable")
+            let signatures = callableSignatureKeys(
                 targetName: callable.targetName,
                 name: callable.name,
                 parameters: callable.parameters
             )
-            guard seen.insert(signature).inserted else {
-                throw ParseError(
-                    "Duplicate callable declaration \(renderCallableSignature(targetName: callable.targetName, name: callable.name, parameters: callable.parameters))."
-                )
+            for signature in signatures {
+                guard seen.insert(signature).inserted else {
+                    throw ParseError(
+                        "Duplicate callable declaration \(renderCallableSignature(targetName: callable.targetName, name: callable.name, parameters: callable.parameters))."
+                    )
+                }
             }
         }
     }
@@ -556,11 +559,14 @@ extension Parser {
     func validateInitializerDeclarations(_ initializers: [InitializerDeclaration]) throws {
         var seen: Set<String> = []
         for initializer in initializers {
-            let signature = initializerSignatureKey(parameters: initializer.parameters)
-            guard seen.insert(signature).inserted else {
-                throw ParseError(
-                    "Duplicate initializer declaration \(renderInitializerSignature(parameters: initializer.parameters))."
-                )
+            try validateOmittableParameters(initializer.parameters, context: "initializer")
+            let signatures = initializerSignatureKeys(parameters: initializer.parameters)
+            for signature in signatures {
+                guard seen.insert(signature).inserted else {
+                    throw ParseError(
+                        "Duplicate initializer declaration \(renderInitializerSignature(parameters: initializer.parameters))."
+                    )
+                }
             }
         }
     }
@@ -572,13 +578,15 @@ extension Parser {
         return zip(lhs, rhs).allSatisfy { $0.typeName == $1.typeName }
     }
 
-    func callableSignatureKey(
+    func callableSignatureKeys(
         targetName: String?,
         name: String,
         parameters: [NeatFunctionParameter]
-    ) -> String {
-        let rendered = parameters.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
-        return "\(targetName ?? "_")@\(name)(\(rendered))"
+    ) -> [String] {
+        signatureParameterVariants(parameters).map { variant in
+            let rendered = variant.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
+            return "\(targetName ?? "_")@\(name)(\(rendered))"
+        }
     }
 
     func renderCallableSignature(
@@ -596,8 +604,10 @@ extension Parser {
         return "@\(name)(\(rendered))"
     }
 
-    func initializerSignatureKey(parameters: [NeatFunctionParameter]) -> String {
-        parameters.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
+    func initializerSignatureKeys(parameters: [NeatFunctionParameter]) -> [String] {
+        signatureParameterVariants(parameters).map { variant in
+            variant.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
+        }
     }
 
     func renderInitializerSignature(parameters: [NeatFunctionParameter]) -> String {
@@ -606,6 +616,36 @@ extension Parser {
             return "\(parameter.name): \(typeName)"
         }.joined(separator: ", ")
         return "init(\(rendered))"
+    }
+
+    func validateOmittableParameters(_ parameters: [NeatFunctionParameter], context: String) throws
+    {
+        var encounteredOptional = false
+        for parameter in parameters.reversed() {
+            if parameter.isOptional {
+                encounteredOptional = true
+                continue
+            }
+            if encounteredOptional {
+                throw ParseError(
+                    "Optional trailing parameters in \(context) declarations must come after all required parameters."
+                )
+            }
+        }
+    }
+
+    func signatureParameterVariants(_ parameters: [NeatFunctionParameter])
+        -> [[NeatFunctionParameter]]
+    {
+        var variants: [[NeatFunctionParameter]] = [parameters]
+        var current = parameters
+
+        while let last = current.last, last.isOptional {
+            current.removeLast()
+            variants.append(current)
+        }
+
+        return variants
     }
 
     mutating func skipUnknownBlockBody() throws {
