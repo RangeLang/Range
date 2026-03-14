@@ -13,7 +13,7 @@ version = "0.7.0"
 
 [grammars.neat]
 repository = "file:///Users/george/Documents/WebProjects/Neat"
-rev = "66e0289788b8cf4cc18cc64155efd57778dc4d84"
+rev = "66e02890aa677006b1c34372b06facd3be77a0b2"
 path = "zed/neat/grammars/tree-sitter-neat"
 
 [language_servers.neat-lsp]
