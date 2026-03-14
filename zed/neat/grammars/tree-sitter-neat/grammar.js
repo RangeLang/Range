@@ -2,6 +2,10 @@ const PREC = {
   member: 8,
   call: 7,
   modifier: 6,
+  unary: 5,
+  comparison: 4,
+  logical: 3,
+  ternary: 2,
 };
 
 module.exports = grammar({
@@ -11,7 +15,7 @@ module.exports = grammar({
 
   word: ($) => $.identifier,
 
-  supertypes: ($) => [$.declaration, $.expression, $.type],
+  supertypes: ($) => [$.declaration, $.expression, $.type, $.statement],
 
   rules: {
     source_file: ($) => repeat($.declaration),
@@ -34,12 +38,14 @@ module.exports = grammar({
       seq(
         "#",
         field("name", $.type_identifier),
+        optional(seq("on", field("target", $.type_identifier))),
         optional(seq(":", commaSep1($.type_identifier))),
         field("body", $.block),
       ),
 
     callable_declaration: ($) =>
       seq(
+        optional(field("receiver", seq($.type_identifier, "@"))),
         "@",
         field("name", $.identifier),
         field("parameters", $.parameter_clause),
@@ -144,6 +150,72 @@ module.exports = grammar({
         ),
       ),
 
+    // ── Statements ────────────────────────────────────────────────────────────
+
+    statement: ($) =>
+      choice(
+        $.if_statement,
+        $.for_statement,
+        $.while_statement,
+        $.switch_statement,
+        $.break_statement,
+        $.continue_statement,
+        $.return_statement,
+      ),
+
+    if_statement: ($) =>
+      seq(
+        "if",
+        field("condition", $.expression),
+        field("body", $.block),
+        optional(
+          seq(
+            "else",
+            field("else", choice($.if_statement, $.block)),
+          ),
+        ),
+      ),
+
+    for_statement: ($) =>
+      seq(
+        "for",
+        field("binding", $.identifier),
+        "in",
+        field("collection", $.expression),
+        field("body", $.block),
+      ),
+
+    while_statement: ($) =>
+      seq(
+        "while",
+        field("condition", $.expression),
+        field("body", $.block),
+      ),
+
+    switch_statement: ($) =>
+      seq(
+        "switch",
+        field("subject", $.expression),
+        "{",
+        repeat(choice($.switch_case, $.switch_default)),
+        "}",
+      ),
+
+    switch_case: ($) =>
+      seq("case", field("pattern", $.expression), ":", field("body", $.block)),
+
+    switch_default: ($) =>
+      seq("default", ":", field("body", $.block)),
+
+    break_statement: (_) => "break",
+
+    continue_statement: (_) => "continue",
+
+    return_statement: ($) =>
+      prec.right(seq("return", optional(field("value", $.expression)))),
+
+    // ── Block ─────────────────────────────────────────────────────────────────
+
     block: ($) =>
       seq(
         "{",
@@ -151,6 +223,7 @@ module.exports = grammar({
           choice(
             $.declaration,
             $.member_declaration,
+            $.statement,
             $.assignment,
             $.expression,
           ),
@@ -165,21 +238,56 @@ module.exports = grammar({
         field("right", $.expression),
       ),
 
+    // ── Expressions ───────────────────────────────────────────────────────────
+
     expression: ($) =>
       choice(
         $.call_expression,
         $.modifier_call,
         $.member_expression,
         $.closure_expression,
+        $.binary_expression,
+        $.unary_expression,
+        $.ternary_expression,
         $.dictionary_literal,
         $.array_literal,
         $.string_literal,
         $.float_literal,
         $.integer_literal,
         $.boolean_literal,
+        $.nil_literal,
         $.type_identifier,
         $.identifier,
       ),
+
+    binary_expression: ($) =>
+      choice(
+        prec.left(PREC.comparison, seq(
+          field("left", $.expression),
+          field("operator", choice("==", "!=", "<", "<=", ">", ">=")),
+          field("right", $.expression),
+        )),
+        prec.left(PREC.logical, seq(
+          field("left", $.expression),
+          field("operator", choice("&&", "||")),
+          field("right", $.expression),
+        )),
+      ),
+
+    unary_expression: ($) =>
+      prec(PREC.unary, seq(
+        field("operator", "!"),
+        field("operand", $.expression),
+      )),
+
+    ternary_expression: ($) =>
+      prec.right(PREC.ternary, seq(
+        field("condition", $.expression),
+        "?",
+        field("then", $.expression),
+        ":",
+        field("else", $.expression),
+      )),
 
     call_expression: ($) =>
       prec.left(
@@ -250,6 +358,8 @@ module.exports = grammar({
     float_literal: (_) => /\d+\.\d+/,
 
     boolean_literal: (_) => choice("true", "false"),
+
+    nil_literal: (_) => "nil",
 
     identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
 
