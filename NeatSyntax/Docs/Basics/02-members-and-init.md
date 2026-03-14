@@ -1,30 +1,28 @@
 # Members And Callables
 
-Declarations use typed members directly, and callable entrypoints use `#name(...)`.
+Declarations use typed members directly, and callable entrypoints use `@name(...)`.
 
 ```neat
-@App: Role {
-    var head: Head {
-    }
+#Counter: Value {
+    var count: Int
 }
 ```
 
 Typed member example:
 
 ```neat
-@Page: Role {
-    var head: Head
+#Record: Value {
+    var id: Int
+    var name: String
     var selectedID: Int?
-    var body: Component {
-    }
 }
 ```
 
 Callable example:
 
 ```neat
-@Theme: Role {
-    #theme() {
+#Logger: Service {
+    @write(text: String) {
     }
 }
 ```
@@ -32,18 +30,19 @@ Callable example:
 Overloaded callable example:
 
 ```neat
-@BackgroundStyle: Role {
-    #background(color: Color) {
+#Formatter: Service {
+    @format(value: Int) {
     }
 
-    #background(color: String) {
+    @format(value: String) {
     }
 }
 ```
 
 Current surface:
 
-- `#name(...)` defines a callable entrypoint on a declaration
+- `@name(...)` defines a callable entrypoint on a declaration
+- `Target@name(...)` defines a callable with an explicit projection target
 - multiple callables are allowed on the same declaration
 - duplicate exact callable signatures on the same declaration are rejected
 - member declarations parse as `var name: Type` and can also use optional types like `var name: Type?`

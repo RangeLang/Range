@@ -419,7 +419,7 @@ struct ProjectScaffolder {
 
     private func renderApp(name: String) -> String {
         """
-        @main \(name): App {
+        #\(name): App {
           var head: Head {
             Meta.title("\(name)")
             Meta.description("A .neat application scaffolded by NeatCLI.")
@@ -439,8 +439,8 @@ struct ProjectScaffolder {
 
     private func renderProgramMain(name: String) -> String {
         """
-        @main \(name): Program {
-          #run() {
+        #\(name): Program {
+          @run() {
           }
         }
         """
@@ -464,11 +464,11 @@ struct ProjectScaffolder {
 
     private func renderHomePage(appName: String) -> String {
         """
-        @StyleModifier Background {
+        #Background: StyleModifier {
           var color: Color
         }
 
-        @HomePage: Page {
+        #HomePage: Page {
           var head: Head {
             Meta.title("Home")
             Meta.description("The home page for \(appName).")
@@ -496,7 +496,7 @@ struct ProjectScaffolder {
 
     private func renderAboutPage(appName: String) -> String {
         """
-        @AboutPage: Page {
+        #AboutPage: Page {
           var head: Head {
             Meta.title("About")
             Meta.description("About the \(appName) application.")
@@ -514,7 +514,7 @@ struct ProjectScaffolder {
 
     private func renderHeader() -> String {
         """
-        @HomePageHeader: Component {
+        #HomePageHeader: Component {
           var body: Component {
             VStack {
               Text("Neat")

@@ -5,21 +5,14 @@ extension Parser {
         var objects: [ObjectType] = []
         while true {
             switch peek() {
-            case .keyword(NeatSyntax.Keyword.function.rawValue):
-                objects.append(.neatFunction(try parseNeatFunctionDeclaration()))
             case .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
                 objects.append(.typeExtension(try parseTypeExtensionDeclaration()))
-            case .atAttribute(let attr, _) where attr == "StyleModifier":
-                try skipStyleModifierDeclaration()
             default:
                 break
             }
 
             switch peek() {
-            case .keyword(NeatSyntax.Keyword.function.rawValue),
-                .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
-                continue
-            case .atAttribute(let attr, _) where attr == "StyleModifier":
+            case .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
                 continue
             default:
                 break
@@ -106,28 +99,13 @@ extension Parser {
         )
     }
 
-    mutating func parseNeatFunctionDeclaration() throws -> NeatFunctionDeclaration {
-        try consumeKeyword(.function)
-        let name = try consumeIdentifier()
-        let parameters = try parseFunctionParameters()
-
-        var returnType: String?
-        if peek() == .arrow {
-            try consume(.arrow)
-            returnType = try consumeTypeReference()
-        }
-
-        if peek() == .leftBrace {
-            try consume(.leftBrace)
-            try skipUnknownBlockBody()
-            try consume(.rightBrace)
-        }
-
-        return NeatFunctionDeclaration(name: name, parameters: parameters, returnType: returnType)
-    }
-
     mutating func parseCallableDeclaration() throws -> CallableDeclaration {
-        guard case .hashDirective(let name) = peek() else {
+        var targetName: String?
+        if case .identifier(let target) = peek(), case .atAttribute = peek(offset: 1) {
+            targetName = target
+            advance()
+        }
+        guard case .atAttribute(let name, _) = peek() else {
             throw ParseError("Expected callable declaration.")
         }
         advance()
@@ -138,24 +116,12 @@ extension Parser {
             try skipUnknownBlockBody()
             try consume(.rightBrace)
         }
-        return CallableDeclaration(name: name, parameters: parameters, hasBody: hasBody)
-    }
-
-    mutating func skipStyleModifierDeclaration() throws {
-        try consume(.atAttribute(name: "StyleModifier", argument: nil))
-        let name = try consumeIdentifier()
-        if peek() == .colon {
-            throw ParseError(
-                "@StyleModifier '\(name)' should not declare conformance; style modifiers are implicitly callable."
-            )
-        }
-        if peek() == .leftBrace {
-            try consume(.leftBrace)
-            while peek() != .rightBrace {
-                advance()
-            }
-            try consume(.rightBrace)
-        }
+        return CallableDeclaration(
+            targetName: targetName,
+            name: name,
+            parameters: parameters,
+            hasBody: hasBody
+        )
     }
 
     mutating func parseTypeExtensionDeclaration() throws -> TypeExtensionDeclaration {
@@ -347,7 +313,7 @@ extension Parser {
 
     mutating func parseDeclarationKind() throws -> DeclarationKind {
         guard let kind = NeatSyntax.declarationKind(for: peek()) else {
-            throw ParseError("Expected @main or a declaration attribute.")
+            throw ParseError("Expected declaration starting with #.")
         }
         advance()
         return kind
@@ -357,30 +323,19 @@ extension Parser {
         -> (name: String, conformances: [String], projectionTarget: String?)
     {
         guard let attribute else {
-            throw ParseError("Expected declaration attribute.")
-        }
-
-        if attribute.name == "main" {
-            let name = try consumeIdentifier()
-            let conformances = try parseConformanceListIfPresent()
-            guard !conformances.isEmpty else {
-                throw ParseError(
-                    "@main requires an entry contract, e.g. @main MyApp: App { ... }."
-                )
-            }
-            return (name, conformances, nil)
+            throw ParseError("Expected declaration name after #.")
         }
 
         if peek() == .colon || peek() == .keyword(NeatSyntax.Keyword.projection.rawValue)
             || peek() == .leftBrace
         {
-            let conformances = try parseConformanceListIfPresent()
             let projectionTarget = try parseProjectionTargetIfPresent()
+            let conformances = try parseConformanceListIfPresent()
             return (attribute.name, conformances, projectionTarget)
         }
 
         throw ParseError(
-            "Expected ':', 'on', or '{' after @\(attribute.name). Use @\(attribute.name) { ... }, @\(attribute.name): Protocol { ... }, or @\(attribute.name): Role on Target { ... }."
+            "Expected 'on', ':', or '{' after #\(attribute.name). Use #\(attribute.name) { ... }, #\(attribute.name): Contract { ... }, or #\(attribute.name) on Target: Contract { ... }."
         )
     }
 
@@ -447,7 +402,7 @@ extension Parser {
     }
 
     func isCallableStart() -> Bool {
-        if case .hashDirective = peek() {
+        if case .atAttribute = peek() {
             return true
         }
         return false
@@ -457,10 +412,13 @@ extension Parser {
         var seen: Set<String> = []
         for callable in callables {
             let signature = callableSignatureKey(
-                name: callable.name, parameters: callable.parameters)
+                targetName: callable.targetName,
+                name: callable.name,
+                parameters: callable.parameters
+            )
             guard seen.insert(signature).inserted else {
                 throw ParseError(
-                    "Duplicate callable declaration \(renderCallableSignature(name: callable.name, parameters: callable.parameters))."
+                    "Duplicate callable declaration \(renderCallableSignature(targetName: callable.targetName, name: callable.name, parameters: callable.parameters))."
                 )
             }
         }
@@ -473,17 +431,28 @@ extension Parser {
         return zip(lhs, rhs).allSatisfy { $0.typeName == $1.typeName }
     }
 
-    func callableSignatureKey(name: String, parameters: [NeatFunctionParameter]) -> String {
+    func callableSignatureKey(
+        targetName: String?,
+        name: String,
+        parameters: [NeatFunctionParameter]
+    ) -> String {
         let rendered = parameters.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
-        return "\(name)(\(rendered))"
+        return "\(targetName ?? "_")@\(name)(\(rendered))"
     }
 
-    func renderCallableSignature(name: String, parameters: [NeatFunctionParameter]) -> String {
+    func renderCallableSignature(
+        targetName: String?,
+        name: String,
+        parameters: [NeatFunctionParameter]
+    ) -> String {
         let rendered = parameters.map { parameter in
             let typeName = parameter.typeName ?? "_"
             return "\(parameter.name): \(typeName)"
         }.joined(separator: ", ")
-        return "#\(name)(\(rendered))"
+        if let targetName {
+            return "\(targetName)@\(name)(\(rendered))"
+        }
+        return "@\(name)(\(rendered))"
     }
 
     mutating func skipUnknownBlockBody() throws {

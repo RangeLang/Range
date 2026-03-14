@@ -63,13 +63,6 @@ extension NeatCLI {
                 let lineNumber = index + 1
                 let prefix = "[\(fileName):\(lineNumber)] "
 
-                if let range = rawLine.range(of: "#print(\"") {
-                    var line = rawLine
-                    line.replaceSubrange(range, with: "print(\"\(prefix)")
-                    result.append(line)
-                    continue
-                }
-
                 if let range = rawLine.range(of: "print(\"") {
                     var line = rawLine
                     line.replaceSubrange(range, with: "print(\"\(prefix)")

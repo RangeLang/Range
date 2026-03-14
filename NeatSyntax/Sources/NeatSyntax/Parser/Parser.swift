@@ -28,16 +28,12 @@ public struct Parser {
     var currentStateTypes: [String: BuiltinType] = [:]
 
     public init(source: String) throws {
-        let normalized = source.replacingOccurrences(of: "#print(", with: "print(")
-        var lexer = Lexer(source: normalized)
+        var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
     }
 
     public mutating func parseComponent() throws -> ComponentNode {
         let declaration = try parseDeclaration()
-        guard declaration.kind != .entry else {
-            throw ParseError("Expected a renderable declaration, not @main.")
-        }
         guard let body = declaration.body else {
             throw ParseError("Component declaration requires a body block.")
         }

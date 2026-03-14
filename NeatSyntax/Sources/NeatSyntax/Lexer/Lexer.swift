@@ -119,8 +119,7 @@ struct Lexer {
                 tokens.append(.hashDirective(identifier))
             case "@":
                 let identifier = try readSigilIdentifier()
-                let argument = try readSigilArgumentIfPresent()
-                tokens.append(.atAttribute(name: identifier, argument: argument))
+                tokens.append(.atAttribute(name: identifier, argument: nil))
             default:
                 if character.isNumber {
                     tokens.append(try readNumberLiteral())
@@ -181,36 +180,6 @@ struct Lexer {
             throw ParseError("Expected identifier after #.")
         }
         return readIdentifier()
-    }
-
-    private mutating func readSigilArgumentIfPresent() throws -> String? {
-        guard peek() == "(" else {
-            return nil
-        }
-
-        advance()
-        let start = index
-
-        while let character = peek(), character != ")" {
-            guard character.isLetter || character.isNumber || character == "_" || character == "."
-            else {
-                throw ParseError("Invalid attribute argument.")
-            }
-            advance()
-        }
-
-        guard peek() == ")" else {
-            throw ParseError("Unterminated attribute argument list.")
-        }
-
-        let value = String(characters[start..<index])
-        advance()
-
-        guard !value.isEmpty else {
-            throw ParseError("Expected attribute argument.")
-        }
-
-        return value
     }
 
     private mutating func readInteger() throws -> Int {

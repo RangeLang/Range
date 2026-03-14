@@ -4,21 +4,22 @@ Neat is currently a declaration-first language.
 
 The parser recognizes a small number of core ideas:
 
-- declarations begin with `@`
+- declarations begin with `#`
+- declarations can project onto other declarations with `on`
 - declarations can compose with `:`
-- declarations can expose callables with `#name(...)`
+- declarations can expose callables with `@name(...)`
 - declarations can carry cases with `case ...`
-- statements use `var`, `let`, `for`, and `switch`
+- statements use `let`, `var`, and control flow
 
 Minimal example:
 
 ```neat
-@Palette {
+#Mode {
     case light, dark
 }
 
-@Theme: Palette {
-    #theme() {
+#Theme on Mode: Config {
+    @label() {
     }
 }
 ```

@@ -1,10 +1,6 @@
-((attribute) @keyword
-  (#eq? @keyword "@main"))
-
-(main_attribute) @keyword
-
 (comment) @comment
-(attribute) @attribute
+
+["#" "@"] @punctuation.special
 
 [
   "enum"
@@ -13,11 +9,16 @@
   "func"
   "let"
   "protocol"
+  "state"
+  "binding"
   "var"
 ] @keyword
 
-(annotated_declaration
+(sigiled_declaration
   name: (type_identifier) @type)
+
+(callable_declaration
+  name: (identifier) @function.method)
 
 (enum_declaration
   name: (type_identifier) @type)
@@ -38,7 +39,13 @@
   name: (identifier) @variable)
 
 (member_declaration
-  name: (identifier) @variable)
+  name: (identifier) @property)
+
+(argument
+  label: (identifier) @property)
+
+(assignment
+  left: (identifier) @variable)
 
 (enum_case_item
   name: (identifier) @constructor)
@@ -56,7 +63,6 @@
   name: (identifier) @function.method)
 
 (type_identifier) @type
-(identifier) @variable
 
 (string_literal) @string
 (escape_sequence) @string.escape

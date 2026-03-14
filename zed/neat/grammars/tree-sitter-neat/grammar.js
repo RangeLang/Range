@@ -18,7 +18,8 @@ module.exports = grammar({
 
     declaration: ($) =>
       choice(
-        $.annotated_declaration,
+        $.sigiled_declaration,
+        $.callable_declaration,
         $.protocol_declaration,
         $.extension_declaration,
         $.enum_declaration,
@@ -29,27 +30,21 @@ module.exports = grammar({
     protocol_declaration: ($) =>
       seq("protocol", field("name", $.type_identifier), field("body", $.block)),
 
-    annotated_declaration: ($) =>
-      choice(
-        seq(
-          alias("@main", $.main_attribute),
-          field("name", $.type_identifier),
-          ":",
-          commaSep1($.type_identifier),
-          field("body", $.block),
-        ),
-        seq(
-          field("attribute", $.attribute),
-          optional(seq(":", commaSep1($.type_identifier))),
-          field("body", $.block),
-        ),
+    sigiled_declaration: ($) =>
+      seq(
+        "#",
+        field("name", $.type_identifier),
+        optional(seq(":", commaSep1($.type_identifier))),
+        field("body", $.block),
       ),
 
-    attribute: ($) =>
+    callable_declaration: ($) =>
       seq(
         "@",
-        choice($.identifier, $.type_identifier),
-        optional(seq("(", field("argument", $.type), ")")),
+        field("name", $.identifier),
+        field("parameters", $.parameter_clause),
+        optional(seq("->", field("return_type", $.type))),
+        field("body", $.block),
       ),
 
     extension_declaration: ($) =>
@@ -88,7 +83,7 @@ module.exports = grammar({
 
     variable_declaration: ($) =>
       seq(
-        choice("let", "var"),
+        choice("let", "var", "state", "binding"),
         field("name", $.identifier),
         optional(seq(":", field("type", $.type))),
         optional(seq("=", field("value", $.expression))),

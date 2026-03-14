@@ -1,36 +1,30 @@
-# Attribute Roles
+# Declaration Headers
 
-`@` is for declaration-level semantics.
+Neat uses declaration headers to describe what a declaration is and where it projects.
 
-Builtin example:
-
-```neat
-@main MyApp: App {
-}
-```
-
-Reusable declaration example:
+Examples:
 
 ```neat
-@Meta {
-    func title(_ text: String) -> Head
+#Theme {
 }
 
-@Theme: Palette {
-    #theme() {
-    }
+#Logger: Service {
+    @write(text: String)
 }
 
-@BackgroundStyle: StyleModifier on Renderable {
-    #background(color: Color) {
-    }
+#Formatter on Record: Service {
+    @format(text: String)
+}
+
+#SharedTools: Service {
+    Record@normalize()
 }
 ```
 
 Current direction:
 
-- `@main` is builtin
-- other `@Name` forms can define reusable declarations directly
-- `@Name: OtherThing` composes from other reusable declarations
-- `on Target` declares a projection target on the declaration header
-- scoped members like `Meta.title(...)` come from `@Meta { ... }`
+- `#Name` declares a named language object
+- `on Target` sets a default projection target for the declaration
+- `: Contract` describes the declaration's composed contract or category
+- `@name(...)` declares a callable member
+- `Target@name(...)` attaches a callable to a specific target directly

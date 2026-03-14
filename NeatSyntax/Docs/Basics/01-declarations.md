@@ -3,20 +3,21 @@
 Neat is declaration-first.
 
 ```neat
-@Palette {
+#Status {
     case light, dark
 }
 
-@Theme: Palette {
-    #theme() {
+#Logger: Service {
+    @write(text: String) {
     }
 }
 ```
 
 Current surface:
 
-- `@Name { ... }` defines a named declaration
-- `@Name: OtherThing { ... }` composes from other declarations
+- `#Name { ... }` defines a named declaration
+- `#Name: Contract { ... }` composes from another declaration or contract
+- `#Name on Target: Contract { ... }` declares a projected declaration with a default target
 - declarations are reusable by default
-- declarations can contain members, callables, cases, state, functions, and a body depending on kind
+- declarations can contain members, callables, cases, and state
 - the parser does not use separate `protocol`, `enum`, or `namespace` keywords anymore

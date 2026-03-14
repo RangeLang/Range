@@ -11,7 +11,6 @@ enum NeatSyntax {
         case forLoop = "for"
         case inKeyword = "in"
         case caseBranch = "case"
-        case function = "func"
         case ifStatement = "if"
         case elseBranch = "else"
         case whileLoop = "while"
@@ -26,24 +25,18 @@ enum NeatSyntax {
 
     static func declarationKind(for token: Token) -> DeclarationKind? {
         switch token {
-        case .keyword(Keyword.component.rawValue):
+        case .hashDirective:
             return .declaration
-        case .atAttribute(let attribute, _):
-            switch attribute {
-            case "main": return .entry
-            case "StyleModifier": return nil
-            default: return .declaration
-            }
         default:
             return nil
         }
     }
 
     static func attributeApplication(for token: Token) -> AttributeApplication? {
-        guard case .atAttribute(let name, let argument) = token else {
+        guard case .hashDirective(let name) = token else {
             return nil
         }
-        return AttributeApplication(name: name, argument: argument)
+        return AttributeApplication(name: name, argument: nil)
     }
 }
 

@@ -1,6 +1,6 @@
-@Component VStack {
+#VStack: Component {
 
-  Body {
+  var body: Component {
     Div {
       content()
     }

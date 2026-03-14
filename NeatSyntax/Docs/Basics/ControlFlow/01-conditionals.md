@@ -2,15 +2,15 @@
 
 ```neat
 if isPrimary {
-    Text("Primary")
+    print("Primary")
 } else if isSecondary {
-    Text("Secondary")
+    print("Secondary")
 } else {
-    Text("Default")
+    print("Default")
 }
 ```
 
-This form works in both view bodies and statement blocks.
+This form works in statement blocks.
 
 Current conditional rules:
 

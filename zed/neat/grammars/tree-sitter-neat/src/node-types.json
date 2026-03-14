@@ -4,7 +4,7 @@
     "named": true,
     "subtypes": [
       {
-        "type": "annotated_declaration",
+        "type": "callable_declaration",
         "named": true
       },
       {
@@ -21,6 +21,10 @@
       },
       {
         "type": "protocol_declaration",
+        "named": true
+      },
+      {
+        "type": "sigiled_declaration",
         "named": true
       },
       {
@@ -108,56 +112,6 @@
         "named": true
       }
     ]
-  },
-  {
-    "type": "annotated_declaration",
-    "named": true,
-    "fields": {
-      "attribute": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "attribute",
-            "named": true
-          }
-        ]
-      },
-      "body": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "block",
-            "named": true
-          }
-        ]
-      },
-      "name": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "type_identifier",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "main_attribute",
-          "named": true
-        },
-        {
-          "type": "type_identifier",
-          "named": true
-        }
-      ]
-    }
   },
   {
     "type": "argument",
@@ -284,36 +238,6 @@
     }
   },
   {
-    "type": "attribute",
-    "named": true,
-    "fields": {
-      "argument": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "type",
-            "named": true
-          }
-        ]
-      }
-    },
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "identifier",
-          "named": true
-        },
-        {
-          "type": "type_identifier",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
     "type": "block",
     "named": true,
     "fields": {},
@@ -393,6 +317,52 @@
         "types": [
           {
             "type": "modifier_call",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "callable_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "parameters": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "parameter_clause",
+            "named": true
+          }
+        ]
+      },
+      "return_type": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "type",
             "named": true
           }
         ]
@@ -884,6 +854,42 @@
     }
   },
   {
+    "type": "sigiled_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "type_identifier",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "type_identifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "source_file",
     "named": true,
     "root": true,
@@ -963,6 +969,10 @@
     "named": false
   },
   {
+    "type": "#",
+    "named": false
+  },
+  {
     "type": "(",
     "named": false
   },
@@ -1027,6 +1037,10 @@
     "named": false
   },
   {
+    "type": "binding",
+    "named": false
+  },
+  {
     "type": "case",
     "named": false
   },
@@ -1072,11 +1086,11 @@
     "named": false
   },
   {
-    "type": "main_attribute",
-    "named": true
+    "type": "protocol",
+    "named": false
   },
   {
-    "type": "protocol",
+    "type": "state",
     "named": false
   },
   {

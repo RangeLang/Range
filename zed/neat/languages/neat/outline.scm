@@ -1,6 +1,8 @@
-(annotated_declaration
-  attribute: (attribute) @context
+(sigiled_declaration
   name: (type_identifier) @name) @item
+
+(callable_declaration
+  name: (identifier) @name) @item
 
 (enum_declaration
   name: (type_identifier) @name) @item

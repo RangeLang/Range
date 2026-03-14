@@ -43,7 +43,7 @@ struct NeatLanguageServer {
                         "documentFormattingProvider": true,
                         "completionProvider": [
                             "resolveProvider": false,
-                            "triggerCharacters": [".", "@"],
+                            "triggerCharacters": [".", "@", "#"],
                         ],
                     ],
                     "serverInfo": [
@@ -303,13 +303,13 @@ struct NeatLanguageServer {
     private func hoverDescription(for symbol: Symbol) -> String {
         switch symbol.kind {
         case .attribute:
-            return "Neat declaration attribute"
+            return "Neat callable sigil"
         case .component:
             return "Neat component"
         case .page:
             return "Neat page"
         case .app:
-            return "Neat main entry declaration"
+            return "Neat application or program declaration"
         case .enumType:
             return "Neat enum"
         case .enumCase:
@@ -377,13 +377,6 @@ struct NeatLanguageServer {
             let lineNumber = index + 1
             let prefix = "[L\(lineNumber)] "
 
-            if let range = rawLine.range(of: "#print(\"") {
-                var line = rawLine
-                line.replaceSubrange(range, with: "print(\"\(prefix)")
-                result.append(line)
-                continue
-            }
-
             if let range = rawLine.range(of: "print(\"") {
                 var line = rawLine
                 line.replaceSubrange(range, with: "print(\"\(prefix)")
@@ -422,14 +415,14 @@ struct NeatLanguageServer {
 
     private func keywordCompletions() -> [[String: Any]] {
         [
-            "case", "extension", "func", "let", "state", "switch",
+            "case", "extension", "let", "state", "switch",
             "var",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
 
     private func attributeCompletions() -> [[String: Any]] {
         [
-            "@main", "@Page", "@Component", "@StyleModifier", "@BuiltIn",
+            "@init", "@run", "@background",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
     }
 
@@ -725,37 +718,24 @@ private struct DocumentIndex {
 
             if let match = firstMatch(
                 in: line,
-                pattern: #"@main\s+([A-Z][A-Za-z0-9_]*)\s*:\s*([A-Z][A-Za-z0-9_.]*)"#
-            ) {
-                let attributeRange = range(in: line, line: lineIndex, value: "@main")
-                let name = match[1]
-                let symbolRange = range(in: line, line: lineIndex, value: name)
-                symbols.append(
-                    Symbol(
-                        name: "@main", kind: .attribute, detail: "attribute", uri: uri,
-                        range: attributeRange, selectionRange: attributeRange))
-                symbols.append(
-                    Symbol(
-                        name: name, kind: .app, detail: "@main", uri: uri, range: symbolRange,
-                        selectionRange: symbolRange))
-                continue
-            }
-
-            if let match = firstMatch(
-                in: line,
-                pattern: #"@([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*[^{}\n]+)?\s*\{"#
+                pattern: #"#([A-Za-z_][A-Za-z0-9_]*)(?:\s*:\s*([A-Za-z_][A-Za-z0-9_.]*))?\s*\{"#
             ) {
                 let name = match[1]
-                let attributeName = "@" + name
-                let symbolRange = range(in: line, line: lineIndex, value: attributeName)
-                let kind: SymbolKind = name == "main" ? .app : .component
+                let declarationName = "#" + name
+                let symbolRange = range(in: line, line: lineIndex, value: declarationName)
+                let contract = match.count > 2 ? match[2] : ""
+                let kind: SymbolKind
+                switch contract {
+                case "App", "Program":
+                    kind = .app
+                case "Page":
+                    kind = .page
+                default:
+                    kind = .component
+                }
                 symbols.append(
                     Symbol(
                         name: name, kind: kind, detail: "declaration", uri: uri,
-                        range: symbolRange, selectionRange: symbolRange))
-                symbols.append(
-                    Symbol(
-                        name: attributeName, kind: .attribute, detail: "attribute", uri: uri,
                         range: symbolRange, selectionRange: symbolRange))
                 continue
             }
@@ -783,18 +763,8 @@ private struct DocumentIndex {
                 continue
             }
 
-            if let match = firstMatch(in: line, pattern: #"\bfunc\s+([a-z_][A-Za-z0-9_]*)"#) {
-                let name = match[1]
-                let symbolRange = range(in: line, line: lineIndex, value: name)
-                symbols.append(
-                    Symbol(
-                        name: name, kind: .function, detail: "func", uri: uri, range: symbolRange,
-                        selectionRange: symbolRange))
-                continue
-            }
-
-            if let match = firstMatch(in: line, pattern: #"#([a-z_][A-Za-z0-9_]*)\s*\("#) {
-                let symbolName = "#" + match[1]
+            if let match = firstMatch(in: line, pattern: #"@([a-z_][A-Za-z0-9_]*)\s*\("#) {
+                let symbolName = "@" + match[1]
                 let symbolRange = range(in: line, line: lineIndex, value: symbolName)
                 symbols.append(
                     Symbol(

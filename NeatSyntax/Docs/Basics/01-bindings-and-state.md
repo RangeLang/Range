@@ -1,17 +1,17 @@
 # Bindings And State
 
-Neat currently uses `var` and `let` in statement blocks, and `state` inside renderable declarations.
+Neat uses `let` and `var` in statement blocks, and `state` inside declarations.
 
 ## Local Bindings
 
 Inside statement blocks:
 
 ```neat
-Button("Add") {
+@increment() {
     let step = 1
-    var next = 2
-    count += step
-    count += next
+    var next = count
+    next += step
+    count = next
 }
 ```
 
@@ -24,10 +24,10 @@ Current rules:
 
 ## State
 
-Inside component-like declarations:
+Inside declarations:
 
 ```neat
-@Counter {
+#Counter {
     state count: Int = 0
 
     state doubled: Int {
@@ -38,7 +38,7 @@ Inside component-like declarations:
 
 Current rules:
 
-- `state` is supported in component/page-style declarations
+- `state` is supported in declarations
 - supported built-in state types are `Int`, `String`, `Bool`, `Dictionary`, and `Void`
 - state type can be inferred from the initializer when inference exists
 - derived state uses a block body and an explicit type
@@ -49,10 +49,9 @@ Current rules:
 Declaration members also use `var`, but they are not the same thing as local mutable bindings.
 
 ```neat
-@App {
-    var head: Head {
-    }
+#Counter {
+    var step: Int
 }
 ```
 
-Here `var head: Head` means “this declaration has a typed member named `head`.” It is structural, not a statement-level mutable variable.
+Here `var step: Int` means “this declaration has a typed member named `step`.” It is structural, not a statement-level mutable variable.

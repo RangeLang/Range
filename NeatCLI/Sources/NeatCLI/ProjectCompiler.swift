@@ -190,7 +190,7 @@ struct ProjectCompiler {
     private func parseAppName(from source: String) -> String? {
         match(
             in: source,
-            pattern: #"@main\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*[A-Za-z_][A-Za-z0-9_.]*"#
+            pattern: #"#([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(?:App|Program)\b"#
         )
     }
 
@@ -522,13 +522,6 @@ struct ProjectCompiler {
         for (index, rawLine) in lines.enumerated() {
             let lineNumber = index + 1
             let prefix = "[\(fileName):\(lineNumber)] "
-
-            if let range = rawLine.range(of: "#print(\"") {
-                var line = rawLine
-                line.replaceSubrange(range, with: "print(\"\(prefix)")
-                result.append(line)
-                continue
-            }
 
             if let range = rawLine.range(of: "print(\"") {
                 var line = rawLine

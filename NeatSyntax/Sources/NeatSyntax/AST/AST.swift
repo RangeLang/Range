@@ -6,7 +6,6 @@ public enum DeclarationKind {
 }
 
 public enum ObjectType {
-    case neatFunction(NeatFunctionDeclaration)
     case typeExtension(TypeExtensionDeclaration)
 }
 
@@ -23,24 +22,11 @@ public struct DeclarationNode {
     public let callables: [CallableDeclaration]
     public let body: ViewNode?
 
-    public var neatFunctions: [NeatFunctionDeclaration] {
-        objects.compactMap { object in
-            switch object {
-            case .typeExtension:
-                return nil
-            case .neatFunction(let function):
-                return function
-            }
-        }
-    }
-
     public var typeExtensions: [TypeExtensionDeclaration] {
         objects.compactMap { object in
             switch object {
             case .typeExtension(let declaration):
                 return declaration
-            case .neatFunction:
-                return nil
             }
         }
     }
@@ -58,24 +44,11 @@ public struct ComponentNode {
     public let callables: [CallableDeclaration]
     public let body: ViewNode
 
-    public var neatFunctions: [NeatFunctionDeclaration] {
-        objects.compactMap { object in
-            switch object {
-            case .typeExtension:
-                return nil
-            case .neatFunction(let function):
-                return function
-            }
-        }
-    }
-
     public var typeExtensions: [TypeExtensionDeclaration] {
         objects.compactMap { object in
             switch object {
             case .typeExtension(let declaration):
                 return declaration
-            case .neatFunction:
-                return nil
             }
         }
     }
@@ -91,18 +64,13 @@ public struct AssociatedValueDeclaration {
     public let typeName: String
 }
 
-public struct NeatFunctionDeclaration {
-    public let name: String
-    public let parameters: [NeatFunctionParameter]
-    public let returnType: String?
-}
-
 public struct NeatFunctionParameter {
     public let name: String
     public let typeName: String?
 }
 
 public struct CallableDeclaration {
+    public let targetName: String?
     public let name: String
     public let parameters: [NeatFunctionParameter]
     public let hasBody: Bool
