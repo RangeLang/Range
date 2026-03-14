@@ -18,17 +18,19 @@
 ] @keyword
 
 ; Control flow
-(if_statement "if" @keyword.control)
-(if_statement "else" @keyword.control)
-(for_statement "for" @keyword.control)
-(for_statement "in" @keyword.control)
-(while_statement "while" @keyword.control)
-(switch_statement "switch" @keyword.control)
-(switch_case "case" @keyword.control)
-(switch_default "default" @keyword.control)
-(return_statement "return" @keyword.control)
-(break_statement) @keyword.control
-(continue_statement) @keyword.control
+[
+  "if"
+  "else"
+  "for"
+  "in"
+  "while"
+  "switch"
+  "case"
+  "default"
+  "return"
+  "break"
+  "continue"
+] @keyword.control
 
 ; Projection keyword
 "on" @keyword
