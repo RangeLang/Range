@@ -4,6 +4,14 @@ extension Parser {
     mutating func parseStatement(
         localBindings: inout [String: LocalBindingKind]
     ) throws -> Statement {
+        if case .keyword(NeatSyntax.Keyword.ifStatement.rawValue) = peek() {
+            return try parseIfStatement(localBindings: &localBindings)
+        }
+
+        if case .keyword(NeatSyntax.Keyword.whileLoop.rawValue) = peek() {
+            return try parseWhileStatement(localBindings: &localBindings)
+        }
+
         if case .keyword(NeatSyntax.Keyword.forLoop.rawValue) = peek() {
             return try parseForStatement(localBindings: &localBindings)
         }
@@ -19,6 +27,24 @@ extension Parser {
         if case .keyword(NeatSyntax.Keyword.variable.rawValue) = peek() {
             advance()
             return try parseLocalDeclaration(kind: .mutable, localBindings: &localBindings)
+        }
+
+        if case .keyword(NeatSyntax.Keyword.returnStatement.rawValue) = peek() {
+            advance()
+            if peek() == .rightBrace {
+                return .return(nil)
+            }
+            return .return(try parseExpression())
+        }
+
+        if case .keyword(NeatSyntax.Keyword.breakStatement.rawValue) = peek() {
+            advance()
+            return .break
+        }
+
+        if case .keyword(NeatSyntax.Keyword.continueStatement.rawValue) = peek() {
+            advance()
+            return .continue
         }
 
         let name = try consumeIdentifier()
@@ -57,7 +83,7 @@ extension Parser {
             throw ParseError("'\(name)' is already declared in this scope.")
         }
         if currentStateNames.contains(name) {
-            throw ParseError("Local binding '\(name)' conflicts with @State '\(name)'.")
+            throw ParseError("Local binding '\(name)' conflicts with state '\(name)'.")
         }
 
         try consume(.equal)
@@ -77,11 +103,15 @@ extension Parser {
             return .local(name)
         }
 
-        if currentStateNames.contains(name) {
+        if currentMutableStateNames.contains(name) {
             return .state(name)
         }
 
-        throw ParseError("Unknown mutable symbol '\(name)'. Declare it with var/let or @State.")
+        if currentStateNames.contains(name) {
+            throw ParseError("Cannot assign to derived state '\(name)'.")
+        }
+
+        throw ParseError("Unknown mutable symbol '\(name)'. Declare it with var/let or state.")
     }
 
     mutating func parseSwitchStatement(
@@ -119,6 +149,45 @@ extension Parser {
         return .switchStatement(expression: subject, cases: cases, defaultBody: defaultBody)
     }
 
+    mutating func parseIfStatement(
+        localBindings: inout [String: LocalBindingKind]
+    ) throws -> Statement {
+        var branches: [StatementConditionalBranch] = []
+
+        try consumeKeyword(.ifStatement)
+        let condition = try parseExpression()
+        let body = try parseStatementBlock(baseLocalBindings: localBindings)
+        branches.append(StatementConditionalBranch(condition: condition, body: body))
+
+        while peek() == .keyword(NeatSyntax.Keyword.elseBranch.rawValue) {
+            try consumeKeyword(.elseBranch)
+
+            if peek() == .keyword(NeatSyntax.Keyword.ifStatement.rawValue) {
+                try consumeKeyword(.ifStatement)
+                let elseIfCondition = try parseExpression()
+                let elseIfBody = try parseStatementBlock(baseLocalBindings: localBindings)
+                branches.append(
+                    StatementConditionalBranch(condition: elseIfCondition, body: elseIfBody))
+                continue
+            }
+
+            let elseBody = try parseStatementBlock(baseLocalBindings: localBindings)
+            branches.append(StatementConditionalBranch(condition: nil, body: elseBody))
+            break
+        }
+
+        return .conditional(branches)
+    }
+
+    mutating func parseWhileStatement(
+        localBindings: inout [String: LocalBindingKind]
+    ) throws -> Statement {
+        try consumeKeyword(.whileLoop)
+        let condition = try parseExpression()
+        let body = try parseStatementBlock(baseLocalBindings: localBindings)
+        return .whileLoop(condition: condition, body: body)
+    }
+
     mutating func parseForStatement(
         localBindings: inout [String: LocalBindingKind]
     ) throws -> Statement {
@@ -128,7 +197,7 @@ extension Parser {
             throw ParseError("'\(name)' is already declared in this scope.")
         }
         guard !currentStateNames.contains(name) else {
-            throw ParseError("Loop binding '\(name)' conflicts with @State '\(name)'.")
+            throw ParseError("Loop binding '\(name)' conflicts with state '\(name)'.")
         }
 
         try consumeKeyword(.inKeyword)
@@ -153,8 +222,14 @@ extension Parser {
             try consume(.colon)
         }
 
+        return try parseStatementBlock(baseLocalBindings: baseLocalBindings)
+    }
+
+    mutating func parseStatementBlock(baseLocalBindings: [String: LocalBindingKind]) throws
+        -> [Statement]
+    {
         guard peek() == .leftBrace else {
-            throw ParseError("Switch case/default requires a block body.")
+            throw ParseError("Expected block body.")
         }
         try consume(.leftBrace)
 
@@ -169,10 +244,25 @@ extension Parser {
     }
 
     func isStatementStart() -> Bool {
+        if peek() == .keyword(NeatSyntax.Keyword.ifStatement.rawValue) {
+            return true
+        }
+        if peek() == .keyword(NeatSyntax.Keyword.whileLoop.rawValue) {
+            return true
+        }
         if peek() == .keyword(NeatSyntax.Keyword.forLoop.rawValue) {
             return true
         }
         if peek() == .keyword(NeatSyntax.Keyword.switchStatement.rawValue) {
+            return true
+        }
+        if peek() == .keyword(NeatSyntax.Keyword.returnStatement.rawValue) {
+            return true
+        }
+        if peek() == .keyword(NeatSyntax.Keyword.breakStatement.rawValue) {
+            return true
+        }
+        if peek() == .keyword(NeatSyntax.Keyword.continueStatement.rawValue) {
             return true
         }
         if peek() == .keyword(NeatSyntax.Keyword.constant.rawValue)

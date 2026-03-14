@@ -56,12 +56,37 @@ struct Lexer {
                 } else {
                     throw ParseError("Unexpected character -.")
                 }
+            case "!":
+                advance()
+                if match("=") {
+                    tokens.append(.bangEqual)
+                } else {
+                    tokens.append(.bang)
+                }
             case ",":
                 advance()
                 tokens.append(.comma)
             case "=":
                 advance()
-                tokens.append(.equal)
+                if match("=") {
+                    tokens.append(.equalEqual)
+                } else {
+                    tokens.append(.equal)
+                }
+            case "<":
+                advance()
+                if match("=") {
+                    tokens.append(.lessEqual)
+                } else {
+                    tokens.append(.less)
+                }
+            case ">":
+                advance()
+                if match("=") {
+                    tokens.append(.greaterEqual)
+                } else {
+                    tokens.append(.greater)
+                }
             case "+":
                 advance()
                 if match("=") {
@@ -69,6 +94,21 @@ struct Lexer {
                 } else {
                     tokens.append(.plus)
                 }
+            case "?":
+                advance()
+                tokens.append(.question)
+            case "&":
+                advance()
+                guard match("&") else {
+                    throw ParseError("Unexpected character &.")
+                }
+                tokens.append(.andAnd)
+            case "|":
+                advance()
+                guard match("|") else {
+                    throw ParseError("Unexpected character |.")
+                }
+                tokens.append(.orOr)
             case "%":
                 advance()
                 tokens.append(.percent)
@@ -80,11 +120,7 @@ struct Lexer {
             case "@":
                 let identifier = try readSigilIdentifier()
                 let argument = try readSigilArgumentIfPresent()
-                if identifier == "State" {
-                    tokens.append(.atState)
-                } else {
-                    tokens.append(.atAttribute(name: identifier, argument: argument))
-                }
+                tokens.append(.atAttribute(name: identifier, argument: argument))
             default:
                 if character.isNumber {
                     tokens.append(try readNumberLiteral())

@@ -80,7 +80,12 @@ extension Parser {
             try consume(.leftBracket)
             let elementType = try consumeTypeReference()
             try consume(.rightBracket)
-            return "[\(elementType)]"
+            var result = "[\(elementType)]"
+            while peek() == .question {
+                try consume(.question)
+                result += "?"
+            }
+            return result
         }
 
         var parts: [String] = [try consumeTypeName()]
@@ -90,6 +95,11 @@ extension Parser {
             parts.append(try consumeTypeName())
         }
 
-        return parts.joined(separator: ".")
+        var result = parts.joined(separator: ".")
+        while peek() == .question {
+            try consume(.question)
+            result += "?"
+        }
+        return result
     }
 }

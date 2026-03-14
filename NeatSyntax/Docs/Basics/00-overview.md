@@ -23,11 +23,4 @@ Minimal example:
 }
 ```
 
-What Neat is not doing right now:
-
-- no `protocol`
-- no separate `enum`
-- no separate `namespace`
-- no full type system beyond the currently parsed surface
-
-Those concepts are being folded into the declaration system instead.
+Note: Neat does not use separate `struct`, `class`, `protocol`, `enum`, `namespace`, or `interface` categories. Those concepts are represented through the declaration system, while the full type system beyond the currently parsed surface is still not implemented.

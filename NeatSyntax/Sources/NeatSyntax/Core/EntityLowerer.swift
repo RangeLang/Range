@@ -35,27 +35,15 @@ public struct EntityLowerer {
 
     private func lowerKind(_ kind: DeclarationKind) -> EntityKind {
         switch kind {
-        case .app:
-            return .app
-        case .page:
-            return .page
-        case .component:
-            return .component
+        case .entry:
+            return .entry
+        case .declaration:
+            return .declaration
         }
     }
 
     private func identity(for kind: DeclarationKind, name: String) -> EntityIdentity {
-        let rawKind: String
-        switch kind {
-        case .app:
-            rawKind = "app"
-        case .page:
-            rawKind = "page"
-        case .component:
-            rawKind = "component"
-        }
-
-        return EntityIdentity(symbol: name, stableID: "\(rawKind):\(name)")
+        EntityIdentity(symbol: name, stableID: "\(lowerKind(kind).rawValue):\(name)")
     }
 
     private func capabilities(
@@ -72,16 +60,6 @@ public struct EntityLowerer {
             values.insert(.stateful)
         }
 
-        switch kind {
-        case .app:
-            values.insert(.compositionRoot)
-            values.insert(.routable)
-        case .page:
-            values.insert(.routable)
-        case .component:
-            break
-        }
-
         return values
     }
 
@@ -89,7 +67,7 @@ public struct EntityLowerer {
         EntityStateField(
             name: state.name,
             type: state.type,
-            initialValue: state.initialValue
+            storage: state.storage
         )
     }
 

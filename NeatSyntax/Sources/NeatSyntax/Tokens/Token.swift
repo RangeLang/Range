@@ -7,7 +7,6 @@ enum Token: Equatable {
     case integer(Int)
     case double(Double)
     case keyword(String)
-    case atState
     case atAttribute(name: String, argument: String?)
     case leftBrace
     case rightBrace
@@ -18,9 +17,19 @@ enum Token: Equatable {
     case dot
     case colon
     case arrow
+    case bang
     case equal
+    case equalEqual
+    case bangEqual
+    case less
+    case lessEqual
+    case greater
+    case greaterEqual
     case plus
     case plusEqual
+    case andAnd
+    case orOr
+    case question
     case percent
     case comma
     case eof

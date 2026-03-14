@@ -5,12 +5,19 @@ enum NeatSyntax {
         case component
         case variable = "var"
         case constant = "let"
+        case state = "state"
         case typeExtension = "extension"
         case projection = "on"
         case forLoop = "for"
         case inKeyword = "in"
         case caseBranch = "case"
         case function = "func"
+        case ifStatement = "if"
+        case elseBranch = "else"
+        case whileLoop = "while"
+        case returnStatement = "return"
+        case breakStatement = "break"
+        case continueStatement = "continue"
         case switchStatement = "switch"
         case defaultBranch = "default"
     }
@@ -20,12 +27,12 @@ enum NeatSyntax {
     static func declarationKind(for token: Token) -> DeclarationKind? {
         switch token {
         case .keyword(Keyword.component.rawValue):
-            return .component
+            return .declaration
         case .atAttribute(let attribute, _):
             switch attribute {
-            case "main": return .app
+            case "main": return .entry
             case "StyleModifier": return nil
-            default: return .component
+            default: return .declaration
             }
         default:
             return nil
@@ -43,6 +50,5 @@ enum NeatSyntax {
 extension NeatSyntax.Keyword: CaseIterable {}
 
 extension BuiltinType {
-    static let supportedNames: [String] = [BuiltinType.int, .string, .bool, .dictionary, .void]
-        .map(\.rawValue)
+    static let supportedNames: [String] = ["Int", "String", "Bool", "Dictionary", "Void"]
 }

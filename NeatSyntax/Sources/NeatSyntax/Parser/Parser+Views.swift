@@ -6,12 +6,42 @@ extension Parser {
     }
 
     mutating func parseView() throws -> ViewNode {
+        if peek() == .keyword(NeatSyntax.Keyword.ifStatement.rawValue) {
+            return try parseViewConditional()
+        }
         if peek() == .keyword(NeatSyntax.Keyword.forLoop.rawValue) {
             return try parseViewLoop()
         }
         let invocation = try parseInvocation()
         let base = try lowerInvocationToView(invocation)
         return try parseModifiersIfPresent(for: base)
+    }
+
+    mutating func parseViewConditional() throws -> ViewNode {
+        var branches: [ViewConditionalBranch] = []
+
+        try consumeKeyword(.ifStatement)
+        let condition = try parseExpression()
+        let body = try parseViewBlock()
+        branches.append(ViewConditionalBranch(condition: condition, body: body))
+
+        while peek() == .keyword(NeatSyntax.Keyword.elseBranch.rawValue) {
+            try consumeKeyword(.elseBranch)
+
+            if peek() == .keyword(NeatSyntax.Keyword.ifStatement.rawValue) {
+                try consumeKeyword(.ifStatement)
+                let elseIfCondition = try parseExpression()
+                let elseIfBody = try parseViewBlock()
+                branches.append(ViewConditionalBranch(condition: elseIfCondition, body: elseIfBody))
+                continue
+            }
+
+            let elseBody = try parseViewBlock()
+            branches.append(ViewConditionalBranch(condition: nil, body: elseBody))
+            break
+        }
+
+        return .conditional(branches)
     }
 
     mutating func parseViewLoop() throws -> ViewNode {
@@ -30,10 +60,25 @@ extension Parser {
         return .forEach(name: name, sequence: sequence, body: body)
     }
 
+    mutating func parseViewBlock() throws -> [ViewNode] {
+        guard peek() == .leftBrace else {
+            throw ParseError("Expected block body.")
+        }
+        try consume(.leftBrace)
+
+        var body: [ViewNode] = []
+        while peek() != .rightBrace {
+            body.append(try parseView())
+        }
+
+        try consume(.rightBrace)
+        return body
+    }
+
     mutating func parseInvocation() throws -> Invocation {
         let name = try consumeCallableName()
         let arguments = try parseInvocationArgumentsIfPresent()
-        let block = try parseInvocationBlockIfPresent()
+        let block = try parseInvocationBlockIfPresent(preferStatements: name == "Button")
         return Invocation(name: name, arguments: arguments, block: block)
     }
 
@@ -84,7 +129,9 @@ extension Parser {
         }
     }
 
-    mutating func parseInvocationBlockIfPresent() throws -> InvocationBlock? {
+    mutating func parseInvocationBlockIfPresent(preferStatements: Bool = false) throws
+        -> InvocationBlock?
+    {
         guard peek() == .leftBrace else { return nil }
         try consume(.leftBrace)
 
@@ -94,7 +141,7 @@ extension Parser {
         }
 
         let block: InvocationBlock
-        if isStatementStart() {
+        if preferStatements {
             var statements: [Statement] = []
             var localBindings: [String: LocalBindingKind] = [:]
             while peek() != .rightBrace {

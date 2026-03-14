@@ -1,6 +1,6 @@
 # Bindings And State
 
-Neat currently uses `var` and `let` in statement blocks, and `@State` inside renderable declarations.
+Neat currently uses `var` and `let` in statement blocks, and `state` inside renderable declarations.
 
 ## Local Bindings
 
@@ -28,16 +28,21 @@ Inside component-like declarations:
 
 ```neat
 @Counter {
-    @State var count: Int = 0
+    state count: Int = 0
+
+    state doubled: Int {
+        return count + count
+    }
 }
 ```
 
 Current rules:
 
-- `@State` is supported in component/page-style declarations
+- `state` is supported in component/page-style declarations
 - supported built-in state types are `Int`, `String`, `Bool`, `Dictionary`, and `Void`
 - state type can be inferred from the initializer when inference exists
-- array inference for `@State` initializers is not implemented yet
+- derived state uses a block body and an explicit type
+- array inference for `state` initializers is not implemented yet
 
 ## Member Declarations
 

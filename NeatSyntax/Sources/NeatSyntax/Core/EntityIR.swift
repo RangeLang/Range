@@ -1,16 +1,13 @@
 import Foundation
 
 public enum EntityKind: String {
-    case app
-    case page
-    case component
+    case entry
+    case declaration
 }
 
 public enum EntityCapability: Hashable {
     case renderable
     case stateful
-    case routable
-    case compositionRoot
 }
 
 public struct EntityIdentity: Hashable {
@@ -21,7 +18,7 @@ public struct EntityIdentity: Hashable {
 public struct EntityStateField {
     public let name: String
     public let type: BuiltinType
-    public let initialValue: Expression
+    public let storage: StateStorage
 }
 
 public enum EntityAttachment {

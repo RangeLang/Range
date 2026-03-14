@@ -43,52 +43,43 @@ extension Parser {
         if peek() == .leftBrace {
             try consume(.leftBrace)
 
-            if kind == .component || kind == .page {
-                currentStateTypes = [:]
-                while peek() == .atState || isCaseDeclarationStart() || isMemberDeclarationStart()
-                    || isCallableStart()
-                {
-                    if isCaseDeclarationStart() {
-                        cases.append(contentsOf: try parseEnumCaseLine())
-                        continue
-                    }
-                    if isMemberDeclarationStart() {
-                        members.append(try parseMemberDeclaration())
-                        continue
-                    }
-                    if isCallableStart() {
-                        callables.append(try parseCallableDeclaration())
-                        continue
-                    }
-
-                    let state = try parseState()
-                    states.append(state)
-                    currentStateTypes[state.name] = state.type
+            currentStateTypes = [:]
+            while peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
+                || isCaseDeclarationStart() || isMemberDeclarationStart()
+                || isCallableStart()
+            {
+                if isCaseDeclarationStart() {
+                    cases.append(contentsOf: try parseEnumCaseLine())
+                    continue
                 }
-
-                if peek() != .rightBrace, !isMemberDeclarationStart() {
-                    currentStateNames = Set(states.map(\.name))
-                    body = try parseDeclarationBody()
-                    currentStateNames = []
+                if isMemberDeclarationStart() {
+                    members.append(try parseMemberDeclaration())
+                    continue
                 }
-                currentStateTypes = [:]
-            } else {
-                while isCaseDeclarationStart() || isMemberDeclarationStart() || isCallableStart() {
-                    if isCaseDeclarationStart() {
-                        cases.append(contentsOf: try parseEnumCaseLine())
-                        continue
-                    }
-                    if isMemberDeclarationStart() {
-                        members.append(try parseMemberDeclaration())
-                        continue
-                    }
+                if isCallableStart() {
                     callables.append(try parseCallableDeclaration())
+                    continue
                 }
 
-                if peek() != .rightBrace {
-                    try skipUnknownBlockBody()
-                }
+                let state = try parseState()
+                states.append(state)
+                currentStateTypes[state.name] = state.type
             }
+
+            if peek() != .rightBrace, !isMemberDeclarationStart() {
+                currentStateNames = Set(states.map(\.name))
+                currentMutableStateNames = Set(
+                    states.compactMap { state in
+                        if case .stored = state.storage { return state.name }
+                        return nil
+                    })
+                body = try parseDeclarationBody()
+                currentStateNames = []
+                currentMutableStateNames = []
+            }
+
+            currentStateTypes = [:]
+            currentMutableStateNames = []
 
             try consume(.rightBrace)
         }
@@ -266,28 +257,54 @@ extension Parser {
     }
 
     mutating func parseState() throws -> StateDeclaration {
-        try consume(.atState)
-        if peek() == .keyword(NeatSyntax.Keyword.variable.rawValue) {
-            advance()
-        }
+        try consumeKeyword(.state)
         let name = try consumeIdentifier()
         var explicitType: BuiltinType?
         if peek() == .colon {
             try consume(.colon)
             explicitType = try parseBuiltinType()
         }
-        try consume(.equal)
-        let initialValue = try parseExpression()
-        let inferredType = try inferType(
-            of: initialValue,
-            stateTypes: currentStateTypes
-        )
+        let storage: StateStorage
+        let inferredType: BuiltinType
+
+        if peek() == .equal {
+            try consume(.equal)
+            let initialValue = try parseExpression()
+            if case .none = initialValue {
+                guard let explicitType else {
+                    throw ParseError(
+                        "state '\(name)' initialized with none requires an explicit optional type.")
+                }
+                guard explicitType.isOptional else {
+                    throw ParseError(
+                        "state '\(name)' initialized with none requires an optional type.")
+                }
+                inferredType = explicitType
+            } else {
+                inferredType = try inferType(
+                    of: initialValue,
+                    stateTypes: currentStateTypes
+                )
+            }
+            storage = .stored(initialValue)
+        } else if peek() == .leftBrace {
+            let body = try parseStatementBlock(baseLocalBindings: [:])
+            guard let explicitType else {
+                throw ParseError("Derived state '\(name)' requires an explicit type.")
+            }
+            inferredType = explicitType
+            storage = .derived(body)
+        } else {
+            throw ParseError("state '\(name)' requires either `= expression` or a block body.")
+        }
+
         if let explicitType, explicitType != inferredType {
             throw ParseError(
-                "@State '\(name)' expects \(explicitType.rawValue), got \(inferredType.rawValue).")
+                "state '\(name)' expects \(explicitType.displayName), got \(inferredType.displayName)."
+            )
         }
         return StateDeclaration(
-            name: name, type: explicitType ?? inferredType, initialValue: initialValue)
+            name: name, type: explicitType ?? inferredType, storage: storage)
     }
 
     mutating func parseDeclarationBody() throws -> ViewNode {
@@ -381,12 +398,11 @@ extension Parser {
         let name = try consumeIdentifier()
         try consume(.colon)
         let typeName = try consumeTypeReference()
-        guard peek() == .leftBrace else {
-            throw ParseError("Expected member block body for '\(name)'.")
+        if peek() == .leftBrace {
+            try consume(.leftBrace)
+            try skipUnknownBlockBody()
+            try consume(.rightBrace)
         }
-        try consume(.leftBrace)
-        try skipUnknownBlockBody()
-        try consume(.rightBrace)
         return MemberDeclaration(name: name, typeName: typeName)
     }
 

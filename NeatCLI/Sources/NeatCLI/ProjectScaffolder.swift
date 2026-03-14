@@ -474,7 +474,7 @@ struct ProjectScaffolder {
             Meta.description("The home page for \(appName).")
           }
 
-          @State count: Int = 0
+          state count: Int = 0
 
           VStack {
             HomePageHeader()

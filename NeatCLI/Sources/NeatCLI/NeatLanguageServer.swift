@@ -422,14 +422,14 @@ struct NeatLanguageServer {
 
     private func keywordCompletions() -> [[String: Any]] {
         [
-            "case", "extension", "func", "let", "switch",
+            "case", "extension", "func", "let", "state", "switch",
             "var",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
 
     private func attributeCompletions() -> [[String: Any]] {
         [
-            "@main", "@Page", "@Component", "@State", "@StyleModifier", "@BuiltIn",
+            "@main", "@Page", "@Component", "@StyleModifier", "@BuiltIn",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
     }
 
@@ -804,13 +804,13 @@ private struct DocumentIndex {
             }
 
             if let match = firstMatch(
-                in: line, pattern: #"@State(?:\s+var)?\s+([a-z_][A-Za-z0-9_]*)"#)
+                in: line, pattern: #"\bstate\s+([a-z_][A-Za-z0-9_]*)"#)
             {
                 let name = match[1]
                 let symbolRange = range(in: line, line: lineIndex, value: name)
                 symbols.append(
                     Symbol(
-                        name: name, kind: .state, detail: "@State", uri: uri, range: symbolRange,
+                        name: name, kind: .state, detail: "state", uri: uri, range: symbolRange,
                         selectionRange: symbolRange))
                 continue
             }

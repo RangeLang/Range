@@ -1,9 +1,8 @@
 import Foundation
 
 public enum DeclarationKind {
-    case app
-    case page
-    case component
+    case entry
+    case declaration
 }
 
 public enum ObjectType {
@@ -126,15 +125,48 @@ public struct MemberDeclaration {
 public struct StateDeclaration {
     public let name: String
     public let type: BuiltinType
-    public let initialValue: Expression
+    public let storage: StateStorage
 }
 
-public enum BuiltinType: String {
-    case int = "Int"
-    case string = "String"
-    case bool = "Bool"
-    case dictionary = "Dictionary"
-    case void = "Void"
+public enum StateStorage {
+    case stored(Expression)
+    case derived([Statement])
+}
+
+public indirect enum BuiltinType: Equatable {
+    case int
+    case string
+    case bool
+    case dictionary
+    case void
+    case none
+    case optional(BuiltinType)
+
+    public var displayName: String {
+        switch self {
+        case .int:
+            return "Int"
+        case .string:
+            return "String"
+        case .bool:
+            return "Bool"
+        case .dictionary:
+            return "Dictionary"
+        case .void:
+            return "Void"
+        case .none:
+            return "none"
+        case .optional(let wrapped):
+            return "\(wrapped.displayName)?"
+        }
+    }
+
+    public var isOptional: Bool {
+        if case .optional = self {
+            return true
+        }
+        return false
+    }
 }
 
 public indirect enum ViewNode {
@@ -143,10 +175,16 @@ public indirect enum ViewNode {
     case component(name: String, children: [ViewNode]?)
     case element(tag: String, children: [ViewNode])
     case forEach(name: String, sequence: Expression, body: [ViewNode])
+    case conditional([ViewConditionalBranch])
     case slot(name: String)
     case vStack([ViewNode])
     case debugPrint(InterpolatedString)
     case modified(base: ViewNode, modifiers: [ModifierCall])
+}
+
+public struct ViewConditionalBranch {
+    public let condition: Expression?
+    public let body: [ViewNode]
 }
 
 public struct ModifierCall {
@@ -187,12 +225,22 @@ public indirect enum Statement {
         expression: Expression
     )
     case forEach(name: String, sequence: Expression, body: [Statement])
+    case whileLoop(condition: Expression, body: [Statement])
+    case conditional([StatementConditionalBranch])
+    case `return`(Expression?)
+    case `break`
+    case `continue`
     case switchStatement(
         expression: Expression,
         cases: [SwitchCase],
         defaultBody: [Statement]?
     )
     case debugPrint(InterpolatedString)
+}
+
+public struct StatementConditionalBranch {
+    public let condition: Expression?
+    public let body: [Statement]
 }
 
 public struct SwitchCase {
@@ -218,11 +266,26 @@ public indirect enum Expression {
     case integer(Int)
     case string(String)
     case boolean(Bool)
+    case none
     case identifier(String)
     case array([Expression])
+    case ternary(condition: Expression, trueExpression: Expression, falseExpression: Expression)
+    case unary(operatorSymbol: UnaryOperator, expression: Expression)
     case binary(lhs: Expression, operatorSymbol: BinaryOperator, rhs: Expression)
+}
+
+public enum UnaryOperator: String {
+    case not = "!"
 }
 
 public enum BinaryOperator: String {
     case addition = "+"
+    case equal = "=="
+    case notEqual = "!="
+    case less = "<"
+    case lessEqual = "<="
+    case greater = ">"
+    case greaterEqual = ">="
+    case and = "&&"
+    case or = "||"
 }

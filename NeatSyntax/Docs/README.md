@@ -12,7 +12,7 @@ Examples here are intentionally small. The goal is to show the real parser surfa
 - typed members with `var name: Type { ... }`
 - local `var` and `let` bindings inside statement blocks
 - callable entrypoints with `#name(...) { ... }`
-- `@State` for component/page state
+- `state` for component/page state
 - arrays in type position like `[Color]`
 - array literals in expressions like `[1, 2, 3]`
 - case-bearing declarations with `case today, tomorrow`
@@ -27,7 +27,7 @@ Examples here are intentionally small. The goal is to show the real parser surfa
 - [01-declarations.md](./Basics/01-declarations.md)
 - [02-members-and-init.md](./Basics/02-members-and-init.md)
 - [04-attribute-roles.md](./Basics/04-attribute-roles.md)
-- [03-control-flow.md](./Basics/03-control-flow.md)
+- [ControlFlow/00-overview.md](./Basics/ControlFlow/00-overview.md)
 
 ## Concepts
 

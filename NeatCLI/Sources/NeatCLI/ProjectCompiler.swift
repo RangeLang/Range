@@ -556,6 +556,10 @@ struct ProjectCompiler {
                 if let children {
                     names.append(contentsOf: referencedComponentNames(in: children))
                 }
+            case .conditional(let branches):
+                for branch in branches {
+                    names.append(contentsOf: referencedComponentNames(in: branch.body))
+                }
             case .element(_, let children):
                 names.append(contentsOf: referencedComponentNames(in: children))
             case .slot:
@@ -693,14 +697,39 @@ struct ProjectCompiler {
         var context = RenderGenerationContext()
         let pageScope = RenderScope(
             prefix: page.name.lowercased(),
-            stateNames: Set(page.states.map(\.name)),
+            stateNames: Set(
+                page.states.compactMap { state in
+                    if case .stored = state.storage { return state.name }
+                    return nil
+                }),
+            derivedStateNames: Set(
+                page.states.compactMap { state in
+                    if case .derived = state.storage { return state.name }
+                    return nil
+                }),
             localBindings: []
         )
         for state in page.states {
-            context.stateDeclarations[pageScope.stateKey(state.name)] = renderExpression(
-                state.initialValue,
-                scope: pageScope
-            )
+            switch state.storage {
+            case .stored(let expression):
+                context.stateDeclarations[pageScope.stateKey(state.name)] = renderExpression(
+                    expression,
+                    scope: pageScope
+                )
+            case .derived(let body):
+                var handlerContext = HandlerRenderContext()
+                let statements = body.map {
+                    renderStatement($0, scope: pageScope, context: &handlerContext)
+                }
+                .joined(separator: "\n")
+                context.derivedStateDeclarations.append(
+                    """
+                    const \(pageScope.stateKey(state.name)) = () => {
+                    \(indent(statements, level: 1))
+                    };
+                    """
+                )
+            }
         }
         let markup = try renderView(
             page.body,
@@ -720,6 +749,10 @@ struct ProjectCompiler {
             ? "const __state = {};"
             : "const __state = {\n\(orderedStates.map { "  \($0.0): \($0.1)" }.joined(separator: ",\n"))\n};"
 
+        let derivedStateLines =
+            context.derivedStateDeclarations.isEmpty
+            ? ""
+            : context.derivedStateDeclarations.joined(separator: "\n\n")
         let handlerLines =
             context.handlers.isEmpty
             ? ""
@@ -730,9 +763,11 @@ struct ProjectCompiler {
             : context.debugLogs.joined(separator: "\n")
         let bindLines = [debugLines, handlerLines].filter { !$0.isEmpty }
             .joined(separator: "\n\n")
+        let preRenderLines = [derivedStateLines].filter { !$0.isEmpty }.joined(separator: "\n\n")
 
         return """
             \(stateLines)
+            \(preRenderLines.isEmpty ? "" : "\(preRenderLines)\n")
             return {
               render() {
                 return `\(markup)`;
@@ -782,19 +817,53 @@ struct ProjectCompiler {
             let renderedSequence = renderExpression(sequence, scope: scope)
             return
                 "${(\(renderedSequence) ?? []).map((\(name)) => `\(content)`).join(\"\")}"
+        case .conditional(let branches):
+            return try renderConditionalView(
+                branches,
+                scope: scope,
+                context: &context,
+                library: library,
+                customModifierStyles: customModifierStyles,
+                slots: slots
+            )
         case .component(let name, let children):
             guard let component = library[name] else {
                 throw ValidationError("Missing component '\(name)'")
             }
             let childScope = RenderScope(
                 prefix: "\(scope.prefix)_\(name.lowercased())_\(context.nextComponentID)",
-                stateNames: Set(component.states.map(\.name)),
+                stateNames: Set(
+                    component.states.compactMap { state in
+                        if case .stored = state.storage { return state.name }
+                        return nil
+                    }),
+                derivedStateNames: Set(
+                    component.states.compactMap { state in
+                        if case .derived = state.storage { return state.name }
+                        return nil
+                    }),
                 localBindings: scope.localBindings
             )
             context.nextComponentID += 1
             for state in component.states {
-                context.stateDeclarations["\(childScope.prefix)_\(state.name)"] = renderExpression(
-                    state.initialValue, scope: childScope)
+                switch state.storage {
+                case .stored(let expression):
+                    context.stateDeclarations["\(childScope.prefix)_\(state.name)"] =
+                        renderExpression(expression, scope: childScope)
+                case .derived(let body):
+                    var handlerContext = HandlerRenderContext()
+                    let statements = body.map {
+                        renderStatement($0, scope: childScope, context: &handlerContext)
+                    }
+                    .joined(separator: "\n")
+                    context.derivedStateDeclarations.append(
+                        """
+                        const \(childScope.stateKey(state.name)) = () => {
+                        \(indent(statements, level: 1))
+                        };
+                        """
+                    )
+                }
             }
             var childSlots: [String: [ViewNode]] = [:]
             if let children {
@@ -870,6 +939,53 @@ struct ProjectCompiler {
                 customModifierStyles: customModifierStyles
             )
         }
+    }
+
+    private func renderConditionalView(
+        _ branches: [ViewConditionalBranch],
+        scope: RenderScope,
+        context: inout RenderGenerationContext,
+        library: [String: ComponentNode],
+        customModifierStyles: [String: String],
+        slots: [String: [ViewNode]]
+    ) throws -> String {
+        var lines: [String] = ["${(() => {"]
+
+        for (index, branch) in branches.enumerated() {
+            let content =
+                try branch.body
+                .map {
+                    try renderView(
+                        $0,
+                        scope: scope,
+                        context: &context,
+                        library: library,
+                        customModifierStyles: customModifierStyles,
+                        slots: slots
+                    )
+                }
+                .joined(separator: "\n")
+            let markup = content.isEmpty ? "" : "\n\(content)\n"
+
+            if let condition = branch.condition {
+                let renderedCondition = renderExpression(condition, scope: scope)
+                let prefix = index == 0 ? "  if" : "  else if"
+                lines.append("\(prefix) (\(renderedCondition)) {")
+                lines.append("    return `\(markup)`;")
+                lines.append("  }")
+            } else {
+                lines.append("  else {")
+                lines.append("    return `\(markup)`;")
+                lines.append("  }")
+            }
+        }
+
+        if branches.last?.condition != nil {
+            lines.append("  return ``;")
+        }
+
+        lines.append("})()}")
+        return lines.joined(separator: "\n")
     }
 
     private func renderModifiedView(
@@ -1199,6 +1315,29 @@ struct ProjectCompiler {
                 \(indent(statements, level: 1))
                 }
                 """
+        case .whileLoop(let condition, let body):
+            let renderedCondition = renderExpression(condition, scope: scope, context: context)
+            var loopContext = context
+            let statements = body.map {
+                renderStatement($0, scope: scope, context: &loopContext)
+            }
+            .joined(separator: "\n")
+            return """
+                while (\(renderedCondition)) {
+                \(indent(statements, level: 1))
+                }
+                """
+        case .conditional(let branches):
+            return renderConditionalStatement(branches: branches, scope: scope, context: context)
+        case .return(let expression):
+            if let expression {
+                return "return \(renderExpression(expression, scope: scope, context: context));"
+            }
+            return "return;"
+        case .break:
+            return "break;"
+        case .continue:
+            return "continue;"
         case .switchStatement(let expression, let cases, let defaultBody):
             return renderSwitchStatement(
                 expression: expression,
@@ -1210,6 +1349,37 @@ struct ProjectCompiler {
         case .debugPrint(let message):
             return "console.log(`\(renderInterpolatedString(message, scope: scope))`);"
         }
+    }
+
+    private func renderConditionalStatement(
+        branches: [StatementConditionalBranch],
+        scope: RenderScope,
+        context: HandlerRenderContext
+    ) -> String {
+        var lines: [String] = []
+
+        for (index, branch) in branches.enumerated() {
+            var branchContext = context
+            let statements = branch.body.map {
+                renderStatement($0, scope: scope, context: &branchContext)
+            }
+            .joined(separator: "\n")
+
+            if let condition = branch.condition {
+                let renderedCondition = renderExpression(condition, scope: scope, context: context)
+                let prefix = index == 0 ? "if" : "else if"
+                lines.append("\(prefix) (\(renderedCondition)) {")
+            } else {
+                lines.append("else {")
+            }
+
+            if !statements.isEmpty {
+                lines.append(indent(statements, level: 1))
+            }
+            lines.append("}")
+        }
+
+        return lines.joined(separator: "\n")
     }
 
     private func renderSwitchStatement(
@@ -1269,12 +1439,17 @@ struct ProjectCompiler {
             return "\"\(escapeJavaScript(value))\""
         case .boolean(let value):
             return value ? "true" : "false"
+        case .none:
+            return "null"
         case .identifier(let name):
             if scope.localBindings.contains(name) {
                 return name
             }
             if context?.localBindings[name] != nil {
                 return name
+            }
+            if scope.derivedStateNames.contains(name) {
+                return "\(scope.stateKey(name))()"
             }
             if scope.stateNames.contains(name) {
                 return "__state.\(scope.stateKey(name))"
@@ -1284,6 +1459,11 @@ struct ProjectCompiler {
             let rendered = values.map { renderExpression($0, scope: scope, context: context) }
                 .joined(separator: ", ")
             return "[\(rendered)]"
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return
+                "\(renderExpression(condition, scope: scope, context: context)) ? \(renderExpression(trueExpression, scope: scope, context: context)) : \(renderExpression(falseExpression, scope: scope, context: context))"
+        case .unary(let op, let nested):
+            return "\(op.rawValue)\(renderExpression(nested, scope: scope, context: context))"
         case .binary(let lhs, let op, let rhs):
             return
                 "\(renderExpression(lhs, scope: scope, context: context)) \(op.rawValue) \(renderExpression(rhs, scope: scope, context: context))"
@@ -1366,6 +1546,7 @@ private struct CompiledRoute: Codable {
 
 private struct RenderGenerationContext {
     var stateDeclarations: [String: String] = [:]
+    var derivedStateDeclarations: [String] = []
     var handlers: [String] = []
     var debugLogs: [String] = []
     var nextButtonID: Int = 0
@@ -1375,6 +1556,7 @@ private struct RenderGenerationContext {
 private struct RenderScope {
     let prefix: String
     let stateNames: Set<String>
+    let derivedStateNames: Set<String>
     let localBindings: Set<String>
 
     func stateKey(_ name: String) -> String {
@@ -1383,7 +1565,11 @@ private struct RenderScope {
 
     func addingLocalBinding(_ name: String) -> RenderScope {
         RenderScope(
-            prefix: prefix, stateNames: stateNames, localBindings: localBindings.union([name]))
+            prefix: prefix,
+            stateNames: stateNames,
+            derivedStateNames: derivedStateNames,
+            localBindings: localBindings.union([name])
+        )
     }
 }
 

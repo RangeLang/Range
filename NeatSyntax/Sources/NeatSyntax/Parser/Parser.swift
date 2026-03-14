@@ -24,6 +24,7 @@ public struct Parser {
     let tokens: [Token]
     var index: Int = 0
     var currentStateNames: Set<String> = []
+    var currentMutableStateNames: Set<String> = []
     var currentStateTypes: [String: BuiltinType] = [:]
 
     public init(source: String) throws {
@@ -34,7 +35,7 @@ public struct Parser {
 
     public mutating func parseComponent() throws -> ComponentNode {
         let declaration = try parseDeclaration()
-        guard declaration.kind != .app else {
+        guard declaration.kind != .entry else {
             throw ParseError("Expected a renderable declaration, not @main.")
         }
         guard let body = declaration.body else {

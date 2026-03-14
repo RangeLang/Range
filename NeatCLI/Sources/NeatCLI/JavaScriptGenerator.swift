@@ -4,7 +4,8 @@ import NeatSyntax
 struct JavaScriptGenerator {
     func generate(component: ComponentNode) -> String {
         let stateNames = Set(component.states.map(\.name))
-        let stateLines = component.states.map(generateState).joined(separator: "\n")
+        let stateLines = component.states.map { generateState($0, stateNames: stateNames) }.joined(
+            separator: "\n")
         var renderButtonIndex = 0
         let renderMarkup = generateView(
             component.body,
@@ -63,8 +64,23 @@ struct JavaScriptGenerator {
         """
     }
 
-    private func generateState(_ state: StateDeclaration) -> String {
-        "const \(state.name) = state(\(generateExpression(state.initialValue, stateNames: [])));"
+    private func generateState(_ state: StateDeclaration, stateNames: Set<String>) -> String {
+        switch state.storage {
+        case .stored(let expression):
+            return
+                "const \(state.name) = state(\(generateExpression(expression, stateNames: stateNames, localBindings: [])));"
+        case .derived(let body):
+            var context = JSHandlerContext()
+            let statements = body.map {
+                generateStatement($0, stateNames: stateNames, context: &context)
+            }
+            .joined(separator: "\n")
+            return """
+                function \(state.name)() {
+                \(indent(statements, level: 1))
+                }
+                """
+        }
     }
 
     private func generateView(
@@ -105,6 +121,14 @@ struct JavaScriptGenerator {
             )
             return
                 "\(indent)${(\(sequenceValue) ?? []).map((\(name)) => `\n\(nested)\n\(indent)`).join(\"\")}"
+        case .conditional(let branches):
+            return generateConditionalView(
+                branches,
+                indentLevel: indentLevel,
+                buttonIndex: &buttonIndex,
+                stateNames: stateNames,
+                localBindings: localBindings
+            )
         case .component(let name, let children):
             if let children {
                 let nested = children.map {
@@ -156,6 +180,55 @@ struct JavaScriptGenerator {
             )
             return applyModifiers(baseMarkup: baseMarkup, modifiers: modifiers, indent: indent)
         }
+    }
+
+    private func generateConditionalView(
+        _ branches: [ViewConditionalBranch],
+        indentLevel: Int,
+        buttonIndex: inout Int,
+        stateNames: Set<String>,
+        localBindings: Set<String>
+    ) -> String {
+        let indent = String(repeating: "  ", count: indentLevel)
+        var lines: [String] = ["\(indent)${(() => {"]
+
+        for (index, branch) in branches.enumerated() {
+            let nested = branch.body.map {
+                generateView(
+                    $0,
+                    indentLevel: indentLevel + 2,
+                    buttonIndex: &buttonIndex,
+                    stateNames: stateNames,
+                    localBindings: localBindings
+                )
+            }
+            .joined(separator: "\n")
+            let markup =
+                nested.isEmpty ? "" : "\n\(nested)\n\(indent)    "
+
+            if let condition = branch.condition {
+                let renderedCondition = generateExpression(
+                    condition,
+                    stateNames: stateNames,
+                    localBindings: localBindings
+                )
+                let prefix = index == 0 ? "  if" : "  else if"
+                lines.append("\(indent)\(prefix) (\(renderedCondition)) {")
+                lines.append("\(indent)    return `\(markup)`;")
+                lines.append("\(indent)  }")
+            } else {
+                lines.append("\(indent)  else {")
+                lines.append("\(indent)    return `\(markup)`;")
+                lines.append("\(indent)  }")
+            }
+        }
+
+        if branches.last?.condition != nil {
+            lines.append("\(indent)  return ``;")
+        }
+
+        lines.append("\(indent)}})()}")
+        return lines.joined(separator: "\n")
     }
 
     private func generateVStack(
@@ -252,6 +325,17 @@ struct JavaScriptGenerator {
                 });
                 """
             )
+        case .conditional(let branches):
+            for branch in branches {
+                for child in branch.body {
+                    collectHandlers(
+                        view: child,
+                        buttonIndex: &buttonIndex,
+                        handlers: &handlers,
+                        stateNames: stateNames
+                    )
+                }
+            }
         case .forEach(_, _, let body):
             for child in body {
                 collectHandlers(
@@ -309,6 +393,12 @@ struct JavaScriptGenerator {
             return
         case .button:
             return
+        case .conditional(let branches):
+            for branch in branches {
+                for child in branch.body {
+                    collectDebugLogs(view: child, logs: &logs)
+                }
+            }
         case .forEach(_, _, let body):
             for child in body {
                 collectDebugLogs(view: child, logs: &logs)
@@ -609,6 +699,35 @@ struct JavaScriptGenerator {
                 \(indent(statements, level: 1))
                 }
                 """
+        case .whileLoop(let condition, let body):
+            let renderedCondition = generateExpression(
+                condition, stateNames: stateNames, context: context)
+            var loopContext = context
+            let statements = body.map {
+                generateStatement($0, stateNames: stateNames, context: &loopContext)
+            }
+            .joined(separator: "\n")
+            return """
+                while (\(renderedCondition)) {
+                \(indent(statements, level: 1))
+                }
+                """
+        case .conditional(let branches):
+            return generateConditionalStatement(
+                branches: branches,
+                stateNames: stateNames,
+                context: context
+            )
+        case .return(let expression):
+            if let expression {
+                return
+                    "return \(generateExpression(expression, stateNames: stateNames, context: context));"
+            }
+            return "return;"
+        case .break:
+            return "break;"
+        case .continue:
+            return "continue;"
         case .switchStatement(let expression, let cases, let defaultBody):
             return generateSwitchStatement(
                 expression: expression,
@@ -621,6 +740,38 @@ struct JavaScriptGenerator {
             return
                 "console.log(`\(generateInterpolatedString(message, stateNames: stateNames, context: context))`);"
         }
+    }
+
+    private func generateConditionalStatement(
+        branches: [StatementConditionalBranch],
+        stateNames: Set<String>,
+        context: JSHandlerContext
+    ) -> String {
+        var lines: [String] = []
+
+        for (index, branch) in branches.enumerated() {
+            var branchContext = context
+            let statements = branch.body.map {
+                generateStatement($0, stateNames: stateNames, context: &branchContext)
+            }
+            .joined(separator: "\n")
+
+            if let condition = branch.condition {
+                let renderedCondition = generateExpression(
+                    condition, stateNames: stateNames, context: context)
+                let prefix = index == 0 ? "if" : "else if"
+                lines.append("\(prefix) (\(renderedCondition)) {")
+            } else {
+                lines.append("else {")
+            }
+
+            if !statements.isEmpty {
+                lines.append(indent(statements, level: 1))
+            }
+            lines.append("}")
+        }
+
+        return lines.joined(separator: "\n")
     }
 
     private func generateSwitchStatement(
@@ -679,6 +830,8 @@ struct JavaScriptGenerator {
             return "\"\(escapeLiteral(value))\""
         case .boolean(let value):
             return value ? "true" : "false"
+        case .none:
+            return "null"
         case .identifier(let name):
             if localBindings.contains(name) {
                 return name
@@ -693,6 +846,12 @@ struct JavaScriptGenerator {
                     $0, stateNames: stateNames, localBindings: localBindings, context: context)
             }.joined(separator: ", ")
             return "[\(rendered)]"
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return
+                "\(generateExpression(condition, stateNames: stateNames, localBindings: localBindings, context: context)) ? \(generateExpression(trueExpression, stateNames: stateNames, localBindings: localBindings, context: context)) : \(generateExpression(falseExpression, stateNames: stateNames, localBindings: localBindings, context: context))"
+        case .unary(let operatorSymbol, let nested):
+            return
+                "\(operatorSymbol.rawValue)\(generateExpression(nested, stateNames: stateNames, localBindings: localBindings, context: context))"
         case .binary(let lhs, let operatorSymbol, let rhs):
             return
                 "\(generateExpression(lhs, stateNames: stateNames, localBindings: localBindings, context: context)) \(operatorSymbol.rawValue) \(generateExpression(rhs, stateNames: stateNames, localBindings: localBindings, context: context))"
