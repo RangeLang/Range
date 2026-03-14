@@ -83,7 +83,7 @@ module.exports = grammar({
 
     variable_declaration: ($) =>
       seq(
-        choice("let", "var", "state", "binding"),
+        choice("let", "var", "state", "binding", "value"),
         field("name", $.identifier),
         optional(seq(":", field("type", $.type))),
         optional(seq("=", field("value", $.expression))),

@@ -1,6 +1,6 @@
 (comment) @comment
 
-["#" "@"] @punctuation.special
+["#" "@"] @keyword
 
 [
   "enum"
@@ -11,11 +11,15 @@
   "protocol"
   "state"
   "binding"
+  "value"
   "var"
 ] @keyword
 
 (sigiled_declaration
-  name: (type_identifier) @type)
+  name: (type_identifier) @property)
+
+(sigiled_declaration
+  (type_identifier) @keyword)
 
 (callable_declaration
   name: (identifier) @function.method)
@@ -36,10 +40,10 @@
   name: (identifier) @parameter)
 
 (variable_declaration
-  name: (identifier) @variable)
+  name: (identifier) @type)
 
 (member_declaration
-  name: (identifier) @property)
+  name: (identifier) @type)
 
 (argument
   label: (identifier) @property)

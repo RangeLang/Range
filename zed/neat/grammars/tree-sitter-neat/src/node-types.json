@@ -1106,6 +1106,10 @@
     "named": true
   },
   {
+    "type": "value",
+    "named": false
+  },
+  {
     "type": "var",
     "named": false
   },

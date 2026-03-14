@@ -450,6 +450,10 @@
             {
               "type": "STRING",
               "value": "binding"
+            },
+            {
+              "type": "STRING",
+              "value": "value"
             }
           ]
         },
