@@ -1,0 +1,21 @@
+#Link: Component {
+  value destination _: URL
+
+  @body -> Renderable
+
+  init(content: @body, destination: URL) {
+    self.destination = destination
+  }
+
+  init(label: String, destination: URL) {
+    self.destination = destination
+    self.body = Text(text: label)
+  }
+}
+
+extension Link {
+  value web: WebNode = WebNode.element(
+    tag: "a",
+    attributes: ["href": destination.path]
+  )
+}

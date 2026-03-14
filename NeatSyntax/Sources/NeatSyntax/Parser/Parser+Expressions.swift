@@ -6,7 +6,7 @@ extension Parser {
     }
 
     mutating func parseTernaryExpression() throws -> Expression {
-        let condition = try parseLogicalOrExpression()
+        let condition = try parseNilCoalescingExpression()
 
         guard peek() == .question else {
             return condition
@@ -21,6 +21,18 @@ extension Parser {
             trueExpression: trueExpression,
             falseExpression: falseExpression
         )
+    }
+
+    mutating func parseNilCoalescingExpression() throws -> Expression {
+        var expression = try parseLogicalOrExpression()
+
+        while peek() == .questionQuestion {
+            advance()
+            let rhs = try parseLogicalOrExpression()
+            expression = .binary(lhs: expression, operatorSymbol: .nilCoalescing, rhs: rhs)
+        }
+
+        return expression
     }
 
     mutating func parseLogicalOrExpression() throws -> Expression {
@@ -351,6 +363,27 @@ extension Parser {
                 guard lhsType == .int || lhsType == .string else {
                     throw ParseError(
                         "Operator '+' is only supported for Int and String, got \(lhsType.displayName)."
+                    )
+                }
+                return lhsType
+            case .nilCoalescing:
+                if lhsType == .none {
+                    return rhsType
+                }
+                if rhsType == .none {
+                    return lhsType
+                }
+                if case .optional(let wrapped) = lhsType {
+                    guard wrapped == rhsType else {
+                        throw ParseError(
+                            "Operator '??' requires the right-hand side to match \(wrapped.displayName), got \(rhsType.displayName)."
+                        )
+                    }
+                    return wrapped
+                }
+                guard lhsType == rhsType else {
+                    throw ParseError(
+                        "Operator '??' requires compatible types, got \(lhsType.displayName) and \(rhsType.displayName)."
                     )
                 }
                 return lhsType

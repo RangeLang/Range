@@ -1,0 +1,12 @@
+#Image: Primitive {
+  value source _: URL
+  value alt: String
+
+  value web: WebNode = WebNode.element(
+    tag: "img",
+    attributes: [
+      "src": source.path,
+      "alt": alt
+    ]
+  )
+}

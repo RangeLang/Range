@@ -499,6 +499,13 @@ private struct MainProgramInterpreter {
             case .addition:
                 return try add(evaluate(lhs), evaluate(rhs))
 
+            case .nilCoalescing:
+                let left = try evaluate(lhs)
+                if case .none = left {
+                    return try evaluate(rhs)
+                }
+                return left
+
             case .equal:
                 return .bool(valuesEqual(try evaluate(lhs), try evaluate(rhs)))
 

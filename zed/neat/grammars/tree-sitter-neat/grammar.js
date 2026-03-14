@@ -5,7 +5,8 @@ const PREC = {
   unary: 5,
   comparison: 4,
   logical: 3,
-  ternary: 2,
+  nil_coalescing: 2,
+  ternary: 1,
 };
 
 module.exports = grammar({
@@ -344,6 +345,14 @@ module.exports = grammar({
           seq(
             field("left", $.expression),
             field("operator", choice("&&", "||")),
+            field("right", $.expression),
+          ),
+        ),
+        prec.left(
+          PREC.nil_coalescing,
+          seq(
+            field("left", $.expression),
+            field("operator", "??"),
             field("right", $.expression),
           ),
         ),

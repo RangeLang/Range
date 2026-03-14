@@ -1,0 +1,6 @@
+#Divider: Primitive {
+  value web: WebNode = WebNode.element(
+    tag: "hr",
+    classes: ["divider"]
+  )
+}

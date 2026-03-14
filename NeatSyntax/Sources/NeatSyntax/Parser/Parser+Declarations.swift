@@ -186,18 +186,10 @@ extension Parser {
         var parameters: [NeatFunctionParameter] = []
         if peek() != .rightParen {
             while true {
-                let localName = try consumeIdentifier()
-                guard localName != "_" else {
-                    throw ParseError("Parameter local name cannot be '_'.")
-                }
-
-                let externalLabel: String?
-                if case .identifier(let secondName) = peek(), peek(offset: 1) == .colon {
-                    advance()
-                    externalLabel = secondName == "_" ? nil : secondName
-                } else {
-                    externalLabel = localName
-                }
+                let (localName, externalLabel) = try parseLabeledDeclarationName(
+                    expecting: "parameter",
+                    allowOmittedLocalName: false
+                )
 
                 var typeName: String?
                 var slotName: String?
@@ -227,6 +219,27 @@ extension Parser {
 
         try consume(.rightParen)
         return parameters
+    }
+
+    mutating func parseLabeledDeclarationName(
+        expecting kind: String,
+        allowOmittedLocalName: Bool = true
+    ) throws -> (localName: String, externalLabel: String?) {
+        let localName = try consumeIdentifier()
+        if !allowOmittedLocalName, localName == "_" {
+            throw ParseError("\(kind.capitalized) local name cannot be '_'.")
+        }
+
+        if case .identifier(let secondName) = peek(), peek(offset: 1) == .colon {
+            advance()
+            return (localName, secondName == "_" ? nil : secondName)
+        }
+
+        guard peek() == .colon else {
+            throw ParseError("Expected ':' after \(kind) name.")
+        }
+
+        return (localName, localName)
     }
 
     mutating func parseEnumCaseLine() throws -> [EnumCaseDeclaration] {
@@ -444,7 +457,7 @@ extension Parser {
 
     mutating func parseMemberDeclaration() throws -> MemberDeclaration {
         try consumeKeyword(.value)
-        let name = try consumeIdentifier()
+        let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "value")
         try consume(.colon)
         let typeName = try consumeTypeReference()
         let value: Expression?
@@ -459,24 +472,34 @@ extension Parser {
             try skipUnknownBlockBody()
             try consume(.rightBrace)
         }
-        return MemberDeclaration(name: name, typeName: typeName, value: value)
+        return MemberDeclaration(
+            localName: localName,
+            externalLabel: externalLabel,
+            typeName: typeName,
+            value: value
+        )
     }
 
     mutating func parseBindingDeclaration() throws -> BindingDeclaration {
         try consumeKeyword(.binding)
-        let name = try consumeIdentifier()
+        let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "binding")
         try consume(.colon)
         let typeName = try consumeTypeReference()
         let storage: BindingStorage
         if peek() == .leftBrace {
             let previousBindingNames = currentBindingNames
-            currentBindingNames = previousBindingNames.union([name])
-            storage = try parseDerivedBindingStorage(name: name)
-            currentBindingNames = previousBindingNames.union([name])
+            currentBindingNames = previousBindingNames.union([localName])
+            storage = try parseDerivedBindingStorage(name: localName)
+            currentBindingNames = previousBindingNames.union([localName])
         } else {
             storage = .plain
         }
-        return BindingDeclaration(name: name, typeName: typeName, storage: storage)
+        return BindingDeclaration(
+            localName: localName,
+            externalLabel: externalLabel,
+            typeName: typeName,
+            storage: storage
+        )
     }
 
     mutating func parseInitializerDeclaration() throws -> InitializerDeclaration {
@@ -535,20 +558,28 @@ extension Parser {
         guard peek() == .keyword(NeatSyntax.Keyword.value.rawValue) else {
             return false
         }
-        guard case .identifier = peek(offset: 1), peek(offset: 2) == .colon else {
-            return false
+        guard case .identifier = peek(offset: 1) else { return false }
+        if peek(offset: 2) == .colon {
+            return true
         }
-        return true
+        return {
+            guard case .identifier = peek(offset: 2) else { return false }
+            return peek(offset: 3) == .colon
+        }()
     }
 
     func isBindingDeclarationStart() -> Bool {
         guard peek() == .keyword(NeatSyntax.Keyword.binding.rawValue) else {
             return false
         }
-        guard case .identifier = peek(offset: 1), peek(offset: 2) == .colon else {
-            return false
+        guard case .identifier = peek(offset: 1) else { return false }
+        if peek(offset: 2) == .colon {
+            return true
         }
-        return true
+        return {
+            guard case .identifier = peek(offset: 2) else { return false }
+            return peek(offset: 3) == .colon
+        }()
     }
 
     func isInitializerDeclarationStart() -> Bool {
