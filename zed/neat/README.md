@@ -30,6 +30,33 @@ neat lsp
 3. Select this folder: `zed/neat`.
 4. Reload Zed if the language does not appear immediately.
 
+## Dev Workflow
+
+Whenever changing this extension, use:
+
+```text
+./scripts/sync-zed-extension.sh
+```
+
+The script:
+
+- bumps `version` in `extension.toml`
+- updates the grammar `rev` to `HEAD` when `zed/neat` is clean
+- rebuilds the Rust extension
+- recompiles the Zed grammar WASM
+- refreshes Zed's installed extension cache
+
+If `zed/neat` still has uncommitted changes, the script leaves `rev` unchanged and prints a warning.
+
+This applies especially to:
+
+- `highlights.scm`
+- grammar changes under `grammars/tree-sitter-neat`
+- `src/lib.rs`
+- language config/query files
+
+Zed caches extension manifests, compiled extension output, and checked-out grammar revisions aggressively enough that version bumps work as the safest cache-buster.
+
 ## Grammar Source
 
 The authored Tree-sitter grammar lives in `zed/neat/grammars/tree-sitter-neat`.
