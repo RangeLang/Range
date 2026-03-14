@@ -50,6 +50,7 @@ extension NeatCLI {
                 guard FileManager.default.fileExists(atPath: packageFile.path) else {
                     throw ValidationError("Missing Package.neat in \(projectRoot.path)")
                 }
+                _ = try PackageManifestLoader.load(from: packageFile)
 
                 let files = try neatFiles(in: projectRoot)
                 guard !files.isEmpty else {
@@ -72,6 +73,10 @@ extension NeatCLI {
         }
 
         private func validateFile(at fileURL: URL) throws {
+            if fileURL.lastPathComponent == "Package.neat" {
+                _ = try PackageManifestLoader.load(from: fileURL)
+                return
+            }
             let source = try String(contentsOf: fileURL, encoding: .utf8)
             var parser = try Parser(source: source)
             _ = try parser.parseSourceFile()

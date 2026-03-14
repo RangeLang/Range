@@ -20,6 +20,7 @@ struct ProjectUpdater {
         }
 
         let source = try String(contentsOf: packageFile, encoding: .utf8)
+        _ = try PackageManifestLoader.load(from: packageFile)
         let modules = parseModules(from: source)
         try updateModules(modules, projectRoot: root)
 

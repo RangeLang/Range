@@ -219,12 +219,11 @@ struct ProjectScaffolder {
     }
 
     private func renderProgramPackage(name: String) -> String {
-        """
-        Package("\(name)") {
-          Dependencies {
-          }
-        }
-        """
+        let packageName = sanitizedSymbolName(from: name)
+        return """
+            #\(packageName): Package {
+            }
+            """
     }
 
     private func renderProgramPlayground(name: String) -> String {

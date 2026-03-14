@@ -1,6 +1,2 @@
-Package("NeatPlayground") {
-  Platform(.program)
-
-  Dependencies {
-  }
+#NeatPlayground: Package {
 }
