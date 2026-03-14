@@ -7,17 +7,19 @@ description = "Neat language support for .neat files."
 repository = "https://github.com/georgeneat/Neat"
 languages = ["languages/neat"]
 
-[grammars.neat]
-repository = "file:///Users/george/Documents/WebProjects/Neat/zed/neat/grammars/tree-sitter-neat"
-rev = "main"
-
 [lib]
 kind = "Rust"
 version = "0.7.0"
 
+[grammars.neat]
+repository = "file:///Users/george/Documents/WebProjects/Neat"
+rev = "e091865514868dca7815a222b928cd456ba8b0d3"
+path = "zed/neat/grammars/tree-sitter-neat"
+
 [language_servers.neat-lsp]
 name = "Neat LSP"
-languages = ["Neat"]
+language = "Neat"
+languages = []
 
 [language_servers.neat-lsp.language_ids]
 Neat = "neat"
