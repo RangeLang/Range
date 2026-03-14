@@ -233,7 +233,7 @@ struct ProjectScaffolder {
         return """
             @main
             {
-              print("Neat program playground")
+              Logger.info("Neat program playground")
 
               let values = [1, 2, 3]
               var total = 0
@@ -243,9 +243,9 @@ struct ProjectScaffolder {
               }
 
               if total == 6 {
-                print("sum = \\(total)")
+                Logger.success("sum = \\(total)")
               } else {
-                print("unexpected sum")
+                Logger.warning("unexpected sum")
               }
             }
             """

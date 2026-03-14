@@ -343,8 +343,7 @@ struct NeatLanguageServer {
 
     private func diagnosticPayload(for text: String, index: DocumentIndex) -> [[String: Any]] {
         do {
-            let annotated = annotateDebugPrints(in: text)
-            var parser = try Parser(source: annotated)
+            var parser = try Parser(source: text)
             _ = try parser.parseDeclaration()
             return []
         } catch {
@@ -358,28 +357,6 @@ struct NeatLanguageServer {
                 ]
             ]
         }
-    }
-
-    private func annotateDebugPrints(in source: String) -> String {
-        let lines = source.components(separatedBy: .newlines)
-        var result: [String] = []
-        result.reserveCapacity(lines.count)
-
-        for (index, rawLine) in lines.enumerated() {
-            let lineNumber = index + 1
-            let prefix = "[L\(lineNumber)] "
-
-            if let range = rawLine.range(of: "print(\"") {
-                var line = rawLine
-                line.replaceSubrange(range, with: "print(\"\(prefix)")
-                result.append(line)
-                continue
-            }
-
-            result.append(rawLine)
-        }
-
-        return result.joined(separator: "\n")
     }
 
     private func requestContext(from message: [String: Any]) -> RequestContext? {

@@ -47,14 +47,15 @@ extension Parser {
             return .continue
         }
 
-        let name = try consumeIdentifier()
-
-        if name == "print" {
-            try consume(.leftParen)
-            let message = try consumeStringLiteral()
-            try consume(.rightParen)
-            return .debugPrint(parseInterpolatedString(message))
+        if isStandaloneCallExpressionStart() {
+            let expression = try parseExpression()
+            guard case .call = expression else {
+                throw ParseError("Expected callable expression.")
+            }
+            return .expression(expression)
         }
+
+        let name = try consumeIdentifier()
 
         let target = try resolveAssignmentTarget(name: name, localBindings: localBindings)
 
@@ -72,6 +73,19 @@ extension Parser {
         default:
             throw ParseError("Expected assignment operator in action block.")
         }
+    }
+
+    func isStandaloneCallExpressionStart() -> Bool {
+        guard case .identifier = peek() else { return false }
+        var offset = 1
+        while peek(offset: offset) == .dot {
+            guard case .identifier = peek(offset: offset + 1) else {
+                return false
+            }
+            offset += 2
+        }
+
+        return peek(offset: offset) == .leftParen
     }
 
     mutating func parseLocalDeclaration(
@@ -277,6 +291,9 @@ extension Parser {
 
         guard case .identifier(let name) = peek() else { return false }
         if name == "print" && peek(offset: 1) == .leftParen {
+            return true
+        }
+        if isStandaloneCallExpressionStart() {
             return true
         }
         let next = peek(offset: 1)

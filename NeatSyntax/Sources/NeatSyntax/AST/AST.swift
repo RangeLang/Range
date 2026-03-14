@@ -79,8 +79,13 @@ public struct AssociatedValueDeclaration {
 }
 
 public struct NeatFunctionParameter {
-    public let name: String
+    public let localName: String
+    public let externalLabel: String?
     public let typeName: String?
+
+    public var name: String {
+        localName
+    }
 
     public var isOptional: Bool {
         guard let typeName else { return false }
@@ -182,7 +187,6 @@ public indirect enum ViewNode {
     case conditional([ViewConditionalBranch])
     case slot(name: String)
     case vStack([ViewNode])
-    case debugPrint(InterpolatedString)
     case modified(base: ViewNode, modifiers: [ModifierCall])
 }
 
@@ -233,6 +237,7 @@ public indirect enum Statement {
         operatorSymbol: CompoundOperator,
         expression: Expression
     )
+    case expression(Expression)
     case forEach(name: String, sequence: Expression, body: [Statement])
     case whileLoop(condition: Expression, body: [Statement])
     case conditional([StatementConditionalBranch])
@@ -244,7 +249,6 @@ public indirect enum Statement {
         cases: [SwitchCase],
         defaultBody: [Statement]?
     )
-    case debugPrint(InterpolatedString)
 }
 
 public struct StatementConditionalBranch {

@@ -1,16 +1,16 @@
 @main {
-  let values = [1, 2, 3, 4]
+  let numbers = [1, 2, 3, 4]
   var total = 0
 
-  print("Neat playground")
+  Logger.info("Neat playground")
 
-  for value in values {
-    total += value
+  for number in numbers {
+    total += number
   }
 
   if total == 10 {
-    print("sum = \(total)")
+    Logger.success("sum = \(total)")
   } else {
-    print("unexpected sum")
+    Logger.warning("unexpected sum")
   }
 }

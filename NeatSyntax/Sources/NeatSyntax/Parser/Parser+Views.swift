@@ -177,19 +177,6 @@ extension Parser {
                 throw ParseError("Div requires a view block.")
             }
             return .element(tag: "div", children: children)
-        case "print":
-            guard invocation.arguments.count == 1 else {
-                throw ParseError("print requires exactly one argument.")
-            }
-            guard invocation.arguments[0].label == nil,
-                case .string(let message) = invocation.arguments[0].value
-            else {
-                throw ParseError("print argument must be a string literal.")
-            }
-            guard invocation.block == nil else {
-                throw ParseError("print does not accept a trailing block.")
-            }
-            return .debugPrint(parseInterpolatedString(message))
         default:
             if invocation.name == "content" {
                 guard invocation.arguments.isEmpty, invocation.block == nil else {

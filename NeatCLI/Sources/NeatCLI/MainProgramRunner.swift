@@ -60,16 +60,18 @@ struct MainProgramRunner {
             )
         }
 
+        if showSummary {
+            let startupMS = Int((Date().timeIntervalSince(startedAt) * 1000.0).rounded())
+            TerminalLog.timedOut("Running \(packageName)", milliseconds: startupMS, level: .warning)
+        }
+
         var interpreter = MainProgramInterpreter(fileName: entryFile.lastPathComponent)
         try interpreter.execute(mainBlock)
 
         if showSummary {
             let elapsedMS = Int((Date().timeIntervalSince(startedAt) * 1000.0).rounded())
-            let durationText =
-                elapsedMS >= 1000
-                ? String(format: "%.2fs", Double(elapsedMS) / 1000.0)
-                : "\(elapsedMS)ms"
-            TerminalLog.out("Ran \(packageName) \(durationText)", level: .success)
+            TerminalLog.timedOut(
+                "Finished \(packageName)", milliseconds: elapsedMS, level: .success)
         }
     }
 
@@ -328,9 +330,87 @@ private struct MainProgramInterpreter {
 
             return .none
 
-        case .debugPrint(let message):
-            Swift.print(render(message))
+        case .expression(let expression):
+            try executeExpressionStatement(expression)
             return .none
+
+        }
+    }
+
+    private enum LoggerOutputMode {
+        case log
+        case debug
+        case info
+        case success
+        case warning
+        case error
+
+        var runtimeLevel: RuntimeLogLevel {
+            switch self {
+            case .log:
+                return .log
+            case .debug:
+                return .debug
+            case .info:
+                return .info
+            case .success:
+                return .success
+            case .warning:
+                return .warning
+            case .error:
+                return .error
+            }
+        }
+
+        var usesStderr: Bool {
+            switch self {
+            case .error:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    private mutating func executeExpressionStatement(_ expression: NeatSyntax.Expression) throws {
+        guard case .call(let name, let arguments) = expression else {
+            throw ValidationError("Standalone expression statements must be callable.")
+        }
+
+        switch name {
+        case "Logger.log":
+            try emitLoggerMessage(arguments, mode: .log)
+        case "Logger.debug":
+            try emitLoggerMessage(arguments, mode: .debug)
+        case "Logger.info":
+            try emitLoggerMessage(arguments, mode: .info)
+        case "Logger.success":
+            try emitLoggerMessage(arguments, mode: .success)
+        case "Logger.warning":
+            try emitLoggerMessage(arguments, mode: .warning)
+        case "Logger.error":
+            try emitLoggerMessage(arguments, mode: .error)
+        default:
+            throw ValidationError(
+                "Running standalone callable expressions is not supported in the main-program interpreter yet (\(name))."
+            )
+        }
+    }
+
+    private mutating func emitLoggerMessage(
+        _ arguments: [CallArgument],
+        mode: LoggerOutputMode
+    ) throws {
+        guard arguments.count == 1 else {
+            throw ValidationError("Logger runtime calls currently require exactly one argument.")
+        }
+
+        let message = stringify(try evaluate(arguments[0].value))
+
+        if mode.usesStderr {
+            TerminalLog.runtimeLogErr(message, level: mode.runtimeLevel)
+        } else {
+            TerminalLog.runtimeLogOut(message, level: mode.runtimeLevel)
         }
     }
 
