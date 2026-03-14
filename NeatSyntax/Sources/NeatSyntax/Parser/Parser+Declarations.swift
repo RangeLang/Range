@@ -409,16 +409,23 @@ extension Parser {
     }
 
     mutating func parseMemberDeclaration() throws -> MemberDeclaration {
-        try consumeKeyword(.variable)
+        try consumeKeyword(.value)
         let name = try consumeIdentifier()
         try consume(.colon)
         let typeName = try consumeTypeReference()
+        let value: Expression?
+        if peek() == .equal {
+            try consume(.equal)
+            value = try parseExpression()
+        } else {
+            value = nil
+        }
         if peek() == .leftBrace {
             try consume(.leftBrace)
             try skipUnknownBlockBody()
             try consume(.rightBrace)
         }
-        return MemberDeclaration(name: name, typeName: typeName)
+        return MemberDeclaration(name: name, typeName: typeName, value: value)
     }
 
     mutating func parseBindingDeclaration() throws -> BindingDeclaration {
@@ -491,7 +498,7 @@ extension Parser {
     }
 
     func isMemberDeclarationStart() -> Bool {
-        guard peek() == .keyword(NeatSyntax.Keyword.variable.rawValue) else {
+        guard peek() == .keyword(NeatSyntax.Keyword.value.rawValue) else {
             return false
         }
         guard case .identifier = peek(offset: 1), peek(offset: 2) == .colon else {
@@ -518,7 +525,7 @@ extension Parser {
     }
 
     func isBodyMemberStart() -> Bool {
-        guard peek() == .keyword(NeatSyntax.Keyword.variable.rawValue) else {
+        guard peek() == .keyword(NeatSyntax.Keyword.value.rawValue) else {
             return false
         }
         guard case .identifier(let name) = peek(offset: 1), name == "body" else {
@@ -540,11 +547,12 @@ extension Parser {
     func validateCallableDeclarations(_ callables: [CallableDeclaration]) throws {
         var seen: Set<String> = []
         for callable in callables {
-            try validateOmittableParameters(callable.parameters, context: "callable")
-            let signatures = callableSignatureKeys(
-                targetName: callable.targetName,
-                name: callable.name,
-                parameters: callable.parameters
+            let signatures = Set(
+                callableSignatureKeys(
+                    targetName: callable.targetName,
+                    name: callable.name,
+                    parameters: callable.parameters
+                )
             )
             for signature in signatures {
                 guard seen.insert(signature).inserted else {
@@ -559,8 +567,7 @@ extension Parser {
     func validateInitializerDeclarations(_ initializers: [InitializerDeclaration]) throws {
         var seen: Set<String> = []
         for initializer in initializers {
-            try validateOmittableParameters(initializer.parameters, context: "initializer")
-            let signatures = initializerSignatureKeys(parameters: initializer.parameters)
+            let signatures = Set(initializerSignatureKeys(parameters: initializer.parameters))
             for signature in signatures {
                 guard seen.insert(signature).inserted else {
                     throw ParseError(
@@ -584,7 +591,10 @@ extension Parser {
         parameters: [NeatFunctionParameter]
     ) -> [String] {
         signatureParameterVariants(parameters).map { variant in
-            let rendered = variant.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
+            let rendered = variant.map { parameter in
+                let typeName = parameter.typeName ?? "_"
+                return "\(parameter.name):\(typeName)"
+            }.joined(separator: ",")
             return "\(targetName ?? "_")@\(name)(\(rendered))"
         }
     }
@@ -606,7 +616,10 @@ extension Parser {
 
     func initializerSignatureKeys(parameters: [NeatFunctionParameter]) -> [String] {
         signatureParameterVariants(parameters).map { variant in
-            variant.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
+            variant.map { parameter in
+                let typeName = parameter.typeName ?? "_"
+                return "\(parameter.name):\(typeName)"
+            }.joined(separator: ",")
         }
     }
 
@@ -618,34 +631,44 @@ extension Parser {
         return "init(\(rendered))"
     }
 
-    func validateOmittableParameters(_ parameters: [NeatFunctionParameter], context: String) throws
-    {
-        var encounteredOptional = false
-        for parameter in parameters.reversed() {
-            if parameter.isOptional {
-                encounteredOptional = true
-                continue
-            }
-            if encounteredOptional {
-                throw ParseError(
-                    "Optional trailing parameters in \(context) declarations must come after all required parameters."
-                )
-            }
-        }
-    }
-
     func signatureParameterVariants(_ parameters: [NeatFunctionParameter])
         -> [[NeatFunctionParameter]]
     {
-        var variants: [[NeatFunctionParameter]] = [parameters]
-        var current = parameters
+        var variants: [[NeatFunctionParameter]] = []
 
-        while let last = current.last, last.isOptional {
-            current.removeLast()
-            variants.append(current)
+        func build(index: Int, current: [NeatFunctionParameter]) {
+            if index == parameters.count {
+                variants.append(current)
+                return
+            }
+
+            let parameter = parameters[index]
+            if parameter.isOptional {
+                build(index: index + 1, current: current)
+            }
+
+            build(index: index + 1, current: current + [parameter])
         }
 
-        return variants
+        build(index: 0, current: [])
+
+        return variants.sorted { lhs, rhs in
+            if lhs.count != rhs.count {
+                return lhs.count > rhs.count
+            }
+
+            let left = lhs.map { parameter in
+                let typeName = parameter.typeName ?? "_"
+                return "\(parameter.name):\(typeName)"
+            }.joined(separator: ",")
+
+            let right = rhs.map { parameter in
+                let typeName = parameter.typeName ?? "_"
+                return "\(parameter.name):\(typeName)"
+            }.joined(separator: ",")
+
+            return left < right
+        }
     }
 
     mutating func skipUnknownBlockBody() throws {
