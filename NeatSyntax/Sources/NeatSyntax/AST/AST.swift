@@ -5,6 +5,15 @@ public enum DeclarationKind {
     case declaration
 }
 
+public enum SourceFileNode {
+    case declaration(DeclarationNode)
+    case mainBlock(MainBlockNode)
+}
+
+public struct MainBlockNode {
+    public let body: [Statement]
+}
+
 public enum ObjectType {
     case typeExtension(TypeExtensionDeclaration)
 }
@@ -18,7 +27,9 @@ public struct DeclarationNode {
     public let objects: [ObjectType]
     public let cases: [EnumCaseDeclaration]
     public let states: [StateDeclaration]
+    public let bindings: [BindingDeclaration]
     public let members: [MemberDeclaration]
+    public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
     public let body: ViewNode?
 
@@ -41,6 +52,9 @@ public struct ComponentNode {
     public let projectionTarget: String?
     public let cases: [EnumCaseDeclaration]
     public let states: [StateDeclaration]
+    public let bindings: [BindingDeclaration]
+    public let members: [MemberDeclaration]
+    public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
     public let body: ViewNode
 
@@ -73,7 +87,12 @@ public struct CallableDeclaration {
     public let targetName: String?
     public let name: String
     public let parameters: [NeatFunctionParameter]
-    public let hasBody: Bool
+    public let body: [Statement]?
+}
+
+public struct InitializerDeclaration {
+    public let parameters: [NeatFunctionParameter]
+    public let body: [Statement]?
 }
 
 public struct TypeExtensionDeclaration {
@@ -90,6 +109,12 @@ public struct MemberDeclaration {
     public let typeName: String
 }
 
+public struct BindingDeclaration {
+    public let name: String
+    public let typeName: String
+    public let storage: BindingStorage
+}
+
 public struct StateDeclaration {
     public let name: String
     public let type: BuiltinType
@@ -99,6 +124,11 @@ public struct StateDeclaration {
 public enum StateStorage {
     case stored(Expression)
     case derived([Statement])
+}
+
+public enum BindingStorage {
+    case plain
+    case derived(get: [Statement], set: [Statement])
 }
 
 public indirect enum BuiltinType: Equatable {
@@ -140,7 +170,7 @@ public indirect enum BuiltinType: Equatable {
 public indirect enum ViewNode {
     case text(InterpolatedString)
     case button(title: String, action: [Statement])
-    case component(name: String, children: [ViewNode]?)
+    case component(name: String, arguments: [CallArgument], children: [ViewNode]?)
     case element(tag: String, children: [ViewNode])
     case forEach(name: String, sequence: Expression, body: [ViewNode])
     case conditional([ViewConditionalBranch])
@@ -163,6 +193,11 @@ public struct ModifierCall {
 public struct ModifierCallArgument {
     public let label: String?
     public let value: ModifierArgument
+}
+
+public struct CallArgument {
+    public let label: String?
+    public let value: Expression
 }
 
 public enum ModifierArgument {
@@ -223,6 +258,7 @@ public enum LocalBindingKind {
 
 public enum AssignmentTarget {
     case state(String)
+    case binding(String)
     case local(String)
 }
 
@@ -236,6 +272,7 @@ public indirect enum Expression {
     case boolean(Bool)
     case none
     case identifier(String)
+    case bindingReference(String)
     case array([Expression])
     case ternary(condition: Expression, trueExpression: Expression, falseExpression: Expression)
     case unary(operatorSymbol: UnaryOperator, expression: Expression)

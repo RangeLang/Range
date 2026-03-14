@@ -97,6 +97,9 @@ struct Lexer {
             case "?":
                 advance()
                 tokens.append(.question)
+            case "$":
+                advance()
+                tokens.append(.dollar)
             case "&":
                 advance()
                 guard match("&") else {

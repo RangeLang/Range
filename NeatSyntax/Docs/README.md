@@ -11,8 +11,10 @@ The focus here is the core syntax implemented in `NeatSyntax`: declarations, mem
 - projected declarations with `#Name on Target: Contract { ... }`
 - typed members with `var name: Type`
 - declaration state with `state name: Type = value`
+- declaration bindings with `binding name: Type`
 - local `let` and `var` bindings inside statement blocks
 - callable members with `@name(...)`
+- explicit binding references with `$name`
 - optional types like `Int?` and empty optional values with `none`
 - arrays in type position like `[Int]`
 - array literals in expressions like `[1, 2, 3]`

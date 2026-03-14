@@ -1,4 +1,4 @@
-import NeatWeb
+import Neat
 import Vapor
 
 enum VaporRouteRegistrar {

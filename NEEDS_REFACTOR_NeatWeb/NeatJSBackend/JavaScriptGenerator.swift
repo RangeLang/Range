@@ -1,26 +1,46 @@
 import Foundation
 import NeatSyntax
 
-struct JavaScriptGenerator {
-    func generate(component: ComponentNode) -> String {
+public struct JavaScriptGenerator {
+    public init() {}
+
+    public func generate(component: ComponentNode) -> String {
         let stateNames = Set(component.states.map(\.name))
+        let bindingNames = Set(component.bindings.map(\.name))
         let stateLines = component.states.map { generateState($0, stateNames: stateNames) }.joined(
             separator: "\n")
+        let bindingLines = component.bindings.compactMap {
+            generateBinding(
+                $0,
+                stateNames: stateNames,
+                bindingNames: bindingNames
+            )
+        }.joined(separator: "\n")
         var renderButtonIndex = 0
         let renderMarkup = generateView(
             component.body,
             indentLevel: 2,
             buttonIndex: &renderButtonIndex,
             stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: [:],
             localBindings: []
         )
         let debugLogs = generateDebugLogs(component.body)
-        let handlers = generateHandlers(component.body, stateNames: stateNames)
+        let handlers = generateHandlers(
+            component.body,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: [:]
+        )
 
         var sections: [String] = []
         sections.append(runtimePrelude())
         if !stateLines.isEmpty {
             sections.append(stateLines)
+        }
+        if !bindingLines.isEmpty {
+            sections.append(bindingLines)
         }
 
         sections.append(
@@ -72,7 +92,13 @@ struct JavaScriptGenerator {
         case .derived(let body):
             var context = JSHandlerContext()
             let statements = body.map {
-                generateStatement($0, stateNames: stateNames, context: &context)
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: [],
+                    valueExpressions: [:],
+                    context: &context
+                )
             }
             .joined(separator: "\n")
             return """
@@ -83,11 +109,58 @@ struct JavaScriptGenerator {
         }
     }
 
+    private func generateBinding(
+        _ binding: BindingDeclaration,
+        stateNames: Set<String>,
+        bindingNames: Set<String>
+    ) -> String? {
+        switch binding.storage {
+        case .plain:
+            return nil
+        case .derived(let getter, let setter):
+            var getterContext = JSHandlerContext()
+            let getterStatements = getter.map {
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: [:],
+                    context: &getterContext
+                )
+            }
+            .joined(separator: "\n")
+            var setterContext = JSHandlerContext()
+            setterContext.locals["newValue"] = .constant
+            let setterStatements = setter.map {
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: [:],
+                    context: &setterContext
+                )
+            }
+            .joined(separator: "\n")
+            return """
+                const \(binding.name) = {
+                  get value() {
+                \(indent(getterStatements, level: 2))
+                  },
+                  set value(newValue) {
+                \(indent(setterStatements, level: 2))
+                  }
+                };
+                """
+        }
+    }
+
     private func generateView(
         _ view: ViewNode,
         indentLevel: Int,
         buttonIndex: inout Int,
         stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
         localBindings: Set<String>
     ) -> String {
         let indent = String(repeating: "  ", count: indentLevel)
@@ -95,7 +168,7 @@ struct JavaScriptGenerator {
         switch view {
         case .text(let string):
             return
-                "\(indent)<span>\(generateInterpolatedString(string, stateNames: stateNames, localBindings: localBindings))</span>"
+                "\(indent)<span>\(generateInterpolatedString(string, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings))</span>"
         case .debugPrint:
             return ""
         case .button(let title, _):
@@ -110,6 +183,8 @@ struct JavaScriptGenerator {
                     indentLevel: indentLevel + 1,
                     buttonIndex: &buttonIndex,
                     stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
                     localBindings: loopBindings
                 )
             }
@@ -117,6 +192,8 @@ struct JavaScriptGenerator {
             let sequenceValue = generateExpression(
                 sequence,
                 stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
                 localBindings: localBindings
             )
             return
@@ -127,9 +204,11 @@ struct JavaScriptGenerator {
                 indentLevel: indentLevel,
                 buttonIndex: &buttonIndex,
                 stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
                 localBindings: localBindings
             )
-        case .component(let name, let children):
+        case .component(let name, _, let children):
             if let children {
                 let nested = children.map {
                     generateView(
@@ -137,6 +216,8 @@ struct JavaScriptGenerator {
                         indentLevel: indentLevel + 1,
                         buttonIndex: &buttonIndex,
                         stateNames: stateNames,
+                        bindingNames: bindingNames,
+                        valueExpressions: valueExpressions,
                         localBindings: localBindings
                     )
                 }
@@ -152,6 +233,8 @@ struct JavaScriptGenerator {
                     indentLevel: indentLevel + 1,
                     buttonIndex: &buttonIndex,
                     stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
                     localBindings: localBindings
                 )
             }
@@ -168,6 +251,8 @@ struct JavaScriptGenerator {
                 indentLevel: indentLevel,
                 buttonIndex: &buttonIndex,
                 stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
                 localBindings: localBindings
             )
         case .modified(let base, let modifiers):
@@ -176,6 +261,8 @@ struct JavaScriptGenerator {
                 indentLevel: indentLevel,
                 buttonIndex: &buttonIndex,
                 stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
                 localBindings: localBindings
             )
             return applyModifiers(baseMarkup: baseMarkup, modifiers: modifiers, indent: indent)
@@ -187,6 +274,8 @@ struct JavaScriptGenerator {
         indentLevel: Int,
         buttonIndex: inout Int,
         stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
         localBindings: Set<String>
     ) -> String {
         let indent = String(repeating: "  ", count: indentLevel)
@@ -199,6 +288,8 @@ struct JavaScriptGenerator {
                     indentLevel: indentLevel + 2,
                     buttonIndex: &buttonIndex,
                     stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
                     localBindings: localBindings
                 )
             }
@@ -210,6 +301,8 @@ struct JavaScriptGenerator {
                 let renderedCondition = generateExpression(
                     condition,
                     stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
                     localBindings: localBindings
                 )
                 let prefix = index == 0 ? "  if" : "  else if"
@@ -236,6 +329,8 @@ struct JavaScriptGenerator {
         indentLevel: Int,
         buttonIndex: inout Int,
         stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
         localBindings: Set<String>
     )
         -> String
@@ -248,6 +343,8 @@ struct JavaScriptGenerator {
                 indentLevel: innerIndentLevel,
                 buttonIndex: &buttonIndex,
                 stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
                 localBindings: localBindings
             )
         }
@@ -267,6 +364,8 @@ struct JavaScriptGenerator {
     private func generateInterpolatedString(
         _ string: InterpolatedString,
         stateNames: Set<String>,
+        bindingNames: Set<String> = [],
+        valueExpressions: [String: String] = [:],
         localBindings: Set<String> = [],
         context: JSHandlerContext? = nil
     ) -> String {
@@ -276,19 +375,26 @@ struct JavaScriptGenerator {
                 return escapeLiteral(value)
             case .expression(let expression):
                 return
-                    "${\(generateExpression(expression, stateNames: stateNames, localBindings: localBindings, context: context))}"
+                    "${\(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))}"
             }
         }.joined()
     }
 
-    private func generateHandlers(_ root: ViewNode, stateNames: Set<String>) -> [String] {
+    private func generateHandlers(
+        _ root: ViewNode,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String]
+    ) -> [String] {
         var handlers: [String] = []
         var buttonIndex = 0
         collectHandlers(
             view: root,
             buttonIndex: &buttonIndex,
             handlers: &handlers,
-            stateNames: stateNames
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: valueExpressions
         )
         return handlers
     }
@@ -303,7 +409,9 @@ struct JavaScriptGenerator {
         view: ViewNode,
         buttonIndex: inout Int,
         handlers: inout [String],
-        stateNames: Set<String>
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String]
     ) {
         switch view {
         case .text:
@@ -315,7 +423,13 @@ struct JavaScriptGenerator {
             buttonIndex += 1
             var context = JSHandlerContext()
             let body = action.map {
-                generateStatement($0, stateNames: stateNames, context: &context)
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: &context
+                )
             }
             .joined(separator: "\n")
             handlers.append(
@@ -332,7 +446,9 @@ struct JavaScriptGenerator {
                         view: child,
                         buttonIndex: &buttonIndex,
                         handlers: &handlers,
-                        stateNames: stateNames
+                        stateNames: stateNames,
+                        bindingNames: bindingNames,
+                        valueExpressions: valueExpressions
                     )
                 }
             }
@@ -342,17 +458,21 @@ struct JavaScriptGenerator {
                     view: child,
                     buttonIndex: &buttonIndex,
                     handlers: &handlers,
-                    stateNames: stateNames
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions
                 )
             }
-        case .component(_, let children):
+        case .component(_, _, let children):
             if let children {
                 for child in children {
                     collectHandlers(
                         view: child,
                         buttonIndex: &buttonIndex,
                         handlers: &handlers,
-                        stateNames: stateNames
+                        stateNames: stateNames,
+                        bindingNames: bindingNames,
+                        valueExpressions: valueExpressions
                     )
                 }
             }
@@ -363,7 +483,9 @@ struct JavaScriptGenerator {
                     view: child,
                     buttonIndex: &buttonIndex,
                     handlers: &handlers,
-                    stateNames: stateNames
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions
                 )
             }
         case .slot:
@@ -374,7 +496,9 @@ struct JavaScriptGenerator {
                     view: child,
                     buttonIndex: &buttonIndex,
                     handlers: &handlers,
-                    stateNames: stateNames
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions
                 )
             }
         case .modified(let base, _):
@@ -382,7 +506,9 @@ struct JavaScriptGenerator {
                 view: base,
                 buttonIndex: &buttonIndex,
                 handlers: &handlers,
-                stateNames: stateNames
+                stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions
             )
         }
     }
@@ -404,7 +530,7 @@ struct JavaScriptGenerator {
                 collectDebugLogs(view: child, logs: &logs)
             }
             return
-        case .component(_, let children):
+        case .component(_, _, let children):
             if let children {
                 for child in children {
                     collectDebugLogs(view: child, logs: &logs)
@@ -650,6 +776,8 @@ struct JavaScriptGenerator {
     private func generateStatement(
         _ statement: Statement,
         stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
         context: inout JSHandlerContext
     ) -> String {
         switch statement {
@@ -663,15 +791,19 @@ struct JavaScriptGenerator {
             }
             context.locals[name] = kind
             return
-                "\(keyword) \(name) = \(generateExpression(expression, stateNames: stateNames, context: context));"
+                "\(keyword) \(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
         case .assignment(let target, let expression):
             switch target {
             case .state(let name):
                 return
-                    "\(name).set(\(generateExpression(expression, stateNames: stateNames, context: context)));"
+                    "\(name).set(\(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context)));"
+            case .binding(let name):
+                let targetName = valueExpressions[name] ?? name
+                return
+                    "\(targetName).value = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
             case .local(let name):
                 return
-                    "\(name) = \(generateExpression(expression, stateNames: stateNames, context: context));"
+                    "\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
             }
         case .compoundAssignment(let target, let operatorSymbol, let expression):
             switch operatorSymbol {
@@ -679,19 +811,33 @@ struct JavaScriptGenerator {
                 switch target {
                 case .state(let name):
                     return
-                        "\(name).set(\(name)() + \(generateExpression(expression, stateNames: stateNames, context: context)));"
+                        "\(name).set(\(name)() + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context)));"
+                case .binding(let name):
+                    let targetName = valueExpressions[name] ?? name
+                    return
+                        "\(targetName).value = \(targetName).value + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
                 case .local(let name):
                     return
-                        "\(name) = \(name) + \(generateExpression(expression, stateNames: stateNames, context: context));"
+                        "\(name) = \(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
                 }
             }
         case .forEach(let name, let sequence, let body):
             let sequenceValue = generateExpression(
-                sequence, stateNames: stateNames, context: context)
+                sequence,
+                stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
+                context: context)
             var loopContext = context
             loopContext.locals[name] = .constant
             let statements = body.map {
-                generateStatement($0, stateNames: stateNames, context: &loopContext)
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: &loopContext
+                )
             }
             .joined(separator: "\n")
             return """
@@ -701,10 +847,20 @@ struct JavaScriptGenerator {
                 """
         case .whileLoop(let condition, let body):
             let renderedCondition = generateExpression(
-                condition, stateNames: stateNames, context: context)
+                condition,
+                stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
+                context: context)
             var loopContext = context
             let statements = body.map {
-                generateStatement($0, stateNames: stateNames, context: &loopContext)
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: &loopContext
+                )
             }
             .joined(separator: "\n")
             return """
@@ -716,12 +872,14 @@ struct JavaScriptGenerator {
             return generateConditionalStatement(
                 branches: branches,
                 stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
                 context: context
             )
         case .return(let expression):
             if let expression {
                 return
-                    "return \(generateExpression(expression, stateNames: stateNames, context: context));"
+                    "return \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
             }
             return "return;"
         case .break:
@@ -734,17 +892,21 @@ struct JavaScriptGenerator {
                 cases: cases,
                 defaultBody: defaultBody,
                 stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
                 context: context
             )
         case .debugPrint(let message):
             return
-                "console.log(`\(generateInterpolatedString(message, stateNames: stateNames, context: context))`);"
+                "console.log(`\(generateInterpolatedString(message, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context))`);"
         }
     }
 
     private func generateConditionalStatement(
         branches: [StatementConditionalBranch],
         stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
         context: JSHandlerContext
     ) -> String {
         var lines: [String] = []
@@ -752,13 +914,23 @@ struct JavaScriptGenerator {
         for (index, branch) in branches.enumerated() {
             var branchContext = context
             let statements = branch.body.map {
-                generateStatement($0, stateNames: stateNames, context: &branchContext)
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: &branchContext
+                )
             }
             .joined(separator: "\n")
 
             if let condition = branch.condition {
                 let renderedCondition = generateExpression(
-                    condition, stateNames: stateNames, context: context)
+                    condition,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: context)
                 let prefix = index == 0 ? "if" : "else if"
                 lines.append("\(prefix) (\(renderedCondition)) {")
             } else {
@@ -779,16 +951,36 @@ struct JavaScriptGenerator {
         cases: [SwitchCase],
         defaultBody: [Statement]?,
         stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
         context: JSHandlerContext
     ) -> String {
-        let subject = generateExpression(expression, stateNames: stateNames, context: context)
+        let subject = generateExpression(
+            expression,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: valueExpressions,
+            context: context
+        )
         var lines: [String] = ["switch (\(subject)) {"]
 
         for caseNode in cases {
-            let value = generateExpression(caseNode.value, stateNames: stateNames, context: context)
+            let value = generateExpression(
+                caseNode.value,
+                stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions,
+                context: context
+            )
             var caseContext = context
             let statements = caseNode.body.map {
-                generateStatement($0, stateNames: stateNames, context: &caseContext)
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: &caseContext
+                )
             }
             .joined(separator: "\n")
             lines.append("  case \(value): {")
@@ -802,7 +994,13 @@ struct JavaScriptGenerator {
         if let defaultBody {
             var defaultContext = context
             let statements = defaultBody.map {
-                generateStatement($0, stateNames: stateNames, context: &defaultContext)
+                generateStatement(
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: &defaultContext
+                )
             }
             .joined(separator: "\n")
             lines.append("  default: {")
@@ -820,6 +1018,8 @@ struct JavaScriptGenerator {
     private func generateExpression(
         _ expression: NeatSyntax.Expression,
         stateNames: Set<String>,
+        bindingNames: Set<String> = [],
+        valueExpressions: [String: String] = [:],
         localBindings: Set<String> = [],
         context: JSHandlerContext? = nil
     ) -> String {
@@ -839,22 +1039,35 @@ struct JavaScriptGenerator {
             if context?.locals[name] != nil {
                 return name
             }
+            if let valueExpression = valueExpressions[name] {
+                return bindingNames.contains(name) ? "\(valueExpression).value" : valueExpression
+            }
+            if bindingNames.contains(name) {
+                return "\(name).value"
+            }
             return stateNames.contains(name) ? "\(name)()" : name
+        case .bindingReference(let name):
+            return valueExpressions[name] ?? name
         case .array(let values):
             let rendered = values.map {
                 generateExpression(
-                    $0, stateNames: stateNames, localBindings: localBindings, context: context)
+                    $0,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    localBindings: localBindings,
+                    context: context)
             }.joined(separator: ", ")
             return "[\(rendered)]"
         case .ternary(let condition, let trueExpression, let falseExpression):
             return
-                "\(generateExpression(condition, stateNames: stateNames, localBindings: localBindings, context: context)) ? \(generateExpression(trueExpression, stateNames: stateNames, localBindings: localBindings, context: context)) : \(generateExpression(falseExpression, stateNames: stateNames, localBindings: localBindings, context: context))"
+                "\(generateExpression(condition, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context)) ? \(generateExpression(trueExpression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context)) : \(generateExpression(falseExpression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))"
         case .unary(let operatorSymbol, let nested):
             return
-                "\(operatorSymbol.rawValue)\(generateExpression(nested, stateNames: stateNames, localBindings: localBindings, context: context))"
+                "\(operatorSymbol.rawValue)\(generateExpression(nested, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))"
         case .binary(let lhs, let operatorSymbol, let rhs):
             return
-                "\(generateExpression(lhs, stateNames: stateNames, localBindings: localBindings, context: context)) \(operatorSymbol.rawValue) \(generateExpression(rhs, stateNames: stateNames, localBindings: localBindings, context: context))"
+                "\(generateExpression(lhs, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context)) \(operatorSymbol.rawValue) \(generateExpression(rhs, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))"
         }
     }
 

@@ -82,10 +82,10 @@ extension Parser {
         return Invocation(name: name, arguments: arguments, block: block)
     }
 
-    mutating func parseInvocationArgumentsIfPresent() throws -> [InvocationArgument] {
+    mutating func parseInvocationArgumentsIfPresent() throws -> [CallArgument] {
         guard peek() == .leftParen else { return [] }
         try consume(.leftParen)
-        var arguments: [InvocationArgument] = []
+        var arguments: [CallArgument] = []
 
         if peek() != .rightParen {
             while true {
@@ -99,34 +99,13 @@ extension Parser {
         return arguments
     }
 
-    mutating func parseInvocationArgument() throws -> InvocationArgument {
-        switch peek() {
-        case .stringLiteral(let value):
+    mutating func parseInvocationArgument() throws -> CallArgument {
+        if case .identifier(let label) = peek(), peek(offset: 1) == .colon {
             advance()
-            return .string(value)
-        case .integer(let value):
-            advance()
-            if peek() == .percent {
-                advance()
-                return .percentage(Double(value))
-            }
-            return .integer(value)
-        case .double(let value):
-            advance()
-            if peek() == .percent {
-                advance()
-                return .percentage(value)
-            }
-            return .double(value)
-        case .identifier(let value):
-            advance()
-            return .identifier(value)
-        case .dot:
-            try consume(.dot)
-            return .enumCase(try consumeIdentifier())
-        default:
-            throw ParseError("Expected invocation argument.")
+            try consume(.colon)
+            return CallArgument(label: label, value: try parseExpression())
         }
+        return CallArgument(label: nil, value: try parseExpression())
     }
 
     mutating func parseInvocationBlockIfPresent(preferStatements: Bool = false) throws
@@ -168,7 +147,9 @@ extension Parser {
             guard invocation.arguments.count == 1 else {
                 throw ParseError("Text requires exactly one argument.")
             }
-            guard case .string(let content) = invocation.arguments[0] else {
+            guard invocation.arguments[0].label == nil,
+                case .string(let content) = invocation.arguments[0].value
+            else {
                 throw ParseError("Text argument must be a string literal.")
             }
             guard invocation.block == nil else {
@@ -179,7 +160,9 @@ extension Parser {
             guard invocation.arguments.count == 1 else {
                 throw ParseError("Button requires exactly one argument.")
             }
-            guard case .string(let title) = invocation.arguments[0] else {
+            guard invocation.arguments[0].label == nil,
+                case .string(let title) = invocation.arguments[0].value
+            else {
                 throw ParseError("Button title must be a string literal.")
             }
             guard case .statements(let action)? = invocation.block else {
@@ -198,7 +181,9 @@ extension Parser {
             guard invocation.arguments.count == 1 else {
                 throw ParseError("print requires exactly one argument.")
             }
-            guard case .string(let message) = invocation.arguments[0] else {
+            guard invocation.arguments[0].label == nil,
+                case .string(let message) = invocation.arguments[0].value
+            else {
                 throw ParseError("print argument must be a string literal.")
             }
             guard invocation.block == nil else {
@@ -213,18 +198,19 @@ extension Parser {
                 return .slot(name: "content")
             }
 
-            guard invocation.arguments.isEmpty else {
-                throw ParseError("Component '\(invocation.name)' does not support arguments yet.")
-            }
             if let block = invocation.block {
                 guard case .views(let children) = block else {
                     throw ParseError(
                         "Component '\(invocation.name)' trailing block must contain views."
                     )
                 }
-                return .component(name: invocation.name, children: children)
+                return .component(
+                    name: invocation.name,
+                    arguments: invocation.arguments,
+                    children: children
+                )
             }
-            return .component(name: invocation.name, children: nil)
+            return .component(name: invocation.name, arguments: invocation.arguments, children: nil)
         }
     }
 

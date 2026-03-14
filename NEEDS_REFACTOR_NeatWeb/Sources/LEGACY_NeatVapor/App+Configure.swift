@@ -1,4 +1,4 @@
-import NeatWeb
+import Neat
 import Vapor
 
 public func configure<T: App>(_ app: Application, for appType: T.Type) async throws {

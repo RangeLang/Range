@@ -1,0 +1,16 @@
+@main {
+  let values = [1, 2, 3, 4]
+  var total = 0
+
+  print("Neat playground")
+
+  for value in values {
+    total += value
+  }
+
+  if total == 10 {
+    print("sum = \(total)")
+  } else {
+    print("unexpected sum")
+  }
+}

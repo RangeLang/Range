@@ -141,6 +141,9 @@ extension Parser {
                 parts.append(nextName)
             }
             return .identifier(parts.joined(separator: "."))
+        case .dollar:
+            try consume(.dollar)
+            return .bindingReference(try consumeIdentifier())
         case .dot:
             advance()
             let name = try consumeIdentifier()
@@ -226,6 +229,8 @@ extension Parser {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
             return type
+        case .bindingReference(let name):
+            throw ParseError("Binding reference '$\(name)' is not valid in a state initializer.")
         case .array:
             throw ParseError("Array type inference is not supported in state initializers yet.")
         case .ternary(let condition, let trueExpression, let falseExpression):

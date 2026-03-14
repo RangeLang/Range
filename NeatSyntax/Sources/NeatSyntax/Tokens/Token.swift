@@ -30,6 +30,7 @@ enum Token: Equatable {
     case andAnd
     case orOr
     case question
+    case dollar
     case percent
     case comma
     case eof

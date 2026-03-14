@@ -5,28 +5,29 @@ import NeatSyntax
 extension NeatCLI {
     struct Compile: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Compile a .neat project or a single .neat component."
+            abstract: "Validate Neat source files and projects."
         )
 
-        @Argument(help: "Project directory or source .neat file.")
+        @Argument(help: "Project directory or source .neat file to validate.")
         var input: String?
 
-        @Argument(help: "Output JavaScript file for single-file component compilation.")
+        @Argument(help: "Reserved for future target output.")
         var output: String?
 
         mutating func run() throws {
             do {
                 switch (input, output) {
-                case (.some(let input), .some(let output)):
-                    try compileSingleFile(input: input, output: output)
+                case (.some, .some(let output)):
+                    throw ValidationError(
+                        "Output generation is unavailable until a target backend is linked. Received output path \(output)."
+                    )
                 case (.some(let input), nil):
-                    let compiler = ProjectCompiler(path: input)
-                    try compiler.run()
+                    try compileProject(at: input)
                 case (nil, nil):
-                    let compiler = ProjectCompiler(path: ".")
-                    try compiler.run()
+                    try compileProject(at: ".")
                 case (nil, .some):
-                    throw ValidationError("Single-file compilation requires both input and output.")
+                    throw ValidationError(
+                        "Output generation is unavailable until a target backend is linked.")
                 }
             } catch {
                 ErrorPresenter.printError(error)
@@ -34,46 +35,85 @@ extension NeatCLI {
             }
         }
 
-        private func compileSingleFile(input: String, output: String) throws {
-            let inputURL = URL(fileURLWithPath: input)
-            let source = try String(contentsOf: inputURL, encoding: .utf8)
-            let annotated = annotateDebugPrints(
-                in: source,
-                fileName: inputURL.lastPathComponent
-            )
-            var parser = try Parser(source: annotated)
-            let component = try parser.parseComponent()
-            let compiled = JavaScriptGenerator().generate(component: component)
+        private func compileProject(at path: String) throws {
+            let inputURL = URL(fileURLWithPath: path).standardizedFileURL
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory)
+            else {
+                throw ValidationError("Missing input at \(inputURL.path)")
+            }
 
-            let outputURL = URL(fileURLWithPath: output)
-            try FileManager.default.createDirectory(
-                at: outputURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true,
-                attributes: nil
-            )
-            try compiled.write(to: outputURL, atomically: true, encoding: String.Encoding.utf8)
+            if isDirectory.boolValue {
+                let projectRoot = inputURL
+                let packageFile = projectRoot.appendingPathComponent(
+                    "Package.neat", isDirectory: false)
+                guard FileManager.default.fileExists(atPath: packageFile.path) else {
+                    throw ValidationError("Missing Package.neat in \(projectRoot.path)")
+                }
+
+                let files = try neatFiles(in: projectRoot)
+                guard !files.isEmpty else {
+                    throw ValidationError("No .neat source files found in \(projectRoot.path)")
+                }
+
+                for file in files {
+                    try validateFile(at: file)
+                }
+
+                Swift.print("Validated \(files.count) Neat source file(s).")
+                return
+            }
+
+            guard inputURL.pathExtension.lowercased() == "neat" else {
+                throw ValidationError("Expected a .neat file or project directory.")
+            }
+            try validateFile(at: inputURL)
+            Swift.print("Validated \(inputURL.lastPathComponent).")
         }
 
-        private func annotateDebugPrints(in source: String, fileName: String) -> String {
-            let lines = source.components(separatedBy: .newlines)
-            var result: [String] = []
-            result.reserveCapacity(lines.count)
+        private func validateFile(at fileURL: URL) throws {
+            let source = try String(contentsOf: fileURL, encoding: .utf8)
+            var parser = try Parser(source: source)
+            _ = try parser.parseSourceFile()
+        }
 
-            for (index, rawLine) in lines.enumerated() {
-                let lineNumber = index + 1
-                let prefix = "[\(fileName):\(lineNumber)] "
+        private func neatFiles(in root: URL) throws -> [URL] {
+            guard
+                let enumerator = FileManager.default.enumerator(
+                    at: root,
+                    includingPropertiesForKeys: [.isDirectoryKey],
+                    options: [.skipsHiddenFiles]
+                )
+            else {
+                throw ValidationError("Could not inspect project files in \(root.path)")
+            }
 
-                if let range = rawLine.range(of: "print(\"") {
-                    var line = rawLine
-                    line.replaceSubrange(range, with: "print(\"\(prefix)")
-                    result.append(line)
+            var files: [URL] = []
+            while let fileURL = enumerator.nextObject() as? URL {
+                let isDirectory =
+                    (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory)
+                    ?? false
+
+                if isDirectory {
+                    if fileURL.lastPathComponent == ".git"
+                        || fileURL.lastPathComponent == ".build"
+                        || fileURL.lastPathComponent == ".neat"
+                    {
+                        enumerator.skipDescendants()
+                    }
                     continue
                 }
 
-                result.append(rawLine)
+                guard fileURL.pathExtension.lowercased() == "neat" else {
+                    continue
+                }
+                if fileURL.lastPathComponent == "Package.neat" {
+                    continue
+                }
+                files.append(fileURL)
             }
 
-            return result.joined(separator: "\n")
+            return files.sorted { $0.path < $1.path }
         }
     }
 }

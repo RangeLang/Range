@@ -6,49 +6,26 @@ extension NeatCLI {
             abstract: "Create a new Neat project."
         )
 
-        @Argument(help: "Project kind (`web`, `program`) or project name.")
-        var first: String?
-
-        @Argument(help: "Project name or target directory.")
-        var second: String?
+        @Argument(help: "Project name.")
+        var name: String?
 
         @Argument(help: "Target directory.")
-        var third: String?
+        var path: String?
 
         mutating func run() throws {
-            let resolvedKind: ProjectScaffolder.ProjectKind?
             let resolvedName: String?
             let resolvedPath: String?
 
-            if let first, let kind = ProjectScaffolder.ProjectKind(rawValue: first.lowercased()) {
-                resolvedKind = kind
-                if let providedPath = third {
-                    resolvedName = second
-                    resolvedPath = providedPath
-                } else if let second, looksLikePath(second) {
-                    resolvedName = nil
-                    resolvedPath = second
-                } else {
-                    resolvedName = second
-                    resolvedPath = nil
-                }
+            if let name, path == nil, looksLikePath(name) {
+                resolvedName = nil
+                resolvedPath = name
             } else {
-                resolvedKind = nil
-                if let providedPath = second {
-                    resolvedName = first
-                    resolvedPath = providedPath
-                } else if let first, looksLikePath(first) {
-                    resolvedName = nil
-                    resolvedPath = first
-                } else {
-                    resolvedName = first
-                    resolvedPath = nil
-                }
+                resolvedName = name
+                resolvedPath = path
             }
 
             do {
                 let scaffolder = ProjectScaffolder(
-                    initialKind: resolvedKind,
                     initialName: resolvedName,
                     initialPath: resolvedPath
                 )

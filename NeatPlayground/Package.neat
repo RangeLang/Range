@@ -1,0 +1,6 @@
+Package("NeatPlayground") {
+  Platform(.program)
+
+  Dependencies {
+  }
+}

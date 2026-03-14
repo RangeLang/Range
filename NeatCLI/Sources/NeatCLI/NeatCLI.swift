@@ -5,7 +5,7 @@ import NeatSyntax
 struct NeatCLI: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "neat",
-        abstract: "Compile .neat components into JavaScript.",
+        abstract: "Create and validate Neat language projects.",
         subcommands: [Create.self, Run.self, Compile.self, Update.self, LSP.self]
     )
 }

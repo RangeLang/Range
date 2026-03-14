@@ -304,18 +304,10 @@ struct NeatLanguageServer {
         switch symbol.kind {
         case .attribute:
             return "Neat callable sigil"
-        case .component:
-            return "Neat component"
-        case .page:
-            return "Neat page"
-        case .app:
-            return "Neat application or program declaration"
-        case .enumType:
-            return "Neat enum"
-        case .enumCase:
-            return "Neat enum case"
-        case .function:
-            return "Neat function"
+        case .declaration:
+            return "Neat declaration"
+        case .callable:
+            return "Neat callable"
         case .variable:
             return "Neat variable"
         case .state:
@@ -723,19 +715,9 @@ private struct DocumentIndex {
                 let name = match[1]
                 let declarationName = "#" + name
                 let symbolRange = range(in: line, line: lineIndex, value: declarationName)
-                let contract = match.count > 2 ? match[2] : ""
-                let kind: SymbolKind
-                switch contract {
-                case "App", "Program":
-                    kind = .app
-                case "Page":
-                    kind = .page
-                default:
-                    kind = .component
-                }
                 symbols.append(
                     Symbol(
-                        name: name, kind: kind, detail: "declaration", uri: uri,
+                        name: name, kind: .declaration, detail: "declaration", uri: uri,
                         range: symbolRange, selectionRange: symbolRange))
                 continue
             }
@@ -768,7 +750,7 @@ private struct DocumentIndex {
                 let symbolRange = range(in: line, line: lineIndex, value: symbolName)
                 symbols.append(
                     Symbol(
-                        name: symbolName, kind: .function, detail: "callable", uri: uri,
+                        name: symbolName, kind: .callable, detail: "callable", uri: uri,
                         range: symbolRange, selectionRange: symbolRange))
                 continue
             }
@@ -795,14 +777,6 @@ private struct DocumentIndex {
                 continue
             }
 
-            if let match = firstMatch(in: line, pattern: #"\bcase\s+([a-z_][A-Za-z0-9_]*)"#) {
-                let name = match[1]
-                let symbolRange = range(in: line, line: lineIndex, value: name)
-                symbols.append(
-                    Symbol(
-                        name: name, kind: .enumCase, detail: "case", uri: uri, range: symbolRange,
-                        selectionRange: symbolRange))
-            }
         }
 
         return symbols
@@ -882,12 +856,8 @@ private struct Symbol {
 
 private enum SymbolKind {
     case attribute
-    case app
-    case page
-    case component
-    case enumType
-    case enumCase
-    case function
+    case declaration
+    case callable
     case variable
     case state
     case styleModifier
@@ -900,13 +870,9 @@ private enum SymbolKind {
         switch self {
         case .attribute:
             return 8
-        case .app, .page, .component, .typeExtension, .view:
+        case .declaration, .typeExtension, .view:
             return 5
-        case .enumType:
-            return 10
-        case .enumCase:
-            return 22
-        case .function, .modifier:
+        case .callable, .modifier:
             return 12
         case .variable, .state:
             return 13
@@ -919,10 +885,8 @@ private enum SymbolKind {
 
     var completionKind: Int {
         switch self {
-        case .function, .modifier:
+        case .callable, .modifier:
             return 3
-        case .enumType, .enumCase:
-            return 20
         case .attribute, .keyword:
             return 14
         case .variable, .state:

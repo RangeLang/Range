@@ -19,6 +19,14 @@ extension Parser {
         return tokens[position]
     }
 
+    func previous() -> Token {
+        let position = index - 1
+        if position < 0 {
+            return .eof
+        }
+        return tokens[position]
+    }
+
     mutating func consume(_ expected: Token) throws {
         guard peek() == expected else {
             throw ParseError("Expected \(expected), found \(peek()).")

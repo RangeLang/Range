@@ -20,8 +20,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Sources",
-            resources: [
-                .process("NeatCLI/Templates")
+            sources: [
+                "Commands",
+                "NeatCLI",
+                "Terminal",
             ]
         )
     ]

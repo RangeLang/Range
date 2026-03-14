@@ -107,6 +107,10 @@ extension Parser {
             return .state(name)
         }
 
+        if currentBindingNames.contains(name) {
+            return .binding(name)
+        }
+
         if currentStateNames.contains(name) {
             throw ParseError("Cannot assign to derived state '\(name)'.")
         }

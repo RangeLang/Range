@@ -3,17 +3,8 @@ import Foundation
 public struct Parser {
     struct Invocation {
         let name: String
-        let arguments: [InvocationArgument]
+        let arguments: [CallArgument]
         let block: InvocationBlock?
-    }
-
-    enum InvocationArgument {
-        case string(String)
-        case integer(Int)
-        case double(Double)
-        case percentage(Double)
-        case identifier(String)
-        case enumCase(String)
     }
 
     enum InvocationBlock {
@@ -26,10 +17,18 @@ public struct Parser {
     var currentStateNames: Set<String> = []
     var currentMutableStateNames: Set<String> = []
     var currentStateTypes: [String: BuiltinType] = [:]
+    var currentBindingNames: Set<String> = []
 
     public init(source: String) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
+    }
+
+    public mutating func parseSourceFile() throws -> SourceFileNode {
+        if isMainBlockStart() {
+            return .mainBlock(try parseMainBlock())
+        }
+        return .declaration(try parseDeclaration())
     }
 
     public mutating func parseComponent() throws -> ComponentNode {
@@ -46,6 +45,9 @@ public struct Parser {
             projectionTarget: declaration.projectionTarget,
             cases: declaration.cases,
             states: declaration.states,
+            bindings: declaration.bindings,
+            members: declaration.members,
+            initializers: declaration.initializers,
             callables: declaration.callables,
             body: body
         )

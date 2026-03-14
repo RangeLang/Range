@@ -3,15 +3,6 @@ import Darwin
 import Foundation
 
 struct ProjectScaffolder {
-    enum ProjectKind: String, CaseIterable {
-        case web
-        case program
-
-        var label: String {
-            rawValue
-        }
-    }
-
     private enum TerminalStyle {
         static let reset = "\u{001B}[0m"
         static let dim = "\u{001B}[2m"
@@ -19,12 +10,10 @@ struct ProjectScaffolder {
         static let clearLine = "\u{001B}[2K"
     }
 
-    private let initialKind: ProjectKind?
     private let initialName: String?
     private let initialPath: String?
 
-    init(initialKind: ProjectKind?, initialName: String?, initialPath: String?) {
-        self.initialKind = initialKind
+    init(initialName: String?, initialPath: String?) {
         self.initialName = initialName
         self.initialPath = initialPath
     }
@@ -32,42 +21,14 @@ struct ProjectScaffolder {
     func run() throws {
         let currentDirectoryName = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .lastPathComponent
-        let projectKind = try resolveProjectKind()
         let projectName = try resolveProjectName(currentDirectoryName: currentDirectoryName)
         let targetDirectory = try resolveTargetDirectory(
             currentDirectoryName: currentDirectoryName,
             projectName: projectName
         )
-        try createProject(
-            kind: projectKind,
-            name: projectName,
-            targetDirectory: targetDirectory,
-            includeStarterFiles: true
-        )
+        try createProject(name: projectName, targetDirectory: targetDirectory)
 
-        print("Created \(projectKind.label) project \(projectName) at \(targetDirectory.path)")
-    }
-
-    private func resolveProjectKind() throws -> ProjectKind {
-        if let initialKind {
-            return initialKind
-        }
-
-        let response = prompt(
-            "Project Kind",
-            placeholder: "web",
-            note: "(web/program)",
-            defaultValue: "web"
-        )
-        guard
-            let kind = ProjectKind(
-                rawValue: response.trimmingCharacters(in: .whitespacesAndNewlines).lowercased())
-        else {
-            throw ValidationError(
-                "Unknown project kind '\(response)'. Supported kinds: \(ProjectKind.allCases.map(\.rawValue).joined(separator: ", "))."
-            )
-        }
-        return kind
+        print("Created Neat project \(projectName) at \(targetDirectory.path)")
     }
 
     private func resolveProjectName(currentDirectoryName: String) throws -> String {
@@ -238,307 +199,80 @@ struct ProjectScaffolder {
         return !entries.isEmpty
     }
 
-    private func createProject(
-        kind: ProjectKind,
-        name: String,
-        targetDirectory: URL,
-        includeStarterFiles: Bool
-    ) throws {
-        switch kind {
-        case .web:
-            try createWebProject(
-                name: name,
-                targetDirectory: targetDirectory,
-                includeStarterFiles: includeStarterFiles
-            )
-        case .program:
-            try createProgramProject(name: name, targetDirectory: targetDirectory)
-        }
-    }
-
-    private func createWebProject(
-        name: String,
-        targetDirectory: URL,
-        includeStarterFiles: Bool
-    ) throws {
+    private func createProject(name: String, targetDirectory: URL) throws {
         let packagePath = targetDirectory.appendingPathComponent("Package.neat", isDirectory: false)
-        let appPath = targetDirectory.appendingPathComponent("App.neat", isDirectory: false)
-        let fontsPath = targetDirectory.appendingPathComponent("Fonts.neat", isDirectory: false)
-        let neatDirectory = targetDirectory.appendingPathComponent(".neat", isDirectory: true)
-        let neatBuildDirectory = neatDirectory.appendingPathComponent("Build", isDirectory: true)
-        let coreVersionDirectory =
-            neatDirectory
-            .appendingPathComponent("Core", isDirectory: true)
-            .appendingPathComponent("V1", isDirectory: true)
-        let coreModifiersDirectory = coreVersionDirectory.appendingPathComponent(
-            "Modifiers", isDirectory: true)
-        let coreComponentsDirectory = coreVersionDirectory.appendingPathComponent(
-            "Components", isDirectory: true)
-        let coreIndexCSSPath = coreVersionDirectory.appendingPathComponent(
-            "index.css", isDirectory: false)
-        let pagesDirectory = targetDirectory.appendingPathComponent("Pages", isDirectory: true)
-        let componentsDirectory = targetDirectory.appendingPathComponent(
-            "Components", isDirectory: true)
-        let publicDirectory = targetDirectory.appendingPathComponent("Public", isDirectory: true)
-
-        try ensureProjectDoesNotExist(at: packagePath, appPath: appPath, fontsPath: fontsPath)
-
-        try FileManager.default.createDirectory(
-            at: pagesDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(
-            at: neatBuildDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(
-            at: coreComponentsDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(
-            at: coreModifiersDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(
-            at: componentsDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(
-            at: publicDirectory, withIntermediateDirectories: true)
-
-        try renderPackage(name: name).write(
-            to: packagePath, atomically: true, encoding: String.Encoding.utf8)
-        try renderApp(name: name).write(
-            to: appPath, atomically: true, encoding: String.Encoding.utf8)
-        try renderFonts().write(
-            to: fontsPath, atomically: true, encoding: String.Encoding.utf8)
-        try defaultRuntimeCoreCSS().write(
-            to: coreIndexCSSPath, atomically: true, encoding: String.Encoding.utf8)
-
-        let coreCardPath = coreComponentsDirectory.appendingPathComponent(
-            "CoreCard.neat", isDirectory: false)
-        let coreHeroPath = coreComponentsDirectory.appendingPathComponent(
-            "CoreHero.neat", isDirectory: false)
-        let vStackPath = coreComponentsDirectory.appendingPathComponent(
-            "VStack.neat", isDirectory: false)
-        let surfaceModifierPath = coreModifiersDirectory.appendingPathComponent(
-            "surface.css", isDirectory: false)
-        try loadTemplateText("Web/core/V1/Components/CoreCard.neat").write(
-            to: coreCardPath, atomically: true, encoding: String.Encoding.utf8)
-        try loadTemplateText("Web/core/V1/Components/CoreHero.neat").write(
-            to: coreHeroPath, atomically: true, encoding: String.Encoding.utf8)
-        try loadTemplateText("Web/core/V1/Components/VStack.neat").write(
-            to: vStackPath, atomically: true, encoding: String.Encoding.utf8)
-        try """
-        border: 1px solid var(--neat-border);
-        background: var(--neat-surface);
-        border-radius: 14px;
-        padding: 1rem;
-        """.write(
-            to: surfaceModifierPath,
-            atomically: true,
-            encoding: String.Encoding.utf8
+        let playgroundPath = targetDirectory.appendingPathComponent(
+            "Playground.neat",
+            isDirectory: false
         )
-
-        guard includeStarterFiles else { return }
-
-        let homePagePath = pagesDirectory.appendingPathComponent(
-            "HomePage.neat", isDirectory: false)
-        let aboutPagePath = pagesDirectory.appendingPathComponent(
-            "AboutPage.neat", isDirectory: false)
-        let headerPath = componentsDirectory.appendingPathComponent(
-            "HomePageHeader.neat", isDirectory: false)
-
-        try renderHomePage(appName: name).write(
-            to: homePagePath, atomically: true, encoding: String.Encoding.utf8)
-        try renderAboutPage(appName: name).write(
-            to: aboutPagePath, atomically: true, encoding: String.Encoding.utf8)
-        try renderHeader().write(to: headerPath, atomically: true, encoding: String.Encoding.utf8)
-    }
-
-    private func createProgramProject(name: String, targetDirectory: URL) throws {
-        let packagePath = targetDirectory.appendingPathComponent("Package.neat", isDirectory: false)
-        let mainPath = targetDirectory.appendingPathComponent("Main.neat", isDirectory: false)
-        let sourcesDirectory = targetDirectory.appendingPathComponent("Sources", isDirectory: true)
 
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: packagePath.path)
-            || fileManager.fileExists(atPath: mainPath.path)
+            || fileManager.fileExists(atPath: playgroundPath.path)
         {
-            throw ValidationError("Target already contains Package.neat or Main.neat.")
+            throw ValidationError("Target already contains Package.neat or Playground.neat.")
         }
 
-        try fileManager.createDirectory(at: sourcesDirectory, withIntermediateDirectories: true)
         try renderProgramPackage(name: name).write(
             to: packagePath,
             atomically: true,
             encoding: .utf8
         )
-        try renderProgramMain(name: name).write(
-            to: mainPath,
+        try renderProgramPlayground(name: name).write(
+            to: playgroundPath,
             atomically: true,
             encoding: .utf8
         )
     }
 
-    private func ensureProjectDoesNotExist(at packagePath: URL, appPath: URL, fontsPath: URL) throws
-    {
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: packagePath.path)
-            || fileManager.fileExists(atPath: appPath.path)
-            || fileManager.fileExists(atPath: fontsPath.path)
-        {
-            throw ValidationError("Target already contains Package.neat, App.neat, or Fonts.neat.")
-        }
-    }
-
-    private func renderPackage(name: String) -> String {
-        """
-        Package("\(name)") {
-          Platform(.web)
-          Entry("App.neat")
-
-          Directories {
-            Pages("Pages")
-            Components("Components")
-            Assets("Public")
-          }
-
-          Dependencies {
-          }
-
-          Core {
-            CoreStylesheet(".neat/Core/V1/index.css")
-            CoreComponents(".neat/Core/V1/Components")
-          }
-        }
-        """
-    }
-
     private func renderProgramPackage(name: String) -> String {
         """
         Package("\(name)") {
-          Platform(.program)
-          Entry("Main.neat")
-
           Dependencies {
           }
         }
         """
     }
 
-    private func renderApp(name: String) -> String {
-        """
-        #\(name): App {
-          var head: Head {
-            Meta.title("\(name)")
-            Meta.description("A .neat application scaffolded by NeatCLI.")
-          }
+    private func renderProgramPlayground(name: String) -> String {
+        return """
+            @main
+            {
+              print("Neat program playground")
 
-          var routes: Routes {
-            Route("/", HomePage)
-            Route("about", AboutPage)
+              let values = [1, 2, 3]
+              var total = 0
 
-            Route("dashboard") {
-              Route("settings", AboutPage)
-            }
-          }
-        }
-        """
-    }
+              for value in values {
+                total += value
+              }
 
-    private func renderProgramMain(name: String) -> String {
-        """
-        #\(name): Program {
-          @run() {
-          }
-        }
-        """
-    }
-
-    private func renderFonts() -> String {
-        """
-        Fonts {
-          Family(.geist) {
-            Name("Geist")
-            URL("https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap")
-          }
-
-          Family(.geistMono) {
-            Name("Geist Mono")
-            URL("https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&display=swap")
-          }
-        }
-        """
-    }
-
-    private func renderHomePage(appName: String) -> String {
-        """
-        #Background: StyleModifier {
-          var color: Color
-        }
-
-        #HomePage: Page {
-          var head: Head {
-            Meta.title("Home")
-            Meta.description("The home page for \(appName).")
-          }
-
-          state count: Int = 0
-
-          var body: Component {
-            VStack {
-              HomePageHeader()
-              CoreHero()
-              CoreCard()
-                .background(.rgba(255, 255, 255, 72%))
-                .padding(24, 28)
-                .shadow(y: 12, blur: 36, color: .rgba(15, 23, 42, 20%))
-              Text("Count: \\(count)")
-              Button("Add") {
-                count += 1
+              if total == 6 {
+                print("sum = \\(total)")
+              } else {
+                print("unexpected sum")
               }
             }
-          }
-        }
-        """
+            """
     }
 
-    private func renderAboutPage(appName: String) -> String {
-        """
-        #AboutPage: Page {
-          var head: Head {
-            Meta.title("About")
-            Meta.description("About the \(appName) application.")
-          }
-
-          var body: Component {
-            VStack {
-              Text("About")
-              Text("This project was created with neat create.")
+    private func sanitizedSymbolName(from raw: String) -> String {
+        let pieces =
+            raw
+            .split { !$0.isLetter && !$0.isNumber }
+            .filter { !$0.isEmpty }
+            .map { piece -> String in
+                let lower = piece.lowercased()
+                return lower.prefix(1).uppercased() + lower.dropFirst()
             }
-          }
+        let joined = pieces.joined()
+        if joined.isEmpty {
+            return "Neat"
         }
-        """
-    }
-
-    private func renderHeader() -> String {
-        """
-        #HomePageHeader: Component {
-          var body: Component {
-            VStack {
-              Text("Neat")
-              Text("Swift-shaped UI compiled for the browser.")
-            }
-          }
+        if let first = joined.first, first.isNumber {
+            return "Neat\(joined)"
         }
-        """
-    }
-
-    private func loadTemplateText(_ relativePath: String) throws -> String {
-        try TemplateLoader.text(at: relativePath)
-    }
-
-    private func defaultRuntimeCoreCSS() throws -> String {
-        let styleFiles = [
-            "Web/runtime/Styles/preflight.css",
-            "Web/runtime/Styles/root.css",
-            "Web/runtime/Styles/layout.css",
-            "Web/runtime/Styles/typography.css",
-            "Web/runtime/Styles/style.css",
-        ]
-        let contents = try styleFiles.map(loadTemplateText)
-        return contents.joined(separator: "\n\n")
+        return joined
     }
 
     private func prompt(

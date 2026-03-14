@@ -2,6 +2,8 @@
 
 Local Zed extension that adds language support for `.neat` files.
 
+The bundled grammar and queries are aligned with the current Neat surface, including declaration headers like `#Name on Target: Contract { ... }` and callable members like `@name(...)`.
+
 ## Features
 
 - Registers a `Neat` language and associates `*.neat` files

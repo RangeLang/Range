@@ -1,6 +1,23 @@
 import Foundation
 
 extension Parser {
+    func isMainBlockStart() -> Bool {
+        guard case .atAttribute(let name, _) = peek(), name == "main" else {
+            return false
+        }
+        return peek(offset: 1) == .leftBrace
+    }
+
+    public mutating func parseMainBlock() throws -> MainBlockNode {
+        guard case .atAttribute(let name, _) = peek(), name == "main" else {
+            throw ParseError("Expected @main block.")
+        }
+        advance()
+        let body = try parseStatementBlock(baseLocalBindings: [:])
+        try consume(.eof)
+        return MainBlockNode(body: body)
+    }
+
     public mutating func parseDeclaration() throws -> DeclarationNode {
         var objects: [ObjectType] = []
         while true {
@@ -20,16 +37,18 @@ extension Parser {
             break
         }
 
-        let attribute = NeatSyntax.attributeApplication(for: peek())
-        let kind = try parseDeclarationKind()
-        let header = try parseDeclarationHeader(after: attribute)
+        let attribute = parseDeclarationAttributeIfPresent()
+        let kind = try parseDeclarationKind(attribute: attribute)
+        let header = try parseDeclarationHeader()
         let name = header.name
         let conformances = header.conformances
         let projectionTarget = header.projectionTarget
 
         var states: [StateDeclaration] = []
         var cases: [EnumCaseDeclaration] = []
+        var bindings: [BindingDeclaration] = []
         var members: [MemberDeclaration] = []
+        var initializers: [InitializerDeclaration] = []
         var callables: [CallableDeclaration] = []
         var body: ViewNode?
 
@@ -38,9 +57,12 @@ extension Parser {
 
             currentStateTypes = [:]
             while peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
-                || isCaseDeclarationStart() || isMemberDeclarationStart()
+                || isCaseDeclarationStart() || isBindingDeclarationStart()
+                || isMemberDeclarationStart()
+                || isInitializerDeclarationStart()
                 || isCallableStart()
             {
+                currentBindingNames = Set(bindings.map(\.name))
                 if isBodyMemberStart() {
                     break
                 }
@@ -50,6 +72,14 @@ extension Parser {
                 }
                 if isMemberDeclarationStart() {
                     members.append(try parseMemberDeclaration())
+                    continue
+                }
+                if isBindingDeclarationStart() {
+                    bindings.append(try parseBindingDeclaration())
+                    continue
+                }
+                if isInitializerDeclarationStart() {
+                    initializers.append(try parseInitializerDeclaration())
                     continue
                 }
                 if isCallableStart() {
@@ -69,13 +99,16 @@ extension Parser {
                         if case .stored = state.storage { return state.name }
                         return nil
                     })
+                currentBindingNames = Set(bindings.map(\.name))
                 body = try parseDeclarationBody()
                 currentStateNames = []
                 currentMutableStateNames = []
+                currentBindingNames = []
             }
 
             currentStateTypes = [:]
             currentMutableStateNames = []
+            currentBindingNames = []
 
             try consume(.rightBrace)
         }
@@ -83,6 +116,7 @@ extension Parser {
         try consume(.eof)
 
         try validateCallableDeclarations(callables)
+        try validateInitializerDeclarations(initializers)
 
         return DeclarationNode(
             kind: kind,
@@ -93,7 +127,9 @@ extension Parser {
             objects: objects,
             cases: cases,
             states: states,
+            bindings: bindings,
             members: members,
+            initializers: initializers,
             callables: callables,
             body: body
         )
@@ -110,17 +146,12 @@ extension Parser {
         }
         advance()
         let parameters = try parseFunctionParameters()
-        let hasBody = peek() == .leftBrace
-        if hasBody {
-            try consume(.leftBrace)
-            try skipUnknownBlockBody()
-            try consume(.rightBrace)
-        }
+        let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
             targetName: targetName,
             name: name,
             parameters: parameters,
-            hasBody: hasBody
+            body: body
         )
     }
 
@@ -311,18 +342,21 @@ extension Parser {
         return try parseLayout()
     }
 
-    mutating func parseDeclarationKind() throws -> DeclarationKind {
+    mutating func parseDeclarationKind(attribute: AttributeApplication?) throws -> DeclarationKind {
         guard let kind = NeatSyntax.declarationKind(for: peek()) else {
             throw ParseError("Expected declaration starting with #.")
         }
         advance()
+        if attribute?.name == "main" {
+            return .entry
+        }
         return kind
     }
 
-    mutating func parseDeclarationHeader(after attribute: AttributeApplication?) throws
+    mutating func parseDeclarationHeader() throws
         -> (name: String, conformances: [String], projectionTarget: String?)
     {
-        guard let attribute else {
+        guard case .hashDirective(let name) = previous() else {
             throw ParseError("Expected declaration name after #.")
         }
 
@@ -331,12 +365,21 @@ extension Parser {
         {
             let projectionTarget = try parseProjectionTargetIfPresent()
             let conformances = try parseConformanceListIfPresent()
-            return (attribute.name, conformances, projectionTarget)
+            return (name, conformances, projectionTarget)
         }
 
         throw ParseError(
-            "Expected 'on', ':', or '{' after #\(attribute.name). Use #\(attribute.name) { ... }, #\(attribute.name): Contract { ... }, or #\(attribute.name) on Target: Contract { ... }."
+            "Expected 'on', ':', or '{' after #\(name). Use #\(name) { ... }, #\(name): Contract { ... }, or #\(name) on Target: Contract { ... }."
         )
+    }
+
+    mutating func parseDeclarationAttributeIfPresent() -> AttributeApplication? {
+        guard case .atAttribute = peek(), case .hashDirective = peek(offset: 1) else {
+            return nil
+        }
+        let attribute = NeatSyntax.attributeApplication(for: peek())
+        advance()
+        return attribute
     }
 
     mutating func parseConformanceListIfPresent() throws -> [String] {
@@ -378,6 +421,75 @@ extension Parser {
         return MemberDeclaration(name: name, typeName: typeName)
     }
 
+    mutating func parseBindingDeclaration() throws -> BindingDeclaration {
+        try consumeKeyword(.binding)
+        let name = try consumeIdentifier()
+        try consume(.colon)
+        let typeName = try consumeTypeReference()
+        let storage: BindingStorage
+        if peek() == .leftBrace {
+            let previousBindingNames = currentBindingNames
+            currentBindingNames = previousBindingNames.union([name])
+            storage = try parseDerivedBindingStorage(name: name)
+            currentBindingNames = previousBindingNames.union([name])
+        } else {
+            storage = .plain
+        }
+        return BindingDeclaration(name: name, typeName: typeName, storage: storage)
+    }
+
+    mutating func parseInitializerDeclaration() throws -> InitializerDeclaration {
+        guard case .identifier(let name) = peek(), name == "init" else {
+            throw ParseError("Expected initializer declaration.")
+        }
+        advance()
+        let parameters = try parseFunctionParameters()
+        let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        return InitializerDeclaration(parameters: parameters, body: body)
+    }
+
+    mutating func parseDerivedBindingStorage(name: String) throws -> BindingStorage {
+        try consume(.leftBrace)
+
+        var getterBody: [Statement]?
+        var setterBody: [Statement]?
+
+        while peek() != .rightBrace {
+            if peek() == .keyword(NeatSyntax.Keyword.getter.rawValue) {
+                guard getterBody == nil else {
+                    throw ParseError("binding '\(name)' can only define one get block.")
+                }
+                try consumeKeyword(.getter)
+                getterBody = try parseStatementBlock(baseLocalBindings: [:])
+                continue
+            }
+
+            if peek() == .keyword(NeatSyntax.Keyword.setter.rawValue) {
+                guard setterBody == nil else {
+                    throw ParseError("binding '\(name)' can only define one set block.")
+                }
+                try consumeKeyword(.setter)
+                setterBody = try parseStatementBlock(
+                    baseLocalBindings: ["newValue": .constant]
+                )
+                continue
+            }
+
+            throw ParseError("Derived binding '\(name)' only supports get and set blocks.")
+        }
+
+        try consume(.rightBrace)
+
+        guard let getterBody else {
+            throw ParseError("Derived binding '\(name)' requires a get block.")
+        }
+        guard let setterBody else {
+            throw ParseError("Derived binding '\(name)' requires a set block.")
+        }
+
+        return .derived(get: getterBody, set: setterBody)
+    }
+
     func isMemberDeclarationStart() -> Bool {
         guard peek() == .keyword(NeatSyntax.Keyword.variable.rawValue) else {
             return false
@@ -386,6 +498,23 @@ extension Parser {
             return false
         }
         return true
+    }
+
+    func isBindingDeclarationStart() -> Bool {
+        guard peek() == .keyword(NeatSyntax.Keyword.binding.rawValue) else {
+            return false
+        }
+        guard case .identifier = peek(offset: 1), peek(offset: 2) == .colon else {
+            return false
+        }
+        return true
+    }
+
+    func isInitializerDeclarationStart() -> Bool {
+        guard case .identifier(let name) = peek(), name == "init" else {
+            return false
+        }
+        return peek(offset: 1) == .leftParen
     }
 
     func isBodyMemberStart() -> Bool {
@@ -424,6 +553,18 @@ extension Parser {
         }
     }
 
+    func validateInitializerDeclarations(_ initializers: [InitializerDeclaration]) throws {
+        var seen: Set<String> = []
+        for initializer in initializers {
+            let signature = initializerSignatureKey(parameters: initializer.parameters)
+            guard seen.insert(signature).inserted else {
+                throw ParseError(
+                    "Duplicate initializer declaration \(renderInitializerSignature(parameters: initializer.parameters))."
+                )
+            }
+        }
+    }
+
     func matches(_ lhs: [NeatFunctionParameter], _ rhs: [NeatFunctionParameter]) -> Bool {
         guard lhs.count == rhs.count else {
             return false
@@ -453,6 +594,18 @@ extension Parser {
             return "\(targetName)@\(name)(\(rendered))"
         }
         return "@\(name)(\(rendered))"
+    }
+
+    func initializerSignatureKey(parameters: [NeatFunctionParameter]) -> String {
+        parameters.map(\.typeName).map { $0 ?? "_" }.joined(separator: ",")
+    }
+
+    func renderInitializerSignature(parameters: [NeatFunctionParameter]) -> String {
+        let rendered = parameters.map { parameter in
+            let typeName = parameter.typeName ?? "_"
+            return "\(parameter.name): \(typeName)"
+        }.joined(separator: ", ")
+        return "init(\(rendered))"
     }
 
     mutating func skipUnknownBlockBody() throws {

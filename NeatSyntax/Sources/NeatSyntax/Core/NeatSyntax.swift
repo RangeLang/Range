@@ -6,6 +6,7 @@ enum NeatSyntax {
         case variable = "var"
         case constant = "let"
         case state = "state"
+        case binding = "binding"
         case typeExtension = "extension"
         case projection = "on"
         case forLoop = "for"
@@ -19,6 +20,8 @@ enum NeatSyntax {
         case continueStatement = "continue"
         case switchStatement = "switch"
         case defaultBranch = "default"
+        case getter = "get"
+        case setter = "set"
     }
     static let keywordIdentifiers: Set<String> = Set(Keyword.allCases.map(\.rawValue))
     static let builtinTypeNames: [String] = BuiltinType.supportedNames
@@ -33,10 +36,10 @@ enum NeatSyntax {
     }
 
     static func attributeApplication(for token: Token) -> AttributeApplication? {
-        guard case .hashDirective(let name) = token else {
+        guard case .atAttribute(let name, let argument) = token else {
             return nil
         }
-        return AttributeApplication(name: name, argument: nil)
+        return AttributeApplication(name: name, argument: argument)
     }
 }
 

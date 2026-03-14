@@ -1,0 +1,8 @@
+#CoreHero: Component {
+  var body: Component {
+    VStack {
+      Text("Ship Faster")
+      Text("Build with shared core components and styling.")
+    }
+  }
+}
