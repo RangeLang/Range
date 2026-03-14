@@ -615,7 +615,7 @@ struct ProjectCompiler {
             pageNames
             .map { "\"\($0)\": () => import(\"./Pages/\($0).js\")" }
             .joined(separator: ", ")
-        let template = try loadTemplateText("runtime/app.js")
+        let template = try loadTemplateText("Web/runtime/app.js")
         return
             template
             .replacingOccurrences(of: "__NEAT_ROUTES_JSON__", with: routesJSON)
@@ -1490,18 +1490,18 @@ struct ProjectCompiler {
 
     private func defaultRuntimeCoreCSS() throws -> String {
         let styleFiles = [
-            "runtime/Styles/preflight.css",
-            "runtime/Styles/root.css",
-            "runtime/Styles/layout.css",
-            "runtime/Styles/typography.css",
-            "runtime/Styles/style.css",
+            "Web/runtime/Styles/preflight.css",
+            "Web/runtime/Styles/root.css",
+            "Web/runtime/Styles/layout.css",
+            "Web/runtime/Styles/typography.css",
+            "Web/runtime/Styles/style.css",
         ]
         let contents = try styleFiles.map(loadTemplateText)
         return contents.joined(separator: "\n\n")
     }
 
     private func defaultHMRJS() -> String {
-        (try? loadTemplateText("runtime/hmr.js")) ?? ""
+        (try? loadTemplateText("Web/runtime/hmr.js")) ?? ""
     }
 
     private func loadTemplateText(_ relativePath: String) throws -> String {

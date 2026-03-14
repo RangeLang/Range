@@ -3,7 +3,7 @@
 Declarations use typed members directly, and callable entrypoints use `#name(...)`.
 
 ```neat
-@App {
+@App: Role {
     var head: Head {
     }
 }
@@ -12,16 +12,18 @@ Declarations use typed members directly, and callable entrypoints use `#name(...
 Typed member example:
 
 ```neat
-@Page {
+@Page: Role {
     var head: Head
     var selectedID: Int?
+    var body: Component {
+    }
 }
 ```
 
 Callable example:
 
 ```neat
-@Theme {
+@Theme: Role {
     #theme() {
     }
 }
@@ -30,7 +32,7 @@ Callable example:
 Overloaded callable example:
 
 ```neat
-@BackgroundStyle {
+@BackgroundStyle: Role {
     #background(color: Color) {
     }
 

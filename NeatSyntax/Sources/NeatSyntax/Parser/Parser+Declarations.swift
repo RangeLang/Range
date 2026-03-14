@@ -48,6 +48,9 @@ extension Parser {
                 || isCaseDeclarationStart() || isMemberDeclarationStart()
                 || isCallableStart()
             {
+                if isBodyMemberStart() {
+                    break
+                }
                 if isCaseDeclarationStart() {
                     cases.append(contentsOf: try parseEnumCaseLine())
                     continue
@@ -66,7 +69,7 @@ extension Parser {
                 currentStateTypes[state.name] = state.type
             }
 
-            if peek() != .rightBrace, !isMemberDeclarationStart() {
+            if peek() != .rightBrace, !isMemberDeclarationStart() || isBodyMemberStart() {
                 currentStateNames = Set(states.map(\.name))
                 currentMutableStateNames = Set(
                     states.compactMap { state in
@@ -308,6 +311,20 @@ extension Parser {
     }
 
     mutating func parseDeclarationBody() throws -> ViewNode {
+        if isBodyMemberStart() {
+            try consumeKeyword(.variable)
+            let name = try consumeIdentifier()
+            guard name == "body" else {
+                throw ParseError("Expected body member declaration.")
+            }
+            try consume(.colon)
+            _ = try consumeTypeReference()
+            let children = try parseViewBlock()
+
+            let base: ViewNode = .vStack(children)
+            return try parseModifiersIfPresent(for: base)
+        }
+
         if case .identifier(let name) = peek(), name == "Body" {
             advance()
             let arguments = try parseInvocationArgumentsIfPresent()
@@ -411,6 +428,19 @@ extension Parser {
             return false
         }
         guard case .identifier = peek(offset: 1), peek(offset: 2) == .colon else {
+            return false
+        }
+        return true
+    }
+
+    func isBodyMemberStart() -> Bool {
+        guard peek() == .keyword(NeatSyntax.Keyword.variable.rawValue) else {
+            return false
+        }
+        guard case .identifier(let name) = peek(offset: 1), name == "body" else {
+            return false
+        }
+        guard peek(offset: 2) == .colon else {
             return false
         }
         return true

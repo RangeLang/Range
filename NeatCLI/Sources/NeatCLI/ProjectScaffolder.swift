@@ -313,11 +313,11 @@ struct ProjectScaffolder {
             "VStack.neat", isDirectory: false)
         let surfaceModifierPath = coreModifiersDirectory.appendingPathComponent(
             "surface.css", isDirectory: false)
-        try loadTemplateText("core/V1/Components/CoreCard.neat").write(
+        try loadTemplateText("Web/core/V1/Components/CoreCard.neat").write(
             to: coreCardPath, atomically: true, encoding: String.Encoding.utf8)
-        try loadTemplateText("core/V1/Components/CoreHero.neat").write(
+        try loadTemplateText("Web/core/V1/Components/CoreHero.neat").write(
             to: coreHeroPath, atomically: true, encoding: String.Encoding.utf8)
-        try loadTemplateText("core/V1/Components/VStack.neat").write(
+        try loadTemplateText("Web/core/V1/Components/VStack.neat").write(
             to: vStackPath, atomically: true, encoding: String.Encoding.utf8)
         try """
         border: 1px solid var(--neat-border);
@@ -476,16 +476,18 @@ struct ProjectScaffolder {
 
           state count: Int = 0
 
-          VStack {
-            HomePageHeader()
-            CoreHero()
-            CoreCard()
-              .background(.rgba(255, 255, 255, 72%))
-              .padding(24, 28)
-              .shadow(y: 12, blur: 36, color: .rgba(15, 23, 42, 20%))
-            Text("Count: \\(count)")
-            Button("Add") {
-              count += 1
+          var body: Component {
+            VStack {
+              HomePageHeader()
+              CoreHero()
+              CoreCard()
+                .background(.rgba(255, 255, 255, 72%))
+                .padding(24, 28)
+                .shadow(y: 12, blur: 36, color: .rgba(15, 23, 42, 20%))
+              Text("Count: \\(count)")
+              Button("Add") {
+                count += 1
+              }
             }
           }
         }
@@ -500,9 +502,11 @@ struct ProjectScaffolder {
             Meta.description("About the \(appName) application.")
           }
 
-          VStack {
-            Text("About")
-            Text("This project was created with neat create.")
+          var body: Component {
+            VStack {
+              Text("About")
+              Text("This project was created with neat create.")
+            }
           }
         }
         """
@@ -511,9 +515,11 @@ struct ProjectScaffolder {
     private func renderHeader() -> String {
         """
         @HomePageHeader: Component {
-          VStack {
-            Text("Neat")
-            Text("Swift-shaped UI compiled for the browser.")
+          var body: Component {
+            VStack {
+              Text("Neat")
+              Text("Swift-shaped UI compiled for the browser.")
+            }
           }
         }
         """
@@ -525,11 +531,11 @@ struct ProjectScaffolder {
 
     private func defaultRuntimeCoreCSS() throws -> String {
         let styleFiles = [
-            "runtime/Styles/preflight.css",
-            "runtime/Styles/root.css",
-            "runtime/Styles/layout.css",
-            "runtime/Styles/typography.css",
-            "runtime/Styles/style.css",
+            "Web/runtime/Styles/preflight.css",
+            "Web/runtime/Styles/root.css",
+            "Web/runtime/Styles/layout.css",
+            "Web/runtime/Styles/typography.css",
+            "Web/runtime/Styles/style.css",
         ]
         let contents = try styleFiles.map(loadTemplateText)
         return contents.joined(separator: "\n\n")
