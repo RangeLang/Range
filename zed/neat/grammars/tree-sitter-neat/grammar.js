@@ -17,6 +17,8 @@ module.exports = grammar({
 
   supertypes: ($) => [$.declaration, $.expression, $.type, $.statement],
 
+  conflicts: ($) => [[$.callable_declaration, $.expression]],
+
   rules: {
     source_file: ($) => repeat($.declaration),
 
@@ -299,9 +301,18 @@ module.exports = grammar({
             "function",
             choice($.identifier, $.type_identifier, $.member_expression),
           ),
-          optional(field("arguments", $.argument_clause)),
-          optional(field("body", $.block)),
-          repeat(field("modifier", $.modifier_call)),
+          choice(
+            seq(
+              field("arguments", $.argument_clause),
+              optional(field("body", $.block)),
+              repeat(field("modifier", $.modifier_call)),
+            ),
+            seq(
+              field("body", $.block),
+              repeat(field("modifier", $.modifier_call)),
+            ),
+            repeat1(field("modifier", $.modifier_call)),
+          ),
         ),
       ),
 
