@@ -172,14 +172,19 @@ extension Parser {
         var parameters: [NeatFunctionParameter] = []
         if peek() != .rightParen {
             while true {
-                let firstName = try consumeIdentifier()
-                let parameterName: String
+                let localName = try consumeIdentifier()
+                guard localName != "_" else {
+                    throw ParseError("Parameter local name cannot be '_'.")
+                }
+
+                let externalLabel: String?
                 if case .identifier(let secondName) = peek(), peek(offset: 1) == .colon {
                     advance()
-                    parameterName = secondName == "_" ? firstName : secondName
+                    externalLabel = secondName == "_" ? nil : secondName
                 } else {
-                    parameterName = firstName
+                    externalLabel = localName
                 }
+
                 var typeName: String?
                 if peek() == .colon {
                     try consume(.colon)
@@ -187,7 +192,11 @@ extension Parser {
                 }
 
                 parameters.append(
-                    NeatFunctionParameter(name: parameterName, typeName: typeName)
+                    NeatFunctionParameter(
+                        localName: localName,
+                        externalLabel: externalLabel,
+                        typeName: typeName
+                    )
                 )
 
                 guard peek() == .comma else { break }
@@ -588,7 +597,9 @@ extension Parser {
         guard lhs.count == rhs.count else {
             return false
         }
-        return zip(lhs, rhs).allSatisfy { $0.typeName == $1.typeName }
+        return zip(lhs, rhs).allSatisfy {
+            $0.externalLabel == $1.externalLabel && $0.typeName == $1.typeName
+        }
     }
 
     func callableSignatureKeys(
@@ -597,10 +608,7 @@ extension Parser {
         parameters: [NeatFunctionParameter]
     ) -> [String] {
         signatureParameterVariants(parameters).map { variant in
-            let rendered = variant.map { parameter in
-                let typeName = parameter.typeName ?? "_"
-                return "\(parameter.name):\(typeName)"
-            }.joined(separator: ",")
+            let rendered = variant.map(parameterSignatureKey).joined(separator: ",")
             return "\(targetName ?? "_")@\(name)(\(rendered))"
         }
     }
@@ -610,10 +618,7 @@ extension Parser {
         name: String,
         parameters: [NeatFunctionParameter]
     ) -> String {
-        let rendered = parameters.map { parameter in
-            let typeName = parameter.typeName ?? "_"
-            return "\(parameter.name): \(typeName)"
-        }.joined(separator: ", ")
+        let rendered = parameters.map(renderParameterSignature).joined(separator: ", ")
         if let targetName {
             return "\(targetName)@\(name)(\(rendered))"
         }
@@ -622,19 +627,30 @@ extension Parser {
 
     func initializerSignatureKeys(parameters: [NeatFunctionParameter]) -> [String] {
         signatureParameterVariants(parameters).map { variant in
-            variant.map { parameter in
-                let typeName = parameter.typeName ?? "_"
-                return "\(parameter.name):\(typeName)"
-            }.joined(separator: ",")
+            variant.map(parameterSignatureKey).joined(separator: ",")
         }
     }
 
     func renderInitializerSignature(parameters: [NeatFunctionParameter]) -> String {
-        let rendered = parameters.map { parameter in
-            let typeName = parameter.typeName ?? "_"
-            return "\(parameter.name): \(typeName)"
-        }.joined(separator: ", ")
+        let rendered = parameters.map(renderParameterSignature).joined(separator: ", ")
         return "init(\(rendered))"
+    }
+
+    func parameterSignatureKey(_ parameter: NeatFunctionParameter) -> String {
+        let label = parameter.externalLabel ?? "_"
+        let typeName = parameter.typeName ?? "_"
+        return "\(label):\(typeName)"
+    }
+
+    func renderParameterSignature(_ parameter: NeatFunctionParameter) -> String {
+        let typeName = parameter.typeName ?? "_"
+        if let externalLabel = parameter.externalLabel {
+            if externalLabel == parameter.localName {
+                return "\(parameter.localName): \(typeName)"
+            }
+            return "\(parameter.localName) \(externalLabel): \(typeName)"
+        }
+        return "\(parameter.localName) _: \(typeName)"
     }
 
     func signatureParameterVariants(_ parameters: [NeatFunctionParameter])
@@ -663,15 +679,9 @@ extension Parser {
                 return lhs.count > rhs.count
             }
 
-            let left = lhs.map { parameter in
-                let typeName = parameter.typeName ?? "_"
-                return "\(parameter.name):\(typeName)"
-            }.joined(separator: ",")
+            let left = lhs.map(parameterSignatureKey).joined(separator: ",")
 
-            let right = rhs.map { parameter in
-                let typeName = parameter.typeName ?? "_"
-                return "\(parameter.name):\(typeName)"
-            }.joined(separator: ",")
+            let right = rhs.map(parameterSignatureKey).joined(separator: ",")
 
             return left < right
         }

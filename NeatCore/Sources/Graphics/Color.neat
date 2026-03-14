@@ -2,5 +2,4 @@
     @hsl(hue: Int, saturation: Int, lightness: Int, alpha: Int?)
     @oklch(lightness: Int, chroma: Int, hue: Int, alpha: Int?)
     @rgb(red: Int, green: Int, blue: Int, alpha: Int?)
-
 }

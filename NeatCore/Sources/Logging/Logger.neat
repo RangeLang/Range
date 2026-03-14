@@ -1,0 +1,8 @@
+#Logger {
+    @log(text _: String)
+    @debug(text _: String)
+    @info(text _: String)
+    @success(text _: String)
+    @warning(text _: String)
+    @error(text _: String)
+}
