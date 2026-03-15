@@ -1,5 +1,7 @@
 construct HomePage : Page {
 
+  environment http: HTTPClient
+
   derived head: Head {
     Meta.title("Home Page")
     Meta.description("Home Page Description")
@@ -8,12 +10,9 @@ construct HomePage : Page {
   state welcomeMessage: String
 
   init() {
-    welcomeMessage = getMessage()
+    welcomeMessage = http.get("")
   }
 
-  function getMessage() {
-    Logger.log("Hello, World!")
-  }
 
   derived body: Renderable {
     Text(welcomeMessage)

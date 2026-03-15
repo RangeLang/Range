@@ -6,7 +6,6 @@
 
 ; ── Keywords ─────────────────────────────────────────────────────────────────
 [
-  "construct"
   "enum"
   "case"
   "extension"
@@ -51,7 +50,6 @@
 
 ; ── Declarations ─────────────────────────────────────────────────────────────
 (sigiled_declaration
-  "construct" @keyword
   name: (type_identifier) @type.definition)
 
 (sigiled_declaration
@@ -59,6 +57,9 @@
 
 (callable_declaration
   name: (identifier) @function.method)
+
+((identifier) @function.method
+ (#eq? @function.method "init"))
 
 (enum_declaration
   name: (type_identifier) @type.definition)

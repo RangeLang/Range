@@ -3,17 +3,37 @@ use zed_extension_api::{self as zed, Result};
 struct NeatExtension;
 
 impl NeatExtension {
-    const SERVER_BINARY_NAME: &'static str = "neat";
-    const HOMEBREW_SERVER_PATH: &'static str = "/opt/homebrew/bin/neat";
+    fn lsp_launch_script() -> String {
+        r#"
+if [ -x "NeatCLI/.build/arm64-apple-macosx/debug/NeatCLI" ]; then
+  exec "NeatCLI/.build/arm64-apple-macosx/debug/NeatCLI" lsp
+fi
 
-    fn resolve_server_path(&self, worktree: &zed::Worktree) -> Result<String> {
-        if std::path::Path::new(Self::HOMEBREW_SERVER_PATH).exists() {
-            return Ok(Self::HOMEBREW_SERVER_PATH.to_string());
-        }
+if [ -x "NeatCLI/.build/debug/NeatCLI" ]; then
+  exec "NeatCLI/.build/debug/NeatCLI" lsp
+fi
 
-        worktree.which(Self::SERVER_BINARY_NAME).ok_or_else(|| {
-            "Could not find `neat` binary on PATH. Install NeatCLI first.".to_string()
-        })
+if [ -x ".build/arm64-apple-macosx/debug/NeatCLI" ]; then
+  exec ".build/arm64-apple-macosx/debug/NeatCLI" lsp
+fi
+
+if [ -x ".build/debug/NeatCLI" ]; then
+  exec ".build/debug/NeatCLI" lsp
+fi
+
+if [ -x "/opt/homebrew/bin/neat" ]; then
+  exec "/opt/homebrew/bin/neat" lsp
+fi
+
+if command -v neat >/dev/null 2>&1; then
+  exec neat lsp
+fi
+
+echo "Could not find a Neat LSP binary. Build NeatCLI locally or install \`neat\` on PATH." >&2
+exit 127
+"#
+        .trim()
+        .to_string()
     }
 }
 
@@ -28,11 +48,9 @@ impl zed::Extension for NeatExtension {
         worktree: &zed::Worktree,
     ) -> Result<zed::Command> {
         if language_server_id.as_ref() == "neat-lsp" {
-            let path = self.resolve_server_path(worktree)?;
-
             return Ok(zed::Command {
-                command: path,
-                args: vec!["lsp".to_string()],
+                command: "sh".to_string(),
+                args: vec!["-lc".to_string(), Self::lsp_launch_script()],
                 env: worktree.shell_env(),
             });
         }
