@@ -11,8 +11,8 @@
     welcomeMessage = getMessage()
   }
 
-  function getMessage() async -> String {
-    return "Hello, World!"
+  function getMessage() {
+    Logger.log("Hello, World!")
   }
 
   derived body: Renderable {

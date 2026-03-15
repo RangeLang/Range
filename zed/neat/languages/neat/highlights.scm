@@ -2,7 +2,7 @@
 (comment) @comment
 
 ; ── Sigil operators ──────────────────────────────────────────────────────────
-["#" "@" "*"] @keyword
+["#" "@"] @keyword
 
 ; ── Keywords ─────────────────────────────────────────────────────────────────
 [
@@ -10,7 +10,6 @@
   "case"
   "extension"
   "func"
-  "function"
   "protocol"
   "state"
   "environment"
@@ -77,9 +76,6 @@
   name: (identifier) @variable.parameter)
 
 (variable_declaration
-  name: (identifier) @variable)
-
-(environment_provision_statement
   name: (identifier) @variable)
 
 (member_declaration
