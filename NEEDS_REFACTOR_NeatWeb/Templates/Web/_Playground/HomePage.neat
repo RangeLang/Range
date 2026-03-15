@@ -5,8 +5,17 @@
     Meta.description("Home Page Description")
   }
 
+  state welcomeMessage: String
+
+  init() {
+    welcomeMessage = getMessage()
+  }
+
+  function getMessage() async -> String {
+    return "Hello, World!"
+  }
 
   derived body: Renderable {
-    Text("Home Page")
+    Text(welcomeMessage)
   }
 }

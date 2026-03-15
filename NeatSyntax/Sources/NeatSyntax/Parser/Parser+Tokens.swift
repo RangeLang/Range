@@ -49,6 +49,19 @@ extension Parser {
         return value
     }
 
+    mutating func consumeEnumCaseName() throws -> String {
+        switch peek() {
+        case .identifier(let value):
+            advance()
+            return value
+        case .keyword(let value):
+            advance()
+            return value
+        default:
+            throw ParseError("Expected enum case name.")
+        }
+    }
+
     mutating func consumeCallableName() throws -> String {
         switch peek() {
         case .identifier(let value):

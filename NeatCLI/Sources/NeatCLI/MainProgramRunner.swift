@@ -220,6 +220,11 @@ private struct MainProgramInterpreter {
             try declare(name: name, kind: kind, value: value)
             return .none
 
+        case .environmentProvision:
+            throw ValidationError(
+                "Environment branching is not supported in the main program interpreter yet."
+            )
+
         case .assignment(let target, let expression):
             let value = try evaluate(expression)
             try assign(target: target, value: value)

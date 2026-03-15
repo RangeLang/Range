@@ -1,0 +1,25 @@
+#HTTPClient {
+  function send(request _: HTTPRequest) -> HTTPResponse
+}
+
+extension HTTPClient {
+  function get(url _: URL) -> HTTPResponse {
+    return send(HTTPRequest(.get, url, [:], none))
+  }
+
+  function post(url _: URL, body _: HTTPBody) -> HTTPResponse {
+    return send(HTTPRequest(.post, url, [:], body))
+  }
+
+  function put(url _: URL, body _: HTTPBody) -> HTTPResponse {
+    return send(HTTPRequest(.put, url, [:], body))
+  }
+
+  function patch(url _: URL, body _: HTTPBody) -> HTTPResponse {
+    return send(HTTPRequest(.patch, url, [:], body))
+  }
+
+  function delete(url _: URL) -> HTTPResponse {
+    return send(HTTPRequest(.delete, url, [:], none))
+  }
+}

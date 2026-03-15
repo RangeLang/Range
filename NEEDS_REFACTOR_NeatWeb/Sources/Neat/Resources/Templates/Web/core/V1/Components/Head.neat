@@ -2,11 +2,11 @@
 
 
 #Meta: Head {
-  @title(text: String)
-  @charset(text: String = "utf-8")
-  @viewport(text: String = "width=device-width, initial-scale=1.0")
+  function title(text: String)
+  function charset(text: String = "utf-8")
+  function viewport(text: String = "width=device-width, initial-scale=1.0")
 }
 
 #Stylesheet on Meta: Head {
-  @stylesheet(text: String)
+  function stylesheet(text: String)
 }

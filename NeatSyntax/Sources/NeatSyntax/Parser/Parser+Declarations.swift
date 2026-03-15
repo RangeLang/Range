@@ -160,14 +160,19 @@ extension Parser {
 
     mutating func parseCallableDeclaration() throws -> CallableDeclaration {
         var targetName: String?
-        if case .identifier(let target) = peek(), case .atAttribute = peek(offset: 1) {
+        if case .identifier(let target) = peek(),
+            peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+        {
             targetName = target
             advance()
         }
-        guard case .atAttribute(let name, _) = peek() else {
-            throw ParseError("Expected callable declaration.")
+
+        guard peek() == .keyword(NeatSyntax.Keyword.function.rawValue) else {
+            throw ParseError("Expected callable declaration starting with function.")
         }
         advance()
+
+        let name = try consumeCallableName()
         let hasExplicitParameterClause = peek() == .leftParen
         guard hasExplicitParameterClause else {
             throw ParseError(
@@ -271,7 +276,7 @@ extension Parser {
         var declarations: [EnumCaseDeclaration] = []
 
         while true {
-            let caseName = try consumeIdentifier()
+            let caseName = try consumeEnumCaseName()
             let associatedValues = try parseAssociatedValuesIfPresent()
             declarations.append(
                 EnumCaseDeclaration(name: caseName, associatedValues: associatedValues)
@@ -358,15 +363,8 @@ extension Parser {
                 }
             }
             storage = .stored(initialValue)
-        } else if peek() == .leftBrace {
-            let body = try parseStatementBlock(baseLocalBindings: [:])
-            guard let explicitType else {
-                throw ParseError("Derived state '\(name)' requires an explicit type.")
-            }
-            inferredType = explicitType
-            storage = .derived(body)
         } else {
-            throw ParseError("state '\(name)' requires either `= expression` or a block body.")
+            throw ParseError("state '\(name)' requires `= expression`.")
         }
 
         if let explicitType, !isCompatibleStateType(explicitType, inferredType: inferredType) {
@@ -731,7 +729,12 @@ extension Parser {
     }
 
     func isCallableStart() -> Bool {
-        if case .atAttribute = peek() {
+        if peek() == .keyword(NeatSyntax.Keyword.function.rawValue) {
+            return true
+        }
+        if case .identifier = peek(),
+            peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+        {
             return true
         }
         return false

@@ -43,6 +43,9 @@ struct Lexer {
             case "]":
                 advance()
                 tokens.append(.rightBracket)
+            case "*":
+                advance()
+                tokens.append(.asterisk)
             case ".":
                 advance()
                 tokens.append(.dot)
@@ -127,6 +130,9 @@ struct Lexer {
             case "@":
                 let identifier = try readSigilIdentifier()
                 tokens.append(.atAttribute(name: identifier, argument: nil))
+            case "`":
+                let identifier = try readEscapedIdentifier()
+                tokens.append(.identifier(identifier))
             default:
                 if character.isNumber {
                     tokens.append(try readNumberLiteral())
@@ -173,9 +179,30 @@ struct Lexer {
         return String(characters[start..<index])
     }
 
+    private mutating func readEscapedIdentifier() throws -> String {
+        advance()
+        guard let next = peek(), next.isLetter || next == "_" else {
+            throw ParseError("Expected identifier after `.")
+        }
+
+        let identifier = readIdentifier()
+
+        guard match("`") else {
+            throw ParseError("Unterminated escaped identifier.")
+        }
+
+        return identifier
+    }
+
     private mutating func readSigilIdentifier() throws -> String {
         advance()
-        guard let next = peek(), next.isLetter else {
+        guard let next = peek() else {
+            throw ParseError("Expected identifier after @.")
+        }
+        if next == "`" {
+            return try readEscapedIdentifier()
+        }
+        guard next.isLetter else {
             throw ParseError("Expected identifier after @.")
         }
         return readIdentifier()
@@ -183,7 +210,13 @@ struct Lexer {
 
     private mutating func readHashIdentifier() throws -> String {
         advance()
-        guard let next = peek(), next.isLetter else {
+        guard let next = peek() else {
+            throw ParseError("Expected identifier after #.")
+        }
+        if next == "`" {
+            return try readEscapedIdentifier()
+        }
+        guard next.isLetter else {
             throw ParseError("Expected identifier after #.")
         }
         return readIdentifier()

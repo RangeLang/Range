@@ -500,13 +500,9 @@
         ]
       },
       "receiver": {
-        "multiple": true,
+        "multiple": false,
         "required": false,
         "types": [
-          {
-            "type": "@",
-            "named": false
-          },
           {
             "type": "type_identifier",
             "named": true
@@ -1756,6 +1752,10 @@
   },
   {
     "type": "func",
+    "named": false
+  },
+  {
+    "type": "function",
     "named": false
   },
   {

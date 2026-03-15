@@ -168,6 +168,13 @@ public struct EnvironmentDeclaration {
     }
 }
 
+public struct EnvironmentProvision {
+    public let isState: Bool
+    public let name: String
+    public let typeName: String
+    public let expression: Expression
+}
+
 public struct StateDeclaration {
     public let name: String
     public let type: BuiltinType
@@ -176,7 +183,6 @@ public struct StateDeclaration {
 
 public enum StateStorage {
     case stored(Expression)
-    case derived([Statement])
 }
 
 public enum BindingStorage {
@@ -190,6 +196,7 @@ public indirect enum BuiltinType: Equatable {
     case float
     case string
     case bool
+    case data
     case dictionary
     case set(BuiltinType)
     case void
@@ -208,6 +215,8 @@ public indirect enum BuiltinType: Equatable {
             return "String"
         case .bool:
             return "Bool"
+        case .data:
+            return "Data"
         case .dictionary:
             return "Dictionary"
         case .set(let element):
@@ -282,6 +291,7 @@ public indirect enum StringSegment {
 
 public indirect enum Statement {
     case declaration(kind: LocalBindingKind, name: String, expression: Expression)
+    case environmentProvision(EnvironmentProvision)
     case assignment(target: AssignmentTarget, expression: Expression)
     case compoundAssignment(
         target: AssignmentTarget,

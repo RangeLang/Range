@@ -2,9 +2,9 @@
 
 
 #Meta: Head {
-  @title(text _: String)
-  @charset(text _: String = "utf-8")
-  @viewport(text _: String = "width=device-width, initial-scale=1.0")
+  function title(text _: String)
+  function charset(text _: String = "utf-8")
+  function viewport(text _: String = "width=device-width, initial-scale=1.0")
 }
 
 #Stylesheet: Head {

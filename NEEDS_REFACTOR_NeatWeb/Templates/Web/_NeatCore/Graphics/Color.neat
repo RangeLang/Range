@@ -1,5 +1,5 @@
  #Color {
-    @hsl(hue: Int, saturation: Int, lightness: Int, alpha: Int?)
-    @oklch(lightness: Int, chroma: Int, hue: Int, alpha: Int?)
-    @rgb(red: Int, green: Int, blue: Int, alpha: Int?)
+    function hsl(hue: Int, saturation: Int, lightness: Int, alpha: Int?)
+    function oklch(lightness: Int, chroma: Int, hue: Int, alpha: Int?)
+    function rgb(red: Int, green: Int, blue: Int, alpha: Int?)
 }

@@ -23,6 +23,7 @@ enum NeatSyntax {
         case continueStatement = "continue"
         case switchStatement = "switch"
         case defaultBranch = "default"
+        case function = "function"
         case getter = "get"
         case setter = "set"
     }
@@ -55,6 +56,7 @@ extension BuiltinType {
         "Float",
         "String",
         "Bool",
+        "Data",
         "Dictionary",
         "Set",
         "Void",

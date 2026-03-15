@@ -1,6 +1,6 @@
 id = "neat"
 name = "Neat"
-version = "0.2.15"
+version = "0.2.17"
 schema_version = 1
 authors = ["Neat Team"]
 description = "Neat language support for .neat files."

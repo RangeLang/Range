@@ -271,6 +271,8 @@ extension Parser {
             return .string
         case "Bool":
             return .bool
+        case "Data":
+            return .data
         case "Dictionary":
             return .dictionary
         case "Void":

@@ -27,61 +27,83 @@ public struct MainJavaScriptGenerator {
         valueExpressions: [String: String],
         context: inout JSMainContext
     ) -> String {
+        let effectiveValueExpressions = mergedValueExpressions(base: valueExpressions, context: context)
         switch statement {
         case .declaration(let kind, let name, let expression):
             let keyword = kind == .constant ? "const" : "let"
             context.locals[name] = kind
             return
-                "\(keyword) \(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                "\(keyword) \(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context));"
+        case .environmentProvision(let provision):
+            let expressionString: String
+            if provision.isState {
+                expressionString = environmentAlias(
+                    for: provision.expression,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: effectiveValueExpressions,
+                    context: context
+                )
+            } else {
+                expressionString = generateExpression(
+                    provision.expression,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: effectiveValueExpressions,
+                    context: context
+                )
+            }
+            context.environmentValueExpressions[provision.name] = expressionString
+            return ""
         case .assignment(let target, let expression):
             switch target {
             case .state(let name):
                 return
-                    "\(name).set(\(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context)));"
+                    "\(name).set(\(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context)));"
             case .binding(let name):
-                let targetName = valueExpressions[name] ?? name
+                let targetName = effectiveValueExpressions[name] ?? name
                 return
-                    "\(targetName).value = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                    "\(targetName).value = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context));"
             case .environment(let name):
                 return generateEnvironmentAssignment(
-                    alias: valueExpressions[name] ?? name,
+                    alias: effectiveValueExpressions[name] ?? name,
                     expression: expression,
                     stateNames: stateNames,
                     bindingNames: bindingNames,
-                    valueExpressions: valueExpressions,
+                    valueExpressions: effectiveValueExpressions,
                     context: context
                 )
             case .local(let name):
                 return
-                    "\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                    "\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context));"
             case .member(let name):
                 return
-                    "self.\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                    "self.\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context));"
             }
         case .compoundAssignment(let target, .plusEquals, let expression):
             switch target {
             case .state(let name):
                 return
-                    "\(name).set(\(name)() + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context)));"
+                    "\(name).set(\(name)() + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context)));"
             case .binding(let name):
-                let targetName = valueExpressions[name] ?? name
+                let targetName = effectiveValueExpressions[name] ?? name
                 return
-                    "\(targetName).value = \(targetName).value + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                    "\(targetName).value = \(targetName).value + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context));"
             case .environment(let name):
                 return generateEnvironmentCompoundAssignment(
-                    alias: valueExpressions[name] ?? name,
+                    alias: effectiveValueExpressions[name] ?? name,
                     expression: expression,
                     stateNames: stateNames,
                     bindingNames: bindingNames,
-                    valueExpressions: valueExpressions,
+                    valueExpressions: effectiveValueExpressions,
                     context: context
                 )
             case .local(let name):
                 return
-                    "\(name) = \(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                    "\(name) = \(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context));"
             case .member(let name):
                 return
-                    "self.\(name) = self.\(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                    "self.\(name) = self.\(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, context: context));"
             }
         case .forEach(let name, let sequence, let body):
             let sequenceValue = generateExpression(
@@ -339,6 +361,7 @@ public struct MainJavaScriptGenerator {
         localBindings: Set<String> = [],
         context: JSMainContext? = nil
     ) -> String {
+        let effectiveValueExpressions = mergedValueExpressions(base: valueExpressions, context: context)
         switch expression {
         case .integer(let value):
             return String(value)
@@ -352,7 +375,7 @@ public struct MainJavaScriptGenerator {
             if localBindings.contains(name) || context?.locals[name] != nil {
                 return name
             }
-            if let valueExpression = valueExpressions[name] {
+            if let valueExpression = effectiveValueExpressions[name] {
                 return bindingNames.contains(name) ? "\(valueExpression).value" : valueExpression
             }
             if bindingNames.contains(name) {
@@ -360,17 +383,17 @@ public struct MainJavaScriptGenerator {
             }
             return stateNames.contains(name) ? "\(name)()" : name
         case .bindingReference(let name):
-            return valueExpressions[name] ?? name
+            return effectiveValueExpressions[name] ?? name
         case .array(let values):
             return
-                "[\(values.map { generateExpression($0, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context) }.joined(separator: ", "))]"
+                "[\(values.map { generateExpression($0, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, localBindings: localBindings, context: context) }.joined(separator: ", "))]"
         case .dictionary(let elements):
             return "{\(elements.map { element in
                 let key = generateDictionaryKey(
                     element.key,
                     stateNames: stateNames,
                     bindingNames: bindingNames,
-                    valueExpressions: valueExpressions,
+                    valueExpressions: effectiveValueExpressions,
                     localBindings: localBindings,
                     context: context
                 )
@@ -378,7 +401,7 @@ public struct MainJavaScriptGenerator {
                     element.value,
                     stateNames: stateNames,
                     bindingNames: bindingNames,
-                    valueExpressions: valueExpressions,
+                    valueExpressions: effectiveValueExpressions,
                     localBindings: localBindings,
                     context: context
                 )
@@ -386,14 +409,38 @@ public struct MainJavaScriptGenerator {
             }.joined(separator: ", "))}"
         case .ternary(let condition, let trueExpression, let falseExpression):
             return
-                "\(generateExpression(condition, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context)) ? \(generateExpression(trueExpression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context)) : \(generateExpression(falseExpression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))"
+                "\(generateExpression(condition, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, localBindings: localBindings, context: context)) ? \(generateExpression(trueExpression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, localBindings: localBindings, context: context)) : \(generateExpression(falseExpression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, localBindings: localBindings, context: context))"
         case .unary(let op, let nested):
             return
-                "\(op.rawValue)\(generateExpression(nested, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))"
+                "\(op.rawValue)\(generateExpression(nested, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, localBindings: localBindings, context: context))"
         case .binary(let lhs, let op, let rhs):
             return
-                "\(generateExpression(lhs, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context)) \(op.rawValue) \(generateExpression(rhs, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: localBindings, context: context))"
+                "\(generateExpression(lhs, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, localBindings: localBindings, context: context)) \(op.rawValue) \(generateExpression(rhs, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: effectiveValueExpressions, localBindings: localBindings, context: context))"
         }
+    }
+
+    private func mergedValueExpressions(
+        base: [String: String],
+        context: JSMainContext?
+    ) -> [String: String] {
+        guard let context else { return base }
+        return base.merging(context.environmentValueExpressions) { _, new in new }
+    }
+
+    private func environmentAlias(
+        for expression: NeatSyntax.Expression,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
+        context: JSMainContext
+    ) -> String {
+        generateExpression(
+            expression,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: valueExpressions,
+            context: context
+        )
     }
 
     private func escapeLiteral(_ value: String) -> String {
@@ -433,4 +480,5 @@ public struct MainJavaScriptGenerator {
 
 private struct JSMainContext {
     var locals: [String: LocalBindingKind] = [:]
+    var environmentValueExpressions: [String: String] = [:]
 }

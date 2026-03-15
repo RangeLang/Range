@@ -1,12 +1,12 @@
 extension Renderable {
-  @padding(value _: Double) -> Renderable {
+  function padding(value _: Double) -> Renderable {
     self.webStyles.append(
       WebStyle(attribute: "padding", value: "\(value)")
     )
     return self
   }
 
-  @padding(edges _: EdgeSet, value _: Double) -> Renderable {
+  function padding(edges _: EdgeSet, value _: Double) -> Renderable {
     if edges == .all {
       self.webStyles.append(WebStyle(attribute: "padding-top", value: "\(value)"))
       self.webStyles.append(WebStyle(attribute: "padding-left", value: "\(value)"))

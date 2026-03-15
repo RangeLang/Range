@@ -2,7 +2,7 @@
 (comment) @comment
 
 ; ── Sigil operators ──────────────────────────────────────────────────────────
-["#" "@"] @keyword
+["#" "@" "*"] @keyword
 
 ; ── Keywords ─────────────────────────────────────────────────────────────────
 [
@@ -10,6 +10,7 @@
   "case"
   "extension"
   "func"
+  "function"
   "protocol"
   "state"
   "environment"
@@ -18,6 +19,11 @@
   "value"
   "var"
 ] @keyword
+
+; When syntax is incomplete, tree-sitter can fall back to plain identifiers
+; inside ERROR nodes. Keep core keywords colored by text anyway.
+((identifier) @keyword
+ (#match? @keyword "^(enum|case|extension|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|on)$"))
 
 ; Control flow
 [
@@ -54,9 +60,6 @@
 (callable_declaration
   name: (identifier) @function.method)
 
-(derived_declaration
-  name: (identifier) @property)
-
 (enum_declaration
   name: (type_identifier) @type.definition)
 
@@ -74,6 +77,9 @@
   name: (identifier) @variable.parameter)
 
 (variable_declaration
+  name: (identifier) @variable)
+
+(environment_provision_statement
   name: (identifier) @variable)
 
 (member_declaration

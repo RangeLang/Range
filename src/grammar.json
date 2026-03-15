@@ -217,17 +217,8 @@
                     "type": "FIELD",
                     "name": "receiver",
                     "content": {
-                      "type": "SEQ",
-                      "members": [
-                        {
-                          "type": "SYMBOL",
-                          "name": "type_identifier"
-                        },
-                        {
-                          "type": "STRING",
-                          "value": "@"
-                        }
-                      ]
+                      "type": "SYMBOL",
+                      "name": "type_identifier"
                     }
                   },
                   {
@@ -237,7 +228,7 @@
               },
               {
                 "type": "STRING",
-                "value": "@"
+                "value": "function"
               },
               {
                 "type": "FIELD",
@@ -301,17 +292,8 @@
                   "type": "FIELD",
                   "name": "receiver",
                   "content": {
-                    "type": "SEQ",
-                    "members": [
-                      {
-                        "type": "SYMBOL",
-                        "name": "type_identifier"
-                      },
-                      {
-                        "type": "STRING",
-                        "value": "@"
-                      }
-                    ]
+                    "type": "SYMBOL",
+                    "name": "type_identifier"
                   }
                 },
                 {
@@ -321,7 +303,7 @@
             },
             {
               "type": "STRING",
-              "value": "@"
+              "value": "function"
             },
             {
               "type": "FIELD",
@@ -2667,8 +2649,20 @@
       "value": "nil"
     },
     "identifier": {
-      "type": "PATTERN",
-      "value": "[a-z_][A-Za-z0-9_]*"
+      "type": "TOKEN",
+      "content": {
+        "type": "CHOICE",
+        "members": [
+          {
+            "type": "PATTERN",
+            "value": "[a-z_][A-Za-z0-9_]*"
+          },
+          {
+            "type": "PATTERN",
+            "value": "`[A-Za-z_][A-Za-z0-9_]*`"
+          }
+        ]
+      }
     },
     "type_identifier": {
       "type": "PATTERN",

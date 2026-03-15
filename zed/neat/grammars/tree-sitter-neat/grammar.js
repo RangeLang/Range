@@ -58,8 +58,8 @@ module.exports = grammar({
       choice(
         prec.right(
           seq(
-            optional(field("receiver", seq($.type_identifier, "@"))),
-            "@",
+            optional(field("receiver", $.type_identifier)),
+            "function",
             field("name", $.identifier),
             field("parameters", $.callable_parameter_clause),
             optional(seq("->", field("return_type", $.type))),
@@ -67,8 +67,8 @@ module.exports = grammar({
           ),
         ),
         seq(
-          optional(field("receiver", seq($.type_identifier, "@"))),
-          "@",
+          optional(field("receiver", $.type_identifier)),
+          "function",
           field("name", $.identifier),
           field("parameters", $.callable_parameter_clause),
           optional(seq("->", field("return_type", $.type))),
@@ -241,6 +241,7 @@ module.exports = grammar({
 
     statement: ($) =>
       choice(
+        $.environment_provision_statement,
         $.if_statement,
         $.for_statement,
         $.while_statement,
@@ -290,6 +291,18 @@ module.exports = grammar({
 
     return_statement: ($) =>
       prec.right(seq("return", optional(field("value", $.expression)))),
+
+    environment_provision_statement: ($) =>
+      seq(
+        "*",
+        "environment",
+        optional("state"),
+        field("name", $.identifier),
+        ":",
+        field("type", $.type),
+        "=",
+        field("value", $.expression),
+      ),
 
     // ── Block ─────────────────────────────────────────────────────────────────
 
@@ -469,7 +482,8 @@ module.exports = grammar({
 
     nil_literal: (_) => "nil",
 
-    identifier: (_) => /[a-z_][A-Za-z0-9_]*/,
+    identifier: (_) =>
+      token(choice(/[a-z_][A-Za-z0-9_]*/, /`[A-Za-z_][A-Za-z0-9_]*`/)),
 
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
 
