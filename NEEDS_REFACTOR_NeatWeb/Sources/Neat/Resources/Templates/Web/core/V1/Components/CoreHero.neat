@@ -1,4 +1,4 @@
-#CoreHero: Component {
+construct CoreHero : Component {
   var body: Component {
     VStack {
       Text("Ship Faster")

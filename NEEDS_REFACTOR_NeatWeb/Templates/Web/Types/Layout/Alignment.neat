@@ -1,4 +1,4 @@
-#Alignment {
+construct Alignment {
   value horizontal: HorizontalAlignment
   value vertical: VerticalAlignment
 }

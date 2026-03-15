@@ -1,4 +1,4 @@
-#VerticalAlignment {
+construct VerticalAlignment {
   case top
   case center
   case bottom

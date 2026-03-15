@@ -1,4 +1,4 @@
-#LineStyle {
+construct LineStyle {
   case solid
   case dashed
   case dotted

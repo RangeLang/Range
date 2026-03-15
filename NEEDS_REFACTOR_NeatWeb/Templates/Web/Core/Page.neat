@@ -1,4 +1,4 @@
-#Page {
+construct Page {
   derived head: Head?
   derived body: Renderable
 }

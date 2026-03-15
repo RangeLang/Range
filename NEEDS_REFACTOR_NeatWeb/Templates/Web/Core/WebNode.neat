@@ -1,4 +1,4 @@
-#WebNode {
+construct WebNode {
   case element(
     tag: String,
     attributes: [String: String] = [:],

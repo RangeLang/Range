@@ -1,4 +1,4 @@
-#HTTPClient {
+construct HTTPClient {
   function send(request _: HTTPRequest) -> HTTPResponse
 }
 

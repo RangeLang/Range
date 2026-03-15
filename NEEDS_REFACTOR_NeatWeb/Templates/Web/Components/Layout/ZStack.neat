@@ -1,4 +1,4 @@
-#ZStack: Component {
+construct ZStack : Component {
   value alignment: Alignment = .center
   derived body: Renderable
 }

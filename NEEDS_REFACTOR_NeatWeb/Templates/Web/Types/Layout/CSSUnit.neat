@@ -1,4 +1,4 @@
-#CSSUnit {
+construct CSSUnit {
   case px(value: Double)
   case rem(value: Double)
   case percent(value: Double)

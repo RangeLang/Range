@@ -1,4 +1,4 @@
-#CornerShape {
+construct CornerShape {
   case round
   case square
   case bevel

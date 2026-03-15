@@ -1,4 +1,4 @@
-#Toggle: Primitive {
+construct Toggle : Primitive {
   binding isOn _: Bool
 
   value web: WebNode = WebNode.element(

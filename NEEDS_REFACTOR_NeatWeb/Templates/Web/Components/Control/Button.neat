@@ -1,4 +1,4 @@
-#Button: Component {
+construct Button : Component {
   value action: () -> Void
 
   derived body: Renderable

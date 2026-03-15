@@ -1,4 +1,4 @@
-#Logger {
+construct Logger {
     function log(text _: String)
     function debug(text _: String)
     function info(text _: String)

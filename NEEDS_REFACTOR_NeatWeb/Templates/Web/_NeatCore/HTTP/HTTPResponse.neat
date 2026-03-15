@@ -1,4 +1,4 @@
-#HTTPResponse {
+construct HTTPResponse {
   value status _: Int
   value headers _: [String: String] = [:]
   value body _: HTTPBody?

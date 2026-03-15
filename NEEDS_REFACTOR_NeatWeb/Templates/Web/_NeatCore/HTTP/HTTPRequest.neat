@@ -1,4 +1,4 @@
-#HTTPRequest {
+construct HTTPRequest {
   value method _: HTTPMethod
   value url _: URL
   value headers _: [String: String] = [:]

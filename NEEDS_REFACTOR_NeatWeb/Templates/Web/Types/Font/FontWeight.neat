@@ -1,4 +1,4 @@
-#FontWeight {
+construct FontWeight {
   case ultraLight
   case thin
   case light

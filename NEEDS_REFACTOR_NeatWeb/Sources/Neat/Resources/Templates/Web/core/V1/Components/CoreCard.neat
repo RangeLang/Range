@@ -1,4 +1,4 @@
-#CoreCard: Component {
+construct CoreCard : Component {
   var body: Component {
     VStack {
       Text("Core Card")

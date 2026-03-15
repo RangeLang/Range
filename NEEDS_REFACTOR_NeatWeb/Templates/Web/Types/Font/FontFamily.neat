@@ -1,4 +1,4 @@
-#FontFamily {
+construct FontFamily {
   value name: String
   value url: String?
 }

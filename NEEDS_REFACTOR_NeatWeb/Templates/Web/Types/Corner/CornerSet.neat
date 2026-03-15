@@ -1,4 +1,4 @@
-#CornerSet {
+construct CornerSet {
   case topLeading
   case topTrailing
   case bottomLeading

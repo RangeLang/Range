@@ -1,4 +1,4 @@
-#ScrollBarVisibility {
+construct ScrollBarVisibility {
   case automatic
   case always
   case hidden

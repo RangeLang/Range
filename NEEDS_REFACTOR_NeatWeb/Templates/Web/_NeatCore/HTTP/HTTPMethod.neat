@@ -1,4 +1,4 @@
-#HTTPMethod {
+construct HTTPMethod {
   case get
   case post
   case put

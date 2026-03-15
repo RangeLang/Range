@@ -1,4 +1,4 @@
-#HStack: Component {
+construct HStack : Component {
   value alignment: VerticalAlignment = .center
   value spacing: Double? = nil
   derived body: Renderable

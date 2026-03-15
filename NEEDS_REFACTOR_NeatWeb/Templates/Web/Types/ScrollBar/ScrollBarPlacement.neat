@@ -1,4 +1,4 @@
-#ScrollBarPlacement {
+construct ScrollBarPlacement {
   case overlay
   case include
 }

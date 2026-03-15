@@ -1,4 +1,4 @@
-#Link: Component {
+construct Link : Component {
   value destination _: URL
 
   derived body: Renderable

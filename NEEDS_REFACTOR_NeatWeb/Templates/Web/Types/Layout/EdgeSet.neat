@@ -1,4 +1,4 @@
-#EdgeSet {
+construct EdgeSet {
   case top
   case leading
   case bottom

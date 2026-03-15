@@ -6,6 +6,7 @@
 
 ; ── Keywords ─────────────────────────────────────────────────────────────────
 [
+  "construct"
   "enum"
   "case"
   "extension"
@@ -22,7 +23,7 @@
 ; When syntax is incomplete, tree-sitter can fall back to plain identifiers
 ; inside ERROR nodes. Keep core keywords colored by text anyway.
 ((identifier) @keyword
- (#match? @keyword "^(enum|case|extension|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|on)$"))
+ (#match? @keyword "^(construct|enum|case|extension|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|on)$"))
 
 ; Control flow
 [
@@ -50,7 +51,7 @@
 
 ; ── Declarations ─────────────────────────────────────────────────────────────
 (sigiled_declaration
-  "#" @type.definition
+  "construct" @keyword
   name: (type_identifier) @type.definition)
 
 (sigiled_declaration

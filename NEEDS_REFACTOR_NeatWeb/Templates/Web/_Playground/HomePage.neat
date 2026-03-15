@@ -1,4 +1,4 @@
-#HomePage: Page {
+construct HomePage : Page {
 
   derived head: Head {
     Meta.title("Home Page")

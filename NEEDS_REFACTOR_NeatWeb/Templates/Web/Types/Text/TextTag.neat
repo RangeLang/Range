@@ -1,4 +1,4 @@
-#TextTag {
+construct TextTag {
   case span
   case p
   case h1

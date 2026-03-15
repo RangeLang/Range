@@ -1,4 +1,4 @@
-#TextField: Primitive {
+construct TextField : Primitive {
   binding text _: String
   value placeholder: String?
 

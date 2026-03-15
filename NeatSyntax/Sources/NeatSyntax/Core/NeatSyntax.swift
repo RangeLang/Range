@@ -23,6 +23,7 @@ enum NeatSyntax {
         case continueStatement = "continue"
         case switchStatement = "switch"
         case defaultBranch = "default"
+        case construct = "construct"
         case function = "function"
         case getter = "get"
         case setter = "set"
@@ -32,7 +33,7 @@ enum NeatSyntax {
 
     static func declarationKind(for token: Token) -> DeclarationKind? {
         switch token {
-        case .hashDirective:
+        case .keyword(Keyword.construct.rawValue):
             return .declaration
         default:
             return nil

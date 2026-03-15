@@ -1,4 +1,4 @@
-#VStack: Component {
+construct VStack : Component {
 
   var body: Component {
     Div {

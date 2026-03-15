@@ -47,7 +47,7 @@ module.exports = grammar({
 
     sigiled_declaration: ($) =>
       seq(
-        "#",
+        "construct",
         field("name", $.type_identifier),
         optional(seq("on", field("target", $.type_identifier))),
         optional(seq(":", commaSep1($.type_identifier))),

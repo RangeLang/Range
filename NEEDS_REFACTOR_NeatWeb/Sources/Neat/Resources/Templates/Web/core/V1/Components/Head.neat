@@ -1,12 +1,12 @@
-#Head {}
+construct Head {}
 
 
-#Meta: Head {
+construct Meta : Head {
   function title(text: String)
   function charset(text: String = "utf-8")
   function viewport(text: String = "width=device-width, initial-scale=1.0")
 }
 
-#Stylesheet on Meta: Head {
+construct Stylesheet on Meta: Head {
   function stylesheet(text: String)
 }

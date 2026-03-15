@@ -453,22 +453,25 @@ extension Parser {
     }
 
     mutating func parseDeclarationKind(attribute: AttributeApplication?) throws -> DeclarationKind {
-        guard let kind = NeatSyntax.declarationKind(for: peek()) else {
-            throw ParseError("Expected declaration starting with #.")
+        switch peek() {
+        case .identifier(let value) where value == "construct":
+            advance()
+        case .keyword(let value) where value == "construct":
+            advance()
+        default:
+            throw ParseError("Expected declaration starting with 'construct'.")
         }
-        advance()
+
         if attribute?.name == "main" {
             return .entry
         }
-        return kind
+        return .declaration
     }
 
     mutating func parseDeclarationHeader() throws
         -> (name: String, conformances: [String], projectionTarget: String?)
     {
-        guard case .hashDirective(let name) = previous() else {
-            throw ParseError("Expected declaration name after #.")
-        }
+        let name = try consumeTypeName()
 
         if peek() == .colon || peek() == .keyword(NeatSyntax.Keyword.projection.rawValue)
             || peek() == .leftBrace
@@ -479,14 +482,28 @@ extension Parser {
         }
 
         throw ParseError(
-            "Expected 'on', ':', or '{' after #\(name). Use #\(name) { ... }, #\(name): Contract { ... }, or #\(name) on Target: Contract { ... }."
+            "Expected 'on', ':', or '{' after declaration name. Use construct \(name) { ... }, construct \(name): Contract { ... }, or construct \(name) on Target: Contract { ... }."
         )
     }
 
     mutating func parseDeclarationAttributeIfPresent() -> AttributeApplication? {
-        guard case .atAttribute = peek(), case .hashDirective = peek(offset: 1) else {
+        guard case .atAttribute = peek() else {
             return nil
         }
+
+        let next = peek(offset: 1)
+        let isConstructStart: Bool
+        switch next {
+        case .identifier(let value) where value == "construct":
+            isConstructStart = true
+        case .keyword(let value) where value == "construct":
+            isConstructStart = true
+        default:
+            isConstructStart = false
+        }
+
+        guard isConstructStart else { return nil }
+
         let attribute = NeatSyntax.attributeApplication(for: peek())
         advance()
         return attribute

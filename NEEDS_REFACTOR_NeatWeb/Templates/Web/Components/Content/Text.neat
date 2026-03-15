@@ -1,4 +1,4 @@
-#Text: Primitive {
+construct Text : Primitive {
   value text: String
   environment textTag: TextTag
 

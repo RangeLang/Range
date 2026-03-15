@@ -1,4 +1,4 @@
-#Spacer: Primitive {
+construct Spacer : Primitive {
   value web: WebNode = WebNode.element(
     tag: "div",
     classes: ["spacer"]
