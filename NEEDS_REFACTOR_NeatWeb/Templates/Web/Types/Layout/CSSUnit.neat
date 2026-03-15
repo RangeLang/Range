@@ -1,0 +1,9 @@
+#CSSUnit {
+  case px(value: Double)
+  case rem(value: Double)
+  case percent(value: Double)
+}
+
+extension CSSUnit {
+  value fill: CSSUnit = .percent(100)
+}

@@ -108,6 +108,70 @@ button .margin:not(.stack):not(.page) {
     flex-direction: row;
 }
 
+.axis-vertical[data-align="leading"] {
+    --stack-align: flex-start;
+}
+
+.axis-vertical[data-align="center"] {
+    --stack-align: center;
+}
+
+.axis-vertical[data-align="trailing"] {
+    --stack-align: flex-end;
+}
+
+.axis-vertical[data-align="stretch"] {
+    --stack-align: stretch;
+}
+
+.axis-horizontal[data-align="top"] {
+    --stack-align: flex-start;
+}
+
+.axis-horizontal[data-align="center"] {
+    --stack-align: center;
+}
+
+.axis-horizontal[data-align="bottom"] {
+    --stack-align: flex-end;
+}
+
+.axis-horizontal[data-align="stretch"] {
+    --stack-align: stretch;
+}
+
+.zstack[data-align-horizontal="leading"] {
+    --z-justify: start;
+}
+
+.zstack[data-align-horizontal="center"] {
+    --z-justify: center;
+}
+
+.zstack[data-align-horizontal="trailing"] {
+    --z-justify: end;
+}
+
+.zstack[data-align-horizontal="stretch"] {
+    --z-justify: stretch;
+}
+
+.zstack[data-align-vertical="top"] {
+    --z-align: start;
+}
+
+.zstack[data-align-vertical="center"] {
+    --z-align: center;
+}
+
+.zstack[data-align-vertical="bottom"] {
+    --z-align: end;
+}
+
+.zstack[data-align-vertical="stretch"] {
+    --z-align: stretch;
+}
+
 .divider {
     --divider-color: rgba(0, 0, 0, 0.1);
     background-color: var(--divider-color);

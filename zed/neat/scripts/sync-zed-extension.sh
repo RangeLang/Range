@@ -6,6 +6,7 @@ EXT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${EXT_DIR}/../.." && pwd)"
 EXT_TOML="${EXT_DIR}/extension.toml"
 INSTALL_DIR="${HOME}/Library/Application Support/Zed/extensions/installed/neat"
+TRANSIENT_GRAMMAR_CHECKOUT="${EXT_DIR}/grammars/neat"
 
 if [[ ! -f "${EXT_TOML}" ]]; then
   echo "error: extension.toml not found at ${EXT_TOML}" >&2
@@ -39,6 +40,8 @@ fi
 
 (cd "${EXT_DIR}" && cargo build)
 (cd "${EXT_DIR}" && ./compile-grammar.sh)
+
+rm -rf "${TRANSIENT_GRAMMAR_CHECKOUT}"
 
 mkdir -p "${INSTALL_DIR}"
 rsync -a --delete \

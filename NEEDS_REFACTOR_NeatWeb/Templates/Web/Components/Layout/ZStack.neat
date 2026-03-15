@@ -1,10 +1,15 @@
 #ZStack: Component {
-  @body -> Renderable
+  value alignment: Alignment = .center
+  derived body: Renderable
 }
 
 extension ZStack {
   value web: WebNode = WebNode.element(
     tag: "div",
-    classes: ["zstack"]
+    classes: ["zstack"],
+    attributes: [
+      "data-align-horizontal": "\(alignment.horizontal)",
+      "data-align-vertical": "\(alignment.vertical)"
+    ]
   )
 }

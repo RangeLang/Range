@@ -42,9 +42,21 @@ public struct MainJavaScriptGenerator {
                 let targetName = valueExpressions[name] ?? name
                 return
                     "\(targetName).value = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+            case .environment(let name):
+                return generateEnvironmentAssignment(
+                    alias: valueExpressions[name] ?? name,
+                    expression: expression,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: context
+                )
             case .local(let name):
                 return
                     "\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+            case .member(let name):
+                return
+                    "self.\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
             }
         case .compoundAssignment(let target, .plusEquals, let expression):
             switch target {
@@ -55,9 +67,21 @@ public struct MainJavaScriptGenerator {
                 let targetName = valueExpressions[name] ?? name
                 return
                     "\(targetName).value = \(targetName).value + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+            case .environment(let name):
+                return generateEnvironmentCompoundAssignment(
+                    alias: valueExpressions[name] ?? name,
+                    expression: expression,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: context
+                )
             case .local(let name):
                 return
                     "\(name) = \(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+            case .member(let name):
+                return
+                    "self.\(name) = self.\(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
             }
         case .forEach(let name, let sequence, let body):
             let sequenceValue = generateExpression(
@@ -140,6 +164,50 @@ public struct MainJavaScriptGenerator {
             return
                 "console.log(`\(generateInterpolatedString(message, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context))`);"
         }
+    }
+
+    private func generateEnvironmentAssignment(
+        alias: String,
+        expression: Expression,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
+        context: JSMainContext
+    ) -> String {
+        let rendered = generateExpression(
+            expression,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: valueExpressions,
+            context: context
+        )
+        if alias.hasSuffix("()") {
+            let base = String(alias.dropLast(2))
+            return "\(base).set(\(rendered));"
+        }
+        return "\(alias) = \(rendered);"
+    }
+
+    private func generateEnvironmentCompoundAssignment(
+        alias: String,
+        expression: Expression,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
+        context: JSMainContext
+    ) -> String {
+        let rendered = generateExpression(
+            expression,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: valueExpressions,
+            context: context
+        )
+        if alias.hasSuffix("()") {
+            let base = String(alias.dropLast(2))
+            return "\(base).set(\(base)() + \(rendered));"
+        }
+        return "\(alias) = \(alias) + \(rendered);"
     }
 
     private func generateConditionalStatement(

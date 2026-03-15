@@ -12,7 +12,9 @@
   "func"
   "protocol"
   "state"
+  "environment"
   "binding"
+  "derived"
   "value"
   "var"
 ] @keyword
@@ -43,6 +45,7 @@
 
 ; ── Declarations ─────────────────────────────────────────────────────────────
 (sigiled_declaration
+  "#" @type.definition
   name: (type_identifier) @type.definition)
 
 (sigiled_declaration
@@ -51,14 +54,17 @@
 (callable_declaration
   name: (identifier) @function.method)
 
+(derived_declaration
+  name: (identifier) @property)
+
 (enum_declaration
-  name: (type_identifier) @type)
+  name: (type_identifier) @type.definition)
 
 (extension_declaration
   type: (type_identifier) @type)
 
 (protocol_declaration
-  name: (type_identifier) @type)
+  name: (type_identifier) @type.definition)
 
 (function_declaration
   name: (identifier) @function)
@@ -102,9 +108,11 @@
 (type_identifier) @type
 
 ; ── Literals ─────────────────────────────────────────────────────────────────
-(string_literal) @string
+(string_content) @string
 (escape_sequence) @string.escape
-(interpolation) @embedded
+(interpolation
+  "\\(" @string.escape
+  ")" @string.escape)
 (integer_literal) @number
 (float_literal) @number.float
 (boolean_literal) @boolean

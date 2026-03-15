@@ -1,0 +1,12 @@
+#HomePage: Page {
+
+  derived head: Head {
+    Meta.title("Home Page")
+    Meta.description("Home Page Description")
+  }
+
+
+  derived body: Renderable {
+    Text("Home Page")
+  }
+}

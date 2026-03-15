@@ -7,7 +7,9 @@ enum NeatSyntax {
         case value = "value"
         case constant = "let"
         case state = "state"
+        case environment = "environment"
         case binding = "binding"
+        case derived = "derived"
         case typeExtension = "extension"
         case projection = "on"
         case forLoop = "for"
@@ -47,5 +49,14 @@ enum NeatSyntax {
 extension NeatSyntax.Keyword: CaseIterable {}
 
 extension BuiltinType {
-    static let supportedNames: [String] = ["Int", "String", "Bool", "Dictionary", "Set", "Void"]
+    static let supportedNames: [String] = [
+        "Int",
+        "Double",
+        "Float",
+        "String",
+        "Bool",
+        "Dictionary",
+        "Set",
+        "Void",
+    ]
 }

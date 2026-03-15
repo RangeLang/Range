@@ -1,20 +1,4 @@
 #App {
-  @head -> Head
-  @routes -> Routes
-}
-
-
-#MyApp: App {
-
-  @head -> Head {
-    Meta.title("My Neat App")
-    Meta.description("Very Neat!")
-    Stylesheet("./index.css")
-  }
-
-  @routes -> Routes {
-    Route("/") {
-      Route("dashboard")
-    }
-  }
+  derived head: Head
+  derived routes: Route
 }

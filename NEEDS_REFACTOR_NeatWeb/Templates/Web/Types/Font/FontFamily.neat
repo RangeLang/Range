@@ -1,0 +1,8 @@
+#FontFamily {
+  value name: String
+  value url: String?
+}
+
+extension FontFamily {
+  value system: FontFamily = FontFamily(name: "system-ui")
+}

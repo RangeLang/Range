@@ -1,0 +1,5 @@
+#HorizontalAlignment {
+  case leading
+  case center
+  case trailing
+}

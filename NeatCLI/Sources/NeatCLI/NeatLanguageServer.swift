@@ -343,7 +343,7 @@ struct NeatLanguageServer {
     private func diagnosticPayload(for text: String, index: DocumentIndex) -> [[String: Any]] {
         do {
             var parser = try Parser(source: text)
-            _ = try parser.parseDeclaration()
+            _ = try parser.parseSourceFile()
             return []
         } catch {
             let fallbackRange = index.firstNonWhitespaceRange ?? index.fullDocumentRange
@@ -383,7 +383,7 @@ struct NeatLanguageServer {
 
     private func keywordCompletions() -> [[String: Any]] {
         [
-            "case", "extension", "state", "switch", "value",
+            "case", "derived", "environment", "extension", "state", "switch", "value",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
 
@@ -710,6 +710,19 @@ private struct DocumentIndex {
                 continue
             }
 
+            if let match = firstMatch(
+                in: line,
+                pattern: #"\bderived\s+([a-z_][A-Za-z0-9_]*)\s*:\s*([A-Z][A-Za-z0-9_.]*)"#
+            ) {
+                let name = match[1]
+                let symbolRange = range(in: line, line: lineIndex, value: name)
+                symbols.append(
+                    Symbol(
+                        name: name, kind: .variable, detail: "derived \(match[2])", uri: uri,
+                        range: symbolRange, selectionRange: symbolRange))
+                continue
+            }
+
             if let match = firstMatch(in: line, pattern: #"\bextension\s+([A-Z][A-Za-z0-9_]*)"#) {
                 let name = match[1]
                 let symbolRange = range(in: line, line: lineIndex, value: name)
@@ -731,19 +744,19 @@ private struct DocumentIndex {
             }
 
             if let match = firstMatch(
-                in: line, pattern: #"\bstate\s+([a-z_][A-Za-z0-9_]*)"#)
+                in: line, pattern: #"\b(environment\s+state|state)\s+([a-z_][A-Za-z0-9_]*)"#)
             {
-                let name = match[1]
+                let name = match[2]
                 let symbolRange = range(in: line, line: lineIndex, value: name)
                 symbols.append(
                     Symbol(
-                        name: name, kind: .state, detail: "state", uri: uri, range: symbolRange,
+                        name: name, kind: .state, detail: match[1], uri: uri, range: symbolRange,
                         selectionRange: symbolRange))
                 continue
             }
 
             if let match = firstMatch(
-                in: line, pattern: #"\b(value|state)\s+([a-z_][A-Za-z0-9_]*)"#)
+                in: line, pattern: #"\b(value|environment|derived)\s+([a-z_][A-Za-z0-9_]*)"#)
             {
                 let name = match[2]
                 let symbolRange = range(in: line, line: lineIndex, value: name)

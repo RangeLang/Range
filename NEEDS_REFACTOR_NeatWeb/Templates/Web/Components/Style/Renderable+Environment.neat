@@ -1,0 +1,9 @@
+
+extension Renderable {
+  @environment(color: Color) -> Renderable {
+    return self.webStyles.append(
+      WebStyle(attribute: "background", value: "\(color)")
+    )
+
+  }
+}

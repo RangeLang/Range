@@ -13,6 +13,7 @@ public struct EntityLowerer {
                 hasBody: declaration.body != nil
             ),
             states: declaration.states.map(lowerState),
+            environments: declaration.environments.map(lowerEnvironment),
             attachments: declaration.objects.map(lowerAttachment),
             body: declaration.body
         )
@@ -28,6 +29,7 @@ public struct EntityLowerer {
                 hasBody: true
             ),
             states: component.states.map(lowerState),
+            environments: component.environments.map(lowerEnvironment),
             attachments: component.objects.map(lowerAttachment),
             body: component.body
         )
@@ -68,6 +70,14 @@ public struct EntityLowerer {
             name: state.name,
             type: state.type,
             storage: state.storage
+        )
+    }
+
+    private func lowerEnvironment(_ environment: EnvironmentDeclaration) -> EntityEnvironmentField {
+        EntityEnvironmentField(
+            isState: environment.isState,
+            name: environment.name,
+            typeName: environment.typeName
         )
     }
 

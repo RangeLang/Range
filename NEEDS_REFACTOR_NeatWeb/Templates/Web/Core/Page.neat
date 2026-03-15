@@ -1,0 +1,4 @@
+#Page {
+  derived head: Head?
+  derived body: Renderable
+}

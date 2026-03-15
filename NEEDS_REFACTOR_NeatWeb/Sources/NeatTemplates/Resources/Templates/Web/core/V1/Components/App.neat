@@ -1,4 +1,0 @@
-#App {
-  var head: Head {}
-  var routes: Routes {}
-}

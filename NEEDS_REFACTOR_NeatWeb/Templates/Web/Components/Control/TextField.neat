@@ -1,6 +1,6 @@
 #TextField: Primitive {
   binding text _: String
-  value placeholder placeholder: String?
+  value placeholder: String?
 
   value web: WebNode = WebNode.element(
     tag: "input",

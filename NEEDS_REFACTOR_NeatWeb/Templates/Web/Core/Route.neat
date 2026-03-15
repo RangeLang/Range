@@ -1,0 +1,6 @@
+#Route {
+  value path _: String
+  value page _: Page?
+
+  derived subroutes: Route
+}

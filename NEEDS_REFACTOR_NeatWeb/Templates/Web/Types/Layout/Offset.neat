@@ -1,0 +1,4 @@
+#Offset {
+  value x: Int
+  value y: Int
+}

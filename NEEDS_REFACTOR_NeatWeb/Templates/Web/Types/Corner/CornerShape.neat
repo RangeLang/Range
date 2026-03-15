@@ -1,0 +1,9 @@
+#CornerShape {
+  case round
+  case square
+  case bevel
+  case notch
+  case scoop
+  case squircle
+  case superellipse(value: Double)
+}

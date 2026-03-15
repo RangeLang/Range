@@ -56,7 +56,15 @@ struct MainProgramRunner {
         switch sourceFile {
         case .mainBlock(let block):
             mainBlock = block
+        case .extensions:
+            throw ValidationError(
+                "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
+            )
         case .declaration:
+            throw ValidationError(
+                "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
+            )
+        case .module:
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )
@@ -717,6 +725,11 @@ private struct MainProgramInterpreter {
                 "Binding assignment is not supported in the main-program interpreter yet (\(name))."
             )
 
+        case .environment(let name):
+            throw ValidationError(
+                "Environment-state assignment is not supported in the main-program interpreter yet (\(name))."
+            )
+
         case .member(let name):
             throw ValidationError(
                 "Member assignment is not supported in the main-program interpreter yet (self.\(name))."
@@ -739,6 +752,11 @@ private struct MainProgramInterpreter {
         case .binding(let name):
             throw ValidationError(
                 "Binding reads are not supported in the main-program interpreter yet (\(name)).")
+
+        case .environment(let name):
+            throw ValidationError(
+                "Environment-state reads are not supported in the main-program interpreter yet (\(name))."
+            )
 
         case .member(let name):
             throw ValidationError(

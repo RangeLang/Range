@@ -17,7 +17,10 @@ public struct Parser {
     var currentStateNames: Set<String> = []
     var currentMutableStateNames: Set<String> = []
     var currentStateTypes: [String: BuiltinType] = [:]
+    var currentEnvironmentTypes: [String: BuiltinType] = [:]
     var currentBindingNames: Set<String> = []
+    var currentEnvironmentNames: Set<String> = []
+    var currentMutableEnvironmentNames: Set<String> = []
 
     public init(source: String) throws {
         var lexer = Lexer(source: source)
@@ -28,7 +31,51 @@ public struct Parser {
         if isMainBlockStart() {
             return .mainBlock(try parseMainBlock())
         }
-        return .declaration(try parseDeclaration())
+
+        currentStateTypes = [:]
+
+        var topLevelStates: [StateDeclaration] = []
+        var declarations: [DeclarationNode] = []
+        var extensions: [TypeExtensionDeclaration] = []
+
+        while peek() != .eof {
+            if peek() == .keyword(NeatSyntax.Keyword.typeExtension.rawValue) {
+                extensions.append(try parseTypeExtensionDeclaration())
+                continue
+            }
+
+            if peek() == .keyword(NeatSyntax.Keyword.state.rawValue) {
+                let state = try parseState()
+                topLevelStates.append(state)
+                currentStateTypes[state.name] = state.type
+                continue
+            }
+
+            if NeatSyntax.declarationKind(for: peek()) != nil {
+                declarations.append(try parseDeclaration(requiresEOF: false))
+                continue
+            }
+
+            throw ParseError("Expected top-level state, extension, or declaration.")
+        }
+
+        try consume(.eof)
+
+        if topLevelStates.isEmpty, declarations.count == 1, extensions.isEmpty {
+            return .declaration(declarations[0])
+        }
+
+        if topLevelStates.isEmpty, declarations.isEmpty, !extensions.isEmpty {
+            return .extensions(extensions)
+        }
+
+        return .module(
+            ModuleFileNode(
+                states: topLevelStates,
+                declarations: declarations,
+                extensions: extensions
+            )
+        )
     }
 
     public mutating func parseComponent() throws -> ComponentNode {
@@ -45,7 +92,9 @@ public struct Parser {
             projectionTarget: declaration.projectionTarget,
             cases: declaration.cases,
             states: declaration.states,
+            environments: declaration.environments,
             bindings: declaration.bindings,
+            deriveds: declaration.deriveds,
             members: declaration.members,
             initializers: declaration.initializers,
             callables: declaration.callables,

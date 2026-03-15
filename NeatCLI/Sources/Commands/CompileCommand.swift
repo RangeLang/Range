@@ -57,11 +57,7 @@ extension NeatCLI {
                     throw ValidationError("No .neat source files found in \(projectRoot.path)")
                 }
 
-                try ProjectSourceValidator.validatePrimaryDeclarations(in: files)
-
-                for file in files {
-                    try validateFile(at: file)
-                }
+                try ProjectSourceValidator.validateFiles(files)
 
                 TerminalLog.out("Validated \(files.count) Neat source file(s).", level: .success)
                 return
@@ -79,9 +75,7 @@ extension NeatCLI {
                 _ = try PackageManifestLoader.load(from: fileURL)
                 return
             }
-            let source = try String(contentsOf: fileURL, encoding: .utf8)
-            var parser = try Parser(source: source)
-            _ = try parser.parseSourceFile()
+            try ProjectSourceValidator.validateFiles([fileURL])
         }
 
         private func neatFiles(in root: URL, excludingManifestAt manifestURL: URL) throws -> [URL] {

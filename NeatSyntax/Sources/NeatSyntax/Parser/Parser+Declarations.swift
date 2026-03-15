@@ -18,7 +18,7 @@ extension Parser {
         return MainBlockNode(body: body)
     }
 
-    public mutating func parseDeclaration() throws -> DeclarationNode {
+    public mutating func parseDeclaration(requiresEOF: Bool = true) throws -> DeclarationNode {
         var objects: [ObjectType] = []
         while true {
             switch peek() {
@@ -45,8 +45,10 @@ extension Parser {
         let projectionTarget = header.projectionTarget
 
         var states: [StateDeclaration] = []
+        var environments: [EnvironmentDeclaration] = []
         var cases: [EnumCaseDeclaration] = []
         var bindings: [BindingDeclaration] = []
+        var deriveds: [DerivedDeclaration] = []
         var members: [MemberDeclaration] = []
         var initializers: [InitializerDeclaration] = []
         var callables: [CallableDeclaration] = []
@@ -55,14 +57,23 @@ extension Parser {
         if peek() == .leftBrace {
             try consume(.leftBrace)
 
-            currentStateTypes = [:]
+            let outerStateTypes = currentStateTypes
+            let outerEnvironmentTypes = currentEnvironmentTypes
+            currentStateTypes = outerStateTypes
+            currentEnvironmentTypes = outerEnvironmentTypes
             while peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
+                || isEnvironmentDeclarationStart()
                 || isCaseDeclarationStart() || isBindingDeclarationStart()
+                || isDerivedDeclarationStart()
                 || isMemberDeclarationStart()
                 || isInitializerDeclarationStart()
                 || isCallableStart()
             {
-                currentBindingNames = Set(bindings.map(\.name))
+                syncCurrentDeclarationSymbols(
+                    states: states,
+                    environments: environments,
+                    bindings: bindings
+                )
                 if isBodyMemberStart() {
                     break
                 }
@@ -76,6 +87,18 @@ extension Parser {
                 }
                 if isBindingDeclarationStart() {
                     bindings.append(try parseBindingDeclaration())
+                    continue
+                }
+                if isDerivedDeclarationStart() {
+                    deriveds.append(try parseDerivedDeclaration())
+                    continue
+                }
+                if isEnvironmentDeclarationStart() {
+                    let environment = try parseEnvironmentDeclaration()
+                    environments.append(environment)
+                    if let builtinType = builtinType(from: environment.typeName) {
+                        currentEnvironmentTypes[environment.name] = builtinType
+                    }
                     continue
                 }
                 if isInitializerDeclarationStart() {
@@ -93,30 +116,28 @@ extension Parser {
             }
 
             if peek() != .rightBrace, !isMemberDeclarationStart() || isBodyMemberStart() {
-                currentStateNames = Set(states.map(\.name))
-                currentMutableStateNames = Set(
-                    states.compactMap { state in
-                        if case .stored = state.storage { return state.name }
-                        return nil
-                    })
-                currentBindingNames = Set(bindings.map(\.name))
+                syncCurrentDeclarationSymbols(
+                    states: states,
+                    environments: environments,
+                    bindings: bindings
+                )
                 body = try parseDeclarationBody()
-                currentStateNames = []
-                currentMutableStateNames = []
-                currentBindingNames = []
+                clearCurrentDeclarationSymbols()
             }
 
-            currentStateTypes = [:]
-            currentMutableStateNames = []
-            currentBindingNames = []
+            currentStateTypes = outerStateTypes
+            currentEnvironmentTypes = outerEnvironmentTypes
+            clearCurrentDeclarationSymbols()
 
             try consume(.rightBrace)
         }
 
-        try consume(.eof)
+        if requiresEOF {
+            try consume(.eof)
+        }
 
         try validateCallableDeclarations(callables)
-        try validateInitializerDeclarations(initializers, availableCallables: callables)
+        try validateInitializerDeclarations(initializers, availableDeriveds: deriveds)
 
         return DeclarationNode(
             kind: kind,
@@ -127,7 +148,9 @@ extension Parser {
             objects: objects,
             cases: cases,
             states: states,
+            environments: environments,
             bindings: bindings,
+            deriveds: deriveds,
             members: members,
             initializers: initializers,
             callables: callables,
@@ -146,17 +169,18 @@ extension Parser {
         }
         advance()
         let hasExplicitParameterClause = peek() == .leftParen
-        let parameters = hasExplicitParameterClause ? try parseFunctionParameters() : []
+        guard hasExplicitParameterClause else {
+            throw ParseError(
+                "Callable declarations must declare an explicit parameter clause. Use derived \(name): Type for produced values."
+            )
+        }
+        let parameters = try parseFunctionParameters()
         let returnTypeName: String?
         if peek() == .arrow {
             try consume(.arrow)
             returnTypeName = try consumeTypeReference()
         } else {
             returnTypeName = nil
-        }
-        guard !parameters.isEmpty || returnTypeName != nil else {
-            throw ParseError(
-                "Callable declarations without parameters must declare an explicit return type.")
         }
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
@@ -329,7 +353,7 @@ extension Parser {
                 } else {
                     inferredType = try inferType(
                         of: initialValue,
-                        stateTypes: currentStateTypes
+                        accessibleTypes: accessibleBuiltinTypes()
                     )
                 }
             }
@@ -345,13 +369,29 @@ extension Parser {
             throw ParseError("state '\(name)' requires either `= expression` or a block body.")
         }
 
-        if let explicitType, explicitType != inferredType {
+        if let explicitType, !isCompatibleStateType(explicitType, inferredType: inferredType) {
             throw ParseError(
                 "state '\(name)' expects \(explicitType.displayName), got \(inferredType.displayName)."
             )
         }
         return StateDeclaration(
             name: name, type: explicitType ?? inferredType, storage: storage)
+    }
+
+    func accessibleBuiltinTypes() -> [String: BuiltinType] {
+        currentStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
+    }
+
+    func isCompatibleStateType(_ explicitType: BuiltinType, inferredType: BuiltinType) -> Bool {
+        if explicitType == inferredType {
+            return true
+        }
+
+        if explicitType == .float && inferredType == .double {
+            return true
+        }
+
+        return false
     }
 
     mutating func parseDeclarationBody() throws -> ViewNode {
@@ -387,6 +427,30 @@ extension Parser {
         }
 
         return try parseLayout()
+    }
+
+    mutating func syncCurrentDeclarationSymbols(
+        states: [StateDeclaration],
+        environments: [EnvironmentDeclaration],
+        bindings: [BindingDeclaration]
+    ) {
+        currentStateNames = Set(states.map(\.name))
+        currentMutableStateNames = Set(
+            states.compactMap { state in
+                if case .stored = state.storage { return state.name }
+                return nil
+            })
+        currentEnvironmentNames = Set(environments.map(\.name))
+        currentMutableEnvironmentNames = Set(environments.filter(\.isState).map(\.name))
+        currentBindingNames = Set(bindings.map(\.name))
+    }
+
+    mutating func clearCurrentDeclarationSymbols() {
+        currentStateNames = []
+        currentMutableStateNames = []
+        currentEnvironmentNames = []
+        currentMutableEnvironmentNames = []
+        currentBindingNames = []
     }
 
     mutating func parseDeclarationKind(attribute: AttributeApplication?) throws -> DeclarationKind {
@@ -502,6 +566,42 @@ extension Parser {
         )
     }
 
+    mutating func parseEnvironmentDeclaration() throws -> EnvironmentDeclaration {
+        try consumeKeyword(.environment)
+        let isStateAlias = peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
+        if isStateAlias {
+            try consumeKeyword(.state)
+        }
+        let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "environment")
+        try consume(.colon)
+        let typeName = try consumeTypeReference()
+        if peek() == .equal {
+            throw ParseError(
+                "Environment declarations do not take initializer expressions. Use the declared name to resolve from outer environment."
+            )
+        }
+        if peek() == .leftBrace {
+            try consume(.leftBrace)
+            try skipUnknownBlockBody()
+            try consume(.rightBrace)
+        }
+        return EnvironmentDeclaration(
+            isState: isStateAlias,
+            localName: localName,
+            externalLabel: externalLabel,
+            typeName: typeName
+        )
+    }
+
+    mutating func parseDerivedDeclaration() throws -> DerivedDeclaration {
+        try consumeKeyword(.derived)
+        let name = try consumeIdentifier()
+        try consume(.colon)
+        let typeName = try consumeTypeReference()
+        let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        return DerivedDeclaration(name: name, typeName: typeName, body: body)
+    }
+
     mutating func parseInitializerDeclaration() throws -> InitializerDeclaration {
         guard case .identifier(let name) = peek(), name == "init" else {
             throw ParseError("Expected initializer declaration.")
@@ -582,6 +682,34 @@ extension Parser {
         }()
     }
 
+    func isEnvironmentDeclarationStart() -> Bool {
+        guard peek() == .keyword(NeatSyntax.Keyword.environment.rawValue) else {
+            return false
+        }
+        let nameOffset: Int
+        if peek(offset: 1) == .keyword(NeatSyntax.Keyword.state.rawValue) {
+            nameOffset = 2
+        } else {
+            nameOffset = 1
+        }
+        guard case .identifier = peek(offset: nameOffset) else { return false }
+        if peek(offset: nameOffset + 1) == .colon {
+            return true
+        }
+        return {
+            guard case .identifier = peek(offset: nameOffset + 1) else { return false }
+            return peek(offset: nameOffset + 2) == .colon
+        }()
+    }
+
+    func isDerivedDeclarationStart() -> Bool {
+        guard peek() == .keyword(NeatSyntax.Keyword.derived.rawValue) else {
+            return false
+        }
+        guard case .identifier = peek(offset: 1) else { return false }
+        return peek(offset: 2) == .colon
+    }
+
     func isInitializerDeclarationStart() -> Bool {
         guard case .identifier(let name) = peek(), name == "init" else {
             return false
@@ -631,16 +759,9 @@ extension Parser {
 
     func validateInitializerDeclarations(
         _ initializers: [InitializerDeclaration],
-        availableCallables: [CallableDeclaration]
+        availableDeriveds: [DerivedDeclaration]
     ) throws {
-        let availableSlotNames = Set<String>(
-            availableCallables.compactMap { callable in
-                guard callable.parameters.isEmpty, callable.returnTypeName != nil else {
-                    return nil
-                }
-                return callable.name
-            }
-        )
+        let availableSlotNames = Set(availableDeriveds.map(\.name))
 
         var seen: Set<String> = []
         for initializer in initializers {

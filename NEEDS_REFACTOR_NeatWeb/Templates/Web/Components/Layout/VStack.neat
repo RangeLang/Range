@@ -1,10 +1,16 @@
 #VStack: Component {
-  @body -> Renderable
+  value alignment: HorizontalAlignment = .center
+  value spacing: Double? = nil
+  derived body: Renderable
 }
 
 extension VStack {
   value web: WebNode = WebNode.element(
     tag: "div",
-    classes: ["vstack"]
+    classes: ["stack", "axis-vertical"],
+    styles: ["--stack-gap": "\(spacing ?? 0)"],
+    attributes: [
+      "data-align": "\(alignment)"
+    ]
   )
 }

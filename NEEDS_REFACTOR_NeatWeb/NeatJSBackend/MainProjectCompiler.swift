@@ -31,7 +31,15 @@ public struct MainProjectCompiler {
         switch try parser.parseSourceFile() {
         case .mainBlock(let mainBlock):
             compiled = MainJavaScriptGenerator().generate(mainBlock: mainBlock)
+        case .extensions:
+            throw ValidationError(
+                "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
+            )
         case .declaration:
+            throw ValidationError(
+                "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
+            )
+        case .module:
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )

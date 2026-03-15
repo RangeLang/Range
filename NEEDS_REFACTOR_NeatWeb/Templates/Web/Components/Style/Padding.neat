@@ -1,0 +1,52 @@
+extension Renderable {
+  @padding(value _: Double) -> Renderable {
+    self.webStyles.append(
+      WebStyle(attribute: "padding", value: "\(value)")
+    )
+    return self
+  }
+
+  @padding(edges _: EdgeSet, value _: Double) -> Renderable {
+    if edges == .all {
+      self.webStyles.append(WebStyle(attribute: "padding-top", value: "\(value)"))
+      self.webStyles.append(WebStyle(attribute: "padding-left", value: "\(value)"))
+      self.webStyles.append(WebStyle(attribute: "padding-bottom", value: "\(value)"))
+      self.webStyles.append(WebStyle(attribute: "padding-right", value: "\(value)"))
+      return self
+    }
+
+    if edges == .horizontal {
+      self.webStyles.append(WebStyle(attribute: "padding-left", value: "\(value)"))
+      self.webStyles.append(WebStyle(attribute: "padding-right", value: "\(value)"))
+      return self
+    }
+
+    if edges == .vertical {
+      self.webStyles.append(WebStyle(attribute: "padding-top", value: "\(value)"))
+      self.webStyles.append(WebStyle(attribute: "padding-bottom", value: "\(value)"))
+      return self
+    }
+
+    if edges == .top {
+      self.webStyles.append(WebStyle(attribute: "padding-top", value: "\(value)"))
+      return self
+    }
+
+    if edges == .leading {
+      self.webStyles.append(WebStyle(attribute: "padding-left", value: "\(value)"))
+      return self
+    }
+
+    if edges == .bottom {
+      self.webStyles.append(WebStyle(attribute: "padding-bottom", value: "\(value)"))
+      return self
+    }
+
+    if edges == .trailing {
+      self.webStyles.append(WebStyle(attribute: "padding-right", value: "\(value)"))
+      return self
+    }
+
+    return self
+  }
+}

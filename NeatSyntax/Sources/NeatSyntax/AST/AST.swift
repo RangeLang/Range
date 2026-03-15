@@ -8,10 +8,18 @@ public enum DeclarationKind {
 public enum SourceFileNode {
     case declaration(DeclarationNode)
     case mainBlock(MainBlockNode)
+    case extensions([TypeExtensionDeclaration])
+    case module(ModuleFileNode)
 }
 
 public struct MainBlockNode {
     public let body: [Statement]
+}
+
+public struct ModuleFileNode {
+    public let states: [StateDeclaration]
+    public let declarations: [DeclarationNode]
+    public let extensions: [TypeExtensionDeclaration]
 }
 
 public enum ObjectType {
@@ -27,7 +35,9 @@ public struct DeclarationNode {
     public let objects: [ObjectType]
     public let cases: [EnumCaseDeclaration]
     public let states: [StateDeclaration]
+    public let environments: [EnvironmentDeclaration]
     public let bindings: [BindingDeclaration]
+    public let deriveds: [DerivedDeclaration]
     public let members: [MemberDeclaration]
     public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
@@ -52,7 +62,9 @@ public struct ComponentNode {
     public let projectionTarget: String?
     public let cases: [EnumCaseDeclaration]
     public let states: [StateDeclaration]
+    public let environments: [EnvironmentDeclaration]
     public let bindings: [BindingDeclaration]
+    public let deriveds: [DerivedDeclaration]
     public let members: [MemberDeclaration]
     public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
@@ -103,6 +115,12 @@ public struct CallableDeclaration {
     public let body: [Statement]?
 }
 
+public struct DerivedDeclaration {
+    public let name: String
+    public let typeName: String
+    public let body: [Statement]?
+}
+
 public struct InitializerDeclaration {
     public let parameters: [NeatFunctionParameter]
     public let body: [Statement]?
@@ -139,6 +157,17 @@ public struct BindingDeclaration {
     }
 }
 
+public struct EnvironmentDeclaration {
+    public let isState: Bool
+    public let localName: String
+    public let externalLabel: String?
+    public let typeName: String
+
+    public var name: String {
+        localName
+    }
+}
+
 public struct StateDeclaration {
     public let name: String
     public let type: BuiltinType
@@ -157,6 +186,8 @@ public enum BindingStorage {
 
 public indirect enum BuiltinType: Equatable {
     case int
+    case double
+    case float
     case string
     case bool
     case dictionary
@@ -169,6 +200,10 @@ public indirect enum BuiltinType: Equatable {
         switch self {
         case .int:
             return "Int"
+        case .double:
+            return "Double"
+        case .float:
+            return "Float"
         case .string:
             return "String"
         case .bool:
@@ -285,6 +320,7 @@ public enum LocalBindingKind {
 public enum AssignmentTarget {
     case state(String)
     case binding(String)
+    case environment(String)
     case local(String)
     case member(String)
 }

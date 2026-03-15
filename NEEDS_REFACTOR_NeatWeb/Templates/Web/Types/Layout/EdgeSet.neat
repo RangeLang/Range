@@ -1,0 +1,9 @@
+#EdgeSet {
+  case top
+  case leading
+  case bottom
+  case trailing
+  case all
+  case horizontal
+  case vertical
+}

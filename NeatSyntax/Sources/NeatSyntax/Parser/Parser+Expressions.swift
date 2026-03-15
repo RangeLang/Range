@@ -263,6 +263,10 @@ extension Parser {
         switch raw {
         case "Int":
             return .int
+        case "Double":
+            return .double
+        case "Float":
+            return .float
         case "String":
             return .string
         case "Bool":
@@ -290,14 +294,13 @@ extension Parser {
 
     func inferType(
         of expression: Expression,
-        stateTypes: [String: BuiltinType]
+        accessibleTypes: [String: BuiltinType]
     ) throws -> BuiltinType {
         switch expression {
         case .integer:
             return .int
         case .double:
-            throw ParseError(
-                "Floating-point type inference is not supported in state initializers yet.")
+            return .double
         case .string:
             return .string
         case .interpolatedString:
@@ -307,7 +310,7 @@ extension Parser {
         case .none:
             return .none
         case .identifier(let name):
-            guard let type = stateTypes[name] else {
+            guard let type = accessibleTypes[name] else {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
             return type
@@ -322,13 +325,13 @@ extension Parser {
             throw ParseError(
                 "Dictionary type inference is not supported in state initializers yet.")
         case .ternary(let condition, let trueExpression, let falseExpression):
-            let conditionType = try inferType(of: condition, stateTypes: stateTypes)
+            let conditionType = try inferType(of: condition, accessibleTypes: accessibleTypes)
             guard conditionType == .bool else {
                 throw ParseError(
                     "Ternary condition must be Bool, got \(conditionType.displayName).")
             }
-            let trueType = try inferType(of: trueExpression, stateTypes: stateTypes)
-            let falseType = try inferType(of: falseExpression, stateTypes: stateTypes)
+            let trueType = try inferType(of: trueExpression, accessibleTypes: accessibleTypes)
+            let falseType = try inferType(of: falseExpression, accessibleTypes: accessibleTypes)
             if trueType == .none, falseType.isOptional {
                 return falseType
             }
@@ -342,7 +345,7 @@ extension Parser {
             }
             return trueType
         case .unary(let operatorSymbol, let nested):
-            let nestedType = try inferType(of: nested, stateTypes: stateTypes)
+            let nestedType = try inferType(of: nested, accessibleTypes: accessibleTypes)
             switch operatorSymbol {
             case .not:
                 guard nestedType == .bool else {
@@ -351,21 +354,41 @@ extension Parser {
                 return .bool
             }
         case .binary(let lhs, let operatorSymbol, let rhs):
-            let lhsType = try inferType(of: lhs, stateTypes: stateTypes)
-            let rhsType = try inferType(of: rhs, stateTypes: stateTypes)
+            let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
+            let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
 
             switch operatorSymbol {
             case .addition:
-                guard lhsType == rhsType else {
-                    throw ParseError(
-                        "Type mismatch in '+': \(lhsType.displayName) and \(rhsType.displayName).")
+                if lhsType == .string && rhsType == .string {
+                    return .string
                 }
-                guard lhsType == .int || lhsType == .string else {
-                    throw ParseError(
-                        "Operator '+' is only supported for Int and String, got \(lhsType.displayName)."
-                    )
+                if lhsType == .int && rhsType == .int {
+                    return .int
                 }
-                return lhsType
+                if lhsType == .double && rhsType == .double {
+                    return .double
+                }
+                if (lhsType == .int && rhsType == .double)
+                    || (lhsType == .double && rhsType == .int)
+                {
+                    return .double
+                }
+                if lhsType == .float && rhsType == .float {
+                    return .float
+                }
+                if (lhsType == .float && rhsType == .int)
+                    || (lhsType == .int && rhsType == .float)
+                {
+                    return .float
+                }
+                if (lhsType == .float && rhsType == .double)
+                    || (lhsType == .double && rhsType == .float)
+                {
+                    return .double
+                }
+                throw ParseError(
+                    "Operator '+' is only supported for Int, Float, Double, and String, got \(lhsType.displayName) and \(rhsType.displayName)."
+                )
             case .nilCoalescing:
                 if lhsType == .none {
                     return rhsType
@@ -401,9 +424,12 @@ extension Parser {
                 }
                 return .bool
             case .less, .lessEqual, .greater, .greaterEqual:
-                guard lhsType == .int, rhsType == .int else {
+                let isNumericComparison =
+                    (lhsType == .int || lhsType == .float || lhsType == .double)
+                    && (rhsType == .int || rhsType == .float || rhsType == .double)
+                guard isNumericComparison else {
                     throw ParseError(
-                        "Operator '\(operatorSymbol.rawValue)' is only supported for Int."
+                        "Operator '\(operatorSymbol.rawValue)' is only supported for Int, Float, and Double."
                     )
                 }
                 return .bool

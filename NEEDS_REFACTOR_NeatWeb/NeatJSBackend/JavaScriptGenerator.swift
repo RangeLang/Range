@@ -7,13 +7,26 @@ public struct JavaScriptGenerator {
     public func generate(component: ComponentNode) -> String {
         let stateNames = Set(component.states.map(\.name))
         let bindingNames = Set(component.bindings.map(\.name))
-        let stateLines = component.states.map { generateState($0, stateNames: stateNames) }.joined(
-            separator: "\n")
+        let environmentValueExpressions = buildEnvironmentValueExpressions(
+            component.environments,
+            stateNames: stateNames,
+            bindingNames: bindingNames
+        )
+        let stateLines = component.states.map {
+            generateState(
+                $0,
+                stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: environmentValueExpressions
+            )
+        }
+        .joined(separator: "\n")
         let bindingLines = component.bindings.compactMap {
             generateBinding(
                 $0,
                 stateNames: stateNames,
-                bindingNames: bindingNames
+                bindingNames: bindingNames,
+                valueExpressions: environmentValueExpressions
             )
         }.joined(separator: "\n")
         var renderButtonIndex = 0
@@ -23,15 +36,20 @@ public struct JavaScriptGenerator {
             buttonIndex: &renderButtonIndex,
             stateNames: stateNames,
             bindingNames: bindingNames,
-            valueExpressions: [:],
+            valueExpressions: environmentValueExpressions,
             localBindings: []
         )
-        let debugLogs = generateDebugLogs(component.body)
+        let debugLogs = generateDebugLogs(
+            component.body,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: environmentValueExpressions
+        )
         let handlers = generateHandlers(
             component.body,
             stateNames: stateNames,
             bindingNames: bindingNames,
-            valueExpressions: [:]
+            valueExpressions: environmentValueExpressions
         )
 
         var sections: [String] = []
@@ -61,6 +79,68 @@ public struct JavaScriptGenerator {
         return sections.joined(separator: "\n\n") + "\n"
     }
 
+    private func buildEnvironmentValueExpressions(
+        _ environments: [EnvironmentDeclaration],
+        stateNames: Set<String>,
+        bindingNames: Set<String>
+    ) -> [String: String] {
+        var valueExpressions: [String: String] = [:]
+
+        for environment in environments {
+            if environment.isState {
+                valueExpressions[environment.name] = "\(environment.name)()"
+            } else {
+                valueExpressions[environment.name] = environment.name
+            }
+        }
+
+        return valueExpressions
+    }
+
+    private func generateEnvironmentAssignment(
+        alias: String,
+        expression: Expression,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
+        context: JSHandlerContext
+    ) -> String {
+        let rendered = generateExpression(
+            expression,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: valueExpressions,
+            context: context
+        )
+        if alias.hasSuffix("()") {
+            let base = String(alias.dropLast(2))
+            return "\(base).set(\(rendered));"
+        }
+        return "\(alias) = \(rendered);"
+    }
+
+    private func generateEnvironmentCompoundAssignment(
+        alias: String,
+        expression: Expression,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String],
+        context: JSHandlerContext
+    ) -> String {
+        let rendered = generateExpression(
+            expression,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: valueExpressions,
+            context: context
+        )
+        if alias.hasSuffix("()") {
+            let base = String(alias.dropLast(2))
+            return "\(base).set(\(base)() + \(rendered));"
+        }
+        return "\(alias) = \(alias) + \(rendered);"
+    }
+
     private func runtimePrelude() -> String {
         """
         const __neatHandlers = new Map();
@@ -84,19 +164,24 @@ public struct JavaScriptGenerator {
         """
     }
 
-    private func generateState(_ state: StateDeclaration, stateNames: Set<String>) -> String {
+    private func generateState(
+        _ state: StateDeclaration,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String]
+    ) -> String {
         switch state.storage {
         case .stored(let expression):
             return
-                "const \(state.name) = state(\(generateExpression(expression, stateNames: stateNames, localBindings: [])));"
+                "const \(state.name) = state(\(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, localBindings: [])));"
         case .derived(let body):
             var context = JSHandlerContext()
             let statements = body.map {
                 generateStatement(
                     $0,
                     stateNames: stateNames,
-                    bindingNames: [],
-                    valueExpressions: [:],
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
                     context: &context
                 )
             }
@@ -112,7 +197,8 @@ public struct JavaScriptGenerator {
     private func generateBinding(
         _ binding: BindingDeclaration,
         stateNames: Set<String>,
-        bindingNames: Set<String>
+        bindingNames: Set<String>,
+        valueExpressions: [String: String]
     ) -> String? {
         switch binding.storage {
         case .plain:
@@ -124,7 +210,7 @@ public struct JavaScriptGenerator {
                     $0,
                     stateNames: stateNames,
                     bindingNames: bindingNames,
-                    valueExpressions: [:],
+                    valueExpressions: valueExpressions,
                     context: &getterContext
                 )
             }
@@ -136,7 +222,7 @@ public struct JavaScriptGenerator {
                     $0,
                     stateNames: stateNames,
                     bindingNames: bindingNames,
-                    valueExpressions: [:],
+                    valueExpressions: valueExpressions,
                     context: &setterContext
                 )
             }
@@ -399,9 +485,20 @@ public struct JavaScriptGenerator {
         return handlers
     }
 
-    private func generateDebugLogs(_ root: ViewNode) -> [String] {
+    private func generateDebugLogs(
+        _ root: ViewNode,
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String]
+    ) -> [String] {
         var logs: [String] = []
-        collectDebugLogs(view: root, logs: &logs)
+        collectDebugLogs(
+            view: root,
+            logs: &logs,
+            stateNames: stateNames,
+            bindingNames: bindingNames,
+            valueExpressions: valueExpressions
+        )
         return logs
     }
 
@@ -513,7 +610,13 @@ public struct JavaScriptGenerator {
         }
     }
 
-    private func collectDebugLogs(view: ViewNode, logs: inout [String]) {
+    private func collectDebugLogs(
+        view: ViewNode,
+        logs: inout [String],
+        stateNames: Set<String>,
+        bindingNames: Set<String>,
+        valueExpressions: [String: String]
+    ) {
         switch view {
         case .text:
             return
@@ -522,35 +625,73 @@ public struct JavaScriptGenerator {
         case .conditional(let branches):
             for branch in branches {
                 for child in branch.body {
-                    collectDebugLogs(view: child, logs: &logs)
+                    collectDebugLogs(
+                        view: child,
+                        logs: &logs,
+                        stateNames: stateNames,
+                        bindingNames: bindingNames,
+                        valueExpressions: valueExpressions
+                    )
                 }
             }
         case .forEach(_, _, let body):
             for child in body {
-                collectDebugLogs(view: child, logs: &logs)
+                collectDebugLogs(
+                    view: child,
+                    logs: &logs,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions
+                )
             }
             return
         case .component(_, _, let children):
             if let children {
                 for child in children {
-                    collectDebugLogs(view: child, logs: &logs)
+                    collectDebugLogs(
+                        view: child,
+                        logs: &logs,
+                        stateNames: stateNames,
+                        bindingNames: bindingNames,
+                        valueExpressions: valueExpressions
+                    )
                 }
             }
             return
         case .element(_, let children):
             for child in children {
-                collectDebugLogs(view: child, logs: &logs)
+                collectDebugLogs(
+                    view: child,
+                    logs: &logs,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions
+                )
             }
         case .slot:
             return
         case .vStack(let children):
             for child in children {
-                collectDebugLogs(view: child, logs: &logs)
+                collectDebugLogs(
+                    view: child,
+                    logs: &logs,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions
+                )
             }
         case .debugPrint(let message):
-            logs.append("console.log(`\(generateInterpolatedString(message, stateNames: []))`);")
+            logs.append(
+                "console.log(`\(generateInterpolatedString(message, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions))`);"
+            )
         case .modified(let base, _):
-            collectDebugLogs(view: base, logs: &logs)
+            collectDebugLogs(
+                view: base,
+                logs: &logs,
+                stateNames: stateNames,
+                bindingNames: bindingNames,
+                valueExpressions: valueExpressions
+            )
         }
     }
 
@@ -801,9 +942,21 @@ public struct JavaScriptGenerator {
                 let targetName = valueExpressions[name] ?? name
                 return
                     "\(targetName).value = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+            case .environment(let name):
+                return generateEnvironmentAssignment(
+                    alias: valueExpressions[name] ?? name,
+                    expression: expression,
+                    stateNames: stateNames,
+                    bindingNames: bindingNames,
+                    valueExpressions: valueExpressions,
+                    context: context
+                )
             case .local(let name):
                 return
                     "\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+            case .member(let name):
+                return
+                    "self.\(name) = \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
             }
         case .compoundAssignment(let target, let operatorSymbol, let expression):
             switch operatorSymbol {
@@ -816,9 +969,21 @@ public struct JavaScriptGenerator {
                     let targetName = valueExpressions[name] ?? name
                     return
                         "\(targetName).value = \(targetName).value + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                case .environment(let name):
+                    return generateEnvironmentCompoundAssignment(
+                        alias: valueExpressions[name] ?? name,
+                        expression: expression,
+                        stateNames: stateNames,
+                        bindingNames: bindingNames,
+                        valueExpressions: valueExpressions,
+                        context: context
+                    )
                 case .local(let name):
                     return
                         "\(name) = \(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
+                case .member(let name):
+                    return
+                        "self.\(name) = self.\(name) + \(generateExpression(expression, stateNames: stateNames, bindingNames: bindingNames, valueExpressions: valueExpressions, context: context));"
                 }
             }
         case .forEach(let name, let sequence, let body):

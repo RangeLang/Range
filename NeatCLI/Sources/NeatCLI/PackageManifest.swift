@@ -16,6 +16,10 @@ enum PackageManifestLoader {
         switch sourceFile {
         case .mainBlock:
             throw ValidationError("Package.neat must declare #Name: Package.")
+        case .extensions:
+            throw ValidationError("Package.neat must declare #Name: Package.")
+        case .module:
+            throw ValidationError("Package.neat must declare #Name: Package.")
         case .declaration(let declaration):
             guard declaration.attribute == nil else {
                 throw ValidationError("Package.neat cannot use declaration attributes.")

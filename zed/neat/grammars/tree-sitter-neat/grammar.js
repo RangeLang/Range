@@ -21,6 +21,7 @@ module.exports = grammar({
   conflicts: ($) => [
     [$.callable_declaration, $.expression],
     [$.callable_declaration],
+    [$.derived_declaration],
   ],
 
   rules: {
@@ -31,6 +32,7 @@ module.exports = grammar({
         $.main_block,
         $.sigiled_declaration,
         $.callable_declaration,
+        $.derived_declaration,
         $.protocol_declaration,
         $.extension_declaration,
         $.enum_declaration,
@@ -71,23 +73,20 @@ module.exports = grammar({
           field("parameters", $.callable_parameter_clause),
           optional(seq("->", field("return_type", $.type))),
         ),
+      ),
+
+    derived_declaration: ($) =>
+      choice(
         prec.right(
           seq(
-            optional(field("receiver", seq($.type_identifier, "@"))),
-            "@",
+            "derived",
             field("name", $.identifier),
-            "->",
-            field("return_type", $.type),
+            ":",
+            field("type", $.type),
             field("body", $.block),
           ),
         ),
-        seq(
-          optional(field("receiver", seq($.type_identifier, "@"))),
-          "@",
-          field("name", $.identifier),
-          "->",
-          field("return_type", $.type),
-        ),
+        seq("derived", field("name", $.identifier), ":", field("type", $.type)),
       ),
 
     extension_declaration: ($) =>
@@ -125,11 +124,19 @@ module.exports = grammar({
       ),
 
     variable_declaration: ($) =>
-      seq(
-        choice("state", "binding", "value"),
-        field("name", $.identifier),
-        optional(seq(":", field("type", $.type))),
-        optional(seq("=", field("value", $.expression))),
+      choice(
+        seq(
+          choice("state", "binding", "value"),
+          field("name", $.identifier),
+          optional(seq(":", field("type", $.type))),
+          optional(seq("=", field("value", $.expression))),
+        ),
+        seq(
+          "environment",
+          optional("state"),
+          field("name", $.identifier),
+          optional(seq(":", field("type", $.type))),
+        ),
       ),
 
     member_declaration: ($) =>
@@ -352,7 +359,7 @@ module.exports = grammar({
           PREC.nil_coalescing,
           seq(
             field("left", $.expression),
-            field("operator", "??"),
+            field("operator", token(prec(1, "??"))),
             field("right", $.expression),
           ),
         ),
@@ -448,7 +455,7 @@ module.exports = grammar({
         '"',
       ),
 
-    interpolation: ($) => seq("\\(", repeat(choice($.expression, /[^)]/)), ")"),
+    interpolation: ($) => seq("\\(", $.expression, ")"),
 
     string_content: (_) => token.immediate(/[^"\\]+/),
 

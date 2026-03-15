@@ -1,0 +1,51 @@
+#Alignment {
+  value horizontal: HorizontalAlignment
+  value vertical: VerticalAlignment
+}
+
+extension Alignment {
+  value center: Alignment = Alignment(
+    horizontal: .center,
+    vertical: .center
+  )
+
+  value topLeading: Alignment = Alignment(
+    horizontal: .leading,
+    vertical: .top
+  )
+
+  value top: Alignment = Alignment(
+    horizontal: .center,
+    vertical: .top
+  )
+
+  value topTrailing: Alignment = Alignment(
+    horizontal: .trailing,
+    vertical: .top
+  )
+
+  value leading: Alignment = Alignment(
+    horizontal: .leading,
+    vertical: .center
+  )
+
+  value trailing: Alignment = Alignment(
+    horizontal: .trailing,
+    vertical: .center
+  )
+
+  value bottomLeading: Alignment = Alignment(
+    horizontal: .leading,
+    vertical: .bottom
+  )
+
+  value bottom: Alignment = Alignment(
+    horizontal: .center,
+    vertical: .bottom
+  )
+
+  value bottomTrailing: Alignment = Alignment(
+    horizontal: .trailing,
+    vertical: .bottom
+  )
+}

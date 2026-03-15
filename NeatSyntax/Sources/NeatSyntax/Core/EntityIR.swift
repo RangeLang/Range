@@ -21,6 +21,12 @@ public struct EntityStateField {
     public let storage: StateStorage
 }
 
+public struct EntityEnvironmentField {
+    public let isState: Bool
+    public let name: String
+    public let typeName: String
+}
+
 public enum EntityAttachment {
     case typeExtension(TypeExtensionDeclaration)
 }
@@ -30,6 +36,7 @@ public struct EntityDefinition {
     public let identity: EntityIdentity
     public let capabilities: Set<EntityCapability>
     public let states: [EntityStateField]
+    public let environments: [EntityEnvironmentField]
     public let attachments: [EntityAttachment]
     public let body: ViewNode?
 }

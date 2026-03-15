@@ -1,7 +1,7 @@
 #Button: Component {
   value action: () -> Void
 
-  @body -> Renderable
+  derived body: Renderable
 
   init(content: @body, action: () -> Void) {
     self.action = action
