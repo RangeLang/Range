@@ -1,4 +1,6 @@
-construct NeatWebExample : App {
+
+
+construct NeatWebExample: App {
 
   derived head: Head {
     Meta.title("My Neat App")

@@ -102,6 +102,10 @@ extension Parser {
             try consume(.question)
             result += "?"
         }
+        if peek() == .ellipsis {
+            try consume(.ellipsis)
+            result += "..."
+        }
         return result
     }
 

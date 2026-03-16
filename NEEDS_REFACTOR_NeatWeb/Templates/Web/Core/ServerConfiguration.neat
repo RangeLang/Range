@@ -1,0 +1,6 @@
+construct ServerConfiguration {
+  value host: String = "127.0.0.1"
+  value port: Int = 3000
+  value actionPrefix: String = "/__neat/actions"
+  value assetPrefix: String = "/__neat"
+}

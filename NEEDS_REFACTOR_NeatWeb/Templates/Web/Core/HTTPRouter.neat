@@ -1,0 +1,45 @@
+construct HTTPRouter {
+  state routes: [HTTPRoute] = []
+
+  function register(route _: HTTPRoute) {
+    routes.append(route)
+  }
+
+  function handle(request _: HTTPRequest) -> HTTPResponse {
+    for route in routes {
+      if route.matches(request: request) {
+        return route.respond(request: request)
+      }
+    }
+
+    return HTTPResponse(
+      404,
+      ["content-type": "text/plain; charset=utf-8"],
+      HTTPBody.text("Not Found")
+    )
+  }
+}
+
+
+construct HTTPRoute {
+  value method _: HTTPMethod
+  value path _: String
+  value responder _: HTTPResponder
+
+  function matches(request _: HTTPRequest) -> Bool {
+    if request.method != method {
+      return false
+    }
+
+    return request.url.path == path
+  }
+
+  function respond(request _: HTTPRequest) -> HTTPResponse {
+    return responder.respond(request: request)
+  }
+}
+
+
+construct HTTPResponder {
+  function respond(request _: HTTPRequest) -> HTTPResponse
+}

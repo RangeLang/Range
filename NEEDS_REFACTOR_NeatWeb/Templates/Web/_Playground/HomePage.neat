@@ -1,20 +1,52 @@
+construct User {
+  value name: String
+  value isAuthenticated: Bool
+}
+
 construct HomePage : Page {
-
-  environment http: HTTPClient
-
   derived head: Head {
     Meta.title("Home Page")
-    Meta.description("Home Page Description")
+    Meta.description("Auth Preview")
   }
 
-  state welcomeMessage: String
+  state email: String = ""
+  state password: String = ""
+  state authError: String? = none
+  state welcomeText: String = "Please sign in"
 
-  init() {
-    welcomeMessage = http.get("")
+  function signIn() {
+    value user = authenticate(email: email, password: password)
+
+    if user.isAuthenticated {
+      authError = none
+      welcomeText = "Welcome \(user.name)"
+    } else {
+      authError = "Invalid email or password"
+      welcomeText = "Welcome Guest"
+    }
   }
 
+  @server
+  function authenticate(email _: String, password _: String) -> User {
+    if email == "demo@neat.dev" && password == "password123" {
+      return User(name: "Neat Dev", isAuthenticated: true)
+    }
+
+    return User(name: "Guest", isAuthenticated: false)
+  }
 
   derived body: Renderable {
-    Text(welcomeMessage)
+    VStack(spacing: 12) {
+      Text("Auth Preview")
+      TextField($email, placeholder: "Email")
+      TextField($password, placeholder: "Password")
+      Button(label: "Sign In", action: signIn)
+
+      if authError != none {
+        Text("\(authError ?? "")")
+      }
+
+      Text(welcomeText)
+    }
   }
 }

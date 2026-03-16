@@ -1,0 +1,20 @@
+construct NeatWeb {
+  function run(app _: App) {
+    value router = HTTPRouter()
+    value serverConfiguration = app.server
+
+    PageRouter.register(app: app, router: router)
+    ServerActionRouter.register(
+      app: app,
+      router: router,
+      actionPrefix: serverConfiguration.actionPrefix
+    )
+    AssetRouter.register(router: router, assetPrefix: serverConfiguration.assetPrefix)
+
+    HTTPServer.start(
+      host: serverConfiguration.host,
+      port: serverConfiguration.port,
+      router: router
+    )
+  }
+}

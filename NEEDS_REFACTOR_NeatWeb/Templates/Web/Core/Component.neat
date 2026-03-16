@@ -1,3 +1,46 @@
 construct Component : Renderable {
+  *builder(RenderableBuilder)
   derived body: Renderable
+}
+
+construct RenderableBuilder {
+  function buildExpression(renderable _: Renderable) -> [Renderable] {
+    return [renderable]
+  }
+
+  function buildBlock(renderables _: [Renderable]...) -> [Renderable] {
+    value result: [Renderable] = []
+
+    for group in renderables {
+      result.append(contentsOf: group)
+    }
+
+    return result
+  }
+
+  function buildOptional(renderables _: [Renderable]?) -> [Renderable] {
+    if renderables == none {
+      return []
+    }
+
+    return renderables ?? []
+  }
+
+  function buildEither(first _: [Renderable]) -> [Renderable] {
+    return first
+  }
+
+  function buildEither(second _: [Renderable]) -> [Renderable] {
+    return second
+  }
+
+  function buildArray(renderables _: [[Renderable]]) -> [Renderable] {
+    value result: [Renderable] = []
+
+    for group in renderables {
+      result.append(contentsOf: group)
+    }
+
+    return result
+  }
 }

@@ -138,6 +138,7 @@ extension Parser {
 
         try validateCallableDeclarations(callables)
         try validateCallableReturnSemantics(callables)
+        try validateDerivedDeclarations(deriveds)
         try validateInitializerDeclarations(initializers, availableDeriveds: deriveds)
 
         return DeclarationNode(
@@ -616,6 +617,34 @@ extension Parser {
         let typeName = try consumeTypeReference()
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return DerivedDeclaration(name: name, typeName: typeName, body: body)
+    }
+
+    func validateDerivedDeclarations(_ deriveds: [DerivedDeclaration]) throws {
+        for derived in deriveds {
+            guard let body = derived.body else { continue }
+
+            if derived.isVariadic {
+                for statement in body {
+                    guard case .expression = statement else {
+                        throw ParseError(
+                            "Variadic derived \(derived.name): \(derived.typeName) can only contain top-level expression statements."
+                        )
+                    }
+                }
+                continue
+            }
+
+            let topLevelExpressions = body.compactMap { statement -> Expression? in
+                guard case .expression(let expression) = statement else { return nil }
+                return expression
+            }
+
+            if topLevelExpressions.count > 1 && topLevelExpressions.count == body.count {
+                throw ParseError(
+                    "Derived \(derived.name): \(derived.typeName) must produce a single value. Use \(derived.typeName)... if you want to collect multiple sibling expressions."
+                )
+            }
+        }
     }
 
     mutating func parseInitializerDeclaration() throws -> InitializerDeclaration {

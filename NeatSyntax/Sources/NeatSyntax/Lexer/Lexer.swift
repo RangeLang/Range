@@ -48,7 +48,14 @@ struct Lexer {
                 tokens.append(.asterisk)
             case ".":
                 advance()
-                tokens.append(.dot)
+                if match(".") {
+                    guard match(".") else {
+                        throw ParseError("Unexpected character sequence ..")
+                    }
+                    tokens.append(.ellipsis)
+                } else {
+                    tokens.append(.dot)
+                }
             case ":":
                 advance()
                 tokens.append(.colon)

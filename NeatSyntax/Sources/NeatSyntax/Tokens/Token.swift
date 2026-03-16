@@ -16,6 +16,7 @@ enum Token: Equatable {
     case rightBracket
     case asterisk
     case dot
+    case ellipsis
     case colon
     case arrow
     case bang
