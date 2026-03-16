@@ -2,14 +2,16 @@
 (comment) @comment
 
 ; ── Sigil operators ──────────────────────────────────────────────────────────
-["#" "@"] @keyword
+["@" "*"] @keyword
 
 ; ── Keywords ─────────────────────────────────────────────────────────────────
 [
+  "construct"
   "enum"
   "case"
   "extension"
   "func"
+  "function"
   "protocol"
   "state"
   "environment"
@@ -17,12 +19,13 @@
   "derived"
   "value"
   "var"
+  "builder"
 ] @keyword
 
 ; When syntax is incomplete, tree-sitter can fall back to plain identifiers
 ; inside ERROR nodes. Keep core keywords colored by text anyway.
 ((identifier) @keyword
- (#match? @keyword "^(construct|enum|case|extension|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|on)$"))
+ (#match? @keyword "^(construct|enum|case|extension|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|on|builder)$"))
 
 ; Control flow
 [
@@ -48,8 +51,23 @@
   "@" @keyword
   "main" @keyword)
 
+; ── Builder sigils ───────────────────────────────────────────────────────────
+(builder_declaration
+  "*" @keyword
+  "builder" @keyword)
+
+(builder_hook_declaration
+  "*" @keyword)
+
+(derived_declaration
+  builder: (builder_application
+    "*" @keyword))
+
 ; ── Declarations ─────────────────────────────────────────────────────────────
 (sigiled_declaration
+  name: (type_identifier) @type.definition)
+
+(builder_declaration
   name: (type_identifier) @type.definition)
 
 (sigiled_declaration
@@ -57,6 +75,19 @@
 
 (callable_declaration
   name: (identifier) @function.method)
+
+(builder_hook_declaration
+  hook: [
+    "expression"
+    "block"
+    "optional"
+    "either"
+    "array"
+  ] @function.special)
+
+(derived_declaration
+  builder: (builder_application
+    name: (type_identifier) @type))
 
 ((identifier) @function.method
  (#eq? @function.method "init"))

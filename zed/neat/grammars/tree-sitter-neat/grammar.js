@@ -30,7 +30,9 @@ module.exports = grammar({
     declaration: ($) =>
       choice(
         $.main_block,
+        $.builder_declaration,
         $.sigiled_declaration,
+        $.builder_hook_declaration,
         $.callable_declaration,
         $.derived_declaration,
         $.protocol_declaration,
@@ -41,6 +43,14 @@ module.exports = grammar({
       ),
 
     main_block: ($) => seq("@", "main", field("body", $.block)),
+
+    builder_declaration: ($) =>
+      seq(
+        "*",
+        "builder",
+        field("name", $.type_identifier),
+        field("body", $.block),
+      ),
 
     protocol_declaration: ($) =>
       seq("protocol", field("name", $.type_identifier), field("body", $.block)),
@@ -79,6 +89,7 @@ module.exports = grammar({
       choice(
         prec.right(
           seq(
+            optional(field("builder", $.builder_application)),
             "derived",
             field("name", $.identifier),
             ":",
@@ -86,7 +97,27 @@ module.exports = grammar({
             field("body", $.block),
           ),
         ),
-        seq("derived", field("name", $.identifier), ":", field("type", $.type)),
+        seq(
+          optional(field("builder", $.builder_application)),
+          "derived",
+          field("name", $.identifier),
+          ":",
+          field("type", $.type),
+        ),
+      ),
+
+    builder_application: ($) => seq("*", field("name", $.type_identifier)),
+
+    builder_hook_declaration: ($) =>
+      seq(
+        "*",
+        field(
+          "hook",
+          choice("expression", "block", "optional", "either", "array"),
+        ),
+        field("parameters", $.callable_parameter_clause),
+        optional(seq("->", field("return_type", $.type))),
+        field("body", $.block),
       ),
 
     extension_declaration: ($) =>
@@ -179,6 +210,7 @@ module.exports = grammar({
     type: ($) =>
       prec.right(
         choice(
+          $.variadic_type,
           $.function_type,
           $.optional_type,
           $.generic_type,
@@ -198,6 +230,22 @@ module.exports = grammar({
       ),
 
     array_type: ($) => seq("[", field("element", $.type), "]"),
+
+    variadic_type: ($) =>
+      seq(
+        field(
+          "element",
+          choice(
+            $.function_type,
+            $.generic_type,
+            $.type_identifier,
+            $.array_type,
+            $.dictionary_type,
+            $.member_type,
+          ),
+        ),
+        "...",
+      ),
 
     dictionary_type: ($) =>
       seq("[", field("key", $.type), ":", field("value", $.type), "]"),

@@ -2,7 +2,7 @@
 
 Local Zed extension that adds language support for `.neat` files.
 
-The bundled grammar and queries are aligned with the current Neat surface, including declaration headers like `#Name on Target: Contract { ... }` and callable members like `@name(...)`.
+The bundled grammar and queries are aligned with the current Neat surface, including `construct Name: Contract { ... }`, builder declarations like `*builder RenderableBuilder { ... }`, builder-backed derived members like `*RenderableBuilder derived body: Renderable`, and `@main { ... }`.
 
 ## Features
 

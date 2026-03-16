@@ -7,5 +7,7 @@ construct WebNode {
     children: [WebNode] = []
   )
 
+  case fragment(children: [WebNode] = [])
+
   case text(value: String)
 }
