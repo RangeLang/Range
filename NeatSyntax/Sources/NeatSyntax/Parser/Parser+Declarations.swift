@@ -19,6 +19,10 @@ extension Parser {
     }
 
     public mutating func parseDeclaration(requiresEOF: Bool = true) throws -> DeclarationNode {
+        if isBuilderDeclarationStart() {
+            return try parseBuilderDeclaration(requiresEOF: requiresEOF)
+        }
+
         var objects: [ObjectType] = []
         while true {
             switch peek() {
@@ -161,6 +165,10 @@ extension Parser {
     }
 
     mutating func parseCallableDeclaration() throws -> CallableDeclaration {
+        if isBuilderCallableStart() {
+            return try parseBuilderCallableDeclaration()
+        }
+
         var targetName: String?
         if case .identifier(let target) = peek(),
             peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
@@ -194,6 +202,95 @@ extension Parser {
             targetName: targetName,
             name: name,
             hasExplicitParameterClause: hasExplicitParameterClause,
+            parameters: parameters,
+            returnTypeName: returnTypeName,
+            body: body
+        )
+    }
+
+    mutating func parseBuilderDeclaration(requiresEOF: Bool = true) throws -> DeclarationNode {
+        try consume(.asterisk)
+        guard case .identifier(let keyword) = peek(), keyword == "builder" else {
+            throw ParseError("Expected declaration starting with '*builder'.")
+        }
+        advance()
+
+        let name = try consumeTypeName()
+        try consume(.leftBrace)
+
+        var callables: [CallableDeclaration] = []
+        while isBuilderCallableStart() {
+            callables.append(try parseCallableDeclaration())
+        }
+
+        try consume(.rightBrace)
+        if requiresEOF {
+            try consume(.eof)
+        }
+
+        try validateCallableDeclarations(callables)
+        try validateCallableReturnSemantics(callables)
+
+        return DeclarationNode(
+            kind: .builder,
+            attribute: nil,
+            name: name,
+            conformances: [],
+            projectionTarget: nil,
+            objects: [],
+            cases: [],
+            states: [],
+            environments: [],
+            bindings: [],
+            deriveds: [],
+            members: [],
+            initializers: [],
+            callables: callables,
+            body: nil
+        )
+    }
+
+    mutating func parseBuilderCallableDeclaration() throws -> CallableDeclaration {
+        try consume(.asterisk)
+
+        let hookName: String
+        switch peek() {
+        case .identifier(let name):
+            hookName = name
+            advance()
+        default:
+            throw ParseError("Expected builder hook name.")
+        }
+
+        let mappedName: String
+        switch hookName {
+        case "expression":
+            mappedName = "buildExpression"
+        case "block":
+            mappedName = "buildBlock"
+        case "optional":
+            mappedName = "buildOptional"
+        case "either":
+            mappedName = "buildEither"
+        case "array":
+            mappedName = "buildArray"
+        default:
+            throw ParseError("Unknown builder hook '\(hookName)'.")
+        }
+
+        let parameters = try parseFunctionParameters()
+        let returnTypeName: String?
+        if peek() == .arrow {
+            try consume(.arrow)
+            returnTypeName = try consumeTypeReference()
+        } else {
+            returnTypeName = nil
+        }
+        let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        return CallableDeclaration(
+            targetName: nil,
+            name: mappedName,
+            hasExplicitParameterClause: true,
             parameters: parameters,
             returnTypeName: returnTypeName,
             body: body
@@ -611,17 +708,27 @@ extension Parser {
     }
 
     mutating func parseDerivedDeclaration() throws -> DerivedDeclaration {
+        let builderName = try parseBuilderDirectiveIfPresent()
         try consumeKeyword(.derived)
         let name = try consumeIdentifier()
         try consume(.colon)
         let typeName = try consumeTypeReference()
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
-        return DerivedDeclaration(name: name, typeName: typeName, body: body)
+        return DerivedDeclaration(
+            builderName: builderName,
+            name: name,
+            typeName: typeName,
+            body: body
+        )
     }
 
     func validateDerivedDeclarations(_ deriveds: [DerivedDeclaration]) throws {
         for derived in deriveds {
             guard let body = derived.body else { continue }
+
+            if derived.builderName != nil {
+                continue
+            }
 
             if derived.isVariadic {
                 for statement in body {
@@ -644,6 +751,115 @@ extension Parser {
                     "Derived \(derived.name): \(derived.typeName) must produce a single value. Use \(derived.typeName)... if you want to collect multiple sibling expressions."
                 )
             }
+        }
+    }
+
+    func validateBuilderDeclarations(in declarations: [DeclarationNode]) throws {
+        let declarationsByName = Dictionary(
+            uniqueKeysWithValues: declarations.map { ($0.name, $0) })
+
+        for declaration in declarations {
+            for derived in declaration.deriveds {
+                guard let builderName = derived.builderName else { continue }
+                guard let builder = declarationsByName[builderName] else {
+                    throw ParseError(
+                        "Derived \(derived.name): \(derived.typeName) references unknown builder \(builderName)."
+                    )
+                }
+                guard builder.kind == .builder else {
+                    throw ParseError(
+                        "Derived \(derived.name): \(derived.typeName) references \(builderName), but it is not declared as a builder."
+                    )
+                }
+
+                let availableHooks = Set(builder.callables.map(\.name))
+                let requiredHooks = requiredBuilderHooks(for: derived)
+
+                let missingHooks = requiredHooks.subtracting(availableHooks).sorted()
+                if !missingHooks.isEmpty {
+                    throw ParseError(
+                        "Builder \(builderName) is missing required hook functions for derived \(derived.name): \(missingHooks.joined(separator: ", "))."
+                    )
+                }
+            }
+        }
+    }
+
+    func requiredBuilderHooks(for derived: DerivedDeclaration) -> Set<String> {
+        guard let body = derived.body else {
+            return []
+        }
+
+        var hooks: Set<String> = ["buildExpression", "buildBlock"]
+        collectBuilderHooks(from: body, into: &hooks)
+        return hooks
+    }
+
+    func collectBuilderHooks(from statements: [Statement], into hooks: inout Set<String>) {
+        for statement in statements {
+            switch statement {
+            case .expression:
+                continue
+            case .declaration:
+                continue
+            case .assignment, .compoundAssignment:
+                continue
+            case .environmentProvision:
+                continue
+            case .return, .break, .continue:
+                continue
+            case .forEach(_, _, let body):
+                hooks.insert("buildArray")
+                collectBuilderHooks(from: body, into: &hooks)
+            case .whileLoop(_, let body):
+                hooks.insert("buildArray")
+                collectBuilderHooks(from: body, into: &hooks)
+            case .conditional(let branches):
+                if branches.contains(where: { $0.condition == nil }) {
+                    hooks.insert("buildEither")
+                } else {
+                    hooks.insert("buildOptional")
+                }
+
+                for branch in branches {
+                    collectBuilderHooks(from: branch.body, into: &hooks)
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                hooks.insert("buildEither")
+                for `case` in cases {
+                    collectBuilderHooks(from: `case`.body, into: &hooks)
+                }
+                if let defaultBody {
+                    collectBuilderHooks(from: defaultBody, into: &hooks)
+                }
+            }
+        }
+    }
+
+    func isBuilderDirectiveStart() -> Bool {
+        guard peek() == .asterisk else { return false }
+
+        switch peek(offset: 1) {
+        case .identifier(let name), .keyword(let name):
+            guard name != "environment", name != "builder" else { return false }
+        default:
+            return false
+        }
+        return true
+    }
+
+    mutating func parseBuilderDirectiveIfPresent() throws -> String? {
+        guard isBuilderDirectiveStart() else {
+            return nil
+        }
+
+        try consume(.asterisk)
+        switch peek() {
+        case .identifier(let name), .keyword(let name):
+            advance()
+            return name
+        default:
+            throw ParseError("Expected *BuilderName directive.")
         }
     }
 
@@ -748,6 +964,9 @@ extension Parser {
     }
 
     func isDerivedDeclarationStart() -> Bool {
+        if isBuilderDirectiveStart() {
+            return true
+        }
         guard peek() == .keyword(NeatSyntax.Keyword.derived.rawValue) else {
             return false
         }
@@ -776,6 +995,9 @@ extension Parser {
     }
 
     func isCallableStart() -> Bool {
+        if isBuilderCallableStart() {
+            return true
+        }
         if peek() == .keyword(NeatSyntax.Keyword.function.rawValue) {
             return true
         }
@@ -785,6 +1007,21 @@ extension Parser {
             return true
         }
         return false
+    }
+
+    func isBuilderDeclarationStart() -> Bool {
+        guard peek() == .asterisk else { return false }
+        guard case .identifier(let name) = peek(offset: 1), name == "builder" else {
+            return false
+        }
+        guard case .identifier = peek(offset: 2) else { return false }
+        return peek(offset: 3) == .leftBrace
+    }
+
+    func isBuilderCallableStart() -> Bool {
+        guard peek() == .asterisk else { return false }
+        guard case .identifier(let name) = peek(offset: 1) else { return false }
+        return ["expression", "block", "optional", "either", "array"].contains(name)
     }
 
     func validateCallableDeclarations(_ callables: [CallableDeclaration]) throws {

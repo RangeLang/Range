@@ -1,14 +1,14 @@
 construct Component : Renderable {
-  *builder(RenderableBuilder)
+  *RenderableBuilder
   derived body: Renderable
 }
 
-construct RenderableBuilder {
-  function buildExpression(renderable _: Renderable) -> [Renderable] {
+*builder RenderableBuilder {
+  *expression(renderable _: Renderable) -> [Renderable] {
     return [renderable]
   }
 
-  function buildBlock(renderables _: [Renderable]...) -> [Renderable] {
+  *block(renderables _: [Renderable]...) -> [Renderable] {
     value result: [Renderable] = []
 
     for group in renderables {
@@ -18,7 +18,7 @@ construct RenderableBuilder {
     return result
   }
 
-  function buildOptional(renderables _: [Renderable]?) -> [Renderable] {
+  *optional(renderables _: [Renderable]?) -> [Renderable] {
     if renderables == none {
       return []
     }
@@ -26,15 +26,15 @@ construct RenderableBuilder {
     return renderables ?? []
   }
 
-  function buildEither(first _: [Renderable]) -> [Renderable] {
+  *either(first _: [Renderable]) -> [Renderable] {
     return first
   }
 
-  function buildEither(second _: [Renderable]) -> [Renderable] {
+  *either(second _: [Renderable]) -> [Renderable] {
     return second
   }
 
-  function buildArray(renderables _: [[Renderable]]) -> [Renderable] {
+  *array(renderables _: [[Renderable]]) -> [Renderable] {
     value result: [Renderable] = []
 
     for group in renderables {

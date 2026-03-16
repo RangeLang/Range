@@ -3,6 +3,7 @@ import Foundation
 public enum EntityKind: String {
     case entry
     case declaration
+    case builder
 }
 
 public enum EntityCapability: Hashable {

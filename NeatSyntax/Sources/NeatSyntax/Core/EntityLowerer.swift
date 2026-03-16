@@ -41,6 +41,8 @@ public struct EntityLowerer {
             return .entry
         case .declaration:
             return .declaration
+        case .builder:
+            return .builder
         }
     }
 

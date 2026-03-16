@@ -51,7 +51,7 @@ public struct Parser {
                 continue
             }
 
-            if NeatSyntax.declarationKind(for: peek()) != nil {
+            if NeatSyntax.declarationKind(for: peek()) != nil || isBuilderDeclarationStart() {
                 declarations.append(try parseDeclaration(requiresEOF: false))
                 continue
             }
@@ -60,6 +60,7 @@ public struct Parser {
         }
 
         try consume(.eof)
+        try validateBuilderDeclarations(in: declarations)
 
         if topLevelStates.isEmpty, declarations.count == 1, extensions.isEmpty {
             return .declaration(declarations[0])

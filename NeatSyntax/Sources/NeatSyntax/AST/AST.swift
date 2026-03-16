@@ -3,6 +3,7 @@ import Foundation
 public enum DeclarationKind {
     case entry
     case declaration
+    case builder
 }
 
 public enum SourceFileNode {
@@ -116,6 +117,7 @@ public struct CallableDeclaration {
 }
 
 public struct DerivedDeclaration {
+    public let builderName: String?
     public let name: String
     public let typeName: String
     public let body: [Statement]?
