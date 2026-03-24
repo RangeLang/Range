@@ -1,9 +1,4 @@
 // Exploratory derived declaration macro-facing compiler surface.
 // This file is for design iteration only.
 
-primitive construct DerivedDeclaration: StorageDeclaration {
-    value name: String
-    value type: TypeReference
-    value initializer: Expression?
-    value accessors: AccessorDeclaration?
-}
+primitive construct DerivedDeclaration: StorageDeclaration

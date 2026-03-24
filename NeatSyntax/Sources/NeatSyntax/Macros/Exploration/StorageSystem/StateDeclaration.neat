@@ -1,12 +1,7 @@
 // Exploratory state declaration macro-facing compiler surface.
 // This file is for design iteration only.
 
-primitive construct StateDeclaration: StorageDeclaration {
-    value name: String
-    value type: TypeReference
-    value initializer: Expression?
-    value accessors: AccessorDeclaration?
-}
+primitive construct StateDeclaration: StorageDeclaration
 
 //MARK: Example
 macro clamped(min: Int, max: Int): Attached<StateDeclaration> -> StateDeclaration { state in

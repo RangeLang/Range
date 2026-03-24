@@ -1,0 +1,6 @@
+// Exploratory property macro-facing compiler surface.
+// This file is for design iteration only.
+
+primitive construct Property: AttachedMacroTarget {
+    value storage: StorageDeclaration
+}
