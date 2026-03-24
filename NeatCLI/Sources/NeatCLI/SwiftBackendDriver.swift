@@ -169,7 +169,7 @@ struct SwiftBackendDriver {
             throw ValidationError(
                 "Swift backend expects @main to live in its own file for now. Split declarations and @main into separate files."
             )
-        case .declaration:
+        case .construct, .enumeration:
             throw ValidationError(
                 "Swift backend requires a file with @main { ... } when compiling a single file."
             )
@@ -182,7 +182,7 @@ struct SwiftBackendDriver {
         -> SwiftBackendEmitter.Program
     {
         var callables: [CallableDeclaration] = []
-        var declarations: [DeclarationNode] = []
+        var declarations: [ConstructDeclaration] = []
         var mainBlock: MainBlockNode?
         var units: [SwiftBackendEmitter.SourceUnit] = []
 
@@ -190,7 +190,7 @@ struct SwiftBackendDriver {
             let sourceFile = try ProjectSourceValidator.parseSourceFile(at: fileURL)
             let swiftFileName = fileURL.deletingPathExtension().lastPathComponent + ".swift"
             switch sourceFile {
-            case .declaration(let declaration):
+            case .construct(let declaration):
                 if declaration.kind == .declaration || declaration.kind == .entry {
                     declarations.append(declaration)
                 }
@@ -204,7 +204,7 @@ struct SwiftBackendDriver {
                     )
                 )
                 declarations.append(
-                    contentsOf: module.declarations.filter {
+                    contentsOf: module.constructs.filter {
                         $0.kind == .declaration || $0.kind == .entry
                     }
                 )
@@ -220,7 +220,7 @@ struct SwiftBackendDriver {
                         mainBlock: block
                     )
                 )
-            case .extensions:
+            case .extensions, .enumeration:
                 continue
             }
         }

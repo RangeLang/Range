@@ -14,7 +14,7 @@ struct SwiftBackendEmitter {
 
     struct Program {
         let callables: [CallableDeclaration]
-        let declarations: [DeclarationNode]
+        let declarations: [ConstructDeclaration]
         let mainBlock: MainBlockNode
         let units: [SourceUnit]
     }

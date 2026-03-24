@@ -4,7 +4,7 @@ import NeatSyntax
 public struct JavaScriptGenerator {
     public init() {}
 
-    public func generate(component: ComponentNode) -> String {
+    public func generate(component: ConstructComponent) -> String {
         let stateNames = Set(component.states.map(\.name))
         let bindingNames = Set(component.bindings.map(\.name))
         let environmentValueExpressions = buildEnvironmentValueExpressions(

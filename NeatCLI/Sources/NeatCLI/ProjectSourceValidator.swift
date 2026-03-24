@@ -88,13 +88,13 @@ enum ProjectSourceValidator {
         }
     }
 
-    private static func declarations(in sourceFile: SourceFileNode) -> [DeclarationNode] {
+    private static func declarations(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
         switch sourceFile {
-        case .declaration(let declaration):
+        case .construct(let declaration):
             return [declaration]
         case .module(let module):
-            return module.declarations
-        case .mainBlock, .extensions:
+            return module.constructs
+        case .mainBlock, .extensions, .enumeration:
             return []
         }
     }
@@ -103,7 +103,7 @@ enum ProjectSourceValidator {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .declaration, .mainBlock, .extensions:
+        case .construct, .mainBlock, .extensions, .enumeration:
             return []
         }
     }

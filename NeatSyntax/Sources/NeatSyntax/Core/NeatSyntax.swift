@@ -2,10 +2,7 @@ import Foundation
 
 enum NeatSyntax {
     enum Keyword: String {
-        case component
-        case variable = "var"
         case value = "value"
-        case constant = "let"
         case state = "state"
         case environment = "environment"
         case binding = "binding"
@@ -23,6 +20,7 @@ enum NeatSyntax {
         case continueStatement = "continue"
         case switchStatement = "switch"
         case defaultBranch = "default"
+        case enumeration = "enum"
         case construct = "construct"
         case function = "function"
         case getter = "get"
@@ -31,7 +29,7 @@ enum NeatSyntax {
     static let keywordIdentifiers: Set<String> = Set(Keyword.allCases.map(\.rawValue))
     static let builtinTypeNames: [String] = BuiltinType.supportedNames
 
-    static func declarationKind(for token: Token) -> DeclarationKind? {
+    static func constructKind(for token: Token) -> ConstructKind? {
         switch token {
         case .keyword(Keyword.construct.rawValue):
             return .declaration

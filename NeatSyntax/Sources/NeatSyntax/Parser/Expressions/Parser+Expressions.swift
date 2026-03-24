@@ -1,6 +1,32 @@
 import Foundation
 
 extension Parser {
+    mutating func parseInvocationArgumentsIfPresent() throws -> [CallArgument] {
+        guard peek() == .leftParen else { return [] }
+        try consume(.leftParen)
+        var arguments: [CallArgument] = []
+
+        if peek() != .rightParen {
+            while true {
+                arguments.append(try parseInvocationArgument())
+                guard peek() == .comma else { break }
+                advance()
+            }
+        }
+
+        try consume(.rightParen)
+        return arguments
+    }
+
+    mutating func parseInvocationArgument() throws -> CallArgument {
+        if case .identifier(let label) = peek(), peek(offset: 1) == .colon {
+            advance()
+            try consume(.colon)
+            return CallArgument(label: label, value: try parseExpression())
+        }
+        return CallArgument(label: nil, value: try parseExpression())
+    }
+
     mutating func parseExpression() throws -> Expression {
         try parseTernaryExpression()
     }
@@ -186,6 +212,59 @@ extension Parser {
         default:
             throw ParseError("Expected expression.")
         }
+    }
+
+    func parseInterpolatedString(_ value: String) -> InterpolatedString {
+        var segments: [StringSegment] = []
+        var currentText = ""
+        let characters = Array(value)
+        var index = 0
+
+        func flushText() {
+            guard !currentText.isEmpty else { return }
+            segments.append(.text(currentText))
+            currentText.removeAll(keepingCapacity: true)
+        }
+
+        while index < characters.count {
+            let character = characters[index]
+            if character == "\\" && index + 1 < characters.count && characters[index + 1] == "(" {
+                flushText()
+                index += 2
+                var expressionText = ""
+                var depth = 1
+
+                while index < characters.count {
+                    let current = characters[index]
+                    if current == "(" {
+                        depth += 1
+                    } else if current == ")" {
+                        depth -= 1
+                        if depth == 0 {
+                            index += 1
+                            break
+                        }
+                    }
+
+                    expressionText.append(current)
+                    index += 1
+                }
+
+                var parser = try? Parser(source: expressionText)
+                if let expression = try? parser?.parseExpression() {
+                    segments.append(.expression(expression))
+                } else {
+                    segments.append(.text("\\(\(expressionText))"))
+                }
+                continue
+            }
+
+            currentText.append(character)
+            index += 1
+        }
+
+        flushText()
+        return InterpolatedString(segments: segments)
     }
 
     mutating func parseCollectionLiteral() throws -> Expression {

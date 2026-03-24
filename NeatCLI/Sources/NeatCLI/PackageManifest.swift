@@ -4,7 +4,7 @@ import NeatSyntax
 
 struct PackageManifest {
     let name: String
-    let declaration: DeclarationNode
+    let declaration: ConstructDeclaration
 }
 
 enum PackageManifestLoader {
@@ -20,7 +20,7 @@ enum PackageManifestLoader {
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .module:
             throw ValidationError("Package.neat must declare construct Name: Package.")
-        case .declaration(let declaration):
+        case .construct(let declaration):
             guard declaration.attribute == nil else {
                 throw ValidationError("Package.neat cannot use declaration attributes.")
             }
@@ -32,11 +32,10 @@ enum PackageManifestLoader {
                 throw ValidationError(
                     "Package.neat must declare exactly construct Name: Package.")
             }
-            guard declaration.body == nil else {
-                throw ValidationError("Package.neat cannot declare a render body.")
-            }
 
             return PackageManifest(name: declaration.name, declaration: declaration)
+        case .enumeration:
+            throw ValidationError("Package.neat must declare construct Name: Package.")
         }
     }
 }

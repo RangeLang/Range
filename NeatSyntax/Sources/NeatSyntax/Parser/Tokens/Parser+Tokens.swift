@@ -71,7 +71,7 @@ extension Parser {
             advance()
             return value
         default:
-            throw ParseError("Expected component or node name.")
+            throw ParseError("Expected callable name.")
         }
     }
 

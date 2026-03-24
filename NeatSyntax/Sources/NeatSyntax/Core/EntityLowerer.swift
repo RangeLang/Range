@@ -3,39 +3,21 @@ import Foundation
 public struct EntityLowerer {
     public init() {}
 
-    public func lower(_ declaration: DeclarationNode) -> EntityDefinition {
+    public func lower(_ construct: ConstructDeclaration) -> EntityDefinition {
         EntityDefinition(
-            kind: lowerKind(declaration.kind),
-            identity: identity(for: declaration.kind, name: declaration.name),
+            kind: lowerKind(construct.kind),
+            identity: identity(for: construct.kind, name: construct.name),
             capabilities: capabilities(
-                kind: declaration.kind,
-                states: declaration.states,
-                hasBody: declaration.body != nil
+                kind: construct.kind,
+                states: construct.states
             ),
-            states: declaration.states.map(lowerState),
-            environments: declaration.environments.map(lowerEnvironment),
-            attachments: declaration.objects.map(lowerAttachment),
-            body: declaration.body
+            states: construct.states.map(lowerState),
+            environments: construct.environments.map(lowerEnvironment),
+            attachments: construct.attachments.map(lowerAttachment)
         )
     }
 
-    public func lower(_ component: ComponentNode) -> EntityDefinition {
-        EntityDefinition(
-            kind: lowerKind(component.kind),
-            identity: identity(for: component.kind, name: component.name),
-            capabilities: capabilities(
-                kind: component.kind,
-                states: component.states,
-                hasBody: true
-            ),
-            states: component.states.map(lowerState),
-            environments: component.environments.map(lowerEnvironment),
-            attachments: component.objects.map(lowerAttachment),
-            body: component.body
-        )
-    }
-
-    private func lowerKind(_ kind: DeclarationKind) -> EntityKind {
+    private func lowerKind(_ kind: ConstructKind) -> EntityKind {
         switch kind {
         case .entry:
             return .entry
@@ -46,20 +28,16 @@ public struct EntityLowerer {
         }
     }
 
-    private func identity(for kind: DeclarationKind, name: String) -> EntityIdentity {
+    private func identity(for kind: ConstructKind, name: String) -> EntityIdentity {
         EntityIdentity(symbol: name, stableID: "\(lowerKind(kind).rawValue):\(name)")
     }
 
     private func capabilities(
-        kind: DeclarationKind,
-        states: [StateDeclaration],
-        hasBody: Bool
+        kind: ConstructKind,
+        states: [StateDeclaration]
     ) -> Set<EntityCapability> {
         var values: Set<EntityCapability> = []
 
-        if hasBody {
-            values.insert(.renderable)
-        }
         if !states.isEmpty {
             values.insert(.stateful)
         }
@@ -83,8 +61,8 @@ public struct EntityLowerer {
         )
     }
 
-    private func lowerAttachment(_ object: ObjectType) -> EntityAttachment {
-        switch object {
+    private func lowerAttachment(_ attachment: ConstructAttachment) -> EntityAttachment {
+        switch attachment {
         case .typeExtension(let declaration):
             return .typeExtension(declaration)
         }

@@ -35,7 +35,7 @@ public struct MainProjectCompiler {
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )
-        case .declaration:
+        case .construct, .enumeration:
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )

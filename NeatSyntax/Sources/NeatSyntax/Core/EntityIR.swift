@@ -7,7 +7,6 @@ public enum EntityKind: String {
 }
 
 public enum EntityCapability: Hashable {
-    case renderable
     case stateful
 }
 
@@ -39,5 +38,4 @@ public struct EntityDefinition {
     public let states: [EntityStateField]
     public let environments: [EntityEnvironmentField]
     public let attachments: [EntityAttachment]
-    public let body: ViewNode?
 }
