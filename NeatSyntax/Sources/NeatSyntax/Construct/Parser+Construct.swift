@@ -8,24 +8,6 @@ extension Parser {
             return try parseBuilderDeclaration(requiresEOF: requiresEOF)
         }
 
-        var attachments: [ConstructAttachment] = []
-        while true {
-            switch peek() {
-            case .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
-                attachments.append(.typeExtension(try parseTypeExtensionDeclaration()))
-            default:
-                break
-            }
-
-            switch peek() {
-            case .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
-                continue
-            default:
-                break
-            }
-            break
-        }
-
         let attribute = parseConstructAttributeIfPresent()
         let kind = try parseConstructKind(attribute: attribute)
         let header = try parseConstructHeader()
@@ -37,7 +19,7 @@ extension Parser {
         var environments: [EnvironmentDeclaration] = []
         var bindings: [BindingDeclaration] = []
         var deriveds: [DerivedDeclaration] = []
-        var members: [MemberDeclaration] = []
+        var values: [ValueDeclaration] = []
         var initializers: [InitializerDeclaration] = []
         var callables: [CallableDeclaration] = []
 
@@ -52,7 +34,7 @@ extension Parser {
                 || isEnvironmentDeclarationStart()
                 || isBindingDeclarationStart()
                 || isDerivedDeclarationStart()
-                || isMemberDeclarationStart()
+                || isValueDeclarationStart()
                 || isInitializerDeclarationStart()
                 || isCallableStart()
             {
@@ -61,8 +43,8 @@ extension Parser {
                     environments: environments,
                     bindings: bindings
                 )
-                if isMemberDeclarationStart() {
-                    members.append(try parseMemberDeclaration())
+                if isValueDeclarationStart() {
+                    values.append(try parseValueDeclaration())
                     continue
                 }
                 if isBindingDeclarationStart() {
@@ -123,12 +105,11 @@ extension Parser {
             name: name,
             conformances: conformances,
             projectionTarget: projectionTarget,
-            attachments: attachments,
             states: states,
             environments: environments,
             bindings: bindings,
             deriveds: deriveds,
-            members: members,
+            values: values,
             initializers: initializers,
             callables: callables
         )
@@ -163,26 +144,14 @@ extension Parser {
             name: name,
             conformances: [],
             projectionTarget: nil,
-            attachments: [],
             states: [],
             environments: [],
             bindings: [],
             deriveds: [],
-            members: [],
+            values: [],
             initializers: [],
             callables: callables
         )
-    }
-
-    mutating func parseTypeExtensionDeclaration() throws -> TypeExtensionDeclaration {
-        try consumeKeyword(.typeExtension)
-        let typeName = try consumeTypeReference()
-        if peek() == .leftBrace {
-            try consume(.leftBrace)
-            try skipUnknownBlockBody()
-            try consume(.rightBrace)
-        }
-        return TypeExtensionDeclaration(typeName: typeName)
     }
 
     mutating func parseConstructKind(attribute: AttributeApplication?) throws -> ConstructKind {

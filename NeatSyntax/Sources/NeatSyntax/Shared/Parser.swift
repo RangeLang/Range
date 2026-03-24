@@ -27,11 +27,11 @@ public struct Parser {
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
-        var extensions: [TypeExtensionDeclaration] = []
+        var extensions: [ExtensionDeclaration] = []
 
         while peek() != .eof {
             if peek() == .keyword(NeatSyntax.Keyword.typeExtension.rawValue) {
-                extensions.append(try parseTypeExtensionDeclaration())
+                extensions.append(try parseExtensionDeclaration())
                 continue
             }
 

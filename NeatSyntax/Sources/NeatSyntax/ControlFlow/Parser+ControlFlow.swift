@@ -77,33 +77,6 @@ extension Parser {
         }
     }
 
-    func isEnvironmentProvisionStart() -> Bool {
-        guard peek() == .asterisk else { return false }
-        return peek(offset: 1) == .keyword(NeatSyntax.Keyword.environment.rawValue)
-    }
-
-    mutating func parseEnvironmentProvision() throws -> EnvironmentProvision {
-        try consume(.asterisk)
-        try consumeKeyword(.environment)
-        let isState = peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
-        if isState {
-            try consumeKeyword(.state)
-        }
-
-        let name = try consumeIdentifier()
-        try consume(.colon)
-        let typeName = try consumeTypeReference()
-        try consume(.equal)
-        let expression = try parseExpression()
-
-        return EnvironmentProvision(
-            isState: isState,
-            name: name,
-            typeName: typeName,
-            expression: expression
-        )
-    }
-
     func isStandaloneCallExpressionStart() -> Bool {
         guard case .identifier = peek() else { return false }
         var offset = 1

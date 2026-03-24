@@ -12,8 +12,7 @@ public struct EntityLowerer {
                 states: construct.states
             ),
             states: construct.states.map(lowerState),
-            environments: construct.environments.map(lowerEnvironment),
-            attachments: construct.attachments.map(lowerAttachment)
+            environments: construct.environments.map(lowerEnvironment)
         )
     }
 
@@ -59,12 +58,5 @@ public struct EntityLowerer {
             name: environment.name,
             typeName: environment.typeName
         )
-    }
-
-    private func lowerAttachment(_ attachment: ConstructAttachment) -> EntityAttachment {
-        switch attachment {
-        case .typeExtension(let declaration):
-            return .typeExtension(declaration)
-        }
     }
 }

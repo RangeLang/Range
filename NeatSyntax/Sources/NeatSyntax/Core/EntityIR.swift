@@ -27,15 +27,10 @@ public struct EntityEnvironmentField {
     public let typeName: String
 }
 
-public enum EntityAttachment {
-    case typeExtension(TypeExtensionDeclaration)
-}
-
 public struct EntityDefinition {
     public let kind: EntityKind
     public let identity: EntityIdentity
     public let capabilities: Set<EntityCapability>
     public let states: [EntityStateField]
     public let environments: [EntityEnvironmentField]
-    public let attachments: [EntityAttachment]
 }

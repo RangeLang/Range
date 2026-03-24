@@ -1,0 +1,81 @@
+import Foundation
+
+extension Parser {
+    mutating func parseBindingDeclaration() throws -> BindingDeclaration {
+        try consumeKeyword(.binding)
+        let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "binding")
+        try consume(.colon)
+        let typeName = try consumeTypeReference()
+        let storage: BindingStorage
+        if peek() == .leftBrace {
+            let previousBindingNames = currentBindingNames
+            currentBindingNames = previousBindingNames.union([localName])
+            storage = try parseDerivedBindingStorage(name: localName)
+            currentBindingNames = previousBindingNames.union([localName])
+        } else {
+            storage = .plain
+        }
+        return BindingDeclaration(
+            localName: localName,
+            externalLabel: externalLabel,
+            typeName: typeName,
+            storage: storage
+        )
+    }
+
+    mutating func parseDerivedBindingStorage(name: String) throws -> BindingStorage {
+        try consume(.leftBrace)
+
+        var getterBody: [Statement]?
+        var setterBody: [Statement]?
+
+        while peek() != .rightBrace {
+            if peek() == .keyword(NeatSyntax.Keyword.getter.rawValue) {
+                guard getterBody == nil else {
+                    throw ParseError("binding '\(name)' can only define one get block.")
+                }
+                try consumeKeyword(.getter)
+                getterBody = try parseStatementBlock(baseLocalBindings: [:])
+                continue
+            }
+
+            if peek() == .keyword(NeatSyntax.Keyword.setter.rawValue) {
+                guard setterBody == nil else {
+                    throw ParseError("binding '\(name)' can only define one set block.")
+                }
+                try consumeKeyword(.setter)
+                setterBody = try parseStatementBlock(
+                    baseLocalBindings: ["newValue": .constant]
+                )
+                continue
+            }
+
+            throw ParseError("Derived binding '\(name)' only supports get and set blocks.")
+        }
+
+        try consume(.rightBrace)
+
+        guard let getterBody else {
+            throw ParseError("Derived binding '\(name)' requires a get block.")
+        }
+        guard let setterBody else {
+            throw ParseError("Derived binding '\(name)' requires a set block.")
+        }
+
+        return .derived(get: getterBody, set: setterBody)
+    }
+
+    func isBindingDeclarationStart() -> Bool {
+        guard peek() == .keyword(NeatSyntax.Keyword.binding.rawValue) else {
+            return false
+        }
+        guard case .identifier = peek(offset: 1) else { return false }
+        if peek(offset: 2) == .colon {
+            return true
+        }
+        return {
+            guard case .identifier = peek(offset: 2) else { return false }
+            return peek(offset: 3) == .colon
+        }()
+    }
+}

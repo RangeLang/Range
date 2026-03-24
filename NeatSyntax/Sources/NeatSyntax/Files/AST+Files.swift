@@ -4,7 +4,7 @@ public enum SourceFileNode {
     case construct(ConstructDeclaration)
     case enumeration(EnumDeclaration)
     case mainBlock(MainBlockNode)
-    case extensions([TypeExtensionDeclaration])
+    case extensions([ExtensionDeclaration])
     case module(ModuleFileNode)
 }
 
@@ -17,5 +17,5 @@ public struct ModuleFileNode {
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]
     public let enumerations: [EnumDeclaration]
-    public let extensions: [TypeExtensionDeclaration]
+    public let extensions: [ExtensionDeclaration]
 }
