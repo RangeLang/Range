@@ -1,0 +1,6 @@
+// Exploratory type reference macro-facing compiler surface.
+// This file is for design iteration only.
+
+primitive construct TypeReference {
+    value self: TypeReference.self
+}

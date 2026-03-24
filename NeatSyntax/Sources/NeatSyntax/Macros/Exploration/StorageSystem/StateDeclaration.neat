@@ -1,0 +1,24 @@
+// Exploratory state declaration macro-facing compiler surface.
+// This file is for design iteration only.
+
+primitive construct StateDeclaration: StorageDeclaration {
+    value name: String
+    value type: TypeReference
+    value initializer: Expression?
+    value accessors: AccessorDeclaration?
+}
+
+//MARK: Example
+macro clamped(min: Int, max: Int): Attached<StateDeclaration> -> StateDeclaration { state in
+    return StateDeclaration(
+        name: state.name,
+        type: state.type,
+        initializer: state.initializer,
+        accessors: AccessorDeclaration(
+            getter: nil,
+            setter: {
+                state = min(max(newValue, min), max)
+            }
+        )
+    )
+}

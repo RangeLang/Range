@@ -1,0 +1,14 @@
+// Exploratory expression macro-facing compiler surface.
+// This file is for design iteration only.
+
+primitive construct Expression: FreestandingMacroTarget {
+    value kind: ExpressionKind
+    value type: TypeReference?
+    value callee: Expression?
+    value memberBase: Expression?
+    value memberName: String?
+    value arguments: [ExpressionArgument]
+    value literalValue: String?
+    value elements: [Expression]
+    value body: Block?
+}

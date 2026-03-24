@@ -1,0 +1,8 @@
+// Exploratory freestanding macro examples.
+// This file is for design iteration only.
+
+macro lock: Freestanding<Block> { block in
+    acquire()
+    block()
+    release()
+}

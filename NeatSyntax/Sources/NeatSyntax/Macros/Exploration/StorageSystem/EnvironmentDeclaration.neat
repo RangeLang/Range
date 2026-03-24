@@ -1,0 +1,10 @@
+// Exploratory environment declaration macro-facing compiler surface.
+// This file is for design iteration only.
+
+primitive construct EnvironmentDeclaration: StorageDeclaration {
+    value name: String
+    value type: TypeReference
+    value initializer: Expression?
+    value accessors: AccessorDeclaration?
+    value isState: Bool
+}

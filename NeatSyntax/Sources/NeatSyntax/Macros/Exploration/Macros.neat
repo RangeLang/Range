@@ -1,0 +1,8 @@
+// Exploratory macro basement surface.
+// This file is for design iteration only.
+
+primitive protocol FreestandingMacroTarget
+primitive protocol AttachedMacroTarget
+
+primitive protocol Freestanding<T: FreestandingMacroTarget>
+primitive protocol Attached<T: AttachedMacroTarget>

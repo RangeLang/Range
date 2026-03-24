@@ -1,0 +1,4 @@
+protocol ExpressableByIntLiteral {
+    #literal(RawInt)
+    init(literal: RawInt)
+}

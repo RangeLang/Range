@@ -1,3 +1,7 @@
-construct Int<value bits: RawInt, value signedness: Signedness = .signed> {
+construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressableByIntLiteral {
     value data: [Bit]
+
+    init(literal _: RawInt) {
+        self.data = Bit.fromRaw(value, bits: bits)
+    }
 }

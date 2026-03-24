@@ -2,30 +2,118 @@
 
 ## Definition
 
-A protocol is an abstract, non-instantiable type definition that describes shared behavior.
+A protocol is a non-instantiable contract.
 
 ## Role
 
-`protocol` defines capability and contract rather than concrete identity-bearing data.
+`protocol` defines required graph shape and behavior for conforming constructs.
 
 ## Mental Model
 
-- `construct` = concrete shape and data
-- `protocol` = abstract capability and contract
+- `construct` owns storage and identity
+- `protocol` declares requirements
 
 ## Properties
 
 - Non-instantiable
+
+```neat
+protocol Named {
+    value name: String
+}
+```
+
 - Can be inherited by constructs
+
+```neat
+protocol Named {
+    value name: String
+}
+
+construct User: Named {
+    value name: String
+}
+```
+
 - Can inherit from other protocols
-- Can declare functions with or without bodies
-- Supports both requirements and default implementations
 
-## Generic Form
+```neat
+protocol Named {
+    value name: String
+}
 
-Protocols use direct generic parameters rather than a separate `associatedtype` mechanism.
+protocol Person: Named {
+    value age: Int
+}
+```
 
-Examples:
+- Can declare graph-binding requirements
+
+```neat
+protocol Paginated {
+    state page: Int
+}
+```
+
+- The graph-binding kind is part of the contract
+
+```neat
+protocol Paginated {
+    state page: Int
+}
+
+construct UserList: Paginated {
+    state page: Int = 0
+}
+```
+
+`state page: Int` must be satisfied by `state`, not by `value`, `binding`, or `derived`.
+
+- Constructs own the storage that satisfies protocol requirements
+
+```neat
+protocol Identifiable {
+    value id: UUID
+}
+
+construct User: Identifiable {
+    value id: UUID
+}
+```
+
+The protocol requires the member, but the storage lives in the construct.
+
+- Protocols can require functions
+
+```neat
+protocol Named {
+    function displayName() -> String
+}
+```
+
+- Protocols can require initializers
+
+```neat
+protocol Loadable {
+    init(path: String)
+}
+```
+
+- Default behavior lives in protocol extensions, not in protocol storage
+
+```neat
+protocol Paginated {
+    state page: Int
+}
+
+extension Paginated {
+    function nextPage() {
+        page += 1
+    }
+}
+```
+
+- Protocols can be generic
 
 ```neat
 protocol Container<Item>
@@ -33,20 +121,10 @@ protocol Container<Item>
 protocol Mapping<Input: Comparable, Output>
 ```
 
-`where` is reserved for genuinely relational constraints between type parameters.
-
-## Conflict Rule
-
-If two inherited protocols provide the same default function implementation, that is a compile error. A construct inheriting both protocols must implement that function explicitly.
+Generic syntax is documented separately from the core protocol concept.
 
 ## Notes
 
-- `protocol` is the main abstraction mechanism in Neat.
-- Protocols are intended to stay lightweight and composable.
-- Generic protocols are meant to be expressed directly, without extra conceptual layers.
-
-## Open Questions
-
-- What the exact protocol body surface is beyond functions
-- How protocol generic syntax should be represented in the AST
-- Whether protocol default implementations have any restrictions relative to construct functions
+- Protocols define contracts, not storage ownership.
+- Protocol extensions may provide behavior defaults.
+- Protocol extensions do not provide storage defaults.
