@@ -11,3 +11,9 @@
 
   Logger.success("sum is \(total == 10 ? "correct" : "incorrect")")
 }
+
+
+construct User {
+    value name: String
+    value age: Int
+}
