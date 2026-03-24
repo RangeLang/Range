@@ -15,11 +15,11 @@ enum PackageManifestLoader {
         let sourceFile = try parser.parseSourceFile()
         switch sourceFile {
         case .mainBlock:
-            throw ValidationError("Package.neat must declare #Name: Package.")
+            throw ValidationError("Package.neat must declare construct Name: Package.")
         case .extensions:
-            throw ValidationError("Package.neat must declare #Name: Package.")
+            throw ValidationError("Package.neat must declare construct Name: Package.")
         case .module:
-            throw ValidationError("Package.neat must declare #Name: Package.")
+            throw ValidationError("Package.neat must declare construct Name: Package.")
         case .declaration(let declaration):
             guard declaration.attribute == nil else {
                 throw ValidationError("Package.neat cannot use declaration attributes.")
@@ -29,7 +29,8 @@ enum PackageManifestLoader {
                     "Package.neat cannot project a package declaration onto another type.")
             }
             guard declaration.conformances == ["Package"] else {
-                throw ValidationError("Package.neat must declare exactly #Name: Package.")
+                throw ValidationError(
+                    "Package.neat must declare exactly construct Name: Package.")
             }
             guard declaration.body == nil else {
                 throw ValidationError("Package.neat cannot declare a render body.")

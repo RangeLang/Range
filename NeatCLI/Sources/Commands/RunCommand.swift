@@ -13,8 +13,9 @@ extension NeatCLI {
 
         mutating func run() throws {
             do {
-                let runner = MainProgramRunner(path: input ?? ".")
-                try runner.run()
+                let driver = SwiftBackendDriver()
+                let buildRoot = try driver.emitProjectWorkspace(at: input ?? ".")
+                try driver.runGeneratedWorkspace(at: buildRoot)
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure

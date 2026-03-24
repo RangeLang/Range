@@ -19,6 +19,7 @@ public struct MainBlockNode {
 
 public struct ModuleFileNode {
     public let states: [StateDeclaration]
+    public let callables: [CallableDeclaration]
     public let declarations: [DeclarationNode]
     public let extensions: [TypeExtensionDeclaration]
 }

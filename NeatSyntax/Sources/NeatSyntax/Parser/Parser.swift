@@ -35,6 +35,7 @@ public struct Parser {
         currentStateTypes = [:]
 
         var topLevelStates: [StateDeclaration] = []
+        var topLevelCallables: [CallableDeclaration] = []
         var declarations: [DeclarationNode] = []
         var extensions: [TypeExtensionDeclaration] = []
 
@@ -51,6 +52,11 @@ public struct Parser {
                 continue
             }
 
+            if isCallableStart() {
+                topLevelCallables.append(try parseCallableDeclaration())
+                continue
+            }
+
             if NeatSyntax.declarationKind(for: peek()) != nil || isBuilderDeclarationStart() {
                 declarations.append(try parseDeclaration(requiresEOF: false))
                 continue
@@ -62,17 +68,22 @@ public struct Parser {
         try consume(.eof)
         try validateBuilderDeclarations(in: declarations)
 
-        if topLevelStates.isEmpty, declarations.count == 1, extensions.isEmpty {
+        if topLevelStates.isEmpty, topLevelCallables.isEmpty, declarations.count == 1,
+            extensions.isEmpty
+        {
             return .declaration(declarations[0])
         }
 
-        if topLevelStates.isEmpty, declarations.isEmpty, !extensions.isEmpty {
+        if topLevelStates.isEmpty, topLevelCallables.isEmpty, declarations.isEmpty,
+            !extensions.isEmpty
+        {
             return .extensions(extensions)
         }
 
         return .module(
             ModuleFileNode(
                 states: topLevelStates,
+                callables: topLevelCallables,
                 declarations: declarations,
                 extensions: extensions
             )
