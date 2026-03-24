@@ -1,4 +1,4 @@
 protocol ExpressableByIntLiteral {
-    #literal(RawInt)
-    init(literal: RawInt)
+    #literal(IntLiteral)
+    init(literal: IntLiteral)
 }

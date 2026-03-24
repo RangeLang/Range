@@ -1,7 +1,7 @@
 // Exploratory initializer macro-facing compiler surface.
 // This file is for design iteration only.
 
-primitive construct Init: AttachedMacroTarget, Callable
+primitive construct Init: AttachedMacroTarget, Callable, Declaration
 
 //MARK: Example
 macro literal<T>: Attached<Init> -> Expression { initializer in

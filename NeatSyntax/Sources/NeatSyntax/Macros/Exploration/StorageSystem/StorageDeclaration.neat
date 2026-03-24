@@ -1,7 +1,7 @@
 // Exploratory storage declaration macro-facing compiler surface.
 // This file is for design iteration only.
 
-primitive protocol StorageDeclaration: AttachedMacroTarget {
+primitive protocol StorageDeclaration: AttachedMacroTarget, Declaration {
     value name: String
     value type: TypeReference
     value initializer: Expression?

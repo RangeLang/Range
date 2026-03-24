@@ -1,0 +1,12 @@
+// Exploratory macro declaration compiler surface.
+// This file is for design iteration only.
+
+primitive construct MacroDeclaration {
+    value name: String
+    value parameters: [Parameter]
+    value target: MacroTarget
+    value targetBinding: String
+    value resultBinding: String
+    value diagnosticsBinding: String
+    value body: Block
+}

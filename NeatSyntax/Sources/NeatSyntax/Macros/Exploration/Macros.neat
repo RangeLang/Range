@@ -4,5 +4,27 @@
 primitive protocol FreestandingMacroTarget
 primitive protocol AttachedMacroTarget
 
+primitive protocol SupportsRewrite<T> {
+    function rewrite(_: T)
+}
+
+primitive protocol SupportsMember<T> {
+    function member(_: T)
+}
+
+primitive protocol SupportsExtension<T> {
+    function extension(_: T)
+}
+
+primitive protocol SupportsSynthesis<T> {
+    function synthesize(_: T)
+}
+
 primitive protocol Freestanding<T: FreestandingMacroTarget>
 primitive protocol Attached<T: AttachedMacroTarget>
+
+primitive protocol Freestanding<Block>: SupportsRewrite<Block>
+primitive protocol Freestanding<Expression>: SupportsRewrite<Expression>
+
+primitive protocol Attached<StateDeclaration>: SupportsRewrite<StateDeclaration>, SupportsMember<Declaration>
+primitive protocol Attached<Construct>: SupportsMember<Declaration>, SupportsExtension<Extension>, SupportsSynthesis<Declaration>

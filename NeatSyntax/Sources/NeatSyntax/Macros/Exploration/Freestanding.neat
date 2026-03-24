@@ -1,8 +1,10 @@
 // Exploratory freestanding macro examples.
 // This file is for design iteration only.
 
-macro lock: Freestanding<Block> { block in
-    acquire()
-    block()
-    release()
+macro lock: Freestanding<Block> { block, result, diagnostics in
+    result.rewrite({
+        acquire()
+        block()
+        release()
+    })
 }

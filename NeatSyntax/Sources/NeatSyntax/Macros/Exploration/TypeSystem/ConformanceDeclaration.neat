@@ -1,0 +1,7 @@
+// Exploratory conformance declaration macro-facing compiler surface.
+// This file is for design iteration only.
+
+primitive construct ConformanceDeclaration: Declaration {
+    value type: TypeReference
+    value protocol: TypeReference
+}

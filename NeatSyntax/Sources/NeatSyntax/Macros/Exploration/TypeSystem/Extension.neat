@@ -3,6 +3,6 @@
 
 primitive construct Extension: AttachedMacroTarget {
     value target: TypeReference
-    value properties: [Property]
+    value storages: [StorageDeclaration]
     value functions: [Function]
 }
