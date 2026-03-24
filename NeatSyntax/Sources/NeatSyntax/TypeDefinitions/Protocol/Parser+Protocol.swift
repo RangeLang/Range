@@ -5,8 +5,12 @@ extension Parser {
         switch peek() {
         case .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue):
             return true
+        case .keyword(NeatSyntax.Keyword.primitive.rawValue):
+            return peek(offset: 1) == .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue)
         case .atAttribute:
             return peek(offset: 1) == .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue)
+                || (peek(offset: 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
+                    && peek(offset: 2) == .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue))
         default:
             return false
         }
@@ -15,7 +19,7 @@ extension Parser {
     public mutating func parseProtocolDeclaration(requiresEOF: Bool = true) throws
         -> ProtocolDeclaration
     {
-        let attribute = parseAttributeIfPresent(before: .protocolDefinition)
+        let modifiers = parseTypeDefinitionModifiers(before: .protocolDefinition)
 
         try consumeKeyword(.protocolDefinition)
         let name = try consumeTypeName()
@@ -32,7 +36,8 @@ extension Parser {
         }
 
         return ProtocolDeclaration(
-            attribute: attribute,
+            attribute: modifiers.attribute,
+            primitive: modifiers.primitive,
             name: name,
             conformances: conformances
         )

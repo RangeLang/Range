@@ -13,7 +13,15 @@ let package = Package(
     targets: [
         .target(
             name: "NeatSyntax",
-            path: "Sources/NeatSyntax"
+            path: "Sources/NeatSyntax",
+            exclude: [
+                "TypeDefinitions/Construct/Construct.Identity.md",
+                "TypeDefinitions/Construct/Construct.Initialization.md",
+                "TypeDefinitions/Construct/Construct.md",
+                "TypeDefinitions/Enum/Enum.md",
+                "TypeDefinitions/Primitive/Primitive.md",
+                "TypeDefinitions/Protocol/Protocol.md",
+            ]
         )
     ]
 )

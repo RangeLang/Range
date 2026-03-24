@@ -58,7 +58,7 @@ public struct Parser {
                 continue
             }
 
-            if NeatSyntax.constructKind(for: peek()) != nil || isBuilderDeclarationStart() {
+            if isConstructDeclarationStart() || isBuilderDeclarationStart() {
                 constructs.append(try parseConstructDeclaration(requiresEOF: false))
                 continue
             }

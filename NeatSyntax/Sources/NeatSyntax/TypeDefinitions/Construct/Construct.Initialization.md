@@ -1,0 +1,76 @@
+# Construct Initialization
+
+## Definition
+
+Constructs support automatic memberwise initialization by default.
+
+## Properties
+
+- A construct gets a memberwise initializer automatically
+
+```neat
+construct User {
+    value name: String
+    value age: Int
+}
+
+value user = User(name: "Ava", age: 20)
+```
+
+- Default values reduce the required initializer surface
+
+```neat
+construct User {
+    value name: String
+    value age: Int = 20
+}
+
+value user = User(name: "Ava")
+```
+
+- A construct may declare custom initializers
+
+```neat
+construct User {
+    value name: String
+    value age: Int
+
+    init(name: String) {
+        self.name = name
+        self.age = 0
+    }
+}
+```
+
+- A construct may declare multiple initializers as long as their signatures do not clash
+
+```neat
+construct User {
+    value name: String
+    value age: Int
+
+    init(name: String) {
+        self.name = name
+        self.age = 0
+    }
+
+    init(name: String, age: Int) {
+        self.name = name
+        self.age = age
+    }
+}
+```
+
+- Every `value` and `state` must be initialized unless it has a default value
+
+```neat
+construct User {
+    value name: String
+    state visits: Int = 0
+}
+```
+
+## Notes
+
+- Construct initialization follows Swift-like memberwise initializer semantics.
+- Default values remove the need to supply that member during initialization.

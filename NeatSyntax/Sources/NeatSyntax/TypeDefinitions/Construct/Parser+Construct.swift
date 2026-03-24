@@ -1,6 +1,21 @@
 import Foundation
 
 extension Parser {
+    func isConstructDeclarationStart() -> Bool {
+        switch peek() {
+        case .keyword(NeatSyntax.Keyword.construct.rawValue):
+            return true
+        case .keyword(NeatSyntax.Keyword.primitive.rawValue):
+            return peek(offset: 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
+        case .atAttribute:
+            return peek(offset: 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
+                || (peek(offset: 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
+                    && peek(offset: 2) == .keyword(NeatSyntax.Keyword.construct.rawValue))
+        default:
+            return false
+        }
+    }
+
     public mutating func parseConstructDeclaration(requiresEOF: Bool = true) throws
         -> ConstructDeclaration
     {
@@ -8,7 +23,8 @@ extension Parser {
             return try parseBuilderDeclaration(requiresEOF: requiresEOF)
         }
 
-        let attribute = parseConstructAttributeIfPresent()
+        let modifiers = parseTypeDefinitionModifiers(before: .construct)
+        let attribute = modifiers.attribute
         let kind = try parseConstructKind(attribute: attribute)
         let header = try parseConstructHeader()
         let name = header.name
@@ -102,6 +118,7 @@ extension Parser {
         return ConstructDeclaration(
             kind: kind,
             attribute: attribute,
+            primitive: modifiers.primitive,
             name: name,
             conformances: conformances,
             projectionTarget: projectionTarget,
@@ -141,6 +158,7 @@ extension Parser {
         return ConstructDeclaration(
             kind: .builder,
             attribute: nil,
+            primitive: nil,
             name: name,
             conformances: [],
             projectionTarget: nil,
@@ -186,9 +204,5 @@ extension Parser {
         throw ParseError(
             "Expected 'on', ':', or '{' after declaration name. Use construct \(name) { ... }, construct \(name): Contract { ... }, or construct \(name) on Target: Contract { ... }."
         )
-    }
-
-    mutating func parseConstructAttributeIfPresent() -> AttributeApplication? {
-        parseAttributeIfPresent(before: .construct)
     }
 }

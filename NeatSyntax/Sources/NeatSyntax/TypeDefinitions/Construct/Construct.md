@@ -4,30 +4,51 @@
 
 A construct is an identity-bearing struct.
 
-## Example
+## Properties
+
+- Declared as a concrete, identity-bearing type
 
 ```neat
-construct User {
+construct Person {
     value name: String
+}
+```
+
+- Instantiable
+
+```neat
+value user = Person(name: "George")
+```
+
+- Can inherit from other constructs
+
+```neat
+construct Person {
+    value name: String
+}
+
+construct User: Person {
     value age: Int
 }
 ```
 
-## Properties
-
-- Instantiable
-- Always fully concrete
-- Can inherit from other constructs
 - Can conform to protocols
+
+```neat
+protocol Named {
+    function displayName() -> String
+}
+
+construct Person: Named {
+    value name: String
+
+    function displayName() -> String {
+        return name
+    }
+}
+```
 
 ## Notes
 
 - `construct` defines a concrete runtime type.
 - A construct carries identity rather than being a purely structural value.
-
-## Open Questions
-
-- What inheritance means for constructs in Neat
-- Whether construct inheritance is single or multiple
-- How identity is represented at runtime
-- Whether all constructs have the same construction model

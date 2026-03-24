@@ -1,0 +1,4 @@
+primitive enum Bit {
+    case zero
+    case one
+}

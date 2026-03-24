@@ -9,6 +9,7 @@ public enum ConstructKind {
 public struct ConstructDeclaration {
     public let kind: ConstructKind
     public let attribute: AttributeApplication?
+    public let primitive: PrimitiveModifier?
     public let name: String
     public let conformances: [String]
     public let projectionTarget: String?
@@ -19,6 +20,10 @@ public struct ConstructDeclaration {
     public let values: [ValueDeclaration]
     public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
+
+    public var isPrimitive: Bool {
+        primitive != nil
+    }
 }
 
 public struct AttributeApplication {

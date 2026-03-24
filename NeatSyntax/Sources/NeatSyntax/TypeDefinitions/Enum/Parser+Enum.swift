@@ -5,8 +5,12 @@ extension Parser {
         switch peek() {
         case .keyword(NeatSyntax.Keyword.enumeration.rawValue):
             return true
+        case .keyword(NeatSyntax.Keyword.primitive.rawValue):
+            return peek(offset: 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
         case .atAttribute:
             return peek(offset: 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
+                || (peek(offset: 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
+                    && peek(offset: 2) == .keyword(NeatSyntax.Keyword.enumeration.rawValue))
         default:
             return false
         }
@@ -15,7 +19,7 @@ extension Parser {
     public mutating func parseEnumDeclaration(requiresEOF: Bool = true) throws
         -> EnumDeclaration
     {
-        let attribute = parseAttributeIfPresent(before: .enumeration)
+        let modifiers = parseTypeDefinitionModifiers(before: .enumeration)
 
         try consumeKeyword(.enumeration)
         let name = try consumeTypeName()
@@ -35,7 +39,8 @@ extension Parser {
         }
 
         return EnumDeclaration(
-            attribute: attribute,
+            attribute: modifiers.attribute,
+            primitive: modifiers.primitive,
             name: name,
             conformances: conformances,
             cases: cases

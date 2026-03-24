@@ -21,6 +21,8 @@ It makes compiler-known foundations visible in stdlib code instead of hiding the
 - The declaration is real Neat surface syntax.
 - The compiler is responsible for its implementation.
 - Ordinary Neat code is expected to build on top of primitive declarations.
+- `primitive` changes implementation origin, not declaration shape.
+- Bodies are allowed wherever the underlying declaration kind normally allows a body.
 
 ## Examples
 
@@ -43,11 +45,11 @@ construct Int<value bits: RawInt, value signedness: Signedness = .signed> {
 
 - `primitive` is a modifier on a type definition, not a standalone declaration category.
 - A primitive declaration may omit its body because no ordinary Neat implementation exists at that level.
+- If a primitive declaration includes a body, that body is still part of the declaration surface.
 - Primitive declarations are intended to keep the boundary between compiler and stdlib explicit.
 
 ## Open Questions
 
-- Whether primitive declarations may always include a body, or only some kinds may
 - If a primitive declaration has a body, whether that body is interface-only or semantically enforced
 - Whether primitive declarations are restricted to stdlib or compiler-owned modules
 - How `primitive` should be represented in the AST and parser
