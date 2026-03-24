@@ -43,3 +43,12 @@ public enum BinaryOperator: String {
     case and = "&&"
     case or = "||"
 }
+
+public struct InterpolatedString {
+    public let segments: [StringSegment]
+}
+
+public indirect enum StringSegment {
+    case text(String)
+    case expression(Expression)
+}
