@@ -94,7 +94,7 @@ enum ProjectSourceValidator {
             return [declaration]
         case .module(let module):
             return module.constructs
-        case .mainBlock, .extensions, .enumeration:
+        case .mainBlock, .extensions, .enumeration, .protocolDefinition:
             return []
         }
     }
@@ -103,7 +103,7 @@ enum ProjectSourceValidator {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .mainBlock, .extensions, .enumeration:
+        case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition:
             return []
         }
     }

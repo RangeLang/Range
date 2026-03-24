@@ -27,6 +27,7 @@ public struct Parser {
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
+        var protocols: [ProtocolDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
 
         while peek() != .eof {
@@ -52,18 +53,24 @@ public struct Parser {
                 continue
             }
 
+            if isProtocolDeclarationStart() {
+                protocols.append(try parseProtocolDeclaration(requiresEOF: false))
+                continue
+            }
+
             if NeatSyntax.constructKind(for: peek()) != nil || isBuilderDeclarationStart() {
                 constructs.append(try parseConstructDeclaration(requiresEOF: false))
                 continue
             }
 
-            throw ParseError("Expected top-level state, extension, enum, or declaration.")
+            throw ParseError("Expected top-level state, extension, enum, protocol, or declaration.")
         }
 
         try consume(.eof)
         try validateBuilderDeclarations(in: constructs)
 
         if topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
+            protocols.isEmpty,
             constructs.count == 1,
             extensions.isEmpty
         {
@@ -71,6 +78,7 @@ public struct Parser {
         }
 
         if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+            protocols.isEmpty,
             enumerations.count == 1, extensions.isEmpty
         {
             return .enumeration(enumerations[0])
@@ -78,6 +86,15 @@ public struct Parser {
 
         if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
+            protocols.count == 1,
+            extensions.isEmpty
+        {
+            return .protocolDefinition(protocols[0])
+        }
+
+        if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+            enumerations.isEmpty,
+            protocols.isEmpty,
             !extensions.isEmpty
         {
             return .extensions(extensions)
@@ -89,6 +106,7 @@ public struct Parser {
                 callables: topLevelCallables,
                 constructs: constructs,
                 enumerations: enumerations,
+                protocols: protocols,
                 extensions: extensions
             )
         )

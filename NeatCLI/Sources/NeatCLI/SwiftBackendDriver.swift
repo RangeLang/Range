@@ -169,7 +169,7 @@ struct SwiftBackendDriver {
             throw ValidationError(
                 "Swift backend expects @main to live in its own file for now. Split declarations and @main into separate files."
             )
-        case .construct, .enumeration:
+        case .construct, .enumeration, .protocolDefinition:
             throw ValidationError(
                 "Swift backend requires a file with @main { ... } when compiling a single file."
             )
@@ -220,7 +220,7 @@ struct SwiftBackendDriver {
                         mainBlock: block
                     )
                 )
-            case .extensions, .enumeration:
+            case .extensions, .enumeration, .protocolDefinition:
                 continue
             }
         }

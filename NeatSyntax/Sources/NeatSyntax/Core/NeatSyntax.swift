@@ -21,6 +21,7 @@ enum NeatSyntax {
         case switchStatement = "switch"
         case defaultBranch = "default"
         case enumeration = "enum"
+        case protocolDefinition = "protocol"
         case construct = "construct"
         case function = "function"
         case getter = "get"
