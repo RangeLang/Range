@@ -1,0 +1,16 @@
+// Exploratory variadic macro example.
+// This file is for design iteration only.
+
+macro variadic: Attached<Parameter> { target, result, diagnostics in
+    if !target.arguments.isEmpty {
+        result.argument.rewrite(
+            ArrayExpression(
+                elements: target.arguments.map { $0.value }
+            )
+        )
+    }
+}
+
+function sum(#variadic _ values: Int) -> Int { }
+
+sum(1, 2, 3)

@@ -1,0 +1,7 @@
+// Exploratory parameter target macro-facing compiler surface.
+// This file is for design iteration only.
+
+primitive construct ParameterTarget {
+    value parameter: Parameter
+    value arguments: [Argument]
+}

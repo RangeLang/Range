@@ -24,4 +24,5 @@ primitive protocol Freestanding<Expression>: SupportsRewrite<Expression>
 
 primitive protocol Attached<State>: SupportsRewrite<State>, SupportsMember<Declaration>
 primitive protocol Attached<Derived>: SupportsRewrite<Derived>
+primitive protocol Attached<Parameter>: SupportsRewrite<Expression>
 primitive protocol Attached<Construct>: SupportsMember<Declaration>, SupportsExtension<Extension>
