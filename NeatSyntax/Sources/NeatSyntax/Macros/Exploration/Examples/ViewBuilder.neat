@@ -1,0 +1,68 @@
+// Exploratory view builder macro example.
+// This file is for design iteration only.
+
+protocol View {
+    #viewBuilder
+    derived body: View
+}
+
+construct ViewBuilder {
+    function buildExpression(_ expression: View) -> View {
+        expression
+    }
+
+    function buildBlock(_ components: [View]) -> View {
+        TupleView(components)
+    }
+
+    function buildEither(first: View) -> View {
+        first
+    }
+
+    function buildEither(second: View) -> View {
+        second
+    }
+
+    function buildOptional(_ component: View?) -> View {
+        component ?? EmptyView()
+    }
+}
+
+function lower(_ block: Block) -> Expression {
+    ViewBuilder.buildBlock(
+        block.statements.map { statement in
+            lower(statement)
+        }
+    )
+}
+
+function lower(_ statement: Statement) -> Expression {
+    switch statement {
+    case ExpressionStatement(let expressionStatement):
+        return ViewBuilder.buildExpression(expressionStatement.expression)
+
+    case If(let ifStatement):
+        if ifStatement.elseBody != nil {
+            return ViewBuilder.buildEither(
+                first: lower(ifStatement.thenBody),
+                second: lower(ifStatement.elseBody!)
+            )
+        }
+
+        return ViewBuilder.buildOptional(
+            ifStatement.thenBody
+        )
+    }
+}
+
+macro viewBuilder: Attached<Derived> { target, result, diagnostics in
+    result.rewrite(
+        Derived(
+            name: target.name,
+            type: target.type,
+            body: {
+                lower(target.body)
+            }
+        )
+    )
+}

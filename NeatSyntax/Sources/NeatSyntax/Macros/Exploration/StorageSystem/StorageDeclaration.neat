@@ -4,6 +4,4 @@
 primitive protocol StorageDeclaration: AttachedMacroTarget, Declaration {
     value name: String
     value type: TypeReference
-    value initializer: Expression?
-    value accessors: AccessorDeclaration?
 }

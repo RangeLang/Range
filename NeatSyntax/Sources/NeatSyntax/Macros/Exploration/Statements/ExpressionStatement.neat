@@ -1,0 +1,6 @@
+// Exploratory expression statement macro-facing compiler surface.
+// This file is for design iteration only.
+
+primitive construct ExpressionStatement: Statement {
+    value expression: Expression
+}

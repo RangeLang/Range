@@ -6,7 +6,7 @@ macro iterable: Attached<Enum> { target, result, diagnostics in
         Value(
             name: "allCases",
             type: Array<target.self>,
-            initializer: target.cases.map { $0.expression }
+            default: target.cases.map { $0.expression }
         )
     )
 }
