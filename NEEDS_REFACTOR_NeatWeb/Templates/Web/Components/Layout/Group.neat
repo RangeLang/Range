@@ -1,5 +1,0 @@
-construct Group : Primitive {
-  value children: [Renderable] = []
-
-  value web: WebNode = WebNode.fragment()
-}

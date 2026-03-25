@@ -1,9 +1,0 @@
-construct Text : Primitive {
-  value text: String
-  environment textTag: TextTag
-
-  value web: WebNode = WebNode.element(
-    tag: "\(textTag)",
-    children: [WebNode.text(value: text)]
-  )
-}

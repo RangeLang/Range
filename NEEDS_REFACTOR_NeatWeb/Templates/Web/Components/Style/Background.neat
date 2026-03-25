@@ -1,8 +1,0 @@
-
-extension Renderable {
-  function background(color: Color) -> Renderable {
-    return self.webStyles.append(
-      WebStyle(attribute: "background", value: "\(color)")
-    )
-  }
-}

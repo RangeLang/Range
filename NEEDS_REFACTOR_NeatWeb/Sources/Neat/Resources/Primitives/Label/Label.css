@@ -1,5 +1,0 @@
-label {
-    display: inline-flex;
-    align-items: center;
-    gap: calc(var(--label-gap, 2) * var(--space-unit));
-}

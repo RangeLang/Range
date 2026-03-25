@@ -383,7 +383,8 @@ struct NeatLanguageServer {
 
     private func keywordCompletions() -> [[String: Any]] {
         [
-            "case", "derived", "environment", "extension", "state", "switch", "value",
+            "case", "construct", "derived", "enum", "environment", "extension", "macro",
+            "primitive", "protocol", "state", "switch", "value",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
 

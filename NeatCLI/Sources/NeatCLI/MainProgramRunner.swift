@@ -60,7 +60,7 @@ struct MainProgramRunner {
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )
-        case .construct, .enumeration, .protocolDefinition:
+        case .construct, .enumeration, .protocolDefinition, .macro:
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )

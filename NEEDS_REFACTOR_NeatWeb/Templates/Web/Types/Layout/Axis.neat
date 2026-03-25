@@ -1,4 +1,0 @@
-construct Axis {
-  case horizontal
-  case vertical
-}

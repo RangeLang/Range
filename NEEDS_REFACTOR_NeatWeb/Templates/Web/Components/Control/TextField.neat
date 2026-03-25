@@ -1,9 +1,0 @@
-construct TextField : Primitive {
-  binding text _: String
-  value placeholder: String?
-
-  value web: WebNode = WebNode.element(
-    tag: "input",
-    attributes: ["type": "text"]
-  )
-}

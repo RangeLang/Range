@@ -1,4 +1,0 @@
-construct HTTPBody {
-  case text(value _: String)
-  case data(value _: Data)
-}

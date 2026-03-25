@@ -1,4 +1,0 @@
-construct ScrollBarBehavior {
-  case mouseMove
-  case scroll
-}

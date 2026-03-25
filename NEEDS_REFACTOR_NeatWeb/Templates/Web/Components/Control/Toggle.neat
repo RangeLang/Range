@@ -1,8 +1,0 @@
-construct Toggle : Primitive {
-  binding isOn _: Bool
-
-  value web: WebNode = WebNode.element(
-    tag: "input",
-    attributes: ["type": "checkbox"]
-  )
-}

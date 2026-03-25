@@ -1,4 +1,0 @@
-construct WebStyle {
-  value attribute: String
-  value value: String
-}

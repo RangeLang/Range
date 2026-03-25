@@ -1,3 +1,0 @@
-construct URL {
-    value path _: String
-}

@@ -30,6 +30,7 @@ module.exports = grammar({
     declaration: ($) =>
       choice(
         $.main_block,
+        $.macro_declaration,
         $.builder_declaration,
         $.sigiled_declaration,
         $.builder_hook_declaration,
@@ -43,6 +44,38 @@ module.exports = grammar({
       ),
 
     main_block: ($) => seq("@", "main", field("body", $.block)),
+
+    macro_declaration: ($) =>
+      seq(
+        "macro",
+        field("name", $.identifier),
+        optional(field("generics", $.generic_parameter_clause)),
+        optional(field("parameters", $.callable_parameter_clause)),
+        ":",
+        field("target", $.macro_target),
+        field("body", $.macro_body),
+      ),
+
+    macro_target: ($) =>
+      seq(
+        field("kind", choice("Attached", "Freestanding")),
+        "<",
+        field("type", $.type),
+        ">",
+      ),
+
+    macro_body: ($) =>
+      seq("{", field("bindings", $.macro_bindings), repeat($.statement), "}"),
+
+    macro_bindings: ($) =>
+      seq(
+        field("target", $.identifier),
+        ",",
+        field("result", $.identifier),
+        ",",
+        field("diagnostics", $.identifier),
+        "in",
+      ),
 
     builder_declaration: ($) =>
       seq(
@@ -185,6 +218,9 @@ module.exports = grammar({
     parameter_clause: ($) => seq("(", optional(commaSep1($.parameter)), ")"),
 
     callable_parameter_clause: ($) => seq("(", commaSep1($.parameter), ")"),
+
+    generic_parameter_clause: ($) =>
+      seq("<", commaSep1(field("parameter", $.type_identifier)), ">"),
 
     parameter: ($) =>
       seq(

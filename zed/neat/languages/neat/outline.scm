@@ -1,3 +1,6 @@
+(macro_declaration
+  name: (identifier) @name) @item
+
 (sigiled_declaration
   name: (type_identifier) @name) @item
 

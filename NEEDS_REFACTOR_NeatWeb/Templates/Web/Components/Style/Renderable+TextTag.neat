@@ -1,5 +1,0 @@
-extension Renderable {
-  function textTag(tag _: TextTag) -> Renderable {
-    *environment textTag: TextTag = tag
-  }
-}

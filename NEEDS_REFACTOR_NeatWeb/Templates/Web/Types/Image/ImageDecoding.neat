@@ -1,5 +1,0 @@
-construct ImageDecoding {
-  case asynchronous
-  case synchronous
-  case automatic
-}

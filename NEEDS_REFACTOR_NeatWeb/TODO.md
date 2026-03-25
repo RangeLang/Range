@@ -1,1 +1,0 @@
-- NeatWeb: build a semantic graph for UI composition and use it for real-time chunking plus predictive loading.

@@ -1,4 +1,0 @@
-construct ListType {
-  case unordered
-  case ordered
-}

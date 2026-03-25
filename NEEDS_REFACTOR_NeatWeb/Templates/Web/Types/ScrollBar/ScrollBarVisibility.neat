@@ -1,6 +1,0 @@
-construct ScrollBarVisibility {
-  case automatic
-  case always
-  case hidden
-  case never
-}

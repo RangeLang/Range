@@ -1,9 +1,0 @@
-construct FontSize {
-  case title
-  case subtitle
-  case headline
-  case subheadline
-  case body
-  case callout
-  case caption
-}

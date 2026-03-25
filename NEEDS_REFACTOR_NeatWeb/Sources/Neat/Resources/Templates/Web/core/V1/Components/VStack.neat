@@ -1,9 +1,0 @@
-construct VStack : Component {
-
-  var body: Component {
-    Div {
-      content()
-    }
-    .class("vstack")
-  }
-}

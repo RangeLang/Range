@@ -1,5 +1,0 @@
-construct ImageFetchPriority {
-  case high
-  case low
-  case automatic
-}

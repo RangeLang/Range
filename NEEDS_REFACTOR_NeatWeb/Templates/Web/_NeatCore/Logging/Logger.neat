@@ -1,8 +1,0 @@
-construct Logger {
-    function log(text _: String)
-    function debug(text _: String)
-    function info(text _: String)
-    function success(text _: String)
-    function warning(text _: String)
-    function error(text _: String)
-}

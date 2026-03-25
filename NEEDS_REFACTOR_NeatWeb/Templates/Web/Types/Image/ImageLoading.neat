@@ -1,4 +1,0 @@
-construct ImageLoading {
-  case deferred
-  case immediate
-}

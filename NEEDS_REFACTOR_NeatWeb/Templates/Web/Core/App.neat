@@ -1,5 +1,0 @@
-construct App {
-  derived head: Head
-  derived routes: Route
-  value server: ServerConfiguration = ServerConfiguration()
-}

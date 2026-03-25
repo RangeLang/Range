@@ -1,4 +1,0 @@
-construct Point {
-  value x: Int
-  value y: Int
-}

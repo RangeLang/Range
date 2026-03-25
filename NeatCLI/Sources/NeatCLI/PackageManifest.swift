@@ -38,6 +38,8 @@ enum PackageManifestLoader {
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .protocolDefinition:
             throw ValidationError("Package.neat must declare construct Name: Package.")
+        case .macro:
+            throw ValidationError("Package.neat must declare construct Name: Package.")
         }
     }
 }
