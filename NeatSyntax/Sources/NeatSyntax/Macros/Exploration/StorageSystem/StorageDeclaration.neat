@@ -1,4 +1,4 @@
-// Exploratory storage declaration macro-facing compiler surface.
+// Exploratory storage macro-facing compiler surface.
 // This file is for design iteration only.
 
 primitive protocol StorageDeclaration: AttachedMacroTarget, Declaration {

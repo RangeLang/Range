@@ -26,5 +26,5 @@ primitive protocol Attached<T: AttachedMacroTarget>
 primitive protocol Freestanding<Block>: SupportsRewrite<Block>
 primitive protocol Freestanding<Expression>: SupportsRewrite<Expression>
 
-primitive protocol Attached<StateDeclaration>: SupportsRewrite<StateDeclaration>, SupportsMember<Declaration>
+primitive protocol Attached<State>: SupportsRewrite<State>, SupportsMember<Declaration>
 primitive protocol Attached<Construct>: SupportsMember<Declaration>, SupportsExtension<Extension>, SupportsSynthesis<Declaration>

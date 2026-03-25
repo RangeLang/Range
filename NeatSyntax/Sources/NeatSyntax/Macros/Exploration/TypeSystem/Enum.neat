@@ -19,8 +19,8 @@ primitive construct AssociatedValue {
 }
 
 //MARK: Example
-macro iterable: Attached<Enum> -> ValueDeclaration { enum in
-    return ValueDeclaration(
+macro iterable: Attached<Enum> -> Value { enum in
+    return Value(
         name: "allCases",
         type: Array<enum.self>,
         initializer: enum.cases.map { $0.expression }

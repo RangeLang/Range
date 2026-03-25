@@ -1,4 +1,0 @@
-// Exploratory value declaration macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive construct ValueDeclaration: StorageDeclaration
