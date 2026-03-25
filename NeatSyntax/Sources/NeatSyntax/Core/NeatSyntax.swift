@@ -24,6 +24,7 @@ enum NeatSyntax {
         case enumeration = "enum"
         case protocolDefinition = "protocol"
         case construct = "construct"
+        case macro = "macro"
         case function = "function"
         case getter = "get"
         case setter = "set"

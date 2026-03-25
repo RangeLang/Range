@@ -4,6 +4,7 @@ public enum SourceFileNode {
     case construct(ConstructDeclaration)
     case enumeration(EnumDeclaration)
     case protocolDefinition(ProtocolDeclaration)
+    case macro(MacroDeclaration)
     case mainBlock(MainBlockNode)
     case extensions([ExtensionDeclaration])
     case module(ModuleFileNode)
@@ -19,5 +20,6 @@ public struct ModuleFileNode {
     public let constructs: [ConstructDeclaration]
     public let enumerations: [EnumDeclaration]
     public let protocols: [ProtocolDeclaration]
+    public let macros: [MacroDeclaration]
     public let extensions: [ExtensionDeclaration]
 }

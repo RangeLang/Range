@@ -28,6 +28,7 @@ public struct Parser {
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
+        var macros: [MacroDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
 
         while peek() != .eof {
@@ -58,12 +59,18 @@ public struct Parser {
                 continue
             }
 
+            if isMacroDeclarationStart() {
+                macros.append(try parseMacroDeclaration())
+                continue
+            }
+
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
                 constructs.append(try parseConstructDeclaration(requiresEOF: false))
                 continue
             }
 
-            throw ParseError("Expected top-level state, extension, enum, protocol, or declaration.")
+            throw ParseError(
+                "Expected top-level state, extension, enum, protocol, macro, or declaration.")
         }
 
         try consume(.eof)
@@ -72,6 +79,7 @@ public struct Parser {
         if topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
             protocols.isEmpty,
             constructs.count == 1,
+            macros.isEmpty,
             extensions.isEmpty
         {
             return .construct(constructs[0])
@@ -79,6 +87,7 @@ public struct Parser {
 
         if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             protocols.isEmpty,
+            macros.isEmpty,
             enumerations.count == 1, extensions.isEmpty
         {
             return .enumeration(enumerations[0])
@@ -87,6 +96,7 @@ public struct Parser {
         if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
             protocols.count == 1,
+            macros.isEmpty,
             extensions.isEmpty
         {
             return .protocolDefinition(protocols[0])
@@ -95,6 +105,16 @@ public struct Parser {
         if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
+            macros.count == 1,
+            extensions.isEmpty
+        {
+            return .macro(macros[0])
+        }
+
+        if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+            enumerations.isEmpty,
+            protocols.isEmpty,
+            macros.isEmpty,
             !extensions.isEmpty
         {
             return .extensions(extensions)
@@ -107,6 +127,7 @@ public struct Parser {
                 constructs: constructs,
                 enumerations: enumerations,
                 protocols: protocols,
+                macros: macros,
                 extensions: extensions
             )
         )
