@@ -1,0 +1,42 @@
+// Exploratory equatable macro example.
+// This file is for design iteration only.
+
+protocol Equatable {
+    function ==(lhs: Self, rhs: Self) -> Bool
+}
+
+macro equatable: Attached<Construct> { target, result, diagnostics in
+    result.extension(
+        Extension(
+            target: target.self,
+            protocols: [Equatable.self],
+            storages: [],
+            functions: [
+                Function(
+                    name: "==",
+                    params: [
+                        Parameter(
+                            externalName: nil,
+                            localName: "lhs",
+                            type: target.self,
+                            defaultValue: nil
+                        ),
+                        Parameter(
+                            externalName: nil,
+                            localName: "rhs",
+                            type: target.self,
+                            defaultValue: nil
+                        )
+                    ],
+                    arguments: [],
+                    returnType: Bool.self,
+                    body: {
+                        return target.storages.allSatisfy { storage in
+                            lhs[storage.name] == rhs[storage.name]
+                        }
+                    }
+                )
+            ]
+        )
+    )
+}

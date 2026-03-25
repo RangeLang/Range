@@ -1,10 +1,2 @@
-// Exploratory freestanding macro examples.
+// Exploratory freestanding macro-facing surface.
 // This file is for design iteration only.
-
-macro lock: Freestanding<Block> { block, result, diagnostics in
-    result.rewrite({
-        acquire()
-        block()
-        release()
-    })
-}

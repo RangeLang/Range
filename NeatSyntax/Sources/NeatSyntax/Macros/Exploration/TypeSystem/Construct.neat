@@ -8,22 +8,3 @@ primitive construct Construct: AttachedMacroTarget {
     value inits: [Init]
     value functions: [Function]
 }
-
-//MARK: Example
-macro codable: Attached<Construct> { construct, result, diagnostics in
-    result.synthesize(
-        ConformanceDeclaration(
-            type: construct.self,
-            protocol: Codable.self
-        )
-    )
-
-    result.synthesize(
-        Function(
-            name: "encode",
-            returnType: nil
-        )
-    )
-
-    result.synthesize(Init)
-}

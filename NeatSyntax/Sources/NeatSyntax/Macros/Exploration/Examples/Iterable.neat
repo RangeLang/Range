@@ -1,0 +1,12 @@
+// Exploratory iterable macro example.
+// This file is for design iteration only.
+
+macro iterable: Attached<Enum> { target, result, diagnostics in
+    result.member(
+        Value(
+            name: "allCases",
+            type: Array<target.self>,
+            initializer: target.cases.map { $0.expression }
+        )
+    )
+}

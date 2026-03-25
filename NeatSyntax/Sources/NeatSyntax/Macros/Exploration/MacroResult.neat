@@ -1,9 +1,0 @@
-// Exploratory macro result surface.
-// This file is for design iteration only.
-
-primitive construct MacroResult {
-    value rewrite: Declaration?
-    value members: [Declaration]
-    value extensions: [Extension]
-    value synthesis: [Declaration]
-}

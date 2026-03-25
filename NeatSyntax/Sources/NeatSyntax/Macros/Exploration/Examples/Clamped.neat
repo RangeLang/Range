@@ -1,0 +1,31 @@
+// Exploratory clamped macro example.
+// This file is for design iteration only.
+
+macro clamped(min: Int, max: Int): Attached<State> { target, result, diagnostics in
+    value backingName = "_\(target.name)"
+
+    result.rewrite(
+        State(
+            name: target.name,
+            type: target.type,
+            initializer: nil,
+            accessors: AccessorDeclaration(
+                getter: {
+                    return backingName
+                },
+                setter: {
+                    backingName = min(max(newValue, min), max)
+                }
+            )
+        )
+    )
+
+    result.member(
+        State(
+            name: backingName,
+            type: target.type,
+            initializer: target.initializer,
+            accessors: nil
+        )
+    )
+}

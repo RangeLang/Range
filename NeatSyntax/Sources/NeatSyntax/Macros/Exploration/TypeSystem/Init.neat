@@ -2,13 +2,3 @@
 // This file is for design iteration only.
 
 primitive construct Init: AttachedMacroTarget, Callable, Declaration
-
-//MARK: Example
-macro literal<T>: Attached<Init> -> Expression { initializer in
-    if initializer.arguments.count == 1,
-       initializer.arguments[0].type == T.self {
-        return initializer.expression(arguments: [
-            initializer.arguments[0]
-        ])
-    }
-}

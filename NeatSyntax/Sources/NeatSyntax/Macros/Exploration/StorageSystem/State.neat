@@ -2,33 +2,3 @@
 // This file is for design iteration only.
 
 primitive construct State: StorageDeclaration
-
-//MARK: Example
-macro clamped(min: Int, max: Int): Attached<State> { state, result, diagnostics in
-    value backingName = "_\(state.name)"
-
-    result.rewrite(
-        State(
-            name: state.name,
-            type: state.type,
-            initializer: nil,
-            accessors: AccessorDeclaration(
-                getter: {
-                    return backingName
-                },
-                setter: {
-                    backingName = min(max(newValue, min), max)
-                }
-            )
-        )
-    )
-
-    result.member(
-        State(
-            name: backingName,
-            type: state.type,
-            initializer: state.initializer,
-            accessors: nil
-        )
-    )
-}

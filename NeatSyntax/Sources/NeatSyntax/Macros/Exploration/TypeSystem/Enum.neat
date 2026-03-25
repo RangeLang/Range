@@ -17,12 +17,3 @@ primitive construct AssociatedValue {
     value label: String?
     value type: TypeReference
 }
-
-//MARK: Example
-macro iterable: Attached<Enum> -> Value { enum in
-    return Value(
-        name: "allCases",
-        type: Array<enum.self>,
-        initializer: enum.cases.map { $0.expression }
-    )
-}
