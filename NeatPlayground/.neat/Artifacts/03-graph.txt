@@ -18,6 +18,7 @@
   [construct] file:/Users/george/Documents/Neat/NeatCore/DataSystem/Set/SetLiteral.neat/construct:SetLiteral :: @core SetLiteral
   [construct] file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/String.neat/construct:String :: @core String
   [construct] file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/StringLiteral.neat/construct:StringLiteral :: @core StringLiteral
+  [construct] file:/Users/george/Documents/Neat/NeatCore/DataSystem/Void/Void.neat/construct:Void :: @core Void
   [construct] file:/Users/george/Documents/Neat/NeatCore/Primitives/Byte.neat/construct:Byte :: @core Byte
   [construct] file:/Users/george/Documents/Neat/NeatPlayground/Package.neat/construct:NeatPlayground :: NeatPlayground
   [construct] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:Person :: Person
@@ -59,6 +60,7 @@
   [file] file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/ExpressableByStringLiteral.neat :: ExpressableByStringLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/String.neat :: String.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/StringLiteral.neat :: StringLiteral.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/DataSystem/Void/Void.neat :: Void.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/Addition.neat :: Addition.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/Comparison.neat :: Comparison.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/CompoundAssignment.neat :: CompoundAssignment.neat
@@ -318,6 +320,7 @@
   file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/StringLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/StringLiteral.neat/construct:StringLiteral
   file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/StringLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/StringLiteral.neat/extension:StringLiteral
   file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/StringLiteral.neat/extension:StringLiteral -extends-> type:StringLiteral
+  file:/Users/george/Documents/Neat/NeatCore/DataSystem/Void/Void.neat -contains-> file:/Users/george/Documents/Neat/NeatCore/DataSystem/Void/Void.neat/construct:Void
   file:/Users/george/Documents/Neat/NeatCore/Primitives/Bit.neat -contains-> file:/Users/george/Documents/Neat/NeatCore/Primitives/Bit.neat/enum:Bit
   file:/Users/george/Documents/Neat/NeatCore/Primitives/Byte.neat -contains-> file:/Users/george/Documents/Neat/NeatCore/Primitives/Byte.neat/construct:Byte
   file:/Users/george/Documents/Neat/NeatCore/Primitives/Byte.neat/construct:Byte -contains-> file:/Users/george/Documents/Neat/NeatCore/Primitives/Byte.neat/construct:Byte/init:

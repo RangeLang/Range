@@ -23,7 +23,7 @@ If the compiler has special knowledge of one of these types, that knowledge shou
 
 The main foundational type and protocol layer:
 
-- Scalar/data families: `Int`, `String`, `Bool`, `Float`, `Data`
+- Scalar/data families: `Int`, `String`, `Bool`, `Float`, `Data`, `Void`
 - Literal carrier types: `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, `SetLiteral`
 - Literal bridge protocols: `ExpressableByIntLiteral`, `ExpressableByStringLiteral`, `ExpressableByBoolLiteral`, `ExpressableByFloatLiteral`, `ExpressableByNilLiteral`, `ExpressableByArrayLiteral`, `ExpressableByDictionaryLiteral`, `ExpressableBySetLiteral`
 - Core generic data types: `Optional`, `Array`, `Dictionary`, `Set`
