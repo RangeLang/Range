@@ -68,3 +68,11 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 `NeatCore` is loaded by `NeatCLI` through the same Swift-based compiler pipeline used for other Neat source. The point is not to eliminate the compiler's bootstrap role, but to keep that role narrow and explicit.
 
 In short: Swift hosts the compiler today, but Neat's basic world should increasingly be described in Neat.
+
+## Boundary Note
+
+Swift may define compiler implementation types such as parser enums, lowering state, backend structures, and other internal machinery.
+
+Neat should define the language-visible type world.
+
+That means foundational language types and protocols such as `Int`, `String`, `Bool`, `Float`, `Data`, `Optional`, `Array`, `Dictionary`, `Set`, `Equatable`, `Hashable`, and `Comparable` belong in `NeatCore`, not as the real source of truth inside Swift compiler enums.
