@@ -471,6 +471,11 @@ private struct MainProgramInterpreter {
         case .nilLiteral:
             return .nilLiteral
 
+        case .block:
+            throw ValidationError(
+                "Block expressions are not supported in the main-program interpreter yet."
+            )
+
         case .identifier(let name):
             return try lookup(name: name)?.value
                 ?? {

@@ -158,6 +158,8 @@ extension Parser {
             let expression = try parseExpression()
             try consume(.rightParen)
             return expression
+        case .leftBrace:
+            return .block(try parseStatementBlock(baseLocalBindings: [:]))
         default:
             throw ParseError("Expected expression.")
         }
@@ -286,6 +288,9 @@ extension Parser {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
+        case .block:
+            throw ParseError(
+                "Block expressions are not supported in state initializer inference yet.")
         case .identifier(let name):
             guard let type = accessibleTypes[name] else {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")

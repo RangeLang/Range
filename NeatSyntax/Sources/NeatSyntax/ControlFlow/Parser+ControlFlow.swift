@@ -343,6 +343,12 @@ extension Parser {
         var localBindings = baseLocalBindings
         var statements: [Statement] = []
         while peek() != .rightBrace {
+            if let expandedStatements = try parseFreestandingBlockMacroExpansionIfPresent(
+                localBindings: &localBindings
+            ) {
+                statements.append(contentsOf: expandedStatements)
+                continue
+            }
             statements.append(try parseStatement(localBindings: &localBindings))
         }
 

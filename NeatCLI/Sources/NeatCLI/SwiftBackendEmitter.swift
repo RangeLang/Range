@@ -321,6 +321,8 @@ struct SwiftBackendEmitter {
             return value ? "true" : "false"
         case .nilLiteral:
             return "nil"
+        case .block:
+            throw ValidationError("Swift backend does not support block expressions.")
         case .identifier(let name):
             return name
         case .call(let name, let arguments):

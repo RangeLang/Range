@@ -74,7 +74,7 @@ extension Parser {
 
     func canUseExplicitTypeForStoredInitializer(_ expression: Expression) -> Bool {
         switch expression {
-        case .call, .unary, .binary:
+        case .call, .unary, .binary, .block:
             return true
         default:
             return false
