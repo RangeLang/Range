@@ -165,9 +165,25 @@ struct SwiftBackendDriver {
                     )
                 ]
             )
-        case .module:
-            throw ValidationError(
-                "Swift backend expects @main to live in its own file for now. Split declarations and @main into separate files."
+        case .module(let module):
+            guard let mainBlock = module.mainBlock else {
+                throw ValidationError(
+                    "Swift backend requires a file with @main { ... } when compiling a single file."
+                )
+            }
+            return .init(
+                callables: module.callables,
+                declarations: module.constructs.filter {
+                    $0.kind == .declaration || $0.kind == .entry
+                },
+                mainBlock: mainBlock,
+                units: [
+                    .init(
+                        swiftFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
+                        callables: module.callables,
+                        mainBlock: mainBlock
+                    )
+                ]
             )
         case .construct, .enumeration, .protocolDefinition, .macro:
             throw ValidationError(
@@ -200,7 +216,7 @@ struct SwiftBackendDriver {
                     .init(
                         swiftFileName: swiftFileName,
                         callables: module.callables,
-                        mainBlock: nil
+                        mainBlock: module.mainBlock
                     )
                 )
                 declarations.append(
@@ -208,6 +224,13 @@ struct SwiftBackendDriver {
                         $0.kind == .declaration || $0.kind == .entry
                     }
                 )
+                if let block = module.mainBlock {
+                    if mainBlock != nil {
+                        throw ValidationError(
+                            "Found multiple @main modules while generating Swift.")
+                    }
+                    mainBlock = block
+                }
             case .mainBlock(let block):
                 if mainBlock != nil {
                     throw ValidationError("Found multiple @main modules while generating Swift.")

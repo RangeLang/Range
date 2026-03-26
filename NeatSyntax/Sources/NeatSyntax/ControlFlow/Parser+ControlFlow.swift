@@ -32,6 +32,10 @@ extension Parser {
             advance()
             return try parseLocalDeclaration(kind: .mutable, localBindings: &localBindings)
         }
+        if case .keyword(NeatSyntax.Keyword.derived.rawValue) = peek() {
+            advance()
+            return try parseLocalDerived(localBindings: &localBindings)
+        }
 
         if case .keyword(NeatSyntax.Keyword.returnStatement.rawValue) = peek() {
             advance()
@@ -51,12 +55,8 @@ extension Parser {
             return .continue
         }
 
-        if isStandaloneCallExpressionStart() {
-            let expression = try parseExpression()
-            guard case .call = expression else {
-                throw ParseError("Expected callable expression.")
-            }
-            return .expression(expression)
+        if isExpressionStatementStart() && !isAssignmentStatementStart() {
+            return .expression(try parseExpression())
         }
 
         let target = try parseAssignmentTarget(localBindings: localBindings)
@@ -90,6 +90,29 @@ extension Parser {
         return peek(offset: offset) == .leftParen
     }
 
+    func isAssignmentStatementStart() -> Bool {
+        guard case .identifier = peek() else { return false }
+        var offset = 1
+        while peek(offset: offset) == .dot {
+            guard case .identifier = peek(offset: offset + 1) else {
+                return false
+            }
+            offset += 2
+        }
+        let next = peek(offset: offset)
+        return next == .equal || next == .plusEqual
+    }
+
+    func isExpressionStatementStart() -> Bool {
+        switch peek() {
+        case .identifier, .integer, .double, .stringLiteral, .leftBracket, .leftParen, .dollar,
+            .dot, .bang:
+            return true
+        default:
+            return false
+        }
+    }
+
     mutating func parseLocalDeclaration(
         kind: LocalBindingKind,
         localBindings: inout [String: LocalBindingKind]
@@ -105,24 +128,52 @@ extension Parser {
             throw ParseError("Local binding '\(name)' conflicts with environment '\(name)'.")
         }
 
+        let typeName: String?
+        if peek() == .colon {
+            try consume(.colon)
+            typeName = try consumeTypeReference()
+        } else {
+            typeName = nil
+        }
+
         try consume(.equal)
         let expression = try parseExpression()
         localBindings[name] = kind
-        return .declaration(kind: kind, name: name, expression: expression)
+        return .declaration(kind: kind, name: name, typeName: typeName, expression: expression)
+    }
+
+    mutating func parseLocalDerived(
+        localBindings: inout [String: LocalBindingKind]
+    ) throws -> Statement {
+        let name = try consumeIdentifier()
+        if localBindings[name] != nil {
+            throw ParseError("'\(name)' is already declared in this scope.")
+        }
+        if currentStateNames.contains(name) {
+            throw ParseError("Local derived '\(name)' conflicts with state '\(name)'.")
+        }
+        if currentEnvironmentNames.contains(name) {
+            throw ParseError("Local derived '\(name)' conflicts with environment '\(name)'.")
+        }
+
+        try consume(.colon)
+        let typeName = try consumeTypeReference()
+        let body = try parseStatementBlock(baseLocalBindings: localBindings)
+        localBindings[name] = .constant
+        return .derived(name: name, typeName: typeName, body: body)
     }
 
     mutating func parseAssignmentTarget(
         localBindings: [String: LocalBindingKind]
     ) throws -> AssignmentTarget {
         let name = try consumeIdentifier()
-
-        if name == "self", peek() == .dot {
+        var target = try resolveAssignmentTarget(name: name, localBindings: localBindings)
+        while peek() == .dot {
             try consume(.dot)
             let memberName = try consumeIdentifier()
-            return .member(memberName)
+            target = .member(base: target, name: memberName)
         }
-
-        return try resolveAssignmentTarget(name: name, localBindings: localBindings)
+        return target
     }
 
     func resolveAssignmentTarget(
@@ -315,15 +366,11 @@ extension Parser {
         }
         if peek() == .keyword(NeatSyntax.Keyword.value.rawValue)
             || peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
+            || peek() == .keyword(NeatSyntax.Keyword.derived.rawValue)
         {
             return true
         }
 
-        guard case .identifier = peek() else { return false }
-        if isStandaloneCallExpressionStart() {
-            return true
-        }
-        let next = peek(offset: 1)
-        return next == .equal || next == .plusEqual
+        return isExpressionStatementStart()
     }
 }

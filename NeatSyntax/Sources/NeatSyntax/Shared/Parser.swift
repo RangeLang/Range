@@ -17,12 +17,9 @@ public struct Parser {
     }
 
     public mutating func parseSourceFile() throws -> SourceFileNode {
-        if isMainBlockStart() {
-            return .mainBlock(try parseMainBlock())
-        }
-
         currentStateTypes = [:]
 
+        var mainBlock: MainBlockNode?
         var topLevelStates: [StateDeclaration] = []
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
@@ -32,6 +29,14 @@ public struct Parser {
         var extensions: [ExtensionDeclaration] = []
 
         while peek() != .eof {
+            if isMainBlockStart() {
+                guard mainBlock == nil else {
+                    throw ParseError("Only one @main block is allowed per file.")
+                }
+                mainBlock = try parseMainBlock(requiresEOF: false)
+                continue
+            }
+
             if peek() == .keyword(NeatSyntax.Keyword.typeExtension.rawValue) {
                 extensions.append(try parseExtensionDeclaration())
                 continue
@@ -76,7 +81,18 @@ public struct Parser {
         try consume(.eof)
         try validateBuilderDeclarations(in: constructs)
 
-        if topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
+        if let mainBlock,
+            topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
+            protocols.isEmpty,
+            constructs.isEmpty,
+            macros.isEmpty,
+            extensions.isEmpty
+        {
+            return .mainBlock(mainBlock)
+        }
+
+        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty,
+            enumerations.isEmpty,
             protocols.isEmpty,
             constructs.count == 1,
             macros.isEmpty,
@@ -85,7 +101,7 @@ public struct Parser {
             return .construct(constructs[0])
         }
 
-        if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
             enumerations.count == 1, extensions.isEmpty
@@ -93,7 +109,7 @@ public struct Parser {
             return .enumeration(enumerations[0])
         }
 
-        if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
             protocols.count == 1,
             macros.isEmpty,
@@ -102,7 +118,7 @@ public struct Parser {
             return .protocolDefinition(protocols[0])
         }
 
-        if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.count == 1,
@@ -111,7 +127,7 @@ public struct Parser {
             return .macro(macros[0])
         }
 
-        if topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
@@ -122,6 +138,7 @@ public struct Parser {
 
         return .module(
             ModuleFileNode(
+                mainBlock: mainBlock,
                 states: topLevelStates,
                 callables: topLevelCallables,
                 constructs: constructs,

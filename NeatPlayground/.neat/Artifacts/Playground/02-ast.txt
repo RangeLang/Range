@@ -1,0 +1,175 @@
+AST:
+  ▿ NeatSyntax.SourceFileNode.module
+    ▿ module: NeatSyntax.ModuleFileNode
+      ▿ mainBlock: Optional(NeatSyntax.MainBlockNode(body: [NeatSyntax.Statement.declaration(kind: NeatSyntax.LocalBindingKind.mutable, name: "person", typeName: Optional("Person"), expression: NeatSyntax.Expression.call(name: "Person", arguments: [NeatSyntax.CallArgument(label: Optional("name"), value: NeatSyntax.Expression.string("George")), NeatSyntax.CallArgument(label: Optional("age"), value: NeatSyntax.Expression.integer(26))])), NeatSyntax.Statement.compoundAssignment(target: NeatSyntax.AssignmentTarget.member(base: NeatSyntax.AssignmentTarget.local("person"), name: "age"), operatorSymbol: NeatSyntax.CompoundOperator.plusEquals, expression: NeatSyntax.Expression.integer(1)), NeatSyntax.Statement.derived(name: "personString", typeName: "String", body: [NeatSyntax.Statement.expression(NeatSyntax.Expression.interpolatedString(NeatSyntax.InterpolatedString(segments: [NeatSyntax.StringSegment.text("Person: "), NeatSyntax.StringSegment.expression(NeatSyntax.Expression.identifier("person.name")), NeatSyntax.StringSegment.text(", Age: "), NeatSyntax.StringSegment.expression(NeatSyntax.Expression.identifier("person.age"))])))]), NeatSyntax.Statement.expression(NeatSyntax.Expression.call(name: "Logger.info", arguments: [NeatSyntax.CallArgument(label: nil, value: NeatSyntax.Expression.identifier("personString"))])), NeatSyntax.Statement.declaration(kind: NeatSyntax.LocalBindingKind.mutable, name: "user", typeName: Optional("User"), expression: NeatSyntax.Expression.call(name: "User", arguments: [NeatSyntax.CallArgument(label: Optional("person"), value: NeatSyntax.Expression.bindingReference("person"))])), NeatSyntax.Statement.expression(NeatSyntax.Expression.call(name: "user.incrementAge", arguments: [])), NeatSyntax.Statement.expression(NeatSyntax.Expression.call(name: "Logger.info", arguments: [NeatSyntax.CallArgument(label: nil, value: NeatSyntax.Expression.interpolatedString(NeatSyntax.InterpolatedString(segments: [NeatSyntax.StringSegment.text("After increment: "), NeatSyntax.StringSegment.expression(NeatSyntax.Expression.identifier("person.age"))])))]))]))
+        ▿ some: NeatSyntax.MainBlockNode
+          ▿ body: 7 elements
+            ▿ NeatSyntax.Statement.declaration
+              ▿ declaration: (4 elements)
+                - kind: NeatSyntax.LocalBindingKind.mutable
+                - name: "person"
+                ▿ typeName: Optional("Person")
+                  - some: "Person"
+                ▿ expression: NeatSyntax.Expression.call
+                  ▿ call: (2 elements)
+                    - name: "Person"
+                    ▿ arguments: 2 elements
+                      ▿ NeatSyntax.CallArgument
+                        ▿ label: Optional("name")
+                          - some: "name"
+                        ▿ value: NeatSyntax.Expression.string
+                          - string: "George"
+                      ▿ NeatSyntax.CallArgument
+                        ▿ label: Optional("age")
+                          - some: "age"
+                        ▿ value: NeatSyntax.Expression.integer
+                          - integer: 26
+            ▿ NeatSyntax.Statement.compoundAssignment
+              ▿ compoundAssignment: (3 elements)
+                ▿ target: NeatSyntax.AssignmentTarget.member
+                  ▿ member: (2 elements)
+                    ▿ base: NeatSyntax.AssignmentTarget.local
+                      - local: "person"
+                    - name: "age"
+                - operatorSymbol: NeatSyntax.CompoundOperator.plusEquals
+                ▿ expression: NeatSyntax.Expression.integer
+                  - integer: 1
+            ▿ NeatSyntax.Statement.derived
+              ▿ derived: (3 elements)
+                - name: "personString"
+                - typeName: "String"
+                ▿ body: 1 element
+                  ▿ NeatSyntax.Statement.expression
+                    ▿ expression: NeatSyntax.Expression.interpolatedString
+                      ▿ interpolatedString: NeatSyntax.InterpolatedString
+                        ▿ segments: 4 elements
+                          ▿ NeatSyntax.StringSegment.text
+                            - text: "Person: "
+                          ▿ NeatSyntax.StringSegment.expression
+                            ▿ expression: NeatSyntax.Expression.identifier
+                              - identifier: "person.name"
+                          ▿ NeatSyntax.StringSegment.text
+                            - text: ", Age: "
+                          ▿ NeatSyntax.StringSegment.expression
+                            ▿ expression: NeatSyntax.Expression.identifier
+                              - identifier: "person.age"
+            ▿ NeatSyntax.Statement.expression
+              ▿ expression: NeatSyntax.Expression.call
+                ▿ call: (2 elements)
+                  - name: "Logger.info"
+                  ▿ arguments: 1 element
+                    ▿ NeatSyntax.CallArgument
+                      - label: nil
+                      ▿ value: NeatSyntax.Expression.identifier
+                        - identifier: "personString"
+            ▿ NeatSyntax.Statement.declaration
+              ▿ declaration: (4 elements)
+                - kind: NeatSyntax.LocalBindingKind.mutable
+                - name: "user"
+                ▿ typeName: Optional("User")
+                  - some: "User"
+                ▿ expression: NeatSyntax.Expression.call
+                  ▿ call: (2 elements)
+                    - name: "User"
+                    ▿ arguments: 1 element
+                      ▿ NeatSyntax.CallArgument
+                        ▿ label: Optional("person")
+                          - some: "person"
+                        ▿ value: NeatSyntax.Expression.bindingReference
+                          - bindingReference: "person"
+            ▿ NeatSyntax.Statement.expression
+              ▿ expression: NeatSyntax.Expression.call
+                ▿ call: (2 elements)
+                  - name: "user.incrementAge"
+                  - arguments: 0 elements
+            ▿ NeatSyntax.Statement.expression
+              ▿ expression: NeatSyntax.Expression.call
+                ▿ call: (2 elements)
+                  - name: "Logger.info"
+                  ▿ arguments: 1 element
+                    ▿ NeatSyntax.CallArgument
+                      - label: nil
+                      ▿ value: NeatSyntax.Expression.interpolatedString
+                        ▿ interpolatedString: NeatSyntax.InterpolatedString
+                          ▿ segments: 2 elements
+                            ▿ NeatSyntax.StringSegment.text
+                              - text: "After increment: "
+                            ▿ NeatSyntax.StringSegment.expression
+                              ▿ expression: NeatSyntax.Expression.identifier
+                                - identifier: "person.age"
+      - states: 0 elements
+      - callables: 0 elements
+      ▿ constructs: 2 elements
+        ▿ NeatSyntax.ConstructDeclaration
+          - macros: 0 elements
+          - kind: NeatSyntax.ConstructKind.declaration
+          - attribute: nil
+          - primitive: nil
+          - name: "Person"
+          - conformances: 0 elements
+          - states: 0 elements
+          - environments: 0 elements
+          - bindings: 0 elements
+          - deriveds: 0 elements
+          ▿ values: 2 elements
+            ▿ NeatSyntax.ValueDeclaration
+              - macros: 0 elements
+              - localName: "name"
+              ▿ externalLabel: Optional("name")
+                - some: "name"
+              - typeName: "String"
+              - value: nil
+            ▿ NeatSyntax.ValueDeclaration
+              - macros: 0 elements
+              - localName: "age"
+              ▿ externalLabel: Optional("age")
+                - some: "age"
+              - typeName: "Int"
+              - value: nil
+          - initializers: 0 elements
+          - callables: 0 elements
+        ▿ NeatSyntax.ConstructDeclaration
+          - macros: 0 elements
+          - kind: NeatSyntax.ConstructKind.declaration
+          - attribute: nil
+          - primitive: nil
+          - name: "User"
+          - conformances: 0 elements
+          - states: 0 elements
+          - environments: 0 elements
+          ▿ bindings: 1 element
+            ▿ NeatSyntax.BindingDeclaration
+              - macros: 0 elements
+              - localName: "person"
+              ▿ externalLabel: Optional("person")
+                - some: "person"
+              - typeName: "Person"
+              - storage: NeatSyntax.BindingStorage.plain
+          - deriveds: 0 elements
+          - values: 0 elements
+          - initializers: 0 elements
+          ▿ callables: 1 element
+            ▿ NeatSyntax.CallableDeclaration
+              - macros: 0 elements
+              - targetType: nil
+              - name: "incrementAge"
+              - hasExplicitParameterClause: true
+              - parameters: 0 elements
+              - returnType: nil
+              ▿ body: Optional([NeatSyntax.Statement.compoundAssignment(target: NeatSyntax.AssignmentTarget.member(base: NeatSyntax.AssignmentTarget.binding("person"), name: "age"), operatorSymbol: NeatSyntax.CompoundOperator.plusEquals, expression: NeatSyntax.Expression.integer(1))])
+                ▿ some: 1 element
+                  ▿ NeatSyntax.Statement.compoundAssignment
+                    ▿ compoundAssignment: (3 elements)
+                      ▿ target: NeatSyntax.AssignmentTarget.member
+                        ▿ member: (2 elements)
+                          ▿ base: NeatSyntax.AssignmentTarget.binding
+                            - binding: "person"
+                          - name: "age"
+                      - operatorSymbol: NeatSyntax.CompoundOperator.plusEquals
+                      ▿ expression: NeatSyntax.Expression.integer
+                        - integer: 1
+      - enumerations: 0 elements
+      - protocols: 0 elements
+      - macros: 0 elements
+      - extensions: 0 elements
+  

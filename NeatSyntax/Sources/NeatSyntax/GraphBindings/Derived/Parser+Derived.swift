@@ -98,6 +98,8 @@ extension Parser {
                 continue
             case .declaration:
                 continue
+            case .derived:
+                continue
             case .assignment, .compoundAssignment:
                 continue
             case .environmentProvision:

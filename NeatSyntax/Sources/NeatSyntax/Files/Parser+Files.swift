@@ -8,13 +8,15 @@ extension Parser {
         return peek(offset: 1) == .leftBrace
     }
 
-    public mutating func parseMainBlock() throws -> MainBlockNode {
+    public mutating func parseMainBlock(requiresEOF: Bool = true) throws -> MainBlockNode {
         guard case .atAttribute(let name, _) = peek(), name == "main" else {
             throw ParseError("Expected @main block.")
         }
         advance()
         let body = try parseStatementBlock(baseLocalBindings: [:])
-        try consume(.eof)
+        if requiresEOF {
+            try consume(.eof)
+        }
         return MainBlockNode(body: body)
     }
 }

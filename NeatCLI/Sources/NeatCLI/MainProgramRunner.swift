@@ -56,15 +56,18 @@ struct MainProgramRunner {
         switch sourceFile {
         case .mainBlock(let block):
             mainBlock = block
+        case .module(let module):
+            guard let block = module.mainBlock else {
+                throw ValidationError(
+                    "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
+                )
+            }
+            mainBlock = block
         case .extensions:
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )
         case .construct, .enumeration, .protocolDefinition, .macro:
-            throw ValidationError(
-                "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
-            )
-        case .module:
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )
@@ -91,10 +94,14 @@ struct MainProgramRunner {
 
         let mainBlocks = try files.compactMap { fileURL -> URL? in
             let sourceFile = try ProjectSourceValidator.parseSourceFile(at: fileURL)
-            guard case .mainBlock = sourceFile else {
+            switch sourceFile {
+            case .mainBlock:
+                return fileURL
+            case .module(let module):
+                return module.mainBlock == nil ? nil : fileURL
+            default:
                 return nil
             }
-            return fileURL
         }
 
         if mainBlocks.isEmpty {
@@ -215,9 +222,14 @@ private struct MainProgramInterpreter {
 
     private mutating func executeStatement(_ statement: Statement) throws -> ControlFlow {
         switch statement {
-        case .declaration(let kind, let name, let expression):
+        case .declaration(let kind, let name, _, let expression):
             let value = try evaluate(expression)
             try declare(name: name, kind: kind, value: value)
+            return .none
+
+        case .derived(let name, _, let body):
+            let value = try evaluateDerivedBody(body, name: name)
+            try declare(name: name, kind: .constant, value: value)
             return .none
 
         case .environmentProvision:
@@ -735,9 +747,9 @@ private struct MainProgramInterpreter {
                 "Environment-state assignment is not supported in the main-program interpreter yet (\(name))."
             )
 
-        case .member(let name):
+        case .member(let base, let name):
             throw ValidationError(
-                "Member assignment is not supported in the main-program interpreter yet (self.\(name))."
+                "Member assignment is not supported in the main-program interpreter yet (\(try renderAssignmentTarget(base)).\(name))."
             )
         }
     }
@@ -763,10 +775,30 @@ private struct MainProgramInterpreter {
                 "Environment-state reads are not supported in the main-program interpreter yet (\(name))."
             )
 
-        case .member(let name):
+        case .member(let base, let name):
             throw ValidationError(
-                "Member reads are not supported in the main-program interpreter yet (self.\(name))."
+                "Member reads are not supported in the main-program interpreter yet (\(try renderAssignmentTarget(base)).\(name))."
             )
+        }
+    }
+
+    private mutating func evaluateDerivedBody(_ body: [Statement], name: String) throws
+        -> RuntimeValue
+    {
+        guard body.count == 1, case .expression(let expression) = body[0] else {
+            throw ValidationError(
+                "Local derived '\(name)' in \(fileName) currently requires a single top-level expression."
+            )
+        }
+        return try evaluate(expression)
+    }
+
+    private func renderAssignmentTarget(_ target: AssignmentTarget) throws -> String {
+        switch target {
+        case .local(let name), .state(let name), .binding(let name), .environment(let name):
+            return name
+        case .member(let base, let name):
+            return "\(try renderAssignmentTarget(base)).\(name)"
         }
     }
 

@@ -1,7 +1,13 @@
 import Foundation
 
 public indirect enum Statement {
-    case declaration(kind: LocalBindingKind, name: String, expression: Expression)
+    case declaration(
+        kind: LocalBindingKind,
+        name: String,
+        typeName: String?,
+        expression: Expression
+    )
+    case derived(name: String, typeName: String, body: [Statement])
     case environmentProvision(EnvironmentProvision)
     case assignment(target: AssignmentTarget, expression: Expression)
     case compoundAssignment(
@@ -38,12 +44,12 @@ public enum LocalBindingKind {
     case mutable
 }
 
-public enum AssignmentTarget {
+public indirect enum AssignmentTarget {
     case state(String)
     case binding(String)
     case environment(String)
     case local(String)
-    case member(String)
+    case member(base: AssignmentTarget, name: String)
 }
 
 public enum CompoundOperator: String {

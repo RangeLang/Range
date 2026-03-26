@@ -1,0 +1,19 @@
+AST:
+  ▿ NeatSyntax.SourceFileNode.construct
+    ▿ construct: NeatSyntax.ConstructDeclaration
+      - macros: 0 elements
+      - kind: NeatSyntax.ConstructKind.declaration
+      - attribute: nil
+      - primitive: nil
+      - name: "NeatPlayground"
+      ▿ conformances: 1 element
+        ▿ NeatSyntax.TypeReference.named
+          - named: "Package"
+      - states: 0 elements
+      - environments: 0 elements
+      - bindings: 0 elements
+      - deriveds: 0 elements
+      - values: 0 elements
+      - initializers: 0 elements
+      - callables: 0 elements
+  

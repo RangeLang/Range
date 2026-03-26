@@ -15,6 +15,7 @@ public struct MainBlockNode {
 }
 
 public struct ModuleFileNode {
+    public let mainBlock: MainBlockNode?
     public let states: [StateDeclaration]
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]

@@ -206,9 +206,16 @@ struct SwiftBackendEmitter {
         let prefix = String(repeating: "    ", count: indent)
 
         switch statement {
-        case .declaration(let kind, let name, let expression):
+        case .declaration(let kind, let name, _, let expression):
             let keyword = kind == .constant ? "let" : "var"
             return "\(prefix)\(keyword) \(name) = \(try emitExpression(expression))"
+        case .derived(let name, let typeName, let body):
+            let bodyText = try emitStatements(body, indent: indent + 2)
+            return """
+                \(prefix)let \(name): \(typeName) = {
+                \(bodyText)
+                \(prefix)}()
+                """
         case .assignment(let target, let expression):
             return
                 "\(prefix)\(try emitAssignmentTarget(target)) = \(try emitExpression(expression))"
@@ -295,9 +302,10 @@ struct SwiftBackendEmitter {
 
     private func emitAssignmentTarget(_ target: AssignmentTarget) throws -> String {
         switch target {
-        case .state(let name), .binding(let name), .environment(let name), .local(let name),
-            .member(let name):
+        case .state(let name), .binding(let name), .environment(let name), .local(let name):
             return name
+        case .member(let base, let name):
+            return "\(try emitAssignmentTarget(base)).\(name)"
         }
     }
 

@@ -1,0 +1,8 @@
+Tokens:
+  keyword(construct)
+  identifier(NeatPlayground)
+  colon
+  identifier(Package)
+  leftBrace
+  rightBrace
+  eof
