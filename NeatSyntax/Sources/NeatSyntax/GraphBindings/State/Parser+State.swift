@@ -32,7 +32,7 @@ extension Parser {
                 }
                 inferredType = explicitType
             } else {
-                if let explicitType, case .call = initialValue {
+                if let explicitType, canUseExplicitTypeForStoredInitializer(initialValue) {
                     inferredType = explicitType
                 } else {
                     inferredType = .named(
@@ -65,6 +65,15 @@ extension Parser {
             type: explicitType ?? inferredType,
             storage: storage
         )
+    }
+
+    func canUseExplicitTypeForStoredInitializer(_ expression: Expression) -> Bool {
+        switch expression {
+        case .call, .unary, .binary:
+            return true
+        default:
+            return false
+        }
     }
 
     func accessibleBuiltinTypes() -> [String: BuiltinType] {

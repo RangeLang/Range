@@ -384,121 +384,29 @@ extension Parser {
                 )
             }
             return trueType
-        case .unary(let operatorSymbol, let nested):
-            let nestedType = try inferType(of: nested, accessibleTypes: accessibleTypes)
+        case .unary(let operatorSymbol, _):
             switch operatorSymbol {
             case .not:
-                guard nestedType == .bool else {
-                    throw ParseError("Operator '!' requires Bool, got \(nestedType.displayName).")
-                }
-                return .bool
+                throw ParseError(
+                    "Unary operator typing is not supported by bootstrap inference yet.")
             }
-        case .binary(let lhs, let operatorSymbol, let rhs):
+        case .binary(_, let operatorSymbol, _):
             switch operatorSymbol {
             case .addition:
-                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
-                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
-                if lhsType == .string && rhsType == .string {
-                    return .string
-                }
-                if lhsType == .int && rhsType == .int {
-                    return .int
-                }
-                if lhsType == .double && rhsType == .double {
-                    return .double
-                }
-                if (lhsType == .int && rhsType == .double)
-                    || (lhsType == .double && rhsType == .int)
-                {
-                    return .double
-                }
-                if lhsType == .float && rhsType == .float {
-                    return .float
-                }
-                if (lhsType == .float && rhsType == .int)
-                    || (lhsType == .int && rhsType == .float)
-                {
-                    return .float
-                }
-                if (lhsType == .float && rhsType == .double)
-                    || (lhsType == .double && rhsType == .float)
-                {
-                    return .double
-                }
                 throw ParseError(
-                    "Operator '+' is only supported for Int, Float, Double, and String, got \(lhsType.displayName) and \(rhsType.displayName)."
-                )
+                    "Binary operator typing is not supported by bootstrap inference yet.")
             case .nilCoalescing:
-                if isNilLiteral(lhs) {
-                    let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
-                    return rhsType
-                }
-                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
-                if isNilLiteral(rhs) {
-                    return lhsType
-                }
-                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
-                if case .optional(let wrapped) = lhsType {
-                    guard wrapped == rhsType else {
-                        throw ParseError(
-                            "Operator '??' requires the right-hand side to match \(wrapped.displayName), got \(rhsType.displayName)."
-                        )
-                    }
-                    return wrapped
-                }
-                guard lhsType == rhsType else {
-                    throw ParseError(
-                        "Operator '??' requires compatible types, got \(lhsType.displayName) and \(rhsType.displayName)."
-                    )
-                }
-                return lhsType
+                throw ParseError(
+                    "Binary operator typing is not supported by bootstrap inference yet.")
             case .equal, .notEqual:
-                if isNilLiteral(lhs) {
-                    let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
-                    guard rhsType.isOptional else {
-                        throw ParseError(
-                            "Type mismatch in '\(operatorSymbol.rawValue)': nil and \(rhsType.displayName)."
-                        )
-                    }
-                    return .bool
-                }
-                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
-                if isNilLiteral(rhs) {
-                    guard lhsType.isOptional else {
-                        throw ParseError(
-                            "Type mismatch in '\(operatorSymbol.rawValue)': \(lhsType.displayName) and nil."
-                        )
-                    }
-                    return .bool
-                }
-                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
-                guard lhsType == rhsType else {
-                    throw ParseError(
-                        "Type mismatch in '\(operatorSymbol.rawValue)': \(lhsType.displayName) and \(rhsType.displayName)."
-                    )
-                }
-                return .bool
+                throw ParseError(
+                    "Binary operator typing is not supported by bootstrap inference yet.")
             case .less, .lessEqual, .greater, .greaterEqual:
-                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
-                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
-                let isNumericComparison =
-                    (lhsType == .int || lhsType == .float || lhsType == .double)
-                    && (rhsType == .int || rhsType == .float || rhsType == .double)
-                guard isNumericComparison else {
-                    throw ParseError(
-                        "Operator '\(operatorSymbol.rawValue)' is only supported for Int, Float, and Double."
-                    )
-                }
-                return .bool
+                throw ParseError(
+                    "Binary operator typing is not supported by bootstrap inference yet.")
             case .and, .or:
-                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
-                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
-                guard lhsType == .bool, rhsType == .bool else {
-                    throw ParseError(
-                        "Operator '\(operatorSymbol.rawValue)' requires Bool operands."
-                    )
-                }
-                return .bool
+                throw ParseError(
+                    "Binary operator typing is not supported by bootstrap inference yet.")
             }
         }
     }
