@@ -39,7 +39,7 @@ extension Parser {
     }
 
     mutating func parseTernaryExpression() throws -> Expression {
-        let condition = try parseNilCoalescingExpression()
+        let condition = try parseBinaryExpression(minimumPrecedence: 0)
 
         if isCurrentExpressionTerminator(peek()) {
             return condition
@@ -60,114 +60,41 @@ extension Parser {
         )
     }
 
-    mutating func parseNilCoalescingExpression() throws -> Expression {
-        var expression = try parseLogicalOrExpression()
-
-        while !isCurrentExpressionTerminator(peek()) && peek() == .questionQuestion {
-            advance()
-            let rhs = try parseLogicalOrExpression()
-            expression = .binary(lhs: expression, operatorSymbol: .nilCoalescing, rhs: rhs)
-        }
-
-        return expression
-    }
-
-    mutating func parseLogicalOrExpression() throws -> Expression {
-        var expression = try parseLogicalAndExpression()
-
-        while !isCurrentExpressionTerminator(peek()) && peek() == .orOr {
-            advance()
-            let rhs = try parseLogicalAndExpression()
-            expression = .binary(lhs: expression, operatorSymbol: .or, rhs: rhs)
-        }
-
-        return expression
-    }
-
-    mutating func parseLogicalAndExpression() throws -> Expression {
-        var expression = try parseEqualityExpression()
-
-        while !isCurrentExpressionTerminator(peek()) && peek() == .andAnd {
-            advance()
-            let rhs = try parseEqualityExpression()
-            expression = .binary(lhs: expression, operatorSymbol: .and, rhs: rhs)
-        }
-
-        return expression
-    }
-
-    mutating func parseEqualityExpression() throws -> Expression {
-        var expression = try parseComparisonExpression()
-
-        while true {
-            if isCurrentExpressionTerminator(peek()) {
-                return expression
-            }
-            switch peek() {
-            case .equalEqual:
-                advance()
-                let rhs = try parseComparisonExpression()
-                expression = .binary(lhs: expression, operatorSymbol: .equal, rhs: rhs)
-            case .bangEqual:
-                advance()
-                let rhs = try parseComparisonExpression()
-                expression = .binary(lhs: expression, operatorSymbol: .notEqual, rhs: rhs)
-            default:
-                return expression
-            }
-        }
-    }
-
-    mutating func parseComparisonExpression() throws -> Expression {
-        var expression = try parseAdditiveExpression()
-
-        while true {
-            if isCurrentExpressionTerminator(peek()) {
-                return expression
-            }
-            switch peek() {
-            case .less:
-                advance()
-                let rhs = try parseAdditiveExpression()
-                expression = .binary(lhs: expression, operatorSymbol: .less, rhs: rhs)
-            case .lessEqual:
-                advance()
-                let rhs = try parseAdditiveExpression()
-                expression = .binary(lhs: expression, operatorSymbol: .lessEqual, rhs: rhs)
-            case .greater:
-                advance()
-                let rhs = try parseAdditiveExpression()
-                expression = .binary(lhs: expression, operatorSymbol: .greater, rhs: rhs)
-            case .greaterEqual:
-                advance()
-                let rhs = try parseAdditiveExpression()
-                expression = .binary(lhs: expression, operatorSymbol: .greaterEqual, rhs: rhs)
-            default:
-                return expression
-            }
-        }
-    }
-
-    mutating func parseAdditiveExpression() throws -> Expression {
+    mutating func parseBinaryExpression(minimumPrecedence: Int) throws -> Expression {
         var expression = try parseUnaryExpression()
 
-        while !isCurrentExpressionTerminator(peek()) && peek() == .plus {
+        while !isCurrentExpressionTerminator(peek()) {
+            guard let infix = currentInfixOperatorInfo() else {
+                break
+            }
+
+            let precedence = operatorEnvironment.precedence(of: infix.precedenceGroup)
+            guard precedence >= minimumPrecedence else {
+                break
+            }
+
             advance()
-            let rhs = try parseUnaryExpression()
-            expression = .binary(lhs: expression, operatorSymbol: .addition, rhs: rhs)
+            let nextMinimumPrecedence: Int
+            switch infix.associativity {
+            case .right:
+                nextMinimumPrecedence = precedence
+            case .left, .none:
+                nextMinimumPrecedence = precedence + 1
+            }
+
+            let rhs = try parseBinaryExpression(minimumPrecedence: nextMinimumPrecedence)
+            expression = .binary(lhs: expression, operatorSymbol: infix.operatorSymbol, rhs: rhs)
         }
 
         return expression
     }
 
     mutating func parseUnaryExpression() throws -> Expression {
-        switch peek() {
-        case .bang:
+        if let unary = currentPrefixOperator() {
             advance()
-            return .unary(operatorSymbol: .not, expression: try parseUnaryExpression())
-        default:
-            return try parsePrimaryExpression()
+            return .unary(operatorSymbol: unary, expression: try parseUnaryExpression())
         }
+        return try parsePrimaryExpression()
     }
 
     mutating func parsePrimaryExpression() throws -> Expression {
@@ -581,5 +508,104 @@ extension Parser {
             return true
         }
         return false
+    }
+
+    func currentPrefixOperator() -> UnaryOperator? {
+        guard let symbol = operatorSymbol(for: peek()) else {
+            return nil
+        }
+        guard operatorEnvironment.prefixOperators.contains(symbol) else {
+            return nil
+        }
+
+        switch symbol {
+        case "!":
+            return .not
+        default:
+            return nil
+        }
+    }
+
+    func currentInfixOperatorInfo() -> (
+        operatorSymbol: BinaryOperator, precedenceGroup: String,
+        associativity: OperatorAssociativity
+    )? {
+        guard let symbol = operatorSymbol(for: peek()) else {
+            return nil
+        }
+        guard let declaration = operatorEnvironment.infixOperators[symbol],
+            let precedenceGroup = declaration.precedenceGroup,
+            let group = operatorEnvironment.precedenceGroups[precedenceGroup]
+        else {
+            return nil
+        }
+
+        guard let operatorSymbol = binaryOperator(for: symbol) else {
+            return nil
+        }
+
+        return (
+            operatorSymbol: operatorSymbol,
+            precedenceGroup: precedenceGroup,
+            associativity: group.associativity ?? .none
+        )
+    }
+
+    func operatorSymbol(for token: Token) -> String? {
+        switch token {
+        case .plus:
+            return "+"
+        case .questionQuestion:
+            return "??"
+        case .equalEqual:
+            return "=="
+        case .bangEqual:
+            return "!="
+        case .less:
+            return "<"
+        case .lessEqual:
+            return "<="
+        case .greater:
+            return ">"
+        case .greaterEqual:
+            return ">="
+        case .andAnd:
+            return "&&"
+        case .orOr:
+            return "||"
+        case .bang:
+            return "!"
+        case .ellipsis:
+            return "..."
+        default:
+            return nil
+        }
+    }
+
+    func binaryOperator(for symbol: String) -> BinaryOperator? {
+        switch symbol {
+        case "+":
+            return .addition
+        case "??":
+            return .nilCoalescing
+        case "==":
+            return .equal
+        case "!=":
+            return .notEqual
+        case "<":
+            return .less
+        case "<=":
+            return .lessEqual
+        case ">":
+            return .greater
+        case ">=":
+            return .greaterEqual
+        case "&&":
+            return .and
+        case "||":
+            return .or
+        default:
+            return nil
+        }
     }
 }

@@ -1,6 +1,142 @@
 import Foundation
 
 public struct Parser {
+    struct OperatorEnvironment {
+        var precedenceGroups: [String: PrecedenceGroupDeclaration]
+        var infixOperators: [String: OperatorDeclaration]
+        var prefixOperators: Set<String>
+        var postfixOperators: Set<String>
+
+        static func bootstrap() -> OperatorEnvironment {
+            let groups = [
+                PrecedenceGroupDeclaration(
+                    name: "AssignmentPrecedence",
+                    associativity: .right,
+                    higherThan: [],
+                    lowerThan: [],
+                    assignment: true
+                ),
+                PrecedenceGroupDeclaration(
+                    name: "LogicalDisjunctionPrecedence",
+                    associativity: .left,
+                    higherThan: ["AssignmentPrecedence"],
+                    lowerThan: [],
+                    assignment: nil
+                ),
+                PrecedenceGroupDeclaration(
+                    name: "LogicalConjunctionPrecedence",
+                    associativity: .left,
+                    higherThan: ["LogicalDisjunctionPrecedence"],
+                    lowerThan: [],
+                    assignment: nil
+                ),
+                PrecedenceGroupDeclaration(
+                    name: "ComparisonPrecedence",
+                    associativity: OperatorAssociativity.none,
+                    higherThan: ["LogicalConjunctionPrecedence"],
+                    lowerThan: [],
+                    assignment: nil
+                ),
+                PrecedenceGroupDeclaration(
+                    name: "NilCoalescingPrecedence",
+                    associativity: .right,
+                    higherThan: ["ComparisonPrecedence"],
+                    lowerThan: [],
+                    assignment: nil
+                ),
+                PrecedenceGroupDeclaration(
+                    name: "AdditionPrecedence",
+                    associativity: .left,
+                    higherThan: ["NilCoalescingPrecedence"],
+                    lowerThan: [],
+                    assignment: nil
+                ),
+            ]
+
+            let operators = [
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "+",
+                    precedenceGroup: "AdditionPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "??",
+                    precedenceGroup: "NilCoalescingPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "==",
+                    precedenceGroup: "ComparisonPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "!=",
+                    precedenceGroup: "ComparisonPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "<",
+                    precedenceGroup: "ComparisonPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "<=",
+                    precedenceGroup: "ComparisonPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: ">",
+                    precedenceGroup: "ComparisonPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: ">=",
+                    precedenceGroup: "ComparisonPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "&&",
+                    precedenceGroup: "LogicalConjunctionPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "||",
+                    precedenceGroup: "LogicalDisjunctionPrecedence"
+                ),
+            ]
+
+            return OperatorEnvironment(
+                precedenceGroups: Dictionary(uniqueKeysWithValues: groups.map { ($0.name, $0) }),
+                infixOperators: Dictionary(uniqueKeysWithValues: operators.map { ($0.symbol, $0) }),
+                prefixOperators: ["!"],
+                postfixOperators: ["..."]
+            )
+        }
+
+        mutating func register(precedenceGroup: PrecedenceGroupDeclaration) {
+            precedenceGroups[precedenceGroup.name] = precedenceGroup
+        }
+
+        mutating func register(operator declaration: OperatorDeclaration) {
+            switch declaration.fixity {
+            case .infix:
+                infixOperators[declaration.symbol] = declaration
+            case .prefix:
+                prefixOperators.insert(declaration.symbol)
+            case .postfix:
+                postfixOperators.insert(declaration.symbol)
+            }
+        }
+
+        func precedence(of groupName: String) -> Int {
+            if let group = precedenceGroups[groupName], !group.higherThan.isEmpty {
+                return group.higherThan.map { precedence(of: $0) + 1 }.max() ?? 0
+            }
+            return 0
+        }
+    }
+
     let tokens: [Token]
     var index: Int = 0
     var currentStateNames: Set<String> = []
@@ -12,10 +148,12 @@ public struct Parser {
     var currentMutableEnvironmentNames: Set<String> = []
     var currentSelfAvailable: Bool = false
     var currentExpressionTerminators: [Token] = []
+    var operatorEnvironment: OperatorEnvironment
 
     public init(source: String) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
+        self.operatorEnvironment = .bootstrap()
     }
 
     func isCurrentExpressionTerminator(_ token: Token) -> Bool {
@@ -78,12 +216,16 @@ public struct Parser {
             }
 
             if isPrecedenceGroupDeclarationStart() {
-                precedenceGroups.append(try parsePrecedenceGroupDeclaration(requiresEOF: false))
+                let declaration = try parsePrecedenceGroupDeclaration(requiresEOF: false)
+                precedenceGroups.append(declaration)
+                operatorEnvironment.register(precedenceGroup: declaration)
                 continue
             }
 
             if isOperatorDeclarationStart() {
-                operators.append(try parseOperatorDeclaration(requiresEOF: false))
+                let declaration = try parseOperatorDeclaration(requiresEOF: false)
+                operators.append(declaration)
+                operatorEnvironment.register(operator: declaration)
                 continue
             }
 
