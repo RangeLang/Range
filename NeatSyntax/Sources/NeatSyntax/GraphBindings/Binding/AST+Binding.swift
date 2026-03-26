@@ -1,6 +1,7 @@
 import Foundation
 
 public struct BindingDeclaration {
+    public let macros: [MacroApplication]
     public let localName: String
     public let externalLabel: String?
     public let typeName: String

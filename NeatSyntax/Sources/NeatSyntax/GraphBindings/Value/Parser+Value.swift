@@ -2,6 +2,7 @@ import Foundation
 
 extension Parser {
     mutating func parseValueDeclaration() throws -> ValueDeclaration {
+        let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.value)
         let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "value")
         try consume(.colon)
@@ -19,6 +20,7 @@ extension Parser {
             try consume(.rightBrace)
         }
         return ValueDeclaration(
+            macros: macros,
             localName: localName,
             externalLabel: externalLabel,
             typeName: typeName,
@@ -27,16 +29,17 @@ extension Parser {
     }
 
     func isValueDeclarationStart() -> Bool {
-        guard peek() == .keyword(NeatSyntax.Keyword.value.rawValue) else {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        guard peek(offset: offset) == .keyword(NeatSyntax.Keyword.value.rawValue) else {
             return false
         }
-        guard case .identifier = peek(offset: 1) else { return false }
-        if peek(offset: 2) == .colon {
+        guard case .identifier = peek(offset: offset + 1) else { return false }
+        if peek(offset: offset + 2) == .colon {
             return true
         }
         return {
-            guard case .identifier = peek(offset: 2) else { return false }
-            return peek(offset: 3) == .colon
+            guard case .identifier = peek(offset: offset + 2) else { return false }
+            return peek(offset: offset + 3) == .colon
         }()
     }
 }

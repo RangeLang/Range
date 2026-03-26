@@ -29,7 +29,7 @@ extension Parser {
     mutating func parseMacroTarget() throws -> MacroTarget {
         let wrapper = try consumeIdentifier()
         try consume(.less)
-        let wrappedType = try consumeTypeReference()
+        let wrappedType = try parseTypeReferenceNode()
         try consume(.greater)
 
         switch wrapper {

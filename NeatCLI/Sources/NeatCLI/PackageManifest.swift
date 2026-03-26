@@ -24,11 +24,7 @@ enum PackageManifestLoader {
             guard declaration.attribute == nil else {
                 throw ValidationError("Package.neat cannot use declaration attributes.")
             }
-            guard declaration.projectionTarget == nil else {
-                throw ValidationError(
-                    "Package.neat cannot project a package declaration onto another type.")
-            }
-            guard declaration.conformances == ["Package"] else {
+            guard declaration.conformances == [.named("Package")] else {
                 throw ValidationError(
                     "Package.neat must declare exactly construct Name: Package.")
             }

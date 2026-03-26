@@ -9,9 +9,14 @@ public struct MacroDeclaration {
     public let body: [Statement]
 }
 
+public struct MacroApplication {
+    public let name: String
+    public let argumentClause: String?
+}
+
 public enum MacroTarget {
-    case attached(String)
-    case freestanding(String)
+    case attached(TypeReference)
+    case freestanding(TypeReference)
 }
 
 public struct MacroBindings {

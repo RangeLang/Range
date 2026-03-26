@@ -1,6 +1,7 @@
 import Foundation
 
 public struct DerivedDeclaration {
+    public let macros: [MacroApplication]
     public let builderName: String?
     public let name: String
     public let typeName: String

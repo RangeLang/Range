@@ -8,7 +8,6 @@ enum NeatSyntax {
         case binding = "binding"
         case derived = "derived"
         case typeExtension = "extension"
-        case projection = "on"
         case forLoop = "for"
         case inKeyword = "in"
         case caseBranch = "case"

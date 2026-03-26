@@ -38,30 +38,21 @@ extension Parser {
         return attribute
     }
 
-    mutating func parseConformanceListIfPresent() throws -> [String] {
+    mutating func parseConformanceListIfPresent() throws -> [TypeReference] {
         guard peek() == .colon else {
             return []
         }
 
         try consume(.colon)
-        var conformances: [String] = []
+        var conformances: [TypeReference] = []
 
         while true {
-            conformances.append(try consumeTypeReference())
+            conformances.append(try parseTypeReferenceNode())
             guard peek() == .comma else { break }
             advance()
         }
 
         return conformances
-    }
-
-    mutating func parseProjectionTargetIfPresent() throws -> String? {
-        guard peek() == .keyword(NeatSyntax.Keyword.projection.rawValue) else {
-            return nil
-        }
-
-        try consumeKeyword(.projection)
-        return try consumeTypeReference()
     }
 
     mutating func skipUnknownBlockBody() throws {

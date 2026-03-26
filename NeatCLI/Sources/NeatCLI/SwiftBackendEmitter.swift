@@ -20,8 +20,10 @@ struct SwiftBackendEmitter {
     }
 
     func emit(program: Program) throws -> String {
-        let functions = try (program.callables + program.declarations.flatMap(\.callables))
-            .filter { $0.targetName == nil }
+        let allCallables = program.callables + program.declarations.flatMap(\.callables)
+        let functions =
+            try allCallables
+            .filter { $0.targetType == nil }
             .map(emitFunction)
             .joined(separator: "\n\n")
 
@@ -114,7 +116,7 @@ struct SwiftBackendEmitter {
         var sections: [String] = ["import Foundation"]
 
         let functions = try unit.callables
-            .filter { $0.targetName == nil }
+            .filter { $0.targetType == nil }
             .map(emitFunction)
             .joined(separator: "\n\n")
 
@@ -149,7 +151,7 @@ struct SwiftBackendEmitter {
         }
 
         let parameters = try callable.parameters.map(emitParameter).joined(separator: ", ")
-        let returnClause = try emitReturnClause(callable.returnTypeName)
+        let returnClause = try emitReturnClause(callable.returnType)
         let functionBody = try emitStatements(body, indent: 1)
 
         return """
@@ -160,29 +162,30 @@ struct SwiftBackendEmitter {
     }
 
     private func emitParameter(_ parameter: NeatFunctionParameter) throws -> String {
-        guard let typeName = parameter.typeName else {
+        guard let typeReference = parameter.typeReference else {
             throw ValidationError("Swift backend requires explicit parameter types.")
         }
 
         let local = parameter.localName
         switch parameter.externalLabel {
         case .none:
-            return "_ \(local): \(emitTypeName(typeName))"
+            return "_ \(local): \(emitTypeName(typeReference))"
         case .some(let external) where external == local:
-            return "\(local): \(emitTypeName(typeName))"
+            return "\(local): \(emitTypeName(typeReference))"
         case .some(let external):
-            return "\(external) \(local): \(emitTypeName(typeName))"
+            return "\(external) \(local): \(emitTypeName(typeReference))"
         }
     }
 
-    private func emitReturnClause(_ typeName: String?) throws -> String {
-        guard let typeName else {
+    private func emitReturnClause(_ typeReference: TypeReference?) throws -> String {
+        guard let typeReference else {
             return ""
         }
-        return " -> \(emitTypeName(typeName))"
+        return " -> \(emitTypeName(typeReference))"
     }
 
-    private func emitTypeName(_ typeName: String) -> String {
+    private func emitTypeName(_ typeReference: TypeReference) -> String {
+        let typeName = typeReference.displayName
         switch typeName {
         case "Int", "Double", "Float", "String", "Bool", "Void":
             return typeName

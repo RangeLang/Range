@@ -2,6 +2,7 @@ import Foundation
 
 extension Parser {
     mutating func parseBindingDeclaration() throws -> BindingDeclaration {
+        let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.binding)
         let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "binding")
         try consume(.colon)
@@ -16,6 +17,7 @@ extension Parser {
             storage = .plain
         }
         return BindingDeclaration(
+            macros: macros,
             localName: localName,
             externalLabel: externalLabel,
             typeName: typeName,
@@ -66,16 +68,17 @@ extension Parser {
     }
 
     func isBindingDeclarationStart() -> Bool {
-        guard peek() == .keyword(NeatSyntax.Keyword.binding.rawValue) else {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        guard peek(offset: offset) == .keyword(NeatSyntax.Keyword.binding.rawValue) else {
             return false
         }
-        guard case .identifier = peek(offset: 1) else { return false }
-        if peek(offset: 2) == .colon {
+        guard case .identifier = peek(offset: offset + 1) else { return false }
+        if peek(offset: offset + 2) == .colon {
             return true
         }
         return {
-            guard case .identifier = peek(offset: 2) else { return false }
-            return peek(offset: 3) == .colon
+            guard case .identifier = peek(offset: offset + 2) else { return false }
+            return peek(offset: offset + 3) == .colon
         }()
     }
 }

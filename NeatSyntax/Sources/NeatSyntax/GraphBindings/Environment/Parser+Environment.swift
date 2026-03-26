@@ -2,6 +2,7 @@ import Foundation
 
 extension Parser {
     mutating func parseEnvironmentDeclaration() throws -> EnvironmentDeclaration {
+        let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.environment)
         let isStateAlias = peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
         if isStateAlias {
@@ -21,6 +22,7 @@ extension Parser {
             try consume(.rightBrace)
         }
         return EnvironmentDeclaration(
+            macros: macros,
             isState: isStateAlias,
             localName: localName,
             externalLabel: externalLabel,
@@ -29,14 +31,15 @@ extension Parser {
     }
 
     func isEnvironmentDeclarationStart() -> Bool {
-        guard peek() == .keyword(NeatSyntax.Keyword.environment.rawValue) else {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        guard peek(offset: offset) == .keyword(NeatSyntax.Keyword.environment.rawValue) else {
             return false
         }
         let nameOffset: Int
-        if peek(offset: 1) == .keyword(NeatSyntax.Keyword.state.rawValue) {
-            nameOffset = 2
+        if peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.state.rawValue) {
+            nameOffset = offset + 2
         } else {
-            nameOffset = 1
+            nameOffset = offset + 1
         }
         guard case .identifier = peek(offset: nameOffset) else { return false }
         if peek(offset: nameOffset + 1) == .colon {

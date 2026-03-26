@@ -6,11 +6,12 @@ extension Parser {
             return try parseBuilderCallableDeclaration()
         }
 
-        var targetName: String?
+        let macros = try parseMacroApplicationsIfPresent()
+        var targetType: TypeReference?
         if case .identifier(let target) = peek(),
             peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
         {
-            targetName = target
+            targetType = .named(target)
             advance()
         }
 
@@ -27,20 +28,21 @@ extension Parser {
             )
         }
         let parameters = try parseFunctionParameters()
-        let returnTypeName: String?
+        let returnType: TypeReference?
         if peek() == .arrow {
             try consume(.arrow)
-            returnTypeName = try consumeTypeReference()
+            returnType = try parseTypeReferenceNode()
         } else {
-            returnTypeName = nil
+            returnType = nil
         }
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
-            targetName: targetName,
+            macros: macros,
+            targetType: targetType,
             name: name,
             hasExplicitParameterClause: hasExplicitParameterClause,
             parameters: parameters,
-            returnTypeName: returnTypeName,
+            returnType: returnType,
             body: body
         )
     }
@@ -74,20 +76,21 @@ extension Parser {
         }
 
         let parameters = try parseFunctionParameters()
-        let returnTypeName: String?
+        let returnType: TypeReference?
         if peek() == .arrow {
             try consume(.arrow)
-            returnTypeName = try consumeTypeReference()
+            returnType = try parseTypeReferenceNode()
         } else {
-            returnTypeName = nil
+            returnType = nil
         }
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
-            targetName: nil,
+            macros: [],
+            targetType: nil,
             name: mappedName,
             hasExplicitParameterClause: true,
             parameters: parameters,
-            returnTypeName: returnTypeName,
+            returnType: returnType,
             body: body
         )
     }
@@ -98,12 +101,13 @@ extension Parser {
         var parameters: [NeatFunctionParameter] = []
         if peek() != .rightParen {
             while true {
+                let macros = try parseMacroApplicationsIfPresent()
                 let (localName, externalLabel) = try parseLabeledDeclarationName(
                     expecting: "parameter",
                     allowOmittedLocalName: false
                 )
 
-                var typeName: String?
+                var typeReference: TypeReference?
                 var slotName: String?
                 if peek() == .colon {
                     try consume(.colon)
@@ -111,15 +115,16 @@ extension Parser {
                         advance()
                         slotName = slot
                     } else {
-                        typeName = try consumeTypeReference()
+                        typeReference = try parseTypeReferenceNode()
                     }
                 }
 
                 parameters.append(
                     NeatFunctionParameter(
+                        macros: macros,
                         localName: localName,
                         externalLabel: externalLabel,
-                        typeName: typeName,
+                        typeReference: typeReference,
                         slotName: slotName
                     )
                 )
@@ -134,31 +139,34 @@ extension Parser {
     }
 
     mutating func parseInitializerDeclaration() throws -> InitializerDeclaration {
+        let macros = try parseMacroApplicationsIfPresent()
         guard case .identifier(let name) = peek(), name == "init" else {
             throw ParseError("Expected initializer declaration.")
         }
         advance()
         let parameters = try parseFunctionParameters()
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
-        return InitializerDeclaration(parameters: parameters, body: body)
+        return InitializerDeclaration(macros: macros, parameters: parameters, body: body)
     }
 
     func isInitializerDeclarationStart() -> Bool {
-        guard case .identifier(let name) = peek(), name == "init" else {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        guard case .identifier(let name) = peek(offset: offset), name == "init" else {
             return false
         }
-        return peek(offset: 1) == .leftParen
+        return peek(offset: offset + 1) == .leftParen
     }
 
     func isCallableStart() -> Bool {
         if isBuilderCallableStart() {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.function.rawValue) {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        if peek(offset: offset) == .keyword(NeatSyntax.Keyword.function.rawValue) {
             return true
         }
-        if case .identifier = peek(),
-            peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+        if case .identifier = peek(offset: offset),
+            peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
         {
             return true
         }
@@ -166,12 +174,13 @@ extension Parser {
     }
 
     func isBuilderDeclarationStart() -> Bool {
-        guard peek() == .asterisk else { return false }
-        guard case .identifier(let name) = peek(offset: 1), name == "builder" else {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        guard peek(offset: offset) == .asterisk else { return false }
+        guard case .identifier(let name) = peek(offset: offset + 1), name == "builder" else {
             return false
         }
-        guard case .identifier = peek(offset: 2) else { return false }
-        return peek(offset: 3) == .leftBrace
+        guard case .identifier = peek(offset: offset + 2) else { return false }
+        return peek(offset: offset + 3) == .leftBrace
     }
 
     func isBuilderCallableStart() -> Bool {
@@ -185,7 +194,7 @@ extension Parser {
         for callable in callables {
             let signatures = Set(
                 callableSignatureKeys(
-                    targetName: callable.targetName,
+                    targetType: callable.targetType,
                     name: callable.name,
                     parameters: callable.parameters
                 )
@@ -193,7 +202,7 @@ extension Parser {
             for signature in signatures {
                 guard seen.insert(signature).inserted else {
                     throw ParseError(
-                        "Duplicate callable declaration \(renderCallableSignature(targetName: callable.targetName, name: callable.name, parameters: callable.parameters))."
+                        "Duplicate callable declaration \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters))."
                     )
                 }
             }
@@ -204,8 +213,10 @@ extension Parser {
         for callable in callables {
             guard let body = callable.body else { continue }
 
-            let explicitReturnType = callable.returnTypeName
-            let expectedBuiltinType = explicitReturnType.flatMap { builtinType(from: $0) }
+            let explicitReturnType = callable.returnType
+            let expectedBuiltinType = explicitReturnType.flatMap {
+                builtinType(from: $0.displayName)
+            }
             let needsValueReturn = callableRequiresValueReturn(
                 explicitReturnType: explicitReturnType,
                 expectedBuiltinType: expectedBuiltinType
@@ -216,7 +227,7 @@ extension Parser {
             if explicitReturnType == nil {
                 if returnExpressions.contains(where: { $0 != nil }) {
                     throw ParseError(
-                        "Callable \(renderCallableSignature(targetName: callable.targetName, name: callable.name, parameters: callable.parameters)) has no return type and cannot return a value."
+                        "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) has no return type and cannot return a value."
                     )
                 }
                 continue
@@ -225,13 +236,13 @@ extension Parser {
             if needsValueReturn {
                 guard blockAlwaysReturnsValue(body) else {
                     throw ParseError(
-                        "Callable \(renderCallableSignature(targetName: callable.targetName, name: callable.name, parameters: callable.parameters)) declares return type \(explicitReturnType!) but does not return a value on all paths."
+                        "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) declares return type \(explicitReturnType!.displayName) but does not return a value on all paths."
                     )
                 }
 
                 if returnExpressions.contains(where: { $0 == nil }) {
                     throw ParseError(
-                        "Callable \(renderCallableSignature(targetName: callable.targetName, name: callable.name, parameters: callable.parameters)) declares return type \(explicitReturnType!) and cannot use bare return."
+                        "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) declares return type \(explicitReturnType!.displayName) and cannot use bare return."
                     )
                 }
             }
@@ -244,8 +255,8 @@ extension Parser {
                 result,
                 parameter in
                 guard
-                    let typeName = parameter.typeName,
-                    let builtin = builtinType(from: typeName)
+                    let typeReference = parameter.typeReference,
+                    let builtin = builtinType(from: typeReference.displayName)
                 else { return }
                 result[parameter.localName] = builtin
             }
@@ -263,7 +274,7 @@ extension Parser {
 
                 guard isCompatibleReturnType(expected: expectedBuiltinType, actual: inferred) else {
                     throw ParseError(
-                        "Callable \(renderCallableSignature(targetName: callable.targetName, name: callable.name, parameters: callable.parameters)) expects return type \(expectedBuiltinType.displayName), got \(inferred.displayName)."
+                        "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) expects return type \(expectedBuiltinType.displayName), got \(inferred.displayName)."
                     )
                 }
             }
@@ -271,7 +282,7 @@ extension Parser {
     }
 
     func callableRequiresValueReturn(
-        explicitReturnType: String?,
+        explicitReturnType: TypeReference?,
         expectedBuiltinType: BuiltinType?
     ) -> Bool {
         guard explicitReturnType != nil else { return false }
@@ -400,30 +411,30 @@ extension Parser {
         }
         return zip(lhs, rhs).allSatisfy {
             $0.externalLabel == $1.externalLabel
-                && $0.typeName == $1.typeName
+                && $0.typeReference == $1.typeReference
                 && $0.slotName == $1.slotName
         }
     }
 
     func callableSignatureKeys(
-        targetName: String?,
+        targetType: TypeReference?,
         name: String,
         parameters: [NeatFunctionParameter]
     ) -> [String] {
         signatureParameterVariants(parameters).map { variant in
             let rendered = variant.map(parameterSignatureKey).joined(separator: ",")
-            return "\(targetName ?? "_")@\(name)(\(rendered))"
+            return "\(targetType?.displayName ?? "_")@\(name)(\(rendered))"
         }
     }
 
     func renderCallableSignature(
-        targetName: String?,
+        targetType: TypeReference?,
         name: String,
         parameters: [NeatFunctionParameter]
     ) -> String {
         let rendered = parameters.map(renderParameterSignature).joined(separator: ", ")
-        if let targetName {
-            return "\(targetName)@\(name)(\(rendered))"
+        if let targetType {
+            return "\(targetType.displayName)@\(name)(\(rendered))"
         }
         return "@\(name)(\(rendered))"
     }
@@ -441,12 +452,16 @@ extension Parser {
 
     func parameterSignatureKey(_ parameter: NeatFunctionParameter) -> String {
         let label = parameter.externalLabel ?? "_"
-        let typeName = parameter.slotName.map { "@\($0)" } ?? parameter.typeName ?? "_"
+        let typeName =
+            parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+            ?? "_"
         return "\(label):\(typeName)"
     }
 
     func renderParameterSignature(_ parameter: NeatFunctionParameter) -> String {
-        let typeName = parameter.slotName.map { "@\($0)" } ?? parameter.typeName ?? "_"
+        let typeName =
+            parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+            ?? "_"
         if let externalLabel = parameter.externalLabel {
             if externalLabel == parameter.localName {
                 return "\(parameter.localName): \(typeName)"

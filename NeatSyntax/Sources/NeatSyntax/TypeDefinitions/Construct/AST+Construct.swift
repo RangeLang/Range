@@ -7,12 +7,12 @@ public enum ConstructKind {
 }
 
 public struct ConstructDeclaration {
+    public let macros: [MacroApplication]
     public let kind: ConstructKind
     public let attribute: AttributeApplication?
     public let primitive: PrimitiveModifier?
     public let name: String
-    public let conformances: [String]
-    public let projectionTarget: String?
+    public let conformances: [TypeReference]
     public let states: [StateDeclaration]
     public let environments: [EnvironmentDeclaration]
     public let bindings: [BindingDeclaration]

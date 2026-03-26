@@ -1,5 +1,6 @@
 import Foundation
 
 public struct ExtensionDeclaration {
-    public let targetName: String
+    public let macros: [MacroApplication]
+    public let targetType: TypeReference
 }

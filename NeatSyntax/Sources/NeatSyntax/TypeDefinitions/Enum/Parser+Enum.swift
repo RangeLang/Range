@@ -2,15 +2,16 @@ import Foundation
 
 extension Parser {
     func isEnumDeclarationStart() -> Bool {
-        switch peek() {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        switch peek(offset: offset) {
         case .keyword(NeatSyntax.Keyword.enumeration.rawValue):
             return true
         case .keyword(NeatSyntax.Keyword.primitive.rawValue):
-            return peek(offset: 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
+            return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
         case .atAttribute:
-            return peek(offset: 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
-                || (peek(offset: 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
-                    && peek(offset: 2) == .keyword(NeatSyntax.Keyword.enumeration.rawValue))
+            return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
+                || (peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
+                    && peek(offset: offset + 2) == .keyword(NeatSyntax.Keyword.enumeration.rawValue))
         default:
             return false
         }
@@ -19,6 +20,7 @@ extension Parser {
     public mutating func parseEnumDeclaration(requiresEOF: Bool = true) throws
         -> EnumDeclaration
     {
+        let macros = try parseMacroApplicationsIfPresent()
         let modifiers = parseTypeDefinitionModifiers(before: .enumeration)
 
         try consumeKeyword(.enumeration)
@@ -39,6 +41,7 @@ extension Parser {
         }
 
         return EnumDeclaration(
+            macros: macros,
             attribute: modifiers.attribute,
             primitive: modifiers.primitive,
             name: name,

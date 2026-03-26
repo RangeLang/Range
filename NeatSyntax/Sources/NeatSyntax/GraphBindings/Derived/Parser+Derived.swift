@@ -2,6 +2,7 @@ import Foundation
 
 extension Parser {
     mutating func parseDerivedDeclaration() throws -> DerivedDeclaration {
+        let macros = try parseMacroApplicationsIfPresent()
         let builderName = try parseBuilderDirectiveIfPresent()
         try consumeKeyword(.derived)
         let name = try consumeIdentifier()
@@ -9,6 +10,7 @@ extension Parser {
         let typeName = try consumeTypeReference()
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return DerivedDeclaration(
+            macros: macros,
             builderName: builderName,
             name: name,
             typeName: typeName,
@@ -131,9 +133,10 @@ extension Parser {
     }
 
     func isBuilderDirectiveStart() -> Bool {
-        guard peek() == .asterisk else { return false }
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        guard peek(offset: offset) == .asterisk else { return false }
 
-        switch peek(offset: 1) {
+        switch peek(offset: offset + 1) {
         case .identifier(let name), .keyword(let name):
             guard name != "environment", name != "builder" else { return false }
         default:
@@ -161,10 +164,11 @@ extension Parser {
         if isBuilderDirectiveStart() {
             return true
         }
-        guard peek() == .keyword(NeatSyntax.Keyword.derived.rawValue) else {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        guard peek(offset: offset) == .keyword(NeatSyntax.Keyword.derived.rawValue) else {
             return false
         }
-        guard case .identifier = peek(offset: 1) else { return false }
-        return peek(offset: 2) == .colon
+        guard case .identifier = peek(offset: offset + 1) else { return false }
+        return peek(offset: offset + 2) == .colon
     }
 }

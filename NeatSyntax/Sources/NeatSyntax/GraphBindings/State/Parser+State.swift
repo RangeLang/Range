@@ -1,7 +1,13 @@
 import Foundation
 
 extension Parser {
+    func isStateDeclarationStart() -> Bool {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        return peek(offset: offset) == .keyword(NeatSyntax.Keyword.state.rawValue)
+    }
+
     mutating func parseState() throws -> StateDeclaration {
+        let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.state)
         let name = try consumeIdentifier()
         var explicitType: BuiltinType?
@@ -46,7 +52,11 @@ extension Parser {
             )
         }
         return StateDeclaration(
-            name: name, type: explicitType ?? inferredType, storage: storage)
+            macros: macros,
+            name: name,
+            type: explicitType ?? inferredType,
+            storage: storage
+        )
     }
 
     func accessibleBuiltinTypes() -> [String: BuiltinType] {

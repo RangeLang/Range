@@ -97,26 +97,30 @@ extension Parser {
     }
 
     mutating func consumeTypeReference() throws -> String {
-        var result = try consumeTypeReferenceBase()
+        try parseTypeReferenceNode().displayName
+    }
+
+    mutating func parseTypeReferenceNode() throws -> TypeReference {
+        var result = try parseTypeReferenceBaseNode()
         while peek() == .question {
             try consume(.question)
-            result += "?"
+            result = .optional(result)
         }
         if peek() == .ellipsis {
             try consume(.ellipsis)
-            result += "..."
+            result = .variadic(result)
         }
         return result
     }
 
-    mutating func consumeTypeReferenceBase() throws -> String {
+    mutating func parseTypeReferenceBaseNode() throws -> TypeReference {
         if peek() == .leftParen {
             try consume(.leftParen)
-            var parameterTypes: [String] = []
+            var parameterTypes: [TypeReference] = []
 
             if peek() != .rightParen {
                 while true {
-                    parameterTypes.append(try consumeTypeReference())
+                    parameterTypes.append(try parseTypeReferenceNode())
                     guard peek() == .comma else { break }
                     advance()
                 }
@@ -127,35 +131,33 @@ extension Parser {
                 throw ParseError("Expected '->' in function type.")
             }
             try consume(.arrow)
-            let returnType = try consumeTypeReference()
-            let renderedParameters = parameterTypes.joined(separator: ", ")
-            return "(\(renderedParameters)) -> \(returnType)"
+            let returnType = try parseTypeReferenceNode()
+            return .function(parameters: parameterTypes, returnType: returnType)
         }
 
         if peek() == .leftBracket {
             try consume(.leftBracket)
-            let elementType = try consumeTypeReference()
+            let elementType = try parseTypeReferenceNode()
             try consume(.rightBracket)
-            return "[\(elementType)]"
+            return .array(elementType)
         }
 
-        var parts: [String] = [try consumeTypeName()]
+        var result: TypeReference = .named(try consumeTypeName())
 
         while peek() == .dot {
             try consume(.dot)
-            parts.append(try consumeTypeName())
+            result = .member(base: result, name: try consumeTypeName())
         }
 
-        var result = parts.joined(separator: ".")
         if peek() == .less {
             try consume(.less)
-            var genericArguments: [String] = [try consumeTypeReference()]
+            var genericArguments: [TypeReference] = [try parseTypeReferenceNode()]
             while peek() == .comma {
                 advance()
-                genericArguments.append(try consumeTypeReference())
+                genericArguments.append(try parseTypeReferenceNode())
             }
             try consume(.greater)
-            result += "<\(genericArguments.joined(separator: ", "))>"
+            result = .generic(base: result, arguments: genericArguments)
         }
 
         return result

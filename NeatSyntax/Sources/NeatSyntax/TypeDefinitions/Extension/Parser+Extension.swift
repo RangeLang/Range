@@ -2,13 +2,14 @@ import Foundation
 
 extension Parser {
     mutating func parseExtensionDeclaration() throws -> ExtensionDeclaration {
+        let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.typeExtension)
-        let targetName = try consumeTypeReference()
+        let targetType = try parseTypeReferenceNode()
         if peek() == .leftBrace {
             try consume(.leftBrace)
             try skipUnknownBlockBody()
             try consume(.rightBrace)
         }
-        return ExtensionDeclaration(targetName: targetName)
+        return ExtensionDeclaration(macros: macros, targetType: targetType)
     }
 }

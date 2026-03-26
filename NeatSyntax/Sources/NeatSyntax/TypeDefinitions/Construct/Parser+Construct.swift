@@ -2,15 +2,16 @@ import Foundation
 
 extension Parser {
     func isConstructDeclarationStart() -> Bool {
-        switch peek() {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        switch peek(offset: offset) {
         case .keyword(NeatSyntax.Keyword.construct.rawValue):
             return true
         case .keyword(NeatSyntax.Keyword.primitive.rawValue):
-            return peek(offset: 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
+            return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
         case .atAttribute:
-            return peek(offset: 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
-                || (peek(offset: 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
-                    && peek(offset: 2) == .keyword(NeatSyntax.Keyword.construct.rawValue))
+            return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
+                || (peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
+                    && peek(offset: offset + 2) == .keyword(NeatSyntax.Keyword.construct.rawValue))
         default:
             return false
         }
@@ -23,13 +24,13 @@ extension Parser {
             return try parseBuilderDeclaration(requiresEOF: requiresEOF)
         }
 
+        let macros = try parseMacroApplicationsIfPresent()
         let modifiers = parseTypeDefinitionModifiers(before: .construct)
         let attribute = modifiers.attribute
         let kind = try parseConstructKind(attribute: attribute)
         let header = try parseConstructHeader()
         let name = header.name
         let conformances = header.conformances
-        let projectionTarget = header.projectionTarget
 
         var states: [StateDeclaration] = []
         var environments: [EnvironmentDeclaration] = []
@@ -116,12 +117,12 @@ extension Parser {
         try validateInitializerDeclarations(initializers, availableDeriveds: deriveds)
 
         return ConstructDeclaration(
+            macros: macros,
             kind: kind,
             attribute: attribute,
             primitive: modifiers.primitive,
             name: name,
             conformances: conformances,
-            projectionTarget: projectionTarget,
             states: states,
             environments: environments,
             bindings: bindings,
@@ -156,12 +157,12 @@ extension Parser {
         try validateCallableReturnSemantics(callables)
 
         return ConstructDeclaration(
+            macros: [],
             kind: .builder,
             attribute: nil,
             primitive: nil,
             name: name,
             conformances: [],
-            projectionTarget: nil,
             states: [],
             environments: [],
             bindings: [],
@@ -189,20 +190,17 @@ extension Parser {
     }
 
     mutating func parseConstructHeader() throws
-        -> (name: String, conformances: [String], projectionTarget: String?)
+        -> (name: String, conformances: [TypeReference])
     {
         let name = try consumeTypeName()
 
-        if peek() == .colon || peek() == .keyword(NeatSyntax.Keyword.projection.rawValue)
-            || peek() == .leftBrace
-        {
-            let projectionTarget = try parseProjectionTargetIfPresent()
+        if peek() == .colon || peek() == .leftBrace {
             let conformances = try parseConformanceListIfPresent()
-            return (name, conformances, projectionTarget)
+            return (name, conformances)
         }
 
         throw ParseError(
-            "Expected 'on', ':', or '{' after declaration name. Use construct \(name) { ... }, construct \(name): Contract { ... }, or construct \(name) on Target: Contract { ... }."
+            "Expected ':' or '{' after declaration name. Use construct \(name) { ... } or construct \(name): Contract { ... }."
         )
     }
 }
