@@ -40,8 +40,10 @@ extension Parser {
 
             let outerStateTypes = currentStateTypes
             let outerEnvironmentTypes = currentEnvironmentTypes
+            let outerSelfAvailable = currentSelfAvailable
             currentStateTypes = outerStateTypes
             currentEnvironmentTypes = outerEnvironmentTypes
+            currentSelfAvailable = true
             while peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
                 || isEnvironmentDeclarationStart()
                 || isBindingDeclarationStart()
@@ -97,6 +99,7 @@ extension Parser {
 
             currentStateTypes = outerStateTypes
             currentEnvironmentTypes = outerEnvironmentTypes
+            currentSelfAvailable = outerSelfAvailable
             clearCurrentDeclarationSymbols()
 
             try consume(.rightBrace)
@@ -186,6 +189,7 @@ extension Parser {
         -> (name: String, conformances: [TypeReference])
     {
         let name = try consumeTypeName()
+        try skipGenericParameterClauseIfPresent()
 
         if peek() == .colon || peek() == .leftBrace {
             let conformances = try parseConformanceListIfPresent()

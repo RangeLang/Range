@@ -1,0 +1,6 @@
+@core
+construct StringLiteral { }
+
+extension StringLiteral {
+    function bytes() -> [Byte]
+}

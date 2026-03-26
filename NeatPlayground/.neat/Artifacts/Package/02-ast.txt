@@ -4,7 +4,6 @@ AST:
       - macros: 0 elements
       - kind: NeatSyntax.ConstructKind.declaration
       - attribute: nil
-      - primitive: nil
       - name: "NeatPlayground"
       ▿ conformances: 1 element
         ▿ NeatSyntax.TypeReference.named

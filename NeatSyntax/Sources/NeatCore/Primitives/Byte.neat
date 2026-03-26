@@ -1,0 +1,4 @@
+@core
+construct Byte {
+    value bits: [Bit]
+}

@@ -75,14 +75,15 @@ extension NeatCLI {
                     }
                 }
 
-                let graph = renderer.renderGraph(files: parsedFiles)
+                let graphFiles = try NeatCoreLoader.parsedDependencyFiles() + parsedFiles
+                let graph = renderer.renderGraph(files: graphFiles)
                 try graph.write(
                     to: outputRoot.appendingPathComponent("03-graph.txt"),
                     atomically: true,
                     encoding: .utf8
                 )
                 let graphHTML = renderer.renderGraphHTML(
-                    files: parsedFiles,
+                    files: graphFiles,
                     title: "Neat Playground Dependency Graph"
                 )
                 try graphHTML.write(

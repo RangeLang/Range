@@ -167,7 +167,7 @@ extension Parser {
                 return .interpolatedString(parseInterpolatedString(value))
             }
             return .string(value)
-        case .identifier(let name):
+        case .identifier(let name), .keyword(let name):
             advance()
             if name == "true" {
                 return .boolean(true)
@@ -179,10 +179,15 @@ extension Parser {
                 return .none
             }
             var parts = [name]
-            while peek() == .dot, case .identifier(let nextName) = peek(offset: 1) {
-                advance()
-                advance()
-                parts.append(nextName)
+            parseMembers: while peek() == .dot {
+                switch peek(offset: 1) {
+                case .identifier(let nextName), .keyword(let nextName):
+                    advance()
+                    advance()
+                    parts.append(nextName)
+                default:
+                    break parseMembers
+                }
             }
             var fullName = parts.joined(separator: ".")
             fullName += try parseGenericArgumentClauseIfPresent()
@@ -195,7 +200,7 @@ extension Parser {
             return .bindingReference(try consumeIdentifier())
         case .dot:
             advance()
-            let name = try consumeIdentifier()
+            let name = try consumeCallableName()
             var fullName = ".\(name)"
             fullName += try parseGenericArgumentClauseIfPresent()
             if peek() == .leftParen {

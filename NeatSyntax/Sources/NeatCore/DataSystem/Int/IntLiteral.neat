@@ -1,0 +1,6 @@
+@core
+construct IntLiteral { }
+
+extension IntLiteral {
+    function bits(count: IntLiteral) -> [Bit]
+}

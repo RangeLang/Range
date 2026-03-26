@@ -15,9 +15,11 @@ enum ProjectSourceValidator {
     }
 
     static func validateFiles(_ files: [URL]) throws {
-        let parsedFiles = try files.map {
-            ParsedFile(url: $0, sourceFile: try parseSourceFile(at: $0))
-        }
+        let parsedFiles =
+            try NeatCoreLoader.parsedValidationFiles()
+            + files.map {
+                ParsedFile(url: $0, sourceFile: try parseSourceFile(at: $0))
+            }
         try validatePrimaryDeclarations(in: parsedFiles)
         try validateTopLevelStates(in: parsedFiles)
         try validateEnvironmentStateResolution(in: parsedFiles)
@@ -25,9 +27,11 @@ enum ProjectSourceValidator {
     }
 
     static func validatePrimaryDeclarations(in files: [URL]) throws {
-        let parsedFiles = try files.map {
-            ParsedFile(url: $0, sourceFile: try parseSourceFile(at: $0))
-        }
+        let parsedFiles =
+            try NeatCoreLoader.parsedValidationFiles()
+            + files.map {
+                ParsedFile(url: $0, sourceFile: try parseSourceFile(at: $0))
+            }
         try validatePrimaryDeclarations(in: parsedFiles)
     }
 

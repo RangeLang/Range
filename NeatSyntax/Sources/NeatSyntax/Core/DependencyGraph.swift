@@ -42,6 +42,7 @@ public enum DependencyGraphEdgeKind: String {
     case conformsTo
     case extends
     case referencesType
+    case referencesIdentity
     case appliesMacro
     case targetsMacro
     case resolvesTo
@@ -318,7 +319,7 @@ public struct DependencyGraph {
 
                 const attachedTypeOwnerIDsByTypeID = new Map();
                 for (const edge of rawEdges) {
-                  const isAttachedTypeEdge = (edge.kind === "referencesType" || edge.kind === "conformsTo")
+                  const isAttachedTypeEdge = (edge.kind === "referencesType" || edge.kind === "referencesIdentity" || edge.kind === "conformsTo")
                     && edge.target.kind === "typeReference";
                   if (!isAttachedTypeEdge) continue;
                   edge.source.attachedTypes.push(edge.target.label);
@@ -718,6 +719,7 @@ public struct DependencyGraph {
                   "conformsTo",
                   "extends",
                   "referencesType",
+                  "referencesIdentity",
                   "appliesMacro",
                   "targetsMacro",
                   "resolvesTo"
@@ -925,7 +927,11 @@ public struct DependencyGraphBuilder {
 
     public func build(files: [ParsedSourceFile]) -> DependencyGraph {
         var collector = GraphCollector()
-        for file in files.sorted(by: { $0.path < $1.path }) {
+        let sortedFiles = files.sorted(by: { $0.path < $1.path })
+        for file in sortedFiles {
+            collector.registerDeclarations(in: file)
+        }
+        for file in sortedFiles {
             collector.add(file)
         }
         return collector.build()
@@ -940,6 +946,20 @@ private struct GraphCollector {
     private var constructCallableNodeIDsByName: [String: [String: String]] = [:]
     private var aliasTargetByNodeID: [String: String] = [:]
     private var constructTypeByNodeID: [String: String] = [:]
+    private var coreConstructNames: Set<String> = []
+
+    mutating func registerDeclarations(in parsedFile: ParsedSourceFile) {
+        switch parsedFile.sourceFile {
+        case .construct(let declaration):
+            registerConstructDeclaration(declaration)
+        case .module(let module):
+            for declaration in module.constructs {
+                registerConstructDeclaration(declaration)
+            }
+        default:
+            break
+        }
+    }
 
     mutating func build() -> DependencyGraph {
         addResolutionEdges()
@@ -1005,9 +1025,9 @@ private struct GraphCollector {
 
     private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
         let constructID = "\(parentID)/construct:\(declaration.name)"
-        addNode(id: constructID, kind: .construct, label: declaration.name)
+        let constructLabel = declaration.isCore ? "@core \(declaration.name)" : declaration.name
+        addNode(id: constructID, kind: .construct, label: constructLabel)
         registerDeclaration(name: declaration.name, nodeID: constructID)
-        constructDeclarationsByName[declaration.name] = declaration
         addEdge(from: parentID, to: constructID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: constructID)
         addTypeReferences(declaration.conformances, from: constructID, kind: .conformsTo)
@@ -1041,7 +1061,8 @@ private struct GraphCollector {
                 ($0.name, "\(constructID)/environment:\($0.name)")
             },
             states: declaration.states.map { ($0.name, "\(constructID)/state:\($0.name)") },
-            values: declaration.values.map { ($0.name, "\(constructID)/value:\($0.name)") }
+            values: declaration.values.map { ($0.name, "\(constructID)/value:\($0.name)") },
+            selfID: constructID
         )
 
         for derived in declaration.deriveds {
@@ -1122,7 +1143,7 @@ private struct GraphCollector {
         addNode(id: stateID, kind: .state, label: declaration.name)
         addEdge(from: parentID, to: stateID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: stateID)
-        addTypeReference(.named(declaration.type.displayName), from: stateID, kind: .referencesType)
+        addStorageTypeReference(.named(declaration.type.displayName), from: stateID)
         if case .stored(let expression) = declaration.storage {
             captureConstructType(for: stateID, from: expression)
             analyzeInitializer(expression, ownerID: stateID, scope: MemoryScope(), visitedCalls: [])
@@ -1134,7 +1155,7 @@ private struct GraphCollector {
         addNode(id: environmentID, kind: .environment, label: declaration.name)
         addEdge(from: parentID, to: environmentID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: environmentID)
-        addTypeReference(.named(declaration.typeName), from: environmentID, kind: .referencesType)
+        addStorageTypeReference(.named(declaration.typeName), from: environmentID)
     }
 
     private mutating func addBinding(_ declaration: BindingDeclaration, parentID: String) {
@@ -1142,7 +1163,7 @@ private struct GraphCollector {
         addNode(id: bindingID, kind: .binding, label: declaration.name)
         addEdge(from: parentID, to: bindingID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: bindingID)
-        addTypeReference(.named(declaration.typeName), from: bindingID, kind: .referencesType)
+        addStorageTypeReference(.named(declaration.typeName), from: bindingID)
         if constructDeclarationsByName[declaration.typeName] != nil {
             constructTypeByNodeID[bindingID] = declaration.typeName
         }
@@ -1153,7 +1174,7 @@ private struct GraphCollector {
         addNode(id: derivedID, kind: .derived, label: declaration.name)
         addEdge(from: parentID, to: derivedID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: derivedID)
-        addTypeReference(.named(declaration.typeName), from: derivedID, kind: .referencesType)
+        addStorageTypeReference(.named(declaration.typeName), from: derivedID)
         if let builderName = declaration.builderName {
             addTypeReference(.named(builderName), from: derivedID, kind: .referencesType)
         }
@@ -1164,7 +1185,7 @@ private struct GraphCollector {
         addNode(id: valueID, kind: .value, label: declaration.name)
         addEdge(from: parentID, to: valueID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: valueID)
-        addTypeReference(.named(declaration.typeName), from: valueID, kind: .referencesType)
+        addStorageTypeReference(.named(declaration.typeName), from: valueID)
         if constructDeclarationsByName[declaration.typeName] != nil {
             constructTypeByNodeID[valueID] = declaration.typeName
         }
@@ -1211,11 +1232,25 @@ private struct GraphCollector {
         addEdge(from: parentID, to: parameterID, kind: .contains)
         addMacroApplications(parameter.macros, parentID: parameterID)
         if let typeReference = parameter.typeReference {
-            addTypeReference(typeReference, from: parameterID, kind: .referencesType)
+            addStorageTypeReference(typeReference, from: parameterID)
             if case .named(let name) = typeReference, constructDeclarationsByName[name] != nil {
                 constructTypeByNodeID[parameterID] = name
             }
         }
+    }
+
+    private mutating func addStorageTypeReference(_ reference: TypeReference, from sourceID: String)
+    {
+        let edgeKind: DependencyGraphEdgeKind
+        if case .named(let name) = reference,
+            constructDeclarationsByName[name] != nil,
+            !coreConstructNames.contains(name)
+        {
+            edgeKind = .referencesIdentity
+        } else {
+            edgeKind = .referencesType
+        }
+        addTypeReference(reference, from: sourceID, kind: edgeKind)
     }
 
     private mutating func addMacroApplications(
@@ -1263,6 +1298,13 @@ private struct GraphCollector {
         declarationNodeIDsByName[name, default: []].insert(nodeID)
     }
 
+    private mutating func registerConstructDeclaration(_ declaration: ConstructDeclaration) {
+        constructDeclarationsByName[declaration.name] = declaration
+        if declaration.isCore {
+            coreConstructNames.insert(declaration.name)
+        }
+    }
+
     private mutating func addResolutionEdges() {
         let typeNodes = nodesByID.values.filter { $0.kind == .typeReference }
         for typeNode in typeNodes {
@@ -1306,7 +1348,7 @@ private struct GraphCollector {
                 addNode(id: localID, kind: nodeKind, label: name)
                 addEdge(from: ownerID, to: localID, kind: .contains)
                 if let typeName {
-                    addTypeReference(.named(typeName), from: localID, kind: .referencesType)
+                    addStorageTypeReference(.named(typeName), from: localID)
                     if constructDeclarationsByName[typeName] != nil {
                         constructTypeByNodeID[localID] = typeName
                     }
@@ -1320,7 +1362,7 @@ private struct GraphCollector {
                 let derivedID = "\(ownerID)/local-derived:\(name)"
                 addNode(id: derivedID, kind: .derived, label: name)
                 addEdge(from: ownerID, to: derivedID, kind: .contains)
-                addTypeReference(.named(typeName), from: derivedID, kind: .referencesType)
+                addStorageTypeReference(.named(typeName), from: derivedID)
                 scope.symbols[name] = derivedID
                 analyzeStatements(
                     body, ownerID: derivedID, scope: scope, visitedCalls: visitedCalls)
@@ -1580,6 +1622,7 @@ private struct GraphCollector {
         declaration: ConstructDeclaration
     ) -> MemoryScope {
         var scope = MemoryScope()
+        scope.symbols["self"] = instanceNodeID
         for state in declaration.states {
             scope.symbols[state.name] = ensureMemberNode(
                 baseID: instanceNodeID, name: state.name, kind: .state)
@@ -1731,9 +1774,13 @@ private struct GraphCollector {
         deriveds: [(String, String)],
         environments: [(String, String)],
         states: [(String, String)],
-        values: [(String, String)]
+        values: [(String, String)],
+        selfID: String? = nil
     ) -> MemoryScope {
         var scope = MemoryScope()
+        if let selfID {
+            scope.symbols["self"] = selfID
+        }
         for (name, id) in states + environments + bindings + deriveds + values {
             scope.symbols[name] = id
         }

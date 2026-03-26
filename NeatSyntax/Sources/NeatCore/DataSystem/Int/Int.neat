@@ -1,8 +1,8 @@
 @core
 construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressableByIntLiteral {
-    value data: [Bit]
+    value bits: [Bit]
 
     init(literal _: IntLiteral) {
-        self.data = Bit.fromRaw(value, bits: bits)
+        self.bits = literal.bits(count: bits)
     }
 }

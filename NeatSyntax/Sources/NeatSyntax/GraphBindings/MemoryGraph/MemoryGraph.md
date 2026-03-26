@@ -131,6 +131,20 @@ construct Book {
 
 `author: Author` is surface syntax. In the memory graph, construct-to-construct relationships are tracked through compiler-synthesized identity rather than literal nested containment.
 
+- `@core construct` references stay plain type composition in the graph.
+
+```neat
+@core
+construct IntLiteral { }
+
+@core
+construct Int {
+    value literal: IntLiteral
+}
+```
+
+`Int.literal` is modeled as plain value composition rather than a construct-identity relationship.
+
 - Every construct is identity-bearing even when identity is not written explicitly.
 
 ```neat

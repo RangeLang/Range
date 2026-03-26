@@ -36,7 +36,7 @@
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/binding:person
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/function:incrementAge()
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/binding:person -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/binding:person/member:age
-  file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/binding:person -referencesType-> type:Person
+  file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/binding:person -referencesIdentity-> type:Person
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/function:incrementAge() -dependsOn-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/binding:person/member:age
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/function:incrementAge() -mutates-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/binding:person/member:age
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main -calls-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/function:incrementAge()
@@ -52,10 +52,10 @@
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local-derived:personString -referencesType-> type:String
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person/member:age
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person/member:name
-  file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person -referencesType-> type:Person
+  file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person -referencesIdentity-> type:Person
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user/member:person
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user -dependsOn-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person
-  file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user -referencesType-> type:User
+  file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user -referencesIdentity-> type:User
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user/member:person -aliases-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user/member:person -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user/member:person/member:age
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:user/member:person/member:age -aliases-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person/member:age

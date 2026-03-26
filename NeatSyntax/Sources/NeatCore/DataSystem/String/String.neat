@@ -1,0 +1,8 @@
+@core
+construct String: ExpressableByStringLiteral {
+    value bytes: [Byte]
+
+    init(literal _: StringLiteral) {
+        self.bytes = literal.bytes()
+    }
+}

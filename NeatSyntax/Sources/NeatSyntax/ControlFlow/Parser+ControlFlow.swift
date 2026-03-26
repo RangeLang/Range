@@ -167,7 +167,15 @@ extension Parser {
         localBindings: [String: LocalBindingKind]
     ) throws -> AssignmentTarget {
         let name = try consumeIdentifier()
-        var target = try resolveAssignmentTarget(name: name, localBindings: localBindings)
+        var target: AssignmentTarget
+        if currentSelfAvailable, name == "self" {
+            guard peek() == .dot else {
+                throw ParseError("Cannot assign to self directly.")
+            }
+            target = .local(name)
+        } else {
+            target = try resolveAssignmentTarget(name: name, localBindings: localBindings)
+        }
         while peek() == .dot {
             try consume(.dot)
             let memberName = try consumeIdentifier()

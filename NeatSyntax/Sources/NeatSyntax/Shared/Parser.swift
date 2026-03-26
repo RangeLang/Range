@@ -10,6 +10,7 @@ public struct Parser {
     var currentBindingNames: Set<String> = []
     var currentEnvironmentNames: Set<String> = []
     var currentMutableEnvironmentNames: Set<String> = []
+    var currentSelfAvailable: Bool = false
 
     public init(source: String) throws {
         var lexer = Lexer(source: source)

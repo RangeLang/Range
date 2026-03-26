@@ -80,7 +80,6 @@ AST:
           - macros: 0 elements
           - kind: NeatSyntax.ConstructKind.declaration
           - attribute: nil
-          - primitive: nil
           - name: "Person"
           - conformances: 0 elements
           ▿ states: 1 element
@@ -106,7 +105,6 @@ AST:
           - macros: 0 elements
           - kind: NeatSyntax.ConstructKind.declaration
           - attribute: nil
-          - primitive: nil
           - name: "User"
           - conformances: 0 elements
           - states: 0 elements

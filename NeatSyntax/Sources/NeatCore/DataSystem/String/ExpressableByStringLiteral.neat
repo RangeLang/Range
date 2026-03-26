@@ -1,0 +1,4 @@
+protocol ExpressableByStringLiteral {
+    #literal(StringLiteral)
+    init(literal: StringLiteral)
+}
