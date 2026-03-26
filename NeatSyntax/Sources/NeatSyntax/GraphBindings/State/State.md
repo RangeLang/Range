@@ -4,6 +4,16 @@
 
 State is a mutable owned graph binding.
 
+## Role
+
+`state` is Neat's mutable source of truth.
+
+## Mental Model
+
+`state` owns mutable storage directly.
+
+If other code needs shared access to that storage, it does so through `binding`.
+
 ## Properties
 
 - Declares mutable owned data
@@ -18,6 +28,8 @@ state page: Int
 state page: Int = 0
 ```
 
+Outside construct member storage, `state` requires an initializer.
+
 - Can participate in memberwise initialization
 
 ```neat
@@ -27,6 +39,8 @@ construct Counter {
 
 value counter = Counter(count: 0)
 ```
+
+Inside construct member storage, `state` may be declared without a default and must then be initialized by construction.
 
 - Can be mutated after initialization
 
@@ -48,3 +62,16 @@ construct Counter {
     }
 }
 ```
+
+- Shared mutation is exposed through binding projection
+
+```neat
+construct User {
+    binding person: Person
+}
+
+state person: Person = Person(name: "George", age: 26)
+state user: User = User(person: $person)
+```
+
+`person` is the owner. `user.person` is borrowed access to that same mutable storage.

@@ -64,6 +64,29 @@ construct Editor {
 
 `binding` creates an alias or borrowed path into existing storage rather than introducing new ownership.
 
+- Ordinary assignment is value-semantic, not implicit shared reference.
+
+```neat
+construct Person {
+    value name: String
+    state age: Int
+}
+
+value person: Person = Person(name: "George", age: 26)
+state editablePerson: Person = person
+```
+
+The memory graph treats `editablePerson` as a new owned value, not as an alias to `person`.
+
+- Shared mutable access is explicit through `binding`.
+
+```neat
+state person: Person = Person(name: "George", age: 26)
+binding selectedPerson: Person = $person
+```
+
+The graph records `selectedPerson` as borrowed access to the storage owned by `person`.
+
 - `environment` is inherited storage from a higher scope.
 
 ```neat
@@ -135,6 +158,19 @@ state user: User = User(person: $person)
 
 If `User.person` is a binding, the graph records that `user.person` aliases existing storage owned by `person`.
 
+- Mutation through a `value` root is invalid even when the construct contains internal `state`.
+
+```neat
+construct Person {
+    value name: String
+    state age: Int
+}
+
+value person: Person = Person(name: "George", age: 26)
+```
+
+`person.age = 27` is rejected because `person` is immutable at the root path.
+
 - The memory graph records derived dependencies.
 
 ```neat
@@ -194,7 +230,7 @@ When packages interact, the compiler merges the relevant graph information at bu
 
 construct Person {
     value name: String
-    value age: Int
+    state age: Int
 }
 
 construct User {
@@ -221,3 +257,4 @@ The memory graph for this code includes:
 - The memory graph is the semantic foundation for later exposed reactivity behavior, but reactivity rules are documented separately.
 - The graph is intended to be solvable from Neat's constrained storage model without general-purpose borrow annotations.
 - This document defines the memory-side model only. It does not yet specify the separate reactive invalidation view in detail.
+- `binding` is the explicit shared-reference mechanism in Neat. It is pointer-like in role, but compiler-tracked and constrained by the storage system.
