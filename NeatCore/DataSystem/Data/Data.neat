@@ -1,0 +1,9 @@
+@core
+construct Data: Equatable, Hashable {
+    // Data is an opaque raw byte sequence, not a numeric scalar.
+    value bytes: [Byte]
+
+    init(bytes: [Byte]) {
+        self.bytes = bytes
+    }
+}
