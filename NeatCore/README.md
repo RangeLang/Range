@@ -38,6 +38,12 @@ Low-level compiler-facing building blocks such as `Bit` and `Byte`.
 
 These are closer to the implementation boundary than the main `DataSystem` layer.
 
+### `Operators`
+
+The intended language-owned home for explicit operator and precedence declarations.
+
+This is where Neat's operator model is being documented as it moves out of compiler bootstrap logic and toward source-defined language rules.
+
 ### `Macros/Exploration`
 
 Exploratory macro and metaprogramming material.
