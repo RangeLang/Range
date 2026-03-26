@@ -189,8 +189,6 @@ struct SwiftBackendEmitter {
         switch typeName {
         case "Int", "Double", "Float", "String", "Bool", "Void":
             return typeName
-        case "Data":
-            return "Data"
         default:
             return typeName
         }

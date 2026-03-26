@@ -42,7 +42,6 @@ public indirect enum BuiltinType: Equatable {
     case float
     case string
     case bool
-    case data
     case dictionary
     case set(BuiltinType)
     case void
@@ -60,8 +59,6 @@ public indirect enum BuiltinType: Equatable {
             return "String"
         case .bool:
             return "Bool"
-        case .data:
-            return "Data"
         case .dictionary:
             return "Dictionary"
         case .set(let element):
