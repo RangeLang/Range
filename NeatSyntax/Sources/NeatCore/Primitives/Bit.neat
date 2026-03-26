@@ -1,4 +1,4 @@
-primitive enum Bit {
+enum Bit {
     case zero
     case one
 }

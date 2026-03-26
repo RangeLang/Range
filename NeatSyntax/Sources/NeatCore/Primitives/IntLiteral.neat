@@ -1,1 +1,2 @@
-primitive IntLiteral
+@core
+construct IntLiteral { }

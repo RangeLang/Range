@@ -1,0 +1,6 @@
+// Exploratory expression macro-facing compiler surface.
+// This file is for design iteration only.
+
+protocol Expression: Statement, FreestandingMacroTarget {
+    value type: TypeReference?
+}

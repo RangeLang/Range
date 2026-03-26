@@ -1,6 +1,0 @@
-// Exploratory value macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive construct Value: StorageDeclaration {
-    value default: Expression?
-}

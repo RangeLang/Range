@@ -1,0 +1,10 @@
+// Exploratory construct macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct Construct: AttachedMacroTarget {
+    value name: String
+    value self: TypeReference
+    value storages: [StorageDeclaration]
+    value inits: [Init]
+    value functions: [Function]
+}

@@ -1,0 +1,7 @@
+// Exploratory storage accessor macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct AccessorDeclaration {
+    value getter: Block?
+    value setter: Block?
+}

@@ -1,6 +1,0 @@
-// Exploratory array expression macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive construct ArrayExpression: Expression {
-    value elements: [Expression]
-}

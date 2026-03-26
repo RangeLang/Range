@@ -1,0 +1,7 @@
+// Exploratory expression argument macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct ExpressionArgument {
+    value label: String?
+    value value: Expression
+}

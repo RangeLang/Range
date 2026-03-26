@@ -1,0 +1,9 @@
+// Exploratory parameter macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct Parameter: AttachedMacroTarget {
+    value externalName: String?
+    value localName: String
+    value type: TypeReference
+    value defaultValue: Expression?
+}

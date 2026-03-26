@@ -1,7 +1,0 @@
-// Exploratory function macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive construct Function: AttachedMacroTarget, Callable, Declaration {
-    value name: String
-    value returnType: TypeReference?
-}

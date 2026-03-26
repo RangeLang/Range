@@ -1,0 +1,4 @@
+// Exploratory initializer macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct Init: AttachedMacroTarget, Callable, Declaration

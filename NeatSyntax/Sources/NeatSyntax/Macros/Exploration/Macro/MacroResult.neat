@@ -1,6 +1,0 @@
-// Exploratory macro result surface.
-// This file is for design iteration only.
-
-primitive construct MacroResult: SupportsRewrite<Expression>, SupportsRewrite<Block>, SupportsRewrite<State>, SupportsRewrite<Derived>, SupportsMember<Declaration>, SupportsExtension<Extension> {
-    value argument: ArgumentResult
-}

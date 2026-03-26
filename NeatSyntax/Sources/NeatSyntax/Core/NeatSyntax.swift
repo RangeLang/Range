@@ -19,7 +19,6 @@ enum NeatSyntax {
         case continueStatement = "continue"
         case switchStatement = "switch"
         case defaultBranch = "default"
-        case primitive = "primitive"
         case enumeration = "enum"
         case protocolDefinition = "protocol"
         case construct = "construct"

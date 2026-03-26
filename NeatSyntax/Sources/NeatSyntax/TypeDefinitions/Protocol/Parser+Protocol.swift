@@ -6,15 +6,9 @@ extension Parser {
         switch peek(offset: offset) {
         case .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue):
             return true
-        case .keyword(NeatSyntax.Keyword.primitive.rawValue):
-            return peek(offset: offset + 1)
-                == .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue)
         case .atAttribute:
             return peek(offset: offset + 1)
                 == .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue)
-                || (peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
-                    && peek(offset: offset + 2)
-                        == .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue))
         default:
             return false
         }
@@ -24,7 +18,10 @@ extension Parser {
         -> ProtocolDeclaration
     {
         let macros = try parseMacroApplicationsIfPresent()
-        let modifiers = parseTypeDefinitionModifiers(before: .protocolDefinition)
+        let attribute = parseAttributeIfPresent(before: .protocolDefinition)
+        if attribute?.name == "core" {
+            throw ParseError("@core can only be applied to construct declarations.")
+        }
 
         try consumeKeyword(.protocolDefinition)
         let name = try consumeTypeName()
@@ -42,8 +39,7 @@ extension Parser {
 
         return ProtocolDeclaration(
             macros: macros,
-            attribute: modifiers.attribute,
-            primitive: modifiers.primitive,
+            attribute: attribute,
             name: name,
             conformances: conformances
         )

@@ -4,6 +4,16 @@
 
 Every construct is identity-bearing by default.
 
+## Role
+
+Construct identity lets Neat model real relationships without making users choose between separate class and struct worlds.
+
+## Mental Model
+
+Constructs are identity-bearing, but that does not mean every construct relationship is literal inline storage.
+
+Construct-to-construct members preserve construct identity in the graph, which keeps recursive models legal.
+
 ## Properties
 
 - Constructs have value semantics by default
@@ -50,7 +60,7 @@ construct Book {
 
 `author: Author` is surface syntax. The graph treats it as a reference through `Author.ID`.
 
-- Construct relationships do not imply literal containment
+- Construct relationships do not imply literal inline containment
 
 ```neat
 construct Author {
@@ -64,6 +74,17 @@ construct Book {
 ```
 
 `Book` does not literally contain `Author` as stored nested data. The relationship is tracked through identity.
+
+- Recursive construct references are legal
+
+```neat
+construct FileNode {
+    value name: String
+    value parent: FileNode
+}
+```
+
+Recursive construct references are legal because construct members preserve construct identity in the graph rather than demanding infinite inline size.
 
 - Cycles between constructs are safe
 
@@ -79,3 +100,5 @@ Cycles are safe because construct references are identity references, not contai
 
 - `User.ID` is the compiler-provided identity type for `User`.
 - Ordinary fields such as `value id: UUID` are user-facing data and do not replace the intrinsic construct identity.
+- Foundational plain-value types such as `Int` belong to `@core construct`, not this identity model.
+- Compiler structural constructs such as `Closure` and `Block` may also belong to `@core construct` when they are non-identity-bearing values.

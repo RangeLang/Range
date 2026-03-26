@@ -1,0 +1,28 @@
+// Exploratory macro basement surface.
+// This file is for design iteration only.
+
+protocol FreestandingMacroTarget
+protocol AttachedMacroTarget
+
+protocol SupportsRewrite<T> {
+    function rewrite(_: T)
+}
+
+protocol SupportsMember<T> {
+    function member(_: T)
+}
+
+protocol SupportsExtension<T> {
+    function extension(_: T)
+}
+
+protocol Freestanding<T: FreestandingMacroTarget>
+protocol Attached<T: AttachedMacroTarget>
+
+protocol Freestanding<Block>: SupportsRewrite<Block>
+protocol Freestanding<Expression>: SupportsRewrite<Expression>
+
+protocol Attached<State>: SupportsRewrite<State>, SupportsMember<Declaration>
+protocol Attached<Derived>: SupportsRewrite<Derived>
+protocol Attached<Parameter>: SupportsRewrite<Expression>
+protocol Attached<Construct>: SupportsMember<Declaration>, SupportsExtension<Extension>

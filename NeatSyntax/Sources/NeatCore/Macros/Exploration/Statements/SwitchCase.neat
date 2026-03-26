@@ -1,0 +1,7 @@
+// Exploratory switch case macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct SwitchCase {
+    value pattern: Expression
+    value body: Block
+}

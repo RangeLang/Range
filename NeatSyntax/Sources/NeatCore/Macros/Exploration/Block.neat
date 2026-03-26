@@ -1,0 +1,6 @@
+// Exploratory block macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct Block: FreestandingMacroTarget {
+    value statements: [Statement]
+}

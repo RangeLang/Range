@@ -10,7 +10,6 @@ public struct ConstructDeclaration {
     public let macros: [MacroApplication]
     public let kind: ConstructKind
     public let attribute: AttributeApplication?
-    public let primitive: PrimitiveModifier?
     public let name: String
     public let conformances: [TypeReference]
     public let states: [StateDeclaration]
@@ -21,8 +20,8 @@ public struct ConstructDeclaration {
     public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
 
-    public var isPrimitive: Bool {
-        primitive != nil
+    public var isCore: Bool {
+        attribute?.name == "core"
     }
 }
 

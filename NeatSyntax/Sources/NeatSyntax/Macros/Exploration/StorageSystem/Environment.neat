@@ -1,7 +1,0 @@
-// Exploratory environment macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive construct Environment: StorageDeclaration {
-    value default: Expression?
-    value isState: Bool
-}

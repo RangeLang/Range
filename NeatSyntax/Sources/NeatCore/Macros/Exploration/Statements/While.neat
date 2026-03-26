@@ -1,0 +1,7 @@
+// Exploratory while statement macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct While: Statement {
+    value condition: Expression
+    value body: Block
+}

@@ -1,7 +1,0 @@
-// Exploratory state macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive construct State: StorageDeclaration {
-    value default: Expression?
-    value accessors: AccessorDeclaration?
-}

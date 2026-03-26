@@ -1,7 +1,0 @@
-// Exploratory switch statement macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive construct Switch: Statement {
-    value expression: Expression
-    value cases: [SwitchCase]
-}

@@ -1,0 +1,9 @@
+// Exploratory extension macro-facing compiler surface.
+// This file is for design iteration only.
+
+construct Extension: AttachedMacroTarget {
+    value target: TypeReference
+    value protocols: [TypeReference]
+    value storages: [StorageDeclaration]
+    value functions: [Function]
+}

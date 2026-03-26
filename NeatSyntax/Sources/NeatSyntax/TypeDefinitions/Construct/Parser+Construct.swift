@@ -6,12 +6,8 @@ extension Parser {
         switch peek(offset: offset) {
         case .keyword(NeatSyntax.Keyword.construct.rawValue):
             return true
-        case .keyword(NeatSyntax.Keyword.primitive.rawValue):
-            return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
         case .atAttribute:
             return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
-                || (peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
-                    && peek(offset: offset + 2) == .keyword(NeatSyntax.Keyword.construct.rawValue))
         default:
             return false
         }
@@ -25,8 +21,7 @@ extension Parser {
         }
 
         let macros = try parseMacroApplicationsIfPresent()
-        let modifiers = parseTypeDefinitionModifiers(before: .construct)
-        let attribute = modifiers.attribute
+        let attribute = parseAttributeIfPresent(before: .construct)
         let kind = try parseConstructKind(attribute: attribute)
         let header = try parseConstructHeader()
         let name = header.name
@@ -120,7 +115,6 @@ extension Parser {
             macros: macros,
             kind: kind,
             attribute: attribute,
-            primitive: modifiers.primitive,
             name: name,
             conformances: conformances,
             states: states,
@@ -160,7 +154,6 @@ extension Parser {
             macros: [],
             kind: .builder,
             attribute: nil,
-            primitive: nil,
             name: name,
             conformances: [],
             states: [],

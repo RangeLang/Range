@@ -1,6 +1,0 @@
-// Exploratory identifier expression macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive construct Identifier: Expression {
-    value name: String
-}

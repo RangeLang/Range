@@ -1,0 +1,7 @@
+// Exploratory storage macro-facing compiler surface.
+// This file is for design iteration only.
+
+protocol StorageDeclaration: AttachedMacroTarget, Declaration {
+    value name: String
+    value type: TypeReference
+}

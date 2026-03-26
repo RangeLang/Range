@@ -1,0 +1,10 @@
+// Exploratory callable macro-facing compiler surface.
+// This file is for design iteration only.
+
+protocol Callable {
+    value params: [Parameter]
+    value arguments: [Argument]
+    value body: Block?
+
+    function expression(arguments: [Argument]) -> Expression
+}

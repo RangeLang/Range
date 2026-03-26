@@ -6,12 +6,8 @@ extension Parser {
         switch peek(offset: offset) {
         case .keyword(NeatSyntax.Keyword.enumeration.rawValue):
             return true
-        case .keyword(NeatSyntax.Keyword.primitive.rawValue):
-            return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
         case .atAttribute:
             return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
-                || (peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.primitive.rawValue)
-                    && peek(offset: offset + 2) == .keyword(NeatSyntax.Keyword.enumeration.rawValue))
         default:
             return false
         }
@@ -21,7 +17,10 @@ extension Parser {
         -> EnumDeclaration
     {
         let macros = try parseMacroApplicationsIfPresent()
-        let modifiers = parseTypeDefinitionModifiers(before: .enumeration)
+        let attribute = parseAttributeIfPresent(before: .enumeration)
+        if attribute?.name == "core" {
+            throw ParseError("@core can only be applied to construct declarations.")
+        }
 
         try consumeKeyword(.enumeration)
         let name = try consumeTypeName()
@@ -42,8 +41,7 @@ extension Parser {
 
         return EnumDeclaration(
             macros: macros,
-            attribute: modifiers.attribute,
-            primitive: modifiers.primitive,
+            attribute: attribute,
             name: name,
             conformances: conformances,
             cases: cases

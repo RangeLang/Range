@@ -80,7 +80,7 @@ macro traced: Attached<Function> { function in
 }
 ```
 
-- Attachment targets are compiler-known primitive concepts
+- Attachment targets are compiler-known language concepts
 
 ```neat
 Expression

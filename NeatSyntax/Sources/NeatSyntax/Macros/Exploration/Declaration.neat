@@ -1,4 +1,0 @@
-// Exploratory declaration macro-facing compiler surface.
-// This file is for design iteration only.
-
-primitive protocol Declaration
