@@ -220,14 +220,18 @@ construct User {
 
 The graph records that `incrementAge` mutates storage reachable through the `person` binding.
 
-- The memory graph can be compiled at different levels.
+- The memory graph is always generated.
+
+The memory graph is the default compiler model for ownership, storage, identity, mutation, and dependency. Neat does not provide a graph-free escape hatch for ordinary memory management.
+
+- Reactivity is an additional exposed layer built on top of the memory graph.
 
 ```neat
-@noMemoryGraph
-package LowLevelRuntime
+@reactive
+package UI
 ```
 
-Neat supports full graph analysis by default, ownership-focused analysis where reactive invalidation is not needed, and graph-free packages for explicitly low-level code.
+Reactive invalidation and update behavior are opt-in views over the existing memory graph rather than a separate ownership system.
 
 - Memory graph information composes across modules.
 
