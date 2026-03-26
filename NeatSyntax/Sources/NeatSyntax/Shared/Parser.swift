@@ -142,7 +142,7 @@ public struct Parser {
     var currentStateNames: Set<String> = []
     var currentMutableStateNames: Set<String> = []
     var currentStateTypes: [String: TypeReference] = [:]
-    var currentEnvironmentTypes: [String: BootstrapType] = [:]
+    var currentEnvironmentTypes: [String: TypeReference] = [:]
     var currentBindingNames: Set<String> = []
     var currentEnvironmentNames: Set<String> = []
     var currentMutableEnvironmentNames: Set<String> = []

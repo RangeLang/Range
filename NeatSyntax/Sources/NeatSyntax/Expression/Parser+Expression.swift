@@ -269,67 +269,28 @@ extension Parser {
         return "<\(arguments.joined(separator: ", "))>"
     }
 
-    mutating func parseBootstrapType() throws -> BootstrapType {
-        let raw = try consumeTypeReference()
-        guard let type = bootstrapType(from: raw) else {
-            throw ParseError(
-                "Unsupported bootstrap type '\(raw)'. Bootstrap types: \(NeatSyntax.bootstrapTypeNames.joined(separator: ", "))."
-            )
-        }
-        return type
-    }
-
-    func bootstrapType(from raw: String) -> BootstrapType? {
-        if raw.hasSuffix("?") {
-            let base = String(raw.dropLast())
-            guard let wrapped = bootstrapType(from: base) else {
-                return nil
-            }
-            return .optional(wrapped)
-        }
-
-        switch raw {
-        case "Int":
-            return .int
-        case "Double":
-            return .double
-        case "Float":
-            return .float
-        case "String":
-            return .string
-        case "Bool":
-            return .bool
-        case "Void":
-            return .void
-        default:
-            break
-        }
-
-        return nil
-    }
-
-    func inferType(
+    func inferBootstrapExpressionType(
         of expression: Expression,
-        accessibleTypes: [String: BootstrapType]
-    ) throws -> BootstrapType {
+        accessibleTypes: [String: TypeReference]
+    ) throws -> BootstrapLiteralType {
         switch expression {
         case .integer:
-            return .int
+            return .intLiteral
         case .double:
-            return .double
+            return .floatLiteral
         case .string:
-            return .string
+            return .stringLiteral
         case .interpolatedString:
-            return .string
+            return .stringLiteral
         case .boolean:
-            return .bool
+            return .boolLiteral
         case .nilLiteral:
-            throw ParseError("nil requires an explicit optional context.")
+            return .nilLiteral
         case .identifier(let name):
             guard let type = accessibleTypes[name] else {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
-            return type
+            return .typed(type)
         case .call:
             throw ParseError(
                 "Callable expressions are not supported in state initializer inference yet.")
@@ -341,14 +302,20 @@ extension Parser {
             throw ParseError(
                 "Dictionary type inference is not supported in state initializers yet.")
         case .ternary(let condition, let trueExpression, let falseExpression):
-            let conditionType = try inferType(of: condition, accessibleTypes: accessibleTypes)
-            guard conditionType == .bool else {
+            let conditionType = try inferBootstrapExpressionType(
+                of: condition,
+                accessibleTypes: accessibleTypes
+            )
+            guard isCompatibleWithExpectedType(conditionType, expected: .named("Bool")) else {
                 throw ParseError(
                     "Ternary condition must be Bool, got \(conditionType.displayName).")
             }
             if isNilLiteral(trueExpression) {
-                let falseType = try inferType(of: falseExpression, accessibleTypes: accessibleTypes)
-                guard falseType.isOptional else {
+                let falseType = try inferBootstrapExpressionType(
+                    of: falseExpression,
+                    accessibleTypes: accessibleTypes
+                )
+                guard isOptionalBootstrapExpressionType(falseType) else {
                     throw ParseError(
                         "Ternary branches must match, got nil and \(falseType.displayName)."
                     )
@@ -356,17 +323,26 @@ extension Parser {
                 return falseType
             }
             if isNilLiteral(falseExpression) {
-                let trueType = try inferType(of: trueExpression, accessibleTypes: accessibleTypes)
-                guard trueType.isOptional else {
+                let trueType = try inferBootstrapExpressionType(
+                    of: trueExpression,
+                    accessibleTypes: accessibleTypes
+                )
+                guard isOptionalBootstrapExpressionType(trueType) else {
                     throw ParseError(
                         "Ternary branches must match, got \(trueType.displayName) and nil."
                     )
                 }
                 return trueType
             }
-            let trueType = try inferType(of: trueExpression, accessibleTypes: accessibleTypes)
-            let falseType = try inferType(of: falseExpression, accessibleTypes: accessibleTypes)
-            guard trueType == falseType else {
+            let trueType = try inferBootstrapExpressionType(
+                of: trueExpression,
+                accessibleTypes: accessibleTypes
+            )
+            let falseType = try inferBootstrapExpressionType(
+                of: falseExpression,
+                accessibleTypes: accessibleTypes
+            )
+            guard bootstrapExpressionTypesMatch(trueType, falseType) else {
                 throw ParseError(
                     "Ternary branches must match, got \(trueType.displayName) and \(falseType.displayName)."
                 )
@@ -400,7 +376,87 @@ extension Parser {
     }
 
     func isNilLiteral(_ expression: Expression) -> Bool {
-        if case .nilLiteral = expression {
+        if case .nilLiteral = expression { return true }
+        return false
+    }
+
+    func defaultTypeReference(for type: BootstrapLiteralType) -> TypeReference? {
+        switch type {
+        case .intLiteral:
+            return .named("Int")
+        case .floatLiteral:
+            return .named("Double")
+        case .stringLiteral:
+            return .named("String")
+        case .boolLiteral:
+            return .named("Bool")
+        case .nilLiteral:
+            return nil
+        case .typed(let typeReference):
+            return typeReference
+        }
+    }
+
+    func isOptionalBootstrapExpressionType(_ type: BootstrapLiteralType) -> Bool {
+        switch type {
+        case .nilLiteral:
+            return true
+        case .typed(let typeReference):
+            if case .optional = typeReference {
+                return true
+            }
+            return false
+        default:
+            return false
+        }
+    }
+
+    func bootstrapExpressionTypesMatch(
+        _ lhs: BootstrapLiteralType,
+        _ rhs: BootstrapLiteralType
+    ) -> Bool {
+        switch (lhs, rhs) {
+        case (.intLiteral, .intLiteral),
+            (.floatLiteral, .floatLiteral),
+            (.stringLiteral, .stringLiteral),
+            (.boolLiteral, .boolLiteral),
+            (.nilLiteral, .nilLiteral):
+            return true
+        case (.typed(let lhsType), .typed(let rhsType)):
+            return lhsType == rhsType || isCompatibleNamedType(expected: lhsType, actual: rhsType)
+        default:
+            return false
+        }
+    }
+
+    func isCompatibleWithExpectedType(_ actual: BootstrapLiteralType, expected: TypeReference)
+        -> Bool
+    {
+        switch actual {
+        case .intLiteral:
+            return expected.displayName == "Int"
+        case .floatLiteral:
+            return expected.displayName == "Float" || expected.displayName == "Double"
+        case .stringLiteral:
+            return expected.displayName == "String"
+        case .boolLiteral:
+            return expected.displayName == "Bool"
+        case .nilLiteral:
+            if case .optional = expected {
+                return true
+            }
+            return false
+        case .typed(let actualType):
+            return actualType == expected
+                || isCompatibleNamedType(expected: expected, actual: actualType)
+        }
+    }
+
+    func isCompatibleNamedType(expected: TypeReference, actual: TypeReference) -> Bool {
+        if expected == actual {
+            return true
+        }
+        if expected.displayName == "Float" && actual.displayName == "Double" {
             return true
         }
         return false

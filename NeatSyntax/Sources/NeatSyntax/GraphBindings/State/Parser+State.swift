@@ -35,12 +35,16 @@ extension Parser {
                 if let explicitType, canUseExplicitTypeForStoredInitializer(initialValue) {
                     inferredType = explicitType
                 } else {
-                    inferredType = .named(
-                        try inferType(
-                            of: initialValue,
-                            accessibleTypes: accessibleBootstrapTypes()
-                        ).displayName
+                    let inferred = try inferBootstrapExpressionType(
+                        of: initialValue,
+                        accessibleTypes: accessibleContextTypes()
                     )
+                    guard let inferredReference = defaultTypeReference(for: inferred) else {
+                        throw ParseError(
+                            "state '\(name)' initialized with nil requires an explicit optional type."
+                        )
+                    }
+                    inferredType = inferredReference
                 }
             }
             storage = .stored(initialValue)
@@ -76,23 +80,12 @@ extension Parser {
         }
     }
 
-    func accessibleBootstrapTypes() -> [String: BootstrapType] {
-        let bootstrapStateTypes = currentStateTypes.compactMapValues {
-            bootstrapType(from: $0.displayName)
-        }
-        return bootstrapStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
+    func accessibleContextTypes() -> [String: TypeReference] {
+        currentStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
     }
 
     func isCompatibleStateType(_ explicitType: TypeReference, inferredType: TypeReference) -> Bool {
-        if explicitType == inferredType {
-            return true
-        }
-
-        if explicitType.displayName == "Float" && inferredType.displayName == "Double" {
-            return true
-        }
-
-        return false
+        isCompatibleNamedType(expected: explicitType, actual: inferredType)
     }
 
     mutating func syncCurrentDeclarationSymbols(

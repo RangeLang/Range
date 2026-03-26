@@ -10,7 +10,7 @@ extension Parser {
         }
         let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "environment")
         try consume(.colon)
-        let typeName = try consumeTypeReference()
+        let type = try parseTypeReferenceNode()
         if peek() == .equal {
             throw ParseError(
                 "Environment declarations do not take initializer expressions. Use the declared name to resolve from outer environment."
@@ -26,7 +26,7 @@ extension Parser {
             isState: isStateAlias,
             localName: localName,
             externalLabel: externalLabel,
-            typeName: typeName
+            type: type
         )
     }
 
@@ -66,14 +66,14 @@ extension Parser {
 
         let name = try consumeIdentifier()
         try consume(.colon)
-        let typeName = try consumeTypeReference()
+        let type = try parseTypeReferenceNode()
         try consume(.equal)
         let expression = try parseExpression()
 
         return EnvironmentProvision(
             isState: isState,
             name: name,
-            typeName: typeName,
+            type: type,
             expression: expression
         )
     }

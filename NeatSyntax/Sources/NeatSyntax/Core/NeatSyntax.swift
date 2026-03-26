@@ -33,7 +33,6 @@ enum NeatSyntax {
         case operatorKeyword = "operator"
     }
     static let keywordIdentifiers: Set<String> = Set(Keyword.allCases.map(\.rawValue))
-    static let bootstrapTypeNames: [String] = BootstrapType.supportedNames
 
     static func constructKind(for token: Token) -> ConstructKind? {
         switch token {
@@ -53,14 +52,3 @@ enum NeatSyntax {
 }
 
 extension NeatSyntax.Keyword: CaseIterable {}
-
-extension BootstrapType {
-    static let supportedNames: [String] = [
-        "Int",
-        "Double",
-        "Float",
-        "String",
-        "Bool",
-        "Void",
-    ]
-}

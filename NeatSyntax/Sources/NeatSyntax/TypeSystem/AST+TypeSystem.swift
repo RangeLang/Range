@@ -36,38 +36,28 @@ public indirect enum TypeReference: Equatable {
     }
 }
 
-public indirect enum BootstrapType: Equatable {
-    case int
-    case double
-    case float
-    case string
-    case bool
-    case void
-    case optional(BootstrapType)
+public enum BootstrapLiteralType: Equatable {
+    case intLiteral
+    case floatLiteral
+    case stringLiteral
+    case boolLiteral
+    case nilLiteral
+    case typed(TypeReference)
 
     public var displayName: String {
         switch self {
-        case .int:
-            return "Int"
-        case .double:
-            return "Double"
-        case .float:
-            return "Float"
-        case .string:
-            return "String"
-        case .bool:
-            return "Bool"
-        case .void:
-            return "Void"
-        case .optional(let wrapped):
-            return "\(wrapped.displayName)?"
+        case .intLiteral:
+            return "IntLiteral"
+        case .floatLiteral:
+            return "FloatLiteral"
+        case .stringLiteral:
+            return "StringLiteral"
+        case .boolLiteral:
+            return "BoolLiteral"
+        case .nilLiteral:
+            return "NilLiteral"
+        case .typed(let type):
+            return type.displayName
         }
-    }
-
-    public var isOptional: Bool {
-        if case .optional = self {
-            return true
-        }
-        return false
     }
 }
