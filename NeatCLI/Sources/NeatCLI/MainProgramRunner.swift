@@ -176,7 +176,7 @@ private struct MainProgramInterpreter {
         case double(Double)
         case string(String)
         case bool(Bool)
-        case none
+        case nilLiteral
         case array([RuntimeValue])
         case dictionary([String: RuntimeValue])
     }
@@ -254,7 +254,7 @@ private struct MainProgramInterpreter {
             switch value {
             case .array(let array):
                 elements = array
-            case .none:
+            case .nilLiteral:
                 elements = []
             default:
                 throw ValidationError(
@@ -468,8 +468,8 @@ private struct MainProgramInterpreter {
         case .boolean(let value):
             return .bool(value)
 
-        case .none:
-            return .none
+        case .nilLiteral:
+            return .nilLiteral
 
         case .identifier(let name):
             return try lookup(name: name)?.value
@@ -526,7 +526,7 @@ private struct MainProgramInterpreter {
 
             case .nilCoalescing:
                 let left = try evaluate(lhs)
-                if case .none = left {
+                if case .nilLiteral = left {
                     return try evaluate(rhs)
                 }
                 return left
@@ -599,7 +599,7 @@ private struct MainProgramInterpreter {
             return value
         case .bool(let value):
             return value ? "true" : "false"
-        case .none:
+        case .nilLiteral:
             return "nil"
         case .array(let values):
             return "[" + values.map(stringify).joined(separator: ", ") + "]"
@@ -693,7 +693,7 @@ private struct MainProgramInterpreter {
             return left == right
         case (.bool(let left), .bool(let right)):
             return left == right
-        case (.none, .none):
+        case (.nilLiteral, .nilLiteral):
             return true
         case (.array(let left), .array(let right)):
             guard left.count == right.count else { return false }

@@ -321,7 +321,7 @@ struct SwiftBackendEmitter {
             return "\"\(try emitInterpolatedString(value))\""
         case .boolean(let value):
             return value ? "true" : "false"
-        case .none:
+        case .nilLiteral:
             return "nil"
         case .identifier(let name):
             return name

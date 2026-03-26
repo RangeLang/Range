@@ -6,7 +6,7 @@ public indirect enum Expression {
     case string(String)
     case interpolatedString(InterpolatedString)
     case boolean(Bool)
-    case none
+    case nilLiteral
     case identifier(String)
     case call(name: String, arguments: [CallArgument])
     case bindingReference(String)

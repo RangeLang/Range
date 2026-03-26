@@ -21,7 +21,7 @@ extension Parser {
         if peek() == .equal {
             try consume(.equal)
             let initialValue = try parseExpression()
-            if case .none = initialValue {
+            if case .nilLiteral = initialValue {
                 guard let explicitType else {
                     throw ParseError(
                         "state '\(name)' initialized with nil requires an explicit optional type.")

@@ -193,7 +193,7 @@ extension Parser {
                 return .boolean(false)
             }
             if name == "nil" {
-                return .none
+                return .nilLiteral
             }
             var parts = [name]
             parseMembers: while peek() == .dot {
@@ -410,7 +410,7 @@ extension Parser {
             return .string
         case .boolean:
             return .bool
-        case .none:
+        case .nilLiteral:
             throw ParseError("nil requires an explicit optional context.")
         case .identifier(let name):
             guard let type = accessibleTypes[name] else {
@@ -579,7 +579,7 @@ extension Parser {
     }
 
     func isNilLiteral(_ expression: Expression) -> Bool {
-        if case .none = expression {
+        if case .nilLiteral = expression {
             return true
         }
         return false

@@ -1518,7 +1518,7 @@ private struct GraphCollector {
         case .binary(let lhs, _, let rhs):
             analyzeExpression(lhs, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
             analyzeExpression(rhs, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
-        case .integer, .double, .string, .boolean, .none:
+        case .integer, .double, .string, .boolean, .nilLiteral:
             return
         }
     }
