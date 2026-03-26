@@ -6,7 +6,7 @@ extension Parser {
         return peek(offset: offset) == .keyword(NeatSyntax.Keyword.state.rawValue)
     }
 
-    mutating func parseState() throws -> StateDeclaration {
+    mutating func parseState(allowDeclaredStorage: Bool = false) throws -> StateDeclaration {
         let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.state)
         let name = try consumeIdentifier()
@@ -42,11 +42,14 @@ extension Parser {
                 }
             }
             storage = .stored(initialValue)
-        } else if let explicitType {
+        } else if allowDeclaredStorage, let explicitType {
             inferredType = explicitType
             storage = .declared
         } else {
-            throw ParseError("state '\(name)' without initializer requires an explicit type.")
+            if allowDeclaredStorage {
+                throw ParseError("state '\(name)' without initializer requires an explicit type.")
+            }
+            throw ParseError("state '\(name)' requires `= expression` outside construct storage.")
         }
 
         if let explicitType, !isCompatibleStateType(explicitType, inferredType: inferredType) {

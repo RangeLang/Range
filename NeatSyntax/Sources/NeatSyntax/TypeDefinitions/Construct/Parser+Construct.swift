@@ -89,7 +89,7 @@ extension Parser {
                     continue
                 }
 
-                let state = try parseState()
+                let state = try parseState(allowDeclaredStorage: true)
                 states.append(state)
                 currentStateTypes[state.name] = state.type
             }
