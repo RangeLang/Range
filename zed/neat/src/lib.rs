@@ -49,7 +49,7 @@ impl zed::Extension for NeatExtension {
     ) -> Result<zed::Command> {
         if language_server_id.as_ref() == "neat-lsp" {
             return Ok(zed::Command {
-                command: "sh".to_string(),
+                command: "/bin/sh".to_string(),
                 args: vec!["-lc".to_string(), Self::lsp_launch_script()],
                 env: worktree.shell_env(),
             });

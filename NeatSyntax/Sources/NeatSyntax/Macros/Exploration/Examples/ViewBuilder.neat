@@ -38,8 +38,8 @@ function lower(_ block: Block) -> Expression {
 
 function lower(_ statement: Statement) -> Expression {
     switch statement {
-    case ExpressionStatement(let expressionStatement):
-        return ViewBuilder.buildExpression(expressionStatement.expression)
+    case Expression(let expression):
+        return ViewBuilder.buildExpression(expression)
 
     case If(let ifStatement):
         if ifStatement.elseBody != nil {

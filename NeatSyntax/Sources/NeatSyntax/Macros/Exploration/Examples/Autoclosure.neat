@@ -7,9 +7,7 @@ macro autoclosure: Attached<Parameter> { target, result, diagnostics in
             Closure(
                 body: Block(
                     statements: [
-                        ExpressionStatement(
-                            expression: target.arguments[0].value
-                        )
+                        target.arguments[0].value
                     ]
                 )
             )

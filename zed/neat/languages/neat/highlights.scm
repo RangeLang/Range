@@ -4,49 +4,13 @@
 ; ── Sigil operators ──────────────────────────────────────────────────────────
 ["@" "*"] @keyword
 
-; ── Keywords ─────────────────────────────────────────────────────────────────
-[
-  "construct"
-  "enum"
-  "case"
-  "extension"
-  "macro"
-  "primitive"
-  "func"
-  "function"
-  "protocol"
-  "state"
-  "environment"
-  "binding"
-  "derived"
-  "value"
-  "var"
-  "builder"
-] @keyword
-
 ; When syntax is incomplete, tree-sitter can fall back to plain identifiers
 ; inside ERROR nodes. Keep core keywords colored by text anyway.
 ((identifier) @keyword
  (#match? @keyword "^(construct|enum|case|extension|macro|primitive|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|on|builder)$"))
 
-; Control flow
-[
-  "if"
-  "else"
-  "for"
-  "in"
-  "while"
-  "switch"
-  "case"
-  "default"
-  "return"
-] @keyword.control
-
 (break_statement) @keyword.control
 (continue_statement) @keyword.control
-
-; Projection keyword
-"on" @keyword
 
 ; ── @main entry point ────────────────────────────────────────────────────────
 (main_block
@@ -70,7 +34,13 @@
 
 ; ── Declarations ─────────────────────────────────────────────────────────────
 (sigiled_declaration
+  "construct" @keyword)
+
+(sigiled_declaration
   name: (type_identifier) @type.definition)
+
+(protocol_declaration
+  "protocol" @keyword)
 
 (macro_declaration
   name: (identifier) @function.special)
@@ -84,9 +54,13 @@
   name: (type_identifier) @type.definition)
 
 (sigiled_declaration
+  "on" @keyword)
+
+(sigiled_declaration
   target: (type_identifier) @type)
 
 (callable_declaration
+  "function" @keyword
   name: (identifier) @function.method)
 
 (builder_hook_declaration
@@ -106,15 +80,18 @@
  (#eq? @function.method "init"))
 
 (enum_declaration
+  "enum" @keyword
   name: (type_identifier) @type.definition)
 
 (extension_declaration
+  "extension" @keyword
   type: (type_identifier) @type)
 
 (protocol_declaration
   name: (type_identifier) @type.definition)
 
 (function_declaration
+  "func" @keyword
   name: (identifier) @function)
 
 ; ── Parameters & variables ───────────────────────────────────────────────────
@@ -122,9 +99,19 @@
   name: (identifier) @variable.parameter)
 
 (variable_declaration
+  [
+    "state"
+    "environment"
+    "binding"
+    "value"
+  ] @keyword
   name: (identifier) @variable)
 
+(derived_declaration
+  "derived" @keyword)
+
 (member_declaration
+  "var" @keyword
   name: (identifier) @property)
 
 ; ── Call sites ───────────────────────────────────────────────────────────────
@@ -137,10 +124,6 @@
 (modifier_call
   name: (identifier) @function.method)
 
-; ── Member access ────────────────────────────────────────────────────────────
-(member_expression
-  member: (identifier) @property)
-
 ; ── Arguments & assignment ───────────────────────────────────────────────────
 (argument
   label: (identifier) @property)
@@ -148,9 +131,8 @@
 (assignment
   left: (identifier) @variable)
 
-; ── Enum cases ───────────────────────────────────────────────────────────────
-(enum_case_item
-  name: (identifier) @constructor)
+(enum_case
+  "case" @keyword.control)
 
 ; ── Types ────────────────────────────────────────────────────────────────────
 (type_identifier) @type
