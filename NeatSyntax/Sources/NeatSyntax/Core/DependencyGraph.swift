@@ -150,6 +150,29 @@ public struct DependencyGraph {
                   display: grid;
                   gap: 10px;
                 }
+                .mode-switch {
+                  margin-top: 18px;
+                  display: inline-flex;
+                  padding: 4px;
+                  gap: 4px;
+                  border-radius: 999px;
+                  background: rgba(48, 41, 34, 0.08);
+                }
+                .mode-button {
+                  border: 0;
+                  border-radius: 999px;
+                  padding: 8px 12px;
+                  font: inherit;
+                  font-size: 13px;
+                  color: var(--muted);
+                  background: transparent;
+                  cursor: pointer;
+                }
+                .mode-button.active {
+                  color: var(--ink);
+                  background: rgba(255,255,255,0.92);
+                  box-shadow: 0 1px 2px rgba(48, 41, 34, 0.1);
+                }
                 .legend-row {
                   display: flex;
                   align-items: center;
@@ -240,6 +263,10 @@ public struct DependencyGraph {
                   <h1>\(escapeHTML(title))</h1>
                   <div class="meta">\(nodes.count) nodes, \(edges.count) edges</div>
                   <p class="hint">Structured by containment first, with related nodes pulled together. Drag nodes to inspect clusters and scroll when the graph grows.</p>
+                  <div class="mode-switch" id="mode-switch">
+                    <button class="mode-button active" data-mode="declaration">Declaration</button>
+                    <button class="mode-button" data-mode="memory">Memory</button>
+                  </div>
                   <div class="legend" id="legend"></div>
                   <section class="details">
                     <h2 id="details-title">Nothing selected</h2>
@@ -348,6 +375,7 @@ public struct DependencyGraph {
                 const detailsTitle = document.getElementById("details-title");
                 const detailsBody = document.getElementById("details-body");
                 const legend = document.getElementById("legend");
+                const modeSwitch = document.getElementById("mode-switch");
 
                 const edgeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
                 const edgeLabelLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -685,6 +713,114 @@ public struct DependencyGraph {
                   return { node, group, label, badge };
                 });
 
+                const declarationEdgeKinds = new Set([
+                  "contains",
+                  "conformsTo",
+                  "extends",
+                  "referencesType",
+                  "appliesMacro",
+                  "targetsMacro",
+                  "resolvesTo"
+                ]);
+                const memoryEdgeKinds = new Set([
+                  "contains",
+                  "dependsOn",
+                  "mutates",
+                  "aliases",
+                  "calls"
+                ]);
+
+                function isDeclarationNode(node) {
+                  if (node.kind === "member") return false;
+                  if (node.id.includes("/main/local:")) return false;
+                  if (node.id.includes("/local-derived:")) return false;
+                  if (node.id.includes("/call:")) return false;
+                  return true;
+                }
+
+                function isMemoryNode(node) {
+                  if (node.id.includes("/main/local:")) return true;
+                  if (node.id.includes("/local-derived:")) return true;
+                  if (node.id.includes("/call:")) return true;
+                  if (node.kind === "member") return true;
+                  if (node.kind === "mainBlock") return true;
+                  if (node.kind === "function" || node.kind === "binding" || node.kind === "state" || node.kind === "derived") {
+                    return true;
+                  }
+                  return false;
+                }
+
+                function applyMode(mode) {
+                  const allowedEdgeKinds = mode === "memory" ? memoryEdgeKinds : declarationEdgeKinds;
+                  const eligibleNodeIDs = new Set(
+                    nodeElements
+                      .filter(({ node }) => mode === "memory" ? isMemoryNode(node) : isDeclarationNode(node))
+                      .map(({ node }) => node.id)
+                  );
+
+                  const visibleEdgeKeys = new Set();
+                  const connectedNodeIDs = new Set();
+
+                  for (const { edge, line, label } of edgeElements) {
+                    const visible =
+                      allowedEdgeKinds.has(edge.kind)
+                      && eligibleNodeIDs.has(edge.sourceID)
+                      && eligibleNodeIDs.has(edge.targetID);
+                    line.style.display = visible ? "" : "none";
+                    label.style.display = visible ? "" : "none";
+                    if (visible) {
+                      visibleEdgeKeys.add(`${edge.sourceID}:${edge.kind}:${edge.targetID}`);
+                      connectedNodeIDs.add(edge.sourceID);
+                      connectedNodeIDs.add(edge.targetID);
+                    }
+                  }
+
+                  for (const { node, group } of nodeElements) {
+                    const visible = connectedNodeIDs.has(node.id);
+                    group.style.display = visible ? "" : "none";
+                  }
+
+                  for (const row of legend.children) {
+                    const kind = row.getAttribute("data-kind");
+                    const hasVisibleNode = nodeElements.some(({ node, group }) =>
+                      node.kind === kind && group.style.display !== "none"
+                    );
+                    row.style.display = hasVisibleNode ? "" : "none";
+                  }
+
+                  if (selectedNode) {
+                    const selectedVisible = connectedNodeIDs.has(selectedNode.id);
+                    if (!selectedVisible) {
+                      selectedNode = null;
+                      detailsTitle.textContent = "Nothing selected";
+                      detailsBody.textContent = "Click a node to inspect its id, kind, and connected edges.";
+                    } else {
+                      const connectedEdges = edges
+                        .filter(edge => visibleEdgeKeys.has(`${edge.sourceID}:${edge.kind}:${edge.targetID}`))
+                        .filter(edge => edge.sourceID === selectedNode.id || edge.targetID === selectedNode.id)
+                        .map(edge => `${edge.sourceID} -${edge.kind}-> ${edge.targetID}`);
+
+                      detailsTitle.textContent = selectedNode.label;
+                      detailsBody.textContent = [
+                        `kind: ${selectedNode.kind}`,
+                        `id: ${selectedNode.id}`,
+                        ...(selectedNode.attachedTypes.length > 0 ? [`type: ${selectedNode.attachedTypes.join(", ")}`] : []),
+                        "",
+                        "connected edges:",
+                        ...(connectedEdges.length ? connectedEdges : ["  none"])
+                      ].join("\\n");
+                    }
+                  }
+
+                  for (const { node: current, group } of nodeElements) {
+                    group.classList.toggle("selected", current === selectedNode && group.style.display !== "none");
+                  }
+
+                  for (const button of modeSwitch.querySelectorAll(".mode-button")) {
+                    button.classList.toggle("active", button.dataset.mode === mode);
+                  }
+                }
+
                 function selectNode(node) {
                   selectedNode = node;
                   for (const { node: current, group } of nodeElements) {
@@ -727,6 +863,17 @@ public struct DependencyGraph {
                 initializeLayout();
                 runLayout();
                 render();
+
+                for (const row of legend.children) {
+                  const kind = row.textContent?.trim() || "";
+                  row.setAttribute("data-kind", kind);
+                }
+
+                for (const button of modeSwitch.querySelectorAll(".mode-button")) {
+                  button.addEventListener("click", () => applyMode(button.dataset.mode || "declaration"));
+                }
+
+                applyMode("declaration");
               </script>
             </body>
             </html>

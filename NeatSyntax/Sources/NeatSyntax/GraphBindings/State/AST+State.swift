@@ -9,4 +9,5 @@ public struct StateDeclaration {
 
 public enum StateStorage {
     case stored(Expression)
+    case declared
 }

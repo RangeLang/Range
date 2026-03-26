@@ -6,16 +6,15 @@
   derived personString: String {
     "Person: \(person.name), Age: \(person.age)"
   }
-  Logger.info(personString)
 
   state user: User = User(person: $person)
   user.incrementAge()
-  Logger.info("After increment: \(person.age)")
+
 }
 
 construct Person {
     value name: String
-    value age: Int
+    state age: Int
 }
 
 construct User {

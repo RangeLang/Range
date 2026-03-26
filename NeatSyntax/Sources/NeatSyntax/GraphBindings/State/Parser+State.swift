@@ -42,8 +42,11 @@ extension Parser {
                 }
             }
             storage = .stored(initialValue)
+        } else if let explicitType {
+            inferredType = explicitType
+            storage = .declared
         } else {
-            throw ParseError("state '\(name)' requires `= expression`.")
+            throw ParseError("state '\(name)' without initializer requires an explicit type.")
         }
 
         if let explicitType, !isCompatibleStateType(explicitType, inferredType: inferredType) {
@@ -81,11 +84,7 @@ extension Parser {
         bindings: [BindingDeclaration]
     ) {
         currentStateNames = Set(states.map(\.name))
-        currentMutableStateNames = Set(
-            states.compactMap { state in
-                if case .stored = state.storage { return state.name }
-                return nil
-            })
+        currentMutableStateNames = Set(states.map(\.name))
         currentEnvironmentNames = Set(environments.map(\.name))
         currentMutableEnvironmentNames = Set(environments.filter(\.isState).map(\.name))
         currentBindingNames = Set(bindings.map(\.name))

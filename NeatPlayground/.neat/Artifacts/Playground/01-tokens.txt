@@ -28,12 +28,6 @@ Tokens:
   leftBrace
   stringLiteral("Person: \\(person.name), Age: \\(person.age)")
   rightBrace
-  identifier(Logger)
-  dot
-  identifier(info)
-  leftParen
-  identifier(personString)
-  rightParen
   keyword(state)
   identifier(user)
   colon
@@ -51,12 +45,6 @@ Tokens:
   identifier(incrementAge)
   leftParen
   rightParen
-  identifier(Logger)
-  dot
-  identifier(info)
-  leftParen
-  stringLiteral("After increment: \\(person.age)")
-  rightParen
   rightBrace
   keyword(construct)
   identifier(Person)
@@ -65,7 +53,7 @@ Tokens:
   identifier(name)
   colon
   identifier(String)
-  keyword(value)
+  keyword(state)
   identifier(age)
   colon
   identifier(Int)

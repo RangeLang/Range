@@ -48,6 +48,29 @@
       display: grid;
       gap: 10px;
     }
+    .mode-switch {
+      margin-top: 18px;
+      display: inline-flex;
+      padding: 4px;
+      gap: 4px;
+      border-radius: 999px;
+      background: rgba(48, 41, 34, 0.08);
+    }
+    .mode-button {
+      border: 0;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font: inherit;
+      font-size: 13px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+    }
+    .mode-button.active {
+      color: var(--ink);
+      background: rgba(255,255,255,0.92);
+      box-shadow: 0 1px 2px rgba(48, 41, 34, 0.1);
+    }
     .legend-row {
       display: flex;
       align-items: center;
@@ -136,8 +159,12 @@
   <div class="layout">
     <aside class="sidebar">
       <h1>Neat Playground Dependency Graph</h1>
-      <div class="meta">23 nodes, 38 edges</div>
+      <div class="meta">23 nodes, 37 edges</div>
       <p class="hint">Structured by containment first, with related nodes pulled together. Drag nodes to inspect clusters and scroll when the graph grows.</p>
+      <div class="mode-switch" id="mode-switch">
+        <button class="mode-button active" data-mode="declaration">Declaration</button>
+        <button class="mode-button" data-mode="memory">Memory</button>
+      </div>
       <div class="legend" id="legend"></div>
       <section class="details">
         <h2 id="details-title">Nothing selected</h2>
@@ -149,7 +176,7 @@
     </main>
   </div>
   <script>
-    const payload = {"edges":[{"kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat\/construct:NeatPlayground"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat\/construct:NeatPlayground","kind":"conformsTo","targetID":"type:Package"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person","kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat"},{"kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:age","kind":"contains"},{"kind":"contains","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:name","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:age","targetID":"type:Int","kind":"referencesType"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:name","targetID":"type:String","kind":"referencesType"},{"kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","kind":"contains"},{"kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person\/member:age"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person","kind":"referencesType","targetID":"type:Person"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person\/member:age","kind":"dependsOn","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()"},{"kind":"mutates","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person\/member:age"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()","kind":"calls","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main"},{"kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString"},{"kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person"},{"kind":"contains","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString","kind":"dependsOn","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age","kind":"dependsOn"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age","kind":"dependsOn","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","kind":"mutates"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age","kind":"mutates"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString","kind":"dependsOn","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:name","kind":"dependsOn","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString","targetID":"type:String","kind":"referencesType"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","kind":"contains"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:name","kind":"contains"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","kind":"referencesType","targetID":"type:Person"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person","kind":"contains"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","kind":"dependsOn","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user"},{"targetID":"type:User","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user","kind":"referencesType"},{"kind":"aliases","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age","kind":"contains"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age","kind":"aliases","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age"},{"sourceID":"type:Person","kind":"resolvesTo","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person"},{"kind":"resolvesTo","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","sourceID":"type:User"}],"nodes":[{"label":"person","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person","kind":"binding"},{"kind":"binding","label":"person","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person"},{"label":"NeatPlayground","kind":"construct","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat\/construct:NeatPlayground"},{"label":"Person","kind":"construct","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","label":"User","kind":"construct"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString","kind":"derived","label":"personString"},{"label":"Package.neat","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat","kind":"file"},{"kind":"file","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat","label":"Playground.neat"},{"kind":"function","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()","label":"incrementAge"},{"kind":"mainBlock","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","label":"@main"},{"label":"age","kind":"member","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person\/member:age"},{"label":"age","kind":"member","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","label":"person","kind":"state"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user","label":"user","kind":"state"},{"label":"Int","kind":"typeReference","id":"type:Int"},{"label":"Package","kind":"typeReference","id":"type:Package"},{"id":"type:Person","kind":"typeReference","label":"Person"},{"id":"type:String","label":"String","kind":"typeReference"},{"label":"User","id":"type:User","kind":"typeReference"},{"kind":"value","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:age","label":"age"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:name","label":"name","kind":"value"},{"label":"age","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age","kind":"value"},{"kind":"value","label":"name","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:name"}]};
+    const payload = {"nodes":[{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person","kind":"binding","label":"person"},{"kind":"binding","label":"person","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person"},{"kind":"construct","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat\/construct:NeatPlayground","label":"NeatPlayground"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person","kind":"construct","label":"Person"},{"label":"User","kind":"construct","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString","label":"personString","kind":"derived"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat","kind":"file","label":"Package.neat"},{"label":"Playground.neat","kind":"file","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()","label":"incrementAge","kind":"function"},{"label":"@main","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","kind":"mainBlock"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person\/member:age","label":"age","kind":"member"},{"label":"age","kind":"member","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age"},{"kind":"state","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/state:age","label":"age"},{"kind":"state","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","label":"person"},{"kind":"state","label":"age","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age"},{"label":"user","kind":"state","id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user"},{"kind":"typeReference","label":"Int","id":"type:Int"},{"id":"type:Package","kind":"typeReference","label":"Package"},{"kind":"typeReference","label":"Person","id":"type:Person"},{"id":"type:String","kind":"typeReference","label":"String"},{"id":"type:User","label":"User","kind":"typeReference"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:name","kind":"value","label":"name"},{"id":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:name","label":"name","kind":"value"}],"edges":[{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat\/construct:NeatPlayground","kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat"},{"kind":"conformsTo","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Package.neat\/construct:NeatPlayground","targetID":"type:Package"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person","kind":"contains"},{"kind":"contains","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","kind":"contains"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/state:age","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person","kind":"contains"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:name","kind":"contains"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/state:age","targetID":"type:Int","kind":"referencesType"},{"targetID":"type:String","kind":"referencesType","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person\/value:name"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","kind":"contains"},{"kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person\/member:age","kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person"},{"targetID":"type:Person","kind":"referencesType","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person"},{"kind":"dependsOn","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person\/member:age"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/binding:person\/member:age","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()","kind":"mutates"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User\/function:incrementAge()","kind":"calls","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","kind":"contains"},{"kind":"contains","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user","kind":"contains"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","kind":"dependsOn"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","kind":"dependsOn"},{"kind":"mutates","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age"},{"sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age","kind":"mutates"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age","kind":"dependsOn","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString"},{"kind":"dependsOn","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:name","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString"},{"kind":"referencesType","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local-derived:personString","targetID":"type:String"},{"kind":"contains","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:name","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","kind":"contains"},{"targetID":"type:Person","kind":"referencesType","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user","kind":"contains"},{"kind":"dependsOn","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user"},{"kind":"referencesType","targetID":"type:User","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user"},{"kind":"aliases","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person","kind":"contains"},{"targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:person\/member:age","sourceID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/main\/local:user\/member:person\/member:age","kind":"aliases"},{"sourceID":"type:Person","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:Person","kind":"resolvesTo"},{"sourceID":"type:User","targetID":"file:\/Users\/george\/Documents\/Neat\/NeatPlayground\/Playground.neat\/construct:User","kind":"resolvesTo"}]};
     const colorByKind = {
       file: "#577590",
       construct: "#c8553d",
@@ -246,6 +273,7 @@
     const detailsTitle = document.getElementById("details-title");
     const detailsBody = document.getElementById("details-body");
     const legend = document.getElementById("legend");
+    const modeSwitch = document.getElementById("mode-switch");
 
     const edgeLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
     const edgeLabelLayer = document.createElementNS("http://www.w3.org/2000/svg", "g");
@@ -583,6 +611,114 @@
       return { node, group, label, badge };
     });
 
+    const declarationEdgeKinds = new Set([
+      "contains",
+      "conformsTo",
+      "extends",
+      "referencesType",
+      "appliesMacro",
+      "targetsMacro",
+      "resolvesTo"
+    ]);
+    const memoryEdgeKinds = new Set([
+      "contains",
+      "dependsOn",
+      "mutates",
+      "aliases",
+      "calls"
+    ]);
+
+    function isDeclarationNode(node) {
+      if (node.kind === "member") return false;
+      if (node.id.includes("/main/local:")) return false;
+      if (node.id.includes("/local-derived:")) return false;
+      if (node.id.includes("/call:")) return false;
+      return true;
+    }
+
+    function isMemoryNode(node) {
+      if (node.id.includes("/main/local:")) return true;
+      if (node.id.includes("/local-derived:")) return true;
+      if (node.id.includes("/call:")) return true;
+      if (node.kind === "member") return true;
+      if (node.kind === "mainBlock") return true;
+      if (node.kind === "function" || node.kind === "binding" || node.kind === "state" || node.kind === "derived") {
+        return true;
+      }
+      return false;
+    }
+
+    function applyMode(mode) {
+      const allowedEdgeKinds = mode === "memory" ? memoryEdgeKinds : declarationEdgeKinds;
+      const eligibleNodeIDs = new Set(
+        nodeElements
+          .filter(({ node }) => mode === "memory" ? isMemoryNode(node) : isDeclarationNode(node))
+          .map(({ node }) => node.id)
+      );
+
+      const visibleEdgeKeys = new Set();
+      const connectedNodeIDs = new Set();
+
+      for (const { edge, line, label } of edgeElements) {
+        const visible =
+          allowedEdgeKinds.has(edge.kind)
+          && eligibleNodeIDs.has(edge.sourceID)
+          && eligibleNodeIDs.has(edge.targetID);
+        line.style.display = visible ? "" : "none";
+        label.style.display = visible ? "" : "none";
+        if (visible) {
+          visibleEdgeKeys.add(`${edge.sourceID}:${edge.kind}:${edge.targetID}`);
+          connectedNodeIDs.add(edge.sourceID);
+          connectedNodeIDs.add(edge.targetID);
+        }
+      }
+
+      for (const { node, group } of nodeElements) {
+        const visible = connectedNodeIDs.has(node.id);
+        group.style.display = visible ? "" : "none";
+      }
+
+      for (const row of legend.children) {
+        const kind = row.getAttribute("data-kind");
+        const hasVisibleNode = nodeElements.some(({ node, group }) =>
+          node.kind === kind && group.style.display !== "none"
+        );
+        row.style.display = hasVisibleNode ? "" : "none";
+      }
+
+      if (selectedNode) {
+        const selectedVisible = connectedNodeIDs.has(selectedNode.id);
+        if (!selectedVisible) {
+          selectedNode = null;
+          detailsTitle.textContent = "Nothing selected";
+          detailsBody.textContent = "Click a node to inspect its id, kind, and connected edges.";
+        } else {
+          const connectedEdges = edges
+            .filter(edge => visibleEdgeKeys.has(`${edge.sourceID}:${edge.kind}:${edge.targetID}`))
+            .filter(edge => edge.sourceID === selectedNode.id || edge.targetID === selectedNode.id)
+            .map(edge => `${edge.sourceID} -${edge.kind}-> ${edge.targetID}`);
+
+          detailsTitle.textContent = selectedNode.label;
+          detailsBody.textContent = [
+            `kind: ${selectedNode.kind}`,
+            `id: ${selectedNode.id}`,
+            ...(selectedNode.attachedTypes.length > 0 ? [`type: ${selectedNode.attachedTypes.join(", ")}`] : []),
+            "",
+            "connected edges:",
+            ...(connectedEdges.length ? connectedEdges : ["  none"])
+          ].join("\n");
+        }
+      }
+
+      for (const { node: current, group } of nodeElements) {
+        group.classList.toggle("selected", current === selectedNode && group.style.display !== "none");
+      }
+
+      for (const button of modeSwitch.querySelectorAll(".mode-button")) {
+        button.classList.toggle("active", button.dataset.mode === mode);
+      }
+    }
+
     function selectNode(node) {
       selectedNode = node;
       for (const { node: current, group } of nodeElements) {
@@ -625,6 +761,17 @@
     initializeLayout();
     runLayout();
     render();
+
+    for (const row of legend.children) {
+      const kind = row.textContent?.trim() || "";
+      row.setAttribute("data-kind", kind);
+    }
+
+    for (const button of modeSwitch.querySelectorAll(".mode-button")) {
+      button.addEventListener("click", () => applyMode(button.dataset.mode || "declaration"));
+    }
+
+    applyMode("declaration");
   </script>
 </body>
 </html>
