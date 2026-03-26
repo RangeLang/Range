@@ -1,0 +1,4 @@
+precedencegroup AssignmentPrecedence {
+    associativity: right
+    assignment: true
+}

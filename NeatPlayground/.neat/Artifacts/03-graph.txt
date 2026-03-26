@@ -59,6 +59,20 @@
   [file] file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/ExpressableByStringLiteral.neat :: ExpressableByStringLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/String.neat :: String.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/DataSystem/String/StringLiteral.neat :: StringLiteral.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/Addition.neat :: Addition.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/Comparison.neat :: Comparison.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/CompoundAssignment.neat :: CompoundAssignment.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/Equality.neat :: Equality.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/Logical.neat :: Logical.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Infix/NilCoalescing.neat :: NilCoalescing.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Postfix/VariadicEllipsis.neat :: VariadicEllipsis.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/PrecedenceGroups/AdditionPrecedence.neat :: AdditionPrecedence.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/PrecedenceGroups/AssignmentPrecedence.neat :: AssignmentPrecedence.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/PrecedenceGroups/ComparisonPrecedence.neat :: ComparisonPrecedence.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/PrecedenceGroups/LogicalConjunctionPrecedence.neat :: LogicalConjunctionPrecedence.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/PrecedenceGroups/LogicalDisjunctionPrecedence.neat :: LogicalDisjunctionPrecedence.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/PrecedenceGroups/NilCoalescingPrecedence.neat :: NilCoalescingPrecedence.neat
+  [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Prefix/LogicalNot.neat :: LogicalNot.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/Primitives/Bit.neat :: Bit.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/Primitives/Byte.neat :: Byte.neat
   [file] file:/Users/george/Documents/Neat/NeatPlayground/Package.neat :: Package.neat

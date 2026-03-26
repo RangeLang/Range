@@ -1,0 +1,2 @@
+infix operator &&: LogicalConjunctionPrecedence
+infix operator ||: LogicalDisjunctionPrecedence

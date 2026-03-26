@@ -146,5 +146,7 @@ AST:
       - enumerations: 0 elements
       - protocols: 0 elements
       - macros: 0 elements
+      - precedenceGroups: 0 elements
+      - operators: 0 elements
       - extensions: 0 elements
   
