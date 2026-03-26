@@ -359,7 +359,13 @@ extension Parser {
         if actual == .none {
             return expected.isOptional
         }
-        return isCompatibleStateType(expected, inferredType: actual)
+        if expected == actual {
+            return true
+        }
+        if expected == .float && actual == .double {
+            return true
+        }
+        return false
     }
 
     func validateInitializerDeclarations(

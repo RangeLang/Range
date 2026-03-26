@@ -1,8 +1,9 @@
 @core
-construct Array<Element> {
-    value count: Int
-
+construct Array<Element>: ExpressableByArrayLiteral {
+    // Array remains opaque at the core level until its storage/lowering is settled.
     init()
-
+    init(literal _: ArrayLiteral)
+    derived count: Int
     function append(element: Element)
+    function element(index: Int) -> Element
 }

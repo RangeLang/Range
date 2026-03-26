@@ -5,16 +5,21 @@ public struct Parser {
     var index: Int = 0
     var currentStateNames: Set<String> = []
     var currentMutableStateNames: Set<String> = []
-    var currentStateTypes: [String: BuiltinType] = [:]
+    var currentStateTypes: [String: TypeReference] = [:]
     var currentEnvironmentTypes: [String: BuiltinType] = [:]
     var currentBindingNames: Set<String> = []
     var currentEnvironmentNames: Set<String> = []
     var currentMutableEnvironmentNames: Set<String> = []
     var currentSelfAvailable: Bool = false
+    var currentExpressionTerminators: [Token] = []
 
     public init(source: String) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
+    }
+
+    func isCurrentExpressionTerminator(_ token: Token) -> Bool {
+        currentExpressionTerminators.contains(where: { $0 == token })
     }
 
     public mutating func parseSourceFile() throws -> SourceFileNode {

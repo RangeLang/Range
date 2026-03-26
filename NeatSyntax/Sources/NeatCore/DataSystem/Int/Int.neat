@@ -1,5 +1,6 @@
 @core
 construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressableByIntLiteral {
+    // Bit-backed storage is the current semantic model, not the final lowering boundary.
     value bits: [Bit]
 
     init(literal _: IntLiteral) {

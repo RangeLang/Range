@@ -31,8 +31,19 @@ extension Parser {
         try parseTernaryExpression()
     }
 
+    mutating func parseExpression(terminatingAt terminators: [Token]) throws -> Expression {
+        let outerTerminators = currentExpressionTerminators
+        currentExpressionTerminators = outerTerminators + terminators
+        defer { currentExpressionTerminators = outerTerminators }
+        return try parseExpression()
+    }
+
     mutating func parseTernaryExpression() throws -> Expression {
         let condition = try parseNilCoalescingExpression()
+
+        if isCurrentExpressionTerminator(peek()) {
+            return condition
+        }
 
         guard peek() == .question else {
             return condition
@@ -52,7 +63,7 @@ extension Parser {
     mutating func parseNilCoalescingExpression() throws -> Expression {
         var expression = try parseLogicalOrExpression()
 
-        while peek() == .questionQuestion {
+        while !isCurrentExpressionTerminator(peek()) && peek() == .questionQuestion {
             advance()
             let rhs = try parseLogicalOrExpression()
             expression = .binary(lhs: expression, operatorSymbol: .nilCoalescing, rhs: rhs)
@@ -64,7 +75,7 @@ extension Parser {
     mutating func parseLogicalOrExpression() throws -> Expression {
         var expression = try parseLogicalAndExpression()
 
-        while peek() == .orOr {
+        while !isCurrentExpressionTerminator(peek()) && peek() == .orOr {
             advance()
             let rhs = try parseLogicalAndExpression()
             expression = .binary(lhs: expression, operatorSymbol: .or, rhs: rhs)
@@ -76,7 +87,7 @@ extension Parser {
     mutating func parseLogicalAndExpression() throws -> Expression {
         var expression = try parseEqualityExpression()
 
-        while peek() == .andAnd {
+        while !isCurrentExpressionTerminator(peek()) && peek() == .andAnd {
             advance()
             let rhs = try parseEqualityExpression()
             expression = .binary(lhs: expression, operatorSymbol: .and, rhs: rhs)
@@ -89,6 +100,9 @@ extension Parser {
         var expression = try parseComparisonExpression()
 
         while true {
+            if isCurrentExpressionTerminator(peek()) {
+                return expression
+            }
             switch peek() {
             case .equalEqual:
                 advance()
@@ -108,6 +122,9 @@ extension Parser {
         var expression = try parseAdditiveExpression()
 
         while true {
+            if isCurrentExpressionTerminator(peek()) {
+                return expression
+            }
             switch peek() {
             case .less:
                 advance()
@@ -134,7 +151,7 @@ extension Parser {
     mutating func parseAdditiveExpression() throws -> Expression {
         var expression = try parseUnaryExpression()
 
-        while peek() == .plus {
+        while !isCurrentExpressionTerminator(peek()) && peek() == .plus {
             advance()
             let rhs = try parseUnaryExpression()
             expression = .binary(lhs: expression, operatorSymbol: .addition, rhs: rhs)

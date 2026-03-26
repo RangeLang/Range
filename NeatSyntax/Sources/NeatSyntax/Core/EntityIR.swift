@@ -17,7 +17,7 @@ public struct EntityIdentity: Hashable {
 
 public struct EntityStateField {
     public let name: String
-    public let type: BuiltinType
+    public let type: TypeReference
     public let storage: StateStorage
 }
 

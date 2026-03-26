@@ -1143,7 +1143,7 @@ private struct GraphCollector {
         addNode(id: stateID, kind: .state, label: declaration.name)
         addEdge(from: parentID, to: stateID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: stateID)
-        addStorageTypeReference(.named(declaration.type.displayName), from: stateID)
+        addStorageTypeReference(declaration.type, from: stateID)
         if case .stored(let expression) = declaration.storage {
             captureConstructType(for: stateID, from: expression)
             analyzeInitializer(expression, ownerID: stateID, scope: MemoryScope(), visitedCalls: [])

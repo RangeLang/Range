@@ -1,0 +1,4 @@
+protocol ExpressableByArrayLiteral {
+    #literal(ArrayLiteral)
+    init(literal: ArrayLiteral)
+}

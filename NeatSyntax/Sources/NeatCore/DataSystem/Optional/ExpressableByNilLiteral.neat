@@ -1,0 +1,4 @@
+protocol ExpressableByNilLiteral {
+    #literal(NilLiteral)
+    init(literal: NilLiteral)
+}

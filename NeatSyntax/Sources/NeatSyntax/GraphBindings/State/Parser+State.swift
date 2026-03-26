@@ -10,13 +10,13 @@ extension Parser {
         let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.state)
         let name = try consumeIdentifier()
-        var explicitType: BuiltinType?
+        var explicitType: TypeReference?
         if peek() == .colon {
             try consume(.colon)
-            explicitType = try parseBuiltinType()
+            explicitType = try parseTypeReferenceNode()
         }
         let storage: StateStorage
-        let inferredType: BuiltinType
+        let inferredType: TypeReference
 
         if peek() == .equal {
             try consume(.equal)
@@ -26,7 +26,7 @@ extension Parser {
                     throw ParseError(
                         "state '\(name)' initialized with none requires an explicit optional type.")
                 }
-                guard explicitType.isOptional else {
+                guard case .optional = explicitType else {
                     throw ParseError(
                         "state '\(name)' initialized with none requires an optional type.")
                 }
@@ -35,9 +35,11 @@ extension Parser {
                 if let explicitType, case .call = initialValue {
                     inferredType = explicitType
                 } else {
-                    inferredType = try inferType(
-                        of: initialValue,
-                        accessibleTypes: accessibleBuiltinTypes()
+                    inferredType = .named(
+                        try inferType(
+                            of: initialValue,
+                            accessibleTypes: accessibleBuiltinTypes()
+                        ).displayName
                     )
                 }
             }
@@ -66,15 +68,18 @@ extension Parser {
     }
 
     func accessibleBuiltinTypes() -> [String: BuiltinType] {
-        currentStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
+        let builtinStateTypes = currentStateTypes.compactMapValues {
+            builtinType(from: $0.displayName)
+        }
+        return builtinStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
     }
 
-    func isCompatibleStateType(_ explicitType: BuiltinType, inferredType: BuiltinType) -> Bool {
+    func isCompatibleStateType(_ explicitType: TypeReference, inferredType: TypeReference) -> Bool {
         if explicitType == inferredType {
             return true
         }
 
-        if explicitType == .float && inferredType == .double {
+        if explicitType.displayName == "Float" && inferredType.displayName == "Double" {
             return true
         }
 

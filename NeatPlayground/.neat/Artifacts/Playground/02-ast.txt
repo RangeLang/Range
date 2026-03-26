@@ -87,7 +87,8 @@ AST:
             ▿ NeatSyntax.StateDeclaration
               - macros: 0 elements
               - name: "age"
-              - type: NeatSyntax.BuiltinType.int
+              ▿ type: NeatSyntax.TypeReference.named
+                - named: "Int"
               - storage: NeatSyntax.StateStorage.declared
           - environments: 0 elements
           - bindings: 0 elements

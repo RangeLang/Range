@@ -236,7 +236,7 @@ extension Parser {
             let defaultValue: Expression?
             if peek() == .equal {
                 try consume(.equal)
-                defaultValue = try parseExpression()
+                defaultValue = try parseExpression(terminatingAt: [.comma, .greater])
             } else {
                 defaultValue = nil
             }

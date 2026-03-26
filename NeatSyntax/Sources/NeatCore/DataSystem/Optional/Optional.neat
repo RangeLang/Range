@@ -1,0 +1,4 @@
+@core
+construct Optional<Wrapped>: ExpressableByNilLiteral {
+    init(literal _: NilLiteral)
+}

@@ -1,5 +1,6 @@
 @core
 construct String: ExpressableByStringLiteral {
+    // String is modeled as UTF-8-oriented byte storage at the semantic level.
     value bytes: [Byte]
 
     init(literal _: StringLiteral) {

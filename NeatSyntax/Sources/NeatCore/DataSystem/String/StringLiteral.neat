@@ -2,5 +2,6 @@
 construct StringLiteral { }
 
 extension StringLiteral {
+    // Literal conversion remains intrinsic until String lowering moves into Neat itself.
     function bytes() -> [Byte]
 }
