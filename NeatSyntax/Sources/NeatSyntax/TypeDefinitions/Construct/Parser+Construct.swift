@@ -73,8 +73,8 @@ extension Parser {
                 if isEnvironmentDeclarationStart() {
                     let environment = try parseEnvironmentDeclaration()
                     environments.append(environment)
-                    if let builtinType = builtinType(from: environment.typeName) {
-                        currentEnvironmentTypes[environment.name] = builtinType
+                    if let bootstrapType = bootstrapType(from: environment.typeName) {
+                        currentEnvironmentTypes[environment.name] = bootstrapType
                     }
                     continue
                 }

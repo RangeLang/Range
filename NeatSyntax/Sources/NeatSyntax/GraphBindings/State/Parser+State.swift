@@ -38,7 +38,7 @@ extension Parser {
                     inferredType = .named(
                         try inferType(
                             of: initialValue,
-                            accessibleTypes: accessibleBuiltinTypes()
+                            accessibleTypes: accessibleBootstrapTypes()
                         ).displayName
                     )
                 }
@@ -76,11 +76,11 @@ extension Parser {
         }
     }
 
-    func accessibleBuiltinTypes() -> [String: BuiltinType] {
-        let builtinStateTypes = currentStateTypes.compactMapValues {
-            builtinType(from: $0.displayName)
+    func accessibleBootstrapTypes() -> [String: BootstrapType] {
+        let bootstrapStateTypes = currentStateTypes.compactMapValues {
+            bootstrapType(from: $0.displayName)
         }
-        return builtinStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
+        return bootstrapStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
     }
 
     func isCompatibleStateType(_ explicitType: TypeReference, inferredType: TypeReference) -> Bool {

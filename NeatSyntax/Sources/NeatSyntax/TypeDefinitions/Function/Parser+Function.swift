@@ -214,12 +214,12 @@ extension Parser {
             guard let body = callable.body else { continue }
 
             let explicitReturnType = callable.returnType
-            let expectedBuiltinType = explicitReturnType.flatMap {
-                builtinType(from: $0.displayName)
+            let expectedBootstrapType = explicitReturnType.flatMap {
+                bootstrapType(from: $0.displayName)
             }
             let needsValueReturn = callableRequiresValueReturn(
                 explicitReturnType: explicitReturnType,
-                expectedBuiltinType: expectedBuiltinType
+                expectedBootstrapType: expectedBootstrapType
             )
 
             let returnExpressions = collectReturnExpressions(in: body)
@@ -247,29 +247,29 @@ extension Parser {
                 }
             }
 
-            guard let expectedBuiltinType, expectedBuiltinType != .void else {
+            guard let expectedBootstrapType, expectedBootstrapType != .void else {
                 continue
             }
 
-            let parameterTypes: [String: BuiltinType] = callable.parameters.reduce(into: [:]) {
+            let parameterTypes: [String: BootstrapType] = callable.parameters.reduce(into: [:]) {
                 result,
                 parameter in
                 guard
                     let typeReference = parameter.typeReference,
-                    let builtin = builtinType(from: typeReference.displayName)
+                    let bootstrapType = bootstrapType(from: typeReference.displayName)
                 else { return }
-                result[parameter.localName] = builtin
+                result[parameter.localName] = bootstrapType
             }
 
-            let accessibleTypes = accessibleBuiltinTypes().merging(parameterTypes) { current, _ in
+            let accessibleTypes = accessibleBootstrapTypes().merging(parameterTypes) { current, _ in
                 current
             }
 
             for expression in returnExpressions.compactMap({ $0 }) {
                 if isNilLiteral(expression) {
-                    guard expectedBuiltinType.isOptional else {
+                    guard expectedBootstrapType.isOptional else {
                         throw ParseError(
-                            "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) expects return type \(expectedBuiltinType.displayName), got nil."
+                            "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) expects return type \(expectedBootstrapType.displayName), got nil."
                         )
                     }
                     continue
@@ -281,9 +281,10 @@ extension Parser {
                     continue
                 }
 
-                guard isCompatibleReturnType(expected: expectedBuiltinType, actual: inferred) else {
+                guard isCompatibleReturnType(expected: expectedBootstrapType, actual: inferred)
+                else {
                     throw ParseError(
-                        "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) expects return type \(expectedBuiltinType.displayName), got \(inferred.displayName)."
+                        "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) expects return type \(expectedBootstrapType.displayName), got \(inferred.displayName)."
                     )
                 }
             }
@@ -292,11 +293,11 @@ extension Parser {
 
     func callableRequiresValueReturn(
         explicitReturnType: TypeReference?,
-        expectedBuiltinType: BuiltinType?
+        expectedBootstrapType: BootstrapType?
     ) -> Bool {
         guard explicitReturnType != nil else { return false }
-        guard let expectedBuiltinType else { return true }
-        return expectedBuiltinType != .void
+        guard let expectedBootstrapType else { return true }
+        return expectedBootstrapType != .void
     }
 
     func collectReturnExpressions(in statements: [Statement]) -> [Expression?] {
@@ -364,7 +365,7 @@ extension Parser {
         }
     }
 
-    func isCompatibleReturnType(expected: BuiltinType, actual: BuiltinType) -> Bool {
+    func isCompatibleReturnType(expected: BootstrapType, actual: BootstrapType) -> Bool {
         if expected == actual {
             return true
         }

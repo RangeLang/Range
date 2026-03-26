@@ -269,20 +269,20 @@ extension Parser {
         return "<\(arguments.joined(separator: ", "))>"
     }
 
-    mutating func parseBuiltinType() throws -> BuiltinType {
+    mutating func parseBootstrapType() throws -> BootstrapType {
         let raw = try consumeTypeReference()
-        guard let type = builtinType(from: raw) else {
+        guard let type = bootstrapType(from: raw) else {
             throw ParseError(
-                "Unsupported type '\(raw)'. Built-in types: \(NeatSyntax.builtinTypeNames.joined(separator: ", "))."
+                "Unsupported bootstrap type '\(raw)'. Bootstrap types: \(NeatSyntax.bootstrapTypeNames.joined(separator: ", "))."
             )
         }
         return type
     }
 
-    func builtinType(from raw: String) -> BuiltinType? {
+    func bootstrapType(from raw: String) -> BootstrapType? {
         if raw.hasSuffix("?") {
             let base = String(raw.dropLast())
-            guard let wrapped = builtinType(from: base) else {
+            guard let wrapped = bootstrapType(from: base) else {
                 return nil
             }
             return .optional(wrapped)
@@ -310,8 +310,8 @@ extension Parser {
 
     func inferType(
         of expression: Expression,
-        accessibleTypes: [String: BuiltinType]
-    ) throws -> BuiltinType {
+        accessibleTypes: [String: BootstrapType]
+    ) throws -> BootstrapType {
         switch expression {
         case .integer:
             return .int

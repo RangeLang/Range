@@ -36,14 +36,14 @@ public indirect enum TypeReference: Equatable {
     }
 }
 
-public indirect enum BuiltinType: Equatable {
+public indirect enum BootstrapType: Equatable {
     case int
     case double
     case float
     case string
     case bool
     case void
-    case optional(BuiltinType)
+    case optional(BootstrapType)
 
     public var displayName: String {
         switch self {
