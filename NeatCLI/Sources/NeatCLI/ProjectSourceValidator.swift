@@ -21,6 +21,7 @@ enum ProjectSourceValidator {
         try validatePrimaryDeclarations(in: parsedFiles)
         try validateTopLevelStates(in: parsedFiles)
         try validateEnvironmentStateResolution(in: parsedFiles)
+        try validateValueBindings(in: parsedFiles)
     }
 
     static func validatePrimaryDeclarations(in files: [URL]) throws {
@@ -106,5 +107,203 @@ enum ProjectSourceValidator {
         case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
             return []
         }
+    }
+
+    private static func validateValueBindings(in parsedFiles: [ParsedFile]) throws {
+        let bindingConstructNames = Set(
+            parsedFiles
+                .flatMap { declarations(in: $0.sourceFile) }
+                .filter { !$0.bindings.isEmpty }
+                .map(\.name)
+        )
+
+        guard !bindingConstructNames.isEmpty else { return }
+
+        for parsedFile in parsedFiles {
+            let fileName = parsedFile.url.lastPathComponent
+
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                try validateValueBindings(
+                    in: declaration,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            case .module(let module):
+                for declaration in module.constructs {
+                    try validateValueBindings(
+                        in: declaration,
+                        bindingConstructNames: bindingConstructNames,
+                        fileName: fileName
+                    )
+                }
+                if let mainBlock = module.mainBlock {
+                    try validateValueDeclarations(
+                        in: mainBlock.body,
+                        bindingConstructNames: bindingConstructNames,
+                        fileName: fileName
+                    )
+                }
+                for callable in module.callables {
+                    if let body = callable.body {
+                        try validateValueDeclarations(
+                            in: body,
+                            bindingConstructNames: bindingConstructNames,
+                            fileName: fileName
+                        )
+                    }
+                }
+            case .mainBlock(let mainBlock):
+                try validateValueDeclarations(
+                    in: mainBlock.body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            case .enumeration, .protocolDefinition, .macro, .extensions:
+                break
+            }
+        }
+    }
+
+    private static func validateValueBindings(
+        in declaration: ConstructDeclaration,
+        bindingConstructNames: Set<String>,
+        fileName: String
+    ) throws {
+        for value in declaration.values {
+            if let constructName = normalizedTypeName(value.typeName),
+                bindingConstructNames.contains(constructName)
+            {
+                throw ValidationError(
+                    "value \(value.name): \(constructName) in construct \(declaration.name) (\(fileName)) is not allowed because \(constructName) declares binding members. Use state or a snapshot construct."
+                )
+            }
+        }
+
+        for derived in declaration.deriveds {
+            if let body = derived.body {
+                try validateValueDeclarations(
+                    in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            }
+        }
+
+        for initializer in declaration.initializers {
+            if let body = initializer.body {
+                try validateValueDeclarations(
+                    in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            }
+        }
+
+        for callable in declaration.callables {
+            if let body = callable.body {
+                try validateValueDeclarations(
+                    in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            }
+        }
+    }
+
+    private static func validateValueDeclarations(
+        in statements: [Statement],
+        bindingConstructNames: Set<String>,
+        fileName: String
+    ) throws {
+        for statement in statements {
+            switch statement {
+            case .declaration(let kind, let name, let typeName, let expression):
+                guard kind == .constant else { continue }
+                let explicitType = typeName.flatMap(normalizedTypeName)
+                let inferredType = inferredConstructName(from: expression)
+                let constructName = explicitType ?? inferredType
+                if let constructName, bindingConstructNames.contains(constructName) {
+                    throw ValidationError(
+                        "value \(name): \(constructName) in \(fileName) is not allowed because \(constructName) declares binding members. Use state or a snapshot construct."
+                    )
+                }
+            case .derived(_, _, let body):
+                try validateValueDeclarations(
+                    in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            case .forEach(_, _, let body):
+                try validateValueDeclarations(
+                    in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            case .whileLoop(_, let body):
+                try validateValueDeclarations(
+                    in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            case .conditional(let branches):
+                for branch in branches {
+                    try validateValueDeclarations(
+                        in: branch.body,
+                        bindingConstructNames: bindingConstructNames,
+                        fileName: fileName
+                    )
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    try validateValueDeclarations(
+                        in: switchCase.body,
+                        bindingConstructNames: bindingConstructNames,
+                        fileName: fileName
+                    )
+                }
+                if let defaultBody {
+                    try validateValueDeclarations(
+                        in: defaultBody,
+                        bindingConstructNames: bindingConstructNames,
+                        fileName: fileName
+                    )
+                }
+            case .environmentProvision, .assignment, .compoundAssignment, .expression, .return,
+                .break, .continue:
+                continue
+            }
+        }
+    }
+
+    private static func inferredConstructName(from expression: NeatSyntax.Expression) -> String? {
+        guard case .call(let name, _) = expression else { return nil }
+        return normalizedTypeName(name)
+    }
+
+    private static func normalizedTypeName(_ raw: String) -> String? {
+        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+
+        while text.hasSuffix("?") {
+            text.removeLast()
+        }
+        if text.hasSuffix("...") {
+            text.removeLast(3)
+        }
+
+        if let genericStart = text.firstIndex(of: "<") {
+            text = String(text[..<genericStart])
+        }
+
+        if text.hasPrefix("[") || text.hasPrefix("(") {
+            return nil
+        }
+
+        if let lastDot = text.lastIndex(of: ".") {
+            text = String(text[text.index(after: lastDot)...])
+        }
+
+        return text.isEmpty ? nil : text
     }
 }
