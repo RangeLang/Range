@@ -78,6 +78,17 @@ state editablePerson: Person = person
 
 The memory graph treats `editablePerson` as a new owned value, not as an alias to `person`.
 
+- Copy-on-write is an implementation optimization, not a semantic aliasing rule.
+
+```neat
+value values: [Int] = [1, 2, 3]
+state editableValues: [Int] = values
+
+editableValues.append(4)
+```
+
+The graph still treats `values` and `editableValues` as independent logical values after assignment. An implementation may share underlying storage temporarily and copy on mutation, but that storage sharing is not modeled as semantic aliasing in the memory graph.
+
 - Shared mutable access is explicit through `binding`.
 
 ```neat
@@ -258,3 +269,4 @@ The memory graph for this code includes:
 - The graph is intended to be solvable from Neat's constrained storage model without general-purpose borrow annotations.
 - This document defines the memory-side model only. It does not yet specify the separate reactive invalidation view in detail.
 - `binding` is the explicit shared-reference mechanism in Neat. It is pointer-like in role, but compiler-tracked and constrained by the storage system.
+- Copy-on-write may be used by `@core` collections and other suitable implementations to preserve value semantics without eager copying.

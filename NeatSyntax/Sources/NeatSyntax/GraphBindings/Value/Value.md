@@ -75,3 +75,14 @@ state editablePerson: Person = person
 ```
 
 `editablePerson` is a separate owned value semantically. Shared live access requires `binding`, not ordinary assignment.
+
+- Implementations may use copy-on-write for some values and constructs
+
+```neat
+value a: [Int] = [1, 2, 3]
+state b: [Int] = a
+
+b.append(4)
+```
+
+Neat still treats `a` and `b` as independent logical values. Copy-on-write is an allowed optimization that can defer physical copying until mutation, but it does not change the language semantics or turn the two values into aliases.

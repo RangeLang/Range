@@ -110,3 +110,9 @@ The following identity details are not fully settled yet:
 
 - how construct identity behaves across copies
 - how much of `Type.ID` is directly exposed in ordinary user code
+
+## Implementation Note
+
+Constructs may still use optimizations such as copy-on-write internally when that preserves the same observable value semantics.
+
+Those optimizations do not change the language rule that ordinary assignment is not the shared-reference mechanism. Shared live access remains the role of `binding`.
