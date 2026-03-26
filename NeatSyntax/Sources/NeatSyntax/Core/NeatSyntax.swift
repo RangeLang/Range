@@ -26,6 +26,11 @@ enum NeatSyntax {
         case function = "function"
         case getter = "get"
         case setter = "set"
+        case `precedencegroup` = "precedencegroup"
+        case infix = "infix"
+        case prefix = "prefix"
+        case postfix = "postfix"
+        case operatorKeyword = "operator"
     }
     static let keywordIdentifiers: Set<String> = Set(Keyword.allCases.map(\.rawValue))
     static let builtinTypeNames: [String] = BuiltinType.supportedNames

@@ -22,5 +22,7 @@ public struct ModuleFileNode {
     public let enumerations: [EnumDeclaration]
     public let protocols: [ProtocolDeclaration]
     public let macros: [MacroDeclaration]
+    public let precedenceGroups: [PrecedenceGroupDeclaration]
+    public let operators: [OperatorDeclaration]
     public let extensions: [ExtensionDeclaration]
 }

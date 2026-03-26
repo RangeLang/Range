@@ -32,6 +32,8 @@ public struct Parser {
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         var macros: [MacroDeclaration] = []
+        var precedenceGroups: [PrecedenceGroupDeclaration] = []
+        var operators: [OperatorDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
 
         while peek() != .eof {
@@ -75,13 +77,24 @@ public struct Parser {
                 continue
             }
 
+            if isPrecedenceGroupDeclarationStart() {
+                precedenceGroups.append(try parsePrecedenceGroupDeclaration(requiresEOF: false))
+                continue
+            }
+
+            if isOperatorDeclarationStart() {
+                operators.append(try parseOperatorDeclaration(requiresEOF: false))
+                continue
+            }
+
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
                 constructs.append(try parseConstructDeclaration(requiresEOF: false))
                 continue
             }
 
             throw ParseError(
-                "Expected top-level state, extension, enum, protocol, macro, or declaration.")
+                "Expected top-level state, extension, enum, protocol, macro, precedencegroup, operator declaration, or declaration."
+            )
         }
 
         try consume(.eof)
@@ -92,6 +105,8 @@ public struct Parser {
             protocols.isEmpty,
             constructs.isEmpty,
             macros.isEmpty,
+            precedenceGroups.isEmpty,
+            operators.isEmpty,
             extensions.isEmpty
         {
             return .mainBlock(mainBlock)
@@ -102,6 +117,8 @@ public struct Parser {
             protocols.isEmpty,
             constructs.count == 1,
             macros.isEmpty,
+            precedenceGroups.isEmpty,
+            operators.isEmpty,
             extensions.isEmpty
         {
             return .construct(constructs[0])
@@ -110,6 +127,8 @@ public struct Parser {
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
+            precedenceGroups.isEmpty,
+            operators.isEmpty,
             enumerations.count == 1, extensions.isEmpty
         {
             return .enumeration(enumerations[0])
@@ -119,6 +138,8 @@ public struct Parser {
             enumerations.isEmpty,
             protocols.count == 1,
             macros.isEmpty,
+            precedenceGroups.isEmpty,
+            operators.isEmpty,
             extensions.isEmpty
         {
             return .protocolDefinition(protocols[0])
@@ -128,6 +149,8 @@ public struct Parser {
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.count == 1,
+            precedenceGroups.isEmpty,
+            operators.isEmpty,
             extensions.isEmpty
         {
             return .macro(macros[0])
@@ -137,6 +160,8 @@ public struct Parser {
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
+            precedenceGroups.isEmpty,
+            operators.isEmpty,
             !extensions.isEmpty
         {
             return .extensions(extensions)
@@ -151,6 +176,8 @@ public struct Parser {
                 enumerations: enumerations,
                 protocols: protocols,
                 macros: macros,
+                precedenceGroups: precedenceGroups,
+                operators: operators,
                 extensions: extensions
             )
         )
