@@ -1,5 +1,5 @@
 @core
-construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressableByIntLiteral {
+construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressableByIntLiteral, Equatable, Hashable, Comparable {
     // Bit-backed storage is the current semantic model, not the final lowering boundary.
     value bits: [Bit]
 

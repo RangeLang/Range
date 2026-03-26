@@ -1,5 +1,5 @@
 @core
-construct Set<Element>: ExpressableBySetLiteral {
+construct Set<Element: Hashable>: ExpressableBySetLiteral {
     // Set remains opaque until uniqueness and hashing semantics are settled.
     init()
     init(literal _: SetLiteral)

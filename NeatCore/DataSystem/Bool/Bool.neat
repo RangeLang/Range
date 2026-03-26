@@ -1,5 +1,5 @@
 @core
-construct Bool: ExpressableByBoolLiteral {
+construct Bool: ExpressableByBoolLiteral, Equatable, Hashable {
     value raw: Bit
 
     init(literal _: BoolLiteral) {

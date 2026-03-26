@@ -1,0 +1,4 @@
+@core
+construct Float<value width: FloatingPointWidth>: ExpressableByFloatLiteral, Equatable, Hashable, Comparable {
+    init(literal _: FloatLiteral)
+}

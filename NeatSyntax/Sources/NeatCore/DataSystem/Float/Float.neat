@@ -1,4 +1,0 @@
-@core
-construct Float<value width: FloatingPointWidth>: ExpressableByFloatLiteral {
-    init(literal _: FloatLiteral)
-}

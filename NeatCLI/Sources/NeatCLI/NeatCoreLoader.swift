@@ -9,7 +9,7 @@ enum NeatCoreLoader {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        let coreRoot = root.appendingPathComponent("NeatSyntax/Sources/NeatCore", isDirectory: true)
+        let coreRoot = root.appendingPathComponent("NeatCore", isDirectory: true)
 
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: coreRoot.path, isDirectory: &isDirectory),

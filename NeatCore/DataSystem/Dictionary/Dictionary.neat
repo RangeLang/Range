@@ -1,5 +1,5 @@
 @core
-construct Dictionary<Key, Value>: ExpressableByDictionaryLiteral {
+construct Dictionary<Key: Hashable, Value>: ExpressableByDictionaryLiteral {
     // Dictionary remains opaque until hashing/storage semantics are settled.
     init()
     init(literal _: DictionaryLiteral)
