@@ -61,3 +61,22 @@ public enum BootstrapLiteralType: Equatable {
         }
     }
 }
+
+public struct BootstrapLiteralBridge {
+    public let carrierType: TypeReference
+    public let defaultDestinationType: TypeReference?
+    public let acceptedDestinationTypeNames: [String]
+    public let requiresOptionalContext: Bool
+
+    public init(
+        carrierType: TypeReference,
+        defaultDestinationType: TypeReference?,
+        acceptedDestinationTypeNames: [String],
+        requiresOptionalContext: Bool
+    ) {
+        self.carrierType = carrierType
+        self.defaultDestinationType = defaultDestinationType
+        self.acceptedDestinationTypeNames = acceptedDestinationTypeNames
+        self.requiresOptionalContext = requiresOptionalContext
+    }
+}

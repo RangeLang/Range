@@ -380,20 +380,54 @@ extension Parser {
         return false
     }
 
-    func defaultTypeReference(for type: BootstrapLiteralType) -> TypeReference? {
+    func bootstrapLiteralBridge(for type: BootstrapLiteralType) -> BootstrapLiteralBridge? {
         switch type {
         case .intLiteral:
-            return .named("Int")
+            return BootstrapLiteralBridge(
+                carrierType: .named("IntLiteral"),
+                defaultDestinationType: .named("Int"),
+                acceptedDestinationTypeNames: ["Int"],
+                requiresOptionalContext: false
+            )
         case .floatLiteral:
-            return .named("Double")
+            return BootstrapLiteralBridge(
+                carrierType: .named("FloatLiteral"),
+                defaultDestinationType: .named("Float"),
+                acceptedDestinationTypeNames: ["Float", "Double"],
+                requiresOptionalContext: false
+            )
         case .stringLiteral:
-            return .named("String")
+            return BootstrapLiteralBridge(
+                carrierType: .named("StringLiteral"),
+                defaultDestinationType: .named("String"),
+                acceptedDestinationTypeNames: ["String"],
+                requiresOptionalContext: false
+            )
         case .boolLiteral:
-            return .named("Bool")
+            return BootstrapLiteralBridge(
+                carrierType: .named("BoolLiteral"),
+                defaultDestinationType: .named("Bool"),
+                acceptedDestinationTypeNames: ["Bool"],
+                requiresOptionalContext: false
+            )
         case .nilLiteral:
+            return BootstrapLiteralBridge(
+                carrierType: .named("NilLiteral"),
+                defaultDestinationType: nil,
+                acceptedDestinationTypeNames: [],
+                requiresOptionalContext: true
+            )
+        case .typed:
             return nil
+        }
+    }
+
+    func defaultDestinationTypeReference(for type: BootstrapLiteralType) -> TypeReference? {
+        switch type {
         case .typed(let typeReference):
             return typeReference
+        default:
+            return bootstrapLiteralBridge(for: type)?.defaultDestinationType
         }
     }
 
@@ -433,19 +467,17 @@ extension Parser {
         -> Bool
     {
         switch actual {
-        case .intLiteral:
-            return expected.displayName == "Int"
-        case .floatLiteral:
-            return expected.displayName == "Float" || expected.displayName == "Double"
-        case .stringLiteral:
-            return expected.displayName == "String"
-        case .boolLiteral:
-            return expected.displayName == "Bool"
-        case .nilLiteral:
-            if case .optional = expected {
-                return true
+        case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral, .nilLiteral:
+            guard let bridge = bootstrapLiteralBridge(for: actual) else {
+                return false
             }
-            return false
+            if bridge.requiresOptionalContext {
+                if case .optional = expected {
+                    return true
+                }
+                return false
+            }
+            return bridge.acceptedDestinationTypeNames.contains(expected.displayName)
         case .typed(let actualType):
             return actualType == expected
                 || isCompatibleNamedType(expected: expected, actual: actualType)

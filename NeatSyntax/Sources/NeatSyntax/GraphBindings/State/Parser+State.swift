@@ -39,7 +39,8 @@ extension Parser {
                         of: initialValue,
                         accessibleTypes: accessibleContextTypes()
                     )
-                    guard let inferredReference = defaultTypeReference(for: inferred) else {
+                    guard let inferredReference = defaultDestinationTypeReference(for: inferred)
+                    else {
                         throw ParseError(
                             "state '\(name)' initialized with nil requires an explicit optional type."
                         )
