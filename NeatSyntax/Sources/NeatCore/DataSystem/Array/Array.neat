@@ -1,0 +1,8 @@
+@core
+construct Array<Element> {
+    value count: Int
+
+    init()
+
+    function append(element: Element)
+}

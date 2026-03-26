@@ -1,5 +1,10 @@
 import Foundation
 
+public enum GenericParameter {
+    case type(name: String, constraint: TypeReference?, defaultArgument: TypeReference?)
+    case value(name: String, typeReference: TypeReference, defaultValue: Expression?)
+}
+
 public indirect enum TypeReference: Equatable {
     case named(String)
     case member(base: TypeReference, name: String)

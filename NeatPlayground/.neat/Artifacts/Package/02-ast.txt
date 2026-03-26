@@ -5,6 +5,7 @@ AST:
       - kind: NeatSyntax.ConstructKind.declaration
       - attribute: nil
       - name: "NeatPlayground"
+      - genericParameters: 0 elements
       ▿ conformances: 1 element
         ▿ NeatSyntax.TypeReference.named
           - named: "Package"

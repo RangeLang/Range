@@ -81,6 +81,7 @@ AST:
           - kind: NeatSyntax.ConstructKind.declaration
           - attribute: nil
           - name: "Person"
+          - genericParameters: 0 elements
           - conformances: 0 elements
           ▿ states: 1 element
             ▿ NeatSyntax.StateDeclaration
@@ -106,6 +107,7 @@ AST:
           - kind: NeatSyntax.ConstructKind.declaration
           - attribute: nil
           - name: "User"
+          - genericParameters: 0 elements
           - conformances: 0 elements
           - states: 0 elements
           - environments: 0 elements

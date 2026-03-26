@@ -11,6 +11,7 @@ public struct ConstructDeclaration {
     public let kind: ConstructKind
     public let attribute: AttributeApplication?
     public let name: String
+    public let genericParameters: [GenericParameter]
     public let conformances: [TypeReference]
     public let states: [StateDeclaration]
     public let environments: [EnvironmentDeclaration]

@@ -1,4 +1,8 @@
 @core
 construct Byte {
     value bits: [Bit]
+
+    init() {
+        self.bits = [Bit](repeating: Bit(0), count: 8)
+    }
 }

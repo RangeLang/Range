@@ -364,13 +364,14 @@ extension Parser {
 
     func validateInitializerDeclarations(
         _ initializers: [InitializerDeclaration],
-        availableDeriveds: [DerivedDeclaration]
+        availableDeriveds: [DerivedDeclaration],
+        allowBodylessInitializers: Bool = false
     ) throws {
         let availableSlotNames = Set(availableDeriveds.map(\.name))
 
         var seen: Set<String> = []
         for initializer in initializers {
-            guard initializer.body != nil else {
+            guard allowBodylessInitializers || initializer.body != nil else {
                 throw ParseError(
                     "Explicit initializer \(renderInitializerSignature(parameters: initializer.parameters)) must include a body."
                 )

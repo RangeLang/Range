@@ -1,0 +1,4 @@
+protocol ExpressableByBoolLiteral {
+    #literal(BoolLiteral)
+    init(literal: BoolLiteral)
+}

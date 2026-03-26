@@ -1,0 +1,4 @@
+@core
+construct BoolLiteral {
+    value raw: Bit
+}

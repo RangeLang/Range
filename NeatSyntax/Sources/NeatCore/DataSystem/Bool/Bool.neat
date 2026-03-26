@@ -1,0 +1,8 @@
+@core
+construct Bool: ExpressableByBoolLiteral {
+    value raw: Bit
+
+    init(literal _: BoolLiteral) {
+        self.raw = literal.raw
+    }
+}

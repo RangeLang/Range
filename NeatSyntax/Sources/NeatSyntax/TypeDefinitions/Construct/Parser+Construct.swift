@@ -25,6 +25,7 @@ extension Parser {
         let kind = try parseConstructKind(attribute: attribute)
         let header = try parseConstructHeader()
         let name = header.name
+        let genericParameters = header.genericParameters
         let conformances = header.conformances
 
         var states: [StateDeclaration] = []
@@ -112,13 +113,18 @@ extension Parser {
         try validateCallableDeclarations(callables)
         try validateCallableReturnSemantics(callables)
         try validateDerivedDeclarations(deriveds)
-        try validateInitializerDeclarations(initializers, availableDeriveds: deriveds)
+        try validateInitializerDeclarations(
+            initializers,
+            availableDeriveds: deriveds,
+            allowBodylessInitializers: declarationIsCore(attribute)
+        )
 
         return ConstructDeclaration(
             macros: macros,
             kind: kind,
             attribute: attribute,
             name: name,
+            genericParameters: genericParameters,
             conformances: conformances,
             states: states,
             environments: environments,
@@ -158,6 +164,7 @@ extension Parser {
             kind: .builder,
             attribute: nil,
             name: name,
+            genericParameters: [],
             conformances: [],
             states: [],
             environments: [],
@@ -185,19 +192,74 @@ extension Parser {
         return .declaration
     }
 
+    private func declarationIsCore(_ attribute: AttributeApplication?) -> Bool {
+        attribute?.name == "core"
+    }
+
     mutating func parseConstructHeader() throws
-        -> (name: String, conformances: [TypeReference])
+        -> (name: String, genericParameters: [GenericParameter], conformances: [TypeReference])
     {
         let name = try consumeTypeName()
-        try skipGenericParameterClauseIfPresent()
+        let genericParameters = try parseConstructGenericParameterClauseIfPresent()
 
         if peek() == .colon || peek() == .leftBrace {
             let conformances = try parseConformanceListIfPresent()
-            return (name, conformances)
+            return (name, genericParameters, conformances)
         }
 
         throw ParseError(
             "Expected ':' or '{' after declaration name. Use construct \(name) { ... } or construct \(name): Contract { ... }."
         )
+    }
+
+    mutating func parseConstructGenericParameterClauseIfPresent() throws -> [GenericParameter] {
+        guard peek() == .less else {
+            return []
+        }
+
+        try consume(.less)
+        var parameters: [GenericParameter] = [try parseConstructGenericParameter()]
+        while peek() == .comma {
+            advance()
+            parameters.append(try parseConstructGenericParameter())
+        }
+        try consume(.greater)
+        return parameters
+    }
+
+    mutating func parseConstructGenericParameter() throws -> GenericParameter {
+        if peek() == .keyword(NeatSyntax.Keyword.value.rawValue) {
+            try consumeKeyword(.value)
+            let name = try consumeIdentifier()
+            try consume(.colon)
+            let typeReference = try parseTypeReferenceNode()
+            let defaultValue: Expression?
+            if peek() == .equal {
+                try consume(.equal)
+                defaultValue = try parseExpression()
+            } else {
+                defaultValue = nil
+            }
+            return .value(name: name, typeReference: typeReference, defaultValue: defaultValue)
+        }
+
+        let name = try consumeIdentifier()
+        let constraint: TypeReference?
+        if peek() == .colon {
+            try consume(.colon)
+            constraint = try parseTypeReferenceNode()
+        } else {
+            constraint = nil
+        }
+
+        let defaultArgument: TypeReference?
+        if peek() == .equal {
+            try consume(.equal)
+            defaultArgument = try parseTypeReferenceNode()
+        } else {
+            defaultArgument = nil
+        }
+
+        return .type(name: name, constraint: constraint, defaultArgument: defaultArgument)
     }
 }
