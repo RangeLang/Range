@@ -1,0 +1,9 @@
+@core
+construct Set<Element>: ExpressableBySetLiteral {
+    // Set remains opaque until uniqueness and hashing semantics are settled.
+    init()
+    init(literal _: SetLiteral)
+    derived count: Int
+    function contains(element: Element) -> Bool
+    function insert(element: Element)
+}

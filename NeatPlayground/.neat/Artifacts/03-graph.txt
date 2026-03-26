@@ -8,17 +8,23 @@
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/ArrayLiteral.neat/construct:ArrayLiteral :: @core ArrayLiteral
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/Bool.neat/construct:Bool :: @core Bool
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/BoolLiteral.neat/construct:BoolLiteral :: @core BoolLiteral
+  [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary :: @core Dictionary
+  [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/DictionaryLiteral.neat/construct:DictionaryLiteral :: @core DictionaryLiteral
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/Float.neat/construct:Float :: @core Float
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/FloatLiteral.neat/construct:FloatLiteral :: @core FloatLiteral
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/Int.neat/construct:Int :: @core Int
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/IntLiteral.neat/construct:IntLiteral :: @core IntLiteral
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/NilLiteral.neat/construct:NilLiteral :: @core NilLiteral
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat/construct:Optional :: @core Optional
+  [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set :: @core Set
+  [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/SetLiteral.neat/construct:SetLiteral :: @core SetLiteral
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/String.neat/construct:String :: @core String
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/StringLiteral.neat/construct:StringLiteral :: @core StringLiteral
   [construct] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/Primitives/Byte.neat/construct:Byte :: @core Byte
   [derived] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local-derived:personString :: personString
   [derived] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/Array.neat/construct:Array/derived:count :: count
+  [derived] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/derived:count :: count
+  [derived] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/derived:count :: count
   [enumeration] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/FloatingPointWidth.neat/enum:FloatingPointWidth :: FloatingPointWidth
   [enumeration] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/Signedness.neat/enum:Signedness :: Signedness
   [enumeration] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/Primitives/Bit.neat/enum:Bit :: Bit
@@ -30,6 +36,9 @@
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/Bool.neat :: Bool.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/BoolLiteral.neat :: BoolLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/ExpressableByBoolLiteral.neat :: ExpressableByBoolLiteral.neat
+  [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat :: Dictionary.neat
+  [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/DictionaryLiteral.neat :: DictionaryLiteral.neat
+  [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/ExpressableByDictionaryLiteral.neat :: ExpressableByDictionaryLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/ExpressableByFloatLiteral.neat :: ExpressableByFloatLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/Float.neat :: Float.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/FloatLiteral.neat :: FloatLiteral.neat
@@ -41,6 +50,11 @@
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/ExpressableByNilLiteral.neat :: ExpressableByNilLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/NilLiteral.neat :: NilLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat :: Optional.neat
+  [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Equatable.neat :: Equatable.neat
+  [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Hashable.neat :: Hashable.neat
+  [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/ExpressableBySetLiteral.neat :: ExpressableBySetLiteral.neat
+  [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat :: Set.neat
+  [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/SetLiteral.neat :: SetLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/ExpressableByStringLiteral.neat :: ExpressableByStringLiteral.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/String.neat :: String.neat
   [file] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/StringLiteral.neat :: StringLiteral.neat
@@ -49,12 +63,20 @@
   [function] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User/function:incrementAge() :: incrementAge
   [function] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/Array.neat/construct:Array/function:append(element:Element) :: append
   [function] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/Array.neat/construct:Array/function:element(index:Int) :: element
+  [function] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key) :: updateValue
+  [function] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:value(key:Key) :: value
+  [function] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:contains(element:Element) :: contains
+  [function] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:insert(element:Element) :: insert
   [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/Array.neat/construct:Array/init: :: init
   [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/Array.neat/construct:Array/init:_:ArrayLiteral :: init
   [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/Bool.neat/construct:Bool/init:_:BoolLiteral :: init
+  [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/init: :: init
+  [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/init:_:DictionaryLiteral :: init
   [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/Float.neat/construct:Float/init:_:FloatLiteral :: init
   [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/Int.neat/construct:Int/init:_:IntLiteral :: init
   [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat/construct:Optional/init:_:NilLiteral :: init
+  [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/init: :: init
+  [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/init:_:SetLiteral :: init
   [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/String.neat/construct:String/init:_:StringLiteral :: init
   [initializer] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/Primitives/Byte.neat/construct:Byte/init: :: init
   [mainBlock] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main :: @main
@@ -68,15 +90,26 @@
   [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/Array.neat/construct:Array/function:element(index:Int)/parameter:index:index :: index
   [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/Array.neat/construct:Array/init:_:ArrayLiteral/parameter:_:literal :: literal
   [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/Bool.neat/construct:Bool/init:_:BoolLiteral/parameter:_:literal :: literal
+  [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key)/parameter:key:for :: for
+  [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key)/parameter:value:value :: value
+  [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:value(key:Key)/parameter:key:for :: for
+  [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/init:_:DictionaryLiteral/parameter:_:literal :: literal
   [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/Float.neat/construct:Float/init:_:FloatLiteral/parameter:_:literal :: literal
   [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/Int.neat/construct:Int/init:_:IntLiteral/parameter:_:literal :: literal
   [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat/construct:Optional/init:_:NilLiteral/parameter:_:literal :: literal
+  [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:contains(element:Element)/parameter:element:element :: element
+  [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:insert(element:Element)/parameter:element:element :: element
+  [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/init:_:SetLiteral/parameter:_:literal :: literal
   [parameter] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/String.neat/construct:String/init:_:StringLiteral/parameter:_:literal :: literal
   [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/ExpressableByArrayLiteral.neat/protocol:ExpressableByArrayLiteral :: ExpressableByArrayLiteral
   [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/ExpressableByBoolLiteral.neat/protocol:ExpressableByBoolLiteral :: ExpressableByBoolLiteral
+  [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/ExpressableByDictionaryLiteral.neat/protocol:ExpressableByDictionaryLiteral :: ExpressableByDictionaryLiteral
   [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/ExpressableByFloatLiteral.neat/protocol:ExpressableByFloatLiteral :: ExpressableByFloatLiteral
   [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/ExpressableByIntLiteral.neat/protocol:ExpressableByIntLiteral :: ExpressableByIntLiteral
   [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/ExpressableByNilLiteral.neat/protocol:ExpressableByNilLiteral :: ExpressableByNilLiteral
+  [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Equatable.neat/protocol:Equatable :: Equatable
+  [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Hashable.neat/protocol:Hashable :: Hashable
+  [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/ExpressableBySetLiteral.neat/protocol:ExpressableBySetLiteral :: ExpressableBySetLiteral
   [protocolDefinition] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/ExpressableByStringLiteral.neat/protocol:ExpressableByStringLiteral :: ExpressableByStringLiteral
   [state] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:Person/state:age :: age
   [state] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main/local:person :: person
@@ -86,23 +119,32 @@
   [typeExtension] file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/StringLiteral.neat/extension:StringLiteral :: StringLiteral
   [typeReference] type:ArrayLiteral :: ArrayLiteral
   [typeReference] type:Bit :: Bit
+  [typeReference] type:Bool :: Bool
   [typeReference] type:BoolLiteral :: BoolLiteral
+  [typeReference] type:DictionaryLiteral :: DictionaryLiteral
   [typeReference] type:Element :: Element
+  [typeReference] type:Equatable :: Equatable
   [typeReference] type:ExpressableByArrayLiteral :: ExpressableByArrayLiteral
   [typeReference] type:ExpressableByBoolLiteral :: ExpressableByBoolLiteral
+  [typeReference] type:ExpressableByDictionaryLiteral :: ExpressableByDictionaryLiteral
   [typeReference] type:ExpressableByFloatLiteral :: ExpressableByFloatLiteral
   [typeReference] type:ExpressableByIntLiteral :: ExpressableByIntLiteral
   [typeReference] type:ExpressableByNilLiteral :: ExpressableByNilLiteral
+  [typeReference] type:ExpressableBySetLiteral :: ExpressableBySetLiteral
   [typeReference] type:ExpressableByStringLiteral :: ExpressableByStringLiteral
   [typeReference] type:FloatLiteral :: FloatLiteral
   [typeReference] type:Int :: Int
   [typeReference] type:IntLiteral :: IntLiteral
+  [typeReference] type:Key :: Key
   [typeReference] type:NilLiteral :: NilLiteral
   [typeReference] type:Package :: Package
   [typeReference] type:Person :: Person
+  [typeReference] type:SetLiteral :: SetLiteral
   [typeReference] type:String :: String
   [typeReference] type:StringLiteral :: StringLiteral
   [typeReference] type:User :: User
+  [typeReference] type:Value :: Value
+  [typeReference] type:Value? :: Value?
   [typeReference] type:[Bit] :: [Bit]
   [typeReference] type:[Byte] :: [Byte]
   [value] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:Person/value:name :: name
@@ -181,6 +223,25 @@
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/BoolLiteral.neat/construct:BoolLiteral -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/BoolLiteral.neat/construct:BoolLiteral/value:raw
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/BoolLiteral.neat/construct:BoolLiteral/value:raw -referencesType-> type:Bit
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/ExpressableByBoolLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/ExpressableByBoolLiteral.neat/protocol:ExpressableByBoolLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary -conformsTo-> type:ExpressableByDictionaryLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/derived:count
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key)
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:value(key:Key)
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/init:
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/init:_:DictionaryLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/derived:count -referencesType-> type:Int
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key) -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key)/parameter:key:for
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key) -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key)/parameter:value:value
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key)/parameter:key:for -referencesType-> type:Key
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:updateValue(value:Value,key:Key)/parameter:value:value -referencesType-> type:Value
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:value(key:Key) -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:value(key:Key)/parameter:key:for
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:value(key:Key) -referencesType-> type:Value?
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/function:value(key:Key)/parameter:key:for -referencesType-> type:Key
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/init:_:DictionaryLiteral -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/init:_:DictionaryLiteral/parameter:_:literal
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/Dictionary.neat/construct:Dictionary/init:_:DictionaryLiteral/parameter:_:literal -referencesType-> type:DictionaryLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/DictionaryLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/DictionaryLiteral.neat/construct:DictionaryLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/ExpressableByDictionaryLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/ExpressableByDictionaryLiteral.neat/protocol:ExpressableByDictionaryLiteral
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/ExpressableByFloatLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/ExpressableByFloatLiteral.neat/protocol:ExpressableByFloatLiteral
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/Float.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/Float.neat/construct:Float
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/Float.neat/construct:Float -conformsTo-> type:ExpressableByFloatLiteral
@@ -211,6 +272,26 @@
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat/construct:Optional -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat/construct:Optional/init:_:NilLiteral
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat/construct:Optional/init:_:NilLiteral -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat/construct:Optional/init:_:NilLiteral/parameter:_:literal
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/Optional.neat/construct:Optional/init:_:NilLiteral/parameter:_:literal -referencesType-> type:NilLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Equatable.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Equatable.neat/protocol:Equatable
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Hashable.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Hashable.neat/protocol:Hashable
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Hashable.neat/protocol:Hashable -conformsTo-> type:Equatable
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/ExpressableBySetLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/ExpressableBySetLiteral.neat/protocol:ExpressableBySetLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set -conformsTo-> type:ExpressableBySetLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/derived:count
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:contains(element:Element)
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:insert(element:Element)
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/init:
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/init:_:SetLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/derived:count -referencesType-> type:Int
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:contains(element:Element) -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:contains(element:Element)/parameter:element:element
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:contains(element:Element) -referencesType-> type:Bool
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:contains(element:Element)/parameter:element:element -referencesType-> type:Element
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:insert(element:Element) -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:insert(element:Element)/parameter:element:element
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/function:insert(element:Element)/parameter:element:element -referencesType-> type:Element
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/init:_:SetLiteral -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/init:_:SetLiteral/parameter:_:literal
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/Set.neat/construct:Set/init:_:SetLiteral/parameter:_:literal -referencesType-> type:SetLiteral
+  file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/SetLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/SetLiteral.neat/construct:SetLiteral
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/ExpressableByStringLiteral.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/ExpressableByStringLiteral.neat/protocol:ExpressableByStringLiteral
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/String.neat -contains-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/String.neat/construct:String
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/String.neat/construct:String -conformsTo-> type:ExpressableByStringLiteral
@@ -231,18 +312,24 @@
   file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/Primitives/Byte.neat/construct:Byte/value:bits -referencesType-> type:[Bit]
   type:ArrayLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/ArrayLiteral.neat/construct:ArrayLiteral
   type:Bit -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/Primitives/Bit.neat/enum:Bit
+  type:Bool -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/Bool.neat/construct:Bool
   type:BoolLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/BoolLiteral.neat/construct:BoolLiteral
+  type:DictionaryLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/DictionaryLiteral.neat/construct:DictionaryLiteral
+  type:Equatable -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Protocols/Equatable.neat/protocol:Equatable
   type:ExpressableByArrayLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Array/ExpressableByArrayLiteral.neat/protocol:ExpressableByArrayLiteral
   type:ExpressableByBoolLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Bool/ExpressableByBoolLiteral.neat/protocol:ExpressableByBoolLiteral
+  type:ExpressableByDictionaryLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Dictionary/ExpressableByDictionaryLiteral.neat/protocol:ExpressableByDictionaryLiteral
   type:ExpressableByFloatLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/ExpressableByFloatLiteral.neat/protocol:ExpressableByFloatLiteral
   type:ExpressableByIntLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/ExpressableByIntLiteral.neat/protocol:ExpressableByIntLiteral
   type:ExpressableByNilLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/ExpressableByNilLiteral.neat/protocol:ExpressableByNilLiteral
+  type:ExpressableBySetLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/ExpressableBySetLiteral.neat/protocol:ExpressableBySetLiteral
   type:ExpressableByStringLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/ExpressableByStringLiteral.neat/protocol:ExpressableByStringLiteral
   type:FloatLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Float/FloatLiteral.neat/construct:FloatLiteral
   type:Int -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/Int.neat/construct:Int
   type:IntLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Int/IntLiteral.neat/construct:IntLiteral
   type:NilLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Optional/NilLiteral.neat/construct:NilLiteral
   type:Person -resolvesTo-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:Person
+  type:SetLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/Set/SetLiteral.neat/construct:SetLiteral
   type:String -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/String.neat/construct:String
   type:StringLiteral -resolvesTo-> file:/Users/george/Documents/Neat/NeatSyntax/Sources/NeatCore/DataSystem/String/StringLiteral.neat/construct:StringLiteral
   type:User -resolvesTo-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User

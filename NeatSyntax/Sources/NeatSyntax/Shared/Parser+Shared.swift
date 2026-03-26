@@ -5,14 +5,30 @@ extension Parser {
         expecting kind: String,
         allowOmittedLocalName: Bool = true
     ) throws -> (localName: String, externalLabel: String?) {
-        let localName = try consumeIdentifier()
+        let localName: String
+        switch peek() {
+        case .identifier(let value):
+            localName = value
+            advance()
+        case .keyword(let value):
+            localName = value
+            advance()
+        default:
+            throw ParseError("Expected \(kind) name.")
+        }
         if !allowOmittedLocalName, localName == "_" {
             throw ParseError("\(kind.capitalized) local name cannot be '_'.")
         }
 
-        if case .identifier(let secondName) = peek(), peek(offset: 1) == .colon {
+        switch peek() {
+        case .identifier(let secondName) where peek(offset: 1) == .colon:
             advance()
             return (localName, secondName == "_" ? nil : secondName)
+        case .keyword(let secondName) where peek(offset: 1) == .colon:
+            advance()
+            return (localName, secondName == "_" ? nil : secondName)
+        default:
+            break
         }
 
         guard peek() == .colon else {

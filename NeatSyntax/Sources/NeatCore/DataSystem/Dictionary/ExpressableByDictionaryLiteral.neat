@@ -1,0 +1,4 @@
+protocol ExpressableByDictionaryLiteral {
+    #literal(DictionaryLiteral)
+    init(literal: DictionaryLiteral)
+}
