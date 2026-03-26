@@ -299,22 +299,10 @@ extension Parser {
             return .string
         case "Bool":
             return .bool
-        case "Dictionary":
-            return .dictionary
         case "Void":
             return .void
         default:
             break
-        }
-
-        if raw.hasPrefix("Set<"), raw.hasSuffix(">") {
-            let start = raw.index(raw.startIndex, offsetBy: 4)
-            let end = raw.index(before: raw.endIndex)
-            let innerRaw = String(raw[start..<end])
-            guard let element = builtinType(from: innerRaw) else {
-                return nil
-            }
-            return .set(element)
         }
 
         return nil

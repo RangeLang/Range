@@ -61,8 +61,6 @@ extension BuiltinType {
         "Float",
         "String",
         "Bool",
-        "Dictionary",
-        "Set",
         "Void",
     ]
 }

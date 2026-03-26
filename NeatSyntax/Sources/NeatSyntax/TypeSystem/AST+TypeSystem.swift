@@ -42,8 +42,6 @@ public indirect enum BuiltinType: Equatable {
     case float
     case string
     case bool
-    case dictionary
-    case set(BuiltinType)
     case void
     case optional(BuiltinType)
 
@@ -59,10 +57,6 @@ public indirect enum BuiltinType: Equatable {
             return "String"
         case .bool:
             return "Bool"
-        case .dictionary:
-            return "Dictionary"
-        case .set(let element):
-            return "Set<\(element.displayName)>"
         case .void:
             return "Void"
         case .optional(let wrapped):
