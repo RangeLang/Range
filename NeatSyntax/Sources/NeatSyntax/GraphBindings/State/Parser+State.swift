@@ -24,11 +24,11 @@ extension Parser {
             if case .none = initialValue {
                 guard let explicitType else {
                     throw ParseError(
-                        "state '\(name)' initialized with none requires an explicit optional type.")
+                        "state '\(name)' initialized with nil requires an explicit optional type.")
                 }
                 guard case .optional = explicitType else {
                     throw ParseError(
-                        "state '\(name)' initialized with none requires an optional type.")
+                        "state '\(name)' initialized with nil requires an optional type.")
                 }
                 inferredType = explicitType
             } else {

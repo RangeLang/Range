@@ -192,7 +192,7 @@ extension Parser {
             if name == "false" {
                 return .boolean(false)
             }
-            if name == "none" || name == "nil" {
+            if name == "nil" {
                 return .none
             }
             var parts = [name]
@@ -411,7 +411,7 @@ extension Parser {
         case .boolean:
             return .bool
         case .none:
-            return .none
+            throw ParseError("nil requires an explicit optional context.")
         case .identifier(let name):
             guard let type = accessibleTypes[name] else {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
@@ -433,14 +433,26 @@ extension Parser {
                 throw ParseError(
                     "Ternary condition must be Bool, got \(conditionType.displayName).")
             }
-            let trueType = try inferType(of: trueExpression, accessibleTypes: accessibleTypes)
-            let falseType = try inferType(of: falseExpression, accessibleTypes: accessibleTypes)
-            if trueType == .none, falseType.isOptional {
+            if isNilLiteral(trueExpression) {
+                let falseType = try inferType(of: falseExpression, accessibleTypes: accessibleTypes)
+                guard falseType.isOptional else {
+                    throw ParseError(
+                        "Ternary branches must match, got nil and \(falseType.displayName)."
+                    )
+                }
                 return falseType
             }
-            if falseType == .none, trueType.isOptional {
+            if isNilLiteral(falseExpression) {
+                let trueType = try inferType(of: trueExpression, accessibleTypes: accessibleTypes)
+                guard trueType.isOptional else {
+                    throw ParseError(
+                        "Ternary branches must match, got \(trueType.displayName) and nil."
+                    )
+                }
                 return trueType
             }
+            let trueType = try inferType(of: trueExpression, accessibleTypes: accessibleTypes)
+            let falseType = try inferType(of: falseExpression, accessibleTypes: accessibleTypes)
             guard trueType == falseType else {
                 throw ParseError(
                     "Ternary branches must match, got \(trueType.displayName) and \(falseType.displayName)."
@@ -457,11 +469,10 @@ extension Parser {
                 return .bool
             }
         case .binary(let lhs, let operatorSymbol, let rhs):
-            let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
-            let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
-
             switch operatorSymbol {
             case .addition:
+                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
+                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
                 if lhsType == .string && rhsType == .string {
                     return .string
                 }
@@ -493,12 +504,15 @@ extension Parser {
                     "Operator '+' is only supported for Int, Float, Double, and String, got \(lhsType.displayName) and \(rhsType.displayName)."
                 )
             case .nilCoalescing:
-                if lhsType == .none {
+                if isNilLiteral(lhs) {
+                    let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
                     return rhsType
                 }
-                if rhsType == .none {
+                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
+                if isNilLiteral(rhs) {
                     return lhsType
                 }
+                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
                 if case .optional(let wrapped) = lhsType {
                     guard wrapped == rhsType else {
                         throw ParseError(
@@ -514,12 +528,25 @@ extension Parser {
                 }
                 return lhsType
             case .equal, .notEqual:
-                if lhsType == .none, rhsType.isOptional {
+                if isNilLiteral(lhs) {
+                    let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
+                    guard rhsType.isOptional else {
+                        throw ParseError(
+                            "Type mismatch in '\(operatorSymbol.rawValue)': nil and \(rhsType.displayName)."
+                        )
+                    }
                     return .bool
                 }
-                if rhsType == .none, lhsType.isOptional {
+                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
+                if isNilLiteral(rhs) {
+                    guard lhsType.isOptional else {
+                        throw ParseError(
+                            "Type mismatch in '\(operatorSymbol.rawValue)': \(lhsType.displayName) and nil."
+                        )
+                    }
                     return .bool
                 }
+                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
                 guard lhsType == rhsType else {
                     throw ParseError(
                         "Type mismatch in '\(operatorSymbol.rawValue)': \(lhsType.displayName) and \(rhsType.displayName)."
@@ -527,6 +554,8 @@ extension Parser {
                 }
                 return .bool
             case .less, .lessEqual, .greater, .greaterEqual:
+                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
+                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
                 let isNumericComparison =
                     (lhsType == .int || lhsType == .float || lhsType == .double)
                     && (rhsType == .int || rhsType == .float || rhsType == .double)
@@ -537,6 +566,8 @@ extension Parser {
                 }
                 return .bool
             case .and, .or:
+                let lhsType = try inferType(of: lhs, accessibleTypes: accessibleTypes)
+                let rhsType = try inferType(of: rhs, accessibleTypes: accessibleTypes)
                 guard lhsType == .bool, rhsType == .bool else {
                     throw ParseError(
                         "Operator '\(operatorSymbol.rawValue)' requires Bool operands."
@@ -545,5 +576,12 @@ extension Parser {
                 return .bool
             }
         }
+    }
+
+    func isNilLiteral(_ expression: Expression) -> Bool {
+        if case .none = expression {
+            return true
+        }
+        return false
     }
 }

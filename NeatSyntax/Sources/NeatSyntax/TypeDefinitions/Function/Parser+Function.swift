@@ -266,6 +266,15 @@ extension Parser {
             }
 
             for expression in returnExpressions.compactMap({ $0 }) {
+                if isNilLiteral(expression) {
+                    guard expectedBuiltinType.isOptional else {
+                        throw ParseError(
+                            "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) expects return type \(expectedBuiltinType.displayName), got nil."
+                        )
+                    }
+                    continue
+                }
+
                 guard
                     let inferred = try? inferType(of: expression, accessibleTypes: accessibleTypes)
                 else {
@@ -356,9 +365,6 @@ extension Parser {
     }
 
     func isCompatibleReturnType(expected: BuiltinType, actual: BuiltinType) -> Bool {
-        if actual == .none {
-            return expected.isOptional
-        }
         if expected == actual {
             return true
         }

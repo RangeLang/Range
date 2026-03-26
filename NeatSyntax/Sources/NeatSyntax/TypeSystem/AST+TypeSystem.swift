@@ -46,7 +46,6 @@ public indirect enum BuiltinType: Equatable {
     case dictionary
     case set(BuiltinType)
     case void
-    case none
     case optional(BuiltinType)
 
     public var displayName: String {
@@ -69,8 +68,6 @@ public indirect enum BuiltinType: Equatable {
             return "Set<\(element.displayName)>"
         case .void:
             return "Void"
-        case .none:
-            return "none"
         case .optional(let wrapped):
             return "\(wrapped.displayName)?"
         }

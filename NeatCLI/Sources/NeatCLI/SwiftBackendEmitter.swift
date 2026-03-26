@@ -192,7 +192,7 @@ struct SwiftBackendEmitter {
         case "Data":
             return "Data"
         default:
-            return typeName == "none" ? "Never" : typeName
+            return typeName
         }
     }
 

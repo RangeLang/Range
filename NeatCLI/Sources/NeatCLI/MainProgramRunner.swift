@@ -258,7 +258,7 @@ private struct MainProgramInterpreter {
                 elements = []
             default:
                 throw ValidationError(
-                    "For-in sequence in \(fileName) must evaluate to an array or none."
+                    "For-in sequence in \(fileName) must evaluate to an array or nil."
                 )
             }
 
@@ -600,7 +600,7 @@ private struct MainProgramInterpreter {
         case .bool(let value):
             return value ? "true" : "false"
         case .none:
-            return "none"
+            return "nil"
         case .array(let values):
             return "[" + values.map(stringify).joined(separator: ", ") + "]"
         case .dictionary(let values):
