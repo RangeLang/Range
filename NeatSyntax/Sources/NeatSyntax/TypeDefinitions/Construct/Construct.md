@@ -10,9 +10,13 @@ A construct is Neat's concrete identity-bearing type.
 
 ## Mental Model
 
-`construct` is identity-bearing by default.
+`construct` unifies the roles that other languages split across value types and reference types.
 
-Plain value foundations such as `Int` are a separate `@core construct` case and are not the default meaning of `construct`.
+User code writes `construct` for concrete modeled entities.
+
+Ordinary `construct` declarations are identity-bearing by default.
+
+Plain foundational and compiler-structural values such as `Int` and `Closure` belong to `@core construct`, not the default `construct` model.
 
 ## Properties
 
@@ -29,6 +33,10 @@ construct Person {
 ```neat
 value user = Person(name: "George")
 ```
+
+- Does not inherit from other constructs
+
+- Reuses behavior through protocols and generics rather than construct inheritance
 
 - Can conform to protocols
 
@@ -63,5 +71,6 @@ construct Book {
 
 - `construct` is identity-bearing by definition.
 - `construct` does not inherit from other constructs.
+- `construct` replaces the struct/class split in normal user modeling.
 - Recursive relationships between constructs are legal because construct-to-construct members are modeled as construct relationships in the graph.
 - Non-identity foundational types belong to `@core construct`, not ordinary `construct`.
