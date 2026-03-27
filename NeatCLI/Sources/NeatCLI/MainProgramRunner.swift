@@ -48,10 +48,7 @@ struct MainProgramRunner {
             entryFile = inputURL
         }
 
-        let source = try String(contentsOf: entryFile, encoding: .utf8)
-        var parser = try Parser(source: source)
-
-        let sourceFile = try parser.parseSourceFile()
+        let sourceFile = try ProjectSourceValidator.expandedParsedFile(at: entryFile).sourceFile
         let mainBlock: MainBlockNode
         switch sourceFile {
         case .mainBlock(let block):
@@ -93,7 +90,7 @@ struct MainProgramRunner {
         let files = try neatFiles(in: root, excludingManifestAt: packageFile)
 
         let mainBlocks = try files.compactMap { fileURL -> URL? in
-            let sourceFile = try ProjectSourceValidator.parseSourceFile(at: fileURL)
+            let sourceFile = try ProjectSourceValidator.expandedParsedFile(at: fileURL).sourceFile
             switch sourceFile {
             case .mainBlock:
                 return fileURL
@@ -222,6 +219,8 @@ private struct MainProgramInterpreter {
 
     private mutating func executeStatement(_ statement: Statement) throws -> ControlFlow {
         switch statement {
+        case .freestandingMacro:
+            throw ValidationError("Freestanding macros must be expanded before interpretation.")
         case .declaration(let kind, let name, _, let expression):
             let value = try evaluate(expression)
             try declare(name: name, kind: kind, value: value)

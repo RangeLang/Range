@@ -15,11 +15,9 @@ extension NeatCLI {
             do {
                 let inputURL = URL(fileURLWithPath: input ?? ".").standardizedFileURL
                 let files = try graphFiles(at: inputURL)
-                let parsedFiles = try files.map { fileURL in
-                    ParsedSourceFile(
-                        path: fileURL.path,
-                        sourceFile: try ProjectSourceValidator.parseSourceFile(at: fileURL)
-                    )
+                let expandedParsedFiles = try ProjectSourceValidator.expandedParsedFiles(for: files)
+                let parsedFiles = expandedParsedFiles.map { parsedFile in
+                    ParsedSourceFile(path: parsedFile.url.path, sourceFile: parsedFile.sourceFile)
                 }
 
                 let graph = DependencyGraphBuilder().build(files: parsedFiles)

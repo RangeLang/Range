@@ -1,4 +1,0 @@
-// Exploratory macro argument result surface.
-// This file is for design iteration only.
-
-construct ArgumentResult: SupportsRewrite<Expression>

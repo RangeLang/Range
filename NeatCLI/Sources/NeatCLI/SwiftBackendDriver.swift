@@ -150,7 +150,7 @@ struct SwiftBackendDriver {
 
     private func loadSwiftProgram(fromSingleFile fileURL: URL) throws -> SwiftBackendEmitter.Program
     {
-        let sourceFile = try ProjectSourceValidator.parseSourceFile(at: fileURL)
+        let sourceFile = try ProjectSourceValidator.expandedParsedFile(at: fileURL).sourceFile
         switch sourceFile {
         case .mainBlock(let mainBlock):
             return .init(
@@ -201,9 +201,11 @@ struct SwiftBackendDriver {
         var declarations: [ConstructDeclaration] = []
         var mainBlock: MainBlockNode?
         var units: [SwiftBackendEmitter.SourceUnit] = []
+        let expandedFiles = try ProjectSourceValidator.expandedParsedFiles(for: files)
 
-        for fileURL in files {
-            let sourceFile = try ProjectSourceValidator.parseSourceFile(at: fileURL)
+        for parsedFile in expandedFiles {
+            let fileURL = parsedFile.url
+            let sourceFile = parsedFile.sourceFile
             let swiftFileName = fileURL.deletingPathExtension().lastPathComponent + ".swift"
             switch sourceFile {
             case .construct(let declaration):

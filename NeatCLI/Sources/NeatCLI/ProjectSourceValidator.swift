@@ -14,12 +14,47 @@ enum ProjectSourceValidator {
         return try parser.parseSourceFile()
     }
 
-    static func validateFiles(_ files: [URL]) throws {
-        let parsedFiles =
-            try NeatCoreLoader.parsedValidationFiles()
-            + files.map {
-                ParsedFile(url: $0, sourceFile: try parseSourceFile(at: $0))
+    static func expandedParsedFiles(
+        for files: [URL],
+        includeCore: Bool = true
+    ) throws -> [ParsedFile] {
+        let coreFiles = includeCore ? try NeatCoreLoader.parsedValidationFiles() : []
+        let projectFiles = try files.map {
+            ParsedFile(url: $0, sourceFile: try parseSourceFile(at: $0))
+        }
+        return try expandParsedFiles(coreFiles + projectFiles)
+    }
+
+    static func expandedParsedFile(at fileURL: URL) throws -> ParsedFile {
+        let files = try expandedParsedFiles(for: [fileURL], includeCore: true)
+        guard
+            let match = files.first(where: {
+                $0.url.standardizedFileURL == fileURL.standardizedFileURL
+            })
+        else {
+            throw ValidationError("Failed to expand \(fileURL.lastPathComponent).")
+        }
+        return match
+    }
+
+    static func expandParsedFiles(_ parsedFiles: [ParsedFile]) throws -> [ParsedFile] {
+        let expanded = try MacroExpander.expand(
+            files: parsedFiles.map {
+                ParsedSourceFile(path: $0.url.path, sourceFile: $0.sourceFile)
             }
+        )
+        let expandedByPath = Dictionary(
+            uniqueKeysWithValues: expanded.map { ($0.path, $0.sourceFile) })
+        return try parsedFiles.map { parsedFile in
+            guard let sourceFile = expandedByPath[parsedFile.url.path] else {
+                throw ValidationError("Failed to expand \(parsedFile.url.lastPathComponent).")
+            }
+            return ParsedFile(url: parsedFile.url, sourceFile: sourceFile)
+        }
+    }
+
+    static func validateFiles(_ files: [URL]) throws {
+        let parsedFiles = try expandedParsedFiles(for: files)
         try validatePrimaryDeclarations(in: parsedFiles)
         try validateTopLevelStates(in: parsedFiles)
         try validateEnvironmentStateResolution(in: parsedFiles)
@@ -27,11 +62,7 @@ enum ProjectSourceValidator {
     }
 
     static func validatePrimaryDeclarations(in files: [URL]) throws {
-        let parsedFiles =
-            try NeatCoreLoader.parsedValidationFiles()
-            + files.map {
-                ParsedFile(url: $0, sourceFile: try parseSourceFile(at: $0))
-            }
+        let parsedFiles = try expandedParsedFiles(for: files)
         try validatePrimaryDeclarations(in: parsedFiles)
     }
 
@@ -222,6 +253,12 @@ enum ProjectSourceValidator {
     ) throws {
         for statement in statements {
             switch statement {
+            case .freestandingMacro(_, _, let body):
+                try validateValueDeclarations(
+                    in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
             case .declaration(let kind, let name, let typeName, let expression):
                 guard kind == .constant else { continue }
                 let explicitType = typeName.flatMap(normalizedTypeName)

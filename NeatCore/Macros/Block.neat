@@ -1,0 +1,4 @@
+@core
+construct Block: FreestandingMacroTarget {
+    value statements: [Statement]
+}

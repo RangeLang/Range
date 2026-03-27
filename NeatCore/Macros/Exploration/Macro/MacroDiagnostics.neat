@@ -1,8 +1,0 @@
-// Exploratory macro diagnostics surface.
-// This file is for design iteration only.
-
-construct MacroDiagnostics {
-    function error(_ message: String)
-    function warning(_ message: String)
-    function note(_ message: String)
-}

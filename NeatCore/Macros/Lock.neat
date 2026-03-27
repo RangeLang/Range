@@ -1,6 +1,3 @@
-// Exploratory lock macro example.
-// This file is for design iteration only.
-
 macro lock: Freestanding<Block> { target, result, diagnostics in
     result.rewrite({
         acquire()

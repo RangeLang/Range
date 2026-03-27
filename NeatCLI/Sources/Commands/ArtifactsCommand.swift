@@ -29,6 +29,10 @@ extension NeatCLI {
                     withIntermediateDirectories: true
                 )
 
+                let expandedParsedFiles = try ProjectSourceValidator.expandedParsedFiles(for: files)
+                let expandedByPath = Dictionary(
+                    uniqueKeysWithValues: expandedParsedFiles.map { ($0.url.path, $0.sourceFile) }
+                )
                 var parsedFiles: [ParsedSourceFile] = []
 
                 for fileURL in files {
@@ -56,10 +60,13 @@ extension NeatCLI {
                             atomically: true,
                             encoding: .utf8
                         )
+                        guard let expandedSourceFile = expandedByPath[fileURL.path] else {
+                            throw ValidationError("Failed to expand \(fileURL.lastPathComponent).")
+                        }
                         parsedFiles.append(
                             ParsedSourceFile(
                                 path: fileURL.path,
-                                sourceFile: try ProjectSourceValidator.parseSourceFile(at: fileURL)
+                                sourceFile: expandedSourceFile
                             )
                         )
                     } catch {
@@ -75,7 +82,8 @@ extension NeatCLI {
                     }
                 }
 
-                let graphFiles = try NeatCoreLoader.parsedDependencyFiles() + parsedFiles
+                let rawCoreFiles = try NeatCoreLoader.parsedDependencyFiles()
+                let graphFiles = try MacroExpander.expand(files: rawCoreFiles + parsedFiles)
                 let graph = renderer.renderGraph(files: graphFiles)
                 try graph.write(
                     to: outputRoot.appendingPathComponent("03-graph.txt"),

@@ -149,7 +149,6 @@ public struct Parser {
     var currentSelfAvailable: Bool = false
     var currentExpressionTerminators: [Token] = []
     var operatorEnvironment: OperatorEnvironment
-    var currentMacroDeclarations: [String: MacroDeclaration] = [:]
 
     public init(source: String) throws {
         var lexer = Lexer(source: source)
@@ -214,7 +213,6 @@ public struct Parser {
             if isMacroDeclarationStart() {
                 let declaration = try parseMacroDeclaration()
                 macros.append(declaration)
-                currentMacroDeclarations[declaration.name] = declaration
                 continue
             }
 

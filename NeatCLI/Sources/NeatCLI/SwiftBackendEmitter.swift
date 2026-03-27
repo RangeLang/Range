@@ -204,6 +204,8 @@ struct SwiftBackendEmitter {
         let prefix = String(repeating: "    ", count: indent)
 
         switch statement {
+        case .freestandingMacro:
+            throw ValidationError("Freestanding macros must be expanded before Swift emission.")
         case .declaration(let kind, let name, _, let expression):
             let keyword = kind == .constant ? "let" : "var"
             return "\(prefix)\(keyword) \(name) = \(try emitExpression(expression))"

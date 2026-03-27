@@ -1342,6 +1342,9 @@ private struct GraphCollector {
         for (index, statement) in statements.enumerated() {
             let statementID = "\(ownerID)/stmt:\(index)"
             switch statement {
+            case .freestandingMacro(_, _, let body):
+                analyzeStatements(
+                    body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
             case .declaration(let kind, let name, let typeName, let expression):
                 let nodeKind: DependencyGraphNodeKind = kind == .mutable ? .state : .value
                 let localID = "\(ownerID)/local:\(name)"

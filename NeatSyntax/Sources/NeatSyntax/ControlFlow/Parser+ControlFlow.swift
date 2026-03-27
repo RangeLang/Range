@@ -4,6 +4,10 @@ extension Parser {
     mutating func parseStatement(
         localBindings: inout [String: LocalBindingKind]
     ) throws -> Statement {
+        if isMacroApplicationStart() {
+            return try parseFreestandingMacroStatement(localBindings: &localBindings)
+        }
+
         if isEnvironmentProvisionStart() {
             return .environmentProvision(try parseEnvironmentProvision())
         }
@@ -75,6 +79,18 @@ extension Parser {
         default:
             throw ParseError("Expected assignment operator in action block.")
         }
+    }
+
+    mutating func parseFreestandingMacroStatement(
+        localBindings: inout [String: LocalBindingKind]
+    ) throws -> Statement {
+        guard case .hashDirective(let name) = peek() else {
+            throw ParseError("Expected freestanding macro application.")
+        }
+        advance()
+        let argumentClause = try parseMacroArgumentClauseIfPresent()
+        let body = try parseStatementBlock(baseLocalBindings: localBindings)
+        return .freestandingMacro(name: name, argumentClause: argumentClause, body: body)
     }
 
     func isStandaloneCallExpressionStart() -> Bool {
@@ -343,12 +359,6 @@ extension Parser {
         var localBindings = baseLocalBindings
         var statements: [Statement] = []
         while peek() != .rightBrace {
-            if let expandedStatements = try parseFreestandingBlockMacroExpansionIfPresent(
-                localBindings: &localBindings
-            ) {
-                statements.append(contentsOf: expandedStatements)
-                continue
-            }
             statements.append(try parseStatement(localBindings: &localBindings))
         }
 
