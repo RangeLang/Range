@@ -15,12 +15,14 @@ A deferred requirement macro is attached to a protocol requirement, but expands 
 
 ```neat
 protocol ExpressableByIntLiteral {
-    #literal(RawInt)
-    init(literal: RawInt)
+    #literal<IntLiteral>
+    init(literal: IntLiteral)
 }
 ```
 
-`#literal(RawInt)` does not expand on the protocol. It is carried by the requirement and expands when a conforming construct provides the matching `init`.
+`#literal<IntLiteral>` does not expand on the protocol. It is carried by the requirement and expands when a conforming construct provides the matching `init`.
+
+For `literal`, the generic argument must be a compiler-recognized literal carrier type such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, or `SetLiteral`.
 
 ## Deferred Conformance Macros
 A protocol can also carry macros targeted at declaration kinds that conform to it, such as constructs or enums.
@@ -36,3 +38,10 @@ protocol Equatable {
 
 ## Rule
 Macros attached to protocol requirements or protocols themselves are part of that protocol's semantics. They expand when those semantics are realized by a concrete conforming declaration of the matching kind.
+
+For literal bridging specifically:
+
+- `#literal<T>` is the canonical form.
+- `T` is a literal carrier type recognized by the compiler.
+- The compiler recognizes literal categories and carrier types.
+- The macro model carries the bridge through protocol requirements and conformances, then rewrites concrete use sites through the realized initializer.

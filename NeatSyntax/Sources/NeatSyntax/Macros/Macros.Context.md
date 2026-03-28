@@ -99,3 +99,4 @@ Function
 
 - Macros should be low-level enough to express advanced features without new baked-in compiler mechanisms.
 - Freestanding and attached macros do not need to share one fake universal context bag.
+- `#literal<T>` is the canonical attached-init literal bridge form, with `T` constrained to compiler-recognized literal carrier types.

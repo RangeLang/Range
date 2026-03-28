@@ -16,6 +16,8 @@ Current bootstrap rules:
 - `Freestanding<Expression>` is currently call-style.
 - Attached parameter macros are bootstrap-executed from Neat macro bodies through `target.parameter.type.rewrite(...)` and `target.arguments.rewrite(...)`.
 - Attached init macros are intended to be graph-driven: protocol init requirements carry macros, conforming initializers inherit them, and invocation rewriting should consume that carried result.
+- For literal bridging, the canonical form is `#literal<T>` on `init(literal: T)`, where `T` is a compiler-recognized literal carrier type.
+- The compiler recognizes carrier types and literal categories; the macro model defines how the bridge is carried and how concrete invocation rewriting occurs after conformance realization.
 - Macro closures currently use only `target` and `diagnostics`; bootstrap work should not add extra bindings.
 - For attached parameter macros, `target` may temporarily act as a contextual wrapper around the attached parameter and its invocation-side argument surface.
 - Single-argument attached rewrites should read from the explicit plural surface, for example `target.arguments[0].expression`, with an enclosing emptiness check when needed.

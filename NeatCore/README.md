@@ -56,8 +56,10 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 - `@core construct` is compiler-recognized, non-identity-bearing, and intended for plain structural/bootstrap data.
 - The memory graph is foundational and always generated.
 - Reactivity is an optional exposed layer derived from the memory graph, not a separate base system.
-- Literal bridging currently uses `#literal(...)` protocols plus empty literal carrier types.
-- Type sugar and literal sugar are still separate concerns. For example, `#literal(NilLiteral)` is part of the core surface, while `T? -> Optional<T>` remains compiler type sugar.
+- Literal bridging currently uses `#literal<T>` on protocol initializer requirements plus literal carrier types.
+- The compiler recognizes the literal carrier types themselves, such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, and `SetLiteral`.
+- Everything beyond carrier recognition is modeled as literal bridge macro behavior carried through conformance.
+- Type sugar and literal sugar are still separate concerns. For example, `#literal<NilLiteral>` is part of the core surface, while `T? -> Optional<T>` remains compiler type sugar.
 
 ## Current Limits
 
