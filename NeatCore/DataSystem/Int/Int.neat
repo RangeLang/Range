@@ -3,7 +3,7 @@ construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: E
     // Bit-backed storage is the current semantic model, not the final lowering boundary.
     value bits: [Bit]
 
-    init(literal _: IntLiteral) {
+    init(literal: IntLiteral) {
         self.bits = literal.bits(count: bits)
     }
 }

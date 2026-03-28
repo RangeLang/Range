@@ -2,7 +2,7 @@
 construct Dictionary<Key: Hashable, Value>: ExpressableByDictionaryLiteral {
     // Dictionary remains opaque until hashing/storage semantics are settled.
     init()
-    init(literal _: DictionaryLiteral)
+    init(literal: DictionaryLiteral)
     derived count: Int
     function value(for key: Key) -> Value?
     function updateValue(value: Value, for key: Key)

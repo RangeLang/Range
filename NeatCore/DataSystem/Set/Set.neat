@@ -2,7 +2,7 @@
 construct Set<Element: Hashable>: ExpressableBySetLiteral {
     // Set remains opaque until uniqueness and hashing semantics are settled.
     init()
-    init(literal _: SetLiteral)
+    init(literal: SetLiteral)
     derived count: Int
     function contains(element: Element) -> Bool
     function insert(element: Element)

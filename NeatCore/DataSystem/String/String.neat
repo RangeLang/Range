@@ -3,7 +3,7 @@ construct String: ExpressableByStringLiteral, Equatable, Hashable, Comparable {
     // String is modeled as UTF-8-oriented byte storage at the semantic level.
     value bytes: [Byte]
 
-    init(literal _: StringLiteral) {
+    init(literal: StringLiteral) {
         self.bytes = literal.bytes()
     }
 }

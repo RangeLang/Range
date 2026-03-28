@@ -2,7 +2,7 @@
 construct Bool: ExpressableByBoolLiteral, Equatable, Hashable {
     value raw: Bit
 
-    init(literal _: BoolLiteral) {
+    init(literal: BoolLiteral) {
         self.raw = literal.raw
     }
 }
