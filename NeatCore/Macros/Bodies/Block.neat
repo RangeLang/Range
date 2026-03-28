@@ -1,4 +1,4 @@
 @core
-construct Block: FreestandingMacroTarget {
+construct Block: FreestandingMacroTarget, SupportsRewrite<Block> {
     value statements: [Statement]
 }

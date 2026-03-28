@@ -1,0 +1,3 @@
+protocol SupportsExtension<T> {
+    function addExtension(_: T)
+}
