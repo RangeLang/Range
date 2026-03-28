@@ -1,0 +1,9 @@
+construct MyCounter: ExpressableByIntLiteral {
+    init(literal: IntLiteral) { }
+}
+
+function answer() -> MyCounter {
+    return 5
+}
+
+@main { }

@@ -20,6 +20,25 @@ public struct LiteralBridgeResolver: Sendable {
         return .named(bridge.constructName)
     }
 
+    public func bridge(
+        expected: TypeReference,
+        carrierTypeName: String
+    ) -> RealizedLiteralBridge? {
+        guard carrierTypeName != "NilLiteral",
+            let expectedConstructName = Self.constructName(for: expected)
+        else {
+            return nil
+        }
+
+        let matches = bridgesByCarrier[carrierTypeName, default: []].filter {
+            $0.constructName == expectedConstructName
+        }
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
+    }
+
     public func isCompatible(expected: TypeReference, carrierTypeName: String) -> Bool {
         if carrierTypeName == "NilLiteral" {
             if case .optional = expected {
@@ -28,8 +47,12 @@ public struct LiteralBridgeResolver: Sendable {
             return false
         }
 
+        guard let expectedConstructName = Self.constructName(for: expected) else {
+            return false
+        }
+
         return bridgesByCarrier[carrierTypeName, default: []].contains {
-            $0.constructName == expected.displayName
+            $0.constructName == expectedConstructName
         }
     }
 
@@ -51,5 +74,22 @@ public struct LiteralBridgeResolver: Sendable {
             return matches[0]
         }
         return nil
+    }
+
+    private static func constructName(for typeReference: TypeReference) -> String? {
+        switch typeReference {
+        case .named, .member:
+            return typeReference.displayName
+        case .generic(let base, _):
+            return constructName(for: base)
+        case .array:
+            return "Array"
+        case .optional:
+            return "Optional"
+        case .variadic(let element):
+            return constructName(for: element)
+        case .function:
+            return nil
+        }
     }
 }

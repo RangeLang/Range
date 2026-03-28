@@ -48,6 +48,7 @@ public enum MacroExpander {
                 MainBlockNode(
                     body: try expand(
                         statements: mainBlock.body,
+                        expectedReturnType: nil,
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
@@ -61,13 +62,20 @@ public enum MacroExpander {
                         MainBlockNode(
                             body: try expand(
                                 statements: $0.body,
+                                expectedReturnType: nil,
                                 macros: macros,
                                 protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables,
                                 attachedLiteralConstructs: attachedLiteralConstructs
                             ))
                     },
-                    states: module.states,
+                    states: module.states.map {
+                        expand(
+                            state: $0,
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs
+                        )
+                    },
                     callables: try module.callables.map {
                         try expand(
                             callable: $0,
@@ -212,7 +220,13 @@ public enum MacroExpander {
             name: construct.name,
             genericParameters: construct.genericParameters,
             conformances: construct.conformances,
-            states: construct.states,
+            states: construct.states.map {
+                expand(
+                    state: $0,
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
+                )
+            },
             environments: construct.environments,
             bindings: construct.bindings,
             deriveds: try construct.deriveds.map {
@@ -265,6 +279,7 @@ public enum MacroExpander {
             body: try callable.body.map {
                 try expand(
                     statements: $0,
+                    expectedReturnType: callable.returnType,
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
@@ -290,6 +305,7 @@ public enum MacroExpander {
             body: try initializer.body.map {
                 try expand(
                     statements: $0,
+                    expectedReturnType: nil,
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
@@ -316,6 +332,7 @@ public enum MacroExpander {
             body: try derived.body.map {
                 try expand(
                     statements: $0,
+                    expectedReturnType: nil,
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
@@ -326,7 +343,38 @@ public enum MacroExpander {
     }
 
     static func expand(
+        state: StateDeclaration,
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge]
+    ) -> StateDeclaration {
+        let storage: StateStorage
+
+        switch state.storage {
+        case .stored(let expression):
+            storage = .stored(
+                expand(
+                    expression: expression,
+                    expectedType: state.type,
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
+                )
+            )
+        case .declared:
+            storage = .declared
+        }
+
+        return StateDeclaration(
+            macros: state.macros,
+            name: state.name,
+            hasExplicitTypeAnnotation: state.hasExplicitTypeAnnotation,
+            type: state.type,
+            storage: storage
+        )
+    }
+
+    static func expand(
         statements: [Statement],
+        expectedReturnType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
@@ -339,6 +387,7 @@ public enum MacroExpander {
             expanded.append(
                 contentsOf: try expand(
                     statement: statement,
+                    expectedReturnType: expectedReturnType,
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
@@ -350,6 +399,7 @@ public enum MacroExpander {
 
     static func expand(
         statement: Statement,
+        expectedReturnType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
@@ -413,11 +463,13 @@ public enum MacroExpander {
                     name: name,
                     sequence: expand(
                         expression: sequence,
+                        expectedType: nil,
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
                     ),
                     body: try expand(
                         statements: body,
+                        expectedReturnType: expectedReturnType,
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
@@ -429,11 +481,13 @@ public enum MacroExpander {
                 .whileLoop(
                     condition: expand(
                         expression: condition,
+                        expectedType: .named("Bool"),
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
                     ),
                     body: try expand(
                         statements: body,
+                        expectedReturnType: expectedReturnType,
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
@@ -448,11 +502,13 @@ public enum MacroExpander {
                             condition: branch.condition.map {
                                 expand(
                                     expression: $0,
+                                    expectedType: .named("Bool"),
                                     attachedParameterCallables: attachedParameterCallables,
                                     attachedLiteralConstructs: attachedLiteralConstructs)
                             },
                             body: try expand(
                                 statements: branch.body,
+                                expectedReturnType: expectedReturnType,
                                 macros: macros,
                                 protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables,
@@ -470,6 +526,7 @@ public enum MacroExpander {
                     typeName: typeName,
                     expression: expand(
                         expression: expression,
+                        expectedType: typeName.map(TypeReference.named),
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
                     )
@@ -481,6 +538,7 @@ public enum MacroExpander {
                     target: target,
                     expression: expand(
                         expression: expression,
+                        expectedType: nil,
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
                     )
@@ -493,6 +551,7 @@ public enum MacroExpander {
                     operatorSymbol: operatorSymbol,
                     expression: expand(
                         expression: expression,
+                        expectedType: nil,
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
                     )
@@ -503,6 +562,7 @@ public enum MacroExpander {
                 .expression(
                     expand(
                         expression: expression,
+                        expectedType: nil,
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs))
             ]
@@ -512,6 +572,7 @@ public enum MacroExpander {
                     expression.map {
                         expand(
                             expression: $0,
+                            expectedType: expectedReturnType,
                             attachedParameterCallables: attachedParameterCallables,
                             attachedLiteralConstructs: attachedLiteralConstructs)
                     })
@@ -521,6 +582,7 @@ public enum MacroExpander {
                 .switchStatement(
                     expression: expand(
                         expression: expression,
+                        expectedType: nil,
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
                     ),
@@ -528,11 +590,13 @@ public enum MacroExpander {
                         SwitchCase(
                             value: expand(
                                 expression: switchCase.value,
+                                expectedType: nil,
                                 attachedParameterCallables: attachedParameterCallables,
                                 attachedLiteralConstructs: attachedLiteralConstructs
                             ),
                             body: try expand(
                                 statements: switchCase.body,
+                                expectedReturnType: expectedReturnType,
                                 macros: macros,
                                 protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables,
@@ -543,6 +607,7 @@ public enum MacroExpander {
                     defaultBody: try defaultBody.map {
                         try expand(
                             statements: $0,
+                            expectedReturnType: expectedReturnType,
                             macros: macros,
                             protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables,
@@ -597,6 +662,7 @@ public enum MacroExpander {
 
     static func expand(
         expression: Expression,
+        expectedType: TypeReference? = nil,
         attachedParameterCallables: [AttachedParameterMacroSignature],
         attachedLiteralConstructs: [RealizedLiteralBridge]
     ) -> Expression {
@@ -607,6 +673,7 @@ public enum MacroExpander {
                     label: argument.label,
                     value: expand(
                         expression: argument.value,
+                        expectedType: nil,
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
                     )
@@ -665,6 +732,7 @@ public enum MacroExpander {
                 elements.map {
                     expand(
                         expression: $0,
+                        expectedType: nil,
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
                     )
@@ -676,11 +744,13 @@ public enum MacroExpander {
                     DictionaryElement(
                         key: expand(
                             expression: element.key,
+                            expectedType: nil,
                             attachedParameterCallables: attachedParameterCallables,
                             attachedLiteralConstructs: attachedLiteralConstructs
                         ),
                         value: expand(
                             expression: element.value,
+                            expectedType: nil,
                             attachedParameterCallables: attachedParameterCallables,
                             attachedLiteralConstructs: attachedLiteralConstructs
                         )
@@ -691,15 +761,18 @@ public enum MacroExpander {
             return .ternary(
                 condition: expand(
                     expression: condition,
+                    expectedType: .named("Bool"),
                     attachedParameterCallables: attachedParameterCallables,
                     attachedLiteralConstructs: attachedLiteralConstructs),
                 trueExpression: expand(
                     expression: trueExpression,
+                    expectedType: expectedType,
                     attachedParameterCallables: attachedParameterCallables,
                     attachedLiteralConstructs: attachedLiteralConstructs
                 ),
                 falseExpression: expand(
                     expression: falseExpression,
+                    expectedType: expectedType,
                     attachedParameterCallables: attachedParameterCallables,
                     attachedLiteralConstructs: attachedLiteralConstructs
                 )
@@ -709,6 +782,7 @@ public enum MacroExpander {
                 operatorSymbol: operatorSymbol,
                 expression: expand(
                     expression: nested,
+                    expectedType: operatorSymbol == .not ? .named("Bool") : nil,
                     attachedParameterCallables: attachedParameterCallables,
                     attachedLiteralConstructs: attachedLiteralConstructs)
             )
@@ -716,11 +790,13 @@ public enum MacroExpander {
             return .binary(
                 lhs: expand(
                     expression: lhs,
+                    expectedType: nil,
                     attachedParameterCallables: attachedParameterCallables,
                     attachedLiteralConstructs: attachedLiteralConstructs),
                 operatorSymbol: operatorSymbol,
                 rhs: expand(
                     expression: rhs,
+                    expectedType: nil,
                     attachedParameterCallables: attachedParameterCallables,
                     attachedLiteralConstructs: attachedLiteralConstructs)
             )
@@ -735,6 +811,7 @@ public enum MacroExpander {
                             return .expression(
                                 expand(
                                     expression: nested,
+                                    expectedType: nil,
                                     attachedParameterCallables: attachedParameterCallables,
                                     attachedLiteralConstructs: attachedLiteralConstructs
                                 ))
@@ -744,6 +821,7 @@ public enum MacroExpander {
             )
             return lowerLiteralExpressionIfPossible(
                 expanded,
+                expectedType: expectedType,
                 attachedLiteralConstructs: attachedLiteralConstructs
             )
         case .block(let body):
@@ -751,6 +829,7 @@ public enum MacroExpander {
                 body.flatMap {
                     (try? expand(
                         statement: $0,
+                        expectedReturnType: nil,
                         macros: [:],
                         protocols: [:],
                         attachedParameterCallables: attachedParameterCallables,
@@ -761,6 +840,7 @@ public enum MacroExpander {
         case .integer, .double, .string, .boolean, .nilLiteral:
             return lowerLiteralExpressionIfPossible(
                 expression,
+                expectedType: expectedType,
                 attachedLiteralConstructs: attachedLiteralConstructs
             )
         case .identifier, .bindingReference:
@@ -770,6 +850,7 @@ public enum MacroExpander {
 
     static func lowerLiteralExpressionIfPossible(
         _ expression: Expression,
+        expectedType: TypeReference? = nil,
         attachedLiteralConstructs: [RealizedLiteralBridge]
     ) -> Expression {
         guard let literalType = bootstrapLiteralType(for: expression)
@@ -777,12 +858,18 @@ public enum MacroExpander {
             return expression
         }
 
-        guard
-            let bridge = preferredDefaultLiteralBridge(
+        let bridge =
+            contextualLiteralBridge(
+                for: literalType.displayName,
+                expectedType: expectedType,
+                attachedLiteralConstructs: attachedLiteralConstructs
+            )
+            ?? preferredDefaultLiteralBridge(
                 for: literalType.displayName,
                 attachedLiteralConstructs: attachedLiteralConstructs
             )
-        else {
+
+        guard let bridge else {
             return expression
         }
 
@@ -818,6 +905,19 @@ public enum MacroExpander {
     ) -> RealizedLiteralBridge? {
         LiteralBridgeResolver(realizedLiteralBridges: attachedLiteralConstructs)
             .preferredDefaultBridge(for: carrierTypeName)
+    }
+
+    static func contextualLiteralBridge(
+        for carrierTypeName: String,
+        expectedType: TypeReference?,
+        attachedLiteralConstructs: [RealizedLiteralBridge]
+    ) -> RealizedLiteralBridge? {
+        guard let expectedType else {
+            return nil
+        }
+
+        return LiteralBridgeResolver(realizedLiteralBridges: attachedLiteralConstructs)
+            .bridge(expected: expectedType, carrierTypeName: carrierTypeName)
     }
 
     static func matchingAttachedParameterCallable(
