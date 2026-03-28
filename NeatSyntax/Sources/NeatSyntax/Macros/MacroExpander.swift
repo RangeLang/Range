@@ -6,6 +6,11 @@ struct AttachedParameterMacroSignature {
     let attachedParameterMacrosByIndex: [Int: MacroDeclaration]
 }
 
+enum AttachedParameterRewriteShape {
+    case single
+    case variadic
+}
+
 public enum MacroExpander {
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
@@ -539,14 +544,40 @@ public enum MacroExpander {
                 return .call(name: name, arguments: rewrittenArguments)
             }
 
-            let wrappedArguments = rewrittenArguments.enumerated().map { index, argument in
-                guard let macro = signature.attachedParameterMacrosByIndex[index] else {
-                    return argument
+            var wrappedArguments: [CallArgument] = []
+            var argumentIndex = 0
+
+            for parameterIndex in signature.labels.indices {
+                if let macro = signature.attachedParameterMacrosByIndex[parameterIndex],
+                    attachedParameterRewriteShape(for: macro) == .variadic
+                {
+                    let consumedArguments = Array(rewrittenArguments.dropFirst(argumentIndex))
+                    wrappedArguments.append(
+                        applyAttachedParameterArgumentRewrite(
+                            macro: macro,
+                            arguments: consumedArguments
+                        )
+                    )
+                    argumentIndex = rewrittenArguments.count
+                    continue
                 }
-                return applyAttachedParameterArgumentRewrite(
-                    macro: macro,
-                    argument: argument
-                )
+
+                guard argumentIndex < rewrittenArguments.count else {
+                    break
+                }
+
+                let argument = rewrittenArguments[argumentIndex]
+                if let macro = signature.attachedParameterMacrosByIndex[parameterIndex] {
+                    wrappedArguments.append(
+                        applyAttachedParameterArgumentRewrite(
+                            macro: macro,
+                            arguments: [argument]
+                        )
+                    )
+                } else {
+                    wrappedArguments.append(argument)
+                }
+                argumentIndex += 1
             }
 
             return .call(name: name, arguments: wrappedArguments)
@@ -635,8 +666,34 @@ public enum MacroExpander {
         signatures: [AttachedParameterMacroSignature]
     ) -> AttachedParameterMacroSignature? {
         signatures.first { signature in
-            signature.name == name
-                && signature.labels.elementsEqual(arguments.map(\.label), by: { $0 == $1 })
+            guard signature.name == name else {
+                return false
+            }
+
+            let variadicIndex = signature.attachedParameterMacrosByIndex
+                .sorted { $0.key < $1.key }
+                .first { attachedParameterRewriteShape(for: $0.value) == .variadic }?.key
+
+            guard let variadicIndex else {
+                return signature.labels.elementsEqual(arguments.map(\.label), by: { $0 == $1 })
+            }
+
+            guard variadicIndex == signature.labels.count - 1 else {
+                return false
+            }
+
+            guard arguments.count >= variadicIndex else {
+                return false
+            }
+
+            let fixedLabels = Array(signature.labels.prefix(variadicIndex))
+            let fixedArgumentLabels = Array(arguments.prefix(variadicIndex)).map(\.label)
+            guard fixedLabels.elementsEqual(fixedArgumentLabels, by: { $0 == $1 }) else {
+                return false
+            }
+
+            let variadicLabel = signature.labels[variadicIndex]
+            return arguments.dropFirst(variadicIndex).allSatisfy { $0.label == variadicLabel }
         }
     }
 
@@ -644,10 +701,10 @@ public enum MacroExpander {
         macro: MacroDeclaration,
         to typeReference: TypeReference
     ) -> TypeReference {
-        for statement in macro.body {
-            guard case .expression(let expression) = statement,
-                case .call(let name, let arguments) = expression,
-                name == "\(macro.bindings.target).type.rewrite",
+        for expression in macroOperationExpressions(in: macro.body) {
+            guard case .call(let name, let arguments) = expression,
+                name == "\(macro.bindings.target).parameter.type.rewrite"
+                    || name == "\(macro.bindings.target).type.rewrite",
                 arguments.count == 1
             else {
                 continue
@@ -666,31 +723,86 @@ public enum MacroExpander {
 
     static func applyAttachedParameterArgumentRewrite(
         macro: MacroDeclaration,
-        argument: CallArgument
+        arguments: [CallArgument]
     ) -> CallArgument {
-        for statement in macro.body {
-            guard case .expression(let expression) = statement,
-                case .call(let name, let arguments) = expression,
-                name == "\(macro.bindings.target).argument.rewrite",
-                arguments.count == 1
+        let primaryArgument = arguments.first ?? CallArgument(label: nil, value: .array([]))
+
+        for expression in macroOperationExpressions(in: macro.body) {
+            guard case .call(let name, let rewriteArguments) = expression,
+                name == "\(macro.bindings.target).arguments.rewrite"
+                    || name == "\(macro.bindings.target).argument.rewrite",
+                rewriteArguments.count == 1
             else {
                 continue
             }
 
             let substituted = substituteMacroBindings(
-                in: arguments[0].value,
+                in: rewriteArguments[0].value,
                 bindings: [
-                    "\(macro.bindings.target).argument.expression": argument.value
+                    "\(macro.bindings.target).argument.expression": primaryArgument.value,
+                    "\(macro.bindings.target).arguments.expression": primaryArgument.value,
+                    "\(macro.bindings.target).arguments": .array(arguments.map(\.value)),
                 ]
             )
 
             return CallArgument(
-                label: argument.label,
+                label: primaryArgument.label,
                 value: interpretAttachedParameterArgumentRewriteExpression(substituted)
             )
         }
 
-        return argument
+        return primaryArgument
+    }
+
+    static func attachedParameterRewriteShape(
+        for macro: MacroDeclaration
+    ) -> AttachedParameterRewriteShape {
+        for expression in macroOperationExpressions(in: macro.body) {
+            guard case .call(let name, let arguments) = expression,
+                name == "\(macro.bindings.target).arguments.rewrite"
+                    || name == "\(macro.bindings.target).argument.rewrite",
+                arguments.count == 1
+            else {
+                continue
+            }
+
+            if case .identifier(let identifier) = arguments[0].value,
+                identifier == "\(macro.bindings.target).arguments"
+            {
+                return .variadic
+            }
+        }
+
+        return .single
+    }
+
+    static func macroOperationExpressions(in statements: [Statement]) -> [Expression] {
+        var expressions: [Expression] = []
+
+        for statement in statements {
+            switch statement {
+            case .expression(let expression):
+                expressions.append(expression)
+            case .conditional(let branches):
+                for branch in branches {
+                    expressions.append(contentsOf: macroOperationExpressions(in: branch.body))
+                }
+            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
+                expressions.append(contentsOf: macroOperationExpressions(in: body))
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    expressions.append(contentsOf: macroOperationExpressions(in: switchCase.body))
+                }
+                if let defaultBody {
+                    expressions.append(contentsOf: macroOperationExpressions(in: defaultBody))
+                }
+            case .declaration, .assignment, .compoundAssignment, .return, .freestandingMacro,
+                .environmentProvision, .break, .continue:
+                continue
+            }
+        }
+
+        return expressions
     }
 
     static func interpretAttachedParameterArgumentRewriteExpression(
@@ -718,16 +830,28 @@ public enum MacroExpander {
             case .array(let parameterExpressions) = parametersArgument.value,
             parameterExpressions.isEmpty,
             case .identifier(let identifier) = returnTypeArgument.value,
-            identifier == "\(targetBinding).type"
+            identifier == "\(targetBinding).parameter.type"
+                || identifier == "\(targetBinding).type"
         {
             return .zeroParameterFunctionReturningTarget
+        }
+
+        if name == "ArrayType",
+            arguments.count == 1,
+            arguments[0].label == "element",
+            case .identifier(let identifier) = arguments[0].value,
+            identifier == "\(targetBinding).parameter.type"
+                || identifier == "\(targetBinding).type"
+        {
+            return .arrayOfTarget
         }
 
         if name == "Closure",
             arguments.count == 1,
             arguments[0].label == nil,
             case .identifier(let identifier) = arguments[0].value,
-            identifier == "\(targetBinding).type"
+            identifier == "\(targetBinding).parameter.type"
+                || identifier == "\(targetBinding).type"
         {
             return .zeroParameterFunctionReturningTarget
         }
@@ -1098,11 +1222,14 @@ public enum MacroExpander {
 
 enum AttachedParameterTypeRewrite {
     case zeroParameterFunctionReturningTarget
+    case arrayOfTarget
 
     func replacingTargetType(with typeReference: TypeReference) -> TypeReference {
         switch self {
         case .zeroParameterFunctionReturningTarget:
             return .function(parameters: [], returnType: typeReference)
+        case .arrayOfTarget:
+            return .array(typeReference)
         }
     }
 }

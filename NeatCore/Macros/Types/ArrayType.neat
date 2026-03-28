@@ -1,0 +1,4 @@
+@core
+construct ArrayType {
+    value element: TypeReference
+}

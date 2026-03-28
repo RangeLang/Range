@@ -1,16 +1,18 @@
 macro autoclosure: Attached<Parameter> { target, diagnostics in
-    target.type.rewrite(
+    target.parameter.type.rewrite(
         FunctionType(
             parameters: [],
-            returnType: target.type
+            returnType: target.parameter.type
         )
     )
 
-    target.argument.rewrite(
-        Closure(
-            body: {
-                target.argument.expression
-            }
+    if !target.arguments.isEmpty {
+        target.arguments.rewrite(
+            Closure(
+                body: {
+                    target.arguments.expression
+                }
+            )
         )
-    )
+    }
 }

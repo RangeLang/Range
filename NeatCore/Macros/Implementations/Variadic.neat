@@ -1,0 +1,9 @@
+macro variadic: Attached<Parameter> { target, diagnostics in
+    target.parameter.type.rewrite(
+        ArrayType(
+            element: target.parameter.type
+        )
+    )
+
+    target.arguments.rewrite(target.arguments)
+}
