@@ -1,10 +1,7 @@
-// Exploratory literal macro example.
-// This file is for design iteration only.
-
-macro literal<T>: Attached<Init> { target, result, diagnostics in
+macro literal<T>: Attached<Init> { target, diagnostics in
     if target.arguments.count == 1,
        target.arguments[0].type == T.self {
-        result.rewrite(
+        target.rewrite(
             target.expression(arguments: [
                 target.arguments[0]
             ])
