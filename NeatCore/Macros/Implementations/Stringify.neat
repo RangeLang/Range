@@ -1,0 +1,3 @@
+macro stringify(value _: Expression): Freestanding<Expression> { target, result, diagnostics in
+    result.rewrite("\(value)")
+}
