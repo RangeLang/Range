@@ -10,8 +10,12 @@ enum ProjectSourceValidator {
 
     static func parseSourceFile(at fileURL: URL) throws -> SourceFileNode {
         let source = try String(contentsOf: fileURL, encoding: .utf8)
-        var parser = try Parser(source: source)
-        return try parser.parseSourceFile()
+        do {
+            var parser = try Parser(source: source)
+            return try parser.parseSourceFile()
+        } catch {
+            throw ValidationError("Failed to parse \(fileURL.path): \(error)")
+        }
     }
 
     static func expandedParsedFiles(

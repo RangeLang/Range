@@ -1,22 +1,25 @@
 import Foundation
 
-struct AutoclosureCallableSignature {
+struct AttachedParameterMacroSignature {
     let name: String
     let labels: [String?]
-    let autoclosureParameterIndices: Set<Int>
+    let attachedParameterMacrosByIndex: [Int: String]
 }
 
 public enum MacroExpander {
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
-        let autoclosureCallables = collectAutoclosureCallables(from: files)
+        let attachedParameterCallables = collectAttachedParameterCallables(
+            from: files,
+            macros: registry
+        )
         return try files.map { parsedFile in
             ParsedSourceFile(
                 path: parsedFile.path,
                 sourceFile: try expand(
                     sourceFile: parsedFile.sourceFile,
                     macros: registry,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 )
             )
         }
@@ -25,7 +28,7 @@ public enum MacroExpander {
     static func expand(
         sourceFile: SourceFileNode,
         macros: [String: MacroDeclaration],
-        autoclosureCallables: [AutoclosureCallableSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws -> SourceFileNode {
         switch sourceFile {
         case .mainBlock(let mainBlock):
@@ -34,7 +37,7 @@ public enum MacroExpander {
                     body: try expand(
                         statements: mainBlock.body,
                         macros: macros,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     ))
             )
         case .module(let module):
@@ -45,7 +48,7 @@ public enum MacroExpander {
                             body: try expand(
                                 statements: $0.body,
                                 macros: macros,
-                                autoclosureCallables: autoclosureCallables
+                                attachedParameterCallables: attachedParameterCallables
                             ))
                     },
                     states: module.states,
@@ -53,14 +56,14 @@ public enum MacroExpander {
                         try expand(
                             callable: $0,
                             macros: macros,
-                            autoclosureCallables: autoclosureCallables
+                            attachedParameterCallables: attachedParameterCallables
                         )
                     },
                     constructs: try module.constructs.map {
                         try expand(
                             construct: $0,
                             macros: macros,
-                            autoclosureCallables: autoclosureCallables
+                            attachedParameterCallables: attachedParameterCallables
                         )
                     },
                     enumerations: module.enumerations,
@@ -76,7 +79,7 @@ public enum MacroExpander {
                 try expand(
                     construct: declaration,
                     macros: macros,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 ))
         case .macro, .enumeration, .protocolDefinition, .extensions:
             return sourceFile
@@ -93,11 +96,14 @@ public enum MacroExpander {
         return registry
     }
 
-    static func collectAutoclosureCallables(from files: [ParsedSourceFile])
-        -> [AutoclosureCallableSignature]
+    static func collectAttachedParameterCallables(
+        from files: [ParsedSourceFile],
+        macros: [String: MacroDeclaration]
+    )
+        -> [AttachedParameterMacroSignature]
     {
         files.flatMap { parsedFile in
-            callablesWithAutoclosure(in: parsedFile.sourceFile)
+            callablesWithAttachedParameterMacros(in: parsedFile.sourceFile, macros: macros)
         }
     }
 
@@ -112,44 +118,63 @@ public enum MacroExpander {
         }
     }
 
-    static func callablesWithAutoclosure(in sourceFile: SourceFileNode)
-        -> [AutoclosureCallableSignature]
+    static func callablesWithAttachedParameterMacros(
+        in sourceFile: SourceFileNode,
+        macros: [String: MacroDeclaration]
+    )
+        -> [AttachedParameterMacroSignature]
     {
         switch sourceFile {
         case .module(let module):
-            return module.callables.compactMap(autoclosureSignature(for:))
+            return module.callables.compactMap {
+                attachedParameterMacroSignature(for: $0, macros: macros)
+            }
         default:
             return []
         }
     }
 
-    static func autoclosureSignature(for callable: CallableDeclaration)
-        -> AutoclosureCallableSignature?
+    static func attachedParameterMacroSignature(
+        for callable: CallableDeclaration,
+        macros: [String: MacroDeclaration]
+    )
+        -> AttachedParameterMacroSignature?
     {
         guard callable.targetType == nil else {
             return nil
         }
 
-        let indices = Set(
-            callable.parameters.enumerated().compactMap { index, parameter in
-                parameter.macros.contains(where: { $0.name == "autoclosure" }) ? index : nil
+        let attachedParameterMacrosByIndex: [Int: String] = Dictionary(
+            uniqueKeysWithValues: callable.parameters.enumerated().compactMap {
+                index, parameter -> (Int, String)? in
+                guard
+                    let macroName = parameter.macros.lazy.map(\.name).first(where: {
+                        guard let macro = macros[$0] else { return false }
+                        guard case .attached(let targetType) = macro.target else { return false }
+                        return targetType.displayName == "Parameter"
+                    })
+                else {
+                    return nil
+                }
+
+                return (index, macroName)
             })
 
-        guard !indices.isEmpty else {
+        guard !attachedParameterMacrosByIndex.isEmpty else {
             return nil
         }
 
-        return AutoclosureCallableSignature(
+        return AttachedParameterMacroSignature(
             name: callable.name,
             labels: callable.parameters.map(\.externalLabel),
-            autoclosureParameterIndices: indices
+            attachedParameterMacrosByIndex: attachedParameterMacrosByIndex
         )
     }
 
     static func expand(
         construct: ConstructDeclaration,
         macros: [String: MacroDeclaration],
-        autoclosureCallables: [AutoclosureCallableSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> ConstructDeclaration
     {
@@ -164,21 +189,25 @@ public enum MacroExpander {
             environments: construct.environments,
             bindings: construct.bindings,
             deriveds: try construct.deriveds.map {
-                try expand(derived: $0, macros: macros, autoclosureCallables: autoclosureCallables)
+                try expand(
+                    derived: $0,
+                    macros: macros,
+                    attachedParameterCallables: attachedParameterCallables
+                )
             },
             values: construct.values,
             initializers: try construct.initializers.map {
                 try expand(
                     initializer: $0,
                     macros: macros,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 )
             },
             callables: try construct.callables.map {
                 try expand(
                     callable: $0,
                     macros: macros,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 )
             }
         )
@@ -187,7 +216,7 @@ public enum MacroExpander {
     static func expand(
         callable: CallableDeclaration,
         macros: [String: MacroDeclaration],
-        autoclosureCallables: [AutoclosureCallableSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> CallableDeclaration
     {
@@ -196,13 +225,13 @@ public enum MacroExpander {
             targetType: callable.targetType,
             name: callable.name,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
-            parameters: expand(parameters: callable.parameters),
+            parameters: expand(parameters: callable.parameters, macros: macros),
             returnType: callable.returnType,
             body: try callable.body.map {
                 try expand(
                     statements: $0,
                     macros: macros,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 )
             }
         )
@@ -211,19 +240,19 @@ public enum MacroExpander {
     static func expand(
         initializer: InitializerDeclaration,
         macros: [String: MacroDeclaration],
-        autoclosureCallables: [AutoclosureCallableSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature]
     )
         throws
         -> InitializerDeclaration
     {
         InitializerDeclaration(
             macros: initializer.macros,
-            parameters: expand(parameters: initializer.parameters),
+            parameters: expand(parameters: initializer.parameters, macros: macros),
             body: try initializer.body.map {
                 try expand(
                     statements: $0,
                     macros: macros,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 )
             }
         )
@@ -232,7 +261,7 @@ public enum MacroExpander {
     static func expand(
         derived: DerivedDeclaration,
         macros: [String: MacroDeclaration],
-        autoclosureCallables: [AutoclosureCallableSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> DerivedDeclaration
     {
@@ -245,7 +274,7 @@ public enum MacroExpander {
                 try expand(
                     statements: $0,
                     macros: macros,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 )
             }
         )
@@ -254,7 +283,7 @@ public enum MacroExpander {
     static func expand(
         statements: [Statement],
         macros: [String: MacroDeclaration],
-        autoclosureCallables: [AutoclosureCallableSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> [Statement]
     {
@@ -264,7 +293,7 @@ public enum MacroExpander {
                 contentsOf: try expand(
                     statement: statement,
                     macros: macros,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 ))
         }
         return expanded
@@ -273,7 +302,7 @@ public enum MacroExpander {
     static func expand(
         statement: Statement,
         macros: [String: MacroDeclaration],
-        autoclosureCallables: [AutoclosureCallableSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> [Statement]
     {
@@ -290,7 +319,7 @@ public enum MacroExpander {
             let expandedTarget = try expand(
                 statements: body,
                 macros: macros,
-                autoclosureCallables: autoclosureCallables
+                attachedParameterCallables: attachedParameterCallables
             )
             let argumentBindings = try parseMacroArgumentBindings(
                 for: macro,
@@ -309,7 +338,7 @@ public enum MacroExpander {
             return try expand(
                 statements: targetSubstituted,
                 macros: macros,
-                autoclosureCallables: autoclosureCallables
+                attachedParameterCallables: attachedParameterCallables
             )
         case .derived(let name, let typeName, let body):
             return [
@@ -318,7 +347,7 @@ public enum MacroExpander {
                     body: try expand(
                         statements: body,
                         macros: macros,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     ))
             ]
         case .forEach(let name, let sequence, let body):
@@ -326,11 +355,12 @@ public enum MacroExpander {
                 .forEach(
                     name: name,
                     sequence: expand(
-                        expression: sequence, autoclosureCallables: autoclosureCallables),
+                        expression: sequence, attachedParameterCallables: attachedParameterCallables
+                    ),
                     body: try expand(
                         statements: body,
                         macros: macros,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     ))
             ]
         case .whileLoop(let condition, let body):
@@ -338,12 +368,12 @@ public enum MacroExpander {
                 .whileLoop(
                     condition: expand(
                         expression: condition,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     ),
                     body: try expand(
                         statements: body,
                         macros: macros,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     ))
             ]
         case .conditional(let branches):
@@ -352,12 +382,14 @@ public enum MacroExpander {
                     try branches.map { branch in
                         StatementConditionalBranch(
                             condition: branch.condition.map {
-                                expand(expression: $0, autoclosureCallables: autoclosureCallables)
+                                expand(
+                                    expression: $0,
+                                    attachedParameterCallables: attachedParameterCallables)
                             },
                             body: try expand(
                                 statements: branch.body,
                                 macros: macros,
-                                autoclosureCallables: autoclosureCallables
+                                attachedParameterCallables: attachedParameterCallables
                             )
                         )
                     }
@@ -371,7 +403,7 @@ public enum MacroExpander {
                     typeName: typeName,
                     expression: expand(
                         expression: expression,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     )
                 )
             ]
@@ -381,7 +413,7 @@ public enum MacroExpander {
                     target: target,
                     expression: expand(
                         expression: expression,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     )
                 )
             ]
@@ -392,20 +424,23 @@ public enum MacroExpander {
                     operatorSymbol: operatorSymbol,
                     expression: expand(
                         expression: expression,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     )
                 )
             ]
         case .expression(let expression):
             return [
                 .expression(
-                    expand(expression: expression, autoclosureCallables: autoclosureCallables))
+                    expand(
+                        expression: expression,
+                        attachedParameterCallables: attachedParameterCallables))
             ]
         case .return(let expression):
             return [
                 .return(
                     expression.map {
-                        expand(expression: $0, autoclosureCallables: autoclosureCallables)
+                        expand(
+                            expression: $0, attachedParameterCallables: attachedParameterCallables)
                     })
             ]
         case .switchStatement(let expression, let cases, let defaultBody):
@@ -413,18 +448,18 @@ public enum MacroExpander {
                 .switchStatement(
                     expression: expand(
                         expression: expression,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     ),
                     cases: try cases.map { switchCase in
                         SwitchCase(
                             value: expand(
                                 expression: switchCase.value,
-                                autoclosureCallables: autoclosureCallables
+                                attachedParameterCallables: attachedParameterCallables
                             ),
                             body: try expand(
                                 statements: switchCase.body,
                                 macros: macros,
-                                autoclosureCallables: autoclosureCallables
+                                attachedParameterCallables: attachedParameterCallables
                             )
                         )
                     },
@@ -432,7 +467,7 @@ public enum MacroExpander {
                         try expand(
                             statements: $0,
                             macros: macros,
-                            autoclosureCallables: autoclosureCallables
+                            attachedParameterCallables: attachedParameterCallables
                         )
                     }
                 )
@@ -442,19 +477,40 @@ public enum MacroExpander {
         }
     }
 
-    static func expand(parameters: [NeatFunctionParameter]) -> [NeatFunctionParameter] {
+    static func expand(
+        parameters: [NeatFunctionParameter],
+        macros: [String: MacroDeclaration]
+    ) -> [NeatFunctionParameter] {
         parameters.map { parameter in
-            guard parameter.macros.contains(where: { $0.name == "autoclosure" }),
+            let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
+                macroApplication in
+                guard let macro = macros[macroApplication.name] else {
+                    return nil
+                }
+                guard case .attached(let targetType) = macro.target,
+                    targetType.displayName == "Parameter"
+                else {
+                    return nil
+                }
+                return macro
+            }
+
+            guard !attachedParameterMacros.isEmpty,
                 let typeReference = parameter.typeReference
             else {
                 return parameter
+            }
+
+            let rewrittenType = attachedParameterMacros.reduce(typeReference) {
+                currentType, macro in
+                applyAttachedParameterTypeRewrite(macro: macro, to: currentType)
             }
 
             return NeatFunctionParameter(
                 macros: parameter.macros,
                 localName: parameter.localName,
                 externalLabel: parameter.externalLabel,
-                typeReference: .function(parameters: [], returnType: typeReference),
+                typeReference: rewrittenType,
                 slotName: parameter.slotName
             )
         }
@@ -462,7 +518,7 @@ public enum MacroExpander {
 
     static func expand(
         expression: Expression,
-        autoclosureCallables: [AutoclosureCallableSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature]
     ) -> Expression {
         switch expression {
         case .call(let name, let arguments):
@@ -471,35 +527,37 @@ public enum MacroExpander {
                     label: argument.label,
                     value: expand(
                         expression: argument.value,
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     )
                 )
             }
 
             guard
-                let signature = matchingAutoclosureCallable(
+                let signature = matchingAttachedParameterCallable(
                     name: name,
                     arguments: rewrittenArguments,
-                    signatures: autoclosureCallables
+                    signatures: attachedParameterCallables
                 )
             else {
                 return .call(name: name, arguments: rewrittenArguments)
             }
 
             let wrappedArguments = rewrittenArguments.enumerated().map { index, argument in
-                guard signature.autoclosureParameterIndices.contains(index) else {
+                guard let macroName = signature.attachedParameterMacrosByIndex[index] else {
                     return argument
                 }
-                return CallArgument(
-                    label: argument.label,
-                    value: .block([.expression(argument.value)])
+                return applyAttachedParameterArgumentRewrite(
+                    macroName: macroName,
+                    argument: argument
                 )
             }
 
             return .call(name: name, arguments: wrappedArguments)
         case .array(let elements):
             return .array(
-                elements.map { expand(expression: $0, autoclosureCallables: autoclosureCallables) }
+                elements.map {
+                    expand(expression: $0, attachedParameterCallables: attachedParameterCallables)
+                }
             )
         case .dictionary(let elements):
             return .dictionary(
@@ -507,11 +565,11 @@ public enum MacroExpander {
                     DictionaryElement(
                         key: expand(
                             expression: element.key,
-                            autoclosureCallables: autoclosureCallables
+                            attachedParameterCallables: attachedParameterCallables
                         ),
                         value: expand(
                             expression: element.value,
-                            autoclosureCallables: autoclosureCallables
+                            attachedParameterCallables: attachedParameterCallables
                         )
                     )
                 }
@@ -519,26 +577,28 @@ public enum MacroExpander {
         case .ternary(let condition, let trueExpression, let falseExpression):
             return .ternary(
                 condition: expand(
-                    expression: condition, autoclosureCallables: autoclosureCallables),
+                    expression: condition, attachedParameterCallables: attachedParameterCallables),
                 trueExpression: expand(
                     expression: trueExpression,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 ),
                 falseExpression: expand(
                     expression: falseExpression,
-                    autoclosureCallables: autoclosureCallables
+                    attachedParameterCallables: attachedParameterCallables
                 )
             )
         case .unary(let operatorSymbol, let nested):
             return .unary(
                 operatorSymbol: operatorSymbol,
-                expression: expand(expression: nested, autoclosureCallables: autoclosureCallables)
+                expression: expand(
+                    expression: nested, attachedParameterCallables: attachedParameterCallables)
             )
         case .binary(let lhs, let operatorSymbol, let rhs):
             return .binary(
-                lhs: expand(expression: lhs, autoclosureCallables: autoclosureCallables),
+                lhs: expand(
+                    expression: lhs, attachedParameterCallables: attachedParameterCallables),
                 operatorSymbol: operatorSymbol,
-                rhs: expand(expression: rhs, autoclosureCallables: autoclosureCallables)
+                rhs: expand(expression: rhs, attachedParameterCallables: attachedParameterCallables)
             )
         case .interpolatedString(let string):
             return .interpolatedString(
@@ -551,7 +611,7 @@ public enum MacroExpander {
                             return .expression(
                                 expand(
                                     expression: nested,
-                                    autoclosureCallables: autoclosureCallables
+                                    attachedParameterCallables: attachedParameterCallables
                                 ))
                         }
                     }
@@ -563,7 +623,7 @@ public enum MacroExpander {
                     (try? expand(
                         statement: $0,
                         macros: [:],
-                        autoclosureCallables: autoclosureCallables
+                        attachedParameterCallables: attachedParameterCallables
                     )) ?? [$0]
                 }
             )
@@ -572,14 +632,41 @@ public enum MacroExpander {
         }
     }
 
-    static func matchingAutoclosureCallable(
+    static func matchingAttachedParameterCallable(
         name: String,
         arguments: [CallArgument],
-        signatures: [AutoclosureCallableSignature]
-    ) -> AutoclosureCallableSignature? {
+        signatures: [AttachedParameterMacroSignature]
+    ) -> AttachedParameterMacroSignature? {
         signatures.first { signature in
             signature.name == name
                 && signature.labels.elementsEqual(arguments.map(\.label), by: { $0 == $1 })
+        }
+    }
+
+    static func applyAttachedParameterTypeRewrite(
+        macro: MacroDeclaration,
+        to typeReference: TypeReference
+    ) -> TypeReference {
+        switch macro.name {
+        case "autoclosure":
+            return .function(parameters: [], returnType: typeReference)
+        default:
+            return typeReference
+        }
+    }
+
+    static func applyAttachedParameterArgumentRewrite(
+        macroName: String,
+        argument: CallArgument
+    ) -> CallArgument {
+        switch macroName {
+        case "autoclosure":
+            return CallArgument(
+                label: argument.label,
+                value: .block([.expression(argument.value)])
+            )
+        default:
+            return argument
         }
     }
 

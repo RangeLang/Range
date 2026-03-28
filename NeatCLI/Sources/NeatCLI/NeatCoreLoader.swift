@@ -49,19 +49,31 @@ enum NeatCoreLoader {
 
     static func parsedDependencyFiles() throws -> [ParsedSourceFile] {
         try coreFiles().map { fileURL in
-            ParsedSourceFile(
-                path: fileURL.path,
-                sourceFile: try ProjectSourceValidator.parseSourceFile(at: fileURL)
-            )
+            do {
+                return ParsedSourceFile(
+                    path: fileURL.path,
+                    sourceFile: try ProjectSourceValidator.parseSourceFile(at: fileURL)
+                )
+            } catch {
+                throw ValidationError(
+                    "Failed to parse NeatCore file \(fileURL.lastPathComponent): \(error)"
+                )
+            }
         }
     }
 
     static func parsedValidationFiles() throws -> [ProjectSourceValidator.ParsedFile] {
         try coreFiles().map { fileURL in
-            ProjectSourceValidator.ParsedFile(
-                url: fileURL,
-                sourceFile: try ProjectSourceValidator.parseSourceFile(at: fileURL)
-            )
+            do {
+                return ProjectSourceValidator.ParsedFile(
+                    url: fileURL,
+                    sourceFile: try ProjectSourceValidator.parseSourceFile(at: fileURL)
+                )
+            } catch {
+                throw ValidationError(
+                    "Failed to parse NeatCore file \(fileURL.lastPathComponent): \(error)"
+                )
+            }
         }
     }
 }

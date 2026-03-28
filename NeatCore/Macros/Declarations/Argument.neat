@@ -2,5 +2,5 @@
 construct Argument {
     value label: String?
     value type: TypeReference
-    value value: Expression
+    value expression: Expression
 }

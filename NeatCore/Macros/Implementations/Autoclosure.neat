@@ -3,13 +3,13 @@ macro autoclosure: Attached<Parameter> { target, diagnostics in
     // target.type.rewrite(() -> target.type)
     //
     // Attached parameter execution still needs invocation context so the
-    // incoming argument can be rewritten through ParameterContext / Argument.
+    // incoming argument can be rewritten through CallContext / Argument.
     //
     // target.arguments[0].rewrite(
     //     Closure(
     //         body: Block(
     //             statements: [
-    //                 target.arguments[0].value
+    //                 target.arguments[0].expression
     //             ]
     //         )
     //     )
