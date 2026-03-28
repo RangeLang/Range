@@ -10,7 +10,10 @@ struct PackageManifest {
 enum PackageManifestLoader {
     static func load(from fileURL: URL) throws -> PackageManifest {
         let source = try String(contentsOf: fileURL, encoding: .utf8)
-        var parser = try Parser(source: source)
+        var parser = try Parser(
+            source: source,
+            literalBridgeResolver: try NeatCoreLoader.literalBridgeResolver()
+        )
 
         let sourceFile = try parser.parseSourceFile()
         switch sourceFile {

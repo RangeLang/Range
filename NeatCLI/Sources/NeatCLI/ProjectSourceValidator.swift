@@ -14,7 +14,10 @@ enum ProjectSourceValidator {
     ) throws -> SourceFileNode {
         let source = try String(contentsOf: fileURL, encoding: .utf8)
         do {
-            var parser = try Parser(source: source, literalBridgeResolver: literalBridgeResolver)
+            var parser = try Parser(
+                source: source,
+                literalBridgeResolver: literalBridgeResolver ?? .empty
+            )
             return try parser.parseSourceFile()
         } catch {
             throw ValidationError("Failed to parse \(fileURL.path): \(error)")
@@ -268,7 +271,8 @@ enum ProjectSourceValidator {
                 case .stored(let expression) = state.storage,
                 let inferred = try? BootstrapExpressionSemantics.inferType(
                     of: expression,
-                    accessibleTypes: accessibleTypes
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver
                 ),
                 inferred.isLiteralLike,
                 !BootstrapExpressionSemantics.isCompatible(
@@ -313,7 +317,8 @@ enum ProjectSourceValidator {
             guard
                 let inferred = try? BootstrapExpressionSemantics.inferType(
                     of: expression,
-                    accessibleTypes: visibleTypes
+                    accessibleTypes: visibleTypes,
+                    resolver: resolver
                 ),
                 inferred.isLiteralLike
             else {

@@ -62,6 +62,10 @@ enum NeatCoreLoader {
         }
     }
 
+    static func literalBridgeResolver() throws -> LiteralBridgeResolver {
+        DeclarationGraph(files: try parsedDependencyFiles()).literalBridgeResolver
+    }
+
     static func parsedValidationFiles() throws -> [ProjectSourceValidator.ParsedFile] {
         try coreFiles().map { fileURL in
             do {

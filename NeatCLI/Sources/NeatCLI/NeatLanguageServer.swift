@@ -342,7 +342,8 @@ struct NeatLanguageServer {
 
     private func diagnosticPayload(for text: String, index: DocumentIndex) -> [[String: Any]] {
         do {
-            var parser = try Parser(source: text)
+            let resolver = (try? NeatCoreLoader.literalBridgeResolver()) ?? .empty
+            var parser = try Parser(source: text, literalBridgeResolver: resolver)
             _ = try parser.parseSourceFile()
             return []
         } catch {

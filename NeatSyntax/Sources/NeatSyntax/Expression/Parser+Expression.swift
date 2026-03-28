@@ -300,21 +300,13 @@ extension Parser {
         let bootstrapAccessibleTypes = accessibleTypes.mapValues { BootstrapLiteralType.typed($0) }
         return try BootstrapExpressionSemantics.inferType(
             of: expression,
-            accessibleTypes: bootstrapAccessibleTypes
+            accessibleTypes: bootstrapAccessibleTypes,
+            resolver: literalBridgeResolver
         )
     }
 
     func isNilLiteral(_ expression: Expression) -> Bool {
         BootstrapExpressionSemantics.isNilLiteral(expression)
-    }
-
-    func bootstrapLiteralBridge(for type: BootstrapLiteralType) -> BootstrapLiteralBridge? {
-        switch type {
-        case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral, .nilLiteral:
-            return BootstrapLiteralRegistry.bridge(for: type)
-        case .typed:
-            return nil
-        }
     }
 
     func defaultDestinationTypeReference(for type: BootstrapLiteralType) -> TypeReference? {

@@ -3,7 +3,8 @@ import Foundation
 public enum BootstrapExpressionSemantics {
     public static func inferType(
         of expression: Expression,
-        accessibleTypes: [String: BootstrapLiteralType]
+        accessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver
     ) throws -> BootstrapLiteralType {
         switch expression {
         case .integer:
@@ -35,14 +36,22 @@ public enum BootstrapExpressionSemantics {
             throw ParseError(
                 "Dictionary type inference is not supported in state initializers yet.")
         case .ternary(let condition, let trueExpression, let falseExpression):
-            let conditionType = try inferType(of: condition, accessibleTypes: accessibleTypes)
-            guard isCompatible(actual: conditionType, expected: .named("Bool"), resolver: nil)
+            let conditionType = try inferType(
+                of: condition,
+                accessibleTypes: accessibleTypes,
+                resolver: resolver
+            )
+            guard isCompatible(actual: conditionType, expected: .named("Bool"), resolver: resolver)
             else {
                 throw ParseError(
                     "Ternary condition must be Bool, got \(conditionType.displayName).")
             }
             if isNilLiteral(trueExpression) {
-                let falseType = try inferType(of: falseExpression, accessibleTypes: accessibleTypes)
+                let falseType = try inferType(
+                    of: falseExpression,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver
+                )
                 guard isOptionalExpressionType(falseType) else {
                     throw ParseError(
                         "Ternary branches must match, got nil and \(falseType.displayName)."
@@ -51,7 +60,11 @@ public enum BootstrapExpressionSemantics {
                 return falseType
             }
             if isNilLiteral(falseExpression) {
-                let trueType = try inferType(of: trueExpression, accessibleTypes: accessibleTypes)
+                let trueType = try inferType(
+                    of: trueExpression,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver
+                )
                 guard isOptionalExpressionType(trueType) else {
                     throw ParseError(
                         "Ternary branches must match, got \(trueType.displayName) and nil."
@@ -59,8 +72,16 @@ public enum BootstrapExpressionSemantics {
                 }
                 return trueType
             }
-            let trueType = try inferType(of: trueExpression, accessibleTypes: accessibleTypes)
-            let falseType = try inferType(of: falseExpression, accessibleTypes: accessibleTypes)
+            let trueType = try inferType(
+                of: trueExpression,
+                accessibleTypes: accessibleTypes,
+                resolver: resolver
+            )
+            let falseType = try inferType(
+                of: falseExpression,
+                accessibleTypes: accessibleTypes,
+                resolver: resolver
+            )
             guard expressionTypesMatch(trueType, falseType) else {
                 throw ParseError(
                     "Ternary branches must match, got \(trueType.displayName) and \(falseType.displayName)."
@@ -85,16 +106,13 @@ public enum BootstrapExpressionSemantics {
 
     public static func defaultDestinationTypeReference(
         for type: BootstrapLiteralType,
-        resolver: LiteralBridgeResolver?
+        resolver: LiteralBridgeResolver
     ) -> TypeReference? {
         switch type {
         case .typed(let typeReference):
             return typeReference
         default:
-            if let resolver {
-                return resolver.defaultDestinationType(for: type.displayName)
-            }
-            return BootstrapLiteralRegistry.bridge(for: type)?.defaultDestinationType
+            return resolver.defaultDestinationType(for: type.displayName)
         }
     }
 
@@ -133,24 +151,14 @@ public enum BootstrapExpressionSemantics {
     public static func isCompatible(
         actual: BootstrapLiteralType,
         expected: TypeReference,
-        resolver: LiteralBridgeResolver?
+        resolver: LiteralBridgeResolver
     ) -> Bool {
         switch actual {
         case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral, .nilLiteral:
-            if let resolver {
-                return resolver.isCompatible(
-                    expected: expected, carrierTypeName: actual.displayName)
-            }
-            guard let bridge = BootstrapLiteralRegistry.bridge(for: actual) else {
-                return false
-            }
-            if bridge.requiresOptionalContext {
-                if case .optional = expected {
-                    return true
-                }
-                return false
-            }
-            return bridge.acceptedDestinationTypeNames.contains(expected.displayName)
+            return resolver.isCompatible(
+                expected: expected,
+                carrierTypeName: actual.displayName
+            )
         case .typed(let actualType):
             return actualType == expected
                 || isCompatibleNamedType(expected: expected, actual: actualType)

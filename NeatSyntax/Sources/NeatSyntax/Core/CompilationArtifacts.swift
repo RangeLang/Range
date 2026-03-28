@@ -15,11 +15,15 @@ public struct CompilationArtifactSnapshot {
 public struct CompilationArtifactsEmitter {
     public init() {}
 
-    public func snapshot(path: String, source: String) throws -> CompilationArtifactSnapshot {
+    public func snapshot(
+        path: String,
+        source: String,
+        literalBridgeResolver: LiteralBridgeResolver = .empty
+    ) throws -> CompilationArtifactSnapshot {
         CompilationArtifactSnapshot(
             path: path,
             tokens: try renderTokens(source: source),
-            ast: try renderAST(source: source)
+            ast: try renderAST(source: source, literalBridgeResolver: literalBridgeResolver)
         )
     }
 
@@ -32,8 +36,11 @@ public struct CompilationArtifactsEmitter {
         )
     }
 
-    public func renderAST(source: String) throws -> String {
-        var parser = try Parser(source: source)
+    public func renderAST(
+        source: String,
+        literalBridgeResolver: LiteralBridgeResolver = .empty
+    ) throws -> String {
+        var parser = try Parser(source: source, literalBridgeResolver: literalBridgeResolver)
         let sourceFile = try parser.parseSourceFile()
         return renderSection(
             title: "AST",

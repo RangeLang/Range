@@ -1,7 +1,9 @@
 import Foundation
 
-public struct LiteralBridgeResolver {
+public struct LiteralBridgeResolver: Sendable {
     private let defaultConstructNameByCarrier: [String: String]
+
+    public static let empty = LiteralBridgeResolver(realizedLiteralBridges: [])
 
     public init(realizedLiteralBridges: [RealizedLiteralBridge]) {
         var grouped: [String: Set<String>] = [:]

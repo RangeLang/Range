@@ -149,9 +149,9 @@ public struct Parser {
     var currentSelfAvailable: Bool = false
     var currentExpressionTerminators: [Token] = []
     var operatorEnvironment: OperatorEnvironment
-    var literalBridgeResolver: LiteralBridgeResolver?
+    var literalBridgeResolver: LiteralBridgeResolver
 
-    public init(source: String, literalBridgeResolver: LiteralBridgeResolver? = nil) throws {
+    public init(source: String, literalBridgeResolver: LiteralBridgeResolver = .empty) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
         self.operatorEnvironment = .bootstrap()
