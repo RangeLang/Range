@@ -778,7 +778,7 @@ public enum MacroExpander {
         }
 
         guard
-            let signature = uniqueLiteralBridge(
+            let bridge = preferredDefaultLiteralBridge(
                 for: literalType.displayName,
                 attachedLiteralConstructs: attachedLiteralConstructs
             )
@@ -787,9 +787,9 @@ public enum MacroExpander {
         }
 
         return .call(
-            name: signature.constructName,
+            name: bridge.constructName,
             arguments: [
-                CallArgument(label: signature.parameterLabel, value: expression)
+                CallArgument(label: bridge.parameterLabel, value: expression)
             ]
         )
     }
@@ -812,7 +812,7 @@ public enum MacroExpander {
         }
     }
 
-    static func uniqueLiteralBridge(
+    static func preferredDefaultLiteralBridge(
         for carrierTypeName: String,
         attachedLiteralConstructs: [RealizedLiteralBridge]
     ) -> RealizedLiteralBridge? {
