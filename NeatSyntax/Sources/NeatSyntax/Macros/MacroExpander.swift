@@ -816,16 +816,8 @@ public enum MacroExpander {
         for carrierTypeName: String,
         attachedLiteralConstructs: [RealizedLiteralBridge]
     ) -> RealizedLiteralBridge? {
-        guard carrierTypeName != "NilLiteral" else {
-            return nil
-        }
-
-        let matches = attachedLiteralConstructs.filter { $0.carrierTypeName == carrierTypeName }
-        guard matches.count == 1 else {
-            return nil
-        }
-
-        return matches[0]
+        LiteralBridgeResolver(realizedLiteralBridges: attachedLiteralConstructs)
+            .preferredDefaultBridge(for: carrierTypeName)
     }
 
     static func matchingAttachedParameterCallable(

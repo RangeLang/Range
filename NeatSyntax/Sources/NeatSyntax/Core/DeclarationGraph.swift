@@ -1,18 +1,21 @@
 import Foundation
 
-public struct RealizedLiteralBridge: Hashable {
+public struct RealizedLiteralBridge: Hashable, Sendable {
     public let constructName: String
     public let carrierTypeName: String
     public let parameterLabel: String?
+    public let isCore: Bool
 
     public init(
         constructName: String,
         carrierTypeName: String,
-        parameterLabel: String?
+        parameterLabel: String?,
+        isCore: Bool
     ) {
         self.constructName = constructName
         self.carrierTypeName = carrierTypeName
         self.parameterLabel = parameterLabel
+        self.isCore = isCore
     }
 }
 
@@ -96,7 +99,8 @@ public struct DeclarationGraph {
                 return RealizedLiteralBridge(
                     constructName: construct.name,
                     carrierTypeName: literalMacro.genericArguments[0].displayName,
-                    parameterLabel: initializer.parameters[0].externalLabel
+                    parameterLabel: initializer.parameters[0].externalLabel,
+                    isCore: construct.isCore
                 )
             }
         }

@@ -1,31 +1,23 @@
 import Foundation
 
 public struct LiteralBridgeResolver: Sendable {
-    private let defaultConstructNameByCarrier: [String: String]
+    private let bridgesByCarrier: [String: [RealizedLiteralBridge]]
 
     public static let empty = LiteralBridgeResolver(realizedLiteralBridges: [])
 
     public init(realizedLiteralBridges: [RealizedLiteralBridge]) {
-        var grouped: [String: Set<String>] = [:]
+        var grouped: [String: [RealizedLiteralBridge]] = [:]
         for bridge in realizedLiteralBridges {
-            grouped[bridge.carrierTypeName, default: []].insert(bridge.constructName)
+            grouped[bridge.carrierTypeName, default: []].append(bridge)
         }
-
-        self.defaultConstructNameByCarrier = grouped.reduce(into: [:]) { result, entry in
-            guard entry.key != "NilLiteral", entry.value.count == 1,
-                let constructName = entry.value.first
-            else {
-                return
-            }
-            result[entry.key] = constructName
-        }
+        self.bridgesByCarrier = grouped
     }
 
     public func defaultDestinationType(for carrierTypeName: String) -> TypeReference? {
-        guard let constructName = defaultConstructNameByCarrier[carrierTypeName] else {
+        guard let bridge = preferredDefaultBridge(for: carrierTypeName) else {
             return nil
         }
-        return .named(constructName)
+        return .named(bridge.constructName)
     }
 
     public func isCompatible(expected: TypeReference, carrierTypeName: String) -> Bool {
@@ -36,9 +28,28 @@ public struct LiteralBridgeResolver: Sendable {
             return false
         }
 
-        guard let constructName = defaultConstructNameByCarrier[carrierTypeName] else {
-            return false
+        return bridgesByCarrier[carrierTypeName, default: []].contains {
+            $0.constructName == expected.displayName
         }
-        return constructName == expected.displayName
+    }
+
+    public func preferredDefaultBridge(for carrierTypeName: String) -> RealizedLiteralBridge? {
+        guard carrierTypeName != "NilLiteral" else {
+            return nil
+        }
+
+        let matches = bridgesByCarrier[carrierTypeName, default: []]
+        guard !matches.isEmpty else {
+            return nil
+        }
+
+        let coreMatches = matches.filter(\.isCore)
+        if coreMatches.count == 1 {
+            return coreMatches[0]
+        }
+        if coreMatches.isEmpty, matches.count == 1 {
+            return matches[0]
+        }
+        return nil
     }
 }
