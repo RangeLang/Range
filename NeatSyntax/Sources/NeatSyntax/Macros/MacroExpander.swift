@@ -6,12 +6,6 @@ struct AttachedParameterMacroSignature {
     let attachedParameterMacrosByIndex: [Int: MacroDeclaration]
 }
 
-struct AttachedLiteralConstructSignature {
-    let constructName: String
-    let carrierTypeName: String
-    let parameterLabel: String?
-}
-
 enum AttachedParameterRewriteShape {
     case single
     case variadic
@@ -20,13 +14,13 @@ enum AttachedParameterRewriteShape {
 public enum MacroExpander {
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
-        let protocols = collectProtocols(from: files)
-        let constructs = collectConstructs(from: files, protocols: protocols)
+        let declarationGraph = DeclarationGraph(files: files)
+        let protocols = declarationGraph.protocolsByName
         let attachedParameterCallables = collectAttachedParameterCallables(
             from: files,
             macros: registry
         )
-        let attachedLiteralConstructs = collectAttachedLiteralConstructs(from: constructs)
+        let attachedLiteralConstructs = declarationGraph.realizedLiteralBridges
         return try files.map { parsedFile in
             ParsedSourceFile(
                 path: parsedFile.path,
@@ -46,7 +40,7 @@ public enum MacroExpander {
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     ) throws -> SourceFileNode {
         switch sourceFile {
         case .mainBlock(let mainBlock):
@@ -138,33 +132,7 @@ public enum MacroExpander {
         from files: [ParsedSourceFile],
         protocols: [String: ProtocolDeclaration]
     ) -> [String: ConstructDeclaration] {
-        var registry: [String: ConstructDeclaration] = [:]
-        for parsedFile in files {
-            for declaration in self.constructs(in: parsedFile.sourceFile) {
-                let carriedInitializers = carriedProtocolInitializerMacros(
-                    for: declaration.initializers,
-                    conformances: declaration.conformances,
-                    protocols: protocols
-                )
-
-                registry[declaration.name] = ConstructDeclaration(
-                    macros: declaration.macros,
-                    kind: declaration.kind,
-                    attribute: declaration.attribute,
-                    name: declaration.name,
-                    genericParameters: declaration.genericParameters,
-                    conformances: declaration.conformances,
-                    states: declaration.states,
-                    environments: declaration.environments,
-                    bindings: declaration.bindings,
-                    deriveds: declaration.deriveds,
-                    values: declaration.values,
-                    initializers: carriedInitializers,
-                    callables: declaration.callables
-                )
-            }
-        }
-        return registry
+        DeclarationGraph.collectConstructs(from: files, protocols: protocols)
     }
 
     static func collectAttachedParameterCallables(
@@ -208,30 +176,6 @@ public enum MacroExpander {
             return module.constructs
         case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
-        }
-    }
-
-    static func collectAttachedLiteralConstructs(
-        from constructs: [String: ConstructDeclaration]
-    ) -> [AttachedLiteralConstructSignature] {
-        constructs.values.flatMap { construct in
-            construct.initializers.compactMap { initializer in
-                guard initializer.parameters.count == 1 else {
-                    return nil
-                }
-                guard
-                    let literalMacro = initializer.macros.first(where: { $0.name == "literal" }),
-                    literalMacro.genericArguments.count == 1
-                else {
-                    return nil
-                }
-
-                return AttachedLiteralConstructSignature(
-                    constructName: construct.name,
-                    carrierTypeName: literalMacro.genericArguments[0].displayName,
-                    parameterLabel: initializer.parameters[0].externalLabel
-                )
-            }
         }
     }
 
@@ -290,7 +234,7 @@ public enum MacroExpander {
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     ) throws
         -> ConstructDeclaration
     {
@@ -346,7 +290,7 @@ public enum MacroExpander {
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     ) throws
         -> CallableDeclaration
     {
@@ -374,7 +318,7 @@ public enum MacroExpander {
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     )
         throws
         -> InitializerDeclaration
@@ -399,7 +343,7 @@ public enum MacroExpander {
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     ) throws
         -> DerivedDeclaration
     {
@@ -425,7 +369,7 @@ public enum MacroExpander {
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     ) throws
         -> [Statement]
     {
@@ -448,7 +392,7 @@ public enum MacroExpander {
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     ) throws
         -> [Statement]
     {
@@ -659,55 +603,18 @@ public enum MacroExpander {
         conformances: [TypeReference],
         protocols: [String: ProtocolDeclaration]
     ) -> [InitializerDeclaration] {
-        let requirementInitializers = conformances.compactMap { protocols[$0.displayName] }
-            .flatMap(\.initializers)
-
-        guard !requirementInitializers.isEmpty else {
-            return initializers
-        }
-
-        return initializers.map { initializer in
-            let carried =
-                requirementInitializers
-                .filter { requirement in
-                    carriedInitializerSignatureMatches(lhs: requirement, rhs: initializer)
-                }
-                .flatMap(\.macros)
-
-            guard !carried.isEmpty else {
-                return initializer
-            }
-
-            let mergedMacros =
-                initializer.macros
-                + carried.filter { carriedMacro in
-                    !initializer.macros.contains {
-                        $0.name == carriedMacro.name
-                            && $0.genericArguments == carriedMacro.genericArguments
-                            && $0.argumentClause == carriedMacro.argumentClause
-                    }
-                }
-
-            return InitializerDeclaration(
-                macros: mergedMacros,
-                parameters: initializer.parameters,
-                body: initializer.body
-            )
-        }
+        DeclarationGraph.carriedProtocolInitializerMacros(
+            for: initializers,
+            conformances: conformances,
+            protocols: protocols
+        )
     }
 
     static func carriedInitializerSignatureMatches(
         lhs: InitializerDeclaration,
         rhs: InitializerDeclaration
     ) -> Bool {
-        lhs.parameters.elementsEqual(
-            rhs.parameters,
-            by: {
-                $0.localName == $1.localName
-                    && $0.externalLabel == $1.externalLabel
-                    && $0.typeReference == $1.typeReference
-                    && $0.slotName == $1.slotName
-            })
+        DeclarationGraph.carriedInitializerSignatureMatches(lhs: lhs, rhs: rhs)
     }
 
     static func expand(
@@ -752,7 +659,7 @@ public enum MacroExpander {
     static func expand(
         expression: Expression,
         attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     ) -> Expression {
         switch expression {
         case .call(let name, let arguments):
@@ -924,20 +831,18 @@ public enum MacroExpander {
 
     static func lowerLiteralExpressionIfPossible(
         _ expression: Expression,
-        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+        attachedLiteralConstructs: [RealizedLiteralBridge]
     ) -> Expression {
-        guard let literalType = bootstrapLiteralType(for: expression),
-            let bridge = BootstrapLiteralRegistry.bridge(for: literalType),
-            let defaultDestinationType = bridge.defaultDestinationType
+        guard let literalType = bootstrapLiteralType(for: expression)
         else {
             return expression
         }
 
         guard
-            let signature = attachedLiteralConstructs.first(where: {
-                $0.constructName == defaultDestinationType.displayName
-                    && $0.carrierTypeName == bridge.carrierType.displayName
-            })
+            let signature = uniqueLiteralBridge(
+                for: literalType.displayName,
+                attachedLiteralConstructs: attachedLiteralConstructs
+            )
         else {
             return expression
         }
@@ -966,6 +871,22 @@ public enum MacroExpander {
             .unary, .binary:
             return nil
         }
+    }
+
+    static func uniqueLiteralBridge(
+        for carrierTypeName: String,
+        attachedLiteralConstructs: [RealizedLiteralBridge]
+    ) -> RealizedLiteralBridge? {
+        guard carrierTypeName != "NilLiteral" else {
+            return nil
+        }
+
+        let matches = attachedLiteralConstructs.filter { $0.carrierTypeName == carrierTypeName }
+        guard matches.count == 1 else {
+            return nil
+        }
+
+        return matches[0]
     }
 
     static func matchingAttachedParameterCallable(
