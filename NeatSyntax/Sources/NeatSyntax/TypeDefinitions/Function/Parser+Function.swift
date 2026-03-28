@@ -269,6 +269,10 @@ extension Parser {
                     continue
                 }
 
+                if inferred.isLiteralLike {
+                    continue
+                }
+
                 guard isCompatibleWithExpectedType(inferred, expected: explicitReturnType)
                 else {
                     throw ParseError(

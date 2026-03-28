@@ -32,17 +32,27 @@ extension Parser {
                 }
                 inferredType = explicitType
             } else {
-                if let explicitType, canUseExplicitTypeForStoredInitializer(initialValue) {
+                let inferred = try inferBootstrapExpressionType(
+                    of: initialValue,
+                    accessibleTypes: accessibleContextTypes()
+                )
+                if let explicitType {
+                    switch inferred {
+                    case .typed(let actualType):
+                        guard isCompatibleStateType(explicitType, inferredType: actualType) else {
+                            throw ParseError(
+                                "state '\(name)' expects \(explicitType.displayName), got \(actualType.displayName)."
+                            )
+                        }
+                    default:
+                        break
+                    }
                     inferredType = explicitType
                 } else {
-                    let inferred = try inferBootstrapExpressionType(
-                        of: initialValue,
-                        accessibleTypes: accessibleContextTypes()
-                    )
                     guard let inferredReference = defaultDestinationTypeReference(for: inferred)
                     else {
                         throw ParseError(
-                            "state '\(name)' initialized with nil requires an explicit optional type."
+                            "state '\(name)' could not infer a destination type from \(inferred.displayName)."
                         )
                     }
                     inferredType = inferredReference
@@ -58,15 +68,10 @@ extension Parser {
             }
             throw ParseError("state '\(name)' requires `= expression` outside construct storage.")
         }
-
-        if let explicitType, !isCompatibleStateType(explicitType, inferredType: inferredType) {
-            throw ParseError(
-                "state '\(name)' expects \(explicitType.displayName), got \(inferredType.displayName)."
-            )
-        }
         return StateDeclaration(
             macros: macros,
             name: name,
+            hasExplicitTypeAnnotation: explicitType != nil,
             type: explicitType ?? inferredType,
             storage: storage
         )

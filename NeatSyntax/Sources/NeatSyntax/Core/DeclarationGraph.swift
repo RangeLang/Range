@@ -30,6 +30,10 @@ public struct DeclarationGraph {
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
     }
 
+    public var literalBridgeResolver: LiteralBridgeResolver {
+        LiteralBridgeResolver(realizedLiteralBridges: realizedLiteralBridges)
+    }
+
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
         var registry: [String: ProtocolDeclaration] = [:]
         for parsedFile in files {

@@ -8,10 +8,13 @@ enum ProjectSourceValidator {
         let sourceFile: SourceFileNode
     }
 
-    static func parseSourceFile(at fileURL: URL) throws -> SourceFileNode {
+    static func parseSourceFile(
+        at fileURL: URL,
+        literalBridgeResolver: LiteralBridgeResolver? = nil
+    ) throws -> SourceFileNode {
         let source = try String(contentsOf: fileURL, encoding: .utf8)
         do {
-            var parser = try Parser(source: source)
+            var parser = try Parser(source: source, literalBridgeResolver: literalBridgeResolver)
             return try parser.parseSourceFile()
         } catch {
             throw ValidationError("Failed to parse \(fileURL.path): \(error)")
@@ -23,8 +26,22 @@ enum ProjectSourceValidator {
         includeCore: Bool = true
     ) throws -> [ParsedFile] {
         let coreFiles = includeCore ? try NeatCoreLoader.parsedValidationFiles() : []
+        let coreLiteralBridgeResolver =
+            includeCore
+            ? DeclarationGraph(
+                files: coreFiles.map {
+                    ParsedSourceFile(path: $0.url.path, sourceFile: $0.sourceFile)
+                }
+            ).literalBridgeResolver
+            : nil
         let projectFiles = try files.map {
-            ParsedFile(url: $0, sourceFile: try parseSourceFile(at: $0))
+            ParsedFile(
+                url: $0,
+                sourceFile: try parseSourceFile(
+                    at: $0,
+                    literalBridgeResolver: coreLiteralBridgeResolver
+                )
+            )
         }
         return try expandParsedFiles(coreFiles + projectFiles)
     }
@@ -61,6 +78,7 @@ enum ProjectSourceValidator {
         let parsedFiles = try expandedParsedFiles(for: files)
         try validatePrimaryDeclarations(in: parsedFiles)
         try validateTopLevelStates(in: parsedFiles)
+        try validateLiteralBridgeCompatibility(in: parsedFiles)
         try validateEnvironmentStateResolution(in: parsedFiles)
         try validateValueBindings(in: parsedFiles)
     }
@@ -128,6 +146,60 @@ enum ProjectSourceValidator {
         }
     }
 
+    private static func validateLiteralBridgeCompatibility(in parsedFiles: [ParsedFile]) throws {
+        let declarationGraph = DeclarationGraph(
+            files: parsedFiles.map {
+                ParsedSourceFile(path: $0.url.path, sourceFile: $0.sourceFile)
+            }
+        )
+        let resolver = declarationGraph.literalBridgeResolver
+
+        for parsedFile in parsedFiles {
+            let fileName = parsedFile.url.lastPathComponent
+
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                try validateLiteralBridgeCompatibility(
+                    in: declaration,
+                    resolver: resolver,
+                    fileName: fileName
+                )
+            case .module(let module):
+                try validateLiteralBridgeCompatibility(
+                    in: module.states,
+                    accessibleTypes: [:],
+                    resolver: resolver,
+                    fileName: fileName
+                )
+
+                let topLevelStateTypes = Dictionary(
+                    uniqueKeysWithValues: module.states.map {
+                        ($0.name, BootstrapLiteralType.typed($0.type))
+                    }
+                )
+
+                for callable in module.callables {
+                    try validateLiteralBridgeCompatibility(
+                        in: callable,
+                        accessibleTypes: topLevelStateTypes,
+                        resolver: resolver,
+                        fileName: fileName
+                    )
+                }
+
+                for declaration in module.constructs {
+                    try validateLiteralBridgeCompatibility(
+                        in: declaration,
+                        resolver: resolver,
+                        fileName: fileName
+                    )
+                }
+            case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
+                break
+            }
+        }
+    }
+
     private static func declarations(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
         switch sourceFile {
         case .construct(let declaration):
@@ -146,6 +218,155 @@ enum ProjectSourceValidator {
         case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
             return []
         }
+    }
+
+    private static func validateLiteralBridgeCompatibility(
+        in declaration: ConstructDeclaration,
+        resolver: LiteralBridgeResolver,
+        fileName: String
+    ) throws {
+        let environmentTypes = Dictionary(
+            uniqueKeysWithValues: declaration.environments.map {
+                ($0.name, BootstrapLiteralType.typed($0.type))
+            }
+        )
+
+        try validateLiteralBridgeCompatibility(
+            in: declaration.states,
+            accessibleTypes: environmentTypes,
+            resolver: resolver,
+            fileName: fileName
+        )
+
+        let stateTypes = Dictionary(
+            uniqueKeysWithValues: declaration.states.map {
+                ($0.name, BootstrapLiteralType.typed($0.type))
+            }
+        )
+        let accessibleTypes = stateTypes.merging(environmentTypes) { current, _ in current }
+
+        for callable in declaration.callables {
+            try validateLiteralBridgeCompatibility(
+                in: callable,
+                accessibleTypes: accessibleTypes,
+                resolver: resolver,
+                fileName: fileName
+            )
+        }
+    }
+
+    private static func validateLiteralBridgeCompatibility(
+        in states: [StateDeclaration],
+        accessibleTypes initialAccessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        fileName: String
+    ) throws {
+        var accessibleTypes = initialAccessibleTypes
+
+        for state in states {
+            if state.hasExplicitTypeAnnotation,
+                case .stored(let expression) = state.storage,
+                let inferred = try? BootstrapExpressionSemantics.inferType(
+                    of: expression,
+                    accessibleTypes: accessibleTypes
+                ),
+                inferred.isLiteralLike,
+                !BootstrapExpressionSemantics.isCompatible(
+                    actual: inferred,
+                    expected: state.type,
+                    resolver: resolver
+                )
+            {
+                throw ValidationError(
+                    "state '\(state.name)' in \(fileName) expects \(state.type.displayName), got \(inferred.displayName)."
+                )
+            }
+
+            accessibleTypes[state.name] = .typed(state.type)
+        }
+    }
+
+    private static func validateLiteralBridgeCompatibility(
+        in callable: CallableDeclaration,
+        accessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        fileName: String
+    ) throws {
+        guard let explicitReturnType = callable.returnType,
+            explicitReturnType.displayName != "Void",
+            let body = callable.body
+        else {
+            return
+        }
+
+        let parameterTypes: [String: BootstrapLiteralType] = Dictionary(
+            uniqueKeysWithValues: callable.parameters.compactMap { parameter in
+                guard let typeReference = parameter.typeReference else {
+                    return nil
+                }
+                return (parameter.localName, BootstrapLiteralType.typed(typeReference))
+            }
+        )
+        let visibleTypes = accessibleTypes.merging(parameterTypes) { current, _ in current }
+
+        for expression in collectReturnExpressions(in: body).compactMap({ $0 }) {
+            guard
+                let inferred = try? BootstrapExpressionSemantics.inferType(
+                    of: expression,
+                    accessibleTypes: visibleTypes
+                ),
+                inferred.isLiteralLike
+            else {
+                continue
+            }
+
+            guard
+                BootstrapExpressionSemantics.isCompatible(
+                    actual: inferred,
+                    expected: explicitReturnType,
+                    resolver: resolver
+                )
+            else {
+                throw ValidationError(
+                    "Callable \(callable.name) in \(fileName) expects return type \(explicitReturnType.displayName), got \(inferred.displayName)."
+                )
+            }
+        }
+    }
+
+    private static func collectReturnExpressions(in statements: [Statement]) -> [NeatSyntax
+        .Expression?]
+    {
+        var expressions: [NeatSyntax.Expression?] = []
+
+        for statement in statements {
+            switch statement {
+            case .freestandingMacro(_, _, let body):
+                expressions.append(contentsOf: collectReturnExpressions(in: body))
+            case .return(let expression):
+                expressions.append(expression)
+            case .forEach(_, _, let body):
+                expressions.append(contentsOf: collectReturnExpressions(in: body))
+            case .whileLoop(_, let body):
+                expressions.append(contentsOf: collectReturnExpressions(in: body))
+            case .conditional(let branches):
+                for branch in branches {
+                    expressions.append(contentsOf: collectReturnExpressions(in: branch.body))
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    expressions.append(contentsOf: collectReturnExpressions(in: switchCase.body))
+                }
+                if let defaultBody {
+                    expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
+                }
+            case .declaration, .derived, .environmentProvision, .assignment, .compoundAssignment,
+                .expression, .break, .continue:
+                continue
+            }
+        }
+
+        return expressions
     }
 
     private static func validateValueBindings(in parsedFiles: [ParsedFile]) throws {

@@ -1103,7 +1103,7 @@ public enum MacroExpander {
         var parser = try Parser(source: "macro(\(argumentClause))")
         _ = try parser.consumeCallableName()
         let arguments = try parser.parseInvocationArgumentsIfPresent()
-        try parser.consume(.eof)
+        try parser.consume(Token.eof)
 
         guard arguments.count == parameters.count else {
             throw ParseError(
@@ -1113,23 +1113,23 @@ public enum MacroExpander {
 
         var bindings: [String: Expression] = [:]
         for (parameter, argument) in zip(parameters, arguments) {
-            switch (parameter.externalLabel, argument.label) {
-            case (nil, nil):
-                break
-            case (nil, .some(let label)):
+            let expectedLabel = parameter.externalLabel
+            let actualLabel = argument.label
+
+            if expectedLabel == nil, actualLabel == nil {
+                // No label expected and none provided.
+            } else if expectedLabel == nil, let actualLabel {
                 throw ParseError(
-                    "Macro #\(macro.name) argument for \(parameter.localName) should not use label \(label)."
+                    "Macro #\(macro.name) argument for \(parameter.localName) should not use label \(actualLabel)."
                 )
-            case (.some(let expected), .some(let actual)) where expected == actual:
-                break
-            case (.some(let expected), .some(let actual)):
+            } else if let expectedLabel, let actualLabel, expectedLabel == actualLabel {
+                // Expected label matched.
+            } else if let expectedLabel, let actualLabel {
                 throw ParseError(
-                    "Macro #\(macro.name) expects argument label \(expected), got \(actual)."
+                    "Macro #\(macro.name) expects argument label \(expectedLabel), got \(actualLabel)."
                 )
-            case (.some(let expected), nil):
-                throw ParseError(
-                    "Macro #\(macro.name) expects argument label \(expected)."
-                )
+            } else if let expectedLabel {
+                throw ParseError("Macro #\(macro.name) expects argument label \(expectedLabel).")
             }
             bindings[parameter.localName] = argument.value
         }

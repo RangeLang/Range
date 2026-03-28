@@ -220,7 +220,10 @@ extension Parser {
                     index += 1
                 }
 
-                var parser = try? Parser(source: expressionText)
+                var parser = try? Parser(
+                    source: expressionText,
+                    literalBridgeResolver: literalBridgeResolver
+                )
                 if let expression = try? parser?.parseExpression() {
                     segments.append(.expression(expression))
                 } else {
@@ -294,114 +297,15 @@ extension Parser {
         of expression: Expression,
         accessibleTypes: [String: TypeReference]
     ) throws -> BootstrapLiteralType {
-        switch expression {
-        case .integer:
-            return .intLiteral
-        case .double:
-            return .floatLiteral
-        case .string:
-            return .stringLiteral
-        case .interpolatedString:
-            return .stringLiteral
-        case .boolean:
-            return .boolLiteral
-        case .nilLiteral:
-            return .nilLiteral
-        case .block:
-            throw ParseError(
-                "Block expressions are not supported in state initializer inference yet.")
-        case .identifier(let name):
-            guard let type = accessibleTypes[name] else {
-                throw ParseError("Unknown identifier '\(name)' in state initializer.")
-            }
-            return .typed(type)
-        case .call:
-            throw ParseError(
-                "Callable expressions are not supported in state initializer inference yet.")
-        case .bindingReference(let name):
-            throw ParseError("Binding reference '$\(name)' is not valid in a state initializer.")
-        case .array:
-            throw ParseError("Array type inference is not supported in state initializers yet.")
-        case .dictionary:
-            throw ParseError(
-                "Dictionary type inference is not supported in state initializers yet.")
-        case .ternary(let condition, let trueExpression, let falseExpression):
-            let conditionType = try inferBootstrapExpressionType(
-                of: condition,
-                accessibleTypes: accessibleTypes
-            )
-            guard isCompatibleWithExpectedType(conditionType, expected: .named("Bool")) else {
-                throw ParseError(
-                    "Ternary condition must be Bool, got \(conditionType.displayName).")
-            }
-            if isNilLiteral(trueExpression) {
-                let falseType = try inferBootstrapExpressionType(
-                    of: falseExpression,
-                    accessibleTypes: accessibleTypes
-                )
-                guard isOptionalBootstrapExpressionType(falseType) else {
-                    throw ParseError(
-                        "Ternary branches must match, got nil and \(falseType.displayName)."
-                    )
-                }
-                return falseType
-            }
-            if isNilLiteral(falseExpression) {
-                let trueType = try inferBootstrapExpressionType(
-                    of: trueExpression,
-                    accessibleTypes: accessibleTypes
-                )
-                guard isOptionalBootstrapExpressionType(trueType) else {
-                    throw ParseError(
-                        "Ternary branches must match, got \(trueType.displayName) and nil."
-                    )
-                }
-                return trueType
-            }
-            let trueType = try inferBootstrapExpressionType(
-                of: trueExpression,
-                accessibleTypes: accessibleTypes
-            )
-            let falseType = try inferBootstrapExpressionType(
-                of: falseExpression,
-                accessibleTypes: accessibleTypes
-            )
-            guard bootstrapExpressionTypesMatch(trueType, falseType) else {
-                throw ParseError(
-                    "Ternary branches must match, got \(trueType.displayName) and \(falseType.displayName)."
-                )
-            }
-            return trueType
-        case .unary(let operatorSymbol, _):
-            switch operatorSymbol {
-            case .not:
-                throw ParseError(
-                    "Unary operator typing is not supported by bootstrap inference yet.")
-            }
-        case .binary(_, let operatorSymbol, _):
-            switch operatorSymbol {
-            case .addition:
-                throw ParseError(
-                    "Binary operator typing is not supported by bootstrap inference yet.")
-            case .nilCoalescing:
-                throw ParseError(
-                    "Binary operator typing is not supported by bootstrap inference yet.")
-            case .equal, .notEqual:
-                throw ParseError(
-                    "Binary operator typing is not supported by bootstrap inference yet.")
-            case .less, .lessEqual, .greater, .greaterEqual:
-                throw ParseError(
-                    "Binary operator typing is not supported by bootstrap inference yet.")
-            case .and, .or:
-                throw ParseError(
-                    "Binary operator typing is not supported by bootstrap inference yet.")
-            }
-        }
+        let bootstrapAccessibleTypes = accessibleTypes.mapValues { BootstrapLiteralType.typed($0) }
+        return try BootstrapExpressionSemantics.inferType(
+            of: expression,
+            accessibleTypes: bootstrapAccessibleTypes
+        )
     }
 
     func isNilLiteral(_ expression: Expression) -> Bool {
-        if case .nilLiteral = expression { return true }
-        return false
+        BootstrapExpressionSemantics.isNilLiteral(expression)
     }
 
     func bootstrapLiteralBridge(for type: BootstrapLiteralType) -> BootstrapLiteralBridge? {
@@ -414,75 +318,35 @@ extension Parser {
     }
 
     func defaultDestinationTypeReference(for type: BootstrapLiteralType) -> TypeReference? {
-        switch type {
-        case .typed(let typeReference):
-            return typeReference
-        default:
-            return bootstrapLiteralBridge(for: type)?.defaultDestinationType
-        }
+        BootstrapExpressionSemantics.defaultDestinationTypeReference(
+            for: type,
+            resolver: literalBridgeResolver
+        )
     }
 
     func isOptionalBootstrapExpressionType(_ type: BootstrapLiteralType) -> Bool {
-        switch type {
-        case .nilLiteral:
-            return true
-        case .typed(let typeReference):
-            if case .optional = typeReference {
-                return true
-            }
-            return false
-        default:
-            return false
-        }
+        BootstrapExpressionSemantics.isOptionalExpressionType(type)
     }
 
     func bootstrapExpressionTypesMatch(
         _ lhs: BootstrapLiteralType,
         _ rhs: BootstrapLiteralType
     ) -> Bool {
-        switch (lhs, rhs) {
-        case (.intLiteral, .intLiteral),
-            (.floatLiteral, .floatLiteral),
-            (.stringLiteral, .stringLiteral),
-            (.boolLiteral, .boolLiteral),
-            (.nilLiteral, .nilLiteral):
-            return true
-        case (.typed(let lhsType), .typed(let rhsType)):
-            return lhsType == rhsType || isCompatibleNamedType(expected: lhsType, actual: rhsType)
-        default:
-            return false
-        }
+        BootstrapExpressionSemantics.expressionTypesMatch(lhs, rhs)
     }
 
     func isCompatibleWithExpectedType(_ actual: BootstrapLiteralType, expected: TypeReference)
         -> Bool
     {
-        switch actual {
-        case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral, .nilLiteral:
-            guard let bridge = bootstrapLiteralBridge(for: actual) else {
-                return false
-            }
-            if bridge.requiresOptionalContext {
-                if case .optional = expected {
-                    return true
-                }
-                return false
-            }
-            return bridge.acceptedDestinationTypeNames.contains(expected.displayName)
-        case .typed(let actualType):
-            return actualType == expected
-                || isCompatibleNamedType(expected: expected, actual: actualType)
-        }
+        BootstrapExpressionSemantics.isCompatible(
+            actual: actual,
+            expected: expected,
+            resolver: literalBridgeResolver
+        )
     }
 
     func isCompatibleNamedType(expected: TypeReference, actual: TypeReference) -> Bool {
-        if expected == actual {
-            return true
-        }
-        if expected.displayName == "Float" && actual.displayName == "Double" {
-            return true
-        }
-        return false
+        BootstrapExpressionSemantics.isCompatibleNamedType(expected: expected, actual: actual)
     }
 
     func currentPrefixOperator() -> UnaryOperator? {

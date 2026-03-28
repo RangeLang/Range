@@ -60,6 +60,15 @@ public enum BootstrapLiteralType: Equatable {
             return type.displayName
         }
     }
+
+    public var isLiteralLike: Bool {
+        switch self {
+        case .typed:
+            return false
+        case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral, .nilLiteral:
+            return true
+        }
+    }
 }
 
 public struct BootstrapLiteralBridge {
