@@ -53,6 +53,7 @@ enum ProjectSourceValidator {
                 )
             )
         }
+        try validateCoreAttributeUsage(in: projectFiles)
         return coreFiles + projectFiles
     }
 
@@ -128,6 +129,16 @@ enum ProjectSourceValidator {
                 }
 
                 firstStateByName[state.name] = parsedFile.url
+            }
+        }
+    }
+
+    private static func validateCoreAttributeUsage(in parsedFiles: [ParsedFile]) throws {
+        for parsedFile in parsedFiles {
+            for declaration in declarations(in: parsedFile.sourceFile) where declaration.isCore {
+                throw ValidationError(
+                    "@core can only be used in NeatCore. Remove @core from \(declaration.name) in \(parsedFile.url.lastPathComponent)."
+                )
             }
         }
     }
