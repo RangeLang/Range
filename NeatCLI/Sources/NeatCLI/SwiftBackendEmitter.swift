@@ -328,7 +328,7 @@ struct SwiftBackendEmitter {
         case .identifier(let name):
             return name
         case .call(let name, let arguments):
-            let rendered = try arguments.map(emitCallArgument).joined(separator: ", ")
+            let rendered = try emitCallArguments(arguments, for: name)
             return "\(name)(\(rendered))"
         case .bindingReference(let name):
             return name
@@ -356,6 +356,27 @@ struct SwiftBackendEmitter {
             return "\(label): \(try emitExpression(argument.value))"
         }
         return try emitExpression(argument.value)
+    }
+
+    private func emitCallArguments(_ arguments: [CallArgument], for callee: String) throws -> String
+    {
+        if isSwiftLiteralBridgeType(callee),
+            arguments.count == 1,
+            arguments[0].label == "literal"
+        {
+            return try emitExpression(arguments[0].value)
+        }
+
+        return try arguments.map(emitCallArgument).joined(separator: ", ")
+    }
+
+    private func isSwiftLiteralBridgeType(_ name: String) -> Bool {
+        switch name {
+        case "Int", "Double", "Float", "String", "Bool":
+            return true
+        default:
+            return false
+        }
     }
 
     private func emitClosureExpression(_ body: [NeatStatement]) throws -> String {

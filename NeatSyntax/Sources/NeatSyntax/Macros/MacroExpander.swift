@@ -6,6 +6,12 @@ struct AttachedParameterMacroSignature {
     let attachedParameterMacrosByIndex: [Int: MacroDeclaration]
 }
 
+struct AttachedLiteralConstructSignature {
+    let constructName: String
+    let carrierTypeName: String
+    let parameterLabel: String?
+}
+
 enum AttachedParameterRewriteShape {
     case single
     case variadic
@@ -15,10 +21,12 @@ public enum MacroExpander {
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
         let protocols = collectProtocols(from: files)
+        let constructs = collectConstructs(from: files, protocols: protocols)
         let attachedParameterCallables = collectAttachedParameterCallables(
             from: files,
             macros: registry
         )
+        let attachedLiteralConstructs = collectAttachedLiteralConstructs(from: constructs)
         return try files.map { parsedFile in
             ParsedSourceFile(
                 path: parsedFile.path,
@@ -26,7 +34,8 @@ public enum MacroExpander {
                     sourceFile: parsedFile.sourceFile,
                     macros: registry,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 )
             )
         }
@@ -36,7 +45,8 @@ public enum MacroExpander {
         sourceFile: SourceFileNode,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
     ) throws -> SourceFileNode {
         switch sourceFile {
         case .mainBlock(let mainBlock):
@@ -46,7 +56,8 @@ public enum MacroExpander {
                         statements: mainBlock.body,
                         macros: macros,
                         protocols: protocols,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     ))
             )
         case .module(let module):
@@ -58,7 +69,8 @@ public enum MacroExpander {
                                 statements: $0.body,
                                 macros: macros,
                                 protocols: protocols,
-                                attachedParameterCallables: attachedParameterCallables
+                                attachedParameterCallables: attachedParameterCallables,
+                                attachedLiteralConstructs: attachedLiteralConstructs
                             ))
                     },
                     states: module.states,
@@ -67,7 +79,8 @@ public enum MacroExpander {
                             callable: $0,
                             macros: macros,
                             protocols: protocols,
-                            attachedParameterCallables: attachedParameterCallables
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs
                         )
                     },
                     constructs: try module.constructs.map {
@@ -75,7 +88,8 @@ public enum MacroExpander {
                             construct: $0,
                             macros: macros,
                             protocols: protocols,
-                            attachedParameterCallables: attachedParameterCallables
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs
                         )
                     },
                     enumerations: module.enumerations,
@@ -92,7 +106,8 @@ public enum MacroExpander {
                     construct: declaration,
                     macros: macros,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 ))
         case .macro, .enumeration, .protocolDefinition, .extensions:
             return sourceFile
@@ -114,6 +129,39 @@ public enum MacroExpander {
         for parsedFile in files {
             for declaration in self.protocols(in: parsedFile.sourceFile) {
                 registry[declaration.name] = declaration
+            }
+        }
+        return registry
+    }
+
+    static func collectConstructs(
+        from files: [ParsedSourceFile],
+        protocols: [String: ProtocolDeclaration]
+    ) -> [String: ConstructDeclaration] {
+        var registry: [String: ConstructDeclaration] = [:]
+        for parsedFile in files {
+            for declaration in self.constructs(in: parsedFile.sourceFile) {
+                let carriedInitializers = carriedProtocolInitializerMacros(
+                    for: declaration.initializers,
+                    conformances: declaration.conformances,
+                    protocols: protocols
+                )
+
+                registry[declaration.name] = ConstructDeclaration(
+                    macros: declaration.macros,
+                    kind: declaration.kind,
+                    attribute: declaration.attribute,
+                    name: declaration.name,
+                    genericParameters: declaration.genericParameters,
+                    conformances: declaration.conformances,
+                    states: declaration.states,
+                    environments: declaration.environments,
+                    bindings: declaration.bindings,
+                    deriveds: declaration.deriveds,
+                    values: declaration.values,
+                    initializers: carriedInitializers,
+                    callables: declaration.callables
+                )
             }
         }
         return registry
@@ -149,6 +197,41 @@ public enum MacroExpander {
             return module.protocols
         case .construct, .enumeration, .mainBlock, .macro, .extensions:
             return []
+        }
+    }
+
+    static func constructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
+        switch sourceFile {
+        case .construct(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.constructs
+        case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+            return []
+        }
+    }
+
+    static func collectAttachedLiteralConstructs(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [AttachedLiteralConstructSignature] {
+        constructs.values.flatMap { construct in
+            construct.initializers.compactMap { initializer in
+                guard initializer.parameters.count == 1 else {
+                    return nil
+                }
+                guard
+                    let literalMacro = initializer.macros.first(where: { $0.name == "literal" }),
+                    literalMacro.genericArguments.count == 1
+                else {
+                    return nil
+                }
+
+                return AttachedLiteralConstructSignature(
+                    constructName: construct.name,
+                    carrierTypeName: literalMacro.genericArguments[0].displayName,
+                    parameterLabel: initializer.parameters[0].externalLabel
+                )
+            }
         }
     }
 
@@ -206,7 +289,8 @@ public enum MacroExpander {
         construct: ConstructDeclaration,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
     ) throws
         -> ConstructDeclaration
     {
@@ -231,7 +315,8 @@ public enum MacroExpander {
                     derived: $0,
                     macros: macros,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 )
             },
             values: construct.values,
@@ -240,7 +325,8 @@ public enum MacroExpander {
                     initializer: $0,
                     macros: macros,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 )
             },
             callables: try construct.callables.map {
@@ -248,7 +334,8 @@ public enum MacroExpander {
                     callable: $0,
                     macros: macros,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 )
             }
         )
@@ -258,7 +345,8 @@ public enum MacroExpander {
         callable: CallableDeclaration,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
     ) throws
         -> CallableDeclaration
     {
@@ -274,7 +362,8 @@ public enum MacroExpander {
                     statements: $0,
                     macros: macros,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 )
             }
         )
@@ -284,7 +373,8 @@ public enum MacroExpander {
         initializer: InitializerDeclaration,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
     )
         throws
         -> InitializerDeclaration
@@ -297,7 +387,8 @@ public enum MacroExpander {
                     statements: $0,
                     macros: macros,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 )
             }
         )
@@ -307,7 +398,8 @@ public enum MacroExpander {
         derived: DerivedDeclaration,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
     ) throws
         -> DerivedDeclaration
     {
@@ -321,7 +413,8 @@ public enum MacroExpander {
                     statements: $0,
                     macros: macros,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 )
             }
         )
@@ -331,7 +424,8 @@ public enum MacroExpander {
         statements: [Statement],
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
     ) throws
         -> [Statement]
     {
@@ -342,7 +436,8 @@ public enum MacroExpander {
                     statement: statement,
                     macros: macros,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 ))
         }
         return expanded
@@ -352,7 +447,8 @@ public enum MacroExpander {
         statement: Statement,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
     ) throws
         -> [Statement]
     {
@@ -370,7 +466,8 @@ public enum MacroExpander {
                 statements: body,
                 macros: macros,
                 protocols: protocols,
-                attachedParameterCallables: attachedParameterCallables
+                attachedParameterCallables: attachedParameterCallables,
+                attachedLiteralConstructs: attachedLiteralConstructs
             )
             let argumentBindings = try parseMacroArgumentBindings(
                 for: macro,
@@ -390,7 +487,8 @@ public enum MacroExpander {
                 statements: targetSubstituted,
                 macros: macros,
                 protocols: protocols,
-                attachedParameterCallables: attachedParameterCallables
+                attachedParameterCallables: attachedParameterCallables,
+                attachedLiteralConstructs: attachedLiteralConstructs
             )
         case .derived(let name, let typeName, let body):
             return [
@@ -400,7 +498,8 @@ public enum MacroExpander {
                         statements: body,
                         macros: macros,
                         protocols: protocols,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     ))
             ]
         case .forEach(let name, let sequence, let body):
@@ -408,13 +507,16 @@ public enum MacroExpander {
                 .forEach(
                     name: name,
                     sequence: expand(
-                        expression: sequence, attachedParameterCallables: attachedParameterCallables
+                        expression: sequence,
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     ),
                     body: try expand(
                         statements: body,
                         macros: macros,
                         protocols: protocols,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     ))
             ]
         case .whileLoop(let condition, let body):
@@ -422,13 +524,15 @@ public enum MacroExpander {
                 .whileLoop(
                     condition: expand(
                         expression: condition,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     ),
                     body: try expand(
                         statements: body,
                         macros: macros,
                         protocols: protocols,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     ))
             ]
         case .conditional(let branches):
@@ -439,13 +543,15 @@ public enum MacroExpander {
                             condition: branch.condition.map {
                                 expand(
                                     expression: $0,
-                                    attachedParameterCallables: attachedParameterCallables)
+                                    attachedParameterCallables: attachedParameterCallables,
+                                    attachedLiteralConstructs: attachedLiteralConstructs)
                             },
                             body: try expand(
                                 statements: branch.body,
                                 macros: macros,
                                 protocols: protocols,
-                                attachedParameterCallables: attachedParameterCallables
+                                attachedParameterCallables: attachedParameterCallables,
+                                attachedLiteralConstructs: attachedLiteralConstructs
                             )
                         )
                     }
@@ -459,7 +565,8 @@ public enum MacroExpander {
                     typeName: typeName,
                     expression: expand(
                         expression: expression,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     )
                 )
             ]
@@ -469,7 +576,8 @@ public enum MacroExpander {
                     target: target,
                     expression: expand(
                         expression: expression,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     )
                 )
             ]
@@ -480,7 +588,8 @@ public enum MacroExpander {
                     operatorSymbol: operatorSymbol,
                     expression: expand(
                         expression: expression,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     )
                 )
             ]
@@ -489,14 +598,17 @@ public enum MacroExpander {
                 .expression(
                     expand(
                         expression: expression,
-                        attachedParameterCallables: attachedParameterCallables))
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs))
             ]
         case .return(let expression):
             return [
                 .return(
                     expression.map {
                         expand(
-                            expression: $0, attachedParameterCallables: attachedParameterCallables)
+                            expression: $0,
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs)
                     })
             ]
         case .switchStatement(let expression, let cases, let defaultBody):
@@ -504,19 +616,22 @@ public enum MacroExpander {
                 .switchStatement(
                     expression: expand(
                         expression: expression,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     ),
                     cases: try cases.map { switchCase in
                         SwitchCase(
                             value: expand(
                                 expression: switchCase.value,
-                                attachedParameterCallables: attachedParameterCallables
+                                attachedParameterCallables: attachedParameterCallables,
+                                attachedLiteralConstructs: attachedLiteralConstructs
                             ),
                             body: try expand(
                                 statements: switchCase.body,
                                 macros: macros,
                                 protocols: protocols,
-                                attachedParameterCallables: attachedParameterCallables
+                                attachedParameterCallables: attachedParameterCallables,
+                                attachedLiteralConstructs: attachedLiteralConstructs
                             )
                         )
                     },
@@ -525,7 +640,8 @@ public enum MacroExpander {
                             statements: $0,
                             macros: macros,
                             protocols: protocols,
-                            attachedParameterCallables: attachedParameterCallables
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs
                         )
                     }
                 )
@@ -567,6 +683,7 @@ public enum MacroExpander {
                 + carried.filter { carriedMacro in
                     !initializer.macros.contains {
                         $0.name == carriedMacro.name
+                            && $0.genericArguments == carriedMacro.genericArguments
                             && $0.argumentClause == carriedMacro.argumentClause
                     }
                 }
@@ -634,7 +751,8 @@ public enum MacroExpander {
 
     static func expand(
         expression: Expression,
-        attachedParameterCallables: [AttachedParameterMacroSignature]
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
     ) -> Expression {
         switch expression {
         case .call(let name, let arguments):
@@ -643,7 +761,8 @@ public enum MacroExpander {
                     label: argument.label,
                     value: expand(
                         expression: argument.value,
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     )
                 )
             }
@@ -698,7 +817,11 @@ public enum MacroExpander {
         case .array(let elements):
             return .array(
                 elements.map {
-                    expand(expression: $0, attachedParameterCallables: attachedParameterCallables)
+                    expand(
+                        expression: $0,
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
+                    )
                 }
             )
         case .dictionary(let elements):
@@ -707,11 +830,13 @@ public enum MacroExpander {
                     DictionaryElement(
                         key: expand(
                             expression: element.key,
-                            attachedParameterCallables: attachedParameterCallables
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs
                         ),
                         value: expand(
                             expression: element.value,
-                            attachedParameterCallables: attachedParameterCallables
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs
                         )
                     )
                 }
@@ -719,31 +844,42 @@ public enum MacroExpander {
         case .ternary(let condition, let trueExpression, let falseExpression):
             return .ternary(
                 condition: expand(
-                    expression: condition, attachedParameterCallables: attachedParameterCallables),
+                    expression: condition,
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs),
                 trueExpression: expand(
                     expression: trueExpression,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 ),
                 falseExpression: expand(
                     expression: falseExpression,
-                    attachedParameterCallables: attachedParameterCallables
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
                 )
             )
         case .unary(let operatorSymbol, let nested):
             return .unary(
                 operatorSymbol: operatorSymbol,
                 expression: expand(
-                    expression: nested, attachedParameterCallables: attachedParameterCallables)
+                    expression: nested,
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs)
             )
         case .binary(let lhs, let operatorSymbol, let rhs):
             return .binary(
                 lhs: expand(
-                    expression: lhs, attachedParameterCallables: attachedParameterCallables),
+                    expression: lhs,
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs),
                 operatorSymbol: operatorSymbol,
-                rhs: expand(expression: rhs, attachedParameterCallables: attachedParameterCallables)
+                rhs: expand(
+                    expression: rhs,
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs)
             )
         case .interpolatedString(let string):
-            return .interpolatedString(
+            let expanded: Expression = .interpolatedString(
                 InterpolatedString(
                     segments: string.segments.map { segment in
                         switch segment {
@@ -753,11 +889,16 @@ public enum MacroExpander {
                             return .expression(
                                 expand(
                                     expression: nested,
-                                    attachedParameterCallables: attachedParameterCallables
+                                    attachedParameterCallables: attachedParameterCallables,
+                                    attachedLiteralConstructs: attachedLiteralConstructs
                                 ))
                         }
                     }
                 )
+            )
+            return lowerLiteralExpressionIfPossible(
+                expanded,
+                attachedLiteralConstructs: attachedLiteralConstructs
             )
         case .block(let body):
             return .block(
@@ -766,12 +907,64 @@ public enum MacroExpander {
                         statement: $0,
                         macros: [:],
                         protocols: [:],
-                        attachedParameterCallables: attachedParameterCallables
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
                     )) ?? [$0]
                 }
             )
-        case .integer, .double, .string, .boolean, .nilLiteral, .identifier, .bindingReference:
+        case .integer, .double, .string, .boolean, .nilLiteral:
+            return lowerLiteralExpressionIfPossible(
+                expression,
+                attachedLiteralConstructs: attachedLiteralConstructs
+            )
+        case .identifier, .bindingReference:
             return expression
+        }
+    }
+
+    static func lowerLiteralExpressionIfPossible(
+        _ expression: Expression,
+        attachedLiteralConstructs: [AttachedLiteralConstructSignature]
+    ) -> Expression {
+        guard let literalType = bootstrapLiteralType(for: expression),
+            let bridge = BootstrapLiteralRegistry.bridge(for: literalType),
+            let defaultDestinationType = bridge.defaultDestinationType
+        else {
+            return expression
+        }
+
+        guard
+            let signature = attachedLiteralConstructs.first(where: {
+                $0.constructName == defaultDestinationType.displayName
+                    && $0.carrierTypeName == bridge.carrierType.displayName
+            })
+        else {
+            return expression
+        }
+
+        return .call(
+            name: signature.constructName,
+            arguments: [
+                CallArgument(label: signature.parameterLabel, value: expression)
+            ]
+        )
+    }
+
+    static func bootstrapLiteralType(for expression: Expression) -> BootstrapLiteralType? {
+        switch expression {
+        case .integer:
+            return .intLiteral
+        case .double:
+            return .floatLiteral
+        case .string, .interpolatedString:
+            return .stringLiteral
+        case .boolean:
+            return .boolLiteral
+        case .nilLiteral:
+            return .nilLiteral
+        case .block, .identifier, .call, .bindingReference, .array, .dictionary, .ternary,
+            .unary, .binary:
+            return nil
         }
     }
 

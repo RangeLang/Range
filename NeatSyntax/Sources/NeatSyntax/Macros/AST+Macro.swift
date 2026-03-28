@@ -11,6 +11,7 @@ public struct MacroDeclaration {
 
 public struct MacroApplication {
     public let name: String
+    public let genericArguments: [TypeReference]
     public let argumentClause: String?
 }
 
