@@ -1,0 +1,5 @@
+function answer() -> Int {
+    return 5
+}
+
+@main { }

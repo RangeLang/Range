@@ -28,6 +28,13 @@ enum ProjectSourceValidator {
         for files: [URL],
         includeCore: Bool = true
     ) throws -> [ParsedFile] {
+        try expandParsedFiles(parsedFiles(for: files, includeCore: includeCore))
+    }
+
+    private static func parsedFiles(
+        for files: [URL],
+        includeCore: Bool = true
+    ) throws -> [ParsedFile] {
         let coreFiles = includeCore ? try NeatCoreLoader.parsedValidationFiles() : []
         let coreLiteralBridgeResolver =
             includeCore
@@ -46,7 +53,7 @@ enum ProjectSourceValidator {
                 )
             )
         }
-        return try expandParsedFiles(coreFiles + projectFiles)
+        return coreFiles + projectFiles
     }
 
     static func expandedParsedFile(at fileURL: URL) throws -> ParsedFile {
@@ -78,12 +85,14 @@ enum ProjectSourceValidator {
     }
 
     static func validateFiles(_ files: [URL]) throws {
-        let parsedFiles = try expandedParsedFiles(for: files)
+        let parsedFiles = try parsedFiles(for: files)
         try validatePrimaryDeclarations(in: parsedFiles)
         try validateTopLevelStates(in: parsedFiles)
         try validateLiteralBridgeCompatibility(in: parsedFiles)
-        try validateEnvironmentStateResolution(in: parsedFiles)
-        try validateValueBindings(in: parsedFiles)
+
+        let expandedFiles = try expandParsedFiles(parsedFiles)
+        try validateEnvironmentStateResolution(in: expandedFiles)
+        try validateValueBindings(in: expandedFiles)
     }
 
     static func validatePrimaryDeclarations(in files: [URL]) throws {

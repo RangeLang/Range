@@ -39,6 +39,7 @@ struct SwiftBackendDriver {
             throw ValidationError("Expected a .neat file or project directory.")
         }
 
+        try ProjectSourceValidator.validateFiles([inputURL])
         let program = try loadSwiftProgram(fromSingleFile: inputURL)
         let buildRoot = inputURL.deletingLastPathComponent()
             .appendingPathComponent(".neat/Build/swift", isDirectory: true)
@@ -75,6 +76,7 @@ struct SwiftBackendDriver {
             guard inputURL.pathExtension.lowercased() == "neat" else {
                 throw ValidationError("Expected a .neat file or project directory.")
             }
+            try ProjectSourceValidator.validateFiles([inputURL])
             program = try loadSwiftProgram(fromSingleFile: inputURL)
         }
 

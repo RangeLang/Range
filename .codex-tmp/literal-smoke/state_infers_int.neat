@@ -1,0 +1,5 @@
+state count = 5
+
+@main {
+    Logger.log(count)
+}
