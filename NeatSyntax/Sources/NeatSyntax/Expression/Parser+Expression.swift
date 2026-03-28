@@ -122,18 +122,8 @@ extension Parser {
             if name == "nil" {
                 return .nilLiteral
             }
-            var parts = [name]
-            parseMembers: while peek() == .dot {
-                switch peek(offset: 1) {
-                case .identifier(let nextName), .keyword(let nextName):
-                    advance()
-                    advance()
-                    parts.append(nextName)
-                default:
-                    break parseMembers
-                }
-            }
-            var fullName = parts.joined(separator: ".")
+            var fullName = name
+            try appendPostfixAccesses(to: &fullName)
             fullName += try parseGenericArgumentClauseIfPresent()
             if peek() == .leftParen {
                 return .call(name: fullName, arguments: try parseInvocationArgumentsIfPresent())
@@ -162,6 +152,35 @@ extension Parser {
             return .block(try parseStatementBlock(baseLocalBindings: [:]))
         default:
             throw ParseError("Expected expression.")
+        }
+    }
+
+    mutating func appendPostfixAccesses(to fullName: inout String) throws {
+        while true {
+            if peek() == .dot {
+                switch peek(offset: 1) {
+                case .identifier(let nextName), .keyword(let nextName):
+                    advance()
+                    advance()
+                    fullName += ".\(nextName)"
+                    continue
+                default:
+                    return
+                }
+            }
+
+            if peek() == .leftBracket {
+                try consume(.leftBracket)
+                guard case .integer(let index) = peek() else {
+                    throw ParseError("Expected integer index.")
+                }
+                advance()
+                try consume(.rightBracket)
+                fullName += "[\(index)]"
+                continue
+            }
+
+            return
         }
     }
 

@@ -739,8 +739,7 @@ public enum MacroExpander {
             let substituted = substituteMacroBindings(
                 in: rewriteArguments[0].value,
                 bindings: [
-                    "\(macro.bindings.target).argument.expression": primaryArgument.value,
-                    "\(macro.bindings.target).arguments.expression": primaryArgument.value,
+                    "\(macro.bindings.target).arguments[0].expression": primaryArgument.value,
                     "\(macro.bindings.target).arguments": .array(arguments.map(\.value)),
                 ]
             )

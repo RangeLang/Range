@@ -10,7 +10,7 @@ macro autoclosure: Attached<Parameter> { target, diagnostics in
         target.arguments.rewrite(
             Closure(
                 body: {
-                    target.arguments.expression
+                    target.arguments[0].expression
                 }
             )
         )
