@@ -1,4 +1,4 @@
 protocol ExpressableBySetLiteral {
-    #literal(SetLiteral)
+    #literal<SetLiteral>
     init(literal: SetLiteral)
 }

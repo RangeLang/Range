@@ -27,10 +27,17 @@ extension Parser {
         let name = try consumeTypeName()
         let genericParameters = try parseProtocolGenericParameterClauseIfPresent()
         let conformances = try parseConformanceListIfPresent()
+        var initializers: [InitializerDeclaration] = []
 
         if peek() == .leftBrace {
             try consume(.leftBrace)
-            try skipUnknownBlockBody()
+            while peek() != .rightBrace {
+                if isInitializerDeclarationStart() {
+                    initializers.append(try parseInitializerDeclaration())
+                    continue
+                }
+                try skipUnknownProtocolRequirement()
+            }
             try consume(.rightBrace)
         }
 
@@ -43,8 +50,22 @@ extension Parser {
             attribute: attribute,
             name: name,
             genericParameters: genericParameters,
-            conformances: conformances
+            conformances: conformances,
+            initializers: initializers
         )
+    }
+
+    mutating func skipUnknownProtocolRequirement() throws {
+        if peek() == .leftBrace {
+            try consume(.leftBrace)
+            try skipUnknownBlockBody()
+            try consume(.rightBrace)
+            return
+        }
+
+        while peek() != .rightBrace, peek() != .eof {
+            advance()
+        }
     }
 
     mutating func parseProtocolGenericParameterClauseIfPresent() throws -> [GenericParameter] {

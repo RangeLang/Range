@@ -1,4 +1,4 @@
 protocol ExpressableByArrayLiteral {
-    #literal(ArrayLiteral)
+    #literal<ArrayLiteral>
     init(literal: ArrayLiteral)
 }

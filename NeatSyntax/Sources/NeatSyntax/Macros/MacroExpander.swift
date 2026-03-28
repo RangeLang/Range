@@ -14,6 +14,7 @@ enum AttachedParameterRewriteShape {
 public enum MacroExpander {
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
+        let protocols = collectProtocols(from: files)
         let attachedParameterCallables = collectAttachedParameterCallables(
             from: files,
             macros: registry
@@ -24,6 +25,7 @@ public enum MacroExpander {
                 sourceFile: try expand(
                     sourceFile: parsedFile.sourceFile,
                     macros: registry,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 )
             )
@@ -33,6 +35,7 @@ public enum MacroExpander {
     static func expand(
         sourceFile: SourceFileNode,
         macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws -> SourceFileNode {
         switch sourceFile {
@@ -42,6 +45,7 @@ public enum MacroExpander {
                     body: try expand(
                         statements: mainBlock.body,
                         macros: macros,
+                        protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables
                     ))
             )
@@ -53,6 +57,7 @@ public enum MacroExpander {
                             body: try expand(
                                 statements: $0.body,
                                 macros: macros,
+                                protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables
                             ))
                     },
@@ -61,6 +66,7 @@ public enum MacroExpander {
                         try expand(
                             callable: $0,
                             macros: macros,
+                            protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables
                         )
                     },
@@ -68,6 +74,7 @@ public enum MacroExpander {
                         try expand(
                             construct: $0,
                             macros: macros,
+                            protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables
                         )
                     },
@@ -84,6 +91,7 @@ public enum MacroExpander {
                 try expand(
                     construct: declaration,
                     macros: macros,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 ))
         case .macro, .enumeration, .protocolDefinition, .extensions:
@@ -96,6 +104,16 @@ public enum MacroExpander {
         for parsedFile in files {
             for macro in self.macros(in: parsedFile.sourceFile) {
                 registry[macro.name] = macro
+            }
+        }
+        return registry
+    }
+
+    static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
+        var registry: [String: ProtocolDeclaration] = [:]
+        for parsedFile in files {
+            for declaration in self.protocols(in: parsedFile.sourceFile) {
+                registry[declaration.name] = declaration
             }
         }
         return registry
@@ -119,6 +137,17 @@ public enum MacroExpander {
         case .module(let module):
             return module.macros
         case .construct, .enumeration, .protocolDefinition, .mainBlock, .extensions:
+            return []
+        }
+    }
+
+    static func protocols(in sourceFile: SourceFileNode) -> [ProtocolDeclaration] {
+        switch sourceFile {
+        case .protocolDefinition(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.protocols
+        case .construct, .enumeration, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -176,11 +205,18 @@ public enum MacroExpander {
     static func expand(
         construct: ConstructDeclaration,
         macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> ConstructDeclaration
     {
-        ConstructDeclaration(
+        let carriedInitializers = carriedInitializerMacros(
+            for: construct.initializers,
+            conformances: construct.conformances,
+            protocols: protocols
+        )
+
+        return ConstructDeclaration(
             macros: construct.macros,
             kind: construct.kind,
             attribute: construct.attribute,
@@ -194,14 +230,16 @@ public enum MacroExpander {
                 try expand(
                     derived: $0,
                     macros: macros,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 )
             },
             values: construct.values,
-            initializers: try construct.initializers.map {
+            initializers: try carriedInitializers.map {
                 try expand(
                     initializer: $0,
                     macros: macros,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 )
             },
@@ -209,6 +247,7 @@ public enum MacroExpander {
                 try expand(
                     callable: $0,
                     macros: macros,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 )
             }
@@ -218,6 +257,7 @@ public enum MacroExpander {
     static func expand(
         callable: CallableDeclaration,
         macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> CallableDeclaration
@@ -233,6 +273,7 @@ public enum MacroExpander {
                 try expand(
                     statements: $0,
                     macros: macros,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 )
             }
@@ -242,6 +283,7 @@ public enum MacroExpander {
     static func expand(
         initializer: InitializerDeclaration,
         macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature]
     )
         throws
@@ -254,6 +296,7 @@ public enum MacroExpander {
                 try expand(
                     statements: $0,
                     macros: macros,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 )
             }
@@ -263,6 +306,7 @@ public enum MacroExpander {
     static func expand(
         derived: DerivedDeclaration,
         macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> DerivedDeclaration
@@ -276,6 +320,7 @@ public enum MacroExpander {
                 try expand(
                     statements: $0,
                     macros: macros,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 )
             }
@@ -285,6 +330,7 @@ public enum MacroExpander {
     static func expand(
         statements: [Statement],
         macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> [Statement]
@@ -295,6 +341,7 @@ public enum MacroExpander {
                 contentsOf: try expand(
                     statement: statement,
                     macros: macros,
+                    protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables
                 ))
         }
@@ -304,6 +351,7 @@ public enum MacroExpander {
     static func expand(
         statement: Statement,
         macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
         attachedParameterCallables: [AttachedParameterMacroSignature]
     ) throws
         -> [Statement]
@@ -321,6 +369,7 @@ public enum MacroExpander {
             let expandedTarget = try expand(
                 statements: body,
                 macros: macros,
+                protocols: protocols,
                 attachedParameterCallables: attachedParameterCallables
             )
             let argumentBindings = try parseMacroArgumentBindings(
@@ -340,6 +389,7 @@ public enum MacroExpander {
             return try expand(
                 statements: targetSubstituted,
                 macros: macros,
+                protocols: protocols,
                 attachedParameterCallables: attachedParameterCallables
             )
         case .derived(let name, let typeName, let body):
@@ -349,6 +399,7 @@ public enum MacroExpander {
                     body: try expand(
                         statements: body,
                         macros: macros,
+                        protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables
                     ))
             ]
@@ -362,6 +413,7 @@ public enum MacroExpander {
                     body: try expand(
                         statements: body,
                         macros: macros,
+                        protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables
                     ))
             ]
@@ -375,6 +427,7 @@ public enum MacroExpander {
                     body: try expand(
                         statements: body,
                         macros: macros,
+                        protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables
                     ))
             ]
@@ -391,6 +444,7 @@ public enum MacroExpander {
                             body: try expand(
                                 statements: branch.body,
                                 macros: macros,
+                                protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables
                             )
                         )
@@ -461,6 +515,7 @@ public enum MacroExpander {
                             body: try expand(
                                 statements: switchCase.body,
                                 macros: macros,
+                                protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables
                             )
                         )
@@ -469,6 +524,7 @@ public enum MacroExpander {
                         try expand(
                             statements: $0,
                             macros: macros,
+                            protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables
                         )
                     }
@@ -477,6 +533,61 @@ public enum MacroExpander {
         default:
             return [statement]
         }
+    }
+
+    static func carriedInitializerMacros(
+        for initializers: [InitializerDeclaration],
+        conformances: [TypeReference],
+        protocols: [String: ProtocolDeclaration]
+    ) -> [InitializerDeclaration] {
+        let requirementInitializers = conformances.compactMap { protocols[$0.displayName] }
+            .flatMap(\.initializers)
+
+        guard !requirementInitializers.isEmpty else {
+            return initializers
+        }
+
+        return initializers.map { initializer in
+            let carried =
+                requirementInitializers
+                .filter { requirement in
+                    initializerSignatureMatches(lhs: requirement, rhs: initializer)
+                }
+                .flatMap(\.macros)
+
+            guard !carried.isEmpty else {
+                return initializer
+            }
+
+            let mergedMacros =
+                initializer.macros
+                + carried.filter { carriedMacro in
+                    !initializer.macros.contains {
+                        $0.name == carriedMacro.name
+                            && $0.argumentClause == carriedMacro.argumentClause
+                    }
+                }
+
+            return InitializerDeclaration(
+                macros: mergedMacros,
+                parameters: initializer.parameters,
+                body: initializer.body
+            )
+        }
+    }
+
+    static func initializerSignatureMatches(
+        lhs: InitializerDeclaration,
+        rhs: InitializerDeclaration
+    ) -> Bool {
+        lhs.parameters.elementsEqual(
+            rhs.parameters,
+            by: {
+                $0.localName == $1.localName
+                    && $0.externalLabel == $1.externalLabel
+                    && $0.typeReference == $1.typeReference
+                    && $0.slotName == $1.slotName
+            })
     }
 
     static func expand(
@@ -651,6 +762,7 @@ public enum MacroExpander {
                     (try? expand(
                         statement: $0,
                         macros: [:],
+                        protocols: [:],
                         attachedParameterCallables: attachedParameterCallables
                     )) ?? [$0]
                 }

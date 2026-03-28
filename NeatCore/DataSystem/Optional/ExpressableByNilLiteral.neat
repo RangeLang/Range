@@ -1,4 +1,4 @@
 protocol ExpressableByNilLiteral {
-    #literal(NilLiteral)
+    #literal<NilLiteral>
     init(literal: NilLiteral)
 }

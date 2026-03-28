@@ -1,4 +1,4 @@
 protocol ExpressableByStringLiteral {
-    #literal(StringLiteral)
+    #literal<StringLiteral>
     init(literal: StringLiteral)
 }

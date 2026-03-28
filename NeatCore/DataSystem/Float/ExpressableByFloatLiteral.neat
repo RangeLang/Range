@@ -1,4 +1,4 @@
 protocol ExpressableByFloatLiteral {
-    #literal(FloatLiteral)
+    #literal<FloatLiteral>
     init(literal: FloatLiteral)
 }

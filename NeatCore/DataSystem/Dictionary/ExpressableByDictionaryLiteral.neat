@@ -1,4 +1,4 @@
 protocol ExpressableByDictionaryLiteral {
-    #literal(DictionaryLiteral)
+    #literal<DictionaryLiteral>
     init(literal: DictionaryLiteral)
 }

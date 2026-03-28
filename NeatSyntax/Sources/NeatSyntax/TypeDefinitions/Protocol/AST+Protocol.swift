@@ -6,4 +6,5 @@ public struct ProtocolDeclaration {
     public let name: String
     public let genericParameters: [GenericParameter]
     public let conformances: [TypeReference]
+    public let initializers: [InitializerDeclaration]
 }
