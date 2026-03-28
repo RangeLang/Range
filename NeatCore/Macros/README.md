@@ -3,6 +3,7 @@
 Current macro surface is split into:
 
 - `CoreMacro`
+- `Bodies`
 - `Statements`
 - `Expressions`
 - `Types`

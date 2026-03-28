@@ -1,0 +1,5 @@
+@core
+construct ParameterContext {
+    value parameter: Parameter
+    value arguments: [Argument]
+}

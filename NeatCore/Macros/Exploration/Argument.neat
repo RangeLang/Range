@@ -1,8 +1,0 @@
-// Exploratory callable argument macro-facing compiler surface.
-// This file is for design iteration only.
-
-construct Argument {
-    value label: String?
-    value type: TypeReference
-    value value: Expression
-}
