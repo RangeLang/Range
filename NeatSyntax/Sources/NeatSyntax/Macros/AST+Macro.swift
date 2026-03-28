@@ -21,6 +21,5 @@ public enum MacroTarget {
 
 public struct MacroBindings {
     public let target: String
-    public let result: String
     public let diagnostics: String
 }

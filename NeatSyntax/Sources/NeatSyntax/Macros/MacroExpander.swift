@@ -1,36 +1,67 @@
 import Foundation
 
+struct AutoclosureCallableSignature {
+    let name: String
+    let labels: [String?]
+    let autoclosureParameterIndices: Set<Int>
+}
+
 public enum MacroExpander {
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
+        let autoclosureCallables = collectAutoclosureCallables(from: files)
         return try files.map { parsedFile in
             ParsedSourceFile(
                 path: parsedFile.path,
-                sourceFile: try expand(sourceFile: parsedFile.sourceFile, macros: registry)
+                sourceFile: try expand(
+                    sourceFile: parsedFile.sourceFile,
+                    macros: registry,
+                    autoclosureCallables: autoclosureCallables
+                )
             )
         }
     }
 
-    public static func expand(
+    static func expand(
         sourceFile: SourceFileNode,
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        autoclosureCallables: [AutoclosureCallableSignature]
     ) throws -> SourceFileNode {
         switch sourceFile {
         case .mainBlock(let mainBlock):
             return .mainBlock(
-                MainBlockNode(body: try expand(statements: mainBlock.body, macros: macros)))
+                MainBlockNode(
+                    body: try expand(
+                        statements: mainBlock.body,
+                        macros: macros,
+                        autoclosureCallables: autoclosureCallables
+                    ))
+            )
         case .module(let module):
             return .module(
                 ModuleFileNode(
                     mainBlock: try module.mainBlock.map {
-                        MainBlockNode(body: try expand(statements: $0.body, macros: macros))
+                        MainBlockNode(
+                            body: try expand(
+                                statements: $0.body,
+                                macros: macros,
+                                autoclosureCallables: autoclosureCallables
+                            ))
                     },
                     states: module.states,
                     callables: try module.callables.map {
-                        try expand(callable: $0, macros: macros)
+                        try expand(
+                            callable: $0,
+                            macros: macros,
+                            autoclosureCallables: autoclosureCallables
+                        )
                     },
                     constructs: try module.constructs.map {
-                        try expand(construct: $0, macros: macros)
+                        try expand(
+                            construct: $0,
+                            macros: macros,
+                            autoclosureCallables: autoclosureCallables
+                        )
                     },
                     enumerations: module.enumerations,
                     protocols: module.protocols,
@@ -41,7 +72,12 @@ public enum MacroExpander {
                 )
             )
         case .construct(let declaration):
-            return .construct(try expand(construct: declaration, macros: macros))
+            return .construct(
+                try expand(
+                    construct: declaration,
+                    macros: macros,
+                    autoclosureCallables: autoclosureCallables
+                ))
         case .macro, .enumeration, .protocolDefinition, .extensions:
             return sourceFile
         }
@@ -57,6 +93,14 @@ public enum MacroExpander {
         return registry
     }
 
+    static func collectAutoclosureCallables(from files: [ParsedSourceFile])
+        -> [AutoclosureCallableSignature]
+    {
+        files.flatMap { parsedFile in
+            callablesWithAutoclosure(in: parsedFile.sourceFile)
+        }
+    }
+
     static func macros(in sourceFile: SourceFileNode) -> [MacroDeclaration] {
         switch sourceFile {
         case .macro(let declaration):
@@ -68,7 +112,45 @@ public enum MacroExpander {
         }
     }
 
-    static func expand(construct: ConstructDeclaration, macros: [String: MacroDeclaration]) throws
+    static func callablesWithAutoclosure(in sourceFile: SourceFileNode)
+        -> [AutoclosureCallableSignature]
+    {
+        switch sourceFile {
+        case .module(let module):
+            return module.callables.compactMap(autoclosureSignature(for:))
+        default:
+            return []
+        }
+    }
+
+    static func autoclosureSignature(for callable: CallableDeclaration)
+        -> AutoclosureCallableSignature?
+    {
+        guard callable.targetType == nil else {
+            return nil
+        }
+
+        let indices = Set(
+            callable.parameters.enumerated().compactMap { index, parameter in
+                parameter.macros.contains(where: { $0.name == "autoclosure" }) ? index : nil
+            })
+
+        guard !indices.isEmpty else {
+            return nil
+        }
+
+        return AutoclosureCallableSignature(
+            name: callable.name,
+            labels: callable.parameters.map(\.externalLabel),
+            autoclosureParameterIndices: indices
+        )
+    }
+
+    static func expand(
+        construct: ConstructDeclaration,
+        macros: [String: MacroDeclaration],
+        autoclosureCallables: [AutoclosureCallableSignature]
+    ) throws
         -> ConstructDeclaration
     {
         ConstructDeclaration(
@@ -81,16 +163,32 @@ public enum MacroExpander {
             states: construct.states,
             environments: construct.environments,
             bindings: construct.bindings,
-            deriveds: try construct.deriveds.map { try expand(derived: $0, macros: macros) },
+            deriveds: try construct.deriveds.map {
+                try expand(derived: $0, macros: macros, autoclosureCallables: autoclosureCallables)
+            },
             values: construct.values,
             initializers: try construct.initializers.map {
-                try expand(initializer: $0, macros: macros)
+                try expand(
+                    initializer: $0,
+                    macros: macros,
+                    autoclosureCallables: autoclosureCallables
+                )
             },
-            callables: try construct.callables.map { try expand(callable: $0, macros: macros) }
+            callables: try construct.callables.map {
+                try expand(
+                    callable: $0,
+                    macros: macros,
+                    autoclosureCallables: autoclosureCallables
+                )
+            }
         )
     }
 
-    static func expand(callable: CallableDeclaration, macros: [String: MacroDeclaration]) throws
+    static func expand(
+        callable: CallableDeclaration,
+        macros: [String: MacroDeclaration],
+        autoclosureCallables: [AutoclosureCallableSignature]
+    ) throws
         -> CallableDeclaration
     {
         CallableDeclaration(
@@ -98,24 +196,44 @@ public enum MacroExpander {
             targetType: callable.targetType,
             name: callable.name,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
-            parameters: callable.parameters,
+            parameters: expand(parameters: callable.parameters),
             returnType: callable.returnType,
-            body: try callable.body.map { try expand(statements: $0, macros: macros) }
+            body: try callable.body.map {
+                try expand(
+                    statements: $0,
+                    macros: macros,
+                    autoclosureCallables: autoclosureCallables
+                )
+            }
         )
     }
 
-    static func expand(initializer: InitializerDeclaration, macros: [String: MacroDeclaration])
+    static func expand(
+        initializer: InitializerDeclaration,
+        macros: [String: MacroDeclaration],
+        autoclosureCallables: [AutoclosureCallableSignature]
+    )
         throws
         -> InitializerDeclaration
     {
         InitializerDeclaration(
             macros: initializer.macros,
-            parameters: initializer.parameters,
-            body: try initializer.body.map { try expand(statements: $0, macros: macros) }
+            parameters: expand(parameters: initializer.parameters),
+            body: try initializer.body.map {
+                try expand(
+                    statements: $0,
+                    macros: macros,
+                    autoclosureCallables: autoclosureCallables
+                )
+            }
         )
     }
 
-    static func expand(derived: DerivedDeclaration, macros: [String: MacroDeclaration]) throws
+    static func expand(
+        derived: DerivedDeclaration,
+        macros: [String: MacroDeclaration],
+        autoclosureCallables: [AutoclosureCallableSignature]
+    ) throws
         -> DerivedDeclaration
     {
         DerivedDeclaration(
@@ -123,21 +241,40 @@ public enum MacroExpander {
             builderName: derived.builderName,
             name: derived.name,
             typeName: derived.typeName,
-            body: try derived.body.map { try expand(statements: $0, macros: macros) }
+            body: try derived.body.map {
+                try expand(
+                    statements: $0,
+                    macros: macros,
+                    autoclosureCallables: autoclosureCallables
+                )
+            }
         )
     }
 
-    static func expand(statements: [Statement], macros: [String: MacroDeclaration]) throws
+    static func expand(
+        statements: [Statement],
+        macros: [String: MacroDeclaration],
+        autoclosureCallables: [AutoclosureCallableSignature]
+    ) throws
         -> [Statement]
     {
         var expanded: [Statement] = []
         for statement in statements {
-            expanded.append(contentsOf: try expand(statement: statement, macros: macros))
+            expanded.append(
+                contentsOf: try expand(
+                    statement: statement,
+                    macros: macros,
+                    autoclosureCallables: autoclosureCallables
+                ))
         }
         return expanded
     }
 
-    static func expand(statement: Statement, macros: [String: MacroDeclaration]) throws
+    static func expand(
+        statement: Statement,
+        macros: [String: MacroDeclaration],
+        autoclosureCallables: [AutoclosureCallableSignature]
+    ) throws
         -> [Statement]
     {
         switch statement {
@@ -150,7 +287,11 @@ public enum MacroExpander {
             else {
                 throw ParseError("Macro #\(name) is not a Freestanding<Block> macro.")
             }
-            let expandedTarget = try expand(statements: body, macros: macros)
+            let expandedTarget = try expand(
+                statements: body,
+                macros: macros,
+                autoclosureCallables: autoclosureCallables
+            )
             let argumentBindings = try parseMacroArgumentBindings(
                 for: macro,
                 argumentClause: argumentClause
@@ -165,49 +306,280 @@ public enum MacroExpander {
                 targetBinding: macro.bindings.target,
                 targetBlock: expandedTarget
             )
-            return try expand(statements: targetSubstituted, macros: macros)
+            return try expand(
+                statements: targetSubstituted,
+                macros: macros,
+                autoclosureCallables: autoclosureCallables
+            )
         case .derived(let name, let typeName, let body):
             return [
                 .derived(
                     name: name, typeName: typeName,
-                    body: try expand(statements: body, macros: macros))
+                    body: try expand(
+                        statements: body,
+                        macros: macros,
+                        autoclosureCallables: autoclosureCallables
+                    ))
             ]
         case .forEach(let name, let sequence, let body):
             return [
                 .forEach(
-                    name: name, sequence: sequence,
-                    body: try expand(statements: body, macros: macros))
+                    name: name,
+                    sequence: expand(
+                        expression: sequence, autoclosureCallables: autoclosureCallables),
+                    body: try expand(
+                        statements: body,
+                        macros: macros,
+                        autoclosureCallables: autoclosureCallables
+                    ))
             ]
         case .whileLoop(let condition, let body):
             return [
-                .whileLoop(condition: condition, body: try expand(statements: body, macros: macros))
+                .whileLoop(
+                    condition: expand(
+                        expression: condition,
+                        autoclosureCallables: autoclosureCallables
+                    ),
+                    body: try expand(
+                        statements: body,
+                        macros: macros,
+                        autoclosureCallables: autoclosureCallables
+                    ))
             ]
         case .conditional(let branches):
             return [
                 .conditional(
                     try branches.map { branch in
                         StatementConditionalBranch(
-                            condition: branch.condition,
-                            body: try expand(statements: branch.body, macros: macros)
+                            condition: branch.condition.map {
+                                expand(expression: $0, autoclosureCallables: autoclosureCallables)
+                            },
+                            body: try expand(
+                                statements: branch.body,
+                                macros: macros,
+                                autoclosureCallables: autoclosureCallables
+                            )
                         )
                     }
                 )
             ]
+        case .declaration(let kind, let name, let typeName, let expression):
+            return [
+                .declaration(
+                    kind: kind,
+                    name: name,
+                    typeName: typeName,
+                    expression: expand(
+                        expression: expression,
+                        autoclosureCallables: autoclosureCallables
+                    )
+                )
+            ]
+        case .assignment(let target, let expression):
+            return [
+                .assignment(
+                    target: target,
+                    expression: expand(
+                        expression: expression,
+                        autoclosureCallables: autoclosureCallables
+                    )
+                )
+            ]
+        case .compoundAssignment(let target, let operatorSymbol, let expression):
+            return [
+                .compoundAssignment(
+                    target: target,
+                    operatorSymbol: operatorSymbol,
+                    expression: expand(
+                        expression: expression,
+                        autoclosureCallables: autoclosureCallables
+                    )
+                )
+            ]
+        case .expression(let expression):
+            return [
+                .expression(
+                    expand(expression: expression, autoclosureCallables: autoclosureCallables))
+            ]
+        case .return(let expression):
+            return [
+                .return(
+                    expression.map {
+                        expand(expression: $0, autoclosureCallables: autoclosureCallables)
+                    })
+            ]
         case .switchStatement(let expression, let cases, let defaultBody):
             return [
                 .switchStatement(
-                    expression: expression,
+                    expression: expand(
+                        expression: expression,
+                        autoclosureCallables: autoclosureCallables
+                    ),
                     cases: try cases.map { switchCase in
                         SwitchCase(
-                            value: switchCase.value,
-                            body: try expand(statements: switchCase.body, macros: macros)
+                            value: expand(
+                                expression: switchCase.value,
+                                autoclosureCallables: autoclosureCallables
+                            ),
+                            body: try expand(
+                                statements: switchCase.body,
+                                macros: macros,
+                                autoclosureCallables: autoclosureCallables
+                            )
                         )
                     },
-                    defaultBody: try defaultBody.map { try expand(statements: $0, macros: macros) }
+                    defaultBody: try defaultBody.map {
+                        try expand(
+                            statements: $0,
+                            macros: macros,
+                            autoclosureCallables: autoclosureCallables
+                        )
+                    }
                 )
             ]
         default:
             return [statement]
+        }
+    }
+
+    static func expand(parameters: [NeatFunctionParameter]) -> [NeatFunctionParameter] {
+        parameters.map { parameter in
+            guard parameter.macros.contains(where: { $0.name == "autoclosure" }),
+                let typeReference = parameter.typeReference
+            else {
+                return parameter
+            }
+
+            return NeatFunctionParameter(
+                macros: parameter.macros,
+                localName: parameter.localName,
+                externalLabel: parameter.externalLabel,
+                typeReference: .function(parameters: [], returnType: typeReference),
+                slotName: parameter.slotName
+            )
+        }
+    }
+
+    static func expand(
+        expression: Expression,
+        autoclosureCallables: [AutoclosureCallableSignature]
+    ) -> Expression {
+        switch expression {
+        case .call(let name, let arguments):
+            let rewrittenArguments = arguments.map { argument in
+                CallArgument(
+                    label: argument.label,
+                    value: expand(
+                        expression: argument.value,
+                        autoclosureCallables: autoclosureCallables
+                    )
+                )
+            }
+
+            guard
+                let signature = matchingAutoclosureCallable(
+                    name: name,
+                    arguments: rewrittenArguments,
+                    signatures: autoclosureCallables
+                )
+            else {
+                return .call(name: name, arguments: rewrittenArguments)
+            }
+
+            let wrappedArguments = rewrittenArguments.enumerated().map { index, argument in
+                guard signature.autoclosureParameterIndices.contains(index) else {
+                    return argument
+                }
+                return CallArgument(
+                    label: argument.label,
+                    value: .block([.expression(argument.value)])
+                )
+            }
+
+            return .call(name: name, arguments: wrappedArguments)
+        case .array(let elements):
+            return .array(
+                elements.map { expand(expression: $0, autoclosureCallables: autoclosureCallables) }
+            )
+        case .dictionary(let elements):
+            return .dictionary(
+                elements.map { element in
+                    DictionaryElement(
+                        key: expand(
+                            expression: element.key,
+                            autoclosureCallables: autoclosureCallables
+                        ),
+                        value: expand(
+                            expression: element.value,
+                            autoclosureCallables: autoclosureCallables
+                        )
+                    )
+                }
+            )
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return .ternary(
+                condition: expand(
+                    expression: condition, autoclosureCallables: autoclosureCallables),
+                trueExpression: expand(
+                    expression: trueExpression,
+                    autoclosureCallables: autoclosureCallables
+                ),
+                falseExpression: expand(
+                    expression: falseExpression,
+                    autoclosureCallables: autoclosureCallables
+                )
+            )
+        case .unary(let operatorSymbol, let nested):
+            return .unary(
+                operatorSymbol: operatorSymbol,
+                expression: expand(expression: nested, autoclosureCallables: autoclosureCallables)
+            )
+        case .binary(let lhs, let operatorSymbol, let rhs):
+            return .binary(
+                lhs: expand(expression: lhs, autoclosureCallables: autoclosureCallables),
+                operatorSymbol: operatorSymbol,
+                rhs: expand(expression: rhs, autoclosureCallables: autoclosureCallables)
+            )
+        case .interpolatedString(let string):
+            return .interpolatedString(
+                InterpolatedString(
+                    segments: string.segments.map { segment in
+                        switch segment {
+                        case .text:
+                            return segment
+                        case .expression(let nested):
+                            return .expression(
+                                expand(
+                                    expression: nested,
+                                    autoclosureCallables: autoclosureCallables
+                                ))
+                        }
+                    }
+                )
+            )
+        case .block(let body):
+            return .block(
+                body.flatMap {
+                    (try? expand(
+                        statement: $0,
+                        macros: [:],
+                        autoclosureCallables: autoclosureCallables
+                    )) ?? [$0]
+                }
+            )
+        case .integer, .double, .string, .boolean, .nilLiteral, .identifier, .bindingReference:
+            return expression
+        }
+    }
+
+    static func matchingAutoclosureCallable(
+        name: String,
+        arguments: [CallArgument],
+        signatures: [AutoclosureCallableSignature]
+    ) -> AutoclosureCallableSignature? {
+        signatures.first { signature in
+            signature.name == name
+                && signature.labels.elementsEqual(arguments.map(\.label), by: { $0 == $1 })
         }
     }
 
@@ -221,7 +593,7 @@ public enum MacroExpander {
             guard case .call(let name, let arguments) = expression else {
                 continue
             }
-            guard name == "\(macro.bindings.result).rewrite" else {
+            guard name == "\(macro.bindings.target).rewrite" else {
                 continue
             }
             guard arguments.count == 1 else {
@@ -229,7 +601,7 @@ public enum MacroExpander {
             }
             guard case .block(let body) = arguments[0].value else {
                 throw ParseError(
-                    "Macro #\(macro.name) result.rewrite(...) must receive a block expression for Freestanding<Block>."
+                    "Macro #\(macro.name) target.rewrite(...) must receive a block expression for Freestanding<Block>."
                 )
             }
             rewriteCalls.append(body)
@@ -237,7 +609,7 @@ public enum MacroExpander {
 
         guard let rewriteBody = rewriteCalls.first else {
             throw ParseError(
-                "Macro #\(macro.name) must call \(macro.bindings.result).rewrite(...) with a block expression."
+                "Macro #\(macro.name) must call \(macro.bindings.target).rewrite(...) with a block expression."
             )
         }
 

@@ -1,0 +1,2 @@
+macro autoclosure: Attached<Parameter> { target, diagnostics in
+}

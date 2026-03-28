@@ -323,8 +323,8 @@ struct SwiftBackendEmitter {
             return value ? "true" : "false"
         case .nilLiteral:
             return "nil"
-        case .block:
-            throw ValidationError("Swift backend does not support block expressions.")
+        case .block(let body):
+            return try emitClosureExpression(body)
         case .identifier(let name):
             return name
         case .call(let name, let arguments):
@@ -356,6 +356,15 @@ struct SwiftBackendEmitter {
             return "\(label): \(try emitExpression(argument.value))"
         }
         return try emitExpression(argument.value)
+    }
+
+    private func emitClosureExpression(_ body: [NeatStatement]) throws -> String {
+        if body.count == 1, case .expression(let expression) = body[0] {
+            return "{ \(try emitExpression(expression)) }"
+        }
+
+        let bodyText = try emitStatements(body, indent: 1)
+        return "{\n\(bodyText)\n}"
     }
 
     private func emitInterpolatedString(_ string: InterpolatedString) throws -> String {

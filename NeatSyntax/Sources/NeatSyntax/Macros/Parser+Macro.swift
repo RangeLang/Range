@@ -47,20 +47,16 @@ extension Parser {
 
         let targetBinding = try consumeIdentifier()
         try consume(.comma)
-        let resultBinding = try consumeIdentifier()
-        try consume(.comma)
         let diagnosticsBinding = try consumeIdentifier()
         try consumeKeyword(.inKeyword)
 
         let bindings = MacroBindings(
             target: targetBinding,
-            result: resultBinding,
             diagnostics: diagnosticsBinding
         )
 
         var localBindings: [String: LocalBindingKind] = [
             targetBinding: .constant,
-            resultBinding: .constant,
             diagnosticsBinding: .constant,
         ]
         var statements: [Statement] = []

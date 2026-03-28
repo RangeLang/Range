@@ -1,5 +1,5 @@
-macro lock: Freestanding<Block> { target, result, diagnostics in
-    result.rewrite({
+macro lock: Freestanding<Block> { target, diagnostics in
+    target.rewrite({
         acquire()
         target()
         release()
