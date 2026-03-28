@@ -3,7 +3,7 @@ import Foundation
 struct AttachedParameterMacroSignature {
     let name: String
     let labels: [String?]
-    let attachedParameterMacrosByIndex: [Int: String]
+    let attachedParameterMacrosByIndex: [Int: MacroDeclaration]
 }
 
 public enum MacroExpander {
@@ -144,20 +144,17 @@ public enum MacroExpander {
             return nil
         }
 
-        let attachedParameterMacrosByIndex: [Int: String] = Dictionary(
+        let attachedParameterMacrosByIndex: [Int: MacroDeclaration] = Dictionary(
             uniqueKeysWithValues: callable.parameters.enumerated().compactMap {
-                index, parameter -> (Int, String)? in
+                index, parameter -> (Int, MacroDeclaration)? in
                 guard
-                    let macroName = parameter.macros.lazy.map(\.name).first(where: {
-                        guard let macro = macros[$0] else { return false }
-                        guard case .attached(let targetType) = macro.target else { return false }
+                    let macro = parameter.macros.lazy.compactMap({ macros[$0.name] }).first(where: {
+                        guard case .attached(let targetType) = $0.target else { return false }
                         return targetType.displayName == "Parameter"
                     })
-                else {
-                    return nil
-                }
+                else { return nil }
 
-                return (index, macroName)
+                return (index, macro)
             })
 
         guard !attachedParameterMacrosByIndex.isEmpty else {
@@ -543,11 +540,11 @@ public enum MacroExpander {
             }
 
             let wrappedArguments = rewrittenArguments.enumerated().map { index, argument in
-                guard let macroName = signature.attachedParameterMacrosByIndex[index] else {
+                guard let macro = signature.attachedParameterMacrosByIndex[index] else {
                     return argument
                 }
                 return applyAttachedParameterArgumentRewrite(
-                    macroName: macroName,
+                    macro: macro,
                     argument: argument
                 )
             }
@@ -647,27 +644,101 @@ public enum MacroExpander {
         macro: MacroDeclaration,
         to typeReference: TypeReference
     ) -> TypeReference {
-        switch macro.name {
-        case "autoclosure":
-            return .function(parameters: [], returnType: typeReference)
-        default:
-            return typeReference
+        for statement in macro.body {
+            guard case .expression(let expression) = statement,
+                case .call(let name, let arguments) = expression,
+                name == "\(macro.bindings.target).type.rewrite",
+                arguments.count == 1
+            else {
+                continue
+            }
+
+            if isClosureTypeRewriteExpression(
+                arguments[0].value,
+                targetBinding: macro.bindings.target
+            ) {
+                return .function(parameters: [], returnType: typeReference)
+            }
         }
+
+        return typeReference
     }
 
     static func applyAttachedParameterArgumentRewrite(
-        macroName: String,
+        macro: MacroDeclaration,
         argument: CallArgument
     ) -> CallArgument {
-        switch macroName {
-        case "autoclosure":
+        for statement in macro.body {
+            guard case .expression(let expression) = statement,
+                case .call(let name, let arguments) = expression,
+                name == "\(macro.bindings.target).argument.rewrite",
+                arguments.count == 1
+            else {
+                continue
+            }
+
+            let substituted = substituteMacroBindings(
+                in: arguments[0].value,
+                bindings: [
+                    "\(macro.bindings.target).argument.expression": argument.value
+                ]
+            )
+
             return CallArgument(
                 label: argument.label,
-                value: .block([.expression(argument.value)])
+                value: interpretAttachedParameterArgumentRewriteExpression(substituted)
             )
-        default:
-            return argument
         }
+
+        return argument
+    }
+
+    static func interpretAttachedParameterArgumentRewriteExpression(
+        _ expression: Expression
+    ) -> Expression {
+        if let blockBody = closureBodyExpression(from: expression) {
+            return .block(blockBody)
+        }
+
+        return expression
+    }
+
+    static func isClosureTypeRewriteExpression(
+        _ expression: Expression,
+        targetBinding: String
+    ) -> Bool {
+        guard case .call(let name, let arguments) = expression,
+            name == "Closure",
+            arguments.count == 1,
+            arguments[0].label == nil,
+            case .identifier(let identifier) = arguments[0].value
+        else {
+            return false
+        }
+
+        return identifier == "\(targetBinding).type"
+    }
+
+    static func closureBodyExpression(from expression: Expression) -> [Statement]? {
+        guard case .call(let name, let arguments) = expression, name == "Closure" else {
+            return nil
+        }
+
+        if arguments.count == 1,
+            arguments[0].label == "body",
+            case .block(let body) = arguments[0].value
+        {
+            return body
+        }
+
+        if arguments.count == 1,
+            arguments[0].label == nil,
+            case .block(let body) = arguments[0].value
+        {
+            return body
+        }
+
+        return nil
     }
 
     static func rewriteBody(for macro: MacroDeclaration) throws -> [Statement] {

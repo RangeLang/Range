@@ -1,17 +1,11 @@
 macro autoclosure: Attached<Parameter> { target, diagnostics in
-    // Remaining gap:
-    // target.type.rewrite(() -> target.type)
-    //
-    // Attached parameter execution still needs invocation context so the
-    // incoming argument can be rewritten through CallContext / Argument.
-    //
-    // target.arguments[0].rewrite(
-    //     Closure(
-    //         body: Block(
-    //             statements: [
-    //                 target.arguments[0].expression
-    //             ]
-    //         )
-    //     )
-    // )
+    target.type.rewrite(Closure(target.type))
+
+    target.argument.rewrite(
+        Closure(
+            body: {
+                target.argument.expression
+            }
+        )
+    )
 }
