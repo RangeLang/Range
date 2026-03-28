@@ -1,17 +1,5 @@
 @import 'tailwindcss';
-
-html,
-body {
-	margin: 0;
-	min-height: 100%;
-	background: #fff;
-	color: #111;
-	font-family: Georgia, 'Times New Roman', serif;
-}
-
-body {
-	font-size: 16px;
-}
+@import '@x33025/sveltely/style.css';
 
 .page {
 	display: grid;
