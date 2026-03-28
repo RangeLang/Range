@@ -150,18 +150,22 @@ public enum MacroExpander {
             else {
                 throw ParseError("Macro #\(name) is not a Freestanding<Block> macro.")
             }
-            if argumentClause != nil {
-                throw ParseError(
-                    "Freestanding block macro #\(name) does not support argument clauses yet.")
-            }
             let expandedTarget = try expand(statements: body, macros: macros)
+            let argumentBindings = try parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: argumentClause
+            )
             let rewriteBody = try rewriteBody(for: macro)
-            let substituted = substituteMacroTargetCalls(
+            let bindingSubstituted = substituteMacroBindings(
                 in: rewriteBody,
+                bindings: argumentBindings
+            )
+            let targetSubstituted = substituteMacroTargetCalls(
+                in: bindingSubstituted,
                 targetBinding: macro.bindings.target,
                 targetBlock: expandedTarget
             )
-            return try expand(statements: substituted, macros: macros)
+            return try expand(statements: targetSubstituted, macros: macros)
         case .derived(let name, let typeName, let body):
             return [
                 .derived(
@@ -242,6 +246,209 @@ public enum MacroExpander {
         }
 
         return rewriteBody
+    }
+
+    static func parseMacroArgumentBindings(
+        for macro: MacroDeclaration,
+        argumentClause: String?
+    ) throws -> [String: Expression] {
+        let parameters = macro.parameters
+        guard !parameters.isEmpty || argumentClause == nil else {
+            throw ParseError("Macro #\(macro.name) requires arguments.")
+        }
+        guard !parameters.isEmpty else {
+            return [:]
+        }
+        guard let argumentClause else {
+            throw ParseError("Macro #\(macro.name) requires arguments.")
+        }
+
+        var parser = try Parser(source: "macro(\(argumentClause))")
+        _ = try parser.consumeCallableName()
+        let arguments = try parser.parseInvocationArgumentsIfPresent()
+        try parser.consume(.eof)
+
+        guard arguments.count == parameters.count else {
+            throw ParseError(
+                "Macro #\(macro.name) expects \(parameters.count) argument(s), got \(arguments.count)."
+            )
+        }
+
+        var bindings: [String: Expression] = [:]
+        for (parameter, argument) in zip(parameters, arguments) {
+            switch (parameter.externalLabel, argument.label) {
+            case (nil, nil):
+                break
+            case (nil, .some(let label)):
+                throw ParseError(
+                    "Macro #\(macro.name) argument for \(parameter.localName) should not use label \(label)."
+                )
+            case (.some(let expected), .some(let actual)) where expected == actual:
+                break
+            case (.some(let expected), .some(let actual)):
+                throw ParseError(
+                    "Macro #\(macro.name) expects argument label \(expected), got \(actual)."
+                )
+            case (.some(let expected), nil):
+                throw ParseError(
+                    "Macro #\(macro.name) expects argument label \(expected)."
+                )
+            }
+            bindings[parameter.localName] = argument.value
+        }
+        return bindings
+    }
+
+    static func substituteMacroBindings(
+        in statements: [Statement],
+        bindings: [String: Expression]
+    ) -> [Statement] {
+        statements.map { substituteMacroBindings(in: $0, bindings: bindings) }
+    }
+
+    static func substituteMacroBindings(
+        in statement: Statement,
+        bindings: [String: Expression]
+    ) -> Statement {
+        switch statement {
+        case .declaration(let kind, let name, let typeName, let expression):
+            return .declaration(
+                kind: kind,
+                name: name,
+                typeName: typeName,
+                expression: substituteMacroBindings(in: expression, bindings: bindings)
+            )
+        case .derived(let name, let typeName, let body):
+            return .derived(
+                name: name,
+                typeName: typeName,
+                body: substituteMacroBindings(in: body, bindings: bindings)
+            )
+        case .assignment(let target, let expression):
+            return .assignment(
+                target: target,
+                expression: substituteMacroBindings(in: expression, bindings: bindings)
+            )
+        case .compoundAssignment(let target, let operatorSymbol, let expression):
+            return .compoundAssignment(
+                target: target,
+                operatorSymbol: operatorSymbol,
+                expression: substituteMacroBindings(in: expression, bindings: bindings)
+            )
+        case .expression(let expression):
+            return .expression(substituteMacroBindings(in: expression, bindings: bindings))
+        case .forEach(let name, let sequence, let body):
+            return .forEach(
+                name: name,
+                sequence: substituteMacroBindings(in: sequence, bindings: bindings),
+                body: substituteMacroBindings(in: body, bindings: bindings)
+            )
+        case .whileLoop(let condition, let body):
+            return .whileLoop(
+                condition: substituteMacroBindings(in: condition, bindings: bindings),
+                body: substituteMacroBindings(in: body, bindings: bindings)
+            )
+        case .conditional(let branches):
+            return .conditional(
+                branches.map { branch in
+                    StatementConditionalBranch(
+                        condition: branch.condition.map {
+                            substituteMacroBindings(in: $0, bindings: bindings)
+                        },
+                        body: substituteMacroBindings(in: branch.body, bindings: bindings)
+                    )
+                }
+            )
+        case .return(let expression):
+            return .return(expression.map { substituteMacroBindings(in: $0, bindings: bindings) })
+        case .switchStatement(let expression, let cases, let defaultBody):
+            return .switchStatement(
+                expression: substituteMacroBindings(in: expression, bindings: bindings),
+                cases: cases.map { switchCase in
+                    SwitchCase(
+                        value: substituteMacroBindings(in: switchCase.value, bindings: bindings),
+                        body: substituteMacroBindings(in: switchCase.body, bindings: bindings)
+                    )
+                },
+                defaultBody: defaultBody.map {
+                    substituteMacroBindings(in: $0, bindings: bindings)
+                }
+            )
+        case .freestandingMacro(let name, let argumentClause, let body):
+            return .freestandingMacro(
+                name: name,
+                argumentClause: argumentClause,
+                body: substituteMacroBindings(in: body, bindings: bindings)
+            )
+        case .environmentProvision, .break, .continue:
+            return statement
+        }
+    }
+
+    static func substituteMacroBindings(
+        in expression: Expression,
+        bindings: [String: Expression]
+    ) -> Expression {
+        switch expression {
+        case .identifier(let name):
+            return bindings[name] ?? expression
+        case .call(let name, let arguments):
+            return .call(
+                name: name,
+                arguments: arguments.map { argument in
+                    CallArgument(
+                        label: argument.label,
+                        value: substituteMacroBindings(in: argument.value, bindings: bindings)
+                    )
+                }
+            )
+        case .array(let elements):
+            return .array(elements.map { substituteMacroBindings(in: $0, bindings: bindings) })
+        case .dictionary(let elements):
+            return .dictionary(
+                elements.map { element in
+                    DictionaryElement(
+                        key: substituteMacroBindings(in: element.key, bindings: bindings),
+                        value: substituteMacroBindings(in: element.value, bindings: bindings)
+                    )
+                }
+            )
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return .ternary(
+                condition: substituteMacroBindings(in: condition, bindings: bindings),
+                trueExpression: substituteMacroBindings(in: trueExpression, bindings: bindings),
+                falseExpression: substituteMacroBindings(in: falseExpression, bindings: bindings)
+            )
+        case .unary(let operatorSymbol, let nested):
+            return .unary(
+                operatorSymbol: operatorSymbol,
+                expression: substituteMacroBindings(in: nested, bindings: bindings)
+            )
+        case .binary(let lhs, let operatorSymbol, let rhs):
+            return .binary(
+                lhs: substituteMacroBindings(in: lhs, bindings: bindings),
+                operatorSymbol: operatorSymbol,
+                rhs: substituteMacroBindings(in: rhs, bindings: bindings)
+            )
+        case .interpolatedString(let string):
+            return .interpolatedString(
+                InterpolatedString(
+                    segments: string.segments.map { segment in
+                        switch segment {
+                        case .text:
+                            return segment
+                        case .expression(let nested):
+                            return .expression(
+                                substituteMacroBindings(in: nested, bindings: bindings))
+                        }
+                    }
+                )
+            )
+        case .block(let body):
+            return .block(substituteMacroBindings(in: body, bindings: bindings))
+        case .integer, .double, .string, .boolean, .nilLiteral, .bindingReference:
+            return expression
+        }
     }
 
     static func substituteMacroTargetCalls(

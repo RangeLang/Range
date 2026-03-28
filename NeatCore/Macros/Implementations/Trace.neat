@@ -1,0 +1,6 @@
+macro trace(message: String): Freestanding<Block> { target, result, diagnostics in
+    result.rewrite({
+        log(message)
+        target()
+    })
+}
