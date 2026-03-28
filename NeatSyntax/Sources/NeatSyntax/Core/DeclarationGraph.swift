@@ -30,19 +30,6 @@ public struct DeclarationGraph {
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
     }
 
-    public func defaultLiteralBridge(for carrierTypeName: String) -> RealizedLiteralBridge? {
-        guard carrierTypeName != "NilLiteral" else {
-            return nil
-        }
-
-        let matches = realizedLiteralBridges.filter { $0.carrierTypeName == carrierTypeName }
-        guard matches.count == 1 else {
-            return nil
-        }
-
-        return matches[0]
-    }
-
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
         var registry: [String: ProtocolDeclaration] = [:]
         for parsedFile in files {

@@ -118,23 +118,6 @@ public enum MacroExpander {
         return registry
     }
 
-    static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
-        var registry: [String: ProtocolDeclaration] = [:]
-        for parsedFile in files {
-            for declaration in self.protocols(in: parsedFile.sourceFile) {
-                registry[declaration.name] = declaration
-            }
-        }
-        return registry
-    }
-
-    static func collectConstructs(
-        from files: [ParsedSourceFile],
-        protocols: [String: ProtocolDeclaration]
-    ) -> [String: ConstructDeclaration] {
-        DeclarationGraph.collectConstructs(from: files, protocols: protocols)
-    }
-
     static func collectAttachedParameterCallables(
         from files: [ParsedSourceFile],
         macros: [String: MacroDeclaration]
@@ -153,28 +136,6 @@ public enum MacroExpander {
         case .module(let module):
             return module.macros
         case .construct, .enumeration, .protocolDefinition, .mainBlock, .extensions:
-            return []
-        }
-    }
-
-    static func protocols(in sourceFile: SourceFileNode) -> [ProtocolDeclaration] {
-        switch sourceFile {
-        case .protocolDefinition(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.protocols
-        case .construct, .enumeration, .mainBlock, .macro, .extensions:
-            return []
-        }
-    }
-
-    static func constructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
-        switch sourceFile {
-        case .construct(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.constructs
-        case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
