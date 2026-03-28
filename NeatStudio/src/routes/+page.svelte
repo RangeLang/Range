@@ -14,6 +14,7 @@
 			Array<{
 				text: string;
 				partId?: string;
+				dim?: boolean;
 			}>
 		>;
 		parts: Part[];
@@ -370,25 +371,28 @@
 			summary: 'A parameter gives a function body a named typed input.',
 			lines: [
 				[
-					{ text: 'function ' },
-					{ text: 'greet', partId: 'host-function' },
-					{ text: '(' },
+					{ text: 'function ', dim: true },
+					{ text: 'greet', dim: true },
+					{ text: '(', dim: true },
 					{ text: 'name', partId: 'parameter-name' },
-					{ text: ': ' },
+					{ text: ' _: ', partId: 'parameter-gap' },
 					{ text: 'String', partId: 'parameter-type' },
-					{ text: ')' }
-				]
+					{ text: ') ', dim: true },
+					{ text: '{', dim: true }
+				],
+				[{ text: '}', dim: true }]
 			],
 			parts: [
 				{
-					id: 'host-function',
-					label: 'greet',
-					description: 'This is the function that owns the parameter.'
-				},
-				{
 					id: 'parameter-name',
 					label: 'name',
-					description: 'This is the local parameter name.'
+					description: 'This is the local parameter name used inside the function body.'
+				},
+				{
+					id: 'parameter-gap',
+					label: '_:',
+					description:
+						"The underscore means this parameter has no external argument label, and ':' introduces its type."
 				},
 				{
 					id: 'parameter-type',
@@ -410,8 +414,9 @@
 		}
 	];
 
-	let selected = $state<Example>(examples[0]);
-	let active = $state<Part>(examples[0].parts[0]);
+	const initialExample = examples.find((example) => example.id === 'parameter') ?? examples[0];
+	let selected = $state<Example>(initialExample);
+	let active = $state<Part>(initialExample.parts[0]);
 
 	function selectExample(id: string) {
 		const match = examples.find((example) => example.id === id);
@@ -464,6 +469,7 @@
 				<pre class="code"><code
 						>{#each selected.lines as line, lineIndex}{#each line as token}<button
 									class="token"
+									class:dim={Boolean(token.dim)}
 									class:interactive={Boolean(token.partId)}
 									type="button"
 									disabled={!token.partId}

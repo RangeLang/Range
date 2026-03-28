@@ -1,1 +1,1 @@
-protocol Attached<T: AttachedMacroTarget>
+protocol Attached<T: AttachedMacroTarget> {}

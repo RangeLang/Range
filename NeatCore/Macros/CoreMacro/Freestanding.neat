@@ -1,1 +1,1 @@
-protocol Freestanding<T: FreestandingMacroTarget>
+protocol Freestanding<T: FreestandingMacroTarget> {}
