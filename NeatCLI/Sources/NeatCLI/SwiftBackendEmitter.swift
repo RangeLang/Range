@@ -360,23 +360,7 @@ struct SwiftBackendEmitter {
 
     private func emitCallArguments(_ arguments: [CallArgument], for callee: String) throws -> String
     {
-        if isSwiftLiteralBridgeType(callee),
-            arguments.count == 1,
-            arguments[0].label == "literal"
-        {
-            return try emitExpression(arguments[0].value)
-        }
-
         return try arguments.map(emitCallArgument).joined(separator: ", ")
-    }
-
-    private func isSwiftLiteralBridgeType(_ name: String) -> Bool {
-        switch name {
-        case "Int", "Double", "Float", "String", "Bool":
-            return true
-        default:
-            return false
-        }
     }
 
     private func emitClosureExpression(_ body: [NeatStatement]) throws -> String {

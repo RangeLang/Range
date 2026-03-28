@@ -1,7 +1,7 @@
 import Foundation
 
-func answer() -> String {
-    return Int(5)
+func answer() -> Int {
+    return Int(literal: 5)
 }
 
 @main
