@@ -1,6 +1,4 @@
-// Exploratory parameter macro-facing compiler surface.
-// This file is for design iteration only.
-
+@core
 construct Parameter: AttachedMacroTarget {
     value externalName: String?
     value localName: String
