@@ -1,0 +1,5 @@
+@core
+construct SwitchCase {
+    value pattern: Expression
+    value body: Block
+}

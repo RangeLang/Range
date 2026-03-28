@@ -1,6 +1,0 @@
-// Exploratory return statement macro-facing compiler surface.
-// This file is for design iteration only.
-
-construct Return: Statement {
-    value expression: Expression?
-}

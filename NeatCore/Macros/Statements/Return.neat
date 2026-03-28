@@ -1,0 +1,4 @@
+@core
+construct Return: Statement {
+    value expression: Expression?
+}

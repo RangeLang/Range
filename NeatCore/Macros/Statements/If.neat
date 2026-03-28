@@ -1,6 +1,4 @@
-// Exploratory if statement macro-facing compiler surface.
-// This file is for design iteration only.
-
+@core
 construct If: Statement {
     value condition: Expression
     value thenBody: Block

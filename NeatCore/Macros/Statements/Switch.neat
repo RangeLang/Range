@@ -1,0 +1,5 @@
+@core
+construct Switch: Statement {
+    value expression: Expression
+    value cases: [SwitchCase]
+}

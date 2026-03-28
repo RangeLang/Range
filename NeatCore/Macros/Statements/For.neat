@@ -1,6 +1,4 @@
-// Exploratory for statement macro-facing compiler surface.
-// This file is for design iteration only.
-
+@core
 construct For: Statement {
     value pattern: Expression
     value sequence: Expression
