@@ -1,5 +1,0 @@
-@core
-construct InitContext: SupportsRewrite<Expression> {
-    value init: Init
-    value calls: [CallContext]
-}
