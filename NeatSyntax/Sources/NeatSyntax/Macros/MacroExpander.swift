@@ -210,7 +210,7 @@ public enum MacroExpander {
     ) throws
         -> ConstructDeclaration
     {
-        let carriedInitializers = carriedInitializerMacros(
+        let carriedInitializers = carriedProtocolInitializerMacros(
             for: construct.initializers,
             conformances: construct.conformances,
             protocols: protocols
@@ -535,7 +535,10 @@ public enum MacroExpander {
         }
     }
 
-    static func carriedInitializerMacros(
+    // Protocol init requirements may carry macros. Conformance realization
+    // applies those macros to matching concrete initializers before later
+    // invocation-side attached-init macro execution runs.
+    static func carriedProtocolInitializerMacros(
         for initializers: [InitializerDeclaration],
         conformances: [TypeReference],
         protocols: [String: ProtocolDeclaration]
@@ -551,7 +554,7 @@ public enum MacroExpander {
             let carried =
                 requirementInitializers
                 .filter { requirement in
-                    initializerSignatureMatches(lhs: requirement, rhs: initializer)
+                    carriedInitializerSignatureMatches(lhs: requirement, rhs: initializer)
                 }
                 .flatMap(\.macros)
 
@@ -576,7 +579,7 @@ public enum MacroExpander {
         }
     }
 
-    static func initializerSignatureMatches(
+    static func carriedInitializerSignatureMatches(
         lhs: InitializerDeclaration,
         rhs: InitializerDeclaration
     ) -> Bool {
