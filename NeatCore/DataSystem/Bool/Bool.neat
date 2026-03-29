@@ -2,5 +2,7 @@
 construct Bool: ExpressableByBoolLiteral, Equatable, Hashable {
     value storage: BoolStorage
 
-    init(literal: BoolLiteral)
+    init(literal: BoolLiteral) {
+        self.storage = literal.storage()
+    }
 }

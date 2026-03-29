@@ -3,20 +3,53 @@ construct Array<Element>: ExpressableByArrayLiteral {
     state storage: ArrayStorage<Element>
 
     init()
-    init(literal: ArrayLiteral)
+    init(literal: ArrayLiteral) {
+        self.storage = literal.storage()
+    }
 
-    derived count: Int
-    derived isEmpty: Bool
+    derived count: Int {
+        storage.count
+    }
 
-    function append(element: Element)
-    function element(index: Int) -> Element
-    function first() -> Element?
-    function last() -> Element?
-    function update(element: Element, index: Int)
-    function insert(element: Element, index: Int)
-    function remove(index: Int) -> Element
-    function removeLast() -> Element?
-    function clear()
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
+
+    function append(element: Element) {
+        storage.append(element: element)
+    }
+
+    function element(index: Int) -> Element {
+        return storage.element(index: index)
+    }
+
+    function first() -> Element? {
+        return storage.first()
+    }
+
+    function last() -> Element? {
+        return storage.last()
+    }
+
+    function update(element: Element, index: Int) {
+        storage.update(element: element, index: index)
+    }
+
+    function insert(element: Element, index: Int) {
+        storage.insert(element: element, index: index)
+    }
+
+    function remove(index: Int) -> Element {
+        return storage.remove(index: index)
+    }
+
+    function removeLast() -> Element? {
+        return storage.removeLast()
+    }
+
+    function clear() {
+        storage.clear()
+    }
 
     function filter(include: (Element) -> Bool) -> Array<Element>
 }

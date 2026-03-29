@@ -3,14 +3,35 @@ construct Dictionary<Key: Hashable, Value>: ExpressableByDictionaryLiteral {
     state storage: DictionaryStorage<Key, Value>
 
     init()
-    init(literal: DictionaryLiteral)
+    init(literal: DictionaryLiteral) {
+        self.storage = literal.storage()
+    }
 
-    derived count: Int
-    derived isEmpty: Bool
+    derived count: Int {
+        storage.count
+    }
 
-    function value(key: Key) -> Value?
-    function updateValue(value: Value, key: Key)
-    function removeValue(key: Key) -> Value?
-    function contains(key: Key) -> Bool
-    function clear()
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
+
+    function value(key: Key) -> Value? {
+        return storage.value(key: key)
+    }
+
+    function updateValue(value: Value, key: Key) {
+        storage.updateValue(value: value, key: key)
+    }
+
+    function removeValue(key: Key) -> Value? {
+        return storage.removeValue(key: key)
+    }
+
+    function contains(key: Key) -> Bool {
+        return storage.contains(key: key)
+    }
+
+    function clear() {
+        storage.clear()
+    }
 }

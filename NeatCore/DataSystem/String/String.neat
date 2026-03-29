@@ -2,5 +2,7 @@
 construct String: ExpressableByStringLiteral, Equatable, Hashable, Comparable {
     value storage: StringStorage
 
-    init(literal: StringLiteral)
+    init(literal: StringLiteral) {
+        self.storage = literal.storage()
+    }
 }

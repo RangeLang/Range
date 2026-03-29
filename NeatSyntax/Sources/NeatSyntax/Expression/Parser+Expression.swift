@@ -24,6 +24,11 @@ extension Parser {
             try consume(.colon)
             return CallArgument(label: label, value: try parseExpression())
         }
+        if case .keyword(let label) = peek(), peek(offset: 1) == .colon {
+            advance()
+            try consume(.colon)
+            return CallArgument(label: label, value: try parseExpression())
+        }
         return CallArgument(label: nil, value: try parseExpression())
     }
 
