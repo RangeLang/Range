@@ -12,6 +12,10 @@ public enum SourceFileNode {
 
 public struct MainBlockNode {
     public let body: [Statement]
+
+    public init(body: [Statement]) {
+        self.body = body
+    }
 }
 
 public struct ModuleFileNode {
@@ -25,4 +29,28 @@ public struct ModuleFileNode {
     public let precedenceGroups: [PrecedenceGroupDeclaration]
     public let operators: [OperatorDeclaration]
     public let extensions: [ExtensionDeclaration]
+
+    public init(
+        mainBlock: MainBlockNode?,
+        states: [StateDeclaration],
+        callables: [CallableDeclaration],
+        constructs: [ConstructDeclaration],
+        enumerations: [EnumDeclaration],
+        protocols: [ProtocolDeclaration],
+        macros: [MacroDeclaration],
+        precedenceGroups: [PrecedenceGroupDeclaration],
+        operators: [OperatorDeclaration],
+        extensions: [ExtensionDeclaration]
+    ) {
+        self.mainBlock = mainBlock
+        self.states = states
+        self.callables = callables
+        self.constructs = constructs
+        self.enumerations = enumerations
+        self.protocols = protocols
+        self.macros = macros
+        self.precedenceGroups = precedenceGroups
+        self.operators = operators
+        self.extensions = extensions
+    }
 }

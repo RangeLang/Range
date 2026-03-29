@@ -33,11 +33,21 @@ public indirect enum Statement {
 public struct StatementConditionalBranch {
     public let condition: Expression?
     public let body: [Statement]
+
+    public init(condition: Expression?, body: [Statement]) {
+        self.condition = condition
+        self.body = body
+    }
 }
 
 public struct SwitchCase {
     public let value: Expression
     public let body: [Statement]
+
+    public init(value: Expression, body: [Statement]) {
+        self.value = value
+        self.body = body
+    }
 }
 
 public enum LocalBindingKind {

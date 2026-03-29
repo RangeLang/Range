@@ -31,7 +31,8 @@ struct SwiftBackendDriver {
             if FileManager.default.fileExists(atPath: buildRoot.path) {
                 try FileManager.default.removeItem(at: buildRoot)
             }
-            try SwiftBackendEmitter().emitWorkspace(program: program, at: buildRoot)
+            let loweredProgram = SwiftBackendLowerer().lower(program: program)
+            try SwiftBackendEmitter().emitWorkspace(program: loweredProgram, at: buildRoot)
             return buildRoot
         }
 
@@ -46,7 +47,8 @@ struct SwiftBackendDriver {
         if FileManager.default.fileExists(atPath: buildRoot.path) {
             try FileManager.default.removeItem(at: buildRoot)
         }
-        try SwiftBackendEmitter().emitWorkspace(program: program, at: buildRoot)
+        let loweredProgram = SwiftBackendLowerer().lower(program: program)
+        try SwiftBackendEmitter().emitWorkspace(program: loweredProgram, at: buildRoot)
         return buildRoot
     }
 
@@ -83,7 +85,8 @@ struct SwiftBackendDriver {
         let outputURL = URL(fileURLWithPath: outputPath).standardizedFileURL
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-        let swift = try SwiftBackendEmitter().emit(program: program)
+        let loweredProgram = SwiftBackendLowerer().lower(program: program)
+        let swift = try SwiftBackendEmitter().emit(program: loweredProgram)
         try swift.write(to: outputURL, atomically: true, encoding: .utf8)
     }
 

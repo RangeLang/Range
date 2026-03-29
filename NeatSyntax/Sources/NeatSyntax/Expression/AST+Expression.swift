@@ -21,11 +21,21 @@ public indirect enum Expression {
 public struct CallArgument {
     public let label: String?
     public let value: Expression
+
+    public init(label: String?, value: Expression) {
+        self.label = label
+        self.value = value
+    }
 }
 
 public struct DictionaryElement {
     public let key: Expression
     public let value: Expression
+
+    public init(key: Expression, value: Expression) {
+        self.key = key
+        self.value = value
+    }
 }
 
 public enum UnaryOperator: String {
@@ -47,6 +57,10 @@ public enum BinaryOperator: String {
 
 public struct InterpolatedString {
     public let segments: [StringSegment]
+
+    public init(segments: [StringSegment]) {
+        self.segments = segments
+    }
 }
 
 public indirect enum StringSegment {

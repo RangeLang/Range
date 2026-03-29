@@ -21,6 +21,36 @@ public struct ConstructDeclaration {
     public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
 
+    public init(
+        macros: [MacroApplication],
+        kind: ConstructKind,
+        attribute: AttributeApplication?,
+        name: String,
+        genericParameters: [GenericParameter],
+        conformances: [TypeReference],
+        states: [StateDeclaration],
+        environments: [EnvironmentDeclaration],
+        bindings: [BindingDeclaration],
+        deriveds: [DerivedDeclaration],
+        values: [ValueDeclaration],
+        initializers: [InitializerDeclaration],
+        callables: [CallableDeclaration]
+    ) {
+        self.macros = macros
+        self.kind = kind
+        self.attribute = attribute
+        self.name = name
+        self.genericParameters = genericParameters
+        self.conformances = conformances
+        self.states = states
+        self.environments = environments
+        self.bindings = bindings
+        self.deriveds = deriveds
+        self.values = values
+        self.initializers = initializers
+        self.callables = callables
+    }
+
     public var isCore: Bool {
         attribute?.name == "core"
     }
@@ -29,4 +59,9 @@ public struct ConstructDeclaration {
 public struct AttributeApplication {
     public let name: String
     public let argument: String?
+
+    public init(name: String, argument: String?) {
+        self.name = name
+        self.argument = argument
+    }
 }
