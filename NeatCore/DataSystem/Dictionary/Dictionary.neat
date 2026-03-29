@@ -1,9 +1,38 @@
 @core
 construct Dictionary<Key: Hashable, Value>: ExpressableByDictionaryLiteral {
-    // Dictionary remains opaque until hashing/storage semantics are settled.
+    state storage: DictionaryStorage<Key, Value>
+
     init()
-    init(literal: DictionaryLiteral)
-    derived count: Int
-    function value(for key: Key) -> Value?
-    function updateValue(value: Value, for key: Key)
+
+    init(literal: DictionaryLiteral) {
+        self.storage = literal.storage()
+    }
+
+    derived count: Int {
+        storage.count
+    }
+
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
+
+    function value(for key: Key) -> Value? {
+        storage.value(for: key)
+    }
+
+    function updateValue(value: Value, for key: Key) {
+        storage.updateValue(value: value, for: key)
+    }
+
+    function removeValue(for key: Key) -> Value? {
+        storage.removeValue(for: key)
+    }
+
+    function contains(key: Key) -> Bool {
+        storage.contains(key: key)
+    }
+
+    function clear() {
+        storage.clear()
+    }
 }

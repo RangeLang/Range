@@ -1,0 +1,10 @@
+@core
+construct SetStorage<Element: Hashable> {
+    init()
+    derived count: Int
+    derived isEmpty: Bool
+    function contains(element: Element) -> Bool
+    function insert(element: Element)
+    function remove(element: Element) -> Element?
+    function clear()
+}

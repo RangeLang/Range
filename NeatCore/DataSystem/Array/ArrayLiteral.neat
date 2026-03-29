@@ -1,4 +1,4 @@
 @core
 construct ArrayLiteral {
-    function buffer<Element>() -> Buffer<Element>
+    function storage<Element>() -> ArrayStorage<Element>
 }

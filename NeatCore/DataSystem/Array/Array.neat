@@ -1,55 +1,55 @@
 @core
 construct Array<Element>: ExpressableByArrayLiteral {
-    state buffer: Buffer<Element>
+    state storage: ArrayStorage<Element>
 
     init()
 
     init(literal: ArrayLiteral) {
-        self.buffer = literal.buffer()
+        self.storage = literal.storage()
     }
 
     derived count: Int {
-        buffer.count
+        storage.count
     }
 
     derived isEmpty: Bool {
-        buffer.isEmpty
+        storage.isEmpty
     }
 
     function append(element: Element) {
-        buffer.append(element: element)
+        storage.append(element: element)
     }
 
     function element(index: Int) -> Element {
-        buffer.element(index: index)
+        storage.element(index: index)
     }
 
     function first() -> Element? {
-        buffer.first()
+        storage.first()
     }
 
     function last() -> Element? {
-        buffer.last()
+        storage.last()
     }
 
     function update(element: Element, index: Int) {
-        buffer.update(element: element, index: index)
+        storage.update(element: element, index: index)
     }
 
     function insert(element: Element, index: Int) {
-        buffer.insert(element: element, index: index)
+        storage.insert(element: element, index: index)
     }
 
     function remove(index: Int) -> Element {
-        buffer.remove(index: index)
+        storage.remove(index: index)
     }
 
     function removeLast() -> Element? {
-        buffer.removeLast()
+        storage.removeLast()
     }
 
     function clear() {
-        buffer.clear()
+        storage.clear()
     }
 
     // Collection transforms belong on Array semantics, not on ArrayLiteral.

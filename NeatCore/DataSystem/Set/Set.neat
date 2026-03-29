@@ -1,9 +1,34 @@
 @core
 construct Set<Element: Hashable>: ExpressableBySetLiteral {
-    // Set remains opaque until uniqueness and hashing semantics are settled.
+    state storage: SetStorage<Element>
+
     init()
-    init(literal: SetLiteral)
-    derived count: Int
-    function contains(element: Element) -> Bool
-    function insert(element: Element)
+
+    init(literal: SetLiteral) {
+        self.storage = literal.storage()
+    }
+
+    derived count: Int {
+        storage.count
+    }
+
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
+
+    function contains(element: Element) -> Bool {
+        storage.contains(element: element)
+    }
+
+    function insert(element: Element) {
+        storage.insert(element: element)
+    }
+
+    function remove(element: Element) -> Element? {
+        storage.remove(element: element)
+    }
+
+    function clear() {
+        storage.clear()
+    }
 }

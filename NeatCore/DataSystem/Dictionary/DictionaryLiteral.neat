@@ -1,2 +1,4 @@
 @core
-construct DictionaryLiteral { }
+construct DictionaryLiteral {
+    function storage<Key: Hashable, Value>() -> DictionaryStorage<Key, Value>
+}
