@@ -13,4 +13,5 @@ construct ArrayStorage<Element> {
     function remove(index: Int) -> Element
     function removeLast() -> Element?
     function clear()
+    function filter(include: (Element) -> Bool) -> ArrayStorage<Element>
 }

@@ -3,6 +3,11 @@ construct Array<Element>: ExpressableByArrayLiteral {
     state storage: ArrayStorage<Element>
 
     init()
+
+    init(storage: ArrayStorage<Element>) {
+        self.storage = storage
+    }
+
     init(literal: ArrayLiteral) {
         self.storage = literal.storage()
     }
@@ -51,5 +56,7 @@ construct Array<Element>: ExpressableByArrayLiteral {
         storage.clear()
     }
 
-    function filter(include: (Element) -> Bool) -> Array<Element>
+    function filter(include: (Element) -> Bool) -> Array<Element> {
+        return Array(storage: storage.filter(include: include))
+    }
 }
