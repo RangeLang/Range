@@ -1,4 +1,2 @@
 @core
-construct SetLiteral {
-    function storage<Element: Hashable>() -> SetStorage<Element>
-}
+construct SetLiteral { }

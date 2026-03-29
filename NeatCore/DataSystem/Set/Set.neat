@@ -3,32 +3,13 @@ construct Set<Element: Hashable>: ExpressableBySetLiteral {
     state storage: SetStorage<Element>
 
     init()
+    init(literal: SetLiteral)
 
-    init(literal: SetLiteral) {
-        self.storage = literal.storage()
-    }
+    derived count: Int
+    derived isEmpty: Bool
 
-    derived count: Int {
-        storage.count
-    }
-
-    derived isEmpty: Bool {
-        storage.isEmpty
-    }
-
-    function contains(element: Element) -> Bool {
-        storage.contains(element: element)
-    }
-
-    function insert(element: Element) {
-        storage.insert(element: element)
-    }
-
-    function remove(element: Element) -> Element? {
-        storage.remove(element: element)
-    }
-
-    function clear() {
-        storage.clear()
-    }
+    function contains(element: Element) -> Bool
+    function insert(element: Element)
+    function remove(element: Element) -> Element?
+    function clear()
 }

@@ -2,7 +2,5 @@
 construct Float<value width: FloatingPointWidth>: ExpressableByFloatLiteral, Equatable, Hashable, Comparable {
     value storage: FloatStorage
 
-    init(literal: FloatLiteral) {
-        self.storage = literal.storage()
-    }
+    init(literal: FloatLiteral)
 }

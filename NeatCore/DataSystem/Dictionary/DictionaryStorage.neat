@@ -1,11 +1,12 @@
 @core
 construct DictionaryStorage<Key: Hashable, Value> {
     init()
+    init(literal: DictionaryLiteral)
     derived count: Int
     derived isEmpty: Bool
-    function value(for key: Key) -> Value?
-    function updateValue(value: Value, for key: Key)
-    function removeValue(for key: Key) -> Value?
+    function value(key: Key) -> Value?
+    function updateValue(value: Value, key: Key)
+    function removeValue(key: Key) -> Value?
     function contains(key: Key) -> Bool
     function clear()
 }

@@ -1,6 +1,7 @@
 @core
 construct ArrayStorage<Element> {
     init()
+    init(literal: ArrayLiteral)
     derived count: Int
     derived isEmpty: Bool
     function append(element: Element)

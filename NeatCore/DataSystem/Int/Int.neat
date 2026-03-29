@@ -2,7 +2,5 @@
 construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressableByIntLiteral, Equatable, Hashable, Comparable {
     value storage: IntStorage
 
-    init(literal: IntLiteral) {
-        self.storage = literal.storage()
-    }
+    init(literal: IntLiteral)
 }

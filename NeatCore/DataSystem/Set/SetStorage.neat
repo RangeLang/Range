@@ -1,6 +1,7 @@
 @core
 construct SetStorage<Element: Hashable> {
     init()
+    init(literal: SetLiteral)
     derived count: Int
     derived isEmpty: Bool
     function contains(element: Element) -> Bool
