@@ -2,6 +2,14 @@
 construct Buffer<Element> {
     init()
     derived count: Int
+    derived isEmpty: Bool
     function append(element: Element)
     function element(index: Int) -> Element
+    function first() -> Element?
+    function last() -> Element?
+    function update(element: Element, index: Int)
+    function insert(element: Element, index: Int)
+    function remove(index: Int) -> Element
+    function removeLast() -> Element?
+    function clear()
 }

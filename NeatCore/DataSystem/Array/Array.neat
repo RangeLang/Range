@@ -8,8 +8,13 @@ construct Array<Element>: ExpressableByArrayLiteral {
         self.buffer = literal.buffer()
     }
 
-    derived count: Int
-    derived isEmpty: Bool
+    derived count: Int {
+        buffer.count
+    }
+
+    derived isEmpty: Bool {
+        buffer.isEmpty
+    }
 
     function append(element: Element) {
         buffer.append(element: element)
@@ -19,8 +24,33 @@ construct Array<Element>: ExpressableByArrayLiteral {
         buffer.element(index: index)
     }
 
-    function first() -> Element?
-    function last() -> Element?
+    function first() -> Element? {
+        buffer.first()
+    }
+
+    function last() -> Element? {
+        buffer.last()
+    }
+
+    function update(element: Element, index: Int) {
+        buffer.update(element: element, index: index)
+    }
+
+    function insert(element: Element, index: Int) {
+        buffer.insert(element: element, index: index)
+    }
+
+    function remove(index: Int) -> Element {
+        buffer.remove(index: index)
+    }
+
+    function removeLast() -> Element? {
+        buffer.removeLast()
+    }
+
+    function clear() {
+        buffer.clear()
+    }
 
     // Collection transforms belong on Array semantics, not on ArrayLiteral.
     function map<Result>(_ transform: (Element) -> Result) -> Array<Result>
