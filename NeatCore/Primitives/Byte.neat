@@ -1,7 +1,0 @@
-@core
-construct Byte {
-    // Byte is semantically 8 bits even though fixed-size enforcement is not implemented yet.
-    value bits: [Bit]
-
-    init()
-}

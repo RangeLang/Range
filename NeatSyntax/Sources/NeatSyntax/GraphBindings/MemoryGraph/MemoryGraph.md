@@ -138,12 +138,35 @@ construct Book {
 construct IntLiteral { }
 
 @core
+construct IntStorage {
+    init(literal: IntLiteral)
+}
+
+@core
 construct Int {
-    value literal: IntLiteral
+    value storage: IntStorage
 }
 ```
 
-`Int.literal` is modeled as plain value composition rather than a construct-identity relationship.
+`Int.storage` is modeled as plain value composition rather than a construct-identity relationship.
+
+- Wrapper types may delegate representation to dedicated storage primitives.
+
+```neat
+@core
+construct ArrayStorage<Element> { }
+
+@core
+construct Array<Element> {
+    state storage: ArrayStorage<Element>
+}
+```
+
+This keeps wrapper semantics and representation semantics separate:
+
+- `Array` remains the language-facing collection type
+- `ArrayStorage` is the mutable storage primitive owned by `Array`
+- a backend may realize that storage in different ways without changing `Array` semantics
 
 - Every construct is identity-bearing even when identity is not written explicitly.
 

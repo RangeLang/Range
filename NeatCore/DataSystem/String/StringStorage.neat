@@ -1,0 +1,4 @@
+@core
+construct StringStorage {
+    init()
+}

@@ -1,4 +1,6 @@
 @core
-construct BoolLiteral {
-    value raw: Bit
+construct BoolLiteral { }
+
+extension BoolLiteral {
+    function storage() -> BoolStorage
 }

@@ -1,8 +1,8 @@
 @core
 construct Bool: ExpressableByBoolLiteral, Equatable, Hashable {
-    value raw: Bit
+    value storage: BoolStorage
 
     init(literal: BoolLiteral) {
-        self.raw = literal.raw
+        self.storage = literal.storage()
     }
 }

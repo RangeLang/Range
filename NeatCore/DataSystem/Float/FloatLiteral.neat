@@ -1,2 +1,6 @@
 @core
 construct FloatLiteral { }
+
+extension FloatLiteral {
+    function storage() -> FloatStorage
+}

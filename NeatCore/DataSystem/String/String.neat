@@ -1,9 +1,8 @@
 @core
 construct String: ExpressableByStringLiteral, Equatable, Hashable, Comparable {
-    // String is modeled as UTF-8-oriented byte storage at the semantic level.
-    value bytes: [Byte]
+    value storage: StringStorage
 
     init(literal: StringLiteral) {
-        self.bytes = literal.bytes()
+        self.storage = literal.storage()
     }
 }

@@ -24,19 +24,15 @@ If the compiler has special knowledge of one of these types, that knowledge shou
 The main foundational type and protocol layer:
 
 - Scalar/data families: `Int`, `String`, `Bool`, `Float`, `Data`, `Void`
+- Scalar storage families: `IntStorage`, `StringStorage`, `BoolStorage`, `FloatStorage`
 - Literal carrier types: `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, `SetLiteral`
 - Literal bridge protocols: `ExpressableByIntLiteral`, `ExpressableByStringLiteral`, `ExpressableByBoolLiteral`, `ExpressableByFloatLiteral`, `ExpressableByNilLiteral`, `ExpressableByArrayLiteral`, `ExpressableByDictionaryLiteral`, `ExpressableBySetLiteral`
 - Core generic data types: `Optional`, `Array`, `Dictionary`, `Set`
+- Collection storage families: `ArrayStorage`, `DictionaryStorage`, `SetStorage`
 - Foundational protocols: `Equatable`, `Hashable`, `Comparable`
 - Supporting enums: `Signedness`, `FloatingPointWidth`
 
 These definitions are intentionally minimal. They describe the language-facing model first; they do not yet imply that every type already has a complete runtime/storage implementation behind it.
-
-### `Primitives`
-
-Low-level compiler-facing building blocks such as `Bit` and `Byte`.
-
-These are closer to the implementation boundary than the main `DataSystem` layer.
 
 ### `Operators`
 
@@ -59,6 +55,7 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 - Literal bridging currently uses `#literal<T>` on protocol initializer requirements plus literal carrier types.
 - The compiler recognizes the literal carrier types themselves, such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, and `SetLiteral`.
 - Everything beyond carrier recognition is modeled as literal bridge macro behavior carried through conformance.
+- Language-facing wrapper types increasingly use dedicated `...Storage` members as the semantic representation boundary. This keeps wrapper semantics in `NeatCore` while leaving backend/runtime realization free to evolve behind those storage types.
 - Type sugar and literal sugar are still separate concerns. For example, `#literal<NilLiteral>` is part of the core surface, while `T? -> Optional<T>` remains compiler type sugar.
 - Literal meaning is settled on the Neat side before any target backend runs. A semantic result such as `Int(literal: 5)` belongs to Neat correctness even if a backend later lowers it to a target-native form.
 
@@ -67,6 +64,7 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 `NeatCore` is still an early foundation layer. In particular:
 
 - Collection storage/lowering is not complete yet.
+- Scalar and collection `...Storage` types are still semantic boundary types rather than fully realized runtime/storage implementations.
 - `Set` and `Dictionary` do not yet have full `Equatable` or `Hashable` conformances.
 - There is no public `Hasher` model yet.
 - Conformance synthesis and macro-driven derivation are still exploratory.
@@ -89,5 +87,6 @@ More precisely:
 - Neat and `NeatCore` define language semantics.
 - A backend such as Swift may adapt those settled semantics to a target representation.
 - Target adaptation must not become the source of truth for language meaning.
+- Wrapper types such as `Int`, `String`, `Array`, `Dictionary`, and `Set` may delegate representation concerns to `...Storage` types without giving up their role as the semantic source of truth.
 
 That means foundational language types and protocols such as `Int`, `String`, `Bool`, `Float`, `Data`, `Optional`, `Array`, `Dictionary`, `Set`, `Equatable`, `Hashable`, and `Comparable` belong in `NeatCore`, not as the real source of truth inside Swift compiler enums.

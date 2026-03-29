@@ -35,7 +35,7 @@
 ```neat
 @core
 construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressableByIntLiteral {
-    value data: [Bit]
+    value storage: IntStorage
 }
 ```
 

@@ -1,4 +1,8 @@
 @core
 construct Float<value width: FloatingPointWidth>: ExpressableByFloatLiteral, Equatable, Hashable, Comparable {
-    init(literal: FloatLiteral)
+    value storage: FloatStorage
+
+    init(literal: FloatLiteral) {
+        self.storage = literal.storage()
+    }
 }

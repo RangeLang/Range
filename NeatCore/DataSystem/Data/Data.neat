@@ -1,9 +1,6 @@
 @core
 construct Data: Equatable, Hashable {
-    // Data is an opaque raw byte sequence, not a numeric scalar.
-    value bytes: [Byte]
+    value storage: DataStorage
 
-    init(bytes: [Byte]) {
-        self.bytes = bytes
-    }
+    init(storage: DataStorage)
 }
