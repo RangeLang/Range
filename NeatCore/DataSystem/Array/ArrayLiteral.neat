@@ -1,2 +1,4 @@
 @core
-construct ArrayLiteral { }
+construct ArrayLiteral {
+    function buffer<Element>() -> Buffer<Element>
+}

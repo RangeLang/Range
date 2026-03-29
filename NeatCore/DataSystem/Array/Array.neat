@@ -1,9 +1,29 @@
 @core
 construct Array<Element>: ExpressableByArrayLiteral {
-    // Array remains opaque at the core level until its storage/lowering is settled.
+    value buffer: Buffer<Element>
+
     init()
-    init(literal: ArrayLiteral)
+
+    init(literal: ArrayLiteral) {
+        self.buffer = literal.buffer()
+    }
+
     derived count: Int
-    function append(element: Element)
-    function element(index: Int) -> Element
+    derived isEmpty: Bool
+
+    function append(element: Element) {
+        buffer.append(element: element)
+    }
+
+    function element(index: Int) -> Element {
+        buffer.element(index: index)
+    }
+
+    function first() -> Element?
+    function last() -> Element?
+
+    // Collection transforms belong on Array semantics, not on ArrayLiteral.
+    function map<Result>(_ transform: (Element) -> Result) -> Array<Result>
+    function filter(_ include: (Element) -> Bool) -> Array<Element>
+    function compactMap<Result>(_ transform: (Element) -> Result?) -> Array<Result>
 }

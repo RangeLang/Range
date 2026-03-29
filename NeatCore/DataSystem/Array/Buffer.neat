@@ -1,0 +1,7 @@
+@core
+construct Buffer<Element> {
+    init()
+    derived count: Int
+    function append(element: Element)
+    function element(index: Int) -> Element
+}
