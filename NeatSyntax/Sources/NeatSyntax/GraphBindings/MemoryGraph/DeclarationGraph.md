@@ -14,6 +14,11 @@ It exists between syntax and the memory graph:
 - the declaration graph records resolved declaration semantics
 - the memory graph records storage, ownership, aliasing, mutation, and derived dependencies
 
+It also precedes backend adaptation:
+
+- the declaration graph resolves what a program means in Neat
+- a backend later adapts that semantic result to a target representation
+
 ## Mental Model
 
 - The declaration graph is not a runtime graph. It is a compiler graph.
@@ -82,6 +87,10 @@ construct Int: ExpressableByIntLiteral {
 
 From the declaration graph, the compiler can derive that `Int` accepts `IntLiteral`.
 
+- Default literal resolution should also be derived after declaration-graph realization.
+
+If a literal has no contextual type, the semantic phase may choose a preferred destination such as an `@core` bridge. That is still part of Neat semantics, not backend behavior.
+
 - The declaration graph precedes the memory graph.
 
 ```neat
@@ -115,6 +124,20 @@ The relevant graph facts are:
 - `String.init(literal:)` satisfies that requirement
 - therefore `String` accepts `StringLiteral`
 
+If source contains:
+
+```neat
+state title = "hello"
+```
+
+then the declaration graph and literal-resolution rules may derive a semantic result such as:
+
+```neat
+String(literal: "hello")
+```
+
+That semantic result is settled before any backend runs.
+
 - Derived protocol semantics also belong in the declaration graph.
 
 ```neat
@@ -135,4 +158,5 @@ The graph should represent that `Point` conforms to `Equatable` and inherits the
 
 - The declaration graph is the right layer for protocol semantics, conformance realization, attached macro carry, and similar declaration-to-declaration reasoning.
 - The memory graph should consume declaration-graph results rather than re-resolving protocol and macro relationships itself.
+- Backends should consume declaration-graph-derived semantic results rather than redefining literal compatibility or bridge meaning.
 - The compiler's current dependency graph machinery can evolve toward this role, but the language model should be expressed in terms of declaration semantics rather than implementation-specific lookup tables.

@@ -45,3 +45,20 @@ For literal bridging specifically:
 - `T` is a literal carrier type recognized by the compiler.
 - The compiler recognizes literal categories and carrier types.
 - The macro model carries the bridge through protocol requirements and conformances, then rewrites concrete use sites through the realized initializer.
+- This rewrite is part of Neat semantic correctness, not backend adaptation.
+- A semantic rewrite such as `5 -> Int(literal: 5)` is the correct Neat result even if a backend later chooses a different target-specific representation.
+
+## Backend Boundary
+
+Literal bridge realization belongs to the Neat semantic phase.
+
+- The semantic phase decides what a literal means in Neat.
+- A backend phase decides how to represent that meaning in a target language such as Swift or C.
+- Backend adaptation must not replace declaration-graph literal resolution as the source of truth.
+
+For example:
+
+- semantic result: `Int(literal: 5)`
+- Swift backend adaptation may later lower that to a Swift-native form
+
+The important boundary is that the backend may adapt a settled semantic result, but it does not define literal meaning.

@@ -60,6 +60,7 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 - The compiler recognizes the literal carrier types themselves, such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, and `SetLiteral`.
 - Everything beyond carrier recognition is modeled as literal bridge macro behavior carried through conformance.
 - Type sugar and literal sugar are still separate concerns. For example, `#literal<NilLiteral>` is part of the core surface, while `T? -> Optional<T>` remains compiler type sugar.
+- Literal meaning is settled on the Neat side before any target backend runs. A semantic result such as `Int(literal: 5)` belongs to Neat correctness even if a backend later lowers it to a target-native form.
 
 ## Current Limits
 
@@ -82,5 +83,11 @@ In short: Swift hosts the compiler today, but Neat's basic world should increasi
 Swift may define compiler implementation types such as parser enums, lowering state, backend structures, and other internal machinery.
 
 Neat should define the language-visible type world.
+
+More precisely:
+
+- Neat and `NeatCore` define language semantics.
+- A backend such as Swift may adapt those settled semantics to a target representation.
+- Target adaptation must not become the source of truth for language meaning.
 
 That means foundational language types and protocols such as `Int`, `String`, `Bool`, `Float`, `Data`, `Optional`, `Array`, `Dictionary`, `Set`, `Equatable`, `Hashable`, and `Comparable` belong in `NeatCore`, not as the real source of truth inside Swift compiler enums.
