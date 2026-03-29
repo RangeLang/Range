@@ -1,6 +1,6 @@
 @core
 construct Array<Element>: ExpressableByArrayLiteral {
-    value buffer: Buffer<Element>
+    state buffer: Buffer<Element>
 
     init()
 
