@@ -1,2 +1,4 @@
 @core
-construct ArrayLiteral { }
+construct ArrayLiteral {
+    function storage<Element>() -> ArrayStorage<Element>
+}

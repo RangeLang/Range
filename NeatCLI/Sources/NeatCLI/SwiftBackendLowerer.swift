@@ -68,6 +68,7 @@ struct SwiftBackendLowerer {
             macros: callable.macros,
             targetType: callable.targetType,
             name: callable.name,
+            genericParameters: callable.genericParameters,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
             parameters: callable.parameters,
             returnType: callable.returnType,

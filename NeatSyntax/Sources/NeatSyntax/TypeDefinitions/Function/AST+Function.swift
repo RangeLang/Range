@@ -35,6 +35,7 @@ public struct CallableDeclaration {
     public let macros: [MacroApplication]
     public let targetType: TypeReference?
     public let name: String
+    public let genericParameters: [GenericParameter]
     public let hasExplicitParameterClause: Bool
     public let parameters: [NeatFunctionParameter]
     public let returnType: TypeReference?
@@ -44,6 +45,7 @@ public struct CallableDeclaration {
         macros: [MacroApplication],
         targetType: TypeReference?,
         name: String,
+        genericParameters: [GenericParameter],
         hasExplicitParameterClause: Bool,
         parameters: [NeatFunctionParameter],
         returnType: TypeReference?,
@@ -52,6 +54,7 @@ public struct CallableDeclaration {
         self.macros = macros
         self.targetType = targetType
         self.name = name
+        self.genericParameters = genericParameters
         self.hasExplicitParameterClause = hasExplicitParameterClause
         self.parameters = parameters
         self.returnType = returnType

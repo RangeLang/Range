@@ -273,6 +273,7 @@ public enum MacroExpander {
             macros: callable.macros,
             targetType: callable.targetType,
             name: callable.name,
+            genericParameters: callable.genericParameters,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
             parameters: expand(parameters: callable.parameters, macros: macros),
             returnType: callable.returnType,

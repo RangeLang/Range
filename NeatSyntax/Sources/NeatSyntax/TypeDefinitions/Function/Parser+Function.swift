@@ -21,6 +21,7 @@ extension Parser {
         advance()
 
         let name = try consumeCallableName()
+        let genericParameters = try parseConstructGenericParameterClauseIfPresent()
         let hasExplicitParameterClause = peek() == .leftParen
         guard hasExplicitParameterClause else {
             throw ParseError(
@@ -40,6 +41,7 @@ extension Parser {
             macros: macros,
             targetType: targetType,
             name: name,
+            genericParameters: genericParameters,
             hasExplicitParameterClause: hasExplicitParameterClause,
             parameters: parameters,
             returnType: returnType,
@@ -88,6 +90,7 @@ extension Parser {
             macros: [],
             targetType: nil,
             name: mappedName,
+            genericParameters: [],
             hasExplicitParameterClause: true,
             parameters: parameters,
             returnType: returnType,
