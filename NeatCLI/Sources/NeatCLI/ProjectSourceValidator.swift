@@ -19,9 +19,9 @@ enum ProjectSourceValidator {
         for files: [URL],
         includeCore: Bool = true
     ) throws -> SemanticProgram {
-        let program = try semanticProgram(for: files, includeCore: includeCore)
-        try SemanticProgramValidator().validate(program)
-        return program
+        try CompilerPipeline().buildValidated(
+            inputs: sourceInputs(for: files, includeCore: includeCore)
+        )
     }
 
     static func expandedParsedFiles(
@@ -49,8 +49,9 @@ enum ProjectSourceValidator {
     }
 
     static func validatePrimaryDeclarations(in files: [URL]) throws {
-        let program = try semanticProgram(for: files)
-        try SemanticProgramValidator().validatePrimaryDeclarations(in: program)
+        try CompilerPipeline().validatePrimaryDeclarations(
+            inputs: sourceInputs(for: files, includeCore: true)
+        )
     }
 
     private static func sourceInputs(

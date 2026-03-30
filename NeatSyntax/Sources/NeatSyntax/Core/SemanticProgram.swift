@@ -90,6 +90,17 @@ public struct CompilerPipeline {
         )
     }
 
+    public func buildValidated(inputs: [SourceInput]) throws -> SemanticProgram {
+        let program = try build(inputs: inputs)
+        try SemanticProgramValidator().validate(program)
+        return program
+    }
+
+    public func validatePrimaryDeclarations(inputs: [SourceInput]) throws {
+        let program = try build(inputs: inputs)
+        try SemanticProgramValidator().validatePrimaryDeclarations(in: program)
+    }
+
     private func parse(
         inputs: [SourceInput],
         literalBridgeResolver: LiteralBridgeResolver
