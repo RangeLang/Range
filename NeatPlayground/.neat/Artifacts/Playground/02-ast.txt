@@ -87,6 +87,7 @@ AST:
             ▿ NeatSyntax.StateDeclaration
               - macros: 0 elements
               - name: "age"
+              - hasExplicitTypeAnnotation: true
               ▿ type: NeatSyntax.TypeReference.named
                 - named: "Int"
               - storage: NeatSyntax.StateStorage.declared
@@ -128,6 +129,7 @@ AST:
               - macros: 0 elements
               - targetType: nil
               - name: "incrementAge"
+              - genericParameters: 0 elements
               - hasExplicitParameterClause: true
               - parameters: 0 elements
               - returnType: nil

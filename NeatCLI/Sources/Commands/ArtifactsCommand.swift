@@ -29,11 +29,12 @@ extension NeatCLI {
                     withIntermediateDirectories: true
                 )
 
-                let expandedParsedFiles = try ProjectSourceValidator.expandedParsedFiles(for: files)
+                let program = try ProjectSourceValidator.semanticProgram(for: files)
                 let expandedByPath = Dictionary(
-                    uniqueKeysWithValues: expandedParsedFiles.map { ($0.url.path, $0.sourceFile) }
+                    uniqueKeysWithValues: program.projectExpandedFiles.map {
+                        ($0.path, $0.sourceFile)
+                    }
                 )
-                var parsedFiles: [ParsedSourceFile] = []
 
                 for fileURL in files {
                     let source = try String(contentsOf: fileURL, encoding: .utf8)
@@ -63,12 +64,7 @@ extension NeatCLI {
                         guard let expandedSourceFile = expandedByPath[fileURL.path] else {
                             throw ValidationError("Failed to expand \(fileURL.lastPathComponent).")
                         }
-                        parsedFiles.append(
-                            ParsedSourceFile(
-                                path: fileURL.path,
-                                sourceFile: expandedSourceFile
-                            )
-                        )
+                        _ = expandedSourceFile
                     } catch {
                         let message = """
                             Parse error:
@@ -82,16 +78,14 @@ extension NeatCLI {
                     }
                 }
 
-                let rawCoreFiles = try NeatCoreLoader.parsedDependencyFiles()
-                let graphFiles = try MacroExpander.expand(files: rawCoreFiles + parsedFiles)
-                let graph = renderer.renderGraph(files: graphFiles)
+                let graph = renderer.renderGraph(files: program.expandedFiles)
                 try graph.write(
                     to: outputRoot.appendingPathComponent("03-graph.txt"),
                     atomically: true,
                     encoding: .utf8
                 )
                 let graphHTML = renderer.renderGraphHTML(
-                    files: graphFiles,
+                    files: program.expandedFiles,
                     title: "Neat Playground Dependency Graph"
                 )
                 try graphHTML.write(
