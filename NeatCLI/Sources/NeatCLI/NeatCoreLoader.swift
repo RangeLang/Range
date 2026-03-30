@@ -47,37 +47,40 @@ enum NeatCoreLoader {
         return files.sorted { $0.path < $1.path }
     }
 
-    static func parsedDependencyFiles() throws -> [ParsedSourceFile] {
+    static func sourceInputs() throws -> [SourceInput] {
         try coreFiles().map { fileURL in
             do {
-                return ParsedSourceFile(
+                return SourceInput(
                     path: fileURL.path,
-                    sourceFile: try ProjectSourceValidator.parseSourceFile(at: fileURL)
+                    source: try String(contentsOf: fileURL, encoding: .utf8),
+                    role: .core
                 )
             } catch {
                 throw ValidationError(
-                    "Failed to parse NeatCore file \(fileURL.lastPathComponent): \(error)"
+                    "Failed to read NeatCore file \(fileURL.lastPathComponent): \(error)"
                 )
             }
         }
     }
 
+    static func semanticProgram() throws -> SemanticProgram {
+        try CompilerPipeline().build(inputs: sourceInputs())
+    }
+
+    static func parsedDependencyFiles() throws -> [ParsedSourceFile] {
+        try semanticProgram().parsedFiles
+    }
+
     static func literalBridgeResolver() throws -> LiteralBridgeResolver {
-        DeclarationGraph(files: try parsedDependencyFiles()).literalBridgeResolver
+        try semanticProgram().literalBridgeResolver
     }
 
     static func parsedValidationFiles() throws -> [ProjectSourceValidator.ParsedFile] {
-        try coreFiles().map { fileURL in
-            do {
-                return ProjectSourceValidator.ParsedFile(
-                    url: fileURL,
-                    sourceFile: try ProjectSourceValidator.parseSourceFile(at: fileURL)
-                )
-            } catch {
-                throw ValidationError(
-                    "Failed to parse NeatCore file \(fileURL.lastPathComponent): \(error)"
-                )
-            }
+        try semanticProgram().parsedFiles.map { parsedFile in
+            ProjectSourceValidator.ParsedFile(
+                url: URL(fileURLWithPath: parsedFile.path),
+                sourceFile: parsedFile.sourceFile
+            )
         }
     }
 }

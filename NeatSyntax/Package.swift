@@ -19,6 +19,7 @@ let package = Package(
                 "TypeDefinitions/Construct/Construct.Initialization.md",
                 "TypeDefinitions/Construct/Construct.md",
                 "Attributes/Core.md",
+                "Core/CompilerPipeline.md",
                 "TypeDefinitions/Enum/Enum.md",
                 "TypeDefinitions/Extension/Extension.md",
                 "TypeDefinitions/Function/Function.md",

@@ -8,59 +8,34 @@ enum ProjectSourceValidator {
         let sourceFile: SourceFileNode
     }
 
-    static func parseSourceFile(
-        at fileURL: URL,
-        literalBridgeResolver: LiteralBridgeResolver? = nil
-    ) throws -> SourceFileNode {
-        let source = try String(contentsOf: fileURL, encoding: .utf8)
-        do {
-            var parser = try Parser(
-                source: source,
-                literalBridgeResolver: literalBridgeResolver ?? .empty
-            )
-            return try parser.parseSourceFile()
-        } catch {
-            throw ValidationError("Failed to parse \(fileURL.path): \(error)")
-        }
+    static func semanticProgram(
+        for files: [URL],
+        includeCore: Bool = true
+    ) throws -> SemanticProgram {
+        try CompilerPipeline().build(inputs: sourceInputs(for: files, includeCore: includeCore))
+    }
+
+    static func validatedSemanticProgram(
+        for files: [URL],
+        includeCore: Bool = true
+    ) throws -> SemanticProgram {
+        let program = try semanticProgram(for: files, includeCore: includeCore)
+        try validate(program)
+        return program
     }
 
     static func expandedParsedFiles(
         for files: [URL],
         includeCore: Bool = true
     ) throws -> [ParsedFile] {
-        try expandParsedFiles(parsedFiles(for: files, includeCore: includeCore))
-    }
-
-    private static func parsedFiles(
-        for files: [URL],
-        includeCore: Bool = true
-    ) throws -> [ParsedFile] {
-        let coreFiles = includeCore ? try NeatCoreLoader.parsedValidationFiles() : []
-        let coreLiteralBridgeResolver =
-            includeCore
-            ? DeclarationGraph(
-                files: coreFiles.map {
-                    ParsedSourceFile(path: $0.url.path, sourceFile: $0.sourceFile)
-                }
-            ).literalBridgeResolver
-            : nil
-        let projectFiles = try files.map {
-            ParsedFile(
-                url: $0,
-                sourceFile: try parseSourceFile(
-                    at: $0,
-                    literalBridgeResolver: coreLiteralBridgeResolver
-                )
-            )
-        }
-        try validateCoreAttributeUsage(in: projectFiles)
-        return coreFiles + projectFiles
+        let program = try semanticProgram(for: files, includeCore: includeCore)
+        return parsedFiles(from: program.expandedFiles)
     }
 
     static func expandedParsedFile(at fileURL: URL) throws -> ParsedFile {
-        let files = try expandedParsedFiles(for: [fileURL], includeCore: true)
+        let program = try semanticProgram(for: [fileURL], includeCore: true)
         guard
-            let match = files.first(where: {
+            let match = parsedFiles(from: program.projectExpandedFiles).first(where: {
                 $0.url.standardizedFileURL == fileURL.standardizedFileURL
             })
         else {
@@ -69,36 +44,52 @@ enum ProjectSourceValidator {
         return match
     }
 
-    static func expandParsedFiles(_ parsedFiles: [ParsedFile]) throws -> [ParsedFile] {
-        let expanded = try MacroExpander.expand(
-            files: parsedFiles.map {
-                ParsedSourceFile(path: $0.url.path, sourceFile: $0.sourceFile)
-            }
-        )
-        let expandedByPath = Dictionary(
-            uniqueKeysWithValues: expanded.map { ($0.path, $0.sourceFile) })
-        return try parsedFiles.map { parsedFile in
-            guard let sourceFile = expandedByPath[parsedFile.url.path] else {
-                throw ValidationError("Failed to expand \(parsedFile.url.lastPathComponent).")
-            }
-            return ParsedFile(url: parsedFile.url, sourceFile: sourceFile)
-        }
-    }
-
     static func validateFiles(_ files: [URL]) throws {
-        let parsedFiles = try parsedFiles(for: files)
-        try validatePrimaryDeclarations(in: parsedFiles)
-        try validateTopLevelStates(in: parsedFiles)
-        try validateLiteralBridgeCompatibility(in: parsedFiles)
-
-        let expandedFiles = try expandParsedFiles(parsedFiles)
-        try validateEnvironmentStateResolution(in: expandedFiles)
-        try validateValueBindings(in: expandedFiles)
+        _ = try validatedSemanticProgram(for: files)
     }
 
     static func validatePrimaryDeclarations(in files: [URL]) throws {
-        let parsedFiles = try expandedParsedFiles(for: files)
-        try validatePrimaryDeclarations(in: parsedFiles)
+        let program = try semanticProgram(for: files)
+        try validatePrimaryDeclarations(in: parsedFiles(from: program.expandedFiles))
+    }
+
+    private static func sourceInputs(
+        for files: [URL],
+        includeCore: Bool
+    ) throws -> [SourceInput] {
+        let coreInputs = includeCore ? try NeatCoreLoader.sourceInputs() : []
+        let projectInputs = try files.map { fileURL in
+            do {
+                return SourceInput(
+                    path: fileURL.path,
+                    source: try String(contentsOf: fileURL, encoding: .utf8),
+                    role: .project
+                )
+            } catch {
+                throw ValidationError("Failed to read \(fileURL.path): \(error)")
+            }
+        }
+        return coreInputs + projectInputs
+    }
+
+    private static func parsedFiles(from files: [ParsedSourceFile]) -> [ParsedFile] {
+        files.map { ParsedFile(url: URL(fileURLWithPath: $0.path), sourceFile: $0.sourceFile) }
+    }
+
+    private static func validate(_ program: SemanticProgram) throws {
+        let allParsedFiles = parsedFiles(from: program.parsedFiles)
+        let projectParsedFiles = parsedFiles(from: program.projectParsedFiles)
+        try validateCoreAttributeUsage(in: projectParsedFiles)
+        try validatePrimaryDeclarations(in: allParsedFiles)
+        try validateTopLevelStates(in: allParsedFiles)
+        try validateLiteralBridgeCompatibility(
+            in: allParsedFiles,
+            resolver: program.declarationGraph.literalBridgeResolver
+        )
+
+        let expandedFiles = parsedFiles(from: program.expandedFiles)
+        try validateEnvironmentStateResolution(in: expandedFiles)
+        try validateValueBindings(in: expandedFiles)
     }
 
     private static func validatePrimaryDeclarations(in parsedFiles: [ParsedFile]) throws {
@@ -169,14 +160,10 @@ enum ProjectSourceValidator {
         }
     }
 
-    private static func validateLiteralBridgeCompatibility(in parsedFiles: [ParsedFile]) throws {
-        let declarationGraph = DeclarationGraph(
-            files: parsedFiles.map {
-                ParsedSourceFile(path: $0.url.path, sourceFile: $0.sourceFile)
-            }
-        )
-        let resolver = declarationGraph.literalBridgeResolver
-
+    private static func validateLiteralBridgeCompatibility(
+        in parsedFiles: [ParsedFile],
+        resolver: LiteralBridgeResolver
+    ) throws {
         for parsedFile in parsedFiles {
             let fileName = parsedFile.url.lastPathComponent
 

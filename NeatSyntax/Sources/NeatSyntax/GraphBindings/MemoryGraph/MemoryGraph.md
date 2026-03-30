@@ -8,6 +8,24 @@ The memory graph is Neat's static model of ownership, storage, borrowing, identi
 
 The memory graph gives the compiler enough information to prove memory safety, determine when storage can be freed, and serve as the substrate for later reactive invalidation. The same underlying graph can be viewed from a memory-management angle or a reactivity angle.
 
+## Pipeline Position
+
+The memory graph comes after declaration-graph realization, not before it.
+
+The compiler pipeline should be understood as:
+
+1. `Lexer`
+2. `Parser`
+3. `AST`
+4. `Declaration Graph`
+5. `Semantic Resolution`
+6. `Memory Graph`
+7. `Reactivity Graph`
+8. `Backend Lowering`
+9. `Emission`
+
+This means the memory graph consumes already-settled declaration semantics. It should not be responsible for resolving protocol conformance, attached macro carry, literal bridge meaning, or similar declaration-level facts on its own.
+
 ## Mental Model
 
 - Neat does not bolt reactivity on top of an unrelated ownership system. The storage declaration keywords define both ownership intent and dependency shape.

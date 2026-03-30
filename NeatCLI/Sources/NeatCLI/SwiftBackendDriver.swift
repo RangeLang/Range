@@ -24,8 +24,8 @@ struct SwiftBackendDriver {
                 throw ValidationError("No .neat source files found in \(projectRoot.path)")
             }
 
-            try ProjectSourceValidator.validateFiles(files)
-            let program = try loadSwiftProgram(fromProjectRoot: projectRoot, files: files)
+            let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(for: files)
+            let program = try loadSwiftProgram(semanticProgram: semanticProgram)
             let buildRoot = projectRoot.appendingPathComponent(
                 ".neat/Build/swift", isDirectory: true)
             if FileManager.default.fileExists(atPath: buildRoot.path) {
@@ -40,8 +40,9 @@ struct SwiftBackendDriver {
             throw ValidationError("Expected a .neat file or project directory.")
         }
 
-        try ProjectSourceValidator.validateFiles([inputURL])
-        let program = try loadSwiftProgram(fromSingleFile: inputURL)
+        let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(for: [inputURL])
+        let program = try loadSwiftProgram(
+            fromSingleFile: inputURL, semanticProgram: semanticProgram)
         let buildRoot = inputURL.deletingLastPathComponent()
             .appendingPathComponent(".neat/Build/swift", isDirectory: true)
         if FileManager.default.fileExists(atPath: buildRoot.path) {
@@ -72,14 +73,17 @@ struct SwiftBackendDriver {
             guard !files.isEmpty else {
                 throw ValidationError("No .neat source files found in \(projectRoot.path)")
             }
-            try ProjectSourceValidator.validateFiles(files)
-            program = try loadSwiftProgram(fromProjectRoot: projectRoot, files: files)
+            let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(for: files)
+            program = try loadSwiftProgram(semanticProgram: semanticProgram)
         } else {
             guard inputURL.pathExtension.lowercased() == "neat" else {
                 throw ValidationError("Expected a .neat file or project directory.")
             }
-            try ProjectSourceValidator.validateFiles([inputURL])
-            program = try loadSwiftProgram(fromSingleFile: inputURL)
+            let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(for: [
+                inputURL
+            ])
+            program = try loadSwiftProgram(
+                fromSingleFile: inputURL, semanticProgram: semanticProgram)
         }
 
         let outputURL = URL(fileURLWithPath: outputPath).standardizedFileURL
@@ -153,9 +157,18 @@ struct SwiftBackendDriver {
         return files.sorted { $0.path < $1.path }
     }
 
-    private func loadSwiftProgram(fromSingleFile fileURL: URL) throws -> SwiftBackendEmitter.Program
-    {
-        let sourceFile = try ProjectSourceValidator.expandedParsedFile(at: fileURL).sourceFile
+    private func loadSwiftProgram(
+        fromSingleFile fileURL: URL,
+        semanticProgram: SemanticProgram
+    ) throws -> SwiftBackendEmitter.Program {
+        guard
+            let parsedFile = semanticProgram.projectExpandedFiles.first(where: {
+                $0.path == fileURL.path
+            })
+        else {
+            throw ValidationError("Failed to expand \(fileURL.lastPathComponent).")
+        }
+        let sourceFile = parsedFile.sourceFile
         switch sourceFile {
         case .mainBlock(let mainBlock):
             return .init(
@@ -199,17 +212,16 @@ struct SwiftBackendDriver {
         }
     }
 
-    private func loadSwiftProgram(fromProjectRoot root: URL, files: [URL]) throws
+    private func loadSwiftProgram(semanticProgram: SemanticProgram) throws
         -> SwiftBackendEmitter.Program
     {
         var callables: [CallableDeclaration] = []
         var declarations: [ConstructDeclaration] = []
         var mainBlock: MainBlockNode?
         var units: [SwiftBackendEmitter.SourceUnit] = []
-        let expandedFiles = try ProjectSourceValidator.expandedParsedFiles(for: files)
 
-        for parsedFile in expandedFiles {
-            let fileURL = parsedFile.url
+        for parsedFile in semanticProgram.projectExpandedFiles {
+            let fileURL = URL(fileURLWithPath: parsedFile.path)
             let sourceFile = parsedFile.sourceFile
             let swiftFileName = fileURL.deletingPathExtension().lastPathComponent + ".swift"
             switch sourceFile {

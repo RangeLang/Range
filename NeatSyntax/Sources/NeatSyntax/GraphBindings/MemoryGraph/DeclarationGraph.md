@@ -1,5 +1,29 @@
 # Declaration Graph
 
+## Compiler Pipeline
+
+Neat's compiler pipeline should be understood in this order:
+
+1. `Lexer`
+2. `Parser`
+3. `AST`
+4. `Declaration Graph`
+5. `Semantic Resolution`
+6. `Memory Graph`
+7. `Reactivity Graph`
+8. `Backend Lowering`
+9. `Emission`
+
+This ordering matters:
+
+- the AST records what was written
+- the declaration graph resolves declaration meaning
+- semantic resolution derives settled language facts from that graph
+- the memory graph and reactivity graph build on already-resolved semantics
+- backends adapt settled Neat meaning to a target representation
+
+The declaration graph is therefore in front of backend lowering. A backend may still need AST structure for bodies and source layout, but it should not treat raw AST as the final semantic source of truth.
+
 ## Definition
 
 The declaration graph is Neat's static semantic graph of declarations and declaration-to-declaration relationships. It records what declarations exist, what they mean, and how they are connected before storage, ownership, or mutation reasoning begins.
