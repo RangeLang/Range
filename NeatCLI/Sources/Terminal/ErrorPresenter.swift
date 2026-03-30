@@ -13,6 +13,9 @@ enum ErrorPresenter {
         if let parse = error as? ParseError {
             return parse.description
         }
+        if let validation = error as? SemanticValidationError {
+            return validation.description
+        }
         if let validation = error as? ValidationError {
             return validation.message
         }
