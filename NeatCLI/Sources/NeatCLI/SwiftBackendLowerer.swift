@@ -18,6 +18,7 @@ struct SwiftBackendLowerer {
     {
         .init(
             swiftFileName: sourceUnit.swiftFileName,
+            declarations: sourceUnit.declarations.map(lower(construct:)),
             callables: sourceUnit.callables.map(lower(callable:)),
             mainBlock: sourceUnit.mainBlock.map(lower(mainBlock:))
         )

@@ -178,6 +178,7 @@ struct SwiftBackendDriver {
                 units: [
                     .init(
                         swiftFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
+                        declarations: [],
                         callables: [],
                         mainBlock: mainBlock
                     )
@@ -198,6 +199,9 @@ struct SwiftBackendDriver {
                 units: [
                     .init(
                         swiftFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
+                        declarations: module.constructs.filter {
+                            $0.kind == .declaration || $0.kind == .entry
+                        },
                         callables: module.callables,
                         mainBlock: mainBlock
                     )
@@ -229,11 +233,23 @@ struct SwiftBackendDriver {
                 if declaration.kind == .declaration || declaration.kind == .entry {
                     declarations.append(declaration)
                 }
+                units.append(
+                    .init(
+                        swiftFileName: swiftFileName,
+                        declarations: declaration.kind == .declaration || declaration.kind == .entry
+                            ? [declaration] : [],
+                        callables: [],
+                        mainBlock: nil
+                    )
+                )
             case .module(let module):
                 callables.append(contentsOf: module.callables)
                 units.append(
                     .init(
                         swiftFileName: swiftFileName,
+                        declarations: module.constructs.filter {
+                            $0.kind == .declaration || $0.kind == .entry
+                        },
                         callables: module.callables,
                         mainBlock: module.mainBlock
                     )
@@ -258,6 +274,7 @@ struct SwiftBackendDriver {
                 units.append(
                     .init(
                         swiftFileName: swiftFileName,
+                        declarations: [],
                         callables: [],
                         mainBlock: block
                     )

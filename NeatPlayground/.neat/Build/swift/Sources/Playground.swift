@@ -1,5 +1,19 @@
 import Foundation
 
+struct Person {
+    let name: String
+    
+    var age: Int
+}
+
+struct User {
+    var person: Person
+    
+    mutating func incrementAge() {
+            person.age += 1
+    }
+}
+
 @main
 struct NeatMain {
     static func main() throws {

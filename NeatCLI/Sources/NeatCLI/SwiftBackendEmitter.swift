@@ -8,6 +8,7 @@ struct SwiftBackendEmitter {
 
     struct SourceUnit {
         let swiftFileName: String
+        let declarations: [ConstructDeclaration]
         let callables: [CallableDeclaration]
         let mainBlock: MainBlockNode?
     }
@@ -26,11 +27,13 @@ struct SwiftBackendEmitter {
             .filter { $0.targetType == nil }
             .map(emitFunction)
             .joined(separator: "\n\n")
+        let declarations = try program.declarations.map(emitConstruct).joined(separator: "\n\n")
 
         let main = try emitMain(program.mainBlock)
 
         let sections = [
             "import Foundation",
+            declarations,
             functions,
             main,
         ].filter { !$0.isEmpty }
@@ -115,6 +118,11 @@ struct SwiftBackendEmitter {
     private func emitSourceUnit(_ unit: SourceUnit) throws -> String {
         var sections: [String] = ["import Foundation"]
 
+        let declarations = try unit.declarations.map(emitConstruct).joined(separator: "\n\n")
+        if !declarations.isEmpty {
+            sections.append(declarations)
+        }
+
         let functions = try unit.callables
             .filter { $0.targetType == nil }
             .map(emitFunction)
@@ -161,6 +169,40 @@ struct SwiftBackendEmitter {
             """
     }
 
+    private func emitConstruct(_ declaration: ConstructDeclaration) throws -> String {
+        let genericClause = emitConstructGenericClause(declaration.genericParameters)
+        let storedValues = try declaration.values.map(emitStoredValue).joined(separator: "\n")
+        let storedStates = try declaration.states.map(emitStoredState).joined(separator: "\n")
+        let storedBindings = try declaration.bindings.map(emitStoredBinding).joined(separator: "\n")
+        let deriveds = try declaration.deriveds.map(emitDerivedMember).joined(separator: "\n\n")
+        let initializers = try declaration.initializers.map(emitInitializer).joined(
+            separator: "\n\n")
+        let methods = try declaration.callables
+            .filter { $0.targetType == nil }
+            .map(emitMethod)
+            .joined(separator: "\n\n")
+
+        let memberSections = [
+            storedValues,
+            storedStates,
+            storedBindings,
+            deriveds,
+            initializers,
+            methods,
+        ].filter { !$0.isEmpty }
+
+        if memberSections.isEmpty {
+            return "struct \(declaration.name)\(genericClause) {\n}"
+        }
+
+        let body = memberSections.joined(separator: "\n\n")
+        return """
+            struct \(declaration.name)\(genericClause) {
+            \(indentBlock(body, level: 1))
+            }
+            """
+    }
+
     private func emitParameter(_ parameter: NeatFunctionParameter) throws -> String {
         guard let typeReference = parameter.typeReference else {
             throw ValidationError("Swift backend requires explicit parameter types.")
@@ -192,6 +234,143 @@ struct SwiftBackendEmitter {
         default:
             return typeName
         }
+    }
+
+    private func emitConstructGenericClause(_ parameters: [GenericParameter]) -> String {
+        guard !parameters.isEmpty else { return "" }
+
+        let rendered = parameters.compactMap { parameter -> String? in
+            switch parameter {
+            case .type(let name, _, _):
+                return name
+            case .value:
+                return nil
+            }
+        }
+
+        guard !rendered.isEmpty else { return "" }
+        return "<\(rendered.joined(separator: ", "))>"
+    }
+
+    private func emitStoredValue(_ value: ValueDeclaration) throws -> String {
+        if let expression = value.value {
+            return "let \(value.name): \(value.typeName) = \(try emitExpression(expression))"
+        }
+        return "let \(value.name): \(value.typeName)"
+    }
+
+    private func emitStoredState(_ state: StateDeclaration) throws -> String {
+        switch state.storage {
+        case .stored(let expression):
+            return
+                "var \(state.name): \(emitTypeName(state.type)) = \(try emitExpression(expression))"
+        case .declared:
+            return "var \(state.name): \(emitTypeName(state.type))"
+        }
+    }
+
+    private func emitStoredBinding(_ binding: BindingDeclaration) throws -> String {
+        switch binding.storage {
+        case .plain:
+            return "var \(binding.name): \(binding.typeName)"
+        case .derived:
+            throw ValidationError("Swift backend does not support derived binding storage yet.")
+        }
+    }
+
+    private func emitDerivedMember(_ derived: DerivedDeclaration) throws -> String {
+        guard let body = derived.body else {
+            return "var \(derived.name): \(derived.typeName)"
+        }
+
+        if body.count == 1, case .expression(let expression) = body[0] {
+            return
+                "var \(derived.name): \(derived.typeName) { \(try emitExpression(expression)) }"
+        }
+
+        let bodyText = try emitStatements(body, indent: 2)
+        return """
+            var \(derived.name): \(derived.typeName) {
+            \(bodyText)
+            }
+            """
+    }
+
+    private func emitInitializer(_ initializer: InitializerDeclaration) throws -> String {
+        let parameters = try initializer.parameters.map(emitParameter).joined(separator: ", ")
+        guard let body = initializer.body else {
+            return "init(\(parameters)) {}"
+        }
+
+        let functionBody = try emitStatements(body, indent: 2)
+        return """
+            init(\(parameters)) {
+            \(functionBody)
+            }
+            """
+    }
+
+    private func emitMethod(_ callable: CallableDeclaration) throws -> String {
+        guard let body = callable.body else {
+            throw ValidationError(
+                "Swift backend requires function \(callable.name) to have a body.")
+        }
+
+        let parameters = try callable.parameters.map(emitParameter).joined(separator: ", ")
+        let returnClause = try emitReturnClause(callable.returnType)
+        let functionBody = try emitStatements(body, indent: 2)
+        let mutatingPrefix = methodNeedsMutation(callable) ? "mutating " : ""
+
+        return """
+            \(mutatingPrefix)func \(callable.name)(\(parameters))\(returnClause) {
+            \(functionBody)
+            }
+            """
+    }
+
+    private func methodNeedsMutation(_ callable: CallableDeclaration) -> Bool {
+        guard let body = callable.body else { return false }
+        return statementsContainMutation(body)
+    }
+
+    private func statementsContainMutation(_ statements: [NeatStatement]) -> Bool {
+        for statement in statements {
+            switch statement {
+            case .assignment, .compoundAssignment:
+                return true
+            case .freestandingMacro(_, _, let body),
+                .forEach(_, _, let body),
+                .whileLoop(_, let body),
+                .derived(_, _, let body):
+                if statementsContainMutation(body) {
+                    return true
+                }
+            case .conditional(let branches):
+                if branches.contains(where: { statementsContainMutation($0.body) }) {
+                    return true
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                if cases.contains(where: { statementsContainMutation($0.body) }) {
+                    return true
+                }
+                if let defaultBody, statementsContainMutation(defaultBody) {
+                    return true
+                }
+            case .declaration, .environmentProvision, .expression, .return, .break, .continue:
+                continue
+            }
+        }
+
+        return false
+    }
+
+    private func indentBlock(_ text: String, level: Int) -> String {
+        let prefix = String(repeating: "    ", count: level)
+        return
+            text
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { prefix + $0 }
+            .joined(separator: "\n")
     }
 
     private func emitStatements(_ statements: [NeatStatement], indent: Int) throws -> String {
