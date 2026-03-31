@@ -13,8 +13,18 @@ extension NeatCLI {
 
         mutating func run() throws {
             do {
+                let project = try ProjectLoader.load(
+                    at: input ?? ".",
+                    options: .init(requireManifestForDirectory: true)
+                )
+                let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(
+                    for: project
+                )
                 let driver = SwiftBackendDriver()
-                let buildRoot = try driver.emitProjectWorkspace(at: input ?? ".")
+                let buildRoot = try driver.emitProjectWorkspace(
+                    project: project,
+                    semanticProgram: semanticProgram
+                )
                 try driver.runGeneratedWorkspace(at: buildRoot)
             } catch {
                 ErrorPresenter.printError(error)

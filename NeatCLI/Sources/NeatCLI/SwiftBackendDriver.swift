@@ -3,48 +3,12 @@ import Foundation
 import NeatSyntax
 
 struct SwiftBackendDriver {
-    func emitProjectWorkspace(at path: String) throws -> URL {
-        let inputURL = URL(fileURLWithPath: path).standardizedFileURL
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory)
-        else {
-            throw ValidationError("Missing input at \(inputURL.path)")
-        }
-
-        if isDirectory.boolValue {
-            let projectRoot = inputURL
-            let packageFile = projectRoot.appendingPathComponent("Package.neat", isDirectory: false)
-            guard FileManager.default.fileExists(atPath: packageFile.path) else {
-                throw ValidationError("Missing Package.neat in \(projectRoot.path)")
-            }
-
-            _ = try PackageManifestLoader.load(from: packageFile)
-            let files = try neatFiles(in: projectRoot, excludingManifestAt: packageFile)
-            guard !files.isEmpty else {
-                throw ValidationError("No .neat source files found in \(projectRoot.path)")
-            }
-
-            let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(for: files)
-            let program = try loadSwiftProgram(semanticProgram: semanticProgram)
-            let buildRoot = projectRoot.appendingPathComponent(
-                ".neat/Build/swift", isDirectory: true)
-            if FileManager.default.fileExists(atPath: buildRoot.path) {
-                try FileManager.default.removeItem(at: buildRoot)
-            }
-            let loweredProgram = SwiftBackendLowerer().lower(program: program)
-            try SwiftBackendEmitter().emitWorkspace(program: loweredProgram, at: buildRoot)
-            return buildRoot
-        }
-
-        guard inputURL.pathExtension.lowercased() == "neat" else {
-            throw ValidationError("Expected a .neat file or project directory.")
-        }
-
-        let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(for: [inputURL])
-        let program = try loadSwiftProgram(
-            fromSingleFile: inputURL, semanticProgram: semanticProgram)
-        let buildRoot = inputURL.deletingLastPathComponent()
-            .appendingPathComponent(".neat/Build/swift", isDirectory: true)
+    func emitProjectWorkspace(
+        project: LoadedProject,
+        semanticProgram: SemanticProgram
+    ) throws -> URL {
+        let program = try loadSwiftProgram(project: project, semanticProgram: semanticProgram)
+        let buildRoot = project.defaultBuildRoot
         if FileManager.default.fileExists(atPath: buildRoot.path) {
             try FileManager.default.removeItem(at: buildRoot)
         }
@@ -53,39 +17,12 @@ struct SwiftBackendDriver {
         return buildRoot
     }
 
-    func emitSwiftSource(at path: String, to outputPath: String) throws {
-        let inputURL = URL(fileURLWithPath: path).standardizedFileURL
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory)
-        else {
-            throw ValidationError("Missing input at \(inputURL.path)")
-        }
-
-        let program: SwiftBackendEmitter.Program
-        if isDirectory.boolValue {
-            let projectRoot = inputURL
-            let packageFile = projectRoot.appendingPathComponent("Package.neat", isDirectory: false)
-            guard FileManager.default.fileExists(atPath: packageFile.path) else {
-                throw ValidationError("Missing Package.neat in \(projectRoot.path)")
-            }
-            _ = try PackageManifestLoader.load(from: packageFile)
-            let files = try neatFiles(in: projectRoot, excludingManifestAt: packageFile)
-            guard !files.isEmpty else {
-                throw ValidationError("No .neat source files found in \(projectRoot.path)")
-            }
-            let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(for: files)
-            program = try loadSwiftProgram(semanticProgram: semanticProgram)
-        } else {
-            guard inputURL.pathExtension.lowercased() == "neat" else {
-                throw ValidationError("Expected a .neat file or project directory.")
-            }
-            let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(for: [
-                inputURL
-            ])
-            program = try loadSwiftProgram(
-                fromSingleFile: inputURL, semanticProgram: semanticProgram)
-        }
-
+    func emitSwiftSource(
+        project: LoadedProject,
+        semanticProgram: SemanticProgram,
+        to outputPath: String
+    ) throws {
+        let program = try loadSwiftProgram(project: project, semanticProgram: semanticProgram)
         let outputURL = URL(fileURLWithPath: outputPath).standardizedFileURL
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
@@ -119,42 +56,18 @@ struct SwiftBackendDriver {
         }
     }
 
-    private func neatFiles(in root: URL, excludingManifestAt manifestURL: URL) throws -> [URL] {
-        guard
-            let enumerator = FileManager.default.enumerator(
-                at: root,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
+    private func loadSwiftProgram(
+        project: LoadedProject,
+        semanticProgram: SemanticProgram
+    ) throws -> SwiftBackendEmitter.Program {
+        if project.isSingleFile {
+            return try loadSwiftProgram(
+                fromSingleFile: project.projectFiles[0],
+                semanticProgram: semanticProgram
             )
-        else {
-            throw ValidationError("Could not inspect project files in \(root.path)")
         }
 
-        var files: [URL] = []
-        while let fileURL = enumerator.nextObject() as? URL {
-            let isDirectory =
-                (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-
-            if isDirectory {
-                if fileURL.lastPathComponent == ".git"
-                    || fileURL.lastPathComponent == ".build"
-                    || fileURL.lastPathComponent == ".neat"
-                {
-                    enumerator.skipDescendants()
-                }
-                continue
-            }
-
-            guard fileURL.pathExtension.lowercased() == "neat" else {
-                continue
-            }
-            if fileURL.standardizedFileURL == manifestURL.standardizedFileURL {
-                continue
-            }
-            files.append(fileURL)
-        }
-
-        return files.sorted { $0.path < $1.path }
+        return try loadSwiftProgram(semanticProgram: semanticProgram)
     }
 
     private func loadSwiftProgram(

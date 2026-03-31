@@ -74,13 +74,4 @@ enum NeatCoreLoader {
     static func literalBridgeResolver() throws -> LiteralBridgeResolver {
         try semanticProgram().literalBridgeResolver
     }
-
-    static func parsedValidationFiles() throws -> [ProjectSourceValidator.ParsedFile] {
-        try semanticProgram().parsedFiles.map { parsedFile in
-            ProjectSourceValidator.ParsedFile(
-                url: URL(fileURLWithPath: parsedFile.path),
-                sourceFile: parsedFile.sourceFile
-            )
-        }
-    }
 }

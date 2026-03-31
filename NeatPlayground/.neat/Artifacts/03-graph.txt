@@ -44,7 +44,6 @@
   [construct] file:/Users/george/Documents/Neat/NeatCore/Macros/Types/ArrayType.neat/construct:ArrayType :: @core ArrayType
   [construct] file:/Users/george/Documents/Neat/NeatCore/Macros/Types/FunctionType.neat/construct:FunctionType :: @core FunctionType
   [construct] file:/Users/george/Documents/Neat/NeatCore/Macros/Types/TypeReference.neat/construct:TypeReference :: @core TypeReference
-  [construct] file:/Users/george/Documents/Neat/NeatPlayground/Package.neat/construct:NeatPlayground :: NeatPlayground
   [construct] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:Person :: Person
   [construct] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User :: User
   [derived] file:/Users/george/Documents/Neat/NeatCore/DataSystem/Array/Array.neat/construct:Array/derived:count :: count
@@ -147,7 +146,6 @@
   [file] file:/Users/george/Documents/Neat/NeatCore/Operators/PrecedenceGroups/LogicalDisjunctionPrecedence.neat :: LogicalDisjunctionPrecedence.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/Operators/PrecedenceGroups/NilCoalescingPrecedence.neat :: NilCoalescingPrecedence.neat
   [file] file:/Users/george/Documents/Neat/NeatCore/Operators/Prefix/LogicalNot.neat :: LogicalNot.neat
-  [file] file:/Users/george/Documents/Neat/NeatPlayground/Package.neat :: Package.neat
   [file] file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat :: Playground.neat
   [function] file:/Users/george/Documents/Neat/NeatCore/DataSystem/Array/Array.neat/construct:Array/function:append(element:Element) :: append
   [function] file:/Users/george/Documents/Neat/NeatCore/DataSystem/Array/Array.neat/construct:Array/function:clear() :: clear
@@ -364,7 +362,6 @@
   [typeReference] type:IntStorage :: IntStorage
   [typeReference] type:Key :: Key
   [typeReference] type:NilLiteral :: NilLiteral
-  [typeReference] type:Package :: Package
   [typeReference] type:Parameter :: Parameter
   [typeReference] type:Person :: Person
   [typeReference] type:SetLiteral :: SetLiteral
@@ -892,8 +889,6 @@
   file:/Users/george/Documents/Neat/NeatCore/Macros/Types/FunctionType.neat/construct:FunctionType/value:returnType -referencesType-> type:TypeReference
   file:/Users/george/Documents/Neat/NeatCore/Macros/Types/TypeReference.neat -contains-> file:/Users/george/Documents/Neat/NeatCore/Macros/Types/TypeReference.neat/construct:TypeReference
   file:/Users/george/Documents/Neat/NeatCore/Macros/Types/TypeReference.neat/construct:TypeReference -conformsTo-> type:SupportsRewrite<TypeReference>
-  file:/Users/george/Documents/Neat/NeatPlayground/Package.neat -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Package.neat/construct:NeatPlayground
-  file:/Users/george/Documents/Neat/NeatPlayground/Package.neat/construct:NeatPlayground -conformsTo-> type:Package
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:Person
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/construct:User
   file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat -contains-> file:/Users/george/Documents/Neat/NeatPlayground/Playground.neat/main

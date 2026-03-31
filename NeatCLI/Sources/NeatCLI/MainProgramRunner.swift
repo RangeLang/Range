@@ -3,52 +3,20 @@ import Foundation
 import NeatSyntax
 
 struct MainProgramRunner {
-    private let path: String
+    private let project: LoadedProject
+    private let semanticProgram: SemanticProgram
     private let showSummary: Bool
 
-    init(path: String, showSummary: Bool = true) {
-        self.path = path
+    init(project: LoadedProject, semanticProgram: SemanticProgram, showSummary: Bool = true) {
+        self.project = project
+        self.semanticProgram = semanticProgram
         self.showSummary = showSummary
     }
 
     func run() throws {
         let startedAt = Date()
-        let inputURL = URL(fileURLWithPath: path).standardizedFileURL
-
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: inputURL.path, isDirectory: &isDirectory)
-        else {
-            throw ValidationError("Missing input at \(inputURL.path)")
-        }
-
-        let entryFile: URL
-        let packageName: String
-
-        if isDirectory.boolValue {
-            let packageFile = inputURL.appendingPathComponent("Package.neat", isDirectory: false)
-            guard FileManager.default.fileExists(atPath: packageFile.path) else {
-                throw ValidationError("Missing Package.neat in \(inputURL.path)")
-            }
-
-            let manifest = try PackageManifestLoader.load(from: packageFile)
-            packageName = manifest.name
-            let files = try neatFiles(in: inputURL, excludingManifestAt: packageFile)
-            try ProjectSourceValidator.validatePrimaryDeclarations(in: files)
-            entryFile = try discoverEntryFile(in: inputURL)
-        } else {
-            guard inputURL.pathExtension.lowercased() == "neat" else {
-                throw ValidationError("Expected a .neat file or project directory.")
-            }
-            if inputURL.lastPathComponent == "Package.neat" {
-                throw ValidationError(
-                    "Package.neat cannot be run directly. Use a file or project with @main.")
-            }
-
-            packageName = inputURL.deletingPathExtension().lastPathComponent
-            entryFile = inputURL
-        }
-
-        let sourceFile = try ProjectSourceValidator.expandedParsedFile(at: entryFile).sourceFile
+        let entryFile = try discoverEntryFile()
+        let sourceFile = try expandedProjectSourceFile(at: entryFile)
         let mainBlock: MainBlockNode
         switch sourceFile {
         case .mainBlock(let block):
@@ -72,7 +40,11 @@ struct MainProgramRunner {
 
         if showSummary {
             let startupMS = Int((Date().timeIntervalSince(startedAt) * 1000.0).rounded())
-            TerminalLog.timedOut("Running \(packageName)", milliseconds: startupMS, level: .warning)
+            TerminalLog.timedOut(
+                "Running \(project.packageName)",
+                milliseconds: startupMS,
+                level: .warning
+            )
         }
 
         var interpreter = MainProgramInterpreter(fileName: entryFile.lastPathComponent)
@@ -81,16 +53,20 @@ struct MainProgramRunner {
         if showSummary {
             let elapsedMS = Int((Date().timeIntervalSince(startedAt) * 1000.0).rounded())
             TerminalLog.timedOut(
-                "Finished \(packageName)", milliseconds: elapsedMS, level: .success)
+                "Finished \(project.packageName)",
+                milliseconds: elapsedMS,
+                level: .success
+            )
         }
     }
 
-    private func discoverEntryFile(in root: URL) throws -> URL {
-        let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
-        let files = try neatFiles(in: root, excludingManifestAt: packageFile)
+    private func discoverEntryFile() throws -> URL {
+        if project.isSingleFile {
+            return project.projectFiles[0]
+        }
 
-        let mainBlocks = try files.compactMap { fileURL -> URL? in
-            let sourceFile = try ProjectSourceValidator.expandedParsedFile(at: fileURL).sourceFile
+        let mainBlocks = try project.projectFiles.compactMap { fileURL -> URL? in
+            let sourceFile = try expandedProjectSourceFile(at: fileURL)
             switch sourceFile {
             case .mainBlock:
                 return fileURL
@@ -102,7 +78,7 @@ struct MainProgramRunner {
         }
 
         if mainBlocks.isEmpty {
-            throw ValidationError("Missing @main block in \(root.path)")
+            throw ValidationError("Missing @main block in \(project.projectRoot.path)")
         }
         if mainBlocks.count > 1 {
             let names = mainBlocks.map(\.lastPathComponent).sorted().joined(separator: ", ")
@@ -111,49 +87,15 @@ struct MainProgramRunner {
         return mainBlocks[0]
     }
 
-    private func neatFiles(in root: URL, excludingManifestAt manifestURL: URL) throws -> [URL] {
-        let fileManager = FileManager.default
+    private func expandedProjectSourceFile(at fileURL: URL) throws -> SourceFileNode {
         guard
-            let enumerator = fileManager.enumerator(
-                at: root,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: []
-            )
+            let parsedFile = semanticProgram.projectExpandedFiles.first(where: {
+                URL(fileURLWithPath: $0.path).standardizedFileURL == fileURL.standardizedFileURL
+            })
         else {
-            throw ValidationError("Could not inspect project files in \(root.path)")
+            throw ValidationError("Failed to expand \(fileURL.lastPathComponent).")
         }
-
-        var matches: [URL] = []
-
-        while let fileURL = enumerator.nextObject() as? URL {
-            let path = fileURL.path
-            let isDirectory =
-                (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory)
-                ?? false
-
-            if path.contains("/.git/") || path.contains("/.build/")
-                || path.contains("/.neat/Build/") || path.contains("/.neat/Packages/")
-            {
-                if isDirectory {
-                    enumerator.skipDescendants()
-                }
-                continue
-            }
-
-            if isDirectory || fileURL.pathExtension.lowercased() != "neat" {
-                continue
-            }
-
-            let fileName = fileURL.lastPathComponent
-            if fileURL.standardizedFileURL == manifestURL.standardizedFileURL
-                || fileName == "Fonts.neat"
-            {
-                continue
-            }
-            matches.append(fileURL)
-        }
-
-        return matches.sorted { $0.path < $1.path }
+        return parsedFile.sourceFile
     }
 }
 

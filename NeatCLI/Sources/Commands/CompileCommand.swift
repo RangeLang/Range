@@ -16,26 +16,30 @@ extension NeatCLI {
 
         mutating func run() throws {
             do {
+                let project = try ProjectLoader.load(
+                    at: input ?? ".",
+                    options: .init(requireManifestForDirectory: true)
+                )
+                let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(
+                    for: project
+                )
                 let driver = SwiftBackendDriver()
-                switch (input, output) {
-                case (.some(let input), .some(let output)):
-                    try driver.emitSwiftSource(at: input, to: output)
+                if let output {
+                    try driver.emitSwiftSource(
+                        project: project,
+                        semanticProgram: semanticProgram,
+                        to: output
+                    )
                     TerminalLog.out("Generated Swift at \(output).", level: .success)
-                case (.some(let input), nil):
-                    let buildRoot = try driver.emitProjectWorkspace(at: input)
+                } else {
+                    let buildRoot = try driver.emitProjectWorkspace(
+                        project: project,
+                        semanticProgram: semanticProgram
+                    )
                     TerminalLog.out(
                         "Generated Swift workspace at \(buildRoot.path).",
                         level: .success
                     )
-                case (nil, nil):
-                    let buildRoot = try driver.emitProjectWorkspace(at: ".")
-                    TerminalLog.out(
-                        "Generated Swift workspace at \(buildRoot.path).",
-                        level: .success
-                    )
-                case (nil, .some(let output)):
-                    try driver.emitSwiftSource(at: ".", to: output)
-                    TerminalLog.out("Generated Swift at \(output).", level: .success)
                 }
             } catch {
                 ErrorPresenter.printError(error)
