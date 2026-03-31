@@ -1,11 +1,11 @@
 import Foundation
 import NeatSyntax
 
-struct SwiftBackendLowerer {
+struct SwiftLoweredProgramAdapter {
     private typealias NeatExpression = NeatSyntax.Expression
     private typealias NeatStatement = NeatSyntax.Statement
 
-    func lower(program: LoweredProgram) -> LoweredProgram {
+    func adapt(program: LoweredProgram) -> LoweredProgram {
         .init(
             callables: program.callables.map(lower(callable:)),
             declarations: program.declarations.map(lower(construct:)),

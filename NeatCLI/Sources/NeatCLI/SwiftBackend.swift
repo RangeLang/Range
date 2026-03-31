@@ -5,7 +5,7 @@ import NeatSyntax
 struct SwiftBackend: RunnableWorkspaceBackend {
     var name: String { "swift" }
     private let programBuilder = SwiftBackendProgramBuilder()
-    private let lowerer = SwiftBackendLowerer()
+    private let adapter = SwiftLoweredProgramAdapter()
     private let emitter = SwiftBackendEmitter()
 
     func emitWorkspace(
@@ -17,7 +17,7 @@ struct SwiftBackend: RunnableWorkspaceBackend {
         if FileManager.default.fileExists(atPath: buildRoot.path) {
             try FileManager.default.removeItem(at: buildRoot)
         }
-        let loweredProgram = lowerer.lower(program: program)
+        let loweredProgram = adapter.adapt(program: program)
         try emitter.emitWorkspace(program: loweredProgram, at: buildRoot)
         return EmittedWorkspace(root: buildRoot)
     }
@@ -30,7 +30,7 @@ struct SwiftBackend: RunnableWorkspaceBackend {
         let program = try programBuilder.build(project: project, semanticProgram: semanticProgram)
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-        let loweredProgram = lowerer.lower(program: program)
+        let loweredProgram = adapter.adapt(program: program)
         let swift = try emitter.emit(program: loweredProgram)
         try swift.write(to: outputURL, atomically: true, encoding: .utf8)
         return EmittedSourceFile(outputURL: outputURL)
