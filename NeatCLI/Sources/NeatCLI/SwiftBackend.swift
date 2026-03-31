@@ -2,40 +2,42 @@ import ArgumentParser
 import Foundation
 import NeatSyntax
 
-struct SwiftBackendDriver {
-    func emitProjectWorkspace(
+struct SwiftBackend: RunnableWorkspaceBackend {
+    var name: String { "swift" }
+
+    func emitWorkspace(
         project: LoadedProject,
         semanticProgram: SemanticProgram
-    ) throws -> URL {
-        let program = try loadSwiftProgram(project: project, semanticProgram: semanticProgram)
+    ) throws -> EmittedWorkspace {
+        let program = try loadProgram(project: project, semanticProgram: semanticProgram)
         let buildRoot = project.defaultBuildRoot
         if FileManager.default.fileExists(atPath: buildRoot.path) {
             try FileManager.default.removeItem(at: buildRoot)
         }
         let loweredProgram = SwiftBackendLowerer().lower(program: program)
         try SwiftBackendEmitter().emitWorkspace(program: loweredProgram, at: buildRoot)
-        return buildRoot
+        return EmittedWorkspace(root: buildRoot)
     }
 
-    func emitSwiftSource(
+    func emitSourceFile(
         project: LoadedProject,
         semanticProgram: SemanticProgram,
-        to outputPath: String
-    ) throws {
-        let program = try loadSwiftProgram(project: project, semanticProgram: semanticProgram)
-        let outputURL = URL(fileURLWithPath: outputPath).standardizedFileURL
+        outputURL: URL
+    ) throws -> EmittedSourceFile {
+        let program = try loadProgram(project: project, semanticProgram: semanticProgram)
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         let loweredProgram = SwiftBackendLowerer().lower(program: program)
         let swift = try SwiftBackendEmitter().emit(program: loweredProgram)
         try swift.write(to: outputURL, atomically: true, encoding: .utf8)
+        return EmittedSourceFile(outputURL: outputURL)
     }
 
-    func runGeneratedWorkspace(at buildRoot: URL) throws {
+    func run(workspace: EmittedWorkspace) throws {
         try runProcess(
             executable: "/usr/bin/env",
             arguments: ["swift", "run", "NeatGenerated"],
-            currentDirectory: buildRoot
+            currentDirectory: workspace.root
         )
     }
 
@@ -56,21 +58,21 @@ struct SwiftBackendDriver {
         }
     }
 
-    private func loadSwiftProgram(
+    private func loadProgram(
         project: LoadedProject,
         semanticProgram: SemanticProgram
     ) throws -> SwiftBackendEmitter.Program {
         if project.isSingleFile {
-            return try loadSwiftProgram(
+            return try loadProgram(
                 fromSingleFile: project.projectFiles[0],
                 semanticProgram: semanticProgram
             )
         }
 
-        return try loadSwiftProgram(semanticProgram: semanticProgram)
+        return try loadProgram(semanticProgram: semanticProgram)
     }
 
-    private func loadSwiftProgram(
+    private func loadProgram(
         fromSingleFile fileURL: URL,
         semanticProgram: SemanticProgram
     ) throws -> SwiftBackendEmitter.Program {
@@ -129,7 +131,7 @@ struct SwiftBackendDriver {
         }
     }
 
-    private func loadSwiftProgram(semanticProgram: SemanticProgram) throws
+    private func loadProgram(semanticProgram: SemanticProgram) throws
         -> SwiftBackendEmitter.Program
     {
         var callables: [CallableDeclaration] = []

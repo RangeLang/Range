@@ -14,6 +14,10 @@ struct User {
     }
 }
 
+func incrementAge() {
+    person.age += 1
+}
+
 @main
 struct NeatMain {
     static func main() throws {

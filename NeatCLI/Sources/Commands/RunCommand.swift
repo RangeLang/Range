@@ -20,12 +20,12 @@ extension NeatCLI {
                 let semanticProgram = try ProjectSourceValidator.validatedSemanticProgram(
                     for: project
                 )
-                let driver = SwiftBackendDriver()
-                let buildRoot = try driver.emitProjectWorkspace(
+                let backend = BackendRegistry.default()
+                let workspace = try backend.emitWorkspace(
                     project: project,
                     semanticProgram: semanticProgram
                 )
-                try driver.runGeneratedWorkspace(at: buildRoot)
+                try backend.run(workspace: workspace)
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure
