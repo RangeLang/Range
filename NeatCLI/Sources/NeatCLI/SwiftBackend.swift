@@ -61,7 +61,7 @@ struct SwiftBackend: RunnableWorkspaceBackend {
     private func loadProgram(
         project: LoadedProject,
         semanticProgram: SemanticProgram
-    ) throws -> SwiftBackendEmitter.Program {
+    ) throws -> LoweredProgram {
         if project.isSingleFile {
             return try loadProgram(
                 fromSingleFile: project.projectFiles[0],
@@ -75,7 +75,7 @@ struct SwiftBackend: RunnableWorkspaceBackend {
     private func loadProgram(
         fromSingleFile fileURL: URL,
         semanticProgram: SemanticProgram
-    ) throws -> SwiftBackendEmitter.Program {
+    ) throws -> LoweredProgram {
         guard
             let parsedFile = semanticProgram.projectExpandedFiles.first(where: {
                 $0.path == fileURL.path
@@ -92,7 +92,8 @@ struct SwiftBackend: RunnableWorkspaceBackend {
                 mainBlock: mainBlock,
                 units: [
                     .init(
-                        swiftFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
+                        outputFileName: fileURL.deletingPathExtension().lastPathComponent
+                            + ".swift",
                         declarations: [],
                         callables: [],
                         mainBlock: mainBlock
@@ -113,7 +114,8 @@ struct SwiftBackend: RunnableWorkspaceBackend {
                 mainBlock: mainBlock,
                 units: [
                     .init(
-                        swiftFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
+                        outputFileName: fileURL.deletingPathExtension().lastPathComponent
+                            + ".swift",
                         declarations: module.constructs.filter {
                             $0.kind == .declaration || $0.kind == .entry
                         },
@@ -131,13 +133,11 @@ struct SwiftBackend: RunnableWorkspaceBackend {
         }
     }
 
-    private func loadProgram(semanticProgram: SemanticProgram) throws
-        -> SwiftBackendEmitter.Program
-    {
+    private func loadProgram(semanticProgram: SemanticProgram) throws -> LoweredProgram {
         var callables: [CallableDeclaration] = []
         var declarations: [ConstructDeclaration] = []
         var mainBlock: MainBlockNode?
-        var units: [SwiftBackendEmitter.SourceUnit] = []
+        var units: [LoweredSourceUnit] = []
 
         for parsedFile in semanticProgram.projectExpandedFiles {
             let fileURL = URL(fileURLWithPath: parsedFile.path)
@@ -150,7 +150,7 @@ struct SwiftBackend: RunnableWorkspaceBackend {
                 }
                 units.append(
                     .init(
-                        swiftFileName: swiftFileName,
+                        outputFileName: swiftFileName,
                         declarations: declaration.kind == .declaration || declaration.kind == .entry
                             ? [declaration] : [],
                         callables: [],
@@ -161,7 +161,7 @@ struct SwiftBackend: RunnableWorkspaceBackend {
                 callables.append(contentsOf: module.callables)
                 units.append(
                     .init(
-                        swiftFileName: swiftFileName,
+                        outputFileName: swiftFileName,
                         declarations: module.constructs.filter {
                             $0.kind == .declaration || $0.kind == .entry
                         },
@@ -188,7 +188,7 @@ struct SwiftBackend: RunnableWorkspaceBackend {
                 mainBlock = block
                 units.append(
                     .init(
-                        swiftFileName: swiftFileName,
+                        outputFileName: swiftFileName,
                         declarations: [],
                         callables: [],
                         mainBlock: block

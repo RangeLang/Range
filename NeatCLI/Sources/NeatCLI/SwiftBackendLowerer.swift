@@ -5,7 +5,7 @@ struct SwiftBackendLowerer {
     private typealias NeatExpression = NeatSyntax.Expression
     private typealias NeatStatement = NeatSyntax.Statement
 
-    func lower(program: SwiftBackendEmitter.Program) -> SwiftBackendEmitter.Program {
+    func lower(program: LoweredProgram) -> LoweredProgram {
         .init(
             callables: program.callables.map(lower(callable:)),
             declarations: program.declarations.map(lower(construct:)),
@@ -14,10 +14,9 @@ struct SwiftBackendLowerer {
         )
     }
 
-    private func lower(sourceUnit: SwiftBackendEmitter.SourceUnit) -> SwiftBackendEmitter.SourceUnit
-    {
+    private func lower(sourceUnit: LoweredSourceUnit) -> LoweredSourceUnit {
         .init(
-            swiftFileName: sourceUnit.swiftFileName,
+            outputFileName: sourceUnit.outputFileName,
             declarations: sourceUnit.declarations.map(lower(construct:)),
             callables: sourceUnit.callables.map(lower(callable:)),
             mainBlock: sourceUnit.mainBlock.map(lower(mainBlock:))

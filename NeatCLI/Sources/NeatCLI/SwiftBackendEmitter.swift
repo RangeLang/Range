@@ -6,21 +6,7 @@ struct SwiftBackendEmitter {
     private typealias NeatExpression = NeatSyntax.Expression
     private typealias NeatStatement = NeatSyntax.Statement
 
-    struct SourceUnit {
-        let swiftFileName: String
-        let declarations: [ConstructDeclaration]
-        let callables: [CallableDeclaration]
-        let mainBlock: MainBlockNode?
-    }
-
-    struct Program {
-        let callables: [CallableDeclaration]
-        let declarations: [ConstructDeclaration]
-        let mainBlock: MainBlockNode
-        let units: [SourceUnit]
-    }
-
-    func emit(program: Program) throws -> String {
+    func emit(program: LoweredProgram) throws -> String {
         let allCallables = program.callables + program.declarations.flatMap(\.callables)
         let functions =
             try allCallables
@@ -41,7 +27,7 @@ struct SwiftBackendEmitter {
         return sections.joined(separator: "\n\n") + "\n"
     }
 
-    func emitWorkspace(program: Program, at root: URL) throws {
+    func emitWorkspace(program: LoweredProgram, at root: URL) throws {
         let sourcesDirectory = root.appendingPathComponent("Sources", isDirectory: true)
         try FileManager.default.createDirectory(
             at: sourcesDirectory, withIntermediateDirectories: true)
@@ -108,14 +94,14 @@ struct SwiftBackendEmitter {
         for unit in program.units {
             let content = try emitSourceUnit(unit)
             try content.write(
-                to: sourcesDirectory.appendingPathComponent(unit.swiftFileName),
+                to: sourcesDirectory.appendingPathComponent(unit.outputFileName),
                 atomically: true,
                 encoding: .utf8
             )
         }
     }
 
-    private func emitSourceUnit(_ unit: SourceUnit) throws -> String {
+    private func emitSourceUnit(_ unit: LoweredSourceUnit) throws -> String {
         var sections: [String] = ["import Foundation"]
 
         let declarations = try unit.declarations.map(emitConstruct).joined(separator: "\n\n")
