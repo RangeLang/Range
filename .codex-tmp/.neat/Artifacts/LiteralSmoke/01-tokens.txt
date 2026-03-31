@@ -1,9 +1,0 @@
-Tokens:
-  atAttribute(@main)
-  leftBrace
-  keyword(state)
-  identifier(count)
-  equal
-  integer(5)
-  rightBrace
-  eof

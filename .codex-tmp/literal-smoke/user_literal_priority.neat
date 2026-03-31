@@ -1,8 +1,0 @@
-construct MyCounter: ExpressableByIntLiteral {
-    init(literal: IntLiteral) { }
-}
-
-state count = 5
-state custom: MyCounter = 5
-
-@main { }

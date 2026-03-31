@@ -1,122 +1,112 @@
 # Handoff
 
 ## Objective
-- Build out Neat's foundation layer while keeping the memory-graph-first language model coherent.
-- Keep `NeatCore` as real `.neat` source consumed by the current Swift-based compiler pipeline.
+- Keep pushing the `NeatCLI` vs `NeatSyntax` split toward the intended architecture:
+  - `NeatSyntax` owns compiler pipeline and semantic validation
+  - `NeatCLI` owns file discovery, commands, backend selection, reporting
+- Keep Swift as a backend adapter, not the source of Neat semantics.
 
 ## What Changed
-- Moved `NeatCore` out of `NeatSyntax/Sources` into top-level [`NeatCore`](/Users/george/Documents/Neat/NeatCore).
-- Updated [`NeatCoreLoader.swift`](/Users/george/Documents/Neat/NeatCLI/Sources/NeatCLI/NeatCoreLoader.swift) to load from the new root path and continue excluding `NeatCore/Macros/Exploration`.
-- Fixed parser support for value-generic defaults like `.signed` in construct headers by adding expression terminators for generic default parsing:
-  - [`Parser.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Shared/Parser.swift)
-  - [`Parser+Expression.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Expression/Parser+Expression.swift)
-  - [`Parser+Construct.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/TypeDefinitions/Construct/Parser+Construct.swift)
-- Generalized `state` declarations from builtin-only types to general `TypeReference`, so declarations like `state elements: [Element]` are legal:
-  - [`AST+State.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/State/AST+State.swift)
-  - [`Parser+State.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/State/Parser+State.swift)
-  - [`EntityIR.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/EntityIR.swift)
-  - [`DependencyGraph.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DependencyGraph.swift)
-- Extended parameter label parsing so keyword labels can appear in the second label position (`for key: Key`):
-  - [`Parser+Shared.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Shared/Parser+Shared.swift)
-- Corrected memory-graph docs:
-  - memory graph is always generated
-  - `@noMemoryGraph` removed
-  - reactivity is the optional exposed layer (`@reactive` direction)
-  - file: [`MemoryGraph.md`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/MemoryGraph/MemoryGraph.md)
+- Added a real semantic pipeline artifact in `NeatSyntax`:
+  - `NeatSyntax/Sources/NeatSyntax/Core/SemanticProgram.swift`
+  - `SourceInput`
+  - `SourceInputRole`
+  - `SemanticProgram`
+  - `CompilerPipeline`
+- Added semantic validation in `NeatSyntax`:
+  - `NeatSyntax/Sources/NeatSyntax/Core/SemanticProgramValidator.swift`
+  - `NeatSyntax/Sources/NeatSyntax/Core/SemanticValidationError.swift`
+- Added validated compile entry points in `CompilerPipeline`:
+  - `buildValidated(inputs:)`
+  - `validatePrimaryDeclarations(inputs:)`
+- Reduced `NeatCLI` semantic assembly:
+  - `NeatCLI/Sources/NeatCLI/ProjectSourceValidator.swift` is now a thin wrapper over `NeatSyntax`
+  - `NeatCLI/Sources/NeatCLI/NeatCoreLoader.swift` now builds `SourceInput` and consumes `SemanticProgram`
+  - `NeatCLI/Sources/Commands/GraphCommand.swift` now uses `SemanticProgram`
+  - `NeatCLI/Sources/Commands/ArtifactsCommand.swift` now uses `SemanticProgram`
+  - `NeatCLI/Sources/Terminal/ErrorPresenter.swift` now handles `SemanticValidationError`
+- Fixed Swift backend construct emission:
+  - `NeatCLI/Sources/NeatCLI/SwiftBackendDriver.swift`
+  - `NeatCLI/Sources/NeatCLI/SwiftBackendLowerer.swift`
+  - `NeatCLI/Sources/NeatCLI/SwiftBackendEmitter.swift`
+- The backend now emits basic Swift `struct` declarations for user constructs such as `Person` and `User`.
 
 ## Key Decisions
-- `construct` is identity-bearing by default for normal user modeling.
-- `@core construct` is non-identity-bearing, compiler-recognized, and plain-value/structural.
-- Memory graph is foundational and always-on.
-- Reactivity is not a separate base system; it is an optional exposed layer derived from the memory graph.
-- `Macros/Exploration` stays excluded from normal compiler/core loading.
-- Core literal bridges use `#literal(...)` protocols and empty literal carrier types for now.
-- Keep type sugar and literal sugar separate for now:
-  - `#literal(NilLiteral)` is fine
-  - `T? -> Optional<T>` remains compiler type sugar, not macro-defined yet
-- Keep `Hashable` simple for now:
-  - `function hashValue() -> Int`
-  - no public `Hasher`/`inout` model yet
+- Compiler pipeline is documented as:
+  1. `Lexer`
+  2. `Parser`
+  3. `AST`
+  4. `DeclarationGraph`
+  5. `SemanticProgram`
+  6. `MemoryGraph`
+  7. `ReactivityGraph`
+  8. `BackendLowering`
+  9. `Emission`
+- `DeclarationGraph` is in front of backend lowering.
+- `SemanticProgram` is the first semantic artifact boundary, not a replacement for `DeclarationGraph`.
+- Swift backend is target adaptation only.
+- Literal semantics are declaration-graph driven; backend scalar collapse is Swift-only adaptation.
+- Current long-term goal is backend swappability: Swift now, C/C++ or native later, without disturbing front-end compiler flow.
 
 ## Current State
-- `NeatCore` exists as a top-level source tree:
-  - [`NeatCore/DataSystem`](/Users/george/Documents/Neat/NeatCore/DataSystem)
-  - [`NeatCore/Primitives`](/Users/george/Documents/Neat/NeatCore/Primitives)
-  - [`NeatCore/Macros/Exploration`](/Users/george/Documents/Neat/NeatCore/Macros/Exploration)
-- Current core scalar/data families exist:
-  - `Int`, `IntLiteral`, `Signedness`, `ExpressableByIntLiteral`
-  - `String`, `StringLiteral`, `ExpressableByStringLiteral`
-  - `Bool`, `BoolLiteral`, `ExpressableByBoolLiteral`
-  - `Float`, `FloatLiteral`, `FloatingPointWidth`, `ExpressableByFloatLiteral`
-  - `Optional`, `NilLiteral`, `ExpressableByNilLiteral`
-  - `Array`, `ArrayLiteral`, `ExpressableByArrayLiteral`
-  - `Dictionary`, `DictionaryLiteral`, `ExpressableByDictionaryLiteral`
-  - `Set`, `SetLiteral`, `ExpressableBySetLiteral`
-- Current foundational protocols exist:
-  - [`Equatable.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/Protocols/Equatable.neat)
-  - [`Hashable.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/Protocols/Hashable.neat)
-  - [`Comparable.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/Protocols/Comparable.neat)
-- Current explicit scalar conformances:
-  - [`Int.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/Int/Int.neat): `ExpressableByIntLiteral, Equatable, Hashable, Comparable`
-  - [`Bool.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/Bool/Bool.neat): `ExpressableByBoolLiteral, Equatable, Hashable`
-  - [`String.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/String/String.neat): `ExpressableByStringLiteral, Equatable, Hashable, Comparable`
-  - [`Float.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/Float/Float.neat): `ExpressableByFloatLiteral, Equatable, Hashable, Comparable`
-- Current collection constraints:
-  - [`Set.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/Set/Set.neat): `Set<Element: Hashable>`
-  - [`Dictionary.neat`](/Users/george/Documents/Neat/NeatCore/DataSystem/Dictionary/Dictionary.neat): `Dictionary<Key: Hashable, Value>`
-- Current collection APIs remain intentionally opaque:
-  - `Array` has `init()`, `init(literal:)`, `count`, `append`, `element(index:)`
-  - `Dictionary` has `init()`, `init(literal:)`, `count`, `value(for key:)`, `updateValue(value:for key:)`
-  - `Set` has `init()`, `init(literal:)`, `count`, `contains(element:)`, `insert(element:)`
-- Intentionally incomplete:
-  - no real storage lowering for collections yet
-  - no public `Hasher`
-  - no `Set`/`Dictionary` equality/hash conformances yet
-  - no conformance synthesis/macros promoted out of exploration
-  - no type-sugar lowering hooks documented beyond existing compiler behavior
+- `NeatSyntax` now owns:
+  - parsing inputs into a semantic artifact
+  - declaration graph construction
+  - semantic validation
+- `NeatCLI` now more cleanly owns:
+  - file discovery
+  - `NeatCore` loading
+  - commands and reporting
+  - backend invocation
+- `graph`, `artifacts`, and `compile` all go through the `NeatSyntax` semantic pipeline.
+- Generated Swift for `NeatPlayground` now includes:
+  - `struct Person`
+  - `struct User`
+  - `mutating func incrementAge()`
+- Still incomplete:
+  - Swift backend is still in `NeatCLI`
+  - `MainProgramRunner` is still CLI-side interpreter logic over semantic/expanded program state
+  - project/package/file discovery is still duplicated across commands
+  - `MemoryGraph` and `ReactivityGraph` are still documented architecture, not implemented pipeline stages
 
 ## Important Files
-- Loader / integration:
-  - [`NeatCoreLoader.swift`](/Users/george/Documents/Neat/NeatCLI/Sources/NeatCLI/NeatCoreLoader.swift)
-- Parser / type system changes:
-  - [`Parser.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Shared/Parser.swift)
-  - [`Parser+Shared.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Shared/Parser+Shared.swift)
-  - [`Parser+Expression.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Expression/Parser+Expression.swift)
-  - [`Parser+Construct.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/TypeDefinitions/Construct/Parser+Construct.swift)
-  - [`AST+State.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/State/AST+State.swift)
-  - [`Parser+State.swift`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/State/Parser+State.swift)
-- Memory graph docs:
-  - [`MemoryGraph.md`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/MemoryGraph/MemoryGraph.md)
-  - [`MemoryGraph.ProofRules.md`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/MemoryGraph/MemoryGraph.ProofRules.md)
-- Core protocols:
-  - [`NeatCore/DataSystem/Protocols`](/Users/george/Documents/Neat/NeatCore/DataSystem/Protocols)
-- Core scalar and collection families:
-  - [`NeatCore/DataSystem`](/Users/george/Documents/Neat/NeatCore/DataSystem)
+- `HANDOFF.md`
+- `NeatSyntax/Sources/NeatSyntax/Core/SemanticProgram.swift`
+- `NeatSyntax/Sources/NeatSyntax/Core/SemanticProgramValidator.swift`
+- `NeatSyntax/Sources/NeatSyntax/Core/SemanticValidationError.swift`
+- `NeatSyntax/Sources/NeatSyntax/Core/CompilerPipeline.md`
+- `NeatSyntax/Sources/NeatSyntax/GraphBindings/MemoryGraph/DeclarationGraph.md`
+- `NeatSyntax/Sources/NeatSyntax/GraphBindings/MemoryGraph/MemoryGraph.md`
+- `NeatCLI/Sources/NeatCLI/ProjectSourceValidator.swift`
+- `NeatCLI/Sources/NeatCLI/NeatCoreLoader.swift`
+- `NeatCLI/Sources/NeatCLI/SwiftBackendDriver.swift`
+- `NeatCLI/Sources/NeatCLI/SwiftBackendLowerer.swift`
+- `NeatCLI/Sources/NeatCLI/SwiftBackendEmitter.swift`
+- `NeatCLI/Sources/Commands/GraphCommand.swift`
+- `NeatCLI/Sources/Commands/ArtifactsCommand.swift`
+- `NeatPlayground/Playground.neat`
+- `NeatPlayground/.neat/Build/swift/Sources/Playground.swift`
 
 ## Open Questions
-- Should `@core` be restricted to `NeatCore` / compiler-owned modules?
-  - tracked in [`CORE_MIGRATION_TODO.md`](/Users/george/Documents/Neat/CORE_MIGRATION_TODO.md)
-- Can a normal `construct` store a `@core construct` member as plain inline value data?
-  - tracked in [`CORE_MIGRATION_TODO.md`](/Users/george/Documents/Neat/CORE_MIGRATION_TODO.md)
-- Should `String` really be `Comparable`, and if so what exact ordering semantics should that imply?
-- Should `Float` really be `Hashable`/`Comparable` as-is, given future NaN/ordering semantics?
-- When should `Set` / `Dictionary` get `Equatable` / `Hashable` conformances?
-- When should type sugar like `T? -> Optional<T>` be documented/formalized beyond current compiler behavior?
+- Should `MainProgramRunner` remain CLI/runtime-specific, or should it consume a more formal `NeatSyntax` semantic interface?
+- Should the Swift backend stay in `NeatCLI`, or eventually move behind a backend package/module boundary?
+- What is the next clean boundary after `SemanticProgram`:
+  - shared project loader/discovery service
+  - backend interface
+  - interpreter boundary
 
 ## Next Step
-- Start tightening conformance relationships for collection and optional types:
-  - `Optional<Wrapped: Equatable>: Equatable`
-  - `Array<Element: Equatable>: Equatable`
-  - `Set<Element: Equatable>: Equatable`
-  - `Dictionary<Key: Equatable, Value: Equatable>: Equatable`
-- If that feels too early, the alternative next step is to document the current `NeatCore` surface explicitly in a top-level `NeatCore/README.md`.
+- Continue the split by centralizing project/package/file loading on the CLI side and reducing duplicate file enumeration across commands, while keeping all semantic compilation behind `NeatSyntax`.
 
 ## Verification
-- Commands run successfully:
-  - `cd /Users/george/Documents/Neat/NeatSyntax && swift build`
-  - `cd /Users/george/Documents/Neat/NeatCLI && swift build`
-  - `cd /Users/george/Documents/Neat/NeatCLI && ./.build/debug/NeatCLI artifacts ../NeatPlayground --output /Users/george/Documents/Neat/NeatPlayground/.neat/Artifacts`
-- Current generated artifact path:
-  - [`NeatPlayground/.neat/Artifacts`](/Users/george/Documents/Neat/NeatPlayground/.neat/Artifacts)
-- Current warning status:
-  - `NeatSyntax` still has an unrelated unhandled markdown warning for [`Macros.Phase.md`](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Macros/Macros.Phase.md)
+- `swift build` in `NeatSyntax` passed
+- `swift build` in `NeatCLI` passed
+- `./.build/debug/NeatCLI graph /Users/george/Documents/Neat/NeatPlayground` passed
+- `./.build/debug/NeatCLI artifacts /Users/george/Documents/Neat/NeatPlayground` passed
+- `./.build/debug/NeatCLI compile /Users/george/Documents/Neat/NeatPlayground` passed
+- Generated Swift file confirmed at:
+  - `NeatPlayground/.neat/Build/swift/Sources/Playground.swift`
+- Note:
+  - local `swift build` of the generated workspace still hits a host toolchain issue:
+    - `unknown argument: '-isysroot'`
+  - that is separate from the Neat-side pipeline/split work.

@@ -1,5 +1,0 @@
-function answer() -> String {
-    return 5
-}
-
-@main { }

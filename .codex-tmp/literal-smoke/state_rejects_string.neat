@@ -1,3 +1,0 @@
-state name: String = 5
-
-@main { }
