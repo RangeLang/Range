@@ -4,18 +4,21 @@ import NeatSyntax
 
 struct SwiftBackend: RunnableWorkspaceBackend {
     var name: String { "swift" }
+    private let programBuilder = SwiftBackendProgramBuilder()
+    private let lowerer = SwiftBackendLowerer()
+    private let emitter = SwiftBackendEmitter()
 
     func emitWorkspace(
         project: LoadedProject,
         semanticProgram: SemanticProgram
     ) throws -> EmittedWorkspace {
-        let program = try loadProgram(project: project, semanticProgram: semanticProgram)
+        let program = try programBuilder.build(project: project, semanticProgram: semanticProgram)
         let buildRoot = project.defaultBuildRoot
         if FileManager.default.fileExists(atPath: buildRoot.path) {
             try FileManager.default.removeItem(at: buildRoot)
         }
-        let loweredProgram = SwiftBackendLowerer().lower(program: program)
-        try SwiftBackendEmitter().emitWorkspace(program: loweredProgram, at: buildRoot)
+        let loweredProgram = lowerer.lower(program: program)
+        try emitter.emitWorkspace(program: loweredProgram, at: buildRoot)
         return EmittedWorkspace(root: buildRoot)
     }
 
@@ -24,11 +27,11 @@ struct SwiftBackend: RunnableWorkspaceBackend {
         semanticProgram: SemanticProgram,
         outputURL: URL
     ) throws -> EmittedSourceFile {
-        let program = try loadProgram(project: project, semanticProgram: semanticProgram)
+        let program = try programBuilder.build(project: project, semanticProgram: semanticProgram)
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-        let loweredProgram = SwiftBackendLowerer().lower(program: program)
-        let swift = try SwiftBackendEmitter().emit(program: loweredProgram)
+        let loweredProgram = lowerer.lower(program: program)
+        let swift = try emitter.emit(program: loweredProgram)
         try swift.write(to: outputURL, atomically: true, encoding: .utf8)
         return EmittedSourceFile(outputURL: outputURL)
     }
@@ -56,158 +59,5 @@ struct SwiftBackend: RunnableWorkspaceBackend {
                 "Generated Swift workspace failed with exit code \(process.terminationStatus)."
             )
         }
-    }
-
-    private func loadProgram(
-        project: LoadedProject,
-        semanticProgram: SemanticProgram
-    ) throws -> LoweredProgram {
-        if project.isSingleFile {
-            return try loadProgram(
-                fromSingleFile: project.projectFiles[0],
-                semanticProgram: semanticProgram
-            )
-        }
-
-        return try loadProgram(semanticProgram: semanticProgram)
-    }
-
-    private func loadProgram(
-        fromSingleFile fileURL: URL,
-        semanticProgram: SemanticProgram
-    ) throws -> LoweredProgram {
-        guard
-            let parsedFile = semanticProgram.projectExpandedFiles.first(where: {
-                $0.path == fileURL.path
-            })
-        else {
-            throw ValidationError("Failed to expand \(fileURL.lastPathComponent).")
-        }
-        let sourceFile = parsedFile.sourceFile
-        switch sourceFile {
-        case .mainBlock(let mainBlock):
-            return .init(
-                callables: [],
-                declarations: [],
-                mainBlock: mainBlock,
-                units: [
-                    .init(
-                        outputFileName: fileURL.deletingPathExtension().lastPathComponent
-                            + ".swift",
-                        declarations: [],
-                        callables: [],
-                        mainBlock: mainBlock
-                    )
-                ]
-            )
-        case .module(let module):
-            guard let mainBlock = module.mainBlock else {
-                throw ValidationError(
-                    "Swift backend requires a file with @main { ... } when compiling a single file."
-                )
-            }
-            return .init(
-                callables: module.callables,
-                declarations: module.constructs.filter {
-                    $0.kind == .declaration || $0.kind == .entry
-                },
-                mainBlock: mainBlock,
-                units: [
-                    .init(
-                        outputFileName: fileURL.deletingPathExtension().lastPathComponent
-                            + ".swift",
-                        declarations: module.constructs.filter {
-                            $0.kind == .declaration || $0.kind == .entry
-                        },
-                        callables: module.callables,
-                        mainBlock: mainBlock
-                    )
-                ]
-            )
-        case .construct, .enumeration, .protocolDefinition, .macro:
-            throw ValidationError(
-                "Swift backend requires a file with @main { ... } when compiling a single file."
-            )
-        case .extensions:
-            throw ValidationError("Extension-only files cannot be compiled to Swift directly.")
-        }
-    }
-
-    private func loadProgram(semanticProgram: SemanticProgram) throws -> LoweredProgram {
-        var callables: [CallableDeclaration] = []
-        var declarations: [ConstructDeclaration] = []
-        var mainBlock: MainBlockNode?
-        var units: [LoweredSourceUnit] = []
-
-        for parsedFile in semanticProgram.projectExpandedFiles {
-            let fileURL = URL(fileURLWithPath: parsedFile.path)
-            let sourceFile = parsedFile.sourceFile
-            let swiftFileName = fileURL.deletingPathExtension().lastPathComponent + ".swift"
-            switch sourceFile {
-            case .construct(let declaration):
-                if declaration.kind == .declaration || declaration.kind == .entry {
-                    declarations.append(declaration)
-                }
-                units.append(
-                    .init(
-                        outputFileName: swiftFileName,
-                        declarations: declaration.kind == .declaration || declaration.kind == .entry
-                            ? [declaration] : [],
-                        callables: [],
-                        mainBlock: nil
-                    )
-                )
-            case .module(let module):
-                callables.append(contentsOf: module.callables)
-                units.append(
-                    .init(
-                        outputFileName: swiftFileName,
-                        declarations: module.constructs.filter {
-                            $0.kind == .declaration || $0.kind == .entry
-                        },
-                        callables: module.callables,
-                        mainBlock: module.mainBlock
-                    )
-                )
-                declarations.append(
-                    contentsOf: module.constructs.filter {
-                        $0.kind == .declaration || $0.kind == .entry
-                    }
-                )
-                if let block = module.mainBlock {
-                    if mainBlock != nil {
-                        throw ValidationError(
-                            "Found multiple @main modules while generating Swift.")
-                    }
-                    mainBlock = block
-                }
-            case .mainBlock(let block):
-                if mainBlock != nil {
-                    throw ValidationError("Found multiple @main modules while generating Swift.")
-                }
-                mainBlock = block
-                units.append(
-                    .init(
-                        outputFileName: swiftFileName,
-                        declarations: [],
-                        callables: [],
-                        mainBlock: block
-                    )
-                )
-            case .extensions, .enumeration, .protocolDefinition, .macro:
-                continue
-            }
-        }
-
-        guard let mainBlock else {
-            throw ValidationError("Missing @main block while generating Swift.")
-        }
-
-        return .init(
-            callables: callables,
-            declarations: declarations,
-            mainBlock: mainBlock,
-            units: units
-        )
     }
 }
