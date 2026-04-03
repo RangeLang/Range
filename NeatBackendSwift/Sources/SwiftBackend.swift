@@ -2,53 +2,46 @@ import ArgumentParser
 import Foundation
 import NeatSyntax
 
-struct SwiftBackend: RunnableWorkspaceBackend {
-    var name: String { "swift" }
+public struct SwiftBackend {
     private let programBuilder = SwiftBackendProgramBuilder()
     private let adapter = SwiftLoweredProgramAdapter()
     private let emitter = SwiftBackendEmitter()
 
-    func emitWorkspace(
-        project: LoadedProject,
+    public init() {}
+
+    public func emitWorkspace(
+        project: SwiftBackendProject,
         semanticProgram: SemanticProgram
-    ) throws -> EmittedWorkspace {
+    ) throws -> URL {
         let program = try programBuilder.build(project: project, semanticProgram: semanticProgram)
-        let buildRoot = project.defaultBuildRoot
+        let buildRoot = project.buildRoot
         if FileManager.default.fileExists(atPath: buildRoot.path) {
             try FileManager.default.removeItem(at: buildRoot)
         }
         let loweredProgram = adapter.adapt(program: program)
         try emitter.emitWorkspace(program: loweredProgram, at: buildRoot)
-        return EmittedWorkspace(root: buildRoot)
+        return buildRoot
     }
 
-    func emitSourceFile(
-        project: LoadedProject,
+    public func emitSourceFile(
+        project: SwiftBackendProject,
         semanticProgram: SemanticProgram,
         outputURL: URL
-    ) throws -> EmittedSourceFile {
+    ) throws -> URL {
         let program = try programBuilder.build(project: project, semanticProgram: semanticProgram)
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         let loweredProgram = adapter.adapt(program: program)
         let swift = try emitter.emit(program: loweredProgram)
         try swift.write(to: outputURL, atomically: true, encoding: .utf8)
-        return EmittedSourceFile(outputURL: outputURL)
+        return outputURL
     }
 
-    func run(workspace: EmittedWorkspace) throws {
-        try runProcess(
-            executable: "/usr/bin/env",
-            arguments: ["swift", "run", "NeatGenerated"],
-            currentDirectory: workspace.root
-        )
-    }
-
-    private func runProcess(executable: String, arguments: [String], currentDirectory: URL) throws {
+    public func run(workspaceRoot: URL) throws {
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        process.currentDirectoryURL = currentDirectory
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = ["swift", "run", "NeatGenerated"]
+        process.currentDirectoryURL = workspaceRoot
         process.standardInput = FileHandle.standardInput
         process.standardOutput = FileHandle.standardOutput
         process.standardError = FileHandle.standardError

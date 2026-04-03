@@ -4,7 +4,7 @@ import NeatSyntax
 
 struct SwiftBackendProgramBuilder {
     func build(
-        project: LoadedProject,
+        project: SwiftBackendProject,
         semanticProgram: SemanticProgram
     ) throws -> LoweredProgram {
         if project.isSingleFile {
