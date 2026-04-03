@@ -36,6 +36,11 @@ extension Parser {
         } else {
             returnType = nil
         }
+        registerVisibleCallableReturnType(
+            targetType: targetType,
+            name: name,
+            returnType: returnType
+        )
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
             macros: macros,
@@ -85,6 +90,11 @@ extension Parser {
         } else {
             returnType = nil
         }
+        registerVisibleCallableReturnType(
+            targetType: nil,
+            name: mappedName,
+            returnType: returnType
+        )
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
             macros: [],
@@ -158,6 +168,22 @@ extension Parser {
             return false
         }
         return peek(offset: offset + 1) == .leftParen
+    }
+
+    mutating func registerVisibleCallableReturnType(
+        targetType: TypeReference?,
+        name: String,
+        returnType: TypeReference?
+    ) {
+        guard let returnType else {
+            return
+        }
+
+        currentCallableReturnTypes[name] = returnType
+
+        if let targetType {
+            currentCallableReturnTypes["\(targetType.displayName).\(name)"] = returnType
+        }
     }
 
     func isCallableStart() -> Bool {

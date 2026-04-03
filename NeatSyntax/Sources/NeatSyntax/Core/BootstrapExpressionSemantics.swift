@@ -4,6 +4,7 @@ public enum BootstrapExpressionSemantics {
     public static func inferType(
         of expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference] = [:],
         resolver: LiteralBridgeResolver
     ) throws -> BootstrapLiteralType {
         switch expression {
@@ -25,27 +26,34 @@ public enum BootstrapExpressionSemantics {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
             return type
-        case .call:
-            throw ParseError(
-                "Callable expressions are not supported in state initializer inference yet.")
+        case .call(let name, _):
+            guard let returnType = callableReturnTypes[name] else {
+                throw ParseError(
+                    "Callable expressions are not supported in state initializer inference yet."
+                )
+            }
+            return .typed(returnType)
         case .bindingReference(let name):
             throw ParseError("Binding reference '$\(name)' is not valid in a state initializer.")
         case .array(let elements):
             return try inferArrayType(
                 elements: elements,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
         case .dictionary(let elements):
             return try inferDictionaryType(
                 elements: elements,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
         case .ternary(let condition, let trueExpression, let falseExpression):
             let conditionType = try inferType(
                 of: condition,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
             guard isCompatible(actual: conditionType, expected: .named("Bool"), resolver: resolver)
@@ -57,6 +65,7 @@ public enum BootstrapExpressionSemantics {
                 let falseType = try inferType(
                     of: falseExpression,
                     accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
                     resolver: resolver
                 )
                 guard isOptionalExpressionType(falseType) else {
@@ -70,6 +79,7 @@ public enum BootstrapExpressionSemantics {
                 let trueType = try inferType(
                     of: trueExpression,
                     accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
                     resolver: resolver
                 )
                 guard isOptionalExpressionType(trueType) else {
@@ -82,11 +92,13 @@ public enum BootstrapExpressionSemantics {
             let trueType = try inferType(
                 of: trueExpression,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
             let falseType = try inferType(
                 of: falseExpression,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
             guard expressionTypesMatch(trueType, falseType) else {
@@ -235,6 +247,7 @@ public enum BootstrapExpressionSemantics {
     private static func inferArrayType(
         elements: [Expression],
         accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver
     ) throws -> BootstrapLiteralType {
         guard let first = elements.first else {
@@ -244,6 +257,7 @@ public enum BootstrapExpressionSemantics {
         var unified = try inferType(
             of: first,
             accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
             resolver: resolver
         )
 
@@ -251,6 +265,7 @@ public enum BootstrapExpressionSemantics {
             let inferred = try inferType(
                 of: element,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
             unified = try unifyCollectionElementTypes(unified, inferred, resolver: resolver)
@@ -267,6 +282,7 @@ public enum BootstrapExpressionSemantics {
     private static func inferDictionaryType(
         elements: [DictionaryElement],
         accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver
     ) throws -> BootstrapLiteralType {
         guard let first = elements.first else {
@@ -276,11 +292,13 @@ public enum BootstrapExpressionSemantics {
         var keyType = try inferType(
             of: first.key,
             accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
             resolver: resolver
         )
         var valueType = try inferType(
             of: first.value,
             accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
             resolver: resolver
         )
 
@@ -288,6 +306,7 @@ public enum BootstrapExpressionSemantics {
             let inferredKey = try inferType(
                 of: element.key,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
             keyType = try unifyCollectionElementTypes(keyType, inferredKey, resolver: resolver)
@@ -295,6 +314,7 @@ public enum BootstrapExpressionSemantics {
             let inferredValue = try inferType(
                 of: element.value,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
             valueType = try unifyCollectionElementTypes(

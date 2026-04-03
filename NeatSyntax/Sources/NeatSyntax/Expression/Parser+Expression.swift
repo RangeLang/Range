@@ -312,6 +312,7 @@ extension Parser {
         return try BootstrapExpressionSemantics.inferType(
             of: expression,
             accessibleTypes: bootstrapAccessibleTypes,
+            callableReturnTypes: currentCallableReturnTypes,
             resolver: literalBridgeResolver
         )
     }

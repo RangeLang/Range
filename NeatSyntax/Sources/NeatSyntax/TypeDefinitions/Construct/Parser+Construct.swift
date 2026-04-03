@@ -41,9 +41,11 @@ extension Parser {
 
             let outerStateTypes = currentStateTypes
             let outerEnvironmentTypes = currentEnvironmentTypes
+            let outerCallableReturnTypes = currentCallableReturnTypes
             let outerSelfAvailable = currentSelfAvailable
             currentStateTypes = outerStateTypes
             currentEnvironmentTypes = outerEnvironmentTypes
+            currentCallableReturnTypes = outerCallableReturnTypes
             currentSelfAvailable = true
             while peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
                 || isEnvironmentDeclarationStart()
@@ -98,6 +100,7 @@ extension Parser {
 
             currentStateTypes = outerStateTypes
             currentEnvironmentTypes = outerEnvironmentTypes
+            currentCallableReturnTypes = outerCallableReturnTypes
             currentSelfAvailable = outerSelfAvailable
             clearCurrentDeclarationSymbols()
 
