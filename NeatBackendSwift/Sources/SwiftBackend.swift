@@ -1,6 +1,17 @@
-import ArgumentParser
 import Foundation
 import NeatSyntax
+
+public struct SwiftBackendError: LocalizedError {
+    public let message: String
+
+    public init(_ message: String) {
+        self.message = message
+    }
+
+    public var errorDescription: String? {
+        message
+    }
+}
 
 public struct SwiftBackend {
     private let programBuilder = SwiftBackendProgramBuilder()
@@ -48,7 +59,7 @@ public struct SwiftBackend {
         try process.run()
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            throw ValidationError(
+            throw SwiftBackendError(
                 "Generated Swift workspace failed with exit code \(process.terminationStatus)."
             )
         }

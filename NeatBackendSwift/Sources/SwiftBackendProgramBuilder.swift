@@ -1,4 +1,3 @@
-import ArgumentParser
 import Foundation
 import NeatSyntax
 
@@ -24,7 +23,7 @@ struct SwiftBackendProgramBuilder {
                 $0.path == fileURL.path
             })
         else {
-            throw ValidationError("Failed to expand \(fileURL.lastPathComponent).")
+            throw SwiftBackendError("Failed to expand \(fileURL.lastPathComponent).")
         }
         let sourceFile = parsedFile.sourceFile
         switch sourceFile {
@@ -45,7 +44,7 @@ struct SwiftBackendProgramBuilder {
             )
         case .module(let module):
             guard let mainBlock = module.mainBlock else {
-                throw ValidationError(
+                throw SwiftBackendError(
                     "Swift backend requires a file with @main { ... } when compiling a single file."
                 )
             }
@@ -68,11 +67,11 @@ struct SwiftBackendProgramBuilder {
                 ]
             )
         case .construct, .enumeration, .protocolDefinition, .macro:
-            throw ValidationError(
+            throw SwiftBackendError(
                 "Swift backend requires a file with @main { ... } when compiling a single file."
             )
         case .extensions:
-            throw ValidationError("Extension-only files cannot be compiled to Swift directly.")
+            throw SwiftBackendError("Extension-only files cannot be compiled to Swift directly.")
         }
     }
 
@@ -119,14 +118,14 @@ struct SwiftBackendProgramBuilder {
                 )
                 if let block = module.mainBlock {
                     if mainBlock != nil {
-                        throw ValidationError(
+                        throw SwiftBackendError(
                             "Found multiple @main modules while generating Swift.")
                     }
                     mainBlock = block
                 }
             case .mainBlock(let block):
                 if mainBlock != nil {
-                    throw ValidationError("Found multiple @main modules while generating Swift.")
+                    throw SwiftBackendError("Found multiple @main modules while generating Swift.")
                 }
                 mainBlock = block
                 units.append(
@@ -143,7 +142,7 @@ struct SwiftBackendProgramBuilder {
         }
 
         guard let mainBlock else {
-            throw ValidationError("Missing @main block while generating Swift.")
+            throw SwiftBackendError("Missing @main block while generating Swift.")
         }
 
         return .init(

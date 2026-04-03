@@ -14,15 +14,13 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../NeatSyntax"),
-        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
+        .package(path: "../NeatSyntax")
     ],
     targets: [
         .target(
             name: "NeatBackendSwift",
             dependencies: [
-                .product(name: "NeatSyntax", package: "NeatSyntax"),
-                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "NeatSyntax", package: "NeatSyntax")
             ],
             path: "Sources"
         )

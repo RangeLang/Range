@@ -1,4 +1,3 @@
-import ArgumentParser
 import Foundation
 import NeatSyntax
 
@@ -140,7 +139,7 @@ struct SwiftBackendEmitter {
 
     private func emitFunction(_ callable: CallableDeclaration) throws -> String {
         guard let body = callable.body else {
-            throw ValidationError(
+            throw SwiftBackendError(
                 "Swift backend requires function \(callable.name) to have a body.")
         }
 
@@ -191,7 +190,7 @@ struct SwiftBackendEmitter {
 
     private func emitParameter(_ parameter: NeatFunctionParameter) throws -> String {
         guard let typeReference = parameter.typeReference else {
-            throw ValidationError("Swift backend requires explicit parameter types.")
+            throw SwiftBackendError("Swift backend requires explicit parameter types.")
         }
 
         let local = parameter.localName
@@ -260,7 +259,7 @@ struct SwiftBackendEmitter {
         case .plain:
             return "var \(binding.name): \(binding.typeName)"
         case .derived:
-            throw ValidationError("Swift backend does not support derived binding storage yet.")
+            throw SwiftBackendError("Swift backend does not support derived binding storage yet.")
         }
     }
 
@@ -298,7 +297,7 @@ struct SwiftBackendEmitter {
 
     private func emitMethod(_ callable: CallableDeclaration) throws -> String {
         guard let body = callable.body else {
-            throw ValidationError(
+            throw SwiftBackendError(
                 "Swift backend requires function \(callable.name) to have a body.")
         }
 
@@ -370,7 +369,7 @@ struct SwiftBackendEmitter {
 
         switch statement {
         case .freestandingMacro:
-            throw ValidationError("Freestanding macros must be expanded before Swift emission.")
+            throw SwiftBackendError("Freestanding macros must be expanded before Swift emission.")
         case .declaration(let kind, let name, _, let expression):
             let keyword = kind == .constant ? "let" : "var"
             return "\(prefix)\(keyword) \(name) = \(try emitExpression(expression))"
@@ -416,7 +415,7 @@ struct SwiftBackendEmitter {
                 indent: indent
             )
         case .environmentProvision:
-            throw ValidationError(
+            throw SwiftBackendError(
                 "Swift backend does not support environment provision statements yet.")
         }
     }

@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import NeatBackendSwift
 import NeatSyntax
 
 enum ErrorPresenter {
@@ -18,6 +19,9 @@ enum ErrorPresenter {
         }
         if let validation = error as? ValidationError {
             return validation.message
+        }
+        if let backend = error as? SwiftBackendError {
+            return backend.message
         }
         return String(describing: error)
     }
