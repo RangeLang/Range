@@ -143,6 +143,7 @@ public struct Parser {
     var currentMutableStateNames: Set<String> = []
     var currentStateTypes: [String: TypeReference] = [:]
     var currentEnvironmentTypes: [String: TypeReference] = [:]
+    var currentCallableReturnTypes: [String: TypeReference] = [:]
     var currentBindingNames: Set<String> = []
     var currentEnvironmentNames: Set<String> = []
     var currentMutableEnvironmentNames: Set<String> = []
@@ -164,6 +165,7 @@ public struct Parser {
 
     public mutating func parseSourceFile() throws -> SourceFileNode {
         currentStateTypes = [:]
+        currentCallableReturnTypes = [:]
 
         var mainBlock: MainBlockNode?
         var topLevelStates: [StateDeclaration] = []
