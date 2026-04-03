@@ -1345,21 +1345,24 @@ private struct GraphCollector {
             case .freestandingMacro(_, _, let body):
                 analyzeStatements(
                     body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
-            case .declaration(let kind, let name, let typeName, let expression):
-                let nodeKind: DependencyGraphNodeKind = kind == .mutable ? .state : .value
-                let localID = "\(ownerID)/local:\(name)"
-                addNode(id: localID, kind: nodeKind, label: name)
+            case .localBinding(let declaration):
+                let nodeKind: DependencyGraphNodeKind =
+                    declaration.kind == .mutable ? .state : .value
+                let localID = "\(ownerID)/local:\(declaration.name)"
+                addNode(id: localID, kind: nodeKind, label: declaration.name)
                 addEdge(from: ownerID, to: localID, kind: .contains)
-                if let typeName {
-                    addStorageTypeReference(.named(typeName), from: localID)
-                    if constructDeclarationsByName[typeName] != nil {
-                        constructTypeByNodeID[localID] = typeName
-                    }
+                addStorageTypeReference(declaration.type, from: localID)
+                if constructDeclarationsByName[declaration.type.displayName] != nil {
+                    constructTypeByNodeID[localID] = declaration.type.displayName
                 }
-                captureConstructType(for: localID, from: expression)
-                scope.symbols[name] = localID
+                captureConstructType(for: localID, from: declaration.expression)
+                scope.symbols[declaration.name] = localID
                 analyzeInitializer(
-                    expression, ownerID: localID, scope: scope, visitedCalls: visitedCalls)
+                    declaration.expression,
+                    ownerID: localID,
+                    scope: scope,
+                    visitedCalls: visitedCalls
+                )
 
             case .derived(let name, let typeName, let body):
                 let derivedID = "\(ownerID)/local-derived:\(name)"

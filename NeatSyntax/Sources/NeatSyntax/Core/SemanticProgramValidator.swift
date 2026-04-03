@@ -254,7 +254,7 @@ public struct SemanticProgramValidator {
                     accessibleTypes: visibleTypes,
                     resolver: resolver
                 ),
-                inferred.isLiteralLike
+                BootstrapExpressionSemantics.isLiteralExpression(expression)
             else {
                 continue
             }
@@ -297,7 +297,7 @@ public struct SemanticProgramValidator {
                 if let defaultBody {
                     expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
                 }
-            case .declaration, .derived, .environmentProvision, .assignment, .compoundAssignment,
+            case .localBinding, .derived, .environmentProvision, .assignment, .compoundAssignment,
                 .expression, .break, .continue:
                 continue
             }
@@ -421,14 +421,14 @@ public struct SemanticProgramValidator {
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )
-            case .declaration(let kind, let name, let typeName, let expression):
-                guard kind == .constant else { continue }
-                let explicitType = typeName.flatMap(normalizedTypeName)
-                let inferredType = inferredConstructName(from: expression)
+            case .localBinding(let declaration):
+                guard declaration.kind == .constant else { continue }
+                let explicitType = normalizedTypeName(declaration.type.displayName)
+                let inferredType = inferredConstructName(from: declaration.expression)
                 let constructName = explicitType ?? inferredType
                 if let constructName, bindingConstructNames.contains(constructName) {
                     throw SemanticValidationError(
-                        "value \(name): \(constructName) in \(fileName) is not allowed because \(constructName) declares binding members. Use state or a snapshot construct."
+                        "value \(declaration.name): \(constructName) in \(fileName) is not allowed because \(constructName) declares binding members. Use state or a snapshot construct."
                     )
                 }
             case .derived(_, _, let body):

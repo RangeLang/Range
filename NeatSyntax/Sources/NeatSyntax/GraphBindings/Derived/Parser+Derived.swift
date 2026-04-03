@@ -98,7 +98,7 @@ extension Parser {
                 collectBuilderHooks(from: body, into: &hooks)
             case .expression:
                 continue
-            case .declaration:
+            case .localBinding:
                 continue
             case .derived:
                 continue

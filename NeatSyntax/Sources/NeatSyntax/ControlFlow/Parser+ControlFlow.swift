@@ -2,7 +2,7 @@ import Foundation
 
 extension Parser {
     mutating func parseStatement(
-        localBindings: inout [String: LocalBindingKind]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         if isMacroApplicationStart() {
             return try parseFreestandingMacroStatement(localBindings: &localBindings)
@@ -82,7 +82,7 @@ extension Parser {
     }
 
     mutating func parseFreestandingMacroStatement(
-        localBindings: inout [String: LocalBindingKind]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         guard case .hashDirective(let name) = peek() else {
             throw ParseError("Expected freestanding macro application.")
@@ -131,7 +131,7 @@ extension Parser {
 
     mutating func parseLocalDeclaration(
         kind: LocalBindingKind,
-        localBindings: inout [String: LocalBindingKind]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         let name = try consumeIdentifier()
         if localBindings[name] != nil {
@@ -144,22 +144,36 @@ extension Parser {
             throw ParseError("Local binding '\(name)' conflicts with environment '\(name)'.")
         }
 
-        let typeName: String?
+        let explicitType: TypeReference?
         if peek() == .colon {
             try consume(.colon)
-            typeName = try consumeTypeReference()
+            explicitType = try parseTypeReferenceNode()
         } else {
-            typeName = nil
+            explicitType = nil
         }
 
         try consume(.equal)
         let expression = try parseExpression()
-        localBindings[name] = kind
-        return .declaration(kind: kind, name: name, typeName: typeName, expression: expression)
+        let resolvedType = try inferInitializedBindingType(
+            name: name,
+            explicitType: explicitType,
+            expression: expression,
+            accessibleTypes: accessibleLocalTypes(localBindings),
+            bindingKindDescription: kind == .constant ? "value" : "state"
+        )
+        let declaration = LocalBindingDeclaration(
+            kind: kind,
+            name: name,
+            hasExplicitTypeAnnotation: explicitType != nil,
+            type: explicitType ?? resolvedType,
+            expression: expression
+        )
+        localBindings[name] = LocalBindingSymbol(kind: kind, type: declaration.type)
+        return .localBinding(declaration)
     }
 
     mutating func parseLocalDerived(
-        localBindings: inout [String: LocalBindingKind]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         let name = try consumeIdentifier()
         if localBindings[name] != nil {
@@ -175,12 +189,12 @@ extension Parser {
         try consume(.colon)
         let typeName = try consumeTypeReference()
         let body = try parseStatementBlock(baseLocalBindings: localBindings)
-        localBindings[name] = .constant
+        localBindings[name] = LocalBindingSymbol(kind: .constant, type: .named(typeName))
         return .derived(name: name, typeName: typeName, body: body)
     }
 
     mutating func parseAssignmentTarget(
-        localBindings: [String: LocalBindingKind]
+        localBindings: [String: LocalBindingSymbol]
     ) throws -> AssignmentTarget {
         let name = try consumeIdentifier()
         var target: AssignmentTarget
@@ -202,10 +216,10 @@ extension Parser {
 
     func resolveAssignmentTarget(
         name: String,
-        localBindings: [String: LocalBindingKind]
+        localBindings: [String: LocalBindingSymbol]
     ) throws -> AssignmentTarget {
-        if let localKind = localBindings[name] {
-            if case .constant = localKind {
+        if let localBinding = localBindings[name] {
+            if case .constant = localBinding.kind {
                 throw ParseError("Cannot assign to immutable value '\(name)'.")
             }
             return .local(name)
@@ -235,7 +249,7 @@ extension Parser {
     }
 
     mutating func parseSwitchStatement(
-        localBindings: inout [String: LocalBindingKind]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         try consumeKeyword(.switchStatement)
         let subject = try parseExpression()
@@ -270,7 +284,7 @@ extension Parser {
     }
 
     mutating func parseIfStatement(
-        localBindings: inout [String: LocalBindingKind]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         var branches: [StatementConditionalBranch] = []
 
@@ -300,7 +314,7 @@ extension Parser {
     }
 
     mutating func parseWhileStatement(
-        localBindings: inout [String: LocalBindingKind]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         try consumeKeyword(.whileLoop)
         let condition = try parseExpression()
@@ -309,7 +323,7 @@ extension Parser {
     }
 
     mutating func parseForStatement(
-        localBindings: inout [String: LocalBindingKind]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         try consumeKeyword(.forLoop)
         let name = try consumeIdentifier()
@@ -328,7 +342,7 @@ extension Parser {
         try consume(.leftBrace)
 
         var loopBindings = localBindings
-        loopBindings[name] = .constant
+        loopBindings[name] = LocalBindingSymbol(kind: .constant, type: .named("Never"))
         var body: [Statement] = []
         while peek() != .rightBrace {
             body.append(try parseStatement(localBindings: &loopBindings))
@@ -338,7 +352,7 @@ extension Parser {
         return .forEach(name: name, sequence: sequence, body: body)
     }
 
-    mutating func parseSwitchBodyStatements(baseLocalBindings: [String: LocalBindingKind])
+    mutating func parseSwitchBodyStatements(baseLocalBindings: [String: LocalBindingSymbol])
         throws -> [Statement]
     {
         if peek() == .colon {
@@ -348,7 +362,7 @@ extension Parser {
         return try parseStatementBlock(baseLocalBindings: baseLocalBindings)
     }
 
-    mutating func parseStatementBlock(baseLocalBindings: [String: LocalBindingKind]) throws
+    mutating func parseStatementBlock(baseLocalBindings: [String: LocalBindingSymbol]) throws
         -> [Statement]
     {
         guard peek() == .leftBrace else {
@@ -396,5 +410,14 @@ extension Parser {
         }
 
         return isExpressionStatementStart()
+    }
+
+    func accessibleLocalTypes(_ localBindings: [String: LocalBindingSymbol]) -> [String:
+        TypeReference]
+    {
+        let localTypes = Dictionary(
+            uniqueKeysWithValues: localBindings.map { ($0.key, $0.value.type) }
+        )
+        return accessibleContextTypes().merging(localTypes) { current, _ in current }
     }
 }

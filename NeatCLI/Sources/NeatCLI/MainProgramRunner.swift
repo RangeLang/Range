@@ -163,9 +163,9 @@ private struct MainProgramInterpreter {
         switch statement {
         case .freestandingMacro:
             throw ValidationError("Freestanding macros must be expanded before interpretation.")
-        case .declaration(let kind, let name, _, let expression):
-            let value = try evaluate(expression)
-            try declare(name: name, kind: kind, value: value)
+        case .localBinding(let declaration):
+            let value = try evaluate(declaration.expression)
+            try declare(name: declaration.name, kind: declaration.kind, value: value)
             return .none
 
         case .derived(let name, _, let body):

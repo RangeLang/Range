@@ -519,17 +519,21 @@ public enum MacroExpander {
                     }
                 )
             ]
-        case .declaration(let kind, let name, let typeName, let expression):
+        case .localBinding(let declaration):
             return [
-                .declaration(
-                    kind: kind,
-                    name: name,
-                    typeName: typeName,
-                    expression: expand(
-                        expression: expression,
-                        expectedType: typeName.map(TypeReference.named),
-                        attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                .localBinding(
+                    LocalBindingDeclaration(
+                        kind: declaration.kind,
+                        name: declaration.name,
+                        hasExplicitTypeAnnotation: declaration.hasExplicitTypeAnnotation,
+                        type: declaration.type,
+                        expression: expand(
+                            expression: declaration.expression,
+                            expectedType: declaration.hasExplicitTypeAnnotation
+                                ? declaration.type : nil,
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs
+                        )
                     )
                 )
             ]
@@ -1056,7 +1060,7 @@ public enum MacroExpander {
                 if let defaultBody {
                     expressions.append(contentsOf: macroOperationExpressions(in: defaultBody))
                 }
-            case .declaration, .assignment, .compoundAssignment, .return, .freestandingMacro,
+            case .localBinding, .assignment, .compoundAssignment, .return, .freestandingMacro,
                 .environmentProvision, .break, .continue:
                 continue
             }
@@ -1241,12 +1245,18 @@ public enum MacroExpander {
         bindings: [String: Expression]
     ) -> Statement {
         switch statement {
-        case .declaration(let kind, let name, let typeName, let expression):
-            return .declaration(
-                kind: kind,
-                name: name,
-                typeName: typeName,
-                expression: substituteMacroBindings(in: expression, bindings: bindings)
+        case .localBinding(let declaration):
+            return .localBinding(
+                LocalBindingDeclaration(
+                    kind: declaration.kind,
+                    name: declaration.name,
+                    hasExplicitTypeAnnotation: declaration.hasExplicitTypeAnnotation,
+                    type: declaration.type,
+                    expression: substituteMacroBindings(
+                        in: declaration.expression,
+                        bindings: bindings
+                    )
+                )
             )
         case .derived(let name, let typeName, let body):
             return .derived(

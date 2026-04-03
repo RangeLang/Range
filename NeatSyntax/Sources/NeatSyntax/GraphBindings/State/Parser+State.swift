@@ -21,43 +21,13 @@ extension Parser {
         if peek() == .equal {
             try consume(.equal)
             let initialValue = try parseExpression()
-            if case .nilLiteral = initialValue {
-                guard let explicitType else {
-                    throw ParseError(
-                        "state '\(name)' initialized with nil requires an explicit optional type.")
-                }
-                guard case .optional = explicitType else {
-                    throw ParseError(
-                        "state '\(name)' initialized with nil requires an optional type.")
-                }
-                inferredType = explicitType
-            } else {
-                let inferred = try inferBootstrapExpressionType(
-                    of: initialValue,
-                    accessibleTypes: accessibleContextTypes()
-                )
-                if let explicitType {
-                    switch inferred {
-                    case .typed(let actualType):
-                        guard isCompatibleStateType(explicitType, inferredType: actualType) else {
-                            throw ParseError(
-                                "state '\(name)' expects \(explicitType.displayName), got \(actualType.displayName)."
-                            )
-                        }
-                    default:
-                        break
-                    }
-                    inferredType = explicitType
-                } else {
-                    guard let inferredReference = defaultDestinationTypeReference(for: inferred)
-                    else {
-                        throw ParseError(
-                            "state '\(name)' could not infer a destination type from \(inferred.displayName)."
-                        )
-                    }
-                    inferredType = inferredReference
-                }
-            }
+            inferredType = try inferInitializedBindingType(
+                name: name,
+                explicitType: explicitType,
+                expression: initialValue,
+                accessibleTypes: accessibleContextTypes(),
+                bindingKindDescription: "state"
+            )
             storage = .stored(initialValue)
         } else if allowDeclaredStorage, let explicitType {
             inferredType = explicitType
@@ -92,6 +62,116 @@ extension Parser {
 
     func isCompatibleStateType(_ explicitType: TypeReference, inferredType: TypeReference) -> Bool {
         isCompatibleNamedType(expected: explicitType, actual: inferredType)
+    }
+
+    func inferInitializedBindingType(
+        name: String,
+        explicitType: TypeReference?,
+        expression: Expression,
+        accessibleTypes: [String: TypeReference],
+        bindingKindDescription: String
+    ) throws -> TypeReference {
+        if isEmptyArrayLiteral(expression) {
+            guard let explicitType else {
+                throw ParseError(
+                    "Array type inference requires at least one element."
+                )
+            }
+            guard isExplicitArrayType(explicitType) else {
+                throw ParseError(
+                    "\(bindingKindDescription) '\(name)' initialized with [] requires an explicit array type."
+                )
+            }
+            return explicitType
+        }
+
+        if isEmptyDictionaryLiteral(expression) {
+            guard let explicitType else {
+                throw ParseError(
+                    "Dictionary type inference requires at least one element."
+                )
+            }
+            guard isExplicitDictionaryType(explicitType) else {
+                throw ParseError(
+                    "\(bindingKindDescription) '\(name)' initialized with [:] requires an explicit dictionary type."
+                )
+            }
+            return explicitType
+        }
+
+        if case .nilLiteral = expression {
+            guard let explicitType else {
+                throw ParseError(
+                    "\(bindingKindDescription) '\(name)' initialized with nil requires an explicit optional type."
+                )
+            }
+            guard case .optional = explicitType else {
+                throw ParseError(
+                    "\(bindingKindDescription) '\(name)' initialized with nil requires an optional type."
+                )
+            }
+            return explicitType
+        }
+
+        let inferred = try inferBootstrapExpressionType(
+            of: expression,
+            accessibleTypes: accessibleTypes
+        )
+
+        if let explicitType {
+            switch inferred {
+            case .typed(let actualType):
+                guard isCompatibleStateType(explicitType, inferredType: actualType) else {
+                    throw ParseError(
+                        "\(bindingKindDescription) '\(name)' expects \(explicitType.displayName), got \(actualType.displayName)."
+                    )
+                }
+            default:
+                break
+            }
+            return explicitType
+        }
+
+        guard let inferredReference = defaultDestinationTypeReference(for: inferred) else {
+            throw ParseError(
+                "\(bindingKindDescription) '\(name)' could not infer a destination type from \(inferred.displayName)."
+            )
+        }
+        return inferredReference
+    }
+
+    func isEmptyArrayLiteral(_ expression: Expression) -> Bool {
+        if case .array(let elements) = expression {
+            return elements.isEmpty
+        }
+        return false
+    }
+
+    func isEmptyDictionaryLiteral(_ expression: Expression) -> Bool {
+        if case .dictionary(let elements) = expression {
+            return elements.isEmpty
+        }
+        return false
+    }
+
+    func isExplicitArrayType(_ typeReference: TypeReference) -> Bool {
+        if case .array = typeReference {
+            return true
+        }
+        return false
+    }
+
+    func isExplicitDictionaryType(_ typeReference: TypeReference) -> Bool {
+        guard case .generic(let base, let arguments) = typeReference else {
+            return false
+        }
+        guard arguments.count == 2 else {
+            return false
+        }
+        guard case .named(let baseName) = base else {
+            return false
+        }
+        return baseName == "Dictionary"
     }
 
     mutating func syncCurrentDeclarationSymbols(

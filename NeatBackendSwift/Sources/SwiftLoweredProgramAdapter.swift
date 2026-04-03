@@ -88,12 +88,15 @@ struct SwiftLoweredProgramAdapter {
                 argumentClause: argumentClause,
                 body: lower(statements: body)
             )
-        case .declaration(let kind, let name, let typeName, let expression):
-            return .declaration(
-                kind: kind,
-                name: name,
-                typeName: typeName,
-                expression: lower(expression: expression)
+        case .localBinding(let declaration):
+            return .localBinding(
+                LocalBindingDeclaration(
+                    kind: declaration.kind,
+                    name: declaration.name,
+                    hasExplicitTypeAnnotation: declaration.hasExplicitTypeAnnotation,
+                    type: declaration.type,
+                    expression: lower(expression: declaration.expression)
+                )
             )
         case .derived(let name, let typeName, let body):
             return .derived(name: name, typeName: typeName, body: lower(statements: body))

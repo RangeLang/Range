@@ -11,7 +11,7 @@ extension Parser {
         if peek() == .leftBrace {
             let previousBindingNames = currentBindingNames
             currentBindingNames = previousBindingNames.union([localName])
-            storage = try parseDerivedBindingStorage(name: localName)
+            storage = try parseDerivedBindingStorage(name: localName, typeName: typeName)
             currentBindingNames = previousBindingNames.union([localName])
         } else {
             storage = .plain
@@ -25,7 +25,9 @@ extension Parser {
         )
     }
 
-    mutating func parseDerivedBindingStorage(name: String) throws -> BindingStorage {
+    mutating func parseDerivedBindingStorage(name: String, typeName: String) throws
+        -> BindingStorage
+    {
         try consume(.leftBrace)
 
         var getterBody: [Statement]?
@@ -47,7 +49,9 @@ extension Parser {
                 }
                 try consumeKeyword(.setter)
                 setterBody = try parseStatementBlock(
-                    baseLocalBindings: ["newValue": .constant]
+                    baseLocalBindings: [
+                        "newValue": .init(kind: .constant, type: .named(typeName))
+                    ]
                 )
                 continue
             }

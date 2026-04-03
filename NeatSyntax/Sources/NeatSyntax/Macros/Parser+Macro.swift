@@ -55,9 +55,9 @@ extension Parser {
             diagnostics: diagnosticsBinding
         )
 
-        var localBindings: [String: LocalBindingKind] = [
-            targetBinding: .constant,
-            diagnosticsBinding: .constant,
+        var localBindings: [String: LocalBindingSymbol] = [
+            targetBinding: .init(kind: .constant, type: .named("MacroTarget")),
+            diagnosticsBinding: .init(kind: .constant, type: .named("MacroDiagnostics")),
         ]
         var statements: [Statement] = []
         while peek() != .rightBrace {

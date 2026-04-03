@@ -2,12 +2,7 @@ import Foundation
 
 public indirect enum Statement {
     case freestandingMacro(name: String, argumentClause: String?, body: [Statement])
-    case declaration(
-        kind: LocalBindingKind,
-        name: String,
-        typeName: String?,
-        expression: Expression
-    )
+    case localBinding(LocalBindingDeclaration)
     case derived(name: String, typeName: String, body: [Statement])
     case environmentProvision(EnvironmentProvision)
     case assignment(target: AssignmentTarget, expression: Expression)
@@ -28,6 +23,28 @@ public indirect enum Statement {
         cases: [SwitchCase],
         defaultBody: [Statement]?
     )
+}
+
+public struct LocalBindingDeclaration {
+    public let kind: LocalBindingKind
+    public let name: String
+    public let hasExplicitTypeAnnotation: Bool
+    public let type: TypeReference
+    public let expression: Expression
+
+    public init(
+        kind: LocalBindingKind,
+        name: String,
+        hasExplicitTypeAnnotation: Bool,
+        type: TypeReference,
+        expression: Expression
+    ) {
+        self.kind = kind
+        self.name = name
+        self.hasExplicitTypeAnnotation = hasExplicitTypeAnnotation
+        self.type = type
+        self.expression = expression
+    }
 }
 
 public struct StatementConditionalBranch {
@@ -53,6 +70,11 @@ public struct SwitchCase {
 public enum LocalBindingKind {
     case constant
     case mutable
+}
+
+struct LocalBindingSymbol {
+    let kind: LocalBindingKind
+    let type: TypeReference
 }
 
 public indirect enum AssignmentTarget {

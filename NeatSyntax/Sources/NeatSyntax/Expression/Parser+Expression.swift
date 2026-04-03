@@ -248,6 +248,12 @@ extension Parser {
     mutating func parseCollectionLiteral() throws -> Expression {
         try consume(.leftBracket)
 
+        if peek() == .colon {
+            try consume(.colon)
+            try consume(.rightBracket)
+            return .dictionary([])
+        }
+
         if peek() == .rightBracket {
             try consume(.rightBracket)
             return .array([])

@@ -341,7 +341,7 @@ struct SwiftBackendEmitter {
                 if let defaultBody, statementsContainMutation(defaultBody) {
                     return true
                 }
-            case .declaration, .environmentProvision, .expression, .return, .break, .continue:
+            case .localBinding, .environmentProvision, .expression, .return, .break, .continue:
                 continue
             }
         }
@@ -370,9 +370,10 @@ struct SwiftBackendEmitter {
         switch statement {
         case .freestandingMacro:
             throw SwiftBackendError("Freestanding macros must be expanded before Swift emission.")
-        case .declaration(let kind, let name, _, let expression):
-            let keyword = kind == .constant ? "let" : "var"
-            return "\(prefix)\(keyword) \(name) = \(try emitExpression(expression))"
+        case .localBinding(let declaration):
+            let keyword = declaration.kind == .constant ? "let" : "var"
+            return
+                "\(prefix)\(keyword) \(declaration.name) = \(try emitExpression(declaration.expression))"
         case .derived(let name, let typeName, let body):
             let bodyText = try emitStatements(body, indent: indent + 2)
             return """
