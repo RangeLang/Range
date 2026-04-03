@@ -1,4 +1,4 @@
 @core
-construct Optional<Wrapped>: ExpressableByNilLiteral {
+construct Optional<Wrapped>: ExpressibleByNilLiteral {
     init(literal: NilLiteral)
 }

@@ -1,4 +1,4 @@
-protocol ExpressableByArrayLiteral {
+protocol ExpressibleByArrayLiteral {
     #literal<ArrayLiteral>
     init(literal: ArrayLiteral)
 }

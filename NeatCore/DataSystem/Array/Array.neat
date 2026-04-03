@@ -1,5 +1,5 @@
 @core
-construct Array<Element>: ExpressableByArrayLiteral {
+construct Array<Element>: ExpressibleByArrayLiteral {
     state storage: ArrayStorage<Element>
 
     init()

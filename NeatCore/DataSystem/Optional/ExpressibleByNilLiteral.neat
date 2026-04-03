@@ -1,4 +1,4 @@
-protocol ExpressableByNilLiteral {
+protocol ExpressibleByNilLiteral {
     #literal<NilLiteral>
     init(literal: NilLiteral)
 }

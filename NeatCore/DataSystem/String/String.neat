@@ -1,5 +1,5 @@
 @core
-construct String: ExpressableByStringLiteral, Equatable, Hashable, Comparable {
+construct String: ExpressibleByStringLiteral, Equatable, Hashable, Comparable {
     value storage: StringStorage
 
     init(literal: StringLiteral) {

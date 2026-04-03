@@ -1,0 +1,7 @@
+construct Greeter: Greetable {
+    value name: String
+
+    function greeting() -> String {
+        "Hello, \(name)"
+    }
+}

@@ -1,5 +1,5 @@
 @core
-construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressableByIntLiteral, Equatable, Hashable, Comparable {
+construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressibleByIntLiteral, Equatable, Hashable, Comparable {
     value storage: IntStorage
 
     init(literal: IntLiteral) {

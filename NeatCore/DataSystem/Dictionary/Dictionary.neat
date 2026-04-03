@@ -1,5 +1,5 @@
 @core
-construct Dictionary<Key: Hashable, Value>: ExpressableByDictionaryLiteral {
+construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
     state storage: DictionaryStorage<Key, Value>
 
     init()

@@ -1,5 +1,5 @@
 @core
-construct Set<Element: Hashable>: ExpressableBySetLiteral {
+construct Set<Element: Hashable>: ExpressibleBySetLiteral {
     state storage: SetStorage<Element>
 
     init()

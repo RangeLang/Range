@@ -1,5 +1,5 @@
 @core
-construct Bool: ExpressableByBoolLiteral, Equatable, Hashable {
+construct Bool: ExpressibleByBoolLiteral, Equatable, Hashable {
     value storage: BoolStorage
 
     init(literal: BoolLiteral) {

@@ -14,7 +14,7 @@ state count: Int = 0
 A deferred requirement macro is attached to a protocol requirement, but expands on the concrete declaration that fulfills that requirement.
 
 ```neat
-protocol ExpressableByIntLiteral {
+protocol ExpressibleByIntLiteral {
     #literal<IntLiteral>
     init(literal: IntLiteral)
 }

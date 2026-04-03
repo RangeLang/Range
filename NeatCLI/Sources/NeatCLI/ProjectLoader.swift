@@ -49,7 +49,7 @@ enum ProjectLoader {
     struct Options {
         var includeCore: Bool = true
         var requireManifestForDirectory: Bool = false
-        var excludedDirectoryNames: Set<String> = [".git", ".build", ".neat"]
+        var excludedDirectoryNames: Set<String> = [".git", ".build", ".neat", "Examples"]
         var excludedFileNames: Set<String> = []
         var excludedPathFragments: [String] = []
     }

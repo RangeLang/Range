@@ -57,22 +57,22 @@ It also precedes backend adaptation:
 
 ```neat
 construct Int { }
-protocol ExpressableByIntLiteral { }
+protocol ExpressibleByIntLiteral { }
 macro literal<T>: Attached<Init> { target, diagnostics in }
 ```
 
 - Declaration relationships appear as graph edges.
 
 ```neat
-construct Int: ExpressableByIntLiteral { }
+construct Int: ExpressibleByIntLiteral { }
 ```
 
-This introduces a semantic conformance edge from `Int` to `ExpressableByIntLiteral`.
+This introduces a semantic conformance edge from `Int` to `ExpressibleByIntLiteral`.
 
 - Protocol requirements are first-class declaration facts.
 
 ```neat
-protocol ExpressableByIntLiteral {
+protocol ExpressibleByIntLiteral {
     #literal<IntLiteral>
     init(literal: IntLiteral)
 }
@@ -83,7 +83,7 @@ The requirement itself is part of the graph, along with its attached macro seman
 - Concrete declarations can satisfy protocol requirements.
 
 ```neat
-construct Int: ExpressableByIntLiteral {
+construct Int: ExpressibleByIntLiteral {
     init(literal: IntLiteral) { }
 }
 ```
@@ -93,7 +93,7 @@ The graph records that this concrete initializer satisfies the protocol requirem
 - Attached macro carry should be derived from declaration relationships.
 
 ```neat
-protocol ExpressableByIntLiteral {
+protocol ExpressibleByIntLiteral {
     #literal<IntLiteral>
     init(literal: IntLiteral)
 }
@@ -104,7 +104,7 @@ The `#literal<IntLiteral>` macro is carried by the requirement and becomes part 
 - Literal acceptance should be derived from graph facts rather than destination tables.
 
 ```neat
-construct Int: ExpressableByIntLiteral {
+construct Int: ExpressibleByIntLiteral {
     init(literal: IntLiteral) { }
 }
 ```
@@ -130,19 +130,19 @@ The compiler should know that `Int` is a valid declaration-level type before it 
 - Literal bridge realization belongs in the declaration graph.
 
 ```neat
-protocol ExpressableByStringLiteral {
+protocol ExpressibleByStringLiteral {
     #literal<StringLiteral>
     init(literal: StringLiteral)
 }
 
-construct String: ExpressableByStringLiteral {
+construct String: ExpressibleByStringLiteral {
     init(literal: StringLiteral) { }
 }
 ```
 
 The relevant graph facts are:
 
-- `String` conforms to `ExpressableByStringLiteral`
+- `String` conforms to `ExpressibleByStringLiteral`
 - the protocol has an initializer requirement
 - that requirement carries `#literal<StringLiteral>`
 - `String.init(literal:)` satisfies that requirement

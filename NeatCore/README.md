@@ -26,7 +26,7 @@ The main foundational type and protocol layer:
 - Scalar/data families: `Int`, `String`, `Bool`, `Float`, `Data`, `Void`
 - Scalar storage families: `IntStorage`, `StringStorage`, `BoolStorage`, `FloatStorage`
 - Literal carrier types: `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, `SetLiteral`
-- Literal bridge protocols: `ExpressableByIntLiteral`, `ExpressableByStringLiteral`, `ExpressableByBoolLiteral`, `ExpressableByFloatLiteral`, `ExpressableByNilLiteral`, `ExpressableByArrayLiteral`, `ExpressableByDictionaryLiteral`, `ExpressableBySetLiteral`
+- Literal bridge protocols: `ExpressibleByIntLiteral`, `ExpressibleByStringLiteral`, `ExpressibleByBoolLiteral`, `ExpressibleByFloatLiteral`, `ExpressibleByNilLiteral`, `ExpressibleByArrayLiteral`, `ExpressibleByDictionaryLiteral`, `ExpressibleBySetLiteral`
 - Core generic data types: `Optional`, `Array`, `Dictionary`, `Set`
 - Collection storage families: `ArrayStorage`, `DictionaryStorage`, `SetStorage`
 - Foundational protocols: `Equatable`, `Hashable`, `Comparable`

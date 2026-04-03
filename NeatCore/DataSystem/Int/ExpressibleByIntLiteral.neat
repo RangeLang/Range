@@ -1,4 +1,4 @@
-protocol ExpressableByIntLiteral {
+protocol ExpressibleByIntLiteral {
     #literal<IntLiteral>
     init(literal: IntLiteral)
 }

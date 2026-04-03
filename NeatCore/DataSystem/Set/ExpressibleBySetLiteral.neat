@@ -1,4 +1,4 @@
-protocol ExpressableBySetLiteral {
+protocol ExpressibleBySetLiteral {
     #literal<SetLiteral>
     init(literal: SetLiteral)
 }
