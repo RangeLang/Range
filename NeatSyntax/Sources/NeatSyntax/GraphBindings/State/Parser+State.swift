@@ -77,9 +77,9 @@ extension Parser {
                     "Array type inference requires at least one element."
                 )
             }
-            guard isExplicitArrayType(explicitType) else {
+            guard isExplicitBracketCollectionType(explicitType) else {
                 throw ParseError(
-                    "\(bindingKindDescription) '\(name)' initialized with [] requires an explicit array type."
+                    "\(bindingKindDescription) '\(name)' initialized with [] requires an explicit array or set type."
                 )
             }
             return explicitType
@@ -154,11 +154,20 @@ extension Parser {
         return false
     }
 
-    func isExplicitArrayType(_ typeReference: TypeReference) -> Bool {
+    func isExplicitBracketCollectionType(_ typeReference: TypeReference) -> Bool {
         if case .array = typeReference {
             return true
         }
-        return false
+        guard case .generic(let base, let arguments) = typeReference else {
+            return false
+        }
+        guard arguments.count == 1 else {
+            return false
+        }
+        guard case .named(let baseName) = base else {
+            return false
+        }
+        return baseName == "Set"
     }
 
     func isExplicitDictionaryType(_ typeReference: TypeReference) -> Bool {

@@ -184,6 +184,14 @@ public enum BootstrapExpressionSemantics {
                 return true
             }
             return false
+        case (.generic(let expectedBase, let expectedArguments), .array(let actualElement)):
+            guard case .named(let expectedBaseName) = expectedBase,
+                expectedBaseName == "Set",
+                expectedArguments.count == 1
+            else {
+                return false
+            }
+            return isCompatibleNamedType(expected: expectedArguments[0], actual: actualElement)
         case (.array(let expectedElement), .array(let actualElement)):
             return isCompatibleNamedType(expected: expectedElement, actual: actualElement)
         case (.optional(let expectedWrapped), .optional(let actualWrapped)):
