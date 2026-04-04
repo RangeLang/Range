@@ -119,6 +119,16 @@ extension Parser {
         )
 
         if let explicitType {
+            if try BootstrapExpressionSemantics.isExpressionCompatible(
+                expression,
+                expected: explicitType,
+                accessibleTypes: accessibleTypes.mapValues(BootstrapLiteralType.typed),
+                callableReturnTypes: currentCallableReturnTypes,
+                resolver: literalBridgeResolver
+            ) {
+                return explicitType
+            }
+
             switch inferred {
             case .typed(let actualType):
                 guard isCompatibleStateType(explicitType, inferredType: actualType) else {

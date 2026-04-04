@@ -1,13 +1,17 @@
 ; ── Comments ────────────────────────────────────────────────────────────────
 (comment) @comment
 
-; ── Sigil operators ──────────────────────────────────────────────────────────
-["@" "*"] @keyword
+("@" @keyword)
 
 ; When syntax is incomplete, tree-sitter can fall back to plain identifiers
 ; inside ERROR nodes. Keep core keywords colored by text anyway.
 ((identifier) @keyword
- (#match? @keyword "^(construct|enum|case|extension|macro|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|on|builder)$"))
+ (#match? @keyword "^(construct|enum|case|extension|macro|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|get|set|on|builder)$"))
+
+((identifier) @keyword
+ (#match? @keyword "^(core|main)$"))
+
+("macro" @keyword)
 
 (break_statement) @keyword.control
 (continue_statement) @keyword.control
@@ -53,12 +57,6 @@
 (builder_declaration
   name: (type_identifier) @type.definition)
 
-(sigiled_declaration
-  "on" @keyword)
-
-(sigiled_declaration
-  target: (type_identifier) @type)
-
 (callable_declaration
   "function" @keyword
   name: (identifier) @function.method)
@@ -85,7 +83,7 @@
 
 (extension_declaration
   "extension" @keyword
-  type: (type_identifier) @type)
+  type: (_) @type)
 
 (protocol_declaration
   name: (type_identifier) @type.definition)

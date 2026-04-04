@@ -45,6 +45,21 @@ module.exports = grammar({
 
     main_block: ($) => seq("@", "main", field("body", $.block)),
 
+    macro_application: ($) =>
+      seq(
+        field("sigil", "#"),
+        field("name", $.identifier),
+        optional(field("generics", $.generic_argument_clause)),
+        optional(field("arguments", $.argument_clause)),
+      ),
+
+    attribute_application: ($) =>
+      seq(
+        field("sigil", "@"),
+        field("name", $.identifier),
+        optional(field("arguments", $.argument_clause)),
+      ),
+
     macro_declaration: ($) =>
       seq(
         "macro",
@@ -71,8 +86,6 @@ module.exports = grammar({
       seq(
         field("target", $.identifier),
         ",",
-        field("result", $.identifier),
-        ",",
         field("diagnostics", $.identifier),
         "in",
       ),
@@ -86,14 +99,24 @@ module.exports = grammar({
       ),
 
     protocol_declaration: ($) =>
-      seq("protocol", field("name", $.type_identifier), field("body", $.block)),
+      seq(
+        repeat(field("macro", $.macro_application)),
+        optional(field("attribute", $.attribute_application)),
+        "protocol",
+        field("name", $.type_identifier),
+        optional(field("generics", $.generic_parameter_clause)),
+        optional(field("conformances", $.conformance_clause)),
+        field("body", $.block),
+      ),
 
     sigiled_declaration: ($) =>
       seq(
+        repeat(field("macro", $.macro_application)),
+        optional(field("attribute", $.attribute_application)),
         "construct",
         field("name", $.type_identifier),
-        optional(seq("on", field("target", $.type_identifier))),
-        optional(seq(":", commaSep1($.type_identifier))),
+        optional(field("generics", $.generic_parameter_clause)),
+        optional(field("conformances", $.conformance_clause)),
         field("body", $.block),
       ),
 
@@ -155,13 +178,21 @@ module.exports = grammar({
 
     extension_declaration: ($) =>
       seq(
+        repeat(field("macro", $.macro_application)),
         "extension",
-        field("type", $.type_identifier),
+        field("type", $.type),
         field("body", $.block),
       ),
 
     enum_declaration: ($) =>
-      seq("enum", field("name", $.type_identifier), field("body", $.enum_body)),
+      seq(
+        repeat(field("macro", $.macro_application)),
+        optional(field("attribute", $.attribute_application)),
+        "enum",
+        field("name", $.type_identifier),
+        optional(field("conformances", $.conformance_clause)),
+        field("body", $.enum_body),
+      ),
 
     enum_body: ($) =>
       seq(
@@ -190,12 +221,25 @@ module.exports = grammar({
     variable_declaration: ($) =>
       choice(
         seq(
-          choice("state", "binding", "value"),
+          repeat(field("macro", $.macro_application)),
+          choice("state", "value"),
           field("name", $.identifier),
           optional(seq(":", field("type", $.type))),
           optional(seq("=", field("value", $.expression))),
         ),
+        prec.right(
+          seq(
+            repeat(field("macro", $.macro_application)),
+            "binding",
+            field("name", $.identifier),
+            ":",
+            field("type", $.type),
+            optional(seq("=", field("value", $.expression))),
+            optional(field("accessors", $.accessor_block)),
+          ),
+        ),
         seq(
+          repeat(field("macro", $.macro_application)),
           "environment",
           optional("state"),
           field("name", $.identifier),
@@ -221,6 +265,11 @@ module.exports = grammar({
 
     generic_parameter_clause: ($) =>
       seq("<", commaSep1(field("parameter", $.type_identifier)), ">"),
+
+    generic_argument_clause: ($) =>
+      seq("<", commaSep1(field("argument", $.type)), ">"),
+
+    conformance_clause: ($) => seq(":", commaSep1($.type)),
 
     parameter: ($) =>
       seq(
@@ -320,6 +369,13 @@ module.exports = grammar({
           field("member", $.type_identifier),
         ),
       ),
+
+    accessor_block: ($) =>
+      seq("{", repeat(choice($.getter_accessor, $.setter_accessor)), "}"),
+
+    getter_accessor: ($) => seq("get", field("body", $.block)),
+
+    setter_accessor: ($) => seq("set", field("body", $.block)),
 
     // ── Statements ────────────────────────────────────────────────────────────
 

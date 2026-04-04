@@ -200,6 +200,25 @@
     ]
   },
   {
+    "type": "accessor_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "getter_accessor",
+          "named": true
+        },
+        {
+          "type": "setter_accessor",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "argument",
     "named": true,
     "fields": {
@@ -318,6 +337,42 @@
           {
             "type": "expression",
             "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "attribute_application",
+    "named": true,
+    "fields": {
+      "arguments": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "argument_clause",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "sigil": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "@",
+            "named": false
           }
         ]
       }
@@ -672,6 +727,21 @@
     }
   },
   {
+    "type": "conformance_clause",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "type",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "derived_declaration",
     "named": true,
     "fields": {
@@ -856,12 +926,42 @@
     "type": "enum_declaration",
     "named": true,
     "fields": {
+      "attribute": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "attribute_application",
+            "named": true
+          }
+        ]
+      },
       "body": {
         "multiple": false,
         "required": true,
         "types": [
           {
             "type": "enum_body",
+            "named": true
+          }
+        ]
+      },
+      "conformances": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "conformance_clause",
+            "named": true
+          }
+        ]
+      },
+      "macro": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "macro_application",
             "named": true
           }
         ]
@@ -928,12 +1028,22 @@
           }
         ]
       },
+      "macro": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "macro_application",
+            "named": true
+          }
+        ]
+      },
       "type": {
         "multiple": false,
         "required": true,
         "types": [
           {
-            "type": "type_identifier",
+            "type": "type",
             "named": true
           }
         ]
@@ -1049,6 +1159,22 @@
     }
   },
   {
+    "type": "generic_argument_clause",
+    "named": true,
+    "fields": {
+      "argument": {
+        "multiple": true,
+        "required": true,
+        "types": [
+          {
+            "type": "type",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "generic_parameter_clause",
     "named": true,
     "fields": {
@@ -1088,6 +1214,22 @@
           },
           {
             "type": "type_identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "getter_accessor",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
             "named": true
           }
         ]
@@ -1150,10 +1292,30 @@
     }
   },
   {
-    "type": "macro_bindings",
+    "type": "macro_application",
     "named": true,
     "fields": {
-      "diagnostics": {
+      "arguments": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "argument_clause",
+            "named": true
+          }
+        ]
+      },
+      "generics": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "generic_argument_clause",
+            "named": true
+          }
+        ]
+      },
+      "name": {
         "multiple": false,
         "required": true,
         "types": [
@@ -1163,7 +1325,23 @@
           }
         ]
       },
-      "result": {
+      "sigil": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "#",
+            "named": false
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "macro_bindings",
+    "named": true,
+    "fields": {
+      "diagnostics": {
         "multiple": false,
         "required": true,
         "types": [
@@ -1536,12 +1714,52 @@
     "type": "protocol_declaration",
     "named": true,
     "fields": {
+      "attribute": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "attribute_application",
+            "named": true
+          }
+        ]
+      },
       "body": {
         "multiple": false,
         "required": true,
         "types": [
           {
             "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "conformances": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "conformance_clause",
+            "named": true
+          }
+        ]
+      },
+      "generics": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "generic_parameter_clause",
+            "named": true
+          }
+        ]
+      },
+      "macro": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "macro_application",
             "named": true
           }
         ]
@@ -1575,7 +1793,7 @@
     }
   },
   {
-    "type": "sigiled_declaration",
+    "type": "setter_accessor",
     "named": true,
     "fields": {
       "body": {
@@ -1584,6 +1802,62 @@
         "types": [
           {
             "type": "block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "sigiled_declaration",
+    "named": true,
+    "fields": {
+      "attribute": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "attribute_application",
+            "named": true
+          }
+        ]
+      },
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "conformances": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "conformance_clause",
+            "named": true
+          }
+        ]
+      },
+      "generics": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "generic_parameter_clause",
+            "named": true
+          }
+        ]
+      },
+      "macro": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "macro_application",
             "named": true
           }
         ]
@@ -1597,27 +1871,7 @@
             "named": true
           }
         ]
-      },
-      "target": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "type_identifier",
-            "named": true
-          }
-        ]
       }
-    },
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "type_identifier",
-          "named": true
-        }
-      ]
     }
   },
   {
@@ -1813,6 +2067,26 @@
     "type": "variable_declaration",
     "named": true,
     "fields": {
+      "accessors": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "accessor_block",
+            "named": true
+          }
+        ]
+      },
+      "macro": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "macro_application",
+            "named": true
+          }
+        ]
+      },
       "name": {
         "multiple": false,
         "required": true,
@@ -1917,6 +2191,10 @@
   },
   {
     "type": "\"",
+    "named": false
+  },
+  {
+    "type": "#",
     "named": false
   },
   {
@@ -2121,6 +2399,10 @@
     "named": false
   },
   {
+    "type": "get",
+    "named": false
+  },
+  {
     "type": "identifier",
     "named": true
   },
@@ -2149,10 +2431,6 @@
     "named": true
   },
   {
-    "type": "on",
-    "named": false
-  },
-  {
     "type": "optional",
     "named": false
   },
@@ -2162,6 +2440,10 @@
   },
   {
     "type": "return",
+    "named": false
+  },
+  {
+    "type": "set",
     "named": false
   },
   {

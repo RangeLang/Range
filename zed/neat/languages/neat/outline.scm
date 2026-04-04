@@ -17,7 +17,7 @@
   name: (type_identifier) @name) @item
 
 (extension_declaration
-  type: (type_identifier) @name) @item
+  type: (_) @name) @item
 
 (function_declaration
   name: (identifier) @name) @item

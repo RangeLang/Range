@@ -184,6 +184,77 @@ public enum BootstrapExpressionSemantics {
         }
     }
 
+    public static func isExpressionCompatible(
+        _ expression: Expression,
+        expected: TypeReference,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference] = [:],
+        resolver: LiteralBridgeResolver
+    ) throws -> Bool {
+        switch expression {
+        case .nilLiteral:
+            if case .optional = expected {
+                return true
+            }
+            return false
+        case .array(let elements):
+            guard let expectedElementType = expectedBracketCollectionElementType(expected) else {
+                let inferred = try inferType(
+                    of: expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                )
+                return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+            }
+
+            return try elements.allSatisfy { element in
+                try isExpressionCompatible(
+                    element,
+                    expected: expectedElementType,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                )
+            }
+        case .dictionary(let elements):
+            guard let (expectedKeyType, expectedValueType) = expectedDictionaryTypes(expected)
+            else {
+                let inferred = try inferType(
+                    of: expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                )
+                return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+            }
+
+            return try elements.allSatisfy { element in
+                try isExpressionCompatible(
+                    element.key,
+                    expected: expectedKeyType,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                ) && isExpressionCompatible(
+                    element.value,
+                    expected: expectedValueType,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                )
+            }
+        default:
+            let inferred = try inferType(
+                of: expression,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                resolver: resolver
+            )
+            return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+        }
+    }
+
     public static func isCompatibleNamedType(expected: TypeReference, actual: TypeReference) -> Bool
     {
         if expected == actual {
@@ -196,6 +267,10 @@ public enum BootstrapExpressionSemantics {
                 return true
             }
             return false
+        case (.optional(let expectedWrapped), .optional(let actualWrapped)):
+            return isCompatibleNamedType(expected: expectedWrapped, actual: actualWrapped)
+        case (.optional(let expectedWrapped), _):
+            return isCompatibleNamedType(expected: expectedWrapped, actual: actual)
         case (.generic(let expectedBase, let expectedArguments), .array(let actualElement)):
             guard case .named(let expectedBaseName) = expectedBase,
                 expectedBaseName == "Set",
@@ -206,8 +281,6 @@ public enum BootstrapExpressionSemantics {
             return isCompatibleNamedType(expected: expectedArguments[0], actual: actualElement)
         case (.array(let expectedElement), .array(let actualElement)):
             return isCompatibleNamedType(expected: expectedElement, actual: actualElement)
-        case (.optional(let expectedWrapped), .optional(let actualWrapped)):
-            return isCompatibleNamedType(expected: expectedWrapped, actual: actualWrapped)
         case (.variadic(let expectedElement), .variadic(let actualElement)):
             return isCompatibleNamedType(expected: expectedElement, actual: actualElement)
         case (
@@ -384,5 +457,38 @@ public enum BootstrapExpressionSemantics {
         default:
             return defaultDestinationTypeReference(for: type, resolver: resolver)
         }
+    }
+
+    private static func expectedBracketCollectionElementType(_ expected: TypeReference)
+        -> TypeReference?
+    {
+        switch expected {
+        case .array(let elementType):
+            return elementType
+        case .generic(let base, let arguments):
+            guard case .named(let baseName) = base,
+                baseName == "Set",
+                arguments.count == 1
+            else {
+                return nil
+            }
+            return arguments[0]
+        default:
+            return nil
+        }
+    }
+
+    private static func expectedDictionaryTypes(_ expected: TypeReference)
+        -> (key: TypeReference, value: TypeReference)?
+    {
+        guard case .generic(let base, let arguments) = expected,
+            case .named(let baseName) = base,
+            baseName == "Dictionary",
+            arguments.count == 2
+        else {
+            return nil
+        }
+
+        return (arguments[0], arguments[1])
     }
 }
