@@ -1,0 +1,7 @@
+function logCount(count: Int) -> Void {
+    if count == 0 {
+        return
+    }
+
+    return
+}

@@ -259,6 +259,15 @@ extension Parser {
                 continue
             }
 
+            if isVoidType(explicitReturnType!) {
+                if returnExpressions.contains(where: { $0 != nil }) {
+                    throw ParseError(
+                        "Callable \(renderCallableSignature(targetType: callable.targetType, name: callable.name, parameters: callable.parameters)) declares return type Void and cannot return a value."
+                    )
+                }
+                continue
+            }
+
             if needsValueReturn {
                 guard blockAlwaysReturnsValue(body) else {
                     throw ParseError(
@@ -318,7 +327,11 @@ extension Parser {
     ) -> Bool {
         guard explicitReturnType != nil else { return false }
         guard let expectedReturnType else { return true }
-        return expectedReturnType.displayName != "Void"
+        return !isVoidType(expectedReturnType)
+    }
+
+    func isVoidType(_ typeReference: TypeReference) -> Bool {
+        typeReference.displayName == "Void"
     }
 
     func collectReturnExpressions(in statements: [Statement]) -> [Expression?] {

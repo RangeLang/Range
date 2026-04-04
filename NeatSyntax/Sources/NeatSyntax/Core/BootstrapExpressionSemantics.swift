@@ -146,6 +146,9 @@ public enum BootstrapExpressionSemantics {
     ) -> Bool {
         switch actual {
         case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral, .nilLiteral:
+            if case .optional(let wrapped) = expected {
+                return isCompatible(actual: actual, expected: wrapped, resolver: resolver)
+            }
             return resolver.isCompatible(
                 expected: expected,
                 carrierTypeName: actual.displayName

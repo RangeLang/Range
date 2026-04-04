@@ -113,11 +113,6 @@ extension Parser {
             return explicitType
         }
 
-        let inferred = try inferBootstrapExpressionType(
-            of: expression,
-            accessibleTypes: accessibleTypes
-        )
-
         if let explicitType {
             if try BootstrapExpressionSemantics.isExpressionCompatible(
                 expression,
@@ -128,7 +123,14 @@ extension Parser {
             ) {
                 return explicitType
             }
+        }
 
+        let inferred = try inferBootstrapExpressionType(
+            of: expression,
+            accessibleTypes: accessibleTypes
+        )
+
+        if let explicitType {
             switch inferred {
             case .typed(let actualType):
                 guard isCompatibleStateType(explicitType, inferredType: actualType) else {
