@@ -61,34 +61,6 @@ public enum BootstrapExpressionSemantics {
                 throw ParseError(
                     "Ternary condition must be Bool, got \(conditionType.displayName).")
             }
-            if isNilLiteral(trueExpression) {
-                let falseType = try inferType(
-                    of: falseExpression,
-                    accessibleTypes: accessibleTypes,
-                    callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
-                )
-                guard isOptionalExpressionType(falseType) else {
-                    throw ParseError(
-                        "Ternary branches must match, got nil and \(falseType.displayName)."
-                    )
-                }
-                return falseType
-            }
-            if isNilLiteral(falseExpression) {
-                let trueType = try inferType(
-                    of: trueExpression,
-                    accessibleTypes: accessibleTypes,
-                    callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
-                )
-                guard isOptionalExpressionType(trueType) else {
-                    throw ParseError(
-                        "Ternary branches must match, got \(trueType.displayName) and nil."
-                    )
-                }
-                return trueType
-            }
             let trueType = try inferType(
                 of: trueExpression,
                 accessibleTypes: accessibleTypes,
@@ -101,12 +73,16 @@ public enum BootstrapExpressionSemantics {
                 callableReturnTypes: callableReturnTypes,
                 resolver: resolver
             )
-            guard expressionTypesMatch(trueType, falseType) else {
+            guard let unifiedType = unifyConditionalBranchTypes(
+                trueType,
+                falseType,
+                resolver: resolver
+            ) else {
                 throw ParseError(
                     "Ternary branches must match, got \(trueType.displayName) and \(falseType.displayName)."
                 )
             }
-            return trueType
+            return unifiedType
         case .unary(let operatorSymbol, _):
             switch operatorSymbol {
             case .not:
@@ -115,7 +91,14 @@ public enum BootstrapExpressionSemantics {
             }
         case .binary(_, let operatorSymbol, _):
             switch operatorSymbol {
-            case .addition, .nilCoalescing, .equal, .notEqual, .less, .lessEqual, .greater,
+            case .nilCoalescing:
+                return try inferNilCoalescingType(
+                    expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                )
+            case .addition, .equal, .notEqual, .less, .lessEqual, .greater,
                 .greaterEqual, .and, .or:
                 throw ParseError(
                     "Binary operator typing is not supported by bootstrap inference yet.")
@@ -153,18 +136,7 @@ public enum BootstrapExpressionSemantics {
         _ lhs: BootstrapLiteralType,
         _ rhs: BootstrapLiteralType
     ) -> Bool {
-        switch (lhs, rhs) {
-        case (.intLiteral, .intLiteral),
-            (.floatLiteral, .floatLiteral),
-            (.stringLiteral, .stringLiteral),
-            (.boolLiteral, .boolLiteral),
-            (.nilLiteral, .nilLiteral):
-            return true
-        case (.typed(let lhsType), .typed(let rhsType)):
-            return lhsType == rhsType || isCompatibleNamedType(expected: lhsType, actual: rhsType)
-        default:
-            return false
-        }
+        unifyConditionalBranchTypes(lhs, rhs, resolver: .empty) != nil
     }
 
     public static func isCompatible(
@@ -456,6 +428,123 @@ public enum BootstrapExpressionSemantics {
             return typeReference
         default:
             return defaultDestinationTypeReference(for: type, resolver: resolver)
+        }
+    }
+
+    private static func inferNilCoalescingType(
+        _ expression: Expression,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver
+    ) throws -> BootstrapLiteralType {
+        guard case .binary(let lhs, .nilCoalescing, let rhs) = expression else {
+            throw ParseError("Expected nil-coalescing expression.")
+        }
+
+        let lhsType = try inferType(
+            of: lhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+        let rhsType = try inferType(
+            of: rhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+
+        if case .nilLiteral = lhsType {
+            guard let rhsMaterialized = materializedTypeReference(for: rhsType, resolver: resolver)
+            else {
+                throw ParseError(
+                    "Nil-coalescing fallback type could not be inferred from \(rhsType.displayName)."
+                )
+            }
+            return .typed(rhsMaterialized)
+        }
+
+        guard let wrappedType = optionalWrappedType(for: lhsType) else {
+            throw ParseError(
+                "Left-hand side of ?? must be optional, got \(lhsType.displayName)."
+            )
+        }
+
+        guard
+            let rhsMaterialized = materializedTypeReference(for: rhsType, resolver: resolver),
+            isCompatibleNamedType(expected: wrappedType, actual: rhsMaterialized)
+        else {
+            throw ParseError(
+                "Nil-coalescing fallback must match \(wrappedType.displayName), got \(rhsType.displayName)."
+            )
+        }
+
+        return .typed(wrappedType)
+    }
+
+    private static func unifyConditionalBranchTypes(
+        _ lhs: BootstrapLiteralType,
+        _ rhs: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> BootstrapLiteralType? {
+        switch (lhs, rhs) {
+        case (.intLiteral, .intLiteral),
+            (.floatLiteral, .floatLiteral),
+            (.stringLiteral, .stringLiteral),
+            (.boolLiteral, .boolLiteral),
+            (.nilLiteral, .nilLiteral):
+            return lhs
+        case (.nilLiteral, _):
+            guard let rhsType = materializedTypeReference(for: rhs, resolver: resolver) else {
+                return nil
+            }
+            return .typed(.optional(rhsType))
+        case (_, .nilLiteral):
+            guard let lhsType = materializedTypeReference(for: lhs, resolver: resolver) else {
+                return nil
+            }
+            return .typed(.optional(lhsType))
+        case (.typed(let lhsType), .typed(let rhsType)):
+            if lhsType == rhsType {
+                return lhs
+            }
+            if isCompatibleNamedType(expected: lhsType, actual: rhsType) {
+                return .typed(lhsType)
+            }
+            if isCompatibleNamedType(expected: rhsType, actual: lhsType) {
+                return .typed(rhsType)
+            }
+            return nil
+        default:
+            guard let lhsType = materializedTypeReference(for: lhs, resolver: resolver),
+                let rhsType = materializedTypeReference(for: rhs, resolver: resolver)
+            else {
+                return nil
+            }
+
+            if lhsType == rhsType {
+                return .typed(lhsType)
+            }
+            if isCompatibleNamedType(expected: lhsType, actual: rhsType) {
+                return .typed(lhsType)
+            }
+            if isCompatibleNamedType(expected: rhsType, actual: lhsType) {
+                return .typed(rhsType)
+            }
+            return nil
+        }
+    }
+
+    private static func optionalWrappedType(for type: BootstrapLiteralType) -> TypeReference? {
+        switch type {
+        case .nilLiteral:
+            return nil
+        case .typed(.optional(let wrapped)):
+            return wrapped
+        case .typed:
+            return nil
+        default:
+            return nil
         }
     }
 

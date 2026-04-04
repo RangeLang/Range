@@ -1,0 +1,4 @@
+@main {
+    state prefersNumber = true
+    state value: Int? = prefersNumber ? 1 : nil
+}
