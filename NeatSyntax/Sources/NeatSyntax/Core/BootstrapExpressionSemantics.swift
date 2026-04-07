@@ -5,7 +5,8 @@ public enum BootstrapExpressionSemantics {
         of expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference] = [:],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver = .empty
     ) throws -> BootstrapLiteralType {
         switch expression {
         case .integer:
@@ -27,7 +28,8 @@ public enum BootstrapExpressionSemantics {
             }
             if let memberType = inferKnownMemberIdentifierType(
                 name: name,
-                accessibleTypes: accessibleTypes
+                accessibleTypes: accessibleTypes,
+                memberResolver: memberResolver
             ) {
                 return .typed(memberType)
             }
@@ -50,7 +52,8 @@ public enum BootstrapExpressionSemantics {
                 arguments: arguments,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             ) {
                 return .typed(constructorType)
             }
@@ -64,21 +67,24 @@ public enum BootstrapExpressionSemantics {
                 elements: elements,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
         case .dictionary(let elements):
             return try inferDictionaryType(
                 elements: elements,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
         case .ternary(let condition, let trueExpression, let falseExpression):
             let conditionType = try inferType(
                 of: condition,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
             guard isCompatible(actual: conditionType, expected: .named("Bool"), resolver: resolver)
             else {
@@ -89,13 +95,15 @@ public enum BootstrapExpressionSemantics {
                 of: trueExpression,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
             let falseType = try inferType(
                 of: falseExpression,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
             guard let unifiedType = unifyConditionalBranchTypes(
                 trueType,
@@ -120,28 +128,32 @@ public enum BootstrapExpressionSemantics {
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 )
             case .equal, .notEqual:
                 return try inferEqualityType(
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 )
             case .addition, .subtraction, .multiplication, .division, .remainder:
                 return try inferArithmeticType(
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 )
             case .less, .lessEqual, .greater, .greaterEqual:
                 return try inferComparisonType(
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 )
             case .and, .or:
                 throw ParseError(
@@ -208,7 +220,8 @@ public enum BootstrapExpressionSemantics {
         expected: TypeReference,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference] = [:],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver = .empty
     ) throws -> Bool {
         switch expression {
         case .nilLiteral:
@@ -222,7 +235,8 @@ public enum BootstrapExpressionSemantics {
                     of: expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 )
                 return isCompatible(actual: inferred, expected: expected, resolver: resolver)
             }
@@ -233,7 +247,8 @@ public enum BootstrapExpressionSemantics {
                     expected: expectedElementType,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 )
             }
         case .dictionary(let elements):
@@ -243,7 +258,8 @@ public enum BootstrapExpressionSemantics {
                     of: expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 )
                 return isCompatible(actual: inferred, expected: expected, resolver: resolver)
             }
@@ -254,13 +270,15 @@ public enum BootstrapExpressionSemantics {
                     expected: expectedKeyType,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 ) && isExpressionCompatible(
                     element.value,
                     expected: expectedValueType,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
-                    resolver: resolver
+                    resolver: resolver,
+                    memberResolver: memberResolver
                 )
             }
         case .call(let name, _):
@@ -271,7 +289,8 @@ public enum BootstrapExpressionSemantics {
                 of: expression,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
             return isCompatible(actual: inferred, expected: expected, resolver: resolver)
         default:
@@ -279,7 +298,8 @@ public enum BootstrapExpressionSemantics {
                 of: expression,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
             return isCompatible(actual: inferred, expected: expected, resolver: resolver)
         }
@@ -351,7 +371,8 @@ public enum BootstrapExpressionSemantics {
         elements: [Expression],
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
     ) throws -> BootstrapLiteralType {
         guard let first = elements.first else {
             throw ParseError("Array type inference requires at least one element.")
@@ -361,7 +382,8 @@ public enum BootstrapExpressionSemantics {
             of: first,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
 
         for element in elements.dropFirst() {
@@ -369,7 +391,8 @@ public enum BootstrapExpressionSemantics {
                 of: element,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
             unified = try unifyCollectionElementTypes(unified, inferred, resolver: resolver)
         }
@@ -386,7 +409,8 @@ public enum BootstrapExpressionSemantics {
         elements: [DictionaryElement],
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
     ) throws -> BootstrapLiteralType {
         guard let first = elements.first else {
             throw ParseError("Dictionary type inference requires at least one element.")
@@ -396,13 +420,15 @@ public enum BootstrapExpressionSemantics {
             of: first.key,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
         var valueType = try inferType(
             of: first.value,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
 
         for element in elements.dropFirst() {
@@ -410,7 +436,8 @@ public enum BootstrapExpressionSemantics {
                 of: element.key,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
             keyType = try unifyCollectionElementTypes(keyType, inferredKey, resolver: resolver)
 
@@ -418,7 +445,8 @@ public enum BootstrapExpressionSemantics {
                 of: element.value,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
-                resolver: resolver
+                resolver: resolver,
+                memberResolver: memberResolver
             )
             valueType = try unifyCollectionElementTypes(
                 valueType, inferredValue, resolver: resolver)
@@ -491,7 +519,8 @@ public enum BootstrapExpressionSemantics {
 
     private static func inferKnownMemberIdentifierType(
         name: String,
-        accessibleTypes: [String: BootstrapLiteralType]
+        accessibleTypes: [String: BootstrapLiteralType],
+        memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
         guard let (baseName, memberName) = splitMemberName(name),
             let baseType = accessibleTypes[baseName],
@@ -500,20 +529,7 @@ public enum BootstrapExpressionSemantics {
             return nil
         }
 
-        switch memberName {
-        case "count":
-            if collectionKind(for: baseReference) != nil || isStringType(baseReference) {
-                return .named("Int")
-            }
-        case "isEmpty":
-            if collectionKind(for: baseReference) != nil || isStringType(baseReference) {
-                return .named("Bool")
-            }
-        default:
-            return nil
-        }
-
-        return nil
+        return memberResolver.memberType(baseType: baseReference, memberName: memberName)
     }
 
     private static func inferKnownMemberCallType(
@@ -604,19 +620,13 @@ public enum BootstrapExpressionSemantics {
         }
     }
 
-    private static func isStringType(_ type: TypeReference) -> Bool {
-        if case .named("String") = type {
-            return true
-        }
-        return false
-    }
-
     private static func inferKnownConstructorType(
         name: String,
         arguments: [CallArgument],
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
     ) throws -> TypeReference? {
         guard name == "String" else {
             return nil
@@ -629,7 +639,8 @@ public enum BootstrapExpressionSemantics {
             of: arguments[0].value,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
         guard isStringCompatible(argumentType, resolver: resolver) else {
             throw ParseError(
@@ -683,7 +694,8 @@ public enum BootstrapExpressionSemantics {
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
     ) throws -> BootstrapLiteralType {
         guard case .binary(let lhs, .nilCoalescing, let rhs) = expression else {
             throw ParseError("Expected nil-coalescing expression.")
@@ -693,13 +705,15 @@ public enum BootstrapExpressionSemantics {
             of: lhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
         let rhsType = try inferType(
             of: rhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
 
         if case .nilLiteral = lhsType {
@@ -734,7 +748,8 @@ public enum BootstrapExpressionSemantics {
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
     ) throws -> BootstrapLiteralType {
         guard case .binary(let lhs, let operatorSymbol, let rhs) = expression,
             operatorSymbol == .equal || operatorSymbol == .notEqual
@@ -746,13 +761,15 @@ public enum BootstrapExpressionSemantics {
             of: lhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
         let rhsType = try inferType(
             of: rhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
 
         guard equalityOperandsAreCompatible(lhsType, rhsType, resolver: resolver) else {
@@ -768,7 +785,8 @@ public enum BootstrapExpressionSemantics {
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
     ) throws -> BootstrapLiteralType {
         guard case .binary(let lhs, let operatorSymbol, let rhs) = expression,
             operatorSymbol == .addition || operatorSymbol == .subtraction
@@ -782,13 +800,15 @@ public enum BootstrapExpressionSemantics {
             of: lhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
         let rhsType = try inferType(
             of: rhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
 
         // TODO: Replace these bootstrap scalar operator rules with declaration-graph
@@ -817,7 +837,8 @@ public enum BootstrapExpressionSemantics {
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
     ) throws -> BootstrapLiteralType {
         guard case .binary(let lhs, let operatorSymbol, let rhs) = expression,
             operatorSymbol == .less || operatorSymbol == .lessEqual
@@ -830,13 +851,15 @@ public enum BootstrapExpressionSemantics {
             of: lhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
         let rhsType = try inferType(
             of: rhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
-            resolver: resolver
+            resolver: resolver,
+            memberResolver: memberResolver
         )
 
         // TODO: Replace these bootstrap scalar operator rules with declaration-graph

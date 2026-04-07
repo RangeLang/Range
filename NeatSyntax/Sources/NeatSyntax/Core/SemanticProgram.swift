@@ -71,11 +71,18 @@ public struct CompilerPipeline {
         let coreInputs = orderedInputs.filter { $0.role == .core }
         let projectInputs = orderedInputs.filter { $0.role == .project }
 
-        let parsedCoreFiles = try parse(inputs: coreInputs, literalBridgeResolver: .empty)
-        let coreResolver = DeclarationGraph(files: parsedCoreFiles).literalBridgeResolver
+        let parsedCoreFiles = try parse(
+            inputs: coreInputs,
+            literalBridgeResolver: .empty,
+            declarationMemberResolver: .empty
+        )
+        let coreGraph = DeclarationGraph(files: parsedCoreFiles)
+        let coreResolver = coreGraph.literalBridgeResolver
+        let coreMemberResolver = coreGraph.memberResolver
         let parsedProjectFiles = try parse(
             inputs: projectInputs,
-            literalBridgeResolver: coreResolver
+            literalBridgeResolver: coreResolver,
+            declarationMemberResolver: coreMemberResolver
         )
 
         let parsedFiles = parsedCoreFiles + parsedProjectFiles
@@ -103,12 +110,14 @@ public struct CompilerPipeline {
 
     private func parse(
         inputs: [SourceInput],
-        literalBridgeResolver: LiteralBridgeResolver
+        literalBridgeResolver: LiteralBridgeResolver,
+        declarationMemberResolver: DeclarationMemberResolver
     ) throws -> [ParsedSourceFile] {
         try inputs.map { input in
             var parser = try Parser(
                 source: input.source,
-                literalBridgeResolver: literalBridgeResolver
+                literalBridgeResolver: literalBridgeResolver,
+                declarationMemberResolver: declarationMemberResolver
             )
             return ParsedSourceFile(
                 path: input.path,

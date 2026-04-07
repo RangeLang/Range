@@ -347,7 +347,8 @@ extension Parser {
             of: expression,
             accessibleTypes: bootstrapAccessibleTypes,
             callableReturnTypes: currentCallableReturnTypes,
-            resolver: literalBridgeResolver
+            resolver: literalBridgeResolver,
+            memberResolver: declarationMemberResolver
         )
     }
 

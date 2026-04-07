@@ -119,7 +119,8 @@ extension Parser {
                 expected: explicitType,
                 accessibleTypes: accessibleTypes.mapValues(BootstrapLiteralType.typed),
                 callableReturnTypes: currentCallableReturnTypes,
-                resolver: literalBridgeResolver
+                resolver: literalBridgeResolver,
+                memberResolver: declarationMemberResolver
             ) {
                 return explicitType
             }

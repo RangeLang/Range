@@ -5,7 +5,7 @@ public enum GenericParameter {
     case value(name: String, typeReference: TypeReference, defaultValue: Expression?)
 }
 
-public indirect enum TypeReference: Equatable {
+public indirect enum TypeReference: Equatable, Sendable {
     case named(String)
     case member(base: TypeReference, name: String)
     case generic(base: TypeReference, arguments: [TypeReference])
@@ -36,7 +36,7 @@ public indirect enum TypeReference: Equatable {
     }
 }
 
-public enum BootstrapLiteralType: Equatable {
+public enum BootstrapLiteralType: Equatable, Sendable {
     case intLiteral
     case floatLiteral
     case stringLiteral

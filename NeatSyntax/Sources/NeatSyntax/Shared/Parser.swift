@@ -178,12 +178,18 @@ public struct Parser {
     var currentExpressionTerminators: [Token] = []
     var operatorEnvironment: OperatorEnvironment
     var literalBridgeResolver: LiteralBridgeResolver
+    var declarationMemberResolver: DeclarationMemberResolver
 
-    public init(source: String, literalBridgeResolver: LiteralBridgeResolver = .empty) throws {
+    public init(
+        source: String,
+        literalBridgeResolver: LiteralBridgeResolver = .empty,
+        declarationMemberResolver: DeclarationMemberResolver = .empty
+    ) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
         self.operatorEnvironment = .bootstrap()
         self.literalBridgeResolver = literalBridgeResolver
+        self.declarationMemberResolver = declarationMemberResolver
     }
 
     func isCurrentExpressionTerminator(_ token: Token) -> Bool {

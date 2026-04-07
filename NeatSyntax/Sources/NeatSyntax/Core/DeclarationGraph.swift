@@ -37,6 +37,10 @@ public struct DeclarationGraph {
         LiteralBridgeResolver(realizedLiteralBridges: realizedLiteralBridges)
     }
 
+    public var memberResolver: DeclarationMemberResolver {
+        DeclarationMemberResolver(constructsByName: constructsByName)
+    }
+
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
         var registry: [String: ProtocolDeclaration] = [:]
         for parsedFile in files {
@@ -182,5 +186,70 @@ public struct DeclarationGraph {
                     && $0.typeReference == $1.typeReference
                     && $0.slotName == $1.slotName
             })
+    }
+}
+
+public struct DeclarationMemberResolver: Sendable {
+    public static let empty = DeclarationMemberResolver(memberTypesByConstructName: [:])
+
+    private let memberTypesByConstructName: [String: [String: TypeReference]]
+
+    public init(constructsByName: [String: ConstructDeclaration]) {
+        self.memberTypesByConstructName = constructsByName.mapValues { construct in
+            var members: [String: TypeReference] = [:]
+            for state in construct.states {
+                members[state.name] = state.type
+            }
+            for environment in construct.environments {
+                members[environment.name] = environment.type
+            }
+            for binding in construct.bindings {
+                members[binding.name] = Self.simpleTypeReference(named: binding.typeName)
+            }
+            for derived in construct.deriveds {
+                members[derived.name] = Self.simpleTypeReference(named: derived.typeName)
+            }
+            for value in construct.values {
+                members[value.name] = Self.simpleTypeReference(named: value.typeName)
+            }
+            return members
+        }
+    }
+
+    private init(memberTypesByConstructName: [String: [String: TypeReference]]) {
+        self.memberTypesByConstructName = memberTypesByConstructName
+    }
+
+    public func memberType(baseType: TypeReference, memberName: String) -> TypeReference? {
+        guard let constructName = constructName(for: baseType) else {
+            return nil
+        }
+        return memberTypesByConstructName[constructName]?[memberName]
+    }
+
+    private func constructName(for type: TypeReference) -> String? {
+        switch type {
+        case .named(let name):
+            return name
+        case .member(_, let name):
+            return name
+        case .generic(let base, _):
+            return constructName(for: base)
+        case .array:
+            return "Array"
+        case .optional:
+            return "Optional"
+        case .function, .variadic:
+            return nil
+        }
+    }
+
+    private static func simpleTypeReference(named name: String) -> TypeReference {
+        var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasSuffix("?") {
+            trimmed.removeLast()
+            return .optional(simpleTypeReference(named: trimmed))
+        }
+        return .named(trimmed)
     }
 }
