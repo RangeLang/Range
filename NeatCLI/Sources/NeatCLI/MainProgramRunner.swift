@@ -469,6 +469,14 @@ private struct MainProgramInterpreter {
             switch operatorSymbol {
             case .addition:
                 return try add(evaluate(lhs), evaluate(rhs))
+            case .subtraction:
+                return try subtract(evaluate(lhs), evaluate(rhs))
+            case .multiplication:
+                return try multiply(evaluate(lhs), evaluate(rhs))
+            case .division:
+                return try divide(evaluate(lhs), evaluate(rhs))
+            case .remainder:
+                return try remainder(evaluate(lhs), evaluate(rhs))
 
             case .nilCoalescing:
                 let left = try evaluate(lhs)
@@ -582,6 +590,60 @@ private struct MainProgramInterpreter {
             return .string(stringify(left) + right)
         default:
             throw ValidationError("Operator '+' is only supported for numbers and strings.")
+        }
+    }
+
+    private func subtract(_ lhs: RuntimeValue, _ rhs: RuntimeValue) throws -> RuntimeValue {
+        switch (lhs, rhs) {
+        case (.int(let left), .int(let right)):
+            return .int(left - right)
+        case (.double(let left), .double(let right)):
+            return .double(left - right)
+        case (.int(let left), .double(let right)):
+            return .double(Double(left) - right)
+        case (.double(let left), .int(let right)):
+            return .double(left - Double(right))
+        default:
+            throw ValidationError("Operator '-' is only supported for numbers.")
+        }
+    }
+
+    private func multiply(_ lhs: RuntimeValue, _ rhs: RuntimeValue) throws -> RuntimeValue {
+        switch (lhs, rhs) {
+        case (.int(let left), .int(let right)):
+            return .int(left * right)
+        case (.double(let left), .double(let right)):
+            return .double(left * right)
+        case (.int(let left), .double(let right)):
+            return .double(Double(left) * right)
+        case (.double(let left), .int(let right)):
+            return .double(left * Double(right))
+        default:
+            throw ValidationError("Operator '*' is only supported for numbers.")
+        }
+    }
+
+    private func divide(_ lhs: RuntimeValue, _ rhs: RuntimeValue) throws -> RuntimeValue {
+        switch (lhs, rhs) {
+        case (.int(let left), .int(let right)):
+            return .int(left / right)
+        case (.double(let left), .double(let right)):
+            return .double(left / right)
+        case (.int(let left), .double(let right)):
+            return .double(Double(left) / right)
+        case (.double(let left), .int(let right)):
+            return .double(left / Double(right))
+        default:
+            throw ValidationError("Operator '/' is only supported for numbers.")
+        }
+    }
+
+    private func remainder(_ lhs: RuntimeValue, _ rhs: RuntimeValue) throws -> RuntimeValue {
+        switch (lhs, rhs) {
+        case (.int(let left), .int(let right)):
+            return .int(left % right)
+        default:
+            throw ValidationError("Operator '%' is only supported for Int values.")
         }
     }
 

@@ -1,0 +1,4 @@
+precedencegroup MultiplicationPrecedence {
+    associativity: left
+    higherThan: AdditionPrecedence
+}

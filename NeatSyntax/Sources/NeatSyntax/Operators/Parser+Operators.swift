@@ -146,9 +146,21 @@ extension Parser {
 
     mutating func consumeOperatorSymbol() throws -> String {
         switch peek() {
+        case .minus:
+            advance()
+            return "-"
         case .plus:
             advance()
             return "+"
+        case .asterisk:
+            advance()
+            return "*"
+        case .slash:
+            advance()
+            return "/"
+        case .percent:
+            advance()
+            return "%"
         case .plusEqual:
             advance()
             return "+="

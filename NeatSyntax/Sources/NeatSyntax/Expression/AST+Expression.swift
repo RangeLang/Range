@@ -44,6 +44,10 @@ public enum UnaryOperator: String {
 
 public enum BinaryOperator: String {
     case addition = "+"
+    case subtraction = "-"
+    case multiplication = "*"
+    case division = "/"
+    case remainder = "%"
     case nilCoalescing = "??"
     case equal = "=="
     case notEqual = "!="

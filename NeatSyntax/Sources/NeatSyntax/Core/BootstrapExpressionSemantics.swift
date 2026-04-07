@@ -129,8 +129,8 @@ public enum BootstrapExpressionSemantics {
                     callableReturnTypes: callableReturnTypes,
                     resolver: resolver
                 )
-            case .addition:
-                return try inferAdditionType(
+            case .addition, .subtraction, .multiplication, .division, .remainder:
+                return try inferArithmeticType(
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
@@ -764,14 +764,18 @@ public enum BootstrapExpressionSemantics {
         return .typed(.named("Bool"))
     }
 
-    private static func inferAdditionType(
+    private static func inferArithmeticType(
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver
     ) throws -> BootstrapLiteralType {
-        guard case .binary(let lhs, .addition, let rhs) = expression else {
-            throw ParseError("Expected addition expression.")
+        guard case .binary(let lhs, let operatorSymbol, let rhs) = expression,
+            operatorSymbol == .addition || operatorSymbol == .subtraction
+                || operatorSymbol == .multiplication || operatorSymbol == .division
+                || operatorSymbol == .remainder
+        else {
+            throw ParseError("Expected arithmetic expression.")
         }
 
         let lhsType = try inferType(
@@ -789,17 +793,23 @@ public enum BootstrapExpressionSemantics {
 
         // TODO: Replace these bootstrap scalar operator rules with declaration-graph
         // operator resolution once NeatCore operator implementations are semantic inputs.
-        if isStringCompatible(lhsType, resolver: resolver),
+        if operatorSymbol == .addition,
+            isStringCompatible(lhsType, resolver: resolver),
             isStringCompatible(rhsType, resolver: resolver)
         {
             return .typed(.named("String"))
         }
-        if let numericType = numericAdditionResultType(lhsType, rhsType, resolver: resolver) {
+        if let numericType = numericArithmeticResultType(
+            lhsType,
+            rhsType,
+            operatorSymbol: operatorSymbol,
+            resolver: resolver
+        ) {
             return .typed(numericType)
         }
 
         throw ParseError(
-            "Operator '+' supports matching numeric operands or String concatenation in bootstrap inference, got \(lhsType.displayName) and \(rhsType.displayName)."
+            "Operator '\(operatorSymbol.rawValue)' supports compatible numeric operands\(operatorSymbol == .addition ? " or String concatenation" : "") in bootstrap inference, got \(lhsType.displayName) and \(rhsType.displayName)."
         )
     }
 
@@ -850,11 +860,20 @@ public enum BootstrapExpressionSemantics {
         return isCompatible(actual: type, expected: .named("String"), resolver: resolver)
     }
 
-    private static func numericAdditionResultType(
+    private static func numericArithmeticResultType(
         _ lhs: BootstrapLiteralType,
         _ rhs: BootstrapLiteralType,
+        operatorSymbol: BinaryOperator,
         resolver: LiteralBridgeResolver
     ) -> TypeReference? {
+        if operatorSymbol == .remainder {
+            guard isIntCompatible(lhs, resolver: resolver), isIntCompatible(rhs, resolver: resolver)
+            else {
+                return nil
+            }
+            return .named("Int")
+        }
+
         if isFloatCompatible(lhs, resolver: resolver), isNumericCompatible(rhs, resolver: resolver)
         {
             return .named("Float")

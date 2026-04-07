@@ -23,7 +23,7 @@ struct Lexer {
                 if match("/") {
                     skipLineComment()
                 } else {
-                    throw ParseError("Unexpected character /.")
+                    tokens.append(.slash)
                 }
             case "{":
                 advance()
@@ -64,7 +64,7 @@ struct Lexer {
                 if match(">") {
                     tokens.append(.arrow)
                 } else {
-                    throw ParseError("Unexpected character -.")
+                    tokens.append(.minus)
                 }
             case "!":
                 advance()

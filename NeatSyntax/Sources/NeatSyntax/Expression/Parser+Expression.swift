@@ -324,7 +324,7 @@ extension Parser {
                     return true
                 }
             case .eof, .leftBrace, .rightBrace, .rightParen, .rightBracket, .equal, .equalEqual,
-                .bangEqual, .lessEqual, .greaterEqual, .plus, .plusEqual, .andAnd, .orOr,
+                .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .andAnd, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
             case .stringLiteral, .integer, .double, .hashDirective, .atAttribute, .dollar,
@@ -430,8 +430,16 @@ extension Parser {
 
     func operatorSymbol(for token: Token) -> String? {
         switch token {
+        case .minus:
+            return "-"
         case .plus:
             return "+"
+        case .asterisk:
+            return "*"
+        case .slash:
+            return "/"
+        case .percent:
+            return "%"
         case .questionQuestion:
             return "??"
         case .equalEqual:
@@ -463,6 +471,14 @@ extension Parser {
         switch symbol {
         case "+":
             return .addition
+        case "-":
+            return .subtraction
+        case "*":
+            return .multiplication
+        case "/":
+            return .division
+        case "%":
+            return .remainder
         case "??":
             return .nilCoalescing
         case "==":

@@ -23,12 +23,14 @@ enum Token: Equatable {
     case equal
     case equalEqual
     case bangEqual
+    case minus
     case less
     case lessEqual
     case greater
     case greaterEqual
     case plus
     case plusEqual
+    case slash
     case andAnd
     case orOr
     case question

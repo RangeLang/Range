@@ -105,6 +105,8 @@ public struct CompilationArtifactsEmitter {
             return "equalEqual"
         case .bangEqual:
             return "bangEqual"
+        case .minus:
+            return "minus"
         case .less:
             return "less"
         case .lessEqual:
@@ -117,6 +119,8 @@ public struct CompilationArtifactsEmitter {
             return "plus"
         case .plusEqual:
             return "plusEqual"
+        case .slash:
+            return "slash"
         case .andAnd:
             return "andAnd"
         case .orOr:

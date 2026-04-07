@@ -51,6 +51,13 @@ public struct Parser {
                     lowerThan: [],
                     assignment: nil
                 ),
+                PrecedenceGroupDeclaration(
+                    name: "MultiplicationPrecedence",
+                    associativity: .left,
+                    higherThan: ["AdditionPrecedence"],
+                    lowerThan: [],
+                    assignment: nil
+                ),
             ]
 
             let operators = [
@@ -58,6 +65,26 @@ public struct Parser {
                     fixity: .infix,
                     symbol: "+",
                     precedenceGroup: "AdditionPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "-",
+                    precedenceGroup: "AdditionPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "*",
+                    precedenceGroup: "MultiplicationPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "/",
+                    precedenceGroup: "MultiplicationPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "%",
+                    precedenceGroup: "MultiplicationPrecedence"
                 ),
                 OperatorDeclaration(
                     fixity: .infix,

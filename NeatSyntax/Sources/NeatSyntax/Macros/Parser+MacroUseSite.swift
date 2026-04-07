@@ -163,6 +163,8 @@ extension Parser {
             return "=="
         case .bangEqual:
             return "!="
+        case .minus:
+            return "-"
         case .less:
             return "<"
         case .lessEqual:
@@ -175,6 +177,8 @@ extension Parser {
             return "+"
         case .plusEqual:
             return "+="
+        case .slash:
+            return "/"
         case .andAnd:
             return "&&"
         case .orOr:
