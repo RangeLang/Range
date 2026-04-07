@@ -190,55 +190,93 @@ public struct DeclarationGraph {
 }
 
 public struct DeclarationMemberResolver: Sendable {
-    public static let empty = DeclarationMemberResolver(memberTypesByConstructName: [:])
+    public static let empty = DeclarationMemberResolver(constructsByName: [:])
 
-    private let memberTypesByConstructName: [String: [String: TypeReference]]
-
-    public init(constructsByName: [String: ConstructDeclaration]) {
-        self.memberTypesByConstructName = constructsByName.mapValues { construct in
-            var members: [String: TypeReference] = [:]
-            for state in construct.states {
-                members[state.name] = state.type
-            }
-            for environment in construct.environments {
-                members[environment.name] = environment.type
-            }
-            for binding in construct.bindings {
-                members[binding.name] = Self.simpleTypeReference(named: binding.typeName)
-            }
-            for derived in construct.deriveds {
-                members[derived.name] = Self.simpleTypeReference(named: derived.typeName)
-            }
-            for value in construct.values {
-                members[value.name] = Self.simpleTypeReference(named: value.typeName)
-            }
-            return members
-        }
+    private struct ConstructMembers: Sendable {
+        var genericParameterNames: [String]
+        var propertyTypes: [String: TypeReference]
+        var callableReturnTypes: [String: TypeReference]
     }
 
-    private init(memberTypesByConstructName: [String: [String: TypeReference]]) {
-        self.memberTypesByConstructName = memberTypesByConstructName
+    private let membersByConstructName: [String: ConstructMembers]
+
+    public init(constructsByName: [String: ConstructDeclaration]) {
+        self.membersByConstructName = constructsByName.mapValues { construct in
+            var propertyTypes: [String: TypeReference] = [:]
+            for state in construct.states {
+                propertyTypes[state.name] = state.type
+            }
+            for environment in construct.environments {
+                propertyTypes[environment.name] = environment.type
+            }
+            for binding in construct.bindings {
+                propertyTypes[binding.name] = Self.simpleTypeReference(named: binding.typeName)
+            }
+            for derived in construct.deriveds {
+                propertyTypes[derived.name] = Self.simpleTypeReference(named: derived.typeName)
+            }
+            for value in construct.values {
+                propertyTypes[value.name] = Self.simpleTypeReference(named: value.typeName)
+            }
+
+            var callableReturnTypes: [String: TypeReference] = [:]
+            for callable in construct.callables {
+                callableReturnTypes[callable.name] = callable.returnType ?? .named("Void")
+            }
+
+            return ConstructMembers(
+                genericParameterNames: construct.genericParameters.map(Self.genericParameterName),
+                propertyTypes: propertyTypes,
+                callableReturnTypes: callableReturnTypes
+            )
+        }
     }
 
     public func memberType(baseType: TypeReference, memberName: String) -> TypeReference? {
-        guard let constructName = constructName(for: baseType) else {
+        guard let context = constructContext(for: baseType),
+            let members = membersByConstructName[context.name],
+            let type = members.propertyTypes[memberName]
+        else {
             return nil
         }
-        return memberTypesByConstructName[constructName]?[memberName]
+        return Self.substitute(type, using: genericSubstitution(for: members, arguments: context.arguments))
     }
 
-    private func constructName(for type: TypeReference) -> String? {
+    public func memberCallableReturnType(
+        baseType: TypeReference,
+        memberName: String
+    ) -> TypeReference? {
+        guard let context = constructContext(for: baseType),
+            let members = membersByConstructName[context.name],
+            let type = members.callableReturnTypes[memberName]
+        else {
+            return nil
+        }
+        return Self.substitute(type, using: genericSubstitution(for: members, arguments: context.arguments))
+    }
+
+    private func genericSubstitution(
+        for members: ConstructMembers,
+        arguments: [TypeReference]
+    ) -> [String: TypeReference] {
+        Dictionary(uniqueKeysWithValues: zip(members.genericParameterNames, arguments))
+    }
+
+    private func constructContext(for type: TypeReference) -> (name: String, arguments: [TypeReference])? {
         switch type {
         case .named(let name):
-            return name
+            return (name, [])
         case .member(_, let name):
-            return name
-        case .generic(let base, _):
-            return constructName(for: base)
-        case .array:
-            return "Array"
-        case .optional:
-            return "Optional"
+            return (name, [])
+        case .generic(let base, let arguments):
+            guard let context = constructContext(for: base) else {
+                return nil
+            }
+            return (context.name, arguments)
+        case .array(let element):
+            return ("Array", [element])
+        case .optional(let wrapped):
+            return ("Optional", [wrapped])
         case .function, .variadic:
             return nil
         }
@@ -251,5 +289,40 @@ public struct DeclarationMemberResolver: Sendable {
             return .optional(simpleTypeReference(named: trimmed))
         }
         return .named(trimmed)
+    }
+
+    private static func genericParameterName(_ parameter: GenericParameter) -> String {
+        switch parameter {
+        case .type(let name, _, _), .value(let name, _, _):
+            return name
+        }
+    }
+
+    private static func substitute(
+        _ type: TypeReference,
+        using substitutions: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return substitutions[name] ?? type
+        case .member(let base, let name):
+            return .member(base: substitute(base, using: substitutions), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: substitute(base, using: substitutions),
+                arguments: arguments.map { substitute($0, using: substitutions) }
+            )
+        case .array(let element):
+            return .array(substitute(element, using: substitutions))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { substitute($0, using: substitutions) },
+                returnType: substitute(returnType, using: substitutions)
+            )
+        case .optional(let wrapped):
+            return .optional(substitute(wrapped, using: substitutions))
+        case .variadic(let element):
+            return .variadic(substitute(element, using: substitutions))
+        }
     }
 }

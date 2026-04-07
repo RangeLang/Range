@@ -43,7 +43,8 @@ public enum BootstrapExpressionSemantics {
             }
             if let memberType = inferKnownMemberCallType(
                 name: name,
-                accessibleTypes: accessibleTypes
+                accessibleTypes: accessibleTypes,
+                memberResolver: memberResolver
             ) {
                 return .typed(memberType)
             }
@@ -534,47 +535,20 @@ public enum BootstrapExpressionSemantics {
 
     private static func inferKnownMemberCallType(
         name: String,
-        accessibleTypes: [String: BootstrapLiteralType]
+        accessibleTypes: [String: BootstrapLiteralType],
+        memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
         guard let (baseName, memberName) = splitMemberName(name),
             let baseType = accessibleTypes[baseName],
-            case .typed(let baseReference) = baseType,
-            let collection = collectionKind(for: baseReference)
+            case .typed(let baseReference) = baseType
         else {
             return nil
         }
 
-        switch (collection, memberName) {
-        case (.array(let element), "append"),
-            (.array(let element), "update"),
-            (.array(let element), "insert"):
-            _ = element
-            return .named("Void")
-        case (.array(let element), "element"),
-            (.array(let element), "remove"):
-            return element
-        case (.array(let element), "first"),
-            (.array(let element), "last"),
-            (.array(let element), "removeLast"):
-            return .optional(element)
-        case (.array(let element), "filter"):
-            return .array(element)
-        case (.dictionary, "updateValue"),
-            (.dictionary, "clear"),
-            (.set, "insert"),
-            (.set, "clear"):
-            return .named("Void")
-        case (.dictionary(_, let value), "value"),
-            (.dictionary(_, let value), "removeValue"):
-            return .optional(value)
-        case (.dictionary, "contains"),
-            (.set, "contains"):
-            return .named("Bool")
-        case (.set(let element), "remove"):
-            return .optional(element)
-        default:
-            return nil
-        }
+        return memberResolver.memberCallableReturnType(
+            baseType: baseReference,
+            memberName: memberName
+        )
     }
 
     private static func splitMemberName(_ name: String) -> (base: String, member: String)? {
@@ -589,35 +563,6 @@ public enum BootstrapExpressionSemantics {
         }
 
         return (base, member)
-    }
-
-    private enum KnownCollectionKind {
-        case array(TypeReference)
-        case dictionary(key: TypeReference, value: TypeReference)
-        case set(TypeReference)
-    }
-
-    private static func collectionKind(for type: TypeReference) -> KnownCollectionKind? {
-        switch type {
-        case .array(let element):
-            return .array(element)
-        case .generic(let base, let arguments):
-            guard case .named(let baseName) = base else {
-                return nil
-            }
-            switch (baseName, arguments.count) {
-            case ("Array", 1):
-                return .array(arguments[0])
-            case ("Dictionary", 2):
-                return .dictionary(key: arguments[0], value: arguments[1])
-            case ("Set", 1):
-                return .set(arguments[0])
-            default:
-                return nil
-            }
-        default:
-            return nil
-        }
     }
 
     private static func inferKnownConstructorType(
