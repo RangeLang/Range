@@ -1,0 +1,8 @@
+function fallback() -> Int {
+    return 42
+}
+
+@main {
+    state current: Int? = nil
+    value resolved = current ?? fallback()
+}

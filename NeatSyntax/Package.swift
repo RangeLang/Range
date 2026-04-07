@@ -39,6 +39,11 @@ let package = Package(
                 "Macros/Macros.md",
                 "TypeSystem/Generics.md",
             ]
+        ),
+        .testTarget(
+            name: "NeatSyntaxTests",
+            dependencies: ["NeatSyntax"],
+            path: "Tests/NeatSyntaxTests"
         )
     ]
 )

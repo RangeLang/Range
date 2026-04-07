@@ -1,0 +1,3 @@
+@main {
+    value resolved = nil ?? 1
+}

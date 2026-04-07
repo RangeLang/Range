@@ -1,0 +1,23 @@
+@main {
+    value intSum = 1 + 2
+    value intDifference = 5 - 2
+    value intProduct = 3 * 4
+    value intQuotient = 8 / 2
+    value intRemainder = 7 % 3
+
+    value floatSum = 1.5 + 2.0
+    value floatDifference = 5.5 - 2.0
+    value floatProduct = 1.5 * 2.0
+    value floatQuotient = 9.0 / 2.0
+
+    value mixedSum = 1 + 2.5
+    value mixedDifference = 5 - 2.5
+    value mixedProduct = 3 * 2.5
+    value mixedQuotient = 9 / 2.0
+
+    value count = 3
+    value lessThan = count < 10
+    value lessOrEqual = count <= 3
+    value greaterThan = 10 > count
+    value greaterOrEqual = count >= 3
+}

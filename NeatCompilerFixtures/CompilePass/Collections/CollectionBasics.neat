@@ -1,0 +1,21 @@
+@main {
+    state numbers = [1, 2, 3]
+    numbers.append(element: 4)
+    numbers.update(element: 10, index: 0)
+
+    value first = numbers.element(index: 0)
+    value numberCount = numbers.count
+    value numbersAreEmpty = numbers.isEmpty
+
+    state counts = ["a": 1]
+    counts.updateValue(value: 2, key: "b")
+
+    value hasA = counts.contains(key: "a")
+    value valueA = counts.value(key: "a")
+
+    state unique: Set<Int> = [1, 2]
+    unique.insert(element: 3)
+
+    value hasOne = unique.contains(element: 1)
+    value uniqueCount = unique.count
+}

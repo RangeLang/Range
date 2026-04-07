@@ -1,0 +1,7 @@
+@main {
+    value text = "Hello"
+    value count = text.count
+    value empty = text.isEmpty
+    value ordered = text < "Zed"
+    value greeting = text + " World"
+}
