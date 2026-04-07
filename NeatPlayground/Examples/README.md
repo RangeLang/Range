@@ -16,6 +16,7 @@ Use these files to document and probe language features such as:
 - functions
 - control flow
 - optionals
+- strings
 - void
 
 Most examples are not standalone runnable programs. They are meant to be

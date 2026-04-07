@@ -26,13 +26,22 @@ public enum BootstrapExpressionSemantics {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
             return type
-        case .call(let name, _):
-            guard let returnType = callableReturnTypes[name] else {
-                throw ParseError(
-                    "Callable expressions are not supported in state initializer inference yet."
-                )
+        case .call(let name, let arguments):
+            if let returnType = callableReturnTypes[name] {
+                return .typed(returnType)
             }
-            return .typed(returnType)
+            if let constructorType = try inferKnownConstructorType(
+                name: name,
+                arguments: arguments,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                resolver: resolver
+            ) {
+                return .typed(constructorType)
+            }
+            throw ParseError(
+                "Callable expressions are not supported in state initializer inference yet."
+            )
         case .bindingReference(let name):
             throw ParseError("Binding reference '$\(name)' is not valid in a state initializer.")
         case .array(let elements):
@@ -105,7 +114,14 @@ public enum BootstrapExpressionSemantics {
                     callableReturnTypes: callableReturnTypes,
                     resolver: resolver
                 )
-            case .addition, .less, .lessEqual, .greater, .greaterEqual, .and, .or:
+            case .addition:
+                return try inferAdditionType(
+                    expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                )
+            case .less, .lessEqual, .greater, .greaterEqual, .and, .or:
                 throw ParseError(
                     "Binary operator typing is not supported by bootstrap inference yet.")
             }
@@ -225,6 +241,17 @@ public enum BootstrapExpressionSemantics {
                     resolver: resolver
                 )
             }
+        case .call(let name, _):
+            if constructorCall(name: name, matches: expected) {
+                return true
+            }
+            let inferred = try inferType(
+                of: expression,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                resolver: resolver
+            )
+            return isCompatible(actual: inferred, expected: expected, resolver: resolver)
         default:
             let inferred = try inferType(
                 of: expression,
@@ -440,6 +467,74 @@ public enum BootstrapExpressionSemantics {
         }
     }
 
+    private static func inferKnownConstructorType(
+        name: String,
+        arguments: [CallArgument],
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver
+    ) throws -> TypeReference? {
+        guard name == "String" else {
+            return nil
+        }
+        guard arguments.count == 1 else {
+            throw ParseError("String initializer inference expects one argument.")
+        }
+
+        let argumentType = try inferType(
+            of: arguments[0].value,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+        guard isStringCompatible(argumentType, resolver: resolver) else {
+            throw ParseError(
+                "String initializer expects String-compatible argument, got \(argumentType.displayName)."
+            )
+        }
+
+        return .named("String")
+    }
+
+    private static func constructorCall(name: String, matches expected: TypeReference) -> Bool {
+        guard let constructorName = normalizedConstructorName(name) else {
+            return false
+        }
+
+        switch expected {
+        case .named(let expectedName):
+            return constructorName == expectedName
+        case .member(_, let expectedName):
+            return constructorName == expectedName
+        case .generic(let base, _):
+            return constructorCall(name: name, matches: base)
+        case .optional(let wrapped), .variadic(let wrapped):
+            return constructorCall(name: name, matches: wrapped)
+        case .array, .function:
+            return false
+        }
+    }
+
+    private static func normalizedConstructorName(_ raw: String) -> String? {
+        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+
+        if let genericStart = text.firstIndex(of: "<") {
+            text = String(text[..<genericStart])
+        }
+        if let lastDot = text.lastIndex(of: ".") {
+            text = String(text[text.index(after: lastDot)...])
+        }
+
+        guard let firstScalar = text.unicodeScalars.first,
+            CharacterSet.uppercaseLetters.contains(firstScalar)
+        else {
+            return nil
+        }
+
+        return text
+    }
+
     private static func inferNilCoalescingType(
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
@@ -523,6 +618,50 @@ public enum BootstrapExpressionSemantics {
         }
 
         return .typed(.named("Bool"))
+    }
+
+    private static func inferAdditionType(
+        _ expression: Expression,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver
+    ) throws -> BootstrapLiteralType {
+        guard case .binary(let lhs, .addition, let rhs) = expression else {
+            throw ParseError("Expected addition expression.")
+        }
+
+        let lhsType = try inferType(
+            of: lhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+        let rhsType = try inferType(
+            of: rhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+
+        guard isStringCompatible(lhsType, resolver: resolver),
+            isStringCompatible(rhsType, resolver: resolver)
+        else {
+            throw ParseError(
+                "Operator '+' supports String concatenation in bootstrap inference, got \(lhsType.displayName) and \(rhsType.displayName)."
+            )
+        }
+
+        return .typed(.named("String"))
+    }
+
+    private static func isStringCompatible(
+        _ type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> Bool {
+        if case .stringLiteral = type {
+            return true
+        }
+        return isCompatible(actual: type, expected: .named("String"), resolver: resolver)
     }
 
     private static func equalityOperandsAreCompatible(
