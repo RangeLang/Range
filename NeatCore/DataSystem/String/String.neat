@@ -5,4 +5,12 @@ construct String: ExpressibleByStringLiteral, Equatable, Hashable, Comparable {
     init(literal: StringLiteral) {
         self.storage = literal.storage()
     }
+
+    derived count: Int {
+        storage.count
+    }
+
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
 }

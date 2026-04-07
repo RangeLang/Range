@@ -502,11 +502,11 @@ public enum BootstrapExpressionSemantics {
 
         switch memberName {
         case "count":
-            if collectionKind(for: baseReference) != nil {
+            if collectionKind(for: baseReference) != nil || isStringType(baseReference) {
                 return .named("Int")
             }
         case "isEmpty":
-            if collectionKind(for: baseReference) != nil {
+            if collectionKind(for: baseReference) != nil || isStringType(baseReference) {
                 return .named("Bool")
             }
         default:
@@ -602,6 +602,13 @@ public enum BootstrapExpressionSemantics {
         default:
             return nil
         }
+    }
+
+    private static func isStringType(_ type: TypeReference) -> Bool {
+        if case .named("String") = type {
+            return true
+        }
+        return false
     }
 
     private static func inferKnownConstructorType(

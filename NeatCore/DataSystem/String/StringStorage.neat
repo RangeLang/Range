@@ -1,4 +1,6 @@
 @core
 construct StringStorage {
     init()
+    derived count: Int
+    derived isEmpty: Bool
 }
