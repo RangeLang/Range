@@ -1,0 +1,11 @@
+@main {
+    state maybeCount: Int? = nil
+
+    if maybeCount == nil {
+        state fallback = 0
+    }
+
+    if maybeCount != nil {
+        state resolved = maybeCount ?? 0
+    }
+}

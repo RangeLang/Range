@@ -98,8 +98,14 @@ public enum BootstrapExpressionSemantics {
                     callableReturnTypes: callableReturnTypes,
                     resolver: resolver
                 )
-            case .addition, .equal, .notEqual, .less, .lessEqual, .greater,
-                .greaterEqual, .and, .or:
+            case .equal, .notEqual:
+                return try inferEqualityType(
+                    expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                )
+            case .addition, .less, .lessEqual, .greater, .greaterEqual, .and, .or:
                 throw ParseError(
                     "Binary operator typing is not supported by bootstrap inference yet.")
             }
@@ -483,6 +489,63 @@ public enum BootstrapExpressionSemantics {
         }
 
         return .typed(wrappedType)
+    }
+
+    private static func inferEqualityType(
+        _ expression: Expression,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver
+    ) throws -> BootstrapLiteralType {
+        guard case .binary(let lhs, let operatorSymbol, let rhs) = expression,
+            operatorSymbol == .equal || operatorSymbol == .notEqual
+        else {
+            throw ParseError("Expected equality expression.")
+        }
+
+        let lhsType = try inferType(
+            of: lhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+        let rhsType = try inferType(
+            of: rhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+
+        guard equalityOperandsAreCompatible(lhsType, rhsType, resolver: resolver) else {
+            throw ParseError(
+                "Equality operands must be compatible, got \(lhsType.displayName) and \(rhsType.displayName)."
+            )
+        }
+
+        return .typed(.named("Bool"))
+    }
+
+    private static func equalityOperandsAreCompatible(
+        _ lhs: BootstrapLiteralType,
+        _ rhs: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> Bool {
+        if case .nilLiteral = lhs {
+            return isOptionalExpressionType(rhs)
+        }
+        if case .nilLiteral = rhs {
+            return isOptionalExpressionType(lhs)
+        }
+
+        guard let lhsType = materializedTypeReference(for: lhs, resolver: resolver),
+            let rhsType = materializedTypeReference(for: rhs, resolver: resolver)
+        else {
+            return false
+        }
+
+        return lhsType == rhsType
+            || isCompatibleNamedType(expected: lhsType, actual: rhsType)
+            || isCompatibleNamedType(expected: rhsType, actual: lhsType)
     }
 
     private static func unifyConditionalBranchTypes(
