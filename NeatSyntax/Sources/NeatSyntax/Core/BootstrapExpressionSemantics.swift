@@ -20,6 +20,12 @@ public enum BootstrapExpressionSemantics {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
+        case .freestandingMacro(let name, _) where name == "stringify":
+            return .stringLiteral
+        case .freestandingMacro(let name, _):
+            throw ParseError(
+                "Freestanding expression macro #\(name) must be expanded before inference."
+            )
         case .block:
             throw ParseError(
                 "Block expressions are not supported in state initializer inference yet.")
@@ -382,7 +388,8 @@ public enum BootstrapExpressionSemantics {
         case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral, .array,
             .dictionary:
             return true
-        case .block, .identifier, .call, .bindingReference, .ternary, .unary, .binary:
+        case .block, .freestandingMacro, .identifier, .call, .bindingReference, .ternary, .unary,
+            .binary:
             return false
         }
     }

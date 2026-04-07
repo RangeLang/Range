@@ -412,6 +412,11 @@ private struct MainProgramInterpreter {
         case .nilLiteral:
             return .nilLiteral
 
+        case .freestandingMacro(let name, _):
+            throw ValidationError(
+                "Freestanding expression macro #\(name) must be expanded before interpretation."
+            )
+
         case .block:
             throw ValidationError(
                 "Block expressions are not supported in the main-program interpreter yet."

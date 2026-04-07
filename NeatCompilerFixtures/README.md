@@ -32,7 +32,7 @@ The current macro fixtures cover only the supported bootstrap surface:
 
 - literal bridge carry through `#literal<T>`
 - attached parameter `#autoclosure`
-- known unsupported freestanding expression macros
+- freestanding expression `#stringify(...)`
 - known `#variadic` return-validation gap
 
 Move the variadic fixture from `CompileFail` to `CompilePass` when callable

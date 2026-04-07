@@ -490,6 +490,8 @@ struct SwiftBackendEmitter {
             return value ? "true" : "false"
         case .nilLiteral:
             return "nil"
+        case .freestandingMacro(let name, _):
+            throw SwiftBackendError("Freestanding expression macro #\(name) must be expanded before Swift emission.")
         case .block(let body):
             return try emitClosureExpression(body)
         case .identifier(let name):

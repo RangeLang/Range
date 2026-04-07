@@ -7,6 +7,7 @@ public indirect enum Expression {
     case interpolatedString(InterpolatedString)
     case boolean(Bool)
     case nilLiteral
+    case freestandingMacro(name: String, arguments: [CallArgument])
     case block([Statement])
     case identifier(String)
     case call(name: String, arguments: [CallArgument])

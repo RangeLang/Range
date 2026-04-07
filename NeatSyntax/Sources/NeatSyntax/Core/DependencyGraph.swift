@@ -1485,6 +1485,11 @@ private struct GraphCollector {
             if let resolved = resolveSimpleName(name, scope: scope) {
                 addEdge(from: ownerID, to: resolved, kind: .dependsOn)
             }
+        case .freestandingMacro(_, let arguments):
+            for argument in arguments {
+                analyzeExpression(
+                    argument.value, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
+            }
         case .call(let name, let arguments):
             for argument in arguments {
                 analyzeExpression(

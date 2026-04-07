@@ -153,6 +153,8 @@ struct SwiftLoweredProgramAdapter {
         let lowered: NeatExpression
 
         switch expression {
+        case .freestandingMacro:
+            lowered = expression
         case .call(let name, let arguments):
             lowered = .call(
                 name: name,

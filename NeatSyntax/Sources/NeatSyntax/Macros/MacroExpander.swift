@@ -733,6 +733,23 @@ public enum MacroExpander {
             }
 
             return .call(name: name, arguments: wrappedArguments)
+        case .freestandingMacro(let name, let arguments):
+            if name == "stringify", arguments.count == 1 {
+                return .string(renderExpressionForStringify(arguments[0].value))
+            }
+
+            let rewrittenArguments = arguments.map { argument in
+                CallArgument(
+                    label: argument.label,
+                    value: expand(
+                        expression: argument.value,
+                        expectedType: nil,
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
+                    )
+                )
+            }
+            return .freestandingMacro(name: name, arguments: rewrittenArguments)
         case .array(let elements):
             return .array(
                 elements.map {
@@ -899,8 +916,8 @@ public enum MacroExpander {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
-        case .block, .identifier, .call, .bindingReference, .array, .dictionary, .ternary,
-            .unary, .binary:
+        case .block, .freestandingMacro, .identifier, .call, .bindingReference, .array,
+            .dictionary, .ternary, .unary, .binary:
             return nil
         }
     }
@@ -1343,6 +1360,16 @@ public enum MacroExpander {
                     )
                 }
             )
+        case .freestandingMacro(let name, let arguments):
+            return .freestandingMacro(
+                name: name,
+                arguments: arguments.map { argument in
+                    CallArgument(
+                        label: argument.label,
+                        value: substituteMacroBindings(in: argument.value, bindings: bindings)
+                    )
+                }
+            )
         case .array(let elements):
             return .array(elements.map { substituteMacroBindings(in: $0, bindings: bindings) })
         case .dictionary(let elements):
@@ -1390,6 +1417,66 @@ public enum MacroExpander {
         case .integer, .double, .string, .boolean, .nilLiteral, .bindingReference:
             return expression
         }
+    }
+
+    static func renderExpressionForStringify(_ expression: Expression) -> String {
+        switch expression {
+        case .integer(let value):
+            return String(value)
+        case .double(let value):
+            return String(value)
+        case .string(let value):
+            return "\"\(value)\""
+        case .interpolatedString(let string):
+            let renderedSegments = string.segments.map { segment in
+                switch segment {
+                case .text(let text):
+                    return text
+                case .expression(let expression):
+                    return "\\(\(renderExpressionForStringify(expression)))"
+                }
+            }.joined()
+            return "\"\(renderedSegments)\""
+        case .boolean(let value):
+            return value ? "true" : "false"
+        case .nilLiteral:
+            return "nil"
+        case .freestandingMacro(let name, let arguments):
+            return "#\(name)(\(renderArgumentsForStringify(arguments)))"
+        case .block:
+            return "{ ... }"
+        case .identifier(let name):
+            return name
+        case .call(let name, let arguments):
+            return "\(name)(\(renderArgumentsForStringify(arguments)))"
+        case .bindingReference(let name):
+            return "$\(name)"
+        case .array(let elements):
+            return "[\(elements.map(renderExpressionForStringify).joined(separator: ", "))]"
+        case .dictionary(let elements):
+            let rendered = elements.map {
+                "\(renderExpressionForStringify($0.key)): \(renderExpressionForStringify($0.value))"
+            }.joined(separator: ", ")
+            return "[\(rendered)]"
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return
+                "\(renderExpressionForStringify(condition)) ? \(renderExpressionForStringify(trueExpression)) : \(renderExpressionForStringify(falseExpression))"
+        case .unary(let operatorSymbol, let expression):
+            return "\(operatorSymbol.rawValue)\(renderExpressionForStringify(expression))"
+        case .binary(let lhs, let operatorSymbol, let rhs):
+            return
+                "\(renderExpressionForStringify(lhs)) \(operatorSymbol.rawValue) \(renderExpressionForStringify(rhs))"
+        }
+    }
+
+    private static func renderArgumentsForStringify(_ arguments: [CallArgument]) -> String {
+        arguments.map { argument in
+            let renderedValue = renderExpressionForStringify(argument.value)
+            if let label = argument.label {
+                return "\(label): \(renderedValue)"
+            }
+            return renderedValue
+        }.joined(separator: ", ")
     }
 
     static func substituteMacroTargetCalls(

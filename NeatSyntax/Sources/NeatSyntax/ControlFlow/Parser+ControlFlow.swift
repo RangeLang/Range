@@ -121,8 +121,8 @@ extension Parser {
 
     func isExpressionStatementStart() -> Bool {
         switch peek() {
-        case .identifier, .integer, .double, .stringLiteral, .leftBracket, .leftParen, .dollar,
-            .dot, .bang:
+        case .identifier, .integer, .double, .stringLiteral, .hashDirective, .leftBracket,
+            .leftParen, .dollar, .dot, .bang:
             return true
         default:
             return false

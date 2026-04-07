@@ -116,6 +116,12 @@ extension Parser {
                 return .interpolatedString(parseInterpolatedString(value))
             }
             return .string(value)
+        case .hashDirective(let name):
+            advance()
+            return .freestandingMacro(
+                name: name,
+                arguments: try parseInvocationArgumentsIfPresent()
+            )
         case .identifier(let name), .keyword(let name):
             advance()
             if name == "true" {
