@@ -10,7 +10,8 @@ public struct SemanticProgramValidator {
         try validateLiteralBridgeCompatibility(
             in: program.parsedFiles,
             resolver: program.literalBridgeResolver,
-            memberResolver: program.declarationGraph.memberResolver
+            memberResolver: program.declarationGraph.memberResolver,
+            operatorResolver: program.declarationGraph.operatorResolver
         )
         try validateEnvironmentStateResolution(in: program.expandedFiles)
         try validateValueBindings(in: program.expandedFiles)
@@ -96,7 +97,8 @@ public struct SemanticProgramValidator {
     private func validateLiteralBridgeCompatibility(
         in parsedFiles: [ParsedSourceFile],
         resolver: LiteralBridgeResolver,
-        memberResolver: DeclarationMemberResolver
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
     ) throws {
         for parsedFile in parsedFiles {
             let fileName = lastPathComponent(of: parsedFile.path)
@@ -107,6 +109,7 @@ public struct SemanticProgramValidator {
                     in: declaration,
                     resolver: resolver,
                     memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
                     fileName: fileName
                 )
             case .module(let module):
@@ -115,6 +118,7 @@ public struct SemanticProgramValidator {
                     accessibleTypes: [:],
                     resolver: resolver,
                     memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
                     fileName: fileName
                 )
 
@@ -130,6 +134,7 @@ public struct SemanticProgramValidator {
                         accessibleTypes: topLevelStateTypes,
                         resolver: resolver,
                         memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
                         fileName: fileName
                     )
                 }
@@ -139,6 +144,7 @@ public struct SemanticProgramValidator {
                         in: declaration,
                         resolver: resolver,
                         memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
                         fileName: fileName
                     )
                 }
@@ -181,6 +187,7 @@ public struct SemanticProgramValidator {
         in declaration: ConstructDeclaration,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
         fileName: String
     ) throws {
         let environmentTypes = Dictionary(
@@ -194,6 +201,7 @@ public struct SemanticProgramValidator {
             accessibleTypes: environmentTypes,
             resolver: resolver,
             memberResolver: memberResolver,
+            operatorResolver: operatorResolver,
             fileName: fileName
         )
 
@@ -210,6 +218,7 @@ public struct SemanticProgramValidator {
                 accessibleTypes: accessibleTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
                 fileName: fileName
             )
         }
@@ -220,6 +229,7 @@ public struct SemanticProgramValidator {
         accessibleTypes initialAccessibleTypes: [String: BootstrapLiteralType],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
         fileName: String
     ) throws {
         var accessibleTypes = initialAccessibleTypes
@@ -231,7 +241,8 @@ public struct SemanticProgramValidator {
                     of: expression,
                     accessibleTypes: accessibleTypes,
                     resolver: resolver,
-                    memberResolver: memberResolver
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
                 ),
                 inferred.isLiteralLike,
                 !BootstrapExpressionSemantics.isCompatible(
@@ -254,6 +265,7 @@ public struct SemanticProgramValidator {
         accessibleTypes: [String: BootstrapLiteralType],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
         fileName: String
     ) throws {
         guard let explicitReturnType = callable.returnType,
@@ -279,7 +291,8 @@ public struct SemanticProgramValidator {
                     of: expression,
                     accessibleTypes: visibleTypes,
                     resolver: resolver,
-                    memberResolver: memberResolver
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
                 ),
                 BootstrapExpressionSemantics.isLiteralExpression(expression)
             else {

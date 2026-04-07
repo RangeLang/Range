@@ -120,7 +120,8 @@ extension Parser {
                 accessibleTypes: accessibleTypes.mapValues(BootstrapLiteralType.typed),
                 callableReturnTypes: currentCallableReturnTypes,
                 resolver: literalBridgeResolver,
-                memberResolver: declarationMemberResolver
+                memberResolver: declarationMemberResolver,
+                operatorResolver: declarationOperatorResolver
             ) {
                 return explicitType
             }

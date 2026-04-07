@@ -348,7 +348,8 @@ extension Parser {
             accessibleTypes: bootstrapAccessibleTypes,
             callableReturnTypes: currentCallableReturnTypes,
             resolver: literalBridgeResolver,
-            memberResolver: declarationMemberResolver
+            memberResolver: declarationMemberResolver,
+            operatorResolver: declarationOperatorResolver
         )
     }
 

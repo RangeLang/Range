@@ -44,6 +44,10 @@ public struct DeclarationGraph {
         DeclarationMemberResolver(constructsByName: constructsByName)
     }
 
+    public var operatorResolver: DeclarationOperatorResolver {
+        DeclarationOperatorResolver(callablesByName: callablesByName)
+    }
+
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
         var registry: [String: ProtocolDeclaration] = [:]
         for parsedFile in files {
@@ -208,6 +212,78 @@ public struct DeclarationGraph {
                     && $0.typeReference == $1.typeReference
                     && $0.slotName == $1.slotName
             })
+    }
+}
+
+public struct DeclarationOperatorResolver: Sendable {
+    public static let empty = DeclarationOperatorResolver(callablesByName: [:])
+
+    private struct OperatorSignature: Sendable {
+        var lhsType: TypeReference
+        var rhsType: TypeReference
+        var returnType: TypeReference
+    }
+
+    private let signaturesByName: [String: [OperatorSignature]]
+
+    public init(callablesByName: [String: [CallableDeclaration]]) {
+        self.signaturesByName = callablesByName.mapValues { callables in
+            callables.compactMap { callable in
+                guard callable.parameters.count == 2,
+                    let lhsParameter = callable.parameters[0].typeReference,
+                    let rhsParameter = callable.parameters[1].typeReference
+                else {
+                    return nil
+                }
+
+                return OperatorSignature(
+                    lhsType: lhsParameter,
+                    rhsType: rhsParameter,
+                    returnType: callable.returnType ?? .named("Void")
+                )
+            }
+        }
+    }
+
+    public func binaryOperatorReturnType(
+        symbol: String,
+        lhs: BootstrapLiteralType,
+        rhs: BootstrapLiteralType,
+        literalBridgeResolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        guard let lhsType = materializedTypeReference(for: lhs, resolver: literalBridgeResolver),
+            let rhsType = materializedTypeReference(for: rhs, resolver: literalBridgeResolver)
+        else {
+            return nil
+        }
+
+        let matches = signaturesByName[symbol, default: []].filter { signature in
+            typeMatches(lhsType, signature.lhsType)
+                && typeMatches(rhsType, signature.rhsType)
+        }
+
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0].returnType
+    }
+
+    private func materializedTypeReference(
+        for type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        switch type {
+        case .typed(let typeReference):
+            return typeReference
+        case .nilLiteral:
+            return nil
+        default:
+            return resolver.defaultDestinationType(for: type.displayName)
+        }
+    }
+
+    private func typeMatches(_ actual: TypeReference, _ expected: TypeReference) -> Bool {
+        actual == expected
     }
 }
 

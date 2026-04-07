@@ -179,17 +179,20 @@ public struct Parser {
     var operatorEnvironment: OperatorEnvironment
     var literalBridgeResolver: LiteralBridgeResolver
     var declarationMemberResolver: DeclarationMemberResolver
+    var declarationOperatorResolver: DeclarationOperatorResolver
 
     public init(
         source: String,
         literalBridgeResolver: LiteralBridgeResolver = .empty,
-        declarationMemberResolver: DeclarationMemberResolver = .empty
+        declarationMemberResolver: DeclarationMemberResolver = .empty,
+        declarationOperatorResolver: DeclarationOperatorResolver = .empty
     ) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
         self.operatorEnvironment = .bootstrap()
         self.literalBridgeResolver = literalBridgeResolver
         self.declarationMemberResolver = declarationMemberResolver
+        self.declarationOperatorResolver = declarationOperatorResolver
     }
 
     func isCurrentExpressionTerminator(_ token: Token) -> Bool {
