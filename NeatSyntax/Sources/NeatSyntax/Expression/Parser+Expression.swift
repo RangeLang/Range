@@ -290,7 +290,7 @@ extension Parser {
     }
 
     mutating func parseGenericArgumentClauseIfPresent() throws -> String {
-        guard peek() == .less else {
+        guard peek() == .less, isGenericArgumentClauseStart() else {
             return ""
         }
 
@@ -302,6 +302,40 @@ extension Parser {
         }
         try consume(.greater)
         return "<\(arguments.joined(separator: ", "))>"
+    }
+
+    func isGenericArgumentClauseStart() -> Bool {
+        switch peek(offset: 1) {
+        case .identifier, .keyword, .leftBracket, .leftParen:
+            break
+        default:
+            return false
+        }
+
+        var offset = 1
+        var depth = 1
+        while true {
+            switch peek(offset: offset) {
+            case .less:
+                depth += 1
+            case .greater:
+                depth -= 1
+                if depth == 0 {
+                    return true
+                }
+            case .eof, .leftBrace, .rightBrace, .rightParen, .rightBracket, .equal, .equalEqual,
+                .bangEqual, .lessEqual, .greaterEqual, .plus, .plusEqual, .andAnd, .orOr,
+                .questionQuestion, .colon, .arrow:
+                return false
+            case .stringLiteral, .integer, .double, .hashDirective, .atAttribute, .dollar,
+                .percent, .bang:
+                return false
+            case .identifier, .keyword, .leftBracket, .leftParen, .asterisk, .dot, .ellipsis,
+                .question, .comma:
+                break
+            }
+            offset += 1
+        }
     }
 
     func inferBootstrapExpressionType(
