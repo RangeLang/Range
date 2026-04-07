@@ -1,0 +1,7 @@
+function takeMany(#variadic values: Int) -> [Int] {
+    return values
+}
+
+@main {
+    value values = takeMany(1, 2, 3)
+}

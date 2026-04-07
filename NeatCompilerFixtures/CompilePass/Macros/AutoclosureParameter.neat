@@ -1,0 +1,7 @@
+function acceptDeferred(#autoclosure value: Int) -> Int {
+    return value()
+}
+
+@main {
+    value result = acceptDeferred(1 + 2)
+}

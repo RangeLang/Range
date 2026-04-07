@@ -1,0 +1,11 @@
+construct FixtureInt: ExpressibleByIntLiteral {
+    value storage: IntStorage
+
+    init(literal: IntLiteral) {
+        self.storage = literal.storage()
+    }
+}
+
+@main {
+    value number: FixtureInt = 1
+}

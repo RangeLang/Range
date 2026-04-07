@@ -25,3 +25,15 @@ they protect real compiler behavior.
 
 Keep `NeatTesting` or `Testing` reserved for a future Neat-native user testing
 library. These fixtures are for host-side compiler regression tests.
+
+## Macro Fixtures
+
+The current macro fixtures cover only the supported bootstrap surface:
+
+- literal bridge carry through `#literal<T>`
+- attached parameter `#autoclosure`
+- known unsupported freestanding expression macros
+- known `#variadic` return-validation gap
+
+Move the variadic fixture from `CompileFail` to `CompilePass` when callable
+return validation consumes the expanded parameter type consistently.
