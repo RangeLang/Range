@@ -1,7 +1,7 @@
 @main {
-    state greeting = "Hello" + " World"
+    value greeting = "Hello" + " World"
     value text = "Hello"
-    state message = text + " World"
-    state explicit: String = "Hello" + " World"
-    state constructed = String("Hello" + " World")
+    value message = text + " World"
+    value explicit: String = "Hello" + " World"
+    value constructed = String("Hello" + " World")
 }
