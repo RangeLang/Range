@@ -22,14 +22,17 @@ public struct RealizedLiteralBridge: Hashable, Sendable {
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
     public let constructsByName: [String: ConstructDeclaration]
+    public let callablesByName: [String: [CallableDeclaration]]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
 
     public init(files: [ParsedSourceFile]) {
         let protocols = Self.collectProtocols(from: files)
         let constructs = Self.collectConstructs(from: files, protocols: protocols)
+        let callables = Self.collectCallables(from: files)
 
         self.protocolsByName = protocols
         self.constructsByName = constructs
+        self.callablesByName = callables
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
     }
 
@@ -84,6 +87,16 @@ public struct DeclarationGraph {
         return registry
     }
 
+    static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]] {
+        var registry: [String: [CallableDeclaration]] = [:]
+        for parsedFile in files {
+            for declaration in callables(in: parsedFile.sourceFile) {
+                registry[declaration.name, default: []].append(declaration)
+            }
+        }
+        return registry
+    }
+
     static func collectRealizedLiteralBridges(
         from constructs: [String: ConstructDeclaration]
     ) -> [RealizedLiteralBridge] {
@@ -128,6 +141,15 @@ public struct DeclarationGraph {
         case .module(let module):
             return module.constructs
         case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+            return []
+        }
+    }
+
+    static func callables(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
+        switch sourceFile {
+        case .module(let module):
+            return module.callables
+        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }

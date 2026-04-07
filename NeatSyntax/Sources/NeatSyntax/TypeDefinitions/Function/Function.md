@@ -40,6 +40,13 @@ function add(left: Int, right: Int) -> Int {
 }
 ```
 
+- May be marked `@core` at the top level and omit a body when the operation is supplied by compiler, runtime, or backend behavior
+
+```neat
+@core
+function +(lhs: Int, rhs: Int) -> Int
+```
+
 - Can appear inside a construct
 
 ```neat

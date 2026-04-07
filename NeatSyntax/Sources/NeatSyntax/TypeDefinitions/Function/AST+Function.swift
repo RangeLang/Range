@@ -33,6 +33,7 @@ public struct NeatFunctionParameter {
 
 public struct CallableDeclaration {
     public let macros: [MacroApplication]
+    public let attribute: AttributeApplication?
     public let targetType: TypeReference?
     public let name: String
     public let genericParameters: [GenericParameter]
@@ -43,6 +44,7 @@ public struct CallableDeclaration {
 
     public init(
         macros: [MacroApplication],
+        attribute: AttributeApplication?,
         targetType: TypeReference?,
         name: String,
         genericParameters: [GenericParameter],
@@ -52,6 +54,7 @@ public struct CallableDeclaration {
         body: [Statement]?
     ) {
         self.macros = macros
+        self.attribute = attribute
         self.targetType = targetType
         self.name = name
         self.genericParameters = genericParameters
@@ -59,6 +62,10 @@ public struct CallableDeclaration {
         self.parameters = parameters
         self.returnType = returnType
         self.body = body
+    }
+
+    public var isCore: Bool {
+        attribute?.name == "core"
     }
 }
 

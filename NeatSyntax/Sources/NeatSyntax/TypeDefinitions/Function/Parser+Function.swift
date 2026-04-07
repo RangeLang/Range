@@ -7,6 +7,7 @@ extension Parser {
         }
 
         let macros = try parseMacroApplicationsIfPresent()
+        let attribute = parseAttributeIfPresent(before: .function)
         var targetType: TypeReference?
         if case .identifier(let target) = peek(),
             peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
@@ -44,6 +45,7 @@ extension Parser {
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
             macros: macros,
+            attribute: attribute,
             targetType: targetType,
             name: name,
             genericParameters: genericParameters,
@@ -98,6 +100,7 @@ extension Parser {
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return CallableDeclaration(
             macros: [],
+            attribute: nil,
             targetType: nil,
             name: mappedName,
             genericParameters: [],
@@ -191,15 +194,23 @@ extension Parser {
             return true
         }
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        if peek(offset: offset) == .keyword(NeatSyntax.Keyword.function.rawValue) {
+        let attributeOffset = isCoreAttribute(at: offset) ? offset + 1 : offset
+        if peek(offset: attributeOffset) == .keyword(NeatSyntax.Keyword.function.rawValue) {
             return true
         }
-        if case .identifier = peek(offset: offset),
-            peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+        if case .identifier = peek(offset: attributeOffset),
+            peek(offset: attributeOffset + 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
         {
             return true
         }
         return false
+    }
+
+    private func isCoreAttribute(at offset: Int) -> Bool {
+        guard case .atAttribute(let name, _) = peek(offset: offset) else {
+            return false
+        }
+        return name == "core"
     }
 
     func isBuilderDeclarationStart() -> Bool {
@@ -238,9 +249,14 @@ extension Parser {
         }
     }
 
-    func validateCallableReturnSemantics(_ callables: [CallableDeclaration]) throws {
+    func validateCallableReturnSemantics(
+        _ callables: [CallableDeclaration],
+        allowBodylessCallables: Bool = false
+    ) throws {
         for callable in callables {
-            guard let body = callable.body else { continue }
+            guard let body = callable.body else {
+                continue
+            }
 
             let explicitReturnType = callable.returnType
             let needsValueReturn = callableRequiresValueReturn(

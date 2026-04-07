@@ -70,6 +70,42 @@ extension Parser {
         case .keyword(let value):
             advance()
             return value
+        case .plus:
+            advance()
+            return "+"
+        case .minus:
+            advance()
+            return "-"
+        case .asterisk:
+            advance()
+            return "*"
+        case .slash:
+            advance()
+            return "/"
+        case .percent:
+            advance()
+            return "%"
+        case .equalEqual:
+            advance()
+            return "=="
+        case .bangEqual:
+            advance()
+            return "!="
+        case .less:
+            advance()
+            return "<"
+        case .lessEqual:
+            advance()
+            return "<="
+        case .greater:
+            advance()
+            return ">"
+        case .greaterEqual:
+            advance()
+            return ">="
+        case .questionQuestion:
+            advance()
+            return "??"
         default:
             throw ParseError("Expected callable name.")
         }

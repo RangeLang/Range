@@ -1,3 +1,30 @@
 infix operator *: MultiplicationPrecedence
 infix operator /: MultiplicationPrecedence
 infix operator %: MultiplicationPrecedence
+
+@core
+function *(lhs: Int, rhs: Int) -> Int
+
+@core
+function *(lhs: Float, rhs: Float) -> Float
+
+@core
+function *(lhs: Int, rhs: Float) -> Float
+
+@core
+function *(lhs: Float, rhs: Int) -> Float
+
+@core
+function /(lhs: Int, rhs: Int) -> Int
+
+@core
+function /(lhs: Float, rhs: Float) -> Float
+
+@core
+function /(lhs: Int, rhs: Float) -> Float
+
+@core
+function /(lhs: Float, rhs: Int) -> Float
+
+@core
+function %(lhs: Int, rhs: Int) -> Int

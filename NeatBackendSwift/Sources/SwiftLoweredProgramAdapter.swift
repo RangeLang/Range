@@ -66,6 +66,7 @@ struct SwiftLoweredProgramAdapter {
     private func lower(callable: CallableDeclaration) -> CallableDeclaration {
         CallableDeclaration(
             macros: callable.macros,
+            attribute: callable.attribute,
             targetType: callable.targetType,
             name: callable.name,
             genericParameters: callable.genericParameters,
