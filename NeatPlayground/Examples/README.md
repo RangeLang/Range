@@ -15,6 +15,7 @@ Use these files to document and probe language features such as:
 - extensions
 - functions
 - control flow
+- operators
 - optionals
 - strings
 - void

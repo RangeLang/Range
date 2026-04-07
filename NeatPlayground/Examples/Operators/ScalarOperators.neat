@@ -1,0 +1,16 @@
+@main {
+    state intSum = 1 + 2
+    state floatSum = 1.5 + 2.0
+    state mixedSum = 1 + 2.5
+
+    value count = 3
+    state incremented = count + 1
+
+    state lessThan = count < 10
+    state lessOrEqual = count <= 3
+    state greaterThan = 10 > count
+    state greaterOrEqual = count >= 3
+
+    value name = "George"
+    state ordered = name < "Zed"
+}

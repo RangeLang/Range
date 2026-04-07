@@ -121,7 +121,14 @@ public enum BootstrapExpressionSemantics {
                     callableReturnTypes: callableReturnTypes,
                     resolver: resolver
                 )
-            case .less, .lessEqual, .greater, .greaterEqual, .and, .or:
+            case .less, .lessEqual, .greater, .greaterEqual:
+                return try inferComparisonType(
+                    expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    resolver: resolver
+                )
+            case .and, .or:
                 throw ParseError(
                     "Binary operator typing is not supported by bootstrap inference yet.")
             }
@@ -643,15 +650,57 @@ public enum BootstrapExpressionSemantics {
             resolver: resolver
         )
 
-        guard isStringCompatible(lhsType, resolver: resolver),
+        // TODO: Replace these bootstrap scalar operator rules with declaration-graph
+        // operator resolution once NeatCore operator implementations are semantic inputs.
+        if isStringCompatible(lhsType, resolver: resolver),
             isStringCompatible(rhsType, resolver: resolver)
+        {
+            return .typed(.named("String"))
+        }
+        if let numericType = numericAdditionResultType(lhsType, rhsType, resolver: resolver) {
+            return .typed(numericType)
+        }
+
+        throw ParseError(
+            "Operator '+' supports matching numeric operands or String concatenation in bootstrap inference, got \(lhsType.displayName) and \(rhsType.displayName)."
+        )
+    }
+
+    private static func inferComparisonType(
+        _ expression: Expression,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver
+    ) throws -> BootstrapLiteralType {
+        guard case .binary(let lhs, let operatorSymbol, let rhs) = expression,
+            operatorSymbol == .less || operatorSymbol == .lessEqual
+                || operatorSymbol == .greater || operatorSymbol == .greaterEqual
         else {
+            throw ParseError("Expected comparison expression.")
+        }
+
+        let lhsType = try inferType(
+            of: lhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+        let rhsType = try inferType(
+            of: rhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            resolver: resolver
+        )
+
+        // TODO: Replace these bootstrap scalar operator rules with declaration-graph
+        // operator resolution once NeatCore operator implementations are semantic inputs.
+        guard comparableOperandsAreCompatible(lhsType, rhsType, resolver: resolver) else {
             throw ParseError(
-                "Operator '+' supports String concatenation in bootstrap inference, got \(lhsType.displayName) and \(rhsType.displayName)."
+                "Comparison operands must be compatible numeric or String values, got \(lhsType.displayName) and \(rhsType.displayName)."
             )
         }
 
-        return .typed(.named("String"))
+        return .typed(.named("Bool"))
     }
 
     private static func isStringCompatible(
@@ -662,6 +711,65 @@ public enum BootstrapExpressionSemantics {
             return true
         }
         return isCompatible(actual: type, expected: .named("String"), resolver: resolver)
+    }
+
+    private static func numericAdditionResultType(
+        _ lhs: BootstrapLiteralType,
+        _ rhs: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        if isFloatCompatible(lhs, resolver: resolver), isNumericCompatible(rhs, resolver: resolver)
+        {
+            return .named("Float")
+        }
+        if isNumericCompatible(lhs, resolver: resolver), isFloatCompatible(rhs, resolver: resolver)
+        {
+            return .named("Float")
+        }
+        if isIntCompatible(lhs, resolver: resolver), isIntCompatible(rhs, resolver: resolver) {
+            return .named("Int")
+        }
+        return nil
+    }
+
+    private static func comparableOperandsAreCompatible(
+        _ lhs: BootstrapLiteralType,
+        _ rhs: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> Bool {
+        if isNumericCompatible(lhs, resolver: resolver), isNumericCompatible(rhs, resolver: resolver)
+        {
+            return true
+        }
+        return isStringCompatible(lhs, resolver: resolver)
+            && isStringCompatible(rhs, resolver: resolver)
+    }
+
+    private static func isNumericCompatible(
+        _ type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> Bool {
+        isIntCompatible(type, resolver: resolver) || isFloatCompatible(type, resolver: resolver)
+    }
+
+    private static func isIntCompatible(
+        _ type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> Bool {
+        if case .intLiteral = type {
+            return true
+        }
+        return isCompatible(actual: type, expected: .named("Int"), resolver: resolver)
+    }
+
+    private static func isFloatCompatible(
+        _ type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> Bool {
+        if case .floatLiteral = type {
+            return true
+        }
+        return isCompatible(actual: type, expected: .named("Float"), resolver: resolver)
     }
 
     private static func equalityOperandsAreCompatible(
