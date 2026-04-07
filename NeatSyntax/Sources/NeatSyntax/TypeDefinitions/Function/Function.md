@@ -82,6 +82,16 @@ construct User {
 }
 ```
 
+- May omit a body inside `@core construct` declarations when the operation is supplied by compiler, runtime, or backend behavior
+
+```neat
+@core
+construct ArrayStorage<Element> {
+    function append(element: Element)
+    function element(index: Int) -> Element
+}
+```
+
 - May omit a body in protocol declarations
 
 ```neat

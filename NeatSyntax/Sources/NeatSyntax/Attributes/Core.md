@@ -27,6 +27,7 @@
 - `@core construct` declarations are non-identity-bearing.
 - `@core construct` declarations compose as plain value data.
 - `@core construct` declarations may still declare fields, conformances, generics, and behavior.
+- Members inside an `@core construct` may omit bodies when the operation is supplied by the compiler, runtime, or backend.
 - `@core` exists for foundational language types and compiler-exposed structural constructs, not ordinary domain modeling.
 - `@core construct` does not inherit from other constructs.
 
@@ -51,8 +52,20 @@ construct Closure {
 }
 ```
 
+```neat
+@core
+construct ArrayStorage<Element> {
+    init()
+    derived count: Int
+    derived isEmpty: Bool
+    function append(element: Element)
+    function element(index: Int) -> Element
+}
+```
+
 ## Notes
 
 - `@core` does not imply that every operation is compiler-implemented.
+- Body omission in an `@core construct` is an explicit declaration that the implementation is provided outside normal Neat source for now.
 - `@core` means the compiler treats the declaration as a plain value type with privileged lowering semantics.
 - Syntax-tree nodes exposed to macros may also be modeled as `@core construct` when they are compiler-recognized structural values.

@@ -3,16 +3,16 @@ import Foundation
 @main
 struct NeatMain {
     static func main() throws {
-        var intSum = 1 + 2
-        var floatSum = 1.5 + 2.0
-        var mixedSum = 1 + 2.5
+        let intSum = 1 + 2
+        let floatSum = 1.5 + 2.0
+        let mixedSum = 1 + 2.5
         let count = 3
-        var incremented = count + 1
-        var lessThan = count < 10
-        var lessOrEqual = count <= 3
-        var greaterThan = 10 > count
-        var greaterOrEqual = count >= 3
+        let incremented = count + 1
+        let lessThan = count < 10
+        let lessOrEqual = count <= 3
+        let greaterThan = 10 > count
+        let greaterOrEqual = count >= 3
         let name = "George"
-        var ordered = name < "Zed"
+        let ordered = name < "Zed"
     }
 }

@@ -1,0 +1,11 @@
+@main {
+    state numbers = [1, 2, 3]
+    numbers.append(element: 4)
+    numbers.update(element: 10, index: 0)
+    numbers.insert(element: 5, index: 1)
+
+    value first = numbers.element(index: 0)
+    value count = numbers.count
+    value empty = numbers.isEmpty
+    value removed = numbers.remove(index: 1)
+}

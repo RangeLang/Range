@@ -1,0 +1,10 @@
+@main {
+    state counts = ["a": 1]
+    counts.updateValue(value: 2, key: "b")
+
+    value hasA = counts.contains(key: "a")
+    value count = counts.count
+    value empty = counts.isEmpty
+    value valueA = counts.value(key: "a")
+    value removed = counts.removeValue(key: "b")
+}

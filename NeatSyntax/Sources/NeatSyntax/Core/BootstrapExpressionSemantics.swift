@@ -22,6 +22,15 @@ public enum BootstrapExpressionSemantics {
             throw ParseError(
                 "Block expressions are not supported in state initializer inference yet.")
         case .identifier(let name):
+            if let type = accessibleTypes[name] {
+                return type
+            }
+            if let memberType = inferKnownMemberIdentifierType(
+                name: name,
+                accessibleTypes: accessibleTypes
+            ) {
+                return .typed(memberType)
+            }
             guard let type = accessibleTypes[name] else {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
@@ -29,6 +38,12 @@ public enum BootstrapExpressionSemantics {
         case .call(let name, let arguments):
             if let returnType = callableReturnTypes[name] {
                 return .typed(returnType)
+            }
+            if let memberType = inferKnownMemberCallType(
+                name: name,
+                accessibleTypes: accessibleTypes
+            ) {
+                return .typed(memberType)
             }
             if let constructorType = try inferKnownConstructorType(
                 name: name,
@@ -471,6 +486,121 @@ public enum BootstrapExpressionSemantics {
             return typeReference
         default:
             return defaultDestinationTypeReference(for: type, resolver: resolver)
+        }
+    }
+
+    private static func inferKnownMemberIdentifierType(
+        name: String,
+        accessibleTypes: [String: BootstrapLiteralType]
+    ) -> TypeReference? {
+        guard let (baseName, memberName) = splitMemberName(name),
+            let baseType = accessibleTypes[baseName],
+            case .typed(let baseReference) = baseType
+        else {
+            return nil
+        }
+
+        switch memberName {
+        case "count":
+            if collectionKind(for: baseReference) != nil {
+                return .named("Int")
+            }
+        case "isEmpty":
+            if collectionKind(for: baseReference) != nil {
+                return .named("Bool")
+            }
+        default:
+            return nil
+        }
+
+        return nil
+    }
+
+    private static func inferKnownMemberCallType(
+        name: String,
+        accessibleTypes: [String: BootstrapLiteralType]
+    ) -> TypeReference? {
+        guard let (baseName, memberName) = splitMemberName(name),
+            let baseType = accessibleTypes[baseName],
+            case .typed(let baseReference) = baseType,
+            let collection = collectionKind(for: baseReference)
+        else {
+            return nil
+        }
+
+        switch (collection, memberName) {
+        case (.array(let element), "append"),
+            (.array(let element), "update"),
+            (.array(let element), "insert"):
+            _ = element
+            return .named("Void")
+        case (.array(let element), "element"),
+            (.array(let element), "remove"):
+            return element
+        case (.array(let element), "first"),
+            (.array(let element), "last"),
+            (.array(let element), "removeLast"):
+            return .optional(element)
+        case (.array(let element), "filter"):
+            return .array(element)
+        case (.dictionary, "updateValue"),
+            (.dictionary, "clear"),
+            (.set, "insert"),
+            (.set, "clear"):
+            return .named("Void")
+        case (.dictionary(_, let value), "value"),
+            (.dictionary(_, let value), "removeValue"):
+            return .optional(value)
+        case (.dictionary, "contains"),
+            (.set, "contains"):
+            return .named("Bool")
+        case (.set(let element), "remove"):
+            return .optional(element)
+        default:
+            return nil
+        }
+    }
+
+    private static func splitMemberName(_ name: String) -> (base: String, member: String)? {
+        guard let dot = name.lastIndex(of: ".") else {
+            return nil
+        }
+
+        let base = String(name[..<dot])
+        let member = String(name[name.index(after: dot)...])
+        guard !base.isEmpty, !member.isEmpty else {
+            return nil
+        }
+
+        return (base, member)
+    }
+
+    private enum KnownCollectionKind {
+        case array(TypeReference)
+        case dictionary(key: TypeReference, value: TypeReference)
+        case set(TypeReference)
+    }
+
+    private static func collectionKind(for type: TypeReference) -> KnownCollectionKind? {
+        switch type {
+        case .array(let element):
+            return .array(element)
+        case .generic(let base, let arguments):
+            guard case .named(let baseName) = base else {
+                return nil
+            }
+            switch (baseName, arguments.count) {
+            case ("Array", 1):
+                return .array(arguments[0])
+            case ("Dictionary", 2):
+                return .dictionary(key: arguments[0], value: arguments[1])
+            case ("Set", 1):
+                return .set(arguments[0])
+            default:
+                return nil
+            }
+        default:
+            return nil
         }
     }
 

@@ -495,6 +495,9 @@ struct SwiftBackendEmitter {
         case .identifier(let name):
             return name
         case .call(let name, let arguments):
+            if let lowered = try emitKnownCollectionCall(name: name, arguments: arguments) {
+                return lowered
+            }
             let rendered = try emitCallArguments(arguments, for: name)
             return "\(name)(\(rendered))"
         case .bindingReference(let name):
@@ -528,6 +531,78 @@ struct SwiftBackendEmitter {
     private func emitCallArguments(_ arguments: [CallArgument], for callee: String) throws -> String
     {
         return try arguments.map(emitCallArgument).joined(separator: ", ")
+    }
+
+    private func emitKnownCollectionCall(name: String, arguments: [CallArgument]) throws -> String? {
+        guard let dot = name.lastIndex(of: ".") else {
+            return nil
+        }
+
+        let base = String(name[..<dot])
+        let member = String(name[name.index(after: dot)...])
+
+        func argument(_ label: String) -> NeatSyntax.Expression? {
+            arguments.first(where: { $0.label == label })?.value
+        }
+
+        switch member {
+        case "append":
+            guard let element = argument("element") else { return nil }
+            return "\(base).append(\(try emitExpression(element)))"
+        case "element":
+            guard let index = argument("index") else { return nil }
+            return "\(base)[\(try emitExpression(index))]"
+        case "update":
+            guard let element = argument("element"), let index = argument("index") else {
+                return nil
+            }
+            return "\(base)[\(try emitExpression(index))] = \(try emitExpression(element))"
+        case "insert":
+            guard let element = argument("element") else { return nil }
+            if let index = argument("index") {
+                return "\(base).insert(\(try emitExpression(element)), at: \(try emitExpression(index)))"
+            }
+            return "\(base).insert(\(try emitExpression(element)))"
+        case "remove":
+            if let index = argument("index") {
+                return "\(base).remove(at: \(try emitExpression(index)))"
+            }
+            guard let element = argument("element") else { return nil }
+            return "\(base).remove(\(try emitExpression(element)))"
+        case "removeLast":
+            guard arguments.isEmpty else { return nil }
+            return "\(base).popLast()"
+        case "clear":
+            guard arguments.isEmpty else { return nil }
+            return "\(base).removeAll()"
+        case "first":
+            guard arguments.isEmpty else { return nil }
+            return "\(base).first"
+        case "last":
+            guard arguments.isEmpty else { return nil }
+            return "\(base).last"
+        case "filter":
+            guard let include = argument("include") else { return nil }
+            return "\(base).filter(\(try emitExpression(include)))"
+        case "value":
+            guard let key = argument("key") else { return nil }
+            return "\(base)[\(try emitExpression(key))]"
+        case "updateValue":
+            guard let value = argument("value"), let key = argument("key") else { return nil }
+            return
+                "\(base).updateValue(\(try emitExpression(value)), forKey: \(try emitExpression(key)))"
+        case "removeValue":
+            guard let key = argument("key") else { return nil }
+            return "\(base).removeValue(forKey: \(try emitExpression(key)))"
+        case "contains":
+            if let key = argument("key") {
+                return "\(base).keys.contains(\(try emitExpression(key)))"
+            }
+            guard let element = argument("element") else { return nil }
+            return "\(base).contains(\(try emitExpression(element)))"
+        default:
+            return nil
+        }
     }
 
     private func emitClosureExpression(_ body: [NeatStatement]) throws -> String {
