@@ -1,1 +1,4 @@
 infix operator ??: NilCoalescingPrecedence
+
+@core
+function ??<Wrapped>(lhs: Optional<Wrapped>, rhs: Wrapped) -> Wrapped

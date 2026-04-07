@@ -693,32 +693,18 @@ public enum BootstrapExpressionSemantics {
             operatorResolver: operatorResolver
         )
 
-        if case .nilLiteral = lhsType {
-            guard let rhsMaterialized = materializedTypeReference(for: rhsType, resolver: resolver)
-            else {
-                throw ParseError(
-                    "Nil-coalescing fallback type could not be inferred from \(rhsType.displayName)."
-                )
-            }
-            return .typed(rhsMaterialized)
+        if let returnType = operatorResolver.binaryOperatorReturnType(
+            symbol: "??",
+            lhs: lhsType,
+            rhs: rhsType,
+            literalBridgeResolver: resolver
+        ) {
+            return .typed(returnType)
         }
 
-        guard let wrappedType = optionalWrappedType(for: lhsType) else {
-            throw ParseError(
-                "Left-hand side of ?? must be optional, got \(lhsType.displayName)."
-            )
-        }
-
-        guard
-            let rhsMaterialized = materializedTypeReference(for: rhsType, resolver: resolver),
-            isCompatibleNamedType(expected: wrappedType, actual: rhsMaterialized)
-        else {
-            throw ParseError(
-                "Nil-coalescing fallback must match \(wrappedType.displayName), got \(rhsType.displayName)."
-            )
-        }
-
-        return .typed(wrappedType)
+        throw ParseError(
+            "Operator '??' has no matching core signature for \(lhsType.displayName) and \(rhsType.displayName)."
+        )
     }
 
     private static func inferEqualityType(
@@ -752,9 +738,6 @@ public enum BootstrapExpressionSemantics {
             operatorResolver: operatorResolver
         )
 
-        if equalityOperandsCompareOptionalNil(lhsType, rhsType) {
-            return .typed(.named("Bool"))
-        }
         if let returnType = operatorResolver.binaryOperatorReturnType(
             symbol: operatorSymbol.rawValue,
             lhs: lhsType,
@@ -870,19 +853,6 @@ public enum BootstrapExpressionSemantics {
             return true
         }
         return isCompatible(actual: type, expected: .named("String"), resolver: resolver)
-    }
-
-    private static func equalityOperandsCompareOptionalNil(
-        _ lhs: BootstrapLiteralType,
-        _ rhs: BootstrapLiteralType
-    ) -> Bool {
-        if case .nilLiteral = lhs {
-            return isOptionalExpressionType(rhs)
-        }
-        if case .nilLiteral = rhs {
-            return isOptionalExpressionType(lhs)
-        }
-        return false
     }
 
     private static func unifyConditionalBranchTypes(

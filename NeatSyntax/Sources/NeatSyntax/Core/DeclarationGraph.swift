@@ -219,6 +219,7 @@ public struct DeclarationOperatorResolver: Sendable {
     public static let empty = DeclarationOperatorResolver(callablesByName: [:])
 
     private struct OperatorSignature: Sendable {
+        var genericParameterNames: Set<String>
         var lhsType: TypeReference
         var rhsType: TypeReference
         var returnType: TypeReference
@@ -237,6 +238,7 @@ public struct DeclarationOperatorResolver: Sendable {
                 }
 
                 return OperatorSignature(
+                    genericParameterNames: Set(callable.genericParameters.map(Self.genericParameterName)),
                     lhsType: lhsParameter,
                     rhsType: rhsParameter,
                     returnType: callable.returnType ?? .named("Void")
@@ -257,15 +259,30 @@ public struct DeclarationOperatorResolver: Sendable {
             return nil
         }
 
-        let matches = signaturesByName[symbol, default: []].filter { signature in
-            typeMatches(lhsType, signature.lhsType)
-                && typeMatches(rhsType, signature.rhsType)
+        let matches: [TypeReference] = signaturesByName[symbol, default: []].compactMap { signature in
+            var bindings: [String: TypeReference] = [:]
+            guard typeMatches(
+                actual: lhsType,
+                expected: signature.lhsType,
+                genericParameterNames: signature.genericParameterNames,
+                bindings: &bindings
+            ),
+                typeMatches(
+                    actual: rhsType,
+                    expected: signature.rhsType,
+                    genericParameterNames: signature.genericParameterNames,
+                    bindings: &bindings
+                )
+            else {
+                return nil
+            }
+            return Self.substitute(signature.returnType, using: bindings)
         }
 
         guard matches.count == 1 else {
             return nil
         }
-        return matches[0].returnType
+        return matches[0]
     }
 
     private func materializedTypeReference(
@@ -276,14 +293,146 @@ public struct DeclarationOperatorResolver: Sendable {
         case .typed(let typeReference):
             return typeReference
         case .nilLiteral:
-            return nil
+            return .named("NilLiteral")
         default:
             return resolver.defaultDestinationType(for: type.displayName)
         }
     }
 
-    private func typeMatches(_ actual: TypeReference, _ expected: TypeReference) -> Bool {
-        actual == expected
+    private func typeMatches(
+        actual: TypeReference,
+        expected: TypeReference,
+        genericParameterNames: Set<String>,
+        bindings: inout [String: TypeReference]
+    ) -> Bool {
+        if case .named(let name) = expected, genericParameterNames.contains(name) {
+            if let existing = bindings[name] {
+                return existing == actual
+            }
+            bindings[name] = actual
+            return true
+        }
+
+        if case .optional(let actualWrapped) = actual,
+            case .generic(.named("Optional"), let expectedArguments) = expected,
+            expectedArguments.count == 1
+        {
+            return typeMatches(
+                actual: actualWrapped,
+                expected: expectedArguments[0],
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+
+        if case .generic(.named("Optional"), let actualArguments) = actual,
+            actualArguments.count == 1,
+            case .optional(let expectedWrapped) = expected
+        {
+            return typeMatches(
+                actual: actualArguments[0],
+                expected: expectedWrapped,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+
+        switch (actual, expected) {
+        case (.named(let actualName), .named(let expectedName)):
+            return actualName == expectedName
+        case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
+            return actualName == expectedName && typeMatches(
+                actual: actualBase,
+                expected: expectedBase,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case (.generic(let actualBase, let actualArguments), .generic(let expectedBase, let expectedArguments)):
+            guard actualArguments.count == expectedArguments.count,
+                typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            else {
+                return false
+            }
+            return zip(actualArguments, expectedArguments).allSatisfy { actualArgument, expectedArgument in
+                typeMatches(
+                    actual: actualArgument,
+                    expected: expectedArgument,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            }
+        case (.array(let actualElement), .array(let expectedElement)),
+            (.optional(let actualElement), .optional(let expectedElement)),
+            (.variadic(let actualElement), .variadic(let expectedElement)):
+            return typeMatches(
+                actual: actualElement,
+                expected: expectedElement,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case (
+            .function(let actualParameters, let actualReturn),
+            .function(let expectedParameters, let expectedReturn)
+        ):
+            guard actualParameters.count == expectedParameters.count else {
+                return false
+            }
+            return zip(actualParameters, expectedParameters).allSatisfy { actualParameter, expectedParameter in
+                typeMatches(
+                    actual: actualParameter,
+                    expected: expectedParameter,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            } && typeMatches(
+                actual: actualReturn,
+                expected: expectedReturn,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        default:
+            return false
+        }
+    }
+
+    private static func genericParameterName(_ parameter: GenericParameter) -> String {
+        switch parameter {
+        case .type(let name, _, _), .value(let name, _, _):
+            return name
+        }
+    }
+
+    private static func substitute(
+        _ type: TypeReference,
+        using substitutions: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return substitutions[name] ?? type
+        case .member(let base, let name):
+            return .member(base: substitute(base, using: substitutions), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: substitute(base, using: substitutions),
+                arguments: arguments.map { substitute($0, using: substitutions) }
+            )
+        case .array(let element):
+            return .array(substitute(element, using: substitutions))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { substitute($0, using: substitutions) },
+                returnType: substitute(returnType, using: substitutions)
+            )
+        case .optional(let wrapped):
+            return .optional(substitute(wrapped, using: substitutions))
+        case .variadic(let element):
+            return .variadic(substitute(element, using: substitutions))
+        }
     }
 }
 

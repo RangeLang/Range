@@ -20,6 +20,12 @@ function ==(lhs: String, rhs: String) -> Bool
 function ==(lhs: Bool, rhs: Bool) -> Bool
 
 @core
+function ==<Wrapped>(lhs: Optional<Wrapped>, rhs: NilLiteral) -> Bool
+
+@core
+function ==<Wrapped>(lhs: NilLiteral, rhs: Optional<Wrapped>) -> Bool
+
+@core
 function !=(lhs: Int, rhs: Int) -> Bool
 
 @core
@@ -36,3 +42,9 @@ function !=(lhs: String, rhs: String) -> Bool
 
 @core
 function !=(lhs: Bool, rhs: Bool) -> Bool
+
+@core
+function !=<Wrapped>(lhs: Optional<Wrapped>, rhs: NilLiteral) -> Bool
+
+@core
+function !=<Wrapped>(lhs: NilLiteral, rhs: Optional<Wrapped>) -> Bool
