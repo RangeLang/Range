@@ -1,0 +1,8 @@
+macro fallbackOne(value _: Optional<Int>): Freestanding<Expression> { target, diagnostics in
+    target.rewrite(value ?? 1)
+}
+
+@main {
+    value maybe: Int? = nil
+    value resolved: Int = #fallbackOne(value: maybe)
+}

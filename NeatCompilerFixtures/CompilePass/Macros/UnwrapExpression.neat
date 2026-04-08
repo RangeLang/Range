@@ -1,0 +1,4 @@
+@main {
+    value maybe: Int? = nil
+    value resolved: Int = #unwrap(value: maybe, fallback: 1)
+}

@@ -243,6 +243,11 @@ public enum BootstrapExpressionSemantics {
         operatorResolver: DeclarationOperatorResolver = .empty
     ) throws -> Bool {
         switch expression {
+        case .freestandingMacro:
+            // Freestanding expression macros expand before semantic validation. In an explicit
+            // context, defer compatibility to the expanded expression instead of rejecting the
+            // use site during bootstrap inference.
+            return true
         case .nilLiteral:
             if case .optional = expected {
                 return true
