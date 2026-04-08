@@ -1,0 +1,7 @@
+macro badStringify(value _: Expression): Freestanding<Expression> { target, diagnostics in
+    target.rewrite("\(value)")
+}
+
+@main {
+    value text = #badStringify(1 + 2)
+}

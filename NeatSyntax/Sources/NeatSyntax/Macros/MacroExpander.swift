@@ -675,7 +675,8 @@ public enum MacroExpander {
                 localName: parameter.localName,
                 externalLabel: parameter.externalLabel,
                 typeReference: rewrittenType,
-                slotName: parameter.slotName
+                slotName: parameter.slotName,
+                capturesSyntax: parameter.capturesSyntax
             )
         }
     }
@@ -1305,10 +1306,25 @@ public enum MacroExpander {
                 )
             }
 
+            if isSyntaxCaptureType(parameter.typeReference) && !parameter.capturesSyntax {
+                throw ParseError(
+                    "Macro #\(macro.name) parameter \(parameter.localName) must use capture \(parameter.typeReference?.displayName ?? "syntax") to bind syntax."
+                )
+            }
+
             bindings[parameter.localName] = argument.value
         }
 
         return bindings
+    }
+
+    static func isSyntaxCaptureType(_ typeReference: TypeReference?) -> Bool {
+        switch typeReference {
+        case .named(let name):
+            return ["Expression", "Statement", "Block", "TypeReference"].contains(name)
+        default:
+            return false
+        }
     }
 
     static func parseMacroArgumentBindings(

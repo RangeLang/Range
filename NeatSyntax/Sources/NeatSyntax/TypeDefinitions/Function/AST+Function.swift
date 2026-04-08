@@ -6,19 +6,22 @@ public struct NeatFunctionParameter {
     public let externalLabel: String?
     public let typeReference: TypeReference?
     public let slotName: String?
+    public let capturesSyntax: Bool
 
     public init(
         macros: [MacroApplication],
         localName: String,
         externalLabel: String?,
         typeReference: TypeReference?,
-        slotName: String?
+        slotName: String?,
+        capturesSyntax: Bool = false
     ) {
         self.macros = macros
         self.localName = localName
         self.externalLabel = externalLabel
         self.typeReference = typeReference
         self.slotName = slotName
+        self.capturesSyntax = capturesSyntax
     }
 
     public var name: String {
@@ -28,6 +31,16 @@ public struct NeatFunctionParameter {
     public var isOptional: Bool {
         guard case .optional = typeReference else { return false }
         return true
+    }
+
+    public var renderedTypeName: String? {
+        guard let typeReference else {
+            return nil
+        }
+        if capturesSyntax {
+            return "capture \(typeReference.displayName)"
+        }
+        return typeReference.displayName
     }
 }
 

@@ -14,6 +14,9 @@ Current bootstrap rules:
 - `Freestanding<Block>` is special-cased to accept an implicit trailing block payload.
 - Extra arguments for block freestanding macros still use `(...)`.
 - `Freestanding<Expression>` is currently call-style.
+- Macro parameters can use `capture T` to request call-site syntax capture for
+  syntax-category types such as `Expression`. Plain `Expression` is not syntax
+  capture.
 - Attached parameter macros are bootstrap-executed from Neat macro bodies through `target.parameter.type.rewrite(...)` and `target.arguments.rewrite(...)`.
 - Attached init macros are intended to be graph-driven: protocol init requirements carry macros, conforming initializers inherit them, and invocation rewriting should consume that carried result.
 - For literal bridging, the canonical form is `#literal<T>` on `init(literal: T)`, where `T` is a compiler-recognized literal carrier type.

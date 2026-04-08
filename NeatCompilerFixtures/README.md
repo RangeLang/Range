@@ -35,6 +35,8 @@ The current macro fixtures cover only the supported bootstrap surface:
 - freestanding expression `#stringify(...)`
 - freestanding expression rewrite through `target.rewrite(...)`, including
   `#unwrap(...)` and a custom macro fixture
+- syntax-category expression macro parameters must use `capture`, for example
+  `value _: capture Expression`
 - known `#variadic` return-validation gap
 
 Move the variadic fixture from `CompileFail` to `CompilePass` when callable

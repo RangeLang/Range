@@ -111,7 +111,9 @@ extension Parser {
         )
     }
 
-    mutating func parseFunctionParameters() throws -> [NeatFunctionParameter] {
+    mutating func parseFunctionParameters(allowSyntaxCapture: Bool = false) throws
+        -> [NeatFunctionParameter]
+    {
         try consume(.leftParen)
 
         var parameters: [NeatFunctionParameter] = []
@@ -125,12 +127,22 @@ extension Parser {
 
                 var typeReference: TypeReference?
                 var slotName: String?
+                var capturesSyntax = false
                 if peek() == .colon {
                     try consume(.colon)
                     if case .atAttribute(let slot, _) = peek() {
                         advance()
                         slotName = slot
                     } else {
+                        if case .identifier(let name) = peek(), name == "capture" {
+                            guard allowSyntaxCapture else {
+                                throw ParseError(
+                                    "capture parameters are only valid in macro declarations."
+                                )
+                            }
+                            advance()
+                            capturesSyntax = true
+                        }
                         typeReference = try parseTypeReferenceNode()
                     }
                 }
@@ -141,7 +153,8 @@ extension Parser {
                         localName: localName,
                         externalLabel: externalLabel,
                         typeReference: typeReference,
-                        slotName: slotName
+                        slotName: slotName,
+                        capturesSyntax: capturesSyntax
                     )
                 )
 
@@ -471,6 +484,7 @@ extension Parser {
             $0.externalLabel == $1.externalLabel
                 && $0.typeReference == $1.typeReference
                 && $0.slotName == $1.slotName
+                && $0.capturesSyntax == $1.capturesSyntax
         }
     }
 
@@ -511,14 +525,14 @@ extension Parser {
     func parameterSignatureKey(_ parameter: NeatFunctionParameter) -> String {
         let label = parameter.externalLabel ?? "_"
         let typeName =
-            parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+            parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
             ?? "_"
         return "\(label):\(typeName)"
     }
 
     func renderParameterSignature(_ parameter: NeatFunctionParameter) -> String {
         let typeName =
-            parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+            parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
             ?? "_"
         if let externalLabel = parameter.externalLabel {
             if externalLabel == parameter.localName {
