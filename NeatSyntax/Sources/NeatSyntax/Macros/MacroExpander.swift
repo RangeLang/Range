@@ -16,6 +16,10 @@ public enum MacroExpander {
         let registry = collectMacros(from: files)
         let declarationGraph = DeclarationGraph(files: files)
         let protocols = declarationGraph.protocolsByName
+        try validateMacroSyntaxCaptures(
+            macros: Array(registry.values),
+            syntaxResolver: declarationGraph.syntaxResolver
+        )
         let attachedParameterCallables = collectAttachedParameterCallables(
             from: files,
             macros: registry
@@ -131,6 +135,29 @@ public enum MacroExpander {
         -> [String: TypeReference]
     {
         collectMacros(from: files).compactMapValues(\.expansionType)
+    }
+
+    static func validateMacroSyntaxCaptures(
+        macros: [MacroDeclaration],
+        syntaxResolver: DeclarationSyntaxResolver
+    ) throws {
+        for macro in macros {
+            for parameter in macro.parameters {
+                guard syntaxResolver.typeConformsToSyntax(parameter.typeReference) else {
+                    if parameter.capturesSyntax {
+                        throw ParseError(
+                            "Macro #\(macro.name) parameter \(parameter.localName) uses capture with non-syntax type \(parameter.typeReference?.displayName ?? "unknown")."
+                        )
+                    }
+                    continue
+                }
+                guard parameter.capturesSyntax else {
+                    throw ParseError(
+                        "Macro #\(macro.name) parameter \(parameter.localName) must use capture \(parameter.typeReference?.displayName ?? "syntax") to bind syntax."
+                    )
+                }
+            }
+        }
     }
 
     static func collectAttachedParameterCallables(
@@ -1312,25 +1339,10 @@ public enum MacroExpander {
                 )
             }
 
-            if isSyntaxCaptureType(parameter.typeReference) && !parameter.capturesSyntax {
-                throw ParseError(
-                    "Macro #\(macro.name) parameter \(parameter.localName) must use capture \(parameter.typeReference?.displayName ?? "syntax") to bind syntax."
-                )
-            }
-
             bindings[parameter.localName] = argument.value
         }
 
         return bindings
-    }
-
-    static func isSyntaxCaptureType(_ typeReference: TypeReference?) -> Bool {
-        switch typeReference {
-        case .named(let name):
-            return ["Expression", "Statement", "Block", "TypeReference"].contains(name)
-        default:
-            return false
-        }
     }
 
     static func parseMacroArgumentBindings(

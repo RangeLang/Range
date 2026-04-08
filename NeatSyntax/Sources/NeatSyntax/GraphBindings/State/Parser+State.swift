@@ -122,7 +122,8 @@ extension Parser {
                 macroExpansionTypes: macroExpansionTypes,
                 resolver: literalBridgeResolver,
                 memberResolver: declarationMemberResolver,
-                operatorResolver: declarationOperatorResolver
+                operatorResolver: declarationOperatorResolver,
+                macroExpansionResolver: declarationMacroExpansionResolver
             ) {
                 return explicitType
             }

@@ -1,3 +1,3 @@
-macro unwrap<T>(value _: Optional<T>, fallback _: T): Freestanding<Expression> { target, diagnostics in
+macro unwrap<T>(value _: Optional<T>, fallback _: T): Freestanding<Expression> -> T { target, diagnostics in
     target.rewrite(value ?? fallback)
 }

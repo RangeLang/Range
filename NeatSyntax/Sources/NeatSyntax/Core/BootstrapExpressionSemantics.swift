@@ -8,7 +8,8 @@ public enum BootstrapExpressionSemantics {
         macroExpansionTypes: [String: TypeReference] = [:],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver = .empty,
-        operatorResolver: DeclarationOperatorResolver = .empty
+        operatorResolver: DeclarationOperatorResolver = .empty,
+        macroExpansionResolver: DeclarationMacroExpansionResolver = .empty
     ) throws -> BootstrapLiteralType {
         switch expression {
         case .integer:
@@ -21,8 +22,18 @@ public enum BootstrapExpressionSemantics {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
-        case .freestandingMacro(let name, _):
-            if let expansionType = macroExpansionTypes[name] {
+        case .freestandingMacro(let name, let arguments):
+            if let expansionType = try inferMacroExpansionType(
+                name: name,
+                arguments: arguments,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                macroExpansionResolver: macroExpansionResolver
+            ) {
                 return .typed(expansionType)
             }
             throw ParseError(
@@ -253,7 +264,8 @@ public enum BootstrapExpressionSemantics {
         macroExpansionTypes: [String: TypeReference] = [:],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver = .empty,
-        operatorResolver: DeclarationOperatorResolver = .empty
+        operatorResolver: DeclarationOperatorResolver = .empty,
+        macroExpansionResolver: DeclarationMacroExpansionResolver = .empty
     ) throws -> Bool {
         switch expression {
         case .freestandingMacro:
@@ -583,6 +595,46 @@ public enum BootstrapExpressionSemantics {
         default:
             return defaultDestinationTypeReference(for: type, resolver: resolver)
         }
+    }
+
+    private static func inferMacroExpansionType(
+        name: String,
+        arguments: [CallArgument],
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        macroExpansionResolver: DeclarationMacroExpansionResolver
+    ) throws -> TypeReference? {
+        if let expansionType = macroExpansionTypes[name], arguments.isEmpty {
+            return expansionType
+        }
+
+        let typedArguments: [DeclarationMacroExpansionArgument] = arguments.map { argument in
+            let inferred = try? inferType(
+                of: argument.value,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                macroExpansionResolver: macroExpansionResolver
+            )
+            return DeclarationMacroExpansionArgument(label: argument.label, type: inferred)
+        }
+
+        if let expansionType = macroExpansionResolver.expansionReturnType(
+            name: name,
+            arguments: typedArguments,
+            literalBridgeResolver: resolver
+        ) {
+            return expansionType
+        }
+
+        return nil
     }
 
     private static func inferKnownMemberIdentifierType(

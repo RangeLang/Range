@@ -14,6 +14,8 @@ Current bootstrap rules:
 - `Freestanding<Block>` is special-cased to accept an implicit trailing block payload.
 - Extra arguments for block freestanding macros still use `(...)`.
 - `Freestanding<Expression>` is currently call-style.
+- Expression macros may declare an expansion result type with `-> T`. Generic
+  result types are resolved from macro argument types where possible.
 - Macro parameters can use `capture T` to request call-site syntax capture for
   syntax-category types such as `Expression`. Plain `Expression` is not syntax
   capture.

@@ -35,6 +35,8 @@ The current macro fixtures cover only the supported bootstrap surface:
 - freestanding expression `#stringify(...)`
 - freestanding expression rewrite through `target.rewrite(...)`, including
   `#unwrap(...)` and a custom macro fixture
+- generic expression macro result substitution, for example
+  `#unwrap<T>(...) -> T` inferring the expanded expression result type
 - syntax-category expression macro parameters must use `capture`, for example
   `value _: capture Expression`
 - known `#variadic` return-validation gap

@@ -1,0 +1,7 @@
+macro badCapture(value _: capture String): Freestanding<Expression> { target, diagnostics in
+    target.rewrite(value)
+}
+
+@main {
+    value text: String = #badCapture("hello")
+}

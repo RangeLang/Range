@@ -180,6 +180,7 @@ public struct Parser {
     var literalBridgeResolver: LiteralBridgeResolver
     var declarationMemberResolver: DeclarationMemberResolver
     var declarationOperatorResolver: DeclarationOperatorResolver
+    var declarationMacroExpansionResolver: DeclarationMacroExpansionResolver
     var macroExpansionTypes: [String: TypeReference] = [:]
 
     public init(
@@ -187,6 +188,7 @@ public struct Parser {
         literalBridgeResolver: LiteralBridgeResolver = .empty,
         declarationMemberResolver: DeclarationMemberResolver = .empty,
         declarationOperatorResolver: DeclarationOperatorResolver = .empty,
+        declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
         macroExpansionTypes: [String: TypeReference] = [:]
     ) throws {
         var lexer = Lexer(source: source)
@@ -195,6 +197,7 @@ public struct Parser {
         self.literalBridgeResolver = literalBridgeResolver
         self.declarationMemberResolver = declarationMemberResolver
         self.declarationOperatorResolver = declarationOperatorResolver
+        self.declarationMacroExpansionResolver = declarationMacroExpansionResolver
         self.macroExpansionTypes = macroExpansionTypes
     }
 

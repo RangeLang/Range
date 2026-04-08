@@ -81,6 +81,9 @@ public struct CompilerPipeline {
         let coreResolver = coreGraph.literalBridgeResolver
         let coreMemberResolver = coreGraph.memberResolver
         let coreOperatorResolver = coreGraph.operatorResolver
+        let coreMacroExpansionResolver = DeclarationMacroExpansionResolver(
+            macrosByName: MacroExpander.collectMacros(from: parsedCoreFiles)
+        )
         let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
             from: parsedCoreFiles
         )
@@ -89,6 +92,7 @@ public struct CompilerPipeline {
             literalBridgeResolver: coreResolver,
             declarationMemberResolver: coreMemberResolver,
             declarationOperatorResolver: coreOperatorResolver,
+            declarationMacroExpansionResolver: coreMacroExpansionResolver,
             macroExpansionTypes: coreMacroExpansionTypes
         )
 
@@ -120,6 +124,7 @@ public struct CompilerPipeline {
         literalBridgeResolver: LiteralBridgeResolver,
         declarationMemberResolver: DeclarationMemberResolver,
         declarationOperatorResolver: DeclarationOperatorResolver,
+        declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
         macroExpansionTypes: [String: TypeReference] = [:]
     ) throws -> [ParsedSourceFile] {
         try inputs.map { input in
@@ -128,6 +133,7 @@ public struct CompilerPipeline {
                 literalBridgeResolver: literalBridgeResolver,
                 declarationMemberResolver: declarationMemberResolver,
                 declarationOperatorResolver: declarationOperatorResolver,
+                declarationMacroExpansionResolver: declarationMacroExpansionResolver,
                 macroExpansionTypes: macroExpansionTypes
             )
             return ParsedSourceFile(

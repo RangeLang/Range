@@ -48,6 +48,13 @@ public struct DeclarationGraph {
         DeclarationOperatorResolver(callablesByName: callablesByName)
     }
 
+    public var syntaxResolver: DeclarationSyntaxResolver {
+        DeclarationSyntaxResolver(
+            protocolsByName: protocolsByName,
+            constructsByName: constructsByName
+        )
+    }
+
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
         var registry: [String: ProtocolDeclaration] = [:]
         for parsedFile in files {
@@ -212,6 +219,342 @@ public struct DeclarationGraph {
                     && $0.typeReference == $1.typeReference
                     && $0.slotName == $1.slotName
             })
+    }
+}
+
+public struct DeclarationSyntaxResolver {
+    private let protocolsByName: [String: ProtocolDeclaration]
+    private let constructsByName: [String: ConstructDeclaration]
+
+    public init(
+        protocolsByName: [String: ProtocolDeclaration],
+        constructsByName: [String: ConstructDeclaration]
+    ) {
+        self.protocolsByName = protocolsByName
+        self.constructsByName = constructsByName
+    }
+
+    public func typeConformsToSyntax(_ typeReference: TypeReference?) -> Bool {
+        guard let typeName = nominalName(of: typeReference) else {
+            return false
+        }
+        return declaration(named: typeName, conformsTo: "Syntax", visited: [])
+    }
+
+    private func declaration(
+        named name: String,
+        conformsTo targetProtocol: String,
+        visited: Set<String>
+    ) -> Bool {
+        if name == targetProtocol {
+            return true
+        }
+        if visited.contains(name) {
+            return false
+        }
+        var nextVisited = visited
+        nextVisited.insert(name)
+
+        if let protocolDeclaration = protocolsByName[name] {
+            return protocolDeclaration.conformances.contains {
+                conformance in
+                guard let conformanceName = nominalName(of: conformance) else {
+                    return false
+                }
+                return declaration(
+                    named: conformanceName,
+                    conformsTo: targetProtocol,
+                    visited: nextVisited
+                )
+            }
+        }
+
+        if let constructDeclaration = constructsByName[name] {
+            return constructDeclaration.conformances.contains {
+                conformance in
+                guard let conformanceName = nominalName(of: conformance) else {
+                    return false
+                }
+                return declaration(
+                    named: conformanceName,
+                    conformsTo: targetProtocol,
+                    visited: nextVisited
+                )
+            }
+        }
+
+        return false
+    }
+
+    private func nominalName(of typeReference: TypeReference?) -> String? {
+        guard let typeReference else {
+            return nil
+        }
+        switch typeReference {
+        case .named(let name):
+            return name
+        case .generic(let base, _):
+            return nominalName(of: base)
+        case .member(_, let name):
+            return name
+        case .array, .function, .optional, .variadic:
+            return nil
+        }
+    }
+}
+
+public struct DeclarationMacroExpansionArgument: Sendable {
+    public let label: String?
+    public let type: BootstrapLiteralType?
+
+    public init(label: String?, type: BootstrapLiteralType?) {
+        self.label = label
+        self.type = type
+    }
+}
+
+public struct DeclarationMacroExpansionResolver: Sendable {
+    public static let empty = DeclarationMacroExpansionResolver(macrosByName: [:])
+
+    private struct MacroExpansionParameter: Sendable {
+        var localName: String
+        var externalLabel: String?
+        var typeReference: TypeReference?
+        var capturesSyntax: Bool
+    }
+
+    private struct MacroExpansionSignature: Sendable {
+        var genericParameterNames: Set<String>
+        var parameters: [MacroExpansionParameter]
+        var returnType: TypeReference
+    }
+
+    private let signaturesByName: [String: [MacroExpansionSignature]]
+
+    public init(macrosByName: [String: MacroDeclaration]) {
+        self.signaturesByName = macrosByName.mapValues { macro in
+            guard let expansionType = macro.expansionType else {
+                return []
+            }
+            return [
+                MacroExpansionSignature(
+                    genericParameterNames: Set(macro.genericParameters),
+                    parameters: macro.parameters.map {
+                        MacroExpansionParameter(
+                            localName: $0.localName,
+                            externalLabel: $0.externalLabel,
+                            typeReference: $0.typeReference,
+                            capturesSyntax: $0.capturesSyntax
+                        )
+                    },
+                    returnType: expansionType
+                )
+            ]
+        }
+    }
+
+    public func expansionReturnType(
+        name: String,
+        arguments: [DeclarationMacroExpansionArgument],
+        literalBridgeResolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        let matches: [TypeReference] = signaturesByName[name, default: []].compactMap { signature in
+            guard signature.parameters.count == arguments.count else {
+                return nil
+            }
+
+            var bindings: [String: TypeReference] = [:]
+            for (parameter, argument) in zip(signature.parameters, arguments) {
+                guard argumentLabel(argument.label, matches: parameter) else {
+                    return nil
+                }
+                if parameter.capturesSyntax {
+                    continue
+                }
+                guard let expectedType = parameter.typeReference else {
+                    continue
+                }
+                guard let actual = argument.type,
+                    let actualType = materializedTypeReference(
+                        for: actual,
+                        resolver: literalBridgeResolver
+                    )
+                else {
+                    return nil
+                }
+                guard typeMatches(
+                    actual: actualType,
+                    expected: expectedType,
+                    genericParameterNames: signature.genericParameterNames,
+                    bindings: &bindings
+                ) else {
+                    return nil
+                }
+            }
+
+            return Self.substitute(signature.returnType, using: bindings)
+        }
+
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
+    }
+
+    private func argumentLabel(_ actualLabel: String?, matches parameter: MacroExpansionParameter)
+        -> Bool
+    {
+        guard let actualLabel else {
+            return true
+        }
+        let expectedLabel = parameter.externalLabel ?? parameter.localName
+        return actualLabel == expectedLabel
+    }
+
+    private func materializedTypeReference(
+        for type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        switch type {
+        case .typed(let typeReference):
+            return typeReference
+        case .nilLiteral:
+            return .named("NilLiteral")
+        default:
+            return resolver.defaultDestinationType(for: type.displayName)
+        }
+    }
+
+    private func typeMatches(
+        actual: TypeReference,
+        expected: TypeReference,
+        genericParameterNames: Set<String>,
+        bindings: inout [String: TypeReference]
+    ) -> Bool {
+        if case .named(let name) = expected, genericParameterNames.contains(name) {
+            if let existing = bindings[name] {
+                return existing == actual
+            }
+            bindings[name] = actual
+            return true
+        }
+
+        if case .optional(let actualWrapped) = actual,
+            case .generic(.named("Optional"), let expectedArguments) = expected,
+            expectedArguments.count == 1
+        {
+            return typeMatches(
+                actual: actualWrapped,
+                expected: expectedArguments[0],
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+
+        if case .generic(.named("Optional"), let actualArguments) = actual,
+            actualArguments.count == 1,
+            case .optional(let expectedWrapped) = expected
+        {
+            return typeMatches(
+                actual: actualArguments[0],
+                expected: expectedWrapped,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+
+        switch (actual, expected) {
+        case (.named(let actualName), .named(let expectedName)):
+            return actualName == expectedName
+        case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
+            return actualName == expectedName && typeMatches(
+                actual: actualBase,
+                expected: expectedBase,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case (
+            .generic(let actualBase, let actualArguments),
+            .generic(let expectedBase, let expectedArguments)
+        ):
+            guard actualArguments.count == expectedArguments.count,
+                typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            else {
+                return false
+            }
+            return zip(actualArguments, expectedArguments).allSatisfy { actualArgument, expectedArgument in
+                typeMatches(
+                    actual: actualArgument,
+                    expected: expectedArgument,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            }
+        case (.array(let actualElement), .array(let expectedElement)),
+            (.optional(let actualElement), .optional(let expectedElement)),
+            (.variadic(let actualElement), .variadic(let expectedElement)):
+            return typeMatches(
+                actual: actualElement,
+                expected: expectedElement,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case (
+            .function(let actualParameters, let actualReturn),
+            .function(let expectedParameters, let expectedReturn)
+        ):
+            guard actualParameters.count == expectedParameters.count else {
+                return false
+            }
+            return zip(actualParameters, expectedParameters).allSatisfy { actualParameter, expectedParameter in
+                typeMatches(
+                    actual: actualParameter,
+                    expected: expectedParameter,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            } && typeMatches(
+                actual: actualReturn,
+                expected: expectedReturn,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        default:
+            return false
+        }
+    }
+
+    private static func substitute(
+        _ type: TypeReference,
+        using substitutions: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return substitutions[name] ?? type
+        case .member(let base, let name):
+            return .member(base: substitute(base, using: substitutions), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: substitute(base, using: substitutions),
+                arguments: arguments.map { substitute($0, using: substitutions) }
+            )
+        case .array(let element):
+            return .array(substitute(element, using: substitutions))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { substitute($0, using: substitutions) },
+                returnType: substitute(returnType, using: substitutions)
+            )
+        case .optional(let wrapped):
+            return .optional(substitute(wrapped, using: substitutions))
+        case .variadic(let element):
+            return .variadic(substitute(element, using: substitutions))
+        }
     }
 }
 
