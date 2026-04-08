@@ -1,0 +1,7 @@
+macro captureText(value _: capture Expression): Freestanding<Expression> -> String { target, diagnostics in
+    target.rewrite("captured: \(value)")
+}
+
+@main {
+    value text: String = #captureText(1 + 2)
+}
