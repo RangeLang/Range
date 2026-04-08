@@ -19,9 +19,6 @@ extension Parser {
     {
         let macros = try parseMacroApplicationsIfPresent()
         let attribute = parseAttributeIfPresent(before: .protocolDefinition)
-        if attribute?.name == "core" {
-            throw ParseError("@core can only be applied to construct declarations.")
-        }
 
         try consumeKeyword(.protocolDefinition)
         let name = try consumeTypeName()

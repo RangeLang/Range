@@ -52,6 +52,7 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 - `@core construct` is compiler-recognized, non-identity-bearing, and intended for plain structural/bootstrap data.
 - Members inside an `@core construct` may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how semantic boundary types such as `ArrayStorage`, `DictionaryStorage`, `SetStorage`, and scalar storage types describe operations whose implementation is not written in Neat yet.
 - Top-level `@core function` declarations may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how primitive operator signatures can live in `NeatCore` without recursively implementing themselves in Neat.
+- `@core protocol` declarations define compiler-recognized semantic categories. `@core` does not cascade through protocol conformance; each core declaration must be explicitly marked.
 - The memory graph is foundational and always generated.
 - Reactivity is an optional exposed layer derived from the memory graph, not a separate base system.
 - Literal bridging currently uses `#literal<T>` on protocol initializer requirements plus literal carrier types.

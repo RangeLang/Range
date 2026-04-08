@@ -1,3 +1,3 @@
-protocol Expression: Statement, FreestandingMacroTarget, SupportsRewrite<Expression> {
+protocol Expression: Syntax, Statement, FreestandingMacroTarget, SupportsRewrite<Expression> {
     value type: TypeReference?
 }

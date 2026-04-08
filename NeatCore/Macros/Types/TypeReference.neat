@@ -1,2 +1,2 @@
 @core
-construct TypeReference: SupportsRewrite<TypeReference> { }
+construct TypeReference: Syntax, SupportsRewrite<TypeReference> { }

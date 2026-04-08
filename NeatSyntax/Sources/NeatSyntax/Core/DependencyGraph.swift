@@ -1111,7 +1111,8 @@ private struct GraphCollector {
 
     private mutating func addProtocol(_ declaration: ProtocolDeclaration, parentID: String) {
         let protocolID = "\(parentID)/protocol:\(declaration.name)"
-        addNode(id: protocolID, kind: .protocolDefinition, label: declaration.name)
+        let label = declaration.isCore ? "@core \(declaration.name)" : declaration.name
+        addNode(id: protocolID, kind: .protocolDefinition, label: label)
         registerDeclaration(name: declaration.name, nodeID: protocolID)
         addEdge(from: parentID, to: protocolID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: protocolID)

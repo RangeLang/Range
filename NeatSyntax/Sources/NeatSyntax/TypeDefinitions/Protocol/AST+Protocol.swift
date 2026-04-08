@@ -7,4 +7,8 @@ public struct ProtocolDeclaration {
     public let genericParameters: [GenericParameter]
     public let conformances: [TypeReference]
     public let initializers: [InitializerDeclaration]
+
+    public var isCore: Bool {
+        attribute?.name == "core"
+    }
 }
