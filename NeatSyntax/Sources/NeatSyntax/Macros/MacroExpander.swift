@@ -127,6 +127,12 @@ public enum MacroExpander {
         return registry
     }
 
+    public static func collectMacroExpansionTypes(from files: [ParsedSourceFile])
+        -> [String: TypeReference]
+    {
+        collectMacros(from: files).compactMapValues(\.expansionType)
+    }
+
     static func collectAttachedParameterCallables(
         from files: [ParsedSourceFile],
         macros: [String: MacroDeclaration]

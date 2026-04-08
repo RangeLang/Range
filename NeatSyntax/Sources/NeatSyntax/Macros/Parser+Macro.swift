@@ -15,6 +15,13 @@ extension Parser {
 
         try consume(.colon)
         let target = try parseMacroTarget()
+        let expansionType: TypeReference?
+        if peek() == .arrow {
+            try consume(.arrow)
+            expansionType = try parseTypeReferenceNode()
+        } else {
+            expansionType = nil
+        }
         let (bindings, body) = try parseMacroBody()
 
         return MacroDeclaration(
@@ -22,6 +29,7 @@ extension Parser {
             genericParameters: genericParameters,
             parameters: parameters,
             target: target,
+            expansionType: expansionType,
             bindings: bindings,
             body: body
         )

@@ -5,6 +5,7 @@ public enum BootstrapExpressionSemantics {
         of expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference] = [:],
+        macroExpansionTypes: [String: TypeReference] = [:],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver = .empty,
         operatorResolver: DeclarationOperatorResolver = .empty
@@ -20,9 +21,10 @@ public enum BootstrapExpressionSemantics {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
-        case .freestandingMacro(let name, _) where name == "stringify":
-            return .stringLiteral
         case .freestandingMacro(let name, _):
+            if let expansionType = macroExpansionTypes[name] {
+                return .typed(expansionType)
+            }
             throw ParseError(
                 "Freestanding expression macro #\(name) must be expanded before inference."
             )
@@ -60,6 +62,7 @@ public enum BootstrapExpressionSemantics {
                 arguments: arguments,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -76,6 +79,7 @@ public enum BootstrapExpressionSemantics {
                 elements: elements,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -85,6 +89,7 @@ public enum BootstrapExpressionSemantics {
                 elements: elements,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -94,6 +99,7 @@ public enum BootstrapExpressionSemantics {
                 of: condition,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -107,6 +113,7 @@ public enum BootstrapExpressionSemantics {
                 of: trueExpression,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -115,6 +122,7 @@ public enum BootstrapExpressionSemantics {
                 of: falseExpression,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -142,6 +150,7 @@ public enum BootstrapExpressionSemantics {
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -151,6 +160,7 @@ public enum BootstrapExpressionSemantics {
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -160,6 +170,7 @@ public enum BootstrapExpressionSemantics {
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -169,6 +180,7 @@ public enum BootstrapExpressionSemantics {
                     expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -238,6 +250,7 @@ public enum BootstrapExpressionSemantics {
         expected: TypeReference,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference] = [:],
+        macroExpansionTypes: [String: TypeReference] = [:],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver = .empty,
         operatorResolver: DeclarationOperatorResolver = .empty
@@ -259,6 +272,7 @@ public enum BootstrapExpressionSemantics {
                     of: expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -272,6 +286,7 @@ public enum BootstrapExpressionSemantics {
                     expected: expectedElementType,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -284,6 +299,7 @@ public enum BootstrapExpressionSemantics {
                     of: expression,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -297,6 +313,7 @@ public enum BootstrapExpressionSemantics {
                     expected: expectedKeyType,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -305,6 +322,7 @@ public enum BootstrapExpressionSemantics {
                     expected: expectedValueType,
                     accessibleTypes: accessibleTypes,
                     callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
@@ -318,6 +336,7 @@ public enum BootstrapExpressionSemantics {
                 of: expression,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -328,6 +347,7 @@ public enum BootstrapExpressionSemantics {
                 of: expression,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -403,6 +423,7 @@ public enum BootstrapExpressionSemantics {
         elements: [Expression],
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -415,6 +436,7 @@ public enum BootstrapExpressionSemantics {
             of: first,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -425,6 +447,7 @@ public enum BootstrapExpressionSemantics {
                 of: element,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -444,6 +467,7 @@ public enum BootstrapExpressionSemantics {
         elements: [DictionaryElement],
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -456,6 +480,7 @@ public enum BootstrapExpressionSemantics {
             of: first.key,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -464,6 +489,7 @@ public enum BootstrapExpressionSemantics {
             of: first.value,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -474,6 +500,7 @@ public enum BootstrapExpressionSemantics {
                 of: element.key,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -484,6 +511,7 @@ public enum BootstrapExpressionSemantics {
                 of: element.value,
                 accessibleTypes: accessibleTypes,
                 callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
@@ -609,6 +637,7 @@ public enum BootstrapExpressionSemantics {
         arguments: [CallArgument],
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -624,6 +653,7 @@ public enum BootstrapExpressionSemantics {
             of: arguments[0].value,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -680,6 +710,7 @@ public enum BootstrapExpressionSemantics {
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -692,6 +723,7 @@ public enum BootstrapExpressionSemantics {
             of: lhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -700,6 +732,7 @@ public enum BootstrapExpressionSemantics {
             of: rhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -723,6 +756,7 @@ public enum BootstrapExpressionSemantics {
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -737,6 +771,7 @@ public enum BootstrapExpressionSemantics {
             of: lhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -745,6 +780,7 @@ public enum BootstrapExpressionSemantics {
             of: rhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -768,6 +804,7 @@ public enum BootstrapExpressionSemantics {
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -784,6 +821,7 @@ public enum BootstrapExpressionSemantics {
             of: lhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -792,6 +830,7 @@ public enum BootstrapExpressionSemantics {
             of: rhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -815,6 +854,7 @@ public enum BootstrapExpressionSemantics {
         _ expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],
         callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -830,6 +870,7 @@ public enum BootstrapExpressionSemantics {
             of: lhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver
@@ -838,6 +879,7 @@ public enum BootstrapExpressionSemantics {
             of: rhs,
             accessibleTypes: accessibleTypes,
             callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver

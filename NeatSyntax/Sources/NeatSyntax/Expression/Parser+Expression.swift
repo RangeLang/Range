@@ -353,6 +353,7 @@ extension Parser {
             of: expression,
             accessibleTypes: bootstrapAccessibleTypes,
             callableReturnTypes: currentCallableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
             resolver: literalBridgeResolver,
             memberResolver: declarationMemberResolver,
             operatorResolver: declarationOperatorResolver

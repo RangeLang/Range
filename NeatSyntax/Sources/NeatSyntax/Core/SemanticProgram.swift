@@ -81,11 +81,15 @@ public struct CompilerPipeline {
         let coreResolver = coreGraph.literalBridgeResolver
         let coreMemberResolver = coreGraph.memberResolver
         let coreOperatorResolver = coreGraph.operatorResolver
+        let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
+            from: parsedCoreFiles
+        )
         let parsedProjectFiles = try parse(
             inputs: projectInputs,
             literalBridgeResolver: coreResolver,
             declarationMemberResolver: coreMemberResolver,
-            declarationOperatorResolver: coreOperatorResolver
+            declarationOperatorResolver: coreOperatorResolver,
+            macroExpansionTypes: coreMacroExpansionTypes
         )
 
         let parsedFiles = parsedCoreFiles + parsedProjectFiles
@@ -115,14 +119,16 @@ public struct CompilerPipeline {
         inputs: [SourceInput],
         literalBridgeResolver: LiteralBridgeResolver,
         declarationMemberResolver: DeclarationMemberResolver,
-        declarationOperatorResolver: DeclarationOperatorResolver
+        declarationOperatorResolver: DeclarationOperatorResolver,
+        macroExpansionTypes: [String: TypeReference] = [:]
     ) throws -> [ParsedSourceFile] {
         try inputs.map { input in
             var parser = try Parser(
                 source: input.source,
                 literalBridgeResolver: literalBridgeResolver,
                 declarationMemberResolver: declarationMemberResolver,
-                declarationOperatorResolver: declarationOperatorResolver
+                declarationOperatorResolver: declarationOperatorResolver,
+                macroExpansionTypes: macroExpansionTypes
             )
             return ParsedSourceFile(
                 path: input.path,

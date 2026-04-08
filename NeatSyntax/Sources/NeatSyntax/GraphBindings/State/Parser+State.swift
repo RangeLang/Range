@@ -119,6 +119,7 @@ extension Parser {
                 expected: explicitType,
                 accessibleTypes: accessibleTypes.mapValues(BootstrapLiteralType.typed),
                 callableReturnTypes: currentCallableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
                 resolver: literalBridgeResolver,
                 memberResolver: declarationMemberResolver,
                 operatorResolver: declarationOperatorResolver

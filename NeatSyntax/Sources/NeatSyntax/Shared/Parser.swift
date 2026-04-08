@@ -180,12 +180,14 @@ public struct Parser {
     var literalBridgeResolver: LiteralBridgeResolver
     var declarationMemberResolver: DeclarationMemberResolver
     var declarationOperatorResolver: DeclarationOperatorResolver
+    var macroExpansionTypes: [String: TypeReference] = [:]
 
     public init(
         source: String,
         literalBridgeResolver: LiteralBridgeResolver = .empty,
         declarationMemberResolver: DeclarationMemberResolver = .empty,
-        declarationOperatorResolver: DeclarationOperatorResolver = .empty
+        declarationOperatorResolver: DeclarationOperatorResolver = .empty,
+        macroExpansionTypes: [String: TypeReference] = [:]
     ) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
@@ -193,6 +195,7 @@ public struct Parser {
         self.literalBridgeResolver = literalBridgeResolver
         self.declarationMemberResolver = declarationMemberResolver
         self.declarationOperatorResolver = declarationOperatorResolver
+        self.macroExpansionTypes = macroExpansionTypes
     }
 
     func isCurrentExpressionTerminator(_ token: Token) -> Bool {

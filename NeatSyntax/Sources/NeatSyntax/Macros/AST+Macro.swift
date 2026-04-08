@@ -5,6 +5,7 @@ public struct MacroDeclaration {
     public let genericParameters: [String]
     public let parameters: [NeatFunctionParameter]
     public let target: MacroTarget
+    public let expansionType: TypeReference?
     public let bindings: MacroBindings
     public let body: [Statement]
 }
