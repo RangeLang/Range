@@ -1,8 +1,10 @@
 const PREC = {
-  member: 8,
-  call: 7,
-  modifier: 6,
-  unary: 5,
+  member: 10,
+  call: 9,
+  modifier: 8,
+  unary: 7,
+  multiplicative: 6,
+  additive: 5,
   comparison: 4,
   logical: 3,
   nil_coalescing: 2,
@@ -22,6 +24,15 @@ module.exports = grammar({
     [$.callable_declaration, $.expression],
     [$.callable_declaration],
     [$.derived_declaration],
+    [
+      $.protocol_declaration,
+      $.sigiled_declaration,
+      $.callable_declaration,
+      $.extension_declaration,
+      $.enum_declaration,
+      $.variable_declaration,
+      $.expression,
+    ],
   ],
 
   rules: {
@@ -33,6 +44,8 @@ module.exports = grammar({
         $.macro_declaration,
         $.builder_declaration,
         $.sigiled_declaration,
+        $.precedence_group_declaration,
+        $.operator_declaration,
         $.builder_hook_declaration,
         $.callable_declaration,
         $.derived_declaration,
@@ -46,12 +59,12 @@ module.exports = grammar({
     main_block: ($) => seq("@", "main", field("body", $.block)),
 
     macro_application: ($) =>
-      seq(
+      prec.right(seq(
         field("sigil", "#"),
         field("name", $.identifier),
         optional(field("generics", $.generic_argument_clause)),
         optional(field("arguments", $.argument_clause)),
-      ),
+      )),
 
     attribute_application: ($) =>
       seq(
@@ -68,6 +81,7 @@ module.exports = grammar({
         optional(field("parameters", $.callable_parameter_clause)),
         ":",
         field("target", $.macro_target),
+        optional(seq("->", field("expansion_type", $.type))),
         field("body", $.macro_body),
       ),
 
@@ -80,7 +94,12 @@ module.exports = grammar({
       ),
 
     macro_body: ($) =>
-      seq("{", field("bindings", $.macro_bindings), repeat($.statement), "}"),
+      seq(
+        "{",
+        field("bindings", $.macro_bindings),
+        repeat(choice($.declaration, $.statement, $.assignment, $.expression)),
+        "}",
+      ),
 
     macro_bindings: ($) =>
       seq(
@@ -124,21 +143,57 @@ module.exports = grammar({
       choice(
         prec.right(
           seq(
+            repeat(field("macro", $.macro_application)),
+            optional(field("attribute", $.attribute_application)),
             optional(field("receiver", $.type_identifier)),
             "function",
-            field("name", $.identifier),
+            field("name", $.callable_name),
+            optional(field("generics", $.generic_parameter_clause)),
             field("parameters", $.callable_parameter_clause),
             optional(seq("->", field("return_type", $.type))),
             field("body", $.block),
           ),
         ),
         seq(
+          repeat(field("macro", $.macro_application)),
+          optional(field("attribute", $.attribute_application)),
           optional(field("receiver", $.type_identifier)),
           "function",
-          field("name", $.identifier),
+          field("name", $.callable_name),
+          optional(field("generics", $.generic_parameter_clause)),
           field("parameters", $.callable_parameter_clause),
           optional(seq("->", field("return_type", $.type))),
         ),
+      ),
+
+    callable_name: ($) => choice($.identifier, $.callable_operator_symbol),
+
+    precedence_group_declaration: ($) =>
+      seq(
+        "precedencegroup",
+        field("name", $.type_identifier),
+        field("body", $.precedence_group_body),
+      ),
+
+    precedence_group_body: ($) =>
+      seq(
+        "{",
+        repeat(
+          choice(
+            seq("associativity", ":", choice("left", "right", "none")),
+            seq(choice("higherThan", "lowerThan"), ":", commaSep1($.type_identifier)),
+            seq("assignment", ":", $.boolean_literal),
+          ),
+        ),
+        "}",
+      ),
+
+    operator_declaration: ($) =>
+      seq(
+        field("fixity", choice("prefix", "infix", "postfix")),
+        "operator",
+        field("symbol", $.operator_symbol),
+        optional(seq(":", field("precedence", $.type_identifier))),
       ),
 
     derived_declaration: ($) =>
@@ -278,17 +333,19 @@ module.exports = grammar({
             field("external_name", $.identifier),
             field("name", $.identifier),
             ":",
-            field("type", choice($.type, $.slot_type)),
+            field("type", choice($.capture_type, $.type, $.slot_type)),
           ),
           seq(
             field("name", $.identifier),
             ":",
-            field("type", choice($.type, $.slot_type)),
+            field("type", choice($.capture_type, $.type, $.slot_type)),
           ),
-          field("type", $.type),
+          field("type", choice($.capture_type, $.type)),
         ),
         optional(seq("=", field("default_value", $.expression))),
       ),
+
+    capture_type: ($) => seq("capture", field("captured", $.type)),
 
     slot_type: ($) => seq("@", field("slot", $.identifier)),
 
@@ -472,6 +529,7 @@ module.exports = grammar({
 
     expression: ($) =>
       choice(
+        $.macro_application,
         $.call_expression,
         $.modifier_call,
         $.member_expression,
@@ -492,6 +550,22 @@ module.exports = grammar({
 
     binary_expression: ($) =>
       choice(
+        prec.left(
+          PREC.multiplicative,
+          seq(
+            field("left", $.expression),
+            field("operator", choice("*", "/", "%")),
+            field("right", $.expression),
+          ),
+        ),
+        prec.left(
+          PREC.additive,
+          seq(
+            field("left", $.expression),
+            field("operator", choice("+", "-")),
+            field("right", $.expression),
+          ),
+        ),
         prec.left(
           PREC.comparison,
           seq(
@@ -621,6 +695,10 @@ module.exports = grammar({
     boolean_literal: (_) => choice("true", "false"),
 
     nil_literal: (_) => "nil",
+
+    callable_operator_symbol: (_) => token(/[!%&*+\-./=>?^|~]+/),
+
+    operator_symbol: (_) => token(/[!%&*+\-./<=>?^|~]+/),
 
     identifier: (_) =>
       token(choice(/[a-z_][A-Za-z0-9_]*/, /`[A-Za-z_][A-Za-z0-9_]*`/)),

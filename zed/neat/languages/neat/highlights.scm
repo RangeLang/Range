@@ -6,7 +6,7 @@
 ; When syntax is incomplete, tree-sitter can fall back to plain identifiers
 ; inside ERROR nodes. Keep core keywords colored by text anyway.
 ((identifier) @keyword
- (#match? @keyword "^(construct|enum|case|extension|macro|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|get|set|on|builder)$"))
+ (#match? @keyword "^(construct|enum|case|extension|macro|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|get|set|on|builder|capture|precedencegroup|prefix|infix|postfix|operator)$"))
 
 ((identifier) @keyword
  (#match? @keyword "^(core|main)$"))
@@ -15,6 +15,8 @@
 
 (break_statement) @keyword.control
 (continue_statement) @keyword.control
+(return_statement
+  "return" @keyword.control)
 
 ; ── @main entry point ────────────────────────────────────────────────────────
 (main_block
@@ -23,6 +25,13 @@
 
 (macro_declaration
   "macro" @keyword)
+
+(macro_bindings
+  "in" @keyword)
+
+(macro_application
+  sigil: "#" @type
+  name: (identifier) @type)
 
 ; ── Builder sigils ───────────────────────────────────────────────────────────
 (builder_declaration
@@ -51,15 +60,41 @@
 
 (macro_declaration
   target: (macro_target
-    kind: _ @keyword
+    kind: _ @type
     type: (_) @type))
+
+(macro_declaration
+  "->" @operator
+  expansion_type: (_) @type)
 
 (builder_declaration
   name: (type_identifier) @type.definition)
 
 (callable_declaration
   "function" @keyword
-  name: (identifier) @function.method)
+  name: (callable_name
+    (identifier) @function.method))
+
+(callable_declaration
+  "function" @keyword
+  name: (callable_name
+    (callable_operator_symbol) @operator))
+
+(precedence_group_declaration
+  "precedencegroup" @keyword
+  name: (type_identifier) @type.definition)
+
+(operator_declaration
+  [
+    "prefix"
+    "infix"
+    "postfix"
+  ] @keyword
+  "operator" @keyword
+  symbol: (operator_symbol) @operator)
+
+(operator_declaration
+  precedence: (type_identifier) @type)
 
 (builder_hook_declaration
   hook: [
@@ -95,6 +130,11 @@
 ; ── Parameters & variables ───────────────────────────────────────────────────
 (parameter
   name: (identifier) @variable.parameter)
+
+(parameter
+  type: (capture_type
+    "capture" @keyword
+    captured: (_) @type))
 
 (variable_declaration
   [
@@ -136,6 +176,8 @@
 (type_identifier) @type
 
 ; ── Literals ─────────────────────────────────────────────────────────────────
+(string_literal
+  "\"" @string)
 (string_content) @string
 (escape_sequence) @string.escape
 (interpolation
@@ -144,4 +186,4 @@
 (integer_literal) @number
 (float_literal) @number.float
 (boolean_literal) @boolean
-(nil_literal) @constant.builtin
+(nil_literal) @keyword

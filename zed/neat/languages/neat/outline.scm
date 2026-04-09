@@ -8,7 +8,17 @@
   name: (type_identifier) @name) @item
 
 (callable_declaration
-  name: (identifier) @name) @item
+  name: (callable_name
+    [
+      (identifier)
+      (callable_operator_symbol)
+    ] @name)) @item
+
+(operator_declaration
+  symbol: (operator_symbol) @name) @item
+
+(precedence_group_declaration
+  name: (type_identifier) @name) @item
 
 (builder_hook_declaration
   hook: (_) @name) @item
