@@ -181,6 +181,7 @@ public struct Parser {
     var declarationMemberResolver: DeclarationMemberResolver
     var declarationOperatorResolver: DeclarationOperatorResolver
     var declarationMacroExpansionResolver: DeclarationMacroExpansionResolver
+    var macroDeclarationsByName: [String: MacroDeclaration]
     var macroExpansionTypes: [String: TypeReference] = [:]
 
     public init(
@@ -189,6 +190,7 @@ public struct Parser {
         declarationMemberResolver: DeclarationMemberResolver = .empty,
         declarationOperatorResolver: DeclarationOperatorResolver = .empty,
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
+        macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:]
     ) throws {
         var lexer = Lexer(source: source)
@@ -198,7 +200,20 @@ public struct Parser {
         self.declarationMemberResolver = declarationMemberResolver
         self.declarationOperatorResolver = declarationOperatorResolver
         self.declarationMacroExpansionResolver = declarationMacroExpansionResolver
+        self.macroDeclarationsByName = macroDeclarationsByName
         self.macroExpansionTypes = macroExpansionTypes
+    }
+
+    mutating func registerMacroDeclaration(_ declaration: MacroDeclaration) {
+        macroDeclarationsByName[declaration.name] = declaration
+        declarationMacroExpansionResolver = DeclarationMacroExpansionResolver(
+            macrosByName: macroDeclarationsByName
+        )
+        if let expansionType = declaration.expansionType {
+            macroExpansionTypes[declaration.name] = expansionType
+        } else {
+            macroExpansionTypes.removeValue(forKey: declaration.name)
+        }
     }
 
     func isCurrentExpressionTerminator(_ token: Token) -> Bool {
@@ -259,6 +274,7 @@ public struct Parser {
             if isMacroDeclarationStart() {
                 let declaration = try parseMacroDeclaration()
                 macros.append(declaration)
+                registerMacroDeclaration(declaration)
                 continue
             }
 

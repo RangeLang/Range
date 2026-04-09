@@ -26,6 +26,35 @@ struct CompilerFixtureTests {
             }
         }
     }
+
+    @Test("Project macros infer across project files")
+    func projectMacrosInferAcrossProjectFiles() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/ProjectMacros.neat",
+                source: """
+                macro captureText(value _: capture Expression): Freestanding<Expression> -> String { target, diagnostics in
+                    target.rewrite("captured: \\(value)")
+                }
+                """,
+                role: .project
+            )
+        )
+        inputs.append(
+            SourceInput(
+                path: "/tmp/ProjectMain.neat",
+                source: """
+                @main {
+                    value text = #captureText(1 + 2)
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
 }
 
 private enum FixtureRole {

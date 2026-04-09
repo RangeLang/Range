@@ -81,18 +81,18 @@ public struct CompilerPipeline {
         let coreResolver = coreGraph.literalBridgeResolver
         let coreMemberResolver = coreGraph.memberResolver
         let coreOperatorResolver = coreGraph.operatorResolver
+        let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
         let coreMacroExpansionResolver = DeclarationMacroExpansionResolver(
-            macrosByName: MacroExpander.collectMacros(from: parsedCoreFiles)
+            macrosByName: coreMacrosByName
         )
-        let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
-            from: parsedCoreFiles
-        )
+        let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(from: parsedCoreFiles)
         let parsedProjectFiles = try parse(
             inputs: projectInputs,
             literalBridgeResolver: coreResolver,
             declarationMemberResolver: coreMemberResolver,
             declarationOperatorResolver: coreOperatorResolver,
             declarationMacroExpansionResolver: coreMacroExpansionResolver,
+            macroDeclarationsByName: coreMacrosByName,
             macroExpansionTypes: coreMacroExpansionTypes
         )
 
@@ -125,21 +125,43 @@ public struct CompilerPipeline {
         declarationMemberResolver: DeclarationMemberResolver,
         declarationOperatorResolver: DeclarationOperatorResolver,
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
+        macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:]
     ) throws -> [ParsedSourceFile] {
-        try inputs.map { input in
+        var currentMacrosByName = macroDeclarationsByName
+        var currentMacroExpansionResolver = declarationMacroExpansionResolver
+        var currentMacroExpansionTypes = macroExpansionTypes
+        var parsedFiles: [ParsedSourceFile] = []
+
+        for input in inputs {
             var parser = try Parser(
                 source: input.source,
                 literalBridgeResolver: literalBridgeResolver,
                 declarationMemberResolver: declarationMemberResolver,
                 declarationOperatorResolver: declarationOperatorResolver,
-                declarationMacroExpansionResolver: declarationMacroExpansionResolver,
-                macroExpansionTypes: macroExpansionTypes
+                declarationMacroExpansionResolver: currentMacroExpansionResolver,
+                macroDeclarationsByName: currentMacrosByName,
+                macroExpansionTypes: currentMacroExpansionTypes
             )
-            return ParsedSourceFile(
+            let parsedFile = ParsedSourceFile(
                 path: input.path,
                 sourceFile: try parser.parseSourceFile()
             )
+
+            parsedFiles.append(parsedFile)
+
+            let discoveredMacros = MacroExpander.collectMacros(from: [parsedFile])
+            if !discoveredMacros.isEmpty {
+                currentMacrosByName.merge(discoveredMacros) { _, new in new }
+                currentMacroExpansionResolver = DeclarationMacroExpansionResolver(
+                    macrosByName: currentMacrosByName
+                )
+                currentMacroExpansionTypes.merge(
+                    MacroExpander.collectMacroExpansionTypes(from: [parsedFile])
+                ) { _, new in new }
+            }
         }
+
+        return parsedFiles
     }
 }
