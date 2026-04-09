@@ -10,8 +10,12 @@ extension Parser {
 
         let name = try consumeCallableName()
         let genericParameters = try parseGenericParameterClauseIfPresent()
-        let parameters =
-            peek() == .leftParen ? try parseFunctionParameters(allowSyntaxCapture: true) : []
+        guard peek() == .leftParen else {
+            throw ParseError(
+                "Macro declarations must declare an explicit parameter clause. Use () for zero-argument macros."
+            )
+        }
+        let parameters = try parseFunctionParameters(allowSyntaxCapture: true)
 
         try consume(.colon)
         let target = try parseMacroTarget()
