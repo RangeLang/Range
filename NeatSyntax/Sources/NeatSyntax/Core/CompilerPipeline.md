@@ -31,7 +31,7 @@ The intended pipeline is:
 
 - `DeclarationGraph`
   is the first dependency-graph layer
-  resolves declaration relationships such as conformances, requirement satisfaction, attached macro carry, and literal bridge realization
+  resolves declaration relationships such as conformances, requirement satisfaction, declaration-targeted macro carry, and literal bridge realization
 
 - `SemanticProgram`
   is the semantically settled compiler artifact derived from the declaration graph

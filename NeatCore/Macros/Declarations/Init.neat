@@ -1,4 +1,4 @@
 @core
-construct Init: AttachedMacroTarget {
+construct Init: Syntax {
     value parameters: [Parameter]
 }

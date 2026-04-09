@@ -85,7 +85,7 @@ extension Parser {
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         guard case .hashDirective(let name) = peek() else {
-            throw ParseError("Expected freestanding macro application.")
+            throw ParseError("Expected block-targeted macro application.")
         }
         advance()
         let argumentClause = try parseMacroArgumentClauseIfPresent()

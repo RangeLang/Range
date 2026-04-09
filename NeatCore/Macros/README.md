@@ -33,7 +33,7 @@ Current bootstrap rules:
 
 Current `Init`-targeted status:
 
-- Protocol init requirements are parsed and keep their attached macros.
+- Protocol init requirements are parsed and keep their carried macros.
 - Conforming initializers inherit carried init macros through conformance matching.
 - `Init` execution is still the missing piece for `literal`.
 

@@ -448,7 +448,7 @@ public enum MacroExpander {
         switch statement {
         case .freestandingMacro(let name, let argumentClause, let body):
             guard let macro = macros[name] else {
-                throw ParseError("Unknown freestanding macro #\(name).")
+                throw ParseError("Unknown block-targeted macro #\(name).")
             }
             guard macro.target.typeReference.displayName == "Block"
             else {

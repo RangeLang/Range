@@ -30,7 +30,7 @@ The declaration graph is Neat's static semantic graph of declarations and declar
 
 ## Role
 
-The declaration graph is the compiler layer that resolves semantic structure such as protocols, conformances, requirements, satisfying declarations, attached macros, and literal bridge realization.
+The declaration graph is the compiler layer that resolves semantic structure such as protocols, conformances, requirements, satisfying declarations, declaration-targeted macros, and literal bridge realization.
 
 It exists between syntax and the memory graph:
 
@@ -78,7 +78,7 @@ protocol ExpressibleByIntLiteral {
 }
 ```
 
-The requirement itself is part of the graph, along with its attached macro semantics.
+The requirement itself is part of the graph, along with its carried macro semantics.
 
 - Concrete declarations can satisfy protocol requirements.
 
@@ -180,7 +180,7 @@ The graph should represent that `Point` conforms to `Equatable` and inherits the
 
 ## Notes
 
-- The declaration graph is the right layer for protocol semantics, conformance realization, attached macro carry, and similar declaration-to-declaration reasoning.
+- The declaration graph is the right layer for protocol semantics, conformance realization, declaration-targeted macro carry, and similar declaration-to-declaration reasoning.
 - The memory graph should consume declaration-graph results rather than re-resolving protocol and macro relationships itself.
 - Backends should consume declaration-graph-derived semantic results rather than redefining literal compatibility or bridge meaning.
 - The compiler's current dependency graph machinery can evolve toward this role, but the language model should be expressed in terms of declaration semantics rather than implementation-specific lookup tables.

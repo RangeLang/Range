@@ -24,7 +24,7 @@ The compiler pipeline should be understood as:
 8. `Backend Lowering`
 9. `Emission`
 
-This means the memory graph consumes already-settled declaration semantics. It should not be responsible for resolving protocol conformance, attached macro carry, literal bridge meaning, or similar declaration-level facts on its own.
+This means the memory graph consumes already-settled declaration semantics. It should not be responsible for resolving protocol conformance, declaration-targeted macro carry, literal bridge meaning, or similar declaration-level facts on its own.
 
 ## Mental Model
 
