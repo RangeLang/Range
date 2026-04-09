@@ -4,7 +4,7 @@
 
 This document maps each macro target concept to the language-level structure it exposes.
 
-## Freestanding
+## Expression And Block Targets
 
 ### Expression exposes
 
@@ -19,7 +19,7 @@ This document maps each macro target concept to the language-level structure it 
 - block invocation/splice with `block()`
 - its statements if lower-level access is needed later
 
-## Attached
+## Declaration Targets
 
 ### Construct exposes
 
@@ -82,5 +82,5 @@ This document maps each macro target concept to the language-level structure it 
 ## Notes
 
 - This is the exposure map, not the final syntax for every field.
-- Freestanding targets are syntax-first.
-- Attached targets are resolved semantic structures.
+- Expression and block targets are syntax-first.
+- Declaration targets are resolved semantic structures.

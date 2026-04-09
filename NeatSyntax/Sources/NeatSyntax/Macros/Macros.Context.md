@@ -2,32 +2,34 @@
 
 ## Definition
 
-Macros receive the compiler structure appropriate to the phase they run in.
+Macros receive the compiler structure appropriate to the syntax target they declare.
 
 ## Properties
 
-- Freestanding macros receive syntax-phase structures directly
+- Expression-targeted macros receive expression syntax directly
 
 ```neat
-macro literal: Freestanding<Expression> { expression in
-    expression
+macro stringify(value _: capture Expression): Expression -> String { target, diagnostics in
+    target.rewrite("\(value)")
 }
 ```
 
 ```neat
-macro lock: Freestanding<Block> { block in
-    block()
+macro lock(): Block { target, diagnostics in
+    target.rewrite({
+        target()
+    })
 }
 ```
 
-- Attached macros receive resolved semantic structures directly
+- Declaration-targeted macros receive the declared compiler structure directly
 
 ```neat
-macro codable: Attached<Construct> { construct in
-    construct.values
-    construct.states
-    construct.bindings
-    construct.deriveds
+macro codable(): Construct { target, diagnostics in
+    target.values
+    target.states
+    target.bindings
+    target.deriveds
 }
 ```
 
@@ -43,40 +45,42 @@ expression
 block
 ```
 
-- Freestanding structures are syntax-first
+- Block and expression targets are syntax-first
 
 ```neat
-macro lock: Freestanding<Block> { block in
-    acquire()
-    block()
-    release()
+macro lock(): Block { target, diagnostics in
+    target.rewrite({
+        acquire()
+        target()
+        release()
+    })
 }
 ```
 
-- Attached structures are graph-aware
+- Declaration targets are declaration-aware
 
 ```neat
-macro clamped: Attached<Property> { property in
-    property.bindingKind
-    property.type
-    property.owner
+macro clamped(min: Int, max: Int): Property { target, diagnostics in
+    target.bindingKind
+    target.type
+    target.owner
 }
 ```
 
-- Callable-attached macros should expose callable structure
+- Callable and initializer targets should expose callable structure
 
 ```neat
-macro literal<T>: Attached<Init> { init in
-    init.params
-    init.arguments
+macro literal<T>(): Init { target, diagnostics in
+    target.params
+    target.arguments
 }
 ```
 
 ```neat
-macro traced: Attached<Function> { function in
-    function.params
-    function.arguments
-    function.returnType
+macro traced(): Function { target, diagnostics in
+    target.params
+    target.arguments
+    target.returnType
 }
 ```
 
@@ -98,5 +102,5 @@ Function
 ## Notes
 
 - Macros should be low-level enough to express advanced features without new baked-in compiler mechanisms.
-- Freestanding and attached macros do not need to share one fake universal context bag.
-- `#literal<T>` is the canonical attached-init literal bridge form, with `T` constrained to compiler-recognized literal carrier types.
+- Different target kinds do not need to share one fake universal context bag.
+- `#literal<T>` is the canonical init-targeted literal bridge form, with `T` constrained to compiler-recognized literal carrier types.

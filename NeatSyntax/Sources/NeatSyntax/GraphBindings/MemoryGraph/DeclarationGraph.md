@@ -58,7 +58,7 @@ It also precedes backend adaptation:
 ```neat
 construct Int { }
 protocol ExpressibleByIntLiteral { }
-macro literal<T>: Attached<Init> { target, diagnostics in }
+macro literal<T>(): Init { target, diagnostics in }
 ```
 
 - Declaration relationships appear as graph edges.
@@ -90,7 +90,7 @@ construct Int: ExpressibleByIntLiteral {
 
 The graph records that this concrete initializer satisfies the protocol requirement.
 
-- Attached macro carry should be derived from declaration relationships.
+- Init-targeted macro carry should be derived from declaration relationships.
 
 ```neat
 protocol ExpressibleByIntLiteral {

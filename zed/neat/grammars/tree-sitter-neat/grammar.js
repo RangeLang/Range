@@ -86,12 +86,7 @@ module.exports = grammar({
       ),
 
     macro_target: ($) =>
-      seq(
-        field("kind", choice("Attached", "Freestanding")),
-        "<",
-        field("type", $.type),
-        ">",
-      ),
+      field("type", $.type),
 
     macro_body: ($) =>
       seq(

@@ -1568,20 +1568,6 @@
     "type": "macro_target",
     "named": true,
     "fields": {
-      "kind": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "Attached",
-            "named": false
-          },
-          {
-            "type": "Freestanding",
-            "named": false
-          }
-        ]
-      },
       "type": {
         "multiple": false,
         "required": true,
@@ -2511,14 +2497,6 @@
   },
   {
     "type": "@",
-    "named": false
-  },
-  {
-    "type": "Attached",
-    "named": false
-  },
-  {
-    "type": "Freestanding",
     "named": false
   },
   {

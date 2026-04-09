@@ -1,7 +1,7 @@
 # Macro Phase
 
-## Immediate Attached Macros
-An immediate attached macro expands on the declaration it is directly attached to.
+## Immediate Declaration Macros
+An immediate declaration-targeted macro expands on the declaration it is directly attached to.
 
 ```neat
 #clamped(min: 0, max: 10)

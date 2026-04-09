@@ -3,6 +3,8 @@
 ## Definition
 
 Macros are compile-time transformations over compiler structures.
+They declare the syntax target they apply to directly, for example `: Expression`,
+`: Block`, `: Parameter`, or `: Init`.
 
 ## Properties
 
@@ -25,50 +27,52 @@ Macros rewrite compiler structures before code generation. They do not add runti
 - Are declared through ordinary Neat syntax
 
 ```neat
-macro codable: Attached<Construct> { }
-macro lock: Freestanding<Block> { }
+macro codable(): Construct { }
+macro lock(): Block { }
 ```
 
-- Are typed by macro kind
+- Are typed by direct target syntax kinds
 
 ```neat
-macro codable: Attached<Construct> { }
-macro clamped: Attached<Property> { }
-macro lock: Freestanding<Block> { }
-macro literal: Freestanding<Expression> { }
+macro codable(): Construct { }
+macro clamped(min: Int, max: Int): State { }
+macro lock(): Block { }
+macro literal<T>(): Init { }
+macro stringify(value _: capture Expression): Expression -> String { }
 ```
 
 - Support composition through the existing type system
 
 ```neat
-macro observable: Attached<Property & Parameter> { }
+macro observable(): Property { }
 ```
 
-- Split into freestanding and attached phases
+- Run as syntax rewrites before semantic validation trusts their result
 
 ```text
 Lexer
 Parser
-Freestanding macros
+Macro expansion
 Type checking / graph construction
-Attached macros
 Code generation
 ```
 
 - Expose the compiler structure appropriate to their phase
 
 ```neat
-macro lock: Freestanding<Block> { block in
-    acquire()
-    block()
-    release()
+macro lock(): Block { target, diagnostics in
+    target.rewrite({
+        acquire()
+        target()
+        release()
+    })
 }
 ```
 
 ```neat
-macro codable: Attached<Construct> { construct in
-    construct.values
-    construct.states
+macro codable(): Construct { target, diagnostics in
+    target.values
+    target.states
 }
 ```
 
@@ -86,6 +90,8 @@ Neat treats these as macro-system problems rather than separate baked-in languag
 
 ## Notes
 
-- Freestanding macros work over syntax-phase compiler structures.
-- Attached macros work over resolved type and graph structures.
+- Expression-targeted and block-targeted macros are invoked at explicit `#macro`
+  use sites.
+- Declaration-targeted macros such as `: Parameter`, `: Construct`, and `: Init`
+  rewrite the declaration surface they are attached to.
 - The macro system is meant to replace one-off compiler markers with one unified transformation model.

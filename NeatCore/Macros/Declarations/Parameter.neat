@@ -1,5 +1,5 @@
 @core
-construct Parameter: AttachedMacroTarget {
+construct Parameter: Syntax {
     value externalName: String?
     value localName: String
     value type: TypeReference

@@ -37,7 +37,7 @@ public enum BootstrapExpressionSemantics {
                 return .typed(expansionType)
             }
             throw ParseError(
-                "Freestanding expression macro #\(name) must be expanded before inference."
+                "Expression macro #\(name) must be expanded before inference."
             )
         case .block:
             throw ParseError(
@@ -269,7 +269,7 @@ public enum BootstrapExpressionSemantics {
     ) throws -> Bool {
         switch expression {
         case .freestandingMacro:
-            // Freestanding expression macros expand before semantic validation. In an explicit
+            // Expression-targeted macros expand before semantic validation. In an explicit
             // context, defer compatibility to the expanded expression instead of rejecting the
             // use site during bootstrap inference.
             return true
