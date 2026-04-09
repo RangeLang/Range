@@ -5,7 +5,7 @@ extension Parser {
         peek() == .keyword(NeatSyntax.Keyword.macro.rawValue)
     }
 
-    mutating func parseMacroDeclaration() throws -> MacroDeclaration {
+    mutating func parseMacroDeclaration(signatureOnly: Bool = false) throws -> MacroDeclaration {
         try consumeKeyword(.macro)
 
         let name = try consumeCallableName()
@@ -22,7 +22,28 @@ extension Parser {
         } else {
             expansionType = nil
         }
-        let (bindings, body) = try parseMacroBody()
+        let bindings: MacroBindings
+        let body: [Statement]
+        if signatureOnly {
+            if peek() == .leftBrace {
+                try consume(.leftBrace)
+                let targetBinding = try consumeIdentifier()
+                try consume(.comma)
+                let diagnosticsBinding = try consumeIdentifier()
+                try consumeKeyword(.inKeyword)
+                bindings = MacroBindings(
+                    target: targetBinding,
+                    diagnostics: diagnosticsBinding
+                )
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+            } else {
+                throw ParseError("Expected macro body.")
+            }
+            body = []
+        } else {
+            (bindings, body) = try parseMacroBody()
+        }
 
         return MacroDeclaration(
             name: name,

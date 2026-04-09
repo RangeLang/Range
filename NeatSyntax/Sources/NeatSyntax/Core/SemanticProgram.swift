@@ -82,18 +82,33 @@ public struct CompilerPipeline {
         let coreMemberResolver = coreGraph.memberResolver
         let coreOperatorResolver = coreGraph.operatorResolver
         let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
-        let coreMacroExpansionResolver = DeclarationMacroExpansionResolver(
-            macrosByName: coreMacrosByName
-        )
         let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(from: parsedCoreFiles)
+        let discoveredProjectSignatureFiles = try discoverDeclarationSignatures(inputs: projectInputs)
+        let discoveredProjectCallableReturnTypes = collectCallableReturnTypes(
+            from: discoveredProjectSignatureFiles
+        )
+        let discoveredProjectMacrosByName = MacroExpander.collectMacros(
+            from: discoveredProjectSignatureFiles
+        )
+        let discoveredProjectMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
+            from: discoveredProjectSignatureFiles
+        )
+        let projectMacrosByName = coreMacrosByName.merging(discoveredProjectMacrosByName) { _, new in
+            new
+        }
         let parsedProjectFiles = try parse(
             inputs: projectInputs,
             literalBridgeResolver: coreResolver,
             declarationMemberResolver: coreMemberResolver,
             declarationOperatorResolver: coreOperatorResolver,
-            declarationMacroExpansionResolver: coreMacroExpansionResolver,
-            macroDeclarationsByName: coreMacrosByName,
-            macroExpansionTypes: coreMacroExpansionTypes
+            declarationMacroExpansionResolver: DeclarationMacroExpansionResolver(
+                macrosByName: projectMacrosByName
+            ),
+            discoveredCallableReturnTypes: discoveredProjectCallableReturnTypes,
+            macroDeclarationsByName: projectMacrosByName,
+            macroExpansionTypes: coreMacroExpansionTypes.merging(
+                discoveredProjectMacroExpansionTypes
+            ) { _, new in new }
         )
 
         let parsedFiles = parsedCoreFiles + parsedProjectFiles
@@ -125,6 +140,7 @@ public struct CompilerPipeline {
         declarationMemberResolver: DeclarationMemberResolver,
         declarationOperatorResolver: DeclarationOperatorResolver,
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
+        discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:]
     ) throws -> [ParsedSourceFile] {
@@ -140,6 +156,7 @@ public struct CompilerPipeline {
                 declarationMemberResolver: declarationMemberResolver,
                 declarationOperatorResolver: declarationOperatorResolver,
                 declarationMacroExpansionResolver: currentMacroExpansionResolver,
+                discoveredCallableReturnTypes: discoveredCallableReturnTypes,
                 macroDeclarationsByName: currentMacrosByName,
                 macroExpansionTypes: currentMacroExpansionTypes
             )
@@ -163,5 +180,39 @@ public struct CompilerPipeline {
         }
 
         return parsedFiles
+    }
+
+    private func discoverDeclarationSignatures(inputs: [SourceInput]) throws -> [ParsedSourceFile] {
+        try inputs.map { input in
+            var parser = try Parser(source: input.source)
+            return ParsedSourceFile(
+                path: input.path,
+                sourceFile: try parser.parseSourceFileForSignatureDiscovery()
+            )
+        }
+    }
+
+    private func collectCallableReturnTypes(
+        from files: [ParsedSourceFile]
+    ) -> [String: TypeReference] {
+        var returnTypes: [String: TypeReference] = [:]
+
+        for parsedFile in files {
+            guard case .module(let module) = parsedFile.sourceFile else {
+                continue
+            }
+
+            for callable in module.callables {
+                guard let returnType = callable.returnType else {
+                    continue
+                }
+                returnTypes[callable.name] = returnType
+                if let targetType = callable.targetType {
+                    returnTypes["\(targetType.displayName).\(callable.name)"] = returnType
+                }
+            }
+        }
+
+        return returnTypes
     }
 }

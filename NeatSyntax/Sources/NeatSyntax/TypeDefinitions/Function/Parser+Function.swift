@@ -1,9 +1,9 @@
 import Foundation
 
 extension Parser {
-    mutating func parseCallableDeclaration() throws -> CallableDeclaration {
+    mutating func parseCallableDeclaration(signatureOnly: Bool = false) throws -> CallableDeclaration {
         if isBuilderCallableStart() {
-            return try parseBuilderCallableDeclaration()
+            return try parseBuilderCallableDeclaration(signatureOnly: signatureOnly)
         }
 
         let macros = try parseMacroApplicationsIfPresent()
@@ -42,7 +42,17 @@ extension Parser {
             name: name,
             returnType: returnType
         )
-        let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        let body: [Statement]?
+        if signatureOnly {
+            if peek() == .leftBrace {
+                try consume(.leftBrace)
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+            }
+            body = nil
+        } else {
+            body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        }
         return CallableDeclaration(
             macros: macros,
             attribute: attribute,
@@ -56,7 +66,7 @@ extension Parser {
         )
     }
 
-    mutating func parseBuilderCallableDeclaration() throws -> CallableDeclaration {
+    mutating func parseBuilderCallableDeclaration(signatureOnly: Bool = false) throws -> CallableDeclaration {
         try consume(.asterisk)
 
         let hookName: String
@@ -97,7 +107,17 @@ extension Parser {
             name: mappedName,
             returnType: returnType
         )
-        let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        let body: [Statement]?
+        if signatureOnly {
+            if peek() == .leftBrace {
+                try consume(.leftBrace)
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+            }
+            body = nil
+        } else {
+            body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        }
         return CallableDeclaration(
             macros: [],
             attribute: nil,

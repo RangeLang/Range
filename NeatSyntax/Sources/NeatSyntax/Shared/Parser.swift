@@ -181,6 +181,7 @@ public struct Parser {
     var declarationMemberResolver: DeclarationMemberResolver
     var declarationOperatorResolver: DeclarationOperatorResolver
     var declarationMacroExpansionResolver: DeclarationMacroExpansionResolver
+    var discoveredCallableReturnTypes: [String: TypeReference]
     var macroDeclarationsByName: [String: MacroDeclaration]
     var macroExpansionTypes: [String: TypeReference] = [:]
 
@@ -190,6 +191,7 @@ public struct Parser {
         declarationMemberResolver: DeclarationMemberResolver = .empty,
         declarationOperatorResolver: DeclarationOperatorResolver = .empty,
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
+        discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:]
     ) throws {
@@ -200,6 +202,7 @@ public struct Parser {
         self.declarationMemberResolver = declarationMemberResolver
         self.declarationOperatorResolver = declarationOperatorResolver
         self.declarationMacroExpansionResolver = declarationMacroExpansionResolver
+        self.discoveredCallableReturnTypes = discoveredCallableReturnTypes
         self.macroDeclarationsByName = macroDeclarationsByName
         self.macroExpansionTypes = macroExpansionTypes
     }
@@ -222,7 +225,7 @@ public struct Parser {
 
     public mutating func parseSourceFile() throws -> SourceFileNode {
         currentStateTypes = [:]
-        currentCallableReturnTypes = [:]
+        currentCallableReturnTypes = discoveredCallableReturnTypes
 
         var mainBlock: MainBlockNode?
         var topLevelStates: [StateDeclaration] = []
@@ -386,6 +389,93 @@ public struct Parser {
                 precedenceGroups: precedenceGroups,
                 operators: operators,
                 extensions: extensions
+            )
+        )
+    }
+
+    public mutating func parseSourceFileForSignatureDiscovery() throws -> SourceFileNode {
+        currentStateTypes = [:]
+        currentCallableReturnTypes = [:]
+
+        var topLevelCallables: [CallableDeclaration] = []
+        var macros: [MacroDeclaration] = []
+        var precedenceGroups: [PrecedenceGroupDeclaration] = []
+        var operators: [OperatorDeclaration] = []
+
+        while peek() != .eof {
+            if isMainBlockStart() {
+                try skipMainBlockForSignatureDiscovery()
+                continue
+            }
+
+            if isStateDeclarationStart() {
+                try skipStateDeclarationForSignatureDiscovery()
+                continue
+            }
+
+            if isCallableStart() {
+                topLevelCallables.append(try parseCallableDeclaration(signatureOnly: true))
+                continue
+            }
+
+            if isMacroDeclarationStart() {
+                let declaration = try parseMacroDeclaration(signatureOnly: true)
+                macros.append(declaration)
+                registerMacroDeclaration(declaration)
+                continue
+            }
+
+            if isPrecedenceGroupDeclarationStart() {
+                let declaration = try parsePrecedenceGroupDeclaration(requiresEOF: false)
+                precedenceGroups.append(declaration)
+                operatorEnvironment.register(precedenceGroup: declaration)
+                continue
+            }
+
+            if isOperatorDeclarationStart() {
+                let declaration = try parseOperatorDeclaration(requiresEOF: false)
+                operators.append(declaration)
+                operatorEnvironment.register(operator: declaration)
+                continue
+            }
+
+            if peek() == .keyword(NeatSyntax.Keyword.typeExtension.rawValue) {
+                _ = try parseExtensionDeclaration()
+                continue
+            }
+
+            if isConstructDeclarationStart() || isBuilderDeclarationStart() {
+                try skipConstructDeclarationForSignatureDiscovery()
+                continue
+            }
+
+            if isProtocolDeclarationStart() {
+                _ = try parseProtocolDeclaration(requiresEOF: false)
+                continue
+            }
+
+            if isEnumDeclarationStart() {
+                _ = try parseEnumDeclaration(requiresEOF: false)
+                continue
+            }
+
+            advance()
+        }
+
+        try consume(.eof)
+
+        return .module(
+            ModuleFileNode(
+                mainBlock: nil,
+                states: [],
+                callables: topLevelCallables,
+                constructs: [],
+                enumerations: [],
+                protocols: [],
+                macros: macros,
+                precedenceGroups: precedenceGroups,
+                operators: operators,
+                extensions: []
             )
         )
     }

@@ -116,4 +116,53 @@ extension Parser {
             }
         }
     }
+
+    mutating func skipMainBlockForSignatureDiscovery() throws {
+        guard case .atAttribute(let name, _) = peek(), name == "main" else {
+            throw ParseError("Expected @main block.")
+        }
+        advance()
+        try consume(.leftBrace)
+        try skipUnknownBlockBody()
+        try consume(.rightBrace)
+    }
+
+    mutating func skipStateDeclarationForSignatureDiscovery() throws {
+        _ = try parseMacroApplicationsIfPresent()
+        try consumeKeyword(.state)
+        _ = try consumeIdentifier()
+        if peek() == .colon {
+            try consume(.colon)
+            _ = try parseTypeReferenceNode()
+        }
+        if peek() == .equal {
+            try consume(.equal)
+            _ = try parseExpression()
+        }
+    }
+
+    mutating func skipConstructDeclarationForSignatureDiscovery() throws {
+        if isBuilderDeclarationStart() {
+            try consume(.asterisk)
+            guard case .identifier(let keyword) = peek(), keyword == "builder" else {
+                throw ParseError("Expected declaration starting with '*builder'.")
+            }
+            advance()
+            _ = try consumeTypeName()
+            try consume(.leftBrace)
+            try skipUnknownBlockBody()
+            try consume(.rightBrace)
+            return
+        }
+
+        _ = try parseMacroApplicationsIfPresent()
+        let attribute = parseAttributeIfPresent(before: .construct)
+        _ = try parseConstructKind(attribute: attribute)
+        _ = try parseConstructHeader()
+        if peek() == .leftBrace {
+            try consume(.leftBrace)
+            try skipUnknownBlockBody()
+            try consume(.rightBrace)
+        }
+    }
 }

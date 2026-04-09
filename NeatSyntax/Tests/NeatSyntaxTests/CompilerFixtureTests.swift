@@ -55,6 +55,33 @@ struct CompilerFixtureTests {
 
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
+
+    @Test("Project callables and macros infer before later declarations")
+    func projectDeclarationsInferBeforeLaterDeclarations() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/ForwardDeclarations.neat",
+                source: """
+                @main {
+                    value messageText = message()
+                    value captured = #captureText(1 + 2)
+                }
+
+                function message() -> String {
+                    return "Hello"
+                }
+
+                macro captureText(value _: capture Expression): Freestanding<Expression> -> String { target, diagnostics in
+                    target.rewrite("captured: \\(value)")
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
 }
 
 private enum FixtureRole {
