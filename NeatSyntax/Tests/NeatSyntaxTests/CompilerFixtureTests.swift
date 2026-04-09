@@ -34,7 +34,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ProjectMacros.neat",
                 source: """
-                macro captureText(value _: capture Expression): Freestanding<Expression> -> String { target, diagnostics in
+                macro captureText(value _: capture Expression): Expression -> String { target, diagnostics in
                     target.rewrite("captured: \\(value)")
                 }
                 """,
@@ -72,7 +72,7 @@ struct CompilerFixtureTests {
                     return "Hello"
                 }
 
-                macro captureText(value _: capture Expression): Freestanding<Expression> -> String { target, diagnostics in
+                macro captureText(value _: capture Expression): Expression -> String { target, diagnostics in
                     target.rewrite("captured: \\(value)")
                 }
                 """,

@@ -31,9 +31,9 @@ library. These fixtures are for host-side compiler regression tests.
 The current macro fixtures cover only the supported bootstrap surface:
 
 - literal bridge carry through `#literal<T>`
-- attached parameter `#autoclosure`
-- freestanding expression `#stringify(...)`
-- freestanding expression rewrite through `target.rewrite(...)`, including
+- parameter-targeted `#autoclosure`
+- expression-targeted `#stringify(...)`
+- expression-targeted rewrite through `target.rewrite(...)`, including
   `#unwrap(...)` and a custom macro fixture
 - custom `capture Expression` macro parameters
 - generic expression macro result substitution, for example

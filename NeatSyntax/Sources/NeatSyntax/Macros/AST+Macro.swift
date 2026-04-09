@@ -17,8 +17,14 @@ public struct MacroApplication {
 }
 
 public enum MacroTarget {
-    case attached(TypeReference)
-    case freestanding(TypeReference)
+    case syntax(TypeReference)
+
+    public var typeReference: TypeReference {
+        switch self {
+        case .syntax(let typeReference):
+            return typeReference
+        }
+    }
 }
 
 public struct MacroBindings {

@@ -1,4 +1,4 @@
-macro badStringify(value _: Expression): Freestanding<Expression> { target, diagnostics in
+macro badStringify(value _: Expression): Expression { target, diagnostics in
     target.rewrite("\(value)")
 }
 

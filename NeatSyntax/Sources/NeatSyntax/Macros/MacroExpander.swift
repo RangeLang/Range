@@ -213,8 +213,7 @@ public enum MacroExpander {
                 index, parameter -> (Int, MacroDeclaration)? in
                 guard
                     let macro = parameter.macros.lazy.compactMap({ macros[$0.name] }).first(where: {
-                        guard case .attached(let targetType) = $0.target else { return false }
-                        return targetType.displayName == "Parameter"
+                        $0.target.typeReference.displayName == "Parameter"
                     })
                 else { return nil }
 
@@ -451,10 +450,9 @@ public enum MacroExpander {
             guard let macro = macros[name] else {
                 throw ParseError("Unknown freestanding macro #\(name).")
             }
-            guard case .freestanding(let targetType) = macro.target,
-                targetType.displayName == "Block"
+            guard macro.target.typeReference.displayName == "Block"
             else {
-                throw ParseError("Macro #\(name) is not a Freestanding<Block> macro.")
+                throw ParseError("Macro #\(name) does not target Block.")
             }
             let expandedTarget = try expand(
                 statements: body,
@@ -681,11 +679,8 @@ public enum MacroExpander {
         parameters.map { parameter in
             let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
                 macroApplication in
-                guard let macro = macros[macroApplication.name] else {
-                    return nil
-                }
-                guard case .attached(let targetType) = macro.target,
-                    targetType.displayName == "Parameter"
+                guard let macro = macros[macroApplication.name],
+                    macro.target.typeReference.displayName == "Parameter"
                 else {
                     return nil
                 }
@@ -785,8 +780,7 @@ public enum MacroExpander {
             return .call(name: name, arguments: wrappedArguments)
         case .freestandingMacro(let name, let arguments):
             guard let macro = macros[name],
-                case .freestanding(let targetType) = macro.target,
-                targetType.displayName == "Expression"
+                macro.target.typeReference.displayName == "Expression"
             else {
                 let rewrittenArguments = try arguments.map { argument in
                     CallArgument(
@@ -1258,7 +1252,7 @@ public enum MacroExpander {
             }
             guard case .block(let body) = arguments[0].value else {
                 throw ParseError(
-                    "Macro #\(macro.name) target.rewrite(...) must receive a block expression for Freestanding<Block>."
+                    "Macro #\(macro.name) target.rewrite(...) must receive a block expression for Block-targeted macros."
                 )
             }
             rewriteCalls.append(body)

@@ -1,4 +1,4 @@
-macro autoclosure: Attached<Parameter> { target, diagnostics in
+macro autoclosure(): Parameter { target, diagnostics in
     target.parameter.type.rewrite(
         FunctionType(
             parameters: [],

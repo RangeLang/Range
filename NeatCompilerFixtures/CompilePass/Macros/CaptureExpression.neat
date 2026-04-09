@@ -1,4 +1,4 @@
-macro captureText(value _: capture Expression): Freestanding<Expression> -> String { target, diagnostics in
+macro captureText(value _: capture Expression): Expression -> String { target, diagnostics in
     target.rewrite("captured: \(value)")
 }
 

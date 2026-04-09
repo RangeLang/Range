@@ -1125,10 +1125,7 @@ private struct GraphCollector {
         registerDeclaration(name: declaration.name, nodeID: macroID)
         addEdge(from: parentID, to: macroID, kind: .contains)
 
-        switch declaration.target {
-        case .attached(let typeReference), .freestanding(let typeReference):
-            addTypeReference(typeReference, from: macroID, kind: .targetsMacro)
-        }
+        addTypeReference(declaration.target.typeReference, from: macroID, kind: .targetsMacro)
     }
 
     private mutating func addExtension(_ declaration: ExtensionDeclaration, parentID: String) {

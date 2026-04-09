@@ -1,4 +1,4 @@
-macro literal<T>: Attached<Init> { target, diagnostics in
+macro literal<T>(): Init { target, diagnostics in
     if target.calls.count == 1 && target.calls[0].arguments.count == 1 && target.calls[0].arguments[0].type == T.self {
         target.rewrite(
             target.expression(arguments: [

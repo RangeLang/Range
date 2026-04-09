@@ -57,19 +57,7 @@ extension Parser {
     }
 
     mutating func parseMacroTarget() throws -> MacroTarget {
-        let wrapper = try consumeIdentifier()
-        try consume(.less)
-        let wrappedType = try parseTypeReferenceNode()
-        try consume(.greater)
-
-        switch wrapper {
-        case "Attached":
-            return .attached(wrappedType)
-        case "Freestanding":
-            return .freestanding(wrappedType)
-        default:
-            throw ParseError("Expected macro target wrapper Attached<...> or Freestanding<...>.")
-        }
+        .syntax(try parseTypeReferenceNode())
     }
 
     mutating func parseMacroBody() throws -> (bindings: MacroBindings, body: [Statement]) {

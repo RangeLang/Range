@@ -1,4 +1,4 @@
-macro lock: Freestanding<Block> { target, diagnostics in
+macro lock(): Block { target, diagnostics in
     target.rewrite({
         acquire()
         target()
