@@ -112,10 +112,6 @@ extension Parser {
         }
 
         try validateCallableDeclarations(callables)
-        try validateCallableReturnSemantics(
-            callables,
-            allowBodylessCallables: declarationIsCore(attribute)
-        )
         try validateDerivedDeclarations(deriveds)
         try validateInitializerDeclarations(
             initializers,
@@ -161,7 +157,6 @@ extension Parser {
         }
 
         try validateCallableDeclarations(callables)
-        try validateCallableReturnSemantics(callables)
 
         return ConstructDeclaration(
             macros: [],

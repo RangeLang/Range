@@ -41,7 +41,5 @@ The current macro fixtures cover only the supported bootstrap surface:
 - syntax-category expression macro parameters must use `capture`, for example
   `value _: capture Expression`
 - invalid capture usage, for example `capture String`
-- known `#variadic` return-validation gap
-
-Move the variadic fixture from `CompileFail` to `CompilePass` when callable
-return validation consumes the expanded parameter type consistently.
+- parameter-targeted `#variadic` rewriting that now validates return semantics
+  against the expanded parameter type

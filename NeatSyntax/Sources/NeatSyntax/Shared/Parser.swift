@@ -308,7 +308,6 @@ public struct Parser {
         try consume(.eof)
         try validateBuilderDeclarations(in: constructs)
         try validateCallableDeclarations(topLevelCallables)
-        try validateCallableReturnSemantics(topLevelCallables)
 
         if let mainBlock,
             topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
