@@ -10,6 +10,17 @@ state count: Int = 0
 
 `#clamped` expands on that `state` declaration itself.
 
+The same base rule applies to `Init`:
+
+```neat
+construct Int {
+    #literal<IntLiteral>
+    init(literal: IntLiteral) { }
+}
+```
+
+Here `#literal<IntLiteral>` belongs to that concrete initializer directly.
+
 ## Deferred Requirement Macros
 A deferred requirement macro is attached to a protocol requirement, but expands on the concrete declaration that fulfills that requirement.
 
@@ -44,7 +55,9 @@ For literal bridging specifically:
 - `#literal<T>` is the canonical form.
 - `T` is a literal carrier type recognized by the compiler.
 - The compiler recognizes literal categories and carrier types.
-- The macro model carries the bridge through protocol requirements and conformances, then rewrites concrete use sites through the realized initializer.
+- A concrete initializer may carry `#literal<T>` directly.
+- A protocol requirement may also carry `#literal<T>`, which is then inherited by satisfying initializers.
+- The macro model rewrites concrete use sites through the realized initializer.
 - This rewrite is part of Neat semantic correctness, not backend adaptation.
 - A semantic rewrite such as `5 -> Int(literal: 5)` is the correct Neat result even if a backend later chooses a different target-specific representation.
 

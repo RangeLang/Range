@@ -1,0 +1,12 @@
+construct FixtureDirectInt {
+    value storage: IntStorage
+
+    #literal<IntLiteral>
+    init(literal: IntLiteral) {
+        self.storage = literal.storage()
+    }
+}
+
+@main {
+    value number: FixtureDirectInt = 1
+}
