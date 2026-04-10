@@ -12,6 +12,10 @@ Current macro surface is split into:
 `Implementations/README.md` is the index of active bootstrap macro coverage and
 the current implementation status of each macro target kind.
 
+`NeatSyntax/Sources/NeatSyntax/Macros/Macros.Context.md` documents the current
+target-surface model, including the conceptual `MacroTarget<T>` split between
+declaration-side and application-side macro access where needed.
+
 Current bootstrap rules:
 
 - Macro declarations must explicitly declare the syntax target they apply to, for example `: Block`, `: Expression`, `: Parameter`, or `: Init`.

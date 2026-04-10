@@ -4,6 +4,82 @@
 
 Macros receive the compiler structure appropriate to the syntax target they declare.
 
+Conceptually, the expansion binding should be understood through the target kind
+itself, not by attaching application data directly onto the declaration model.
+
+```text
+target: <macro target kind>
+```
+
+This is a language model, not a fully generalized bootstrap implementation
+today.
+
+The important split is still the same:
+
+- declaration-side surface
+- application-side surface
+
+The important rule is:
+
+- the declaration graph may know many uses globally
+- a macro expansion should normally see at most one canonical application at a
+  time
+
+Different target kinds do not need to expose the same surface. Each target kind
+should only expose the facets that make sense for that target kind.
+
+## Current Conceptual Mapping
+
+These are the current active target kinds as they should be understood
+conceptually today:
+
+```text
+Expression -> application-facing
+Block      -> application-facing
+Parameter  -> declaration + application
+Init       -> declaration + application
+```
+
+This does not mean the compiler should attach application data directly onto the
+declaration model itself. It means the target kind should define the
+macro-facing surfaces it exposes.
+
+## Current Preferred Shape
+
+For declaration-targeted macro kinds that need both sides, the preferred
+surface is for the target kind to expose:
+
+- a `declaration` value
+- an `application` value
+- nested `Declaration` and `Application` facet types describing those values
+
+Current preferred `Init` shape:
+
+```neat
+@core construct Init: Syntax {
+    value declaration: Declaration
+    value application: Application
+
+    construct Declaration {
+        value parameters: [Parameter]
+        function expression(arguments: [Argument]) -> Expression
+    }
+
+    construct Application: SupportsRewrite<Expression> {
+        value arguments: [Argument]
+    }
+}
+```
+
+This keeps the model clean:
+
+- `Init` remains the target kind
+- `declaration` is a real facet value
+- `application` is a real facet value
+- `Declaration` describes declaration-side macro access
+- `Application` describes the single canonical application-side access
+- the compiler still owns how those surfaces are materialized during expansion
+
 ## Properties
 
 - Expression-targeted macros receive expression syntax directly
@@ -67,20 +143,20 @@ macro clamped(min: Int, max: Int): Property { target, diagnostics in
 }
 ```
 
-- Callable and initializer targets should expose callable structure
+- Callable and initializer targets should prefer declaration and application
+  facets rather than one flat bag of members
 
 ```neat
 macro literal<T>(): Init { target, diagnostics in
-    target.params
-    target.arguments
+    value declaration = target.declaration
+    value application = target.application
 }
 ```
 
 ```neat
 macro traced(): Function { target, diagnostics in
-    target.params
-    target.arguments
-    target.returnType
+    value declaration = target.declaration
+    value application = target.application
 }
 ```
 
@@ -103,4 +179,13 @@ Function
 
 - Macros should be low-level enough to express advanced features without new baked-in compiler mechanisms.
 - Different target kinds do not need to share one fake universal context bag.
+- Target surfaces should be selective, not universal:
+  some targets are syntax-first and only need rewrite surface,
+  some targets are declaration-first,
+  and some targets need both declaration and application.
+- For the current active surface:
+  `Expression` and `Block` are effectively syntax/application-first;
+  `Parameter` already behaves like declaration plus application in bootstrap;
+  `Init` already needs that split semantically, even though generalized init
+  macro execution is still incomplete.
 - `#literal<T>` is the canonical init-targeted literal bridge form, with `T` constrained to compiler-recognized literal carrier types.
