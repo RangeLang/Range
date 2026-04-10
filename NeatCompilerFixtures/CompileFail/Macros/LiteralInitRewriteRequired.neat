@@ -1,0 +1,15 @@
+macro literal<T>(): Init { target, diagnostics in
+}
+
+construct FixtureInt {
+    value storage: IntStorage
+
+    #literal<IntLiteral>
+    init(literal: IntLiteral) {
+        self.storage = literal.storage()
+    }
+}
+
+@main {
+    value number: FixtureInt = 1
+}

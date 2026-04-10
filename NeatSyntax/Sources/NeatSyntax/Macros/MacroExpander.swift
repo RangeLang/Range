@@ -922,7 +922,7 @@ public enum MacroExpander {
                     }
                 )
             )
-            return lowerLiteralExpressionIfPossible(
+            return try lowerLiteralExpressionIfPossible(
                 expanded,
                 expectedType: expectedType,
                 macros: macros,
@@ -942,7 +942,7 @@ public enum MacroExpander {
                 }
             )
         case .integer, .double, .string, .boolean, .nilLiteral:
-            return lowerLiteralExpressionIfPossible(
+            return try lowerLiteralExpressionIfPossible(
                 expression,
                 expectedType: expectedType,
                 macros: macros,
@@ -958,7 +958,7 @@ public enum MacroExpander {
         expectedType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
         attachedLiteralConstructs: [RealizedLiteralBridge]
-    ) -> Expression {
+    ) throws -> Expression {
         guard let literalType = bootstrapLiteralType(for: expression)
         else {
             return expression
@@ -979,7 +979,7 @@ public enum MacroExpander {
             return expression
         }
 
-        return executeInitMacroRewrite(
+        guard let rewritten = executeInitMacroRewrite(
             macroName: "literal",
             bridge: bridge,
             applicationArguments: [
@@ -987,12 +987,13 @@ public enum MacroExpander {
             ],
             macros: macros
         )
-            ?? .call(
-                name: bridge.constructName,
-                arguments: [
-                    CallArgument(label: bridge.parameterLabel, value: expression)
-                ]
+        else {
+            throw ParseError(
+                "Init macro #literal for \(bridge.constructName) could not be interpreted through declaration/application rewrite semantics."
             )
+        }
+
+        return rewritten
     }
 
     static func executeInitMacroRewrite(
@@ -1018,10 +1019,8 @@ public enum MacroExpander {
     }
 
     static func initRewriteExpression(for macro: MacroDeclaration) -> Expression? {
-        for statement in macro.body {
-            guard case .expression(let expression) = statement,
-                case .call(let name, let arguments) = expression
-            else {
+        for expression in macroOperationExpressions(in: macro.body) {
+            guard case .call(let name, let arguments) = expression else {
                 continue
             }
 
