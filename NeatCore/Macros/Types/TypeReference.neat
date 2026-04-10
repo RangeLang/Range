@@ -1,2 +1,4 @@
 @core
-construct TypeReference: Syntax, SupportsRewrite<TypeReference> { }
+construct TypeReference: Syntax, SupportsRewrite<TypeReference> {
+    value displayName: String
+}
