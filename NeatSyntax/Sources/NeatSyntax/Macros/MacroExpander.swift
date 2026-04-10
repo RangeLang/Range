@@ -290,6 +290,15 @@ public enum MacroExpander {
                     attachedParameterCallables: attachedParameterCallables,
                     attachedLiteralConstructs: attachedLiteralConstructs
                 )
+            },
+            constructs: try construct.constructs.map {
+                try expand(
+                    construct: $0,
+                    macros: macros,
+                    protocols: protocols,
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
+                )
             }
         )
     }

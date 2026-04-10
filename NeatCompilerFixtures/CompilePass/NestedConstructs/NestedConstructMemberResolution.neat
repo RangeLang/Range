@@ -1,0 +1,13 @@
+construct Parent {
+    value child: Child
+
+    construct Child {
+        value text: String
+    }
+
+    function childText() -> String {
+        return self.child.text
+    }
+}
+
+@main { }

@@ -72,30 +72,82 @@ public struct DeclarationGraph {
         var registry: [String: ConstructDeclaration] = [:]
         for parsedFile in files {
             for declaration in constructs(in: parsedFile.sourceFile) {
-                let realizedInitializers = carriedProtocolInitializerMacros(
-                    for: declaration.initializers,
-                    conformances: declaration.conformances,
+                collectConstruct(
+                    declaration,
+                    qualifiedName: declaration.name,
+                    into: &registry,
                     protocols: protocols
-                )
-
-                registry[declaration.name] = ConstructDeclaration(
-                    macros: declaration.macros,
-                    kind: declaration.kind,
-                    attribute: declaration.attribute,
-                    name: declaration.name,
-                    genericParameters: declaration.genericParameters,
-                    conformances: declaration.conformances,
-                    states: declaration.states,
-                    environments: declaration.environments,
-                    bindings: declaration.bindings,
-                    deriveds: declaration.deriveds,
-                    values: declaration.values,
-                    initializers: realizedInitializers,
-                    callables: declaration.callables
                 )
             }
         }
         return registry
+    }
+
+    private static func collectConstruct(
+        _ declaration: ConstructDeclaration,
+        qualifiedName: String,
+        into registry: inout [String: ConstructDeclaration],
+        protocols: [String: ProtocolDeclaration]
+    ) {
+        let realizedInitializers = carriedProtocolInitializerMacros(
+            for: declaration.initializers,
+            conformances: declaration.conformances,
+            protocols: protocols
+        )
+
+        let qualifiedChildren = declaration.constructs.map { child in
+            qualifiedConstruct(child, qualifiedName: "\(qualifiedName).\(child.name)")
+        }
+
+        registry[qualifiedName] = ConstructDeclaration(
+            macros: declaration.macros,
+            kind: declaration.kind,
+            attribute: declaration.attribute,
+            name: qualifiedName,
+            genericParameters: declaration.genericParameters,
+            conformances: declaration.conformances,
+            states: declaration.states,
+            environments: declaration.environments,
+            bindings: declaration.bindings,
+            deriveds: declaration.deriveds,
+            values: declaration.values,
+            initializers: realizedInitializers,
+            callables: declaration.callables,
+            constructs: qualifiedChildren
+        )
+
+        for child in declaration.constructs {
+            collectConstruct(
+                child,
+                qualifiedName: "\(qualifiedName).\(child.name)",
+                into: &registry,
+                protocols: protocols
+            )
+        }
+    }
+
+    private static func qualifiedConstruct(
+        _ declaration: ConstructDeclaration,
+        qualifiedName: String
+    ) -> ConstructDeclaration {
+        ConstructDeclaration(
+            macros: declaration.macros,
+            kind: declaration.kind,
+            attribute: declaration.attribute,
+            name: qualifiedName,
+            genericParameters: declaration.genericParameters,
+            conformances: declaration.conformances,
+            states: declaration.states,
+            environments: declaration.environments,
+            bindings: declaration.bindings,
+            deriveds: declaration.deriveds,
+            values: declaration.values,
+            initializers: declaration.initializers,
+            callables: declaration.callables,
+            constructs: declaration.constructs.map {
+                qualifiedConstruct($0, qualifiedName: "\(qualifiedName).\($0.name)")
+            }
+        )
     }
 
     static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]] {
@@ -295,8 +347,8 @@ public struct DeclarationSyntaxResolver {
             return name
         case .generic(let base, _):
             return nominalName(of: base)
-        case .member(_, let name):
-            return name
+        case .member:
+            return typeReference.displayName
         case .array, .function, .optional, .variadic:
             return nil
         }
@@ -792,26 +844,45 @@ public struct DeclarationMemberResolver: Sendable {
 
     public init(constructsByName: [String: ConstructDeclaration]) {
         self.membersByConstructName = constructsByName.mapValues { construct in
+            let nestedTypeMap = Self.nestedTypeMap(for: construct)
             var propertyTypes: [String: TypeReference] = [:]
             for state in construct.states {
-                propertyTypes[state.name] = state.type
+                propertyTypes[state.name] = Self.qualifyNestedLocalTypes(
+                    state.type,
+                    using: nestedTypeMap
+                )
             }
             for environment in construct.environments {
-                propertyTypes[environment.name] = environment.type
+                propertyTypes[environment.name] = Self.qualifyNestedLocalTypes(
+                    environment.type,
+                    using: nestedTypeMap
+                )
             }
             for binding in construct.bindings {
-                propertyTypes[binding.name] = Self.simpleTypeReference(named: binding.typeName)
+                propertyTypes[binding.name] = Self.qualifyNestedLocalTypes(
+                    Self.simpleTypeReference(named: binding.typeName),
+                    using: nestedTypeMap
+                )
             }
             for derived in construct.deriveds {
-                propertyTypes[derived.name] = Self.simpleTypeReference(named: derived.typeName)
+                propertyTypes[derived.name] = Self.qualifyNestedLocalTypes(
+                    Self.simpleTypeReference(named: derived.typeName),
+                    using: nestedTypeMap
+                )
             }
             for value in construct.values {
-                propertyTypes[value.name] = Self.simpleTypeReference(named: value.typeName)
+                propertyTypes[value.name] = Self.qualifyNestedLocalTypes(
+                    Self.simpleTypeReference(named: value.typeName),
+                    using: nestedTypeMap
+                )
             }
 
             var callableReturnTypes: [String: TypeReference] = [:]
             for callable in construct.callables {
-                callableReturnTypes[callable.name] = callable.returnType ?? .named("Void")
+                callableReturnTypes[callable.name] = Self.qualifyNestedLocalTypes(
+                    callable.returnType ?? .named("Void"),
+                    using: nestedTypeMap
+                )
             }
 
             return ConstructMembers(
@@ -819,6 +890,43 @@ public struct DeclarationMemberResolver: Sendable {
                 propertyTypes: propertyTypes,
                 callableReturnTypes: callableReturnTypes
             )
+        }
+    }
+
+    private static func nestedTypeMap(for construct: ConstructDeclaration) -> [String: TypeReference] {
+        Dictionary(
+            uniqueKeysWithValues: construct.constructs.map { nested in
+                let localName = nested.name.split(separator: ".").last.map(String.init) ?? nested.name
+                return (localName, .member(base: .named(construct.name), name: localName))
+            }
+        )
+    }
+
+    private static func qualifyNestedLocalTypes(
+        _ type: TypeReference,
+        using nestedTypeMap: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return nestedTypeMap[name] ?? type
+        case .member(let base, let name):
+            return .member(base: qualifyNestedLocalTypes(base, using: nestedTypeMap), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: qualifyNestedLocalTypes(base, using: nestedTypeMap),
+                arguments: arguments.map { qualifyNestedLocalTypes($0, using: nestedTypeMap) }
+            )
+        case .array(let element):
+            return .array(qualifyNestedLocalTypes(element, using: nestedTypeMap))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { qualifyNestedLocalTypes($0, using: nestedTypeMap) },
+                returnType: qualifyNestedLocalTypes(returnType, using: nestedTypeMap)
+            )
+        case .optional(let wrapped):
+            return .optional(qualifyNestedLocalTypes(wrapped, using: nestedTypeMap))
+        case .variadic(let element):
+            return .variadic(qualifyNestedLocalTypes(element, using: nestedTypeMap))
         }
     }
 
@@ -856,8 +964,8 @@ public struct DeclarationMemberResolver: Sendable {
         switch type {
         case .named(let name):
             return (name, [])
-        case .member(_, let name):
-            return (name, [])
+        case .member:
+            return (type.displayName, [])
         case .generic(let base, let arguments):
             guard let context = constructContext(for: base) else {
                 return nil

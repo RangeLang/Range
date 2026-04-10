@@ -41,7 +41,8 @@ struct SwiftLoweredProgramAdapter {
             deriveds: construct.deriveds.map(lower(derived:)),
             values: construct.values,
             initializers: construct.initializers.map(lower(initializer:)),
-            callables: construct.callables.map(lower(callable:))
+            callables: construct.callables.map(lower(callable:)),
+            constructs: construct.constructs.map(lower(construct:))
         )
     }
 

@@ -1053,6 +1053,9 @@ private struct GraphCollector {
         for callable in declaration.callables {
             addCallable(callable, parentID: constructID)
         }
+        for nested in declaration.constructs {
+            addConstruct(nested, parentID: constructID)
+        }
 
         let scope = makeScope(
             bindings: declaration.bindings.map { ($0.name, "\(constructID)/binding:\($0.name)") },
@@ -1300,6 +1303,9 @@ private struct GraphCollector {
         constructDeclarationsByName[declaration.name] = declaration
         if declaration.isCore {
             coreConstructNames.insert(declaration.name)
+        }
+        for nested in declaration.constructs {
+            registerConstructDeclaration(nested)
         }
     }
 

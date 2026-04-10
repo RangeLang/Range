@@ -20,6 +20,7 @@ public struct ConstructDeclaration {
     public let values: [ValueDeclaration]
     public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
+    public let constructs: [ConstructDeclaration]
 
     public init(
         macros: [MacroApplication],
@@ -34,7 +35,8 @@ public struct ConstructDeclaration {
         deriveds: [DerivedDeclaration],
         values: [ValueDeclaration],
         initializers: [InitializerDeclaration],
-        callables: [CallableDeclaration]
+        callables: [CallableDeclaration],
+        constructs: [ConstructDeclaration]
     ) {
         self.macros = macros
         self.kind = kind
@@ -49,6 +51,7 @@ public struct ConstructDeclaration {
         self.values = values
         self.initializers = initializers
         self.callables = callables
+        self.constructs = constructs
     }
 
     public var isCore: Bool {

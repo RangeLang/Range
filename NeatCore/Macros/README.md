@@ -35,6 +35,9 @@ Current bootstrap rules:
 - For parameter-targeted macros, `target` may temporarily act as a contextual wrapper around the parameter and its invocation-side argument surface.
 - Single-argument attached rewrites should read from the explicit plural surface, for example `target.arguments[0].expression`, with an enclosing emptiness check when needed.
 - Rewrite and extension capability are modeled explicitly with macro-surface protocols such as `SupportsRewrite<T>` and `SupportsExtension<T>`.
+- Preferred target-surface design uses declaration/application facet values on
+  target kinds such as `Init`, with nested `Declaration` and `Application`
+  constructs defining those facet types.
 - `FunctionType` is the type-surface model for callable types like `() -> Int`; `Closure` remains the expression/value form.
 - `ArrayType` is the type-surface model for array types like `[Int]`.
 

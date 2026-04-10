@@ -1,4 +1,16 @@
 @core
 construct Init: Syntax {
-    value parameters: [Parameter]
+    value declaration: Declaration
+    value application: Application
+
+    @core
+    construct Declaration {
+        value parameters: [Parameter]
+        function expression(arguments: [Argument]) -> Expression
+    }
+
+    @core
+    construct Application: SupportsRewrite<Expression> {
+        value arguments: [Argument]
+    }
 }

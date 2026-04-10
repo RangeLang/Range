@@ -35,6 +35,7 @@ extension Parser {
         var values: [ValueDeclaration] = []
         var initializers: [InitializerDeclaration] = []
         var callables: [CallableDeclaration] = []
+        var constructs: [ConstructDeclaration] = []
 
         if peek() == .leftBrace {
             try consume(.leftBrace)
@@ -54,6 +55,7 @@ extension Parser {
                 || isValueDeclarationStart()
                 || isInitializerDeclarationStart()
                 || isCallableStart()
+                || isConstructDeclarationStart()
             {
                 syncCurrentDeclarationSymbols(
                     states: states,
@@ -84,6 +86,10 @@ extension Parser {
                 }
                 if isCallableStart() {
                     callables.append(try parseCallableDeclaration())
+                    continue
+                }
+                if isConstructDeclarationStart() || isBuilderDeclarationStart() {
+                    constructs.append(try parseConstructDeclaration(requiresEOF: false))
                     continue
                 }
 
@@ -132,7 +138,8 @@ extension Parser {
             deriveds: deriveds,
             values: values,
             initializers: initializers,
-            callables: callables
+            callables: callables,
+            constructs: constructs
         )
     }
 
@@ -171,7 +178,8 @@ extension Parser {
             deriveds: [],
             values: [],
             initializers: [],
-            callables: callables
+            callables: callables,
+            constructs: []
         )
     }
 
