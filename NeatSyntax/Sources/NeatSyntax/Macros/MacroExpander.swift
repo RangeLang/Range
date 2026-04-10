@@ -1251,11 +1251,13 @@ public enum MacroExpander {
                 continue
             }
 
-            if let rewrittenType = interpretedAttachedParameterTypeRewrite(
+            if let rewrittenType = interpretTypeReferenceRewriteExpression(
                 rewrite.payload,
-                targetBinding: targetBinding
+                bindings: [
+                    "\(targetBinding).declaration.type": typeReference
+                ]
             ) {
-                return rewrittenType.replacingTargetType(with: typeReference)
+                return rewrittenType
             }
         }
 
@@ -1359,47 +1361,6 @@ public enum MacroExpander {
         }
 
         return expression
-    }
-
-    static func interpretedAttachedParameterTypeRewrite(
-        _ expression: Expression,
-        targetBinding: String
-    ) -> AttachedParameterTypeRewrite? {
-        guard case .call(let name, let arguments) = expression else {
-            return nil
-        }
-
-        if name == "FunctionType",
-            arguments.count == 2,
-            let parametersArgument = arguments.first(where: { $0.label == "parameters" }),
-            let returnTypeArgument = arguments.first(where: { $0.label == "returnType" }),
-            case .array(let parameterExpressions) = parametersArgument.value,
-            parameterExpressions.isEmpty,
-            case .identifier(let identifier) = returnTypeArgument.value,
-            identifier == "\(targetBinding).declaration.type"
-        {
-            return .zeroParameterFunctionReturningTarget
-        }
-
-        if name == "ArrayType",
-            arguments.count == 1,
-            arguments[0].label == "element",
-            case .identifier(let identifier) = arguments[0].value,
-            identifier == "\(targetBinding).declaration.type"
-        {
-            return .arrayOfTarget
-        }
-
-        if name == "Closure",
-            arguments.count == 1,
-            arguments[0].label == nil,
-            case .identifier(let identifier) = arguments[0].value,
-            identifier == "\(targetBinding).declaration.type"
-        {
-            return .zeroParameterFunctionReturningTarget
-        }
-
-        return nil
     }
 
     static func closureBodyExpression(from expression: Expression) -> [Statement]? {
@@ -1744,6 +1705,50 @@ public enum MacroExpander {
         }
     }
 
+    static func interpretTypeReferenceRewriteExpression(
+        _ expression: Expression,
+        bindings: [String: TypeReference]
+    ) -> TypeReference? {
+        switch expression {
+        case .identifier(let name):
+            if let bound = bindings[name] {
+                return bound
+            }
+            return .named(name)
+        case .call(let name, let arguments):
+            if name == "ArrayType",
+                arguments.count == 1,
+                arguments[0].label == "element" || arguments[0].label == nil,
+                let element = interpretTypeReferenceRewriteExpression(
+                    arguments[0].value,
+                    bindings: bindings
+                )
+            {
+                return .array(element)
+            }
+
+            if name == "FunctionType",
+                let parametersArgument = arguments.first(where: { $0.label == "parameters" }),
+                let returnTypeArgument = arguments.first(where: { $0.label == "returnType" }),
+                case .array(let parameterExpressions) = parametersArgument.value,
+                let parameters = parameterExpressions.compactMap({
+                    interpretTypeReferenceRewriteExpression($0, bindings: bindings)
+                }) as [TypeReference]?,
+                parameters.count == parameterExpressions.count,
+                let returnType = interpretTypeReferenceRewriteExpression(
+                    returnTypeArgument.value,
+                    bindings: bindings
+                )
+            {
+                return .function(parameters: parameters, returnType: returnType)
+            }
+
+            return nil
+        default:
+            return nil
+        }
+    }
+
     static func resolvedRewriteCall(
         from expression: Expression,
         targetBinding: String
@@ -1962,20 +1967,6 @@ public enum MacroExpander {
             ]
         default:
             return [statement]
-        }
-    }
-}
-
-enum AttachedParameterTypeRewrite {
-    case zeroParameterFunctionReturningTarget
-    case arrayOfTarget
-
-    func replacingTargetType(with typeReference: TypeReference) -> TypeReference {
-        switch self {
-        case .zeroParameterFunctionReturningTarget:
-            return .function(parameters: [], returnType: typeReference)
-        case .arrayOfTarget:
-            return .array(typeReference)
         }
     }
 }
