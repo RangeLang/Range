@@ -1,8 +1,8 @@
 macro literal<T>(): Init { target, diagnostics in
-    if target.calls.count == 1 && target.calls[0].arguments.count == 1 && target.calls[0].arguments[0].type == T.self {
-        target.rewrite(
-            target.expression(arguments: [
-                target.calls[0].arguments[0]
+    if target.application.arguments.count == 1 && target.application.arguments[0].type == T.self {
+        target.application.rewrite(
+            target.declaration.expression(arguments: [
+                target.application.arguments[0]
             ])
         )
     }

@@ -66,6 +66,8 @@ Current status:
   graph-backed literal bridge realization.
 - Protocol initializer requirements may also carry `#literal<T>` onto
   conforming initializers through declaration-graph realization.
+- The core `literal` declaration now uses declaration/application facet syntax
+  on `Init` to match the preferred target-surface model.
 - General `Init` macro body execution is not implemented yet.
 - `literal` currently works through declaration-graph literal bridge semantics
   rather than a fully generalized init-macro execution path.

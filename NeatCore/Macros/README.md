@@ -46,6 +46,10 @@ Current `Init`-targeted status:
 - Concrete `#literal<T>` attachment already participates in graph-backed literal bridge realization.
 - Protocol init requirements are parsed and keep their carried macros.
 - Conforming initializers inherit carried init macros through conformance matching.
-- General `Init` macro body execution is still the missing piece; `literal` currently lowers through declaration-graph literal bridge semantics.
+- The `Init` surface now models `target.declaration` and `target.application`,
+  and `literal` is written in that shape in NeatCore.
+- General `Init` macro body execution is still the missing piece; `literal`
+  currently lowers through declaration-graph literal bridge semantics rather
+  than executing that body generically.
 
 This is a temporary bootstrap shape. The surface is being promoted out of `Exploration` only when the model is settled enough to support real compiler behavior.

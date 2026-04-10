@@ -71,6 +71,20 @@ Current preferred `Init` shape:
 }
 ```
 
+Current `literal` declaration in that shape:
+
+```neat
+macro literal<T>(): Init { target, diagnostics in
+    if target.application.arguments.count == 1 && target.application.arguments[0].type == T.self {
+        target.application.rewrite(
+            target.declaration.expression(arguments: [
+                target.application.arguments[0]
+            ])
+        )
+    }
+}
+```
+
 This keeps the model clean:
 
 - `Init` remains the target kind
