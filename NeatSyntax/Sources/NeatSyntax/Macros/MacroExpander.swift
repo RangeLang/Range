@@ -11,6 +11,19 @@ enum AttachedParameterRewriteShape {
     case variadic
 }
 
+enum ResolvedRewriteSite {
+    case targetDirect
+    case initApplication
+    case parameterDeclarationType
+    case parameterApplicationArguments
+    case parameterApplicationArgument
+}
+
+struct ResolvedRewriteCall {
+    let site: ResolvedRewriteSite
+    let payload: Expression
+}
+
 public enum MacroExpander {
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
@@ -1020,17 +1033,16 @@ public enum MacroExpander {
 
     static func initRewriteExpression(for macro: MacroDeclaration) -> Expression? {
         for expression in macroOperationExpressions(in: macro.body) {
-            guard case .call(let name, let arguments) = expression else {
-                continue
-            }
-
-            guard name == "\(macro.bindings.target).application.rewrite",
-                arguments.count == 1
+            guard let rewrite = resolvedRewriteCall(
+                from: expression,
+                targetBinding: macro.bindings.target
+            ),
+                rewrite.site == .initApplication
             else {
                 continue
             }
 
-            return arguments[0].value
+            return rewrite.payload
         }
 
         return nil
@@ -1230,15 +1242,17 @@ public enum MacroExpander {
     ) -> TypeReference {
         let targetBinding = macro.bindings.target
         for expression in macroOperationExpressions(in: macro.body) {
-            guard case .call(let name, let arguments) = expression,
-                name == "\(targetBinding).declaration.type.rewrite",
-                arguments.count == 1
+            guard let rewrite = resolvedRewriteCall(
+                from: expression,
+                targetBinding: targetBinding
+            ),
+                rewrite.site == .parameterDeclarationType
             else {
                 continue
             }
 
             if let rewrittenType = interpretedAttachedParameterTypeRewrite(
-                arguments[0].value,
+                rewrite.payload,
                 targetBinding: targetBinding
             ) {
                 return rewrittenType.replacingTargetType(with: typeReference)
@@ -1256,16 +1270,18 @@ public enum MacroExpander {
         let primaryArgument = arguments.first ?? CallArgument(label: nil, value: .array([]))
 
         for expression in macroOperationExpressions(in: macro.body) {
-            guard case .call(let name, let rewriteArguments) = expression,
-                name == "\(targetBinding).application.arguments.rewrite"
-                    || name == "\(targetBinding).application.argument.rewrite",
-                rewriteArguments.count == 1
+            guard let rewrite = resolvedRewriteCall(
+                from: expression,
+                targetBinding: targetBinding
+            ),
+                rewrite.site == .parameterApplicationArguments
+                    || rewrite.site == .parameterApplicationArgument
             else {
                 continue
             }
 
             let substituted = substituteMacroBindings(
-                in: rewriteArguments[0].value,
+                in: rewrite.payload,
                 bindings: [
                     "\(targetBinding).application.arguments[0].expression": primaryArgument.value,
                     "\(targetBinding).application.arguments": .array(arguments.map(\.value)),
@@ -1286,15 +1302,17 @@ public enum MacroExpander {
     ) -> AttachedParameterRewriteShape {
         let targetBinding = macro.bindings.target
         for expression in macroOperationExpressions(in: macro.body) {
-            guard case .call(let name, let arguments) = expression,
-                name == "\(targetBinding).application.arguments.rewrite"
-                    || name == "\(targetBinding).application.argument.rewrite",
-                arguments.count == 1
+            guard let rewrite = resolvedRewriteCall(
+                from: expression,
+                targetBinding: targetBinding
+            ),
+                rewrite.site == .parameterApplicationArguments
+                    || rewrite.site == .parameterApplicationArgument
             else {
                 continue
             }
 
-            if case .identifier(let identifier) = arguments[0].value,
+            if case .identifier(let identifier) = rewrite.payload,
                 identifier == "\(targetBinding).application.arguments"
             {
                 return .variadic
@@ -1410,19 +1428,16 @@ public enum MacroExpander {
         var rewriteCalls: [[Statement]] = []
 
         for statement in macro.body {
-            guard case .expression(let expression) = statement else {
+            guard case .expression(let expression) = statement,
+                let rewrite = resolvedRewriteCall(
+                    from: expression,
+                    targetBinding: macro.bindings.target
+                ),
+                rewrite.site == .targetDirect
+            else {
                 continue
             }
-            guard case .call(let name, let arguments) = expression else {
-                continue
-            }
-            guard name == "\(macro.bindings.target).rewrite" else {
-                continue
-            }
-            guard arguments.count == 1 else {
-                continue
-            }
-            guard case .block(let body) = arguments[0].value else {
+            guard case .block(let body) = rewrite.payload else {
                 throw ParseError(
                     "Macro #\(macro.name) target.rewrite(...) must receive a block expression for Block-targeted macros."
                 )
@@ -1447,19 +1462,16 @@ public enum MacroExpander {
         var rewriteExpressions: [Expression] = []
 
         for statement in macro.body {
-            guard case .expression(let expression) = statement else {
+            guard case .expression(let expression) = statement,
+                let rewrite = resolvedRewriteCall(
+                    from: expression,
+                    targetBinding: macro.bindings.target
+                ),
+                rewrite.site == .targetDirect
+            else {
                 continue
             }
-            guard case .call(let name, let arguments) = expression else {
-                continue
-            }
-            guard name == "\(macro.bindings.target).rewrite" else {
-                continue
-            }
-            guard arguments.count == 1 else {
-                continue
-            }
-            rewriteExpressions.append(arguments[0].value)
+            rewriteExpressions.append(rewrite.payload)
         }
 
         guard let rewriteExpression = rewriteExpressions.first else {
@@ -1730,6 +1742,37 @@ public enum MacroExpander {
         case .integer, .double, .string, .boolean, .nilLiteral, .bindingReference:
             return expression
         }
+    }
+
+    static func resolvedRewriteCall(
+        from expression: Expression,
+        targetBinding: String
+    ) -> ResolvedRewriteCall? {
+        guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
+            return nil
+        }
+
+        let site: ResolvedRewriteSite?
+        switch name {
+        case "\(targetBinding).rewrite":
+            site = .targetDirect
+        case "\(targetBinding).application.rewrite":
+            site = .initApplication
+        case "\(targetBinding).declaration.type.rewrite":
+            site = .parameterDeclarationType
+        case "\(targetBinding).application.arguments.rewrite":
+            site = .parameterApplicationArguments
+        case "\(targetBinding).application.argument.rewrite":
+            site = .parameterApplicationArgument
+        default:
+            site = nil
+        }
+
+        guard let site else {
+            return nil
+        }
+
+        return ResolvedRewriteCall(site: site, payload: arguments[0].value)
     }
 
     static func renderExpressionForStringify(_ expression: Expression) -> String {

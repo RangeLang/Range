@@ -53,6 +53,9 @@ Current status:
 - They already use declaration plus application-side behavior:
   the macro is attached to a parameter declaration, while expansion rewrites the
   callable signature and the invocation arguments together.
+- Rewrite-site matching is now centralized through a shared resolved
+  rewrite-target layer in the expander, though payload interpretation is still
+  narrower than the surface ultimately wants.
 
 ### `Init`
 
@@ -71,6 +74,8 @@ Current status:
 - `literal` now executes through the `Init` declaration/application rewrite
   path, and malformed `literal` rewrites fail explicitly rather than silently
   falling back.
+- Rewrite-site matching for `Init` now also goes through the shared resolved
+  rewrite-target layer rather than a separate ad hoc rewrite-call matcher.
 - Fully generalized `Init` macro execution for arbitrary init-targeted macros
   is not implemented yet.
 
