@@ -172,7 +172,7 @@ macro lock(): Block { target, diagnostics in
 ```neat
 macro clamped(min: Int, max: Int): Property { target, diagnostics in
     target.bindingKind
-    target.type
+    target.declaration.type
     target.owner
 }
 ```

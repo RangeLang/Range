@@ -7,7 +7,7 @@ macro clamped(min: Int, max: Int): Attached<State> { target, result, diagnostics
     result.rewrite(
         State(
             name: target.name,
-            type: target.type,
+            type: target.declaration.type,
             default: nil,
             accessors: AccessorDeclaration(
                 getter: {
@@ -23,7 +23,7 @@ macro clamped(min: Int, max: Int): Attached<State> { target, result, diagnostics
     result.member(
         State(
             name: backingName,
-            type: target.type,
+            type: target.declaration.type,
             default: target.default,
             accessors: nil
         )

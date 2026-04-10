@@ -59,7 +59,7 @@ macro viewBuilder: Attached<Derived> { target, result, diagnostics in
     result.rewrite(
         Derived(
             name: target.name,
-            type: target.type,
+            type: target.declaration.type,
             body: {
                 lower(target.body)
             }

@@ -1,11 +1,11 @@
 // Exploratory variadic macro example.
 // This file is for design iteration only.
 
-macro variadic: Attached<Parameter> { target, result, diagnostics in
-    if !target.arguments.isEmpty {
-        result.argument.rewrite(
+macro variadic(): Parameter { target, diagnostics in
+    if !target.application.arguments.isEmpty {
+        target.application.argument.rewrite(
             ArrayExpression(
-                elements: target.arguments.map { $0.value }
+                elements: target.application.arguments.map { $0.value }
             )
         )
     }

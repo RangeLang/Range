@@ -1226,9 +1226,7 @@ public enum MacroExpander {
         let targetBinding = macro.bindings.target
         for expression in macroOperationExpressions(in: macro.body) {
             guard case .call(let name, let arguments) = expression,
-                name == "\(targetBinding).parameter.type.rewrite"
-                    || name == "\(targetBinding).type.rewrite"
-                    || name == "\(targetBinding).declaration.type.rewrite",
+                name == "\(targetBinding).declaration.type.rewrite",
                 arguments.count == 1
             else {
                 continue
@@ -1254,9 +1252,7 @@ public enum MacroExpander {
 
         for expression in macroOperationExpressions(in: macro.body) {
             guard case .call(let name, let rewriteArguments) = expression,
-                name == "\(targetBinding).arguments.rewrite"
-                    || name == "\(targetBinding).argument.rewrite"
-                    || name == "\(targetBinding).application.arguments.rewrite"
+                name == "\(targetBinding).application.arguments.rewrite"
                     || name == "\(targetBinding).application.argument.rewrite",
                 rewriteArguments.count == 1
             else {
@@ -1266,9 +1262,7 @@ public enum MacroExpander {
             let substituted = substituteMacroBindings(
                 in: rewriteArguments[0].value,
                 bindings: [
-                    "\(targetBinding).arguments[0].expression": primaryArgument.value,
                     "\(targetBinding).application.arguments[0].expression": primaryArgument.value,
-                    "\(targetBinding).arguments": .array(arguments.map(\.value)),
                     "\(targetBinding).application.arguments": .array(arguments.map(\.value)),
                 ]
             )
@@ -1288,9 +1282,7 @@ public enum MacroExpander {
         let targetBinding = macro.bindings.target
         for expression in macroOperationExpressions(in: macro.body) {
             guard case .call(let name, let arguments) = expression,
-                name == "\(targetBinding).arguments.rewrite"
-                    || name == "\(targetBinding).argument.rewrite"
-                    || name == "\(targetBinding).application.arguments.rewrite"
+                name == "\(targetBinding).application.arguments.rewrite"
                     || name == "\(targetBinding).application.argument.rewrite",
                 arguments.count == 1
             else {
@@ -1298,8 +1290,7 @@ public enum MacroExpander {
             }
 
             if case .identifier(let identifier) = arguments[0].value,
-                identifier == "\(targetBinding).arguments"
-                    || identifier == "\(targetBinding).application.arguments"
+                identifier == "\(targetBinding).application.arguments"
             {
                 return .variadic
             }
@@ -1362,9 +1353,7 @@ public enum MacroExpander {
             case .array(let parameterExpressions) = parametersArgument.value,
             parameterExpressions.isEmpty,
             case .identifier(let identifier) = returnTypeArgument.value,
-            identifier == "\(targetBinding).parameter.type"
-                || identifier == "\(targetBinding).type"
-                || identifier == "\(targetBinding).declaration.type"
+            identifier == "\(targetBinding).declaration.type"
         {
             return .zeroParameterFunctionReturningTarget
         }
@@ -1373,9 +1362,7 @@ public enum MacroExpander {
             arguments.count == 1,
             arguments[0].label == "element",
             case .identifier(let identifier) = arguments[0].value,
-            identifier == "\(targetBinding).parameter.type"
-                || identifier == "\(targetBinding).type"
-                || identifier == "\(targetBinding).declaration.type"
+            identifier == "\(targetBinding).declaration.type"
         {
             return .arrayOfTarget
         }
@@ -1384,9 +1371,7 @@ public enum MacroExpander {
             arguments.count == 1,
             arguments[0].label == nil,
             case .identifier(let identifier) = arguments[0].value,
-            identifier == "\(targetBinding).parameter.type"
-                || identifier == "\(targetBinding).type"
-                || identifier == "\(targetBinding).declaration.type"
+            identifier == "\(targetBinding).declaration.type"
         {
             return .zeroParameterFunctionReturningTarget
         }

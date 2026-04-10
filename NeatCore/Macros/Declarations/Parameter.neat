@@ -15,9 +15,4 @@ construct Parameter: Syntax {
     construct Application: SupportsRewrite<Expression> {
         value arguments: [Argument]
     }
-
-    value externalName: String?
-    value localName: String
-    value type: TypeReference
-    value defaultValue: Expression?
 }
