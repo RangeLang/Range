@@ -80,6 +80,26 @@ This keeps the model clean:
 - `Application` describes the single canonical application-side access
 - the compiler still owns how those surfaces are materialized during expansion
 
+Current aligned `Parameter` shape:
+
+```neat
+@core construct Parameter: Syntax {
+    value declaration: Declaration
+    value application: Application
+
+    construct Declaration {
+        value externalName: String?
+        value localName: String
+        value type: TypeReference
+        value defaultValue: Expression?
+    }
+
+    construct Application: SupportsRewrite<Expression> {
+        value arguments: [Argument]
+    }
+}
+```
+
 ## Properties
 
 - Expression-targeted macros receive expression syntax directly
@@ -185,7 +205,8 @@ Function
   and some targets need both declaration and application.
 - For the current active surface:
   `Expression` and `Block` are effectively syntax/application-first;
-  `Parameter` already behaves like declaration plus application in bootstrap;
+  `Parameter` now uses declaration plus application facets in the active
+  bootstrap surface;
   `Init` already needs that split semantically, even though generalized init
   macro execution is still incomplete.
 - `#literal<T>` is the canonical init-targeted literal bridge form, with `T` constrained to compiler-recognized literal carrier types.

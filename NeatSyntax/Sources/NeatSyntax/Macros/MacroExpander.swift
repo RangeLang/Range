@@ -1064,10 +1064,12 @@ public enum MacroExpander {
         macro: MacroDeclaration,
         to typeReference: TypeReference
     ) -> TypeReference {
+        let targetBinding = macro.bindings.target
         for expression in macroOperationExpressions(in: macro.body) {
             guard case .call(let name, let arguments) = expression,
-                name == "\(macro.bindings.target).parameter.type.rewrite"
-                    || name == "\(macro.bindings.target).type.rewrite",
+                name == "\(targetBinding).parameter.type.rewrite"
+                    || name == "\(targetBinding).type.rewrite"
+                    || name == "\(targetBinding).declaration.type.rewrite",
                 arguments.count == 1
             else {
                 continue
@@ -1075,7 +1077,7 @@ public enum MacroExpander {
 
             if let rewrittenType = interpretedAttachedParameterTypeRewrite(
                 arguments[0].value,
-                targetBinding: macro.bindings.target
+                targetBinding: targetBinding
             ) {
                 return rewrittenType.replacingTargetType(with: typeReference)
             }
@@ -1088,12 +1090,15 @@ public enum MacroExpander {
         macro: MacroDeclaration,
         arguments: [CallArgument]
     ) -> CallArgument {
+        let targetBinding = macro.bindings.target
         let primaryArgument = arguments.first ?? CallArgument(label: nil, value: .array([]))
 
         for expression in macroOperationExpressions(in: macro.body) {
             guard case .call(let name, let rewriteArguments) = expression,
-                name == "\(macro.bindings.target).arguments.rewrite"
-                    || name == "\(macro.bindings.target).argument.rewrite",
+                name == "\(targetBinding).arguments.rewrite"
+                    || name == "\(targetBinding).argument.rewrite"
+                    || name == "\(targetBinding).application.arguments.rewrite"
+                    || name == "\(targetBinding).application.argument.rewrite",
                 rewriteArguments.count == 1
             else {
                 continue
@@ -1102,8 +1107,10 @@ public enum MacroExpander {
             let substituted = substituteMacroBindings(
                 in: rewriteArguments[0].value,
                 bindings: [
-                    "\(macro.bindings.target).arguments[0].expression": primaryArgument.value,
-                    "\(macro.bindings.target).arguments": .array(arguments.map(\.value)),
+                    "\(targetBinding).arguments[0].expression": primaryArgument.value,
+                    "\(targetBinding).application.arguments[0].expression": primaryArgument.value,
+                    "\(targetBinding).arguments": .array(arguments.map(\.value)),
+                    "\(targetBinding).application.arguments": .array(arguments.map(\.value)),
                 ]
             )
 
@@ -1119,17 +1126,21 @@ public enum MacroExpander {
     static func attachedParameterRewriteShape(
         for macro: MacroDeclaration
     ) -> AttachedParameterRewriteShape {
+        let targetBinding = macro.bindings.target
         for expression in macroOperationExpressions(in: macro.body) {
             guard case .call(let name, let arguments) = expression,
-                name == "\(macro.bindings.target).arguments.rewrite"
-                    || name == "\(macro.bindings.target).argument.rewrite",
+                name == "\(targetBinding).arguments.rewrite"
+                    || name == "\(targetBinding).argument.rewrite"
+                    || name == "\(targetBinding).application.arguments.rewrite"
+                    || name == "\(targetBinding).application.argument.rewrite",
                 arguments.count == 1
             else {
                 continue
             }
 
             if case .identifier(let identifier) = arguments[0].value,
-                identifier == "\(macro.bindings.target).arguments"
+                identifier == "\(targetBinding).arguments"
+                    || identifier == "\(targetBinding).application.arguments"
             {
                 return .variadic
             }
@@ -1194,6 +1205,7 @@ public enum MacroExpander {
             case .identifier(let identifier) = returnTypeArgument.value,
             identifier == "\(targetBinding).parameter.type"
                 || identifier == "\(targetBinding).type"
+                || identifier == "\(targetBinding).declaration.type"
         {
             return .zeroParameterFunctionReturningTarget
         }
@@ -1204,6 +1216,7 @@ public enum MacroExpander {
             case .identifier(let identifier) = arguments[0].value,
             identifier == "\(targetBinding).parameter.type"
                 || identifier == "\(targetBinding).type"
+                || identifier == "\(targetBinding).declaration.type"
         {
             return .arrayOfTarget
         }
@@ -1214,6 +1227,7 @@ public enum MacroExpander {
             case .identifier(let identifier) = arguments[0].value,
             identifier == "\(targetBinding).parameter.type"
                 || identifier == "\(targetBinding).type"
+                || identifier == "\(targetBinding).declaration.type"
         {
             return .zeroParameterFunctionReturningTarget
         }

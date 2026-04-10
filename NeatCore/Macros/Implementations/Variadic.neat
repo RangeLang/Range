@@ -1,9 +1,9 @@
 macro variadic(): Parameter { target, diagnostics in
-    target.parameter.type.rewrite(
+    target.declaration.type.rewrite(
         ArrayType(
-            element: target.parameter.type
+            element: target.declaration.type
         )
     )
 
-    target.arguments.rewrite(target.arguments)
+    target.application.arguments.rewrite(target.application.arguments)
 }

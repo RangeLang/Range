@@ -1,16 +1,16 @@
 macro autoclosure(): Parameter { target, diagnostics in
-    target.parameter.type.rewrite(
+    target.declaration.type.rewrite(
         FunctionType(
             parameters: [],
-            returnType: target.parameter.type
+            returnType: target.declaration.type
         )
     )
 
-    if !target.arguments.isEmpty {
-        target.arguments.rewrite(
+    if !target.application.arguments.isEmpty {
+        target.application.arguments.rewrite(
             Closure(
                 body: {
-                    target.arguments[0].expression
+                    target.application.arguments[0].expression
                 }
             )
         )

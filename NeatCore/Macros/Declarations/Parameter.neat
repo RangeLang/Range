@@ -1,5 +1,21 @@
 @core
 construct Parameter: Syntax {
+    value declaration: Declaration
+    value application: Application
+
+    @core
+    construct Declaration {
+        value externalName: String?
+        value localName: String
+        value type: TypeReference
+        value defaultValue: Expression?
+    }
+
+    @core
+    construct Application: SupportsRewrite<Expression> {
+        value arguments: [Argument]
+    }
+
     value externalName: String?
     value localName: String
     value type: TypeReference
