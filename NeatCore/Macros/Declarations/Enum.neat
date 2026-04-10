@@ -1,0 +1,18 @@
+@core
+construct Enum: Syntax {
+    value name: String
+    value self: TypeReference
+    value cases: [Case]
+
+    @core
+    construct Case {
+        value name: String
+        value associatedValues: [AssociatedValue]
+    }
+
+    @core
+    construct AssociatedValue {
+        value label: String?
+        value type: TypeReference
+    }
+}

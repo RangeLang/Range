@@ -38,6 +38,9 @@ Expression -> application-facing
 Block      -> application-facing
 Parameter  -> declaration + application
 Init       -> declaration + application
+Function   -> declaration + application
+Construct  -> declaration-facing
+Enum       -> declaration-facing
 ```
 
 This does not mean the compiler should attach application data directly onto the
@@ -114,6 +117,26 @@ Current aligned `Parameter` shape:
 }
 ```
 
+Current preferred `Function` shape:
+
+```neat
+@core
+construct Function: Syntax {
+    value declaration: Declaration
+    value application: Application
+
+    construct Declaration {
+        value name: String
+        value parameters: [Parameter]
+        value returnType: TypeReference?
+    }
+
+    construct Application: SupportsRewrite<Expression> {
+        value arguments: [Argument]
+    }
+}
+```
+
 ## Properties
 
 - Expression-targeted macros receive expression syntax directly
@@ -136,10 +159,18 @@ macro lock(): Block { target, diagnostics in
 
 ```neat
 macro codable(): Construct { target, diagnostics in
-    target.values
-    target.states
-    target.bindings
-    target.deriveds
+    target.name
+    target.self
+    target.inits
+    target.functions
+}
+```
+
+```neat
+macro iterable(): Enum { target, diagnostics in
+    target.name
+    target.self
+    target.cases
 }
 ```
 

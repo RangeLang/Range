@@ -1,0 +1,8 @@
+@core
+construct Construct: Syntax {
+    value name: String
+    value self: TypeReference
+    value inits: [Init]
+    value functions: [Function]
+    value constructs: [Construct]
+}
