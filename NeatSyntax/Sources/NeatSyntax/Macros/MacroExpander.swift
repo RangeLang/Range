@@ -979,9 +979,10 @@ public enum MacroExpander {
             return expression
         }
 
-        return interpretLiteralInitMacroRewrite(
-            literalExpression: expression,
+        return executeInitMacroRewrite(
+            macroName: "literal",
             bridge: bridge,
+            applicationArguments: [expression],
             macros: macros
         )
             ?? .call(
@@ -992,12 +993,13 @@ public enum MacroExpander {
             )
     }
 
-    static func interpretLiteralInitMacroRewrite(
-        literalExpression: Expression,
+    static func executeInitMacroRewrite(
+        macroName: String,
         bridge: RealizedLiteralBridge,
+        applicationArguments: [Expression],
         macros: [String: MacroDeclaration]
     ) -> Expression? {
-        guard let macro = macros["literal"], macro.target.typeReference.displayName == "Init" else {
+        guard let macro = macros[macroName], macro.target.typeReference.displayName == "Init" else {
             return nil
         }
 
@@ -1005,10 +1007,10 @@ public enum MacroExpander {
             return nil
         }
 
-        return interpretInitRewriteExpression(
+        return executeInitRewriteExpression(
             rewriteExpression,
             targetBinding: macro.bindings.target,
-            literalExpression: literalExpression,
+            applicationArguments: applicationArguments,
             bridge: bridge
         )
     }
@@ -1034,10 +1036,10 @@ public enum MacroExpander {
         return nil
     }
 
-    static func interpretInitRewriteExpression(
+    static func executeInitRewriteExpression(
         _ expression: Expression,
         targetBinding: String,
-        literalExpression: Expression,
+        applicationArguments: [Expression],
         bridge: RealizedLiteralBridge
     ) -> Expression? {
         guard case .call(let name, let arguments) = expression else {
@@ -1055,10 +1057,10 @@ public enum MacroExpander {
         }
 
         let rewrittenArguments = values.compactMap {
-            interpretInitApplicationArgument(
+            resolveInitApplicationArgument(
                 $0,
                 targetBinding: targetBinding,
-                literalExpression: literalExpression
+                applicationArguments: applicationArguments
             )
         }
 
@@ -1074,18 +1076,19 @@ public enum MacroExpander {
         )
     }
 
-    static func interpretInitApplicationArgument(
+    static func resolveInitApplicationArgument(
         _ expression: Expression,
         targetBinding: String,
-        literalExpression: Expression
+        applicationArguments: [Expression]
     ) -> Expression? {
         switch expression {
         case .identifier(let identifier):
+            let firstArgument = applicationArguments.first
             if identifier == "\(targetBinding).application.arguments[0]"
                 || identifier == "\(targetBinding).application.arguments[0].expression"
                 || identifier == "\(targetBinding).calls[0].arguments[0]"
             {
-                return literalExpression
+                return firstArgument
             }
             return nil
         default:
