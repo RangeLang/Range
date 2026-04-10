@@ -13,8 +13,8 @@ Current macro surface is split into:
 the current implementation status of each macro target kind.
 
 `NeatSyntax/Sources/NeatSyntax/Macros/Macros.Context.md` documents the current
-target-surface model, including the conceptual `MacroTarget<T>` split between
-declaration-side and application-side macro access where needed.
+target-surface model, including declaration-side and application-side macro
+access where needed.
 
 Current bootstrap rules:
 
@@ -33,6 +33,7 @@ Current bootstrap rules:
 - The compiler recognizes carrier types and literal categories; the macro model defines how the bridge is realized on concrete initializers, with protocol carry as an extension of that same rule.
 - Macro closures currently use only `target` and `diagnostics`; bootstrap work should not add extra bindings.
 - Parameter now uses explicit declaration/application facet values on its macro surface.
+- `Init` literal lowering now also executes through explicit declaration/application facet semantics.
 - Single-argument attached rewrites should read from the explicit plural application surface, for example `target.application.arguments[0].expression`, with an enclosing emptiness check when needed.
 - Rewrite and extension capability are modeled explicitly with macro-surface protocols such as `SupportsRewrite<T>` and `SupportsExtension<T>`.
 - Preferred target-surface design uses declaration/application facet values on
@@ -48,8 +49,10 @@ Current `Init`-targeted status:
 - Conforming initializers inherit carried init macros through conformance matching.
 - The `Init` surface now models `target.declaration` and `target.application`,
   and `literal` is written in that shape in NeatCore.
-- General `Init` macro body execution is still the missing piece; `literal`
-  currently lowers through declaration-graph literal bridge semantics rather
-  than executing that body generically.
+- Literal bridge lowering now executes through the authoritative `Init`
+  declaration/application rewrite path for `literal`, with an explicit
+  diagnostic if that rewrite cannot be interpreted.
+- Full generalized `Init` macro execution for arbitrary init-targeted macros is
+  still a remaining step beyond `literal`.
 
 This is a temporary bootstrap shape. The surface is being promoted out of `Exploration` only when the model is settled enough to support real compiler behavior.

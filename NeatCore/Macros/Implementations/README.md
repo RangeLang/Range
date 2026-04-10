@@ -68,16 +68,19 @@ Current status:
   conforming initializers through declaration-graph realization.
 - The core `literal` declaration now uses declaration/application facet syntax
   on `Init` to match the preferred target-surface model.
-- General `Init` macro body execution is not implemented yet.
-- `literal` currently works through declaration-graph literal bridge semantics
-  rather than a fully generalized init-macro execution path.
+- `literal` now executes through the `Init` declaration/application rewrite
+  path, and malformed `literal` rewrites fail explicitly rather than silently
+  falling back.
+- Fully generalized `Init` macro execution for arbitrary init-targeted macros
+  is not implemented yet.
 
 ## Current Rule Of Thumb
 
 - `Expression` and `Block` are the most complete macro targets today.
 - `Parameter` is real, but still bootstrap-shaped.
-- `Init` has real language surface and real graph participation, but not yet a
-  generalized body-execution model.
+- `Init` now has real language surface, graph participation, and an
+  authoritative execution path for `literal`, but not yet a generalized
+  body-execution model for arbitrary init macros.
 
 ## Important Separation
 
@@ -97,8 +100,9 @@ Examples of contextual information include:
 - matched construction or call application
 - expected type during expansion
 
-This is the main remaining design gap for normalizing `Init` and future
-declaration-targeted macros.
+The main remaining gap is no longer `literal` itself, but widening the same
+execution model to arbitrary `Init` macros and then applying similar cleanup to
+other declaration-targeted targets.
 
 ## Gaps To Cover Next
 

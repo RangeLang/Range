@@ -221,6 +221,6 @@ Function
   `Expression` and `Block` are effectively syntax/application-first;
   `Parameter` now uses declaration plus application facets in the active
   bootstrap surface;
-  `Init` already needs that split semantically, even though generalized init
-  macro execution is still incomplete.
+  `Init` now uses declaration plus application facets authoritatively for
+  `literal`, even though generalized init macro execution is still incomplete.
 - `#literal<T>` is the canonical init-targeted literal bridge form, with `T` constrained to compiler-recognized literal carrier types.
