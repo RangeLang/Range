@@ -1024,8 +1024,7 @@ public enum MacroExpander {
                 continue
             }
 
-            guard name == "\(macro.bindings.target).application.rewrite"
-                    || name == "\(macro.bindings.target).rewrite",
+            guard name == "\(macro.bindings.target).application.rewrite",
                 arguments.count == 1
             else {
                 continue
@@ -1047,8 +1046,7 @@ public enum MacroExpander {
             return nil
         }
 
-        guard name == "\(targetBinding).declaration.expression"
-                || name == "\(targetBinding).expression",
+        guard name == "\(targetBinding).declaration.expression",
             arguments.count == 1,
             arguments[0].label == "arguments" || arguments[0].label == nil,
             case .array(let values) = arguments[0].value
@@ -1102,10 +1100,7 @@ public enum MacroExpander {
         targetBinding: String,
         applicationArguments: [CallArgument]
     ) -> CallArgument? {
-        let wholePrefixes = [
-            "\(targetBinding).application.arguments[",
-            "\(targetBinding).calls[0].arguments[",
-        ]
+        let wholePrefixes = ["\(targetBinding).application.arguments["]
         let expressionPrefix = "\(targetBinding).application.arguments["
 
         for prefix in wholePrefixes {
