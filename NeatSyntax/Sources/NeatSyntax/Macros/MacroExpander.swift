@@ -925,6 +925,7 @@ public enum MacroExpander {
             return lowerLiteralExpressionIfPossible(
                 expanded,
                 expectedType: expectedType,
+                macros: macros,
                 attachedLiteralConstructs: attachedLiteralConstructs
             )
         case .block(let body):
@@ -944,6 +945,7 @@ public enum MacroExpander {
             return lowerLiteralExpressionIfPossible(
                 expression,
                 expectedType: expectedType,
+                macros: macros,
                 attachedLiteralConstructs: attachedLiteralConstructs
             )
         case .identifier, .bindingReference:
@@ -954,6 +956,7 @@ public enum MacroExpander {
     static func lowerLiteralExpressionIfPossible(
         _ expression: Expression,
         expectedType: TypeReference? = nil,
+        macros: [String: MacroDeclaration],
         attachedLiteralConstructs: [RealizedLiteralBridge]
     ) -> Expression {
         guard let literalType = bootstrapLiteralType(for: expression)
@@ -976,12 +979,118 @@ public enum MacroExpander {
             return expression
         }
 
+        return interpretLiteralInitMacroRewrite(
+            literalExpression: expression,
+            bridge: bridge,
+            macros: macros
+        )
+            ?? .call(
+                name: bridge.constructName,
+                arguments: [
+                    CallArgument(label: bridge.parameterLabel, value: expression)
+                ]
+            )
+    }
+
+    static func interpretLiteralInitMacroRewrite(
+        literalExpression: Expression,
+        bridge: RealizedLiteralBridge,
+        macros: [String: MacroDeclaration]
+    ) -> Expression? {
+        guard let macro = macros["literal"], macro.target.typeReference.displayName == "Init" else {
+            return nil
+        }
+
+        guard let rewriteExpression = initRewriteExpression(for: macro) else {
+            return nil
+        }
+
+        return interpretInitRewriteExpression(
+            rewriteExpression,
+            targetBinding: macro.bindings.target,
+            literalExpression: literalExpression,
+            bridge: bridge
+        )
+    }
+
+    static func initRewriteExpression(for macro: MacroDeclaration) -> Expression? {
+        for statement in macro.body {
+            guard case .expression(let expression) = statement,
+                case .call(let name, let arguments) = expression
+            else {
+                continue
+            }
+
+            guard name == "\(macro.bindings.target).application.rewrite"
+                    || name == "\(macro.bindings.target).rewrite",
+                arguments.count == 1
+            else {
+                continue
+            }
+
+            return arguments[0].value
+        }
+
+        return nil
+    }
+
+    static func interpretInitRewriteExpression(
+        _ expression: Expression,
+        targetBinding: String,
+        literalExpression: Expression,
+        bridge: RealizedLiteralBridge
+    ) -> Expression? {
+        guard case .call(let name, let arguments) = expression else {
+            return nil
+        }
+
+        guard name == "\(targetBinding).declaration.expression"
+                || name == "\(targetBinding).expression",
+            arguments.count == 1,
+            arguments[0].label == "arguments" || arguments[0].label == nil,
+            case .array(let values) = arguments[0].value,
+            values.count == 1
+        else {
+            return nil
+        }
+
+        let rewrittenArguments = values.compactMap {
+            interpretInitApplicationArgument(
+                $0,
+                targetBinding: targetBinding,
+                literalExpression: literalExpression
+            )
+        }
+
+        guard rewrittenArguments.count == 1 else {
+            return nil
+        }
+
         return .call(
             name: bridge.constructName,
             arguments: [
-                CallArgument(label: bridge.parameterLabel, value: expression)
+                CallArgument(label: bridge.parameterLabel, value: rewrittenArguments[0])
             ]
         )
+    }
+
+    static func interpretInitApplicationArgument(
+        _ expression: Expression,
+        targetBinding: String,
+        literalExpression: Expression
+    ) -> Expression? {
+        switch expression {
+        case .identifier(let identifier):
+            if identifier == "\(targetBinding).application.arguments[0]"
+                || identifier == "\(targetBinding).application.arguments[0].expression"
+                || identifier == "\(targetBinding).calls[0].arguments[0]"
+            {
+                return literalExpression
+            }
+            return nil
+        default:
+            return nil
+        }
     }
 
     static func bootstrapLiteralType(for expression: Expression) -> BootstrapLiteralType? {
