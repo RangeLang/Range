@@ -982,7 +982,9 @@ public enum MacroExpander {
         return executeInitMacroRewrite(
             macroName: "literal",
             bridge: bridge,
-            applicationArguments: [expression],
+            applicationArguments: [
+                CallArgument(label: bridge.parameterLabel, value: expression)
+            ],
             macros: macros
         )
             ?? .call(
@@ -996,7 +998,7 @@ public enum MacroExpander {
     static func executeInitMacroRewrite(
         macroName: String,
         bridge: RealizedLiteralBridge,
-        applicationArguments: [Expression],
+        applicationArguments: [CallArgument],
         macros: [String: MacroDeclaration]
     ) -> Expression? {
         guard let macro = macros[macroName], macro.target.typeReference.displayName == "Init" else {
@@ -1039,7 +1041,7 @@ public enum MacroExpander {
     static func executeInitRewriteExpression(
         _ expression: Expression,
         targetBinding: String,
-        applicationArguments: [Expression],
+        applicationArguments: [CallArgument],
         bridge: RealizedLiteralBridge
     ) -> Expression? {
         guard case .call(let name, let arguments) = expression else {
@@ -1050,50 +1052,101 @@ public enum MacroExpander {
                 || name == "\(targetBinding).expression",
             arguments.count == 1,
             arguments[0].label == "arguments" || arguments[0].label == nil,
-            case .array(let values) = arguments[0].value,
-            values.count == 1
+            case .array(let values) = arguments[0].value
         else {
             return nil
         }
 
         let rewrittenArguments = values.compactMap {
-            resolveInitApplicationArgument(
+            resolveInitApplicationArgumentReference(
                 $0,
                 targetBinding: targetBinding,
                 applicationArguments: applicationArguments
             )
         }
 
-        guard rewrittenArguments.count == 1 else {
+        guard rewrittenArguments.count == values.count, !rewrittenArguments.isEmpty else {
             return nil
         }
 
+        let fallbackLabel = rewrittenArguments.count == 1 ? bridge.parameterLabel : nil
         return .call(
             name: bridge.constructName,
-            arguments: [
-                CallArgument(label: bridge.parameterLabel, value: rewrittenArguments[0])
-            ]
+            arguments: rewrittenArguments.map { argument in
+                CallArgument(
+                    label: argument.label ?? fallbackLabel,
+                    value: argument.value
+                )
+            }
         )
     }
 
-    static func resolveInitApplicationArgument(
+    static func resolveInitApplicationArgumentReference(
         _ expression: Expression,
         targetBinding: String,
-        applicationArguments: [Expression]
-    ) -> Expression? {
+        applicationArguments: [CallArgument]
+    ) -> CallArgument? {
         switch expression {
         case .identifier(let identifier):
-            let firstArgument = applicationArguments.first
-            if identifier == "\(targetBinding).application.arguments[0]"
-                || identifier == "\(targetBinding).application.arguments[0].expression"
-                || identifier == "\(targetBinding).calls[0].arguments[0]"
-            {
-                return firstArgument
-            }
-            return nil
+            return resolveInitApplicationArgumentIdentifier(
+                identifier,
+                targetBinding: targetBinding,
+                applicationArguments: applicationArguments
+            )
         default:
             return nil
         }
+    }
+
+    static func resolveInitApplicationArgumentIdentifier(
+        _ identifier: String,
+        targetBinding: String,
+        applicationArguments: [CallArgument]
+    ) -> CallArgument? {
+        let wholePrefixes = [
+            "\(targetBinding).application.arguments[",
+            "\(targetBinding).calls[0].arguments[",
+        ]
+        let expressionPrefix = "\(targetBinding).application.arguments["
+
+        for prefix in wholePrefixes {
+            if let index = indexedReference(identifier, prefix: prefix, suffix: "]") {
+                guard applicationArguments.indices.contains(index) else {
+                    return nil
+                }
+                return applicationArguments[index]
+            }
+        }
+
+        if let index = indexedReference(
+            identifier,
+            prefix: expressionPrefix,
+            suffix: "].expression"
+        ) {
+            guard applicationArguments.indices.contains(index) else {
+                return nil
+            }
+            let argument = applicationArguments[index]
+            return CallArgument(label: argument.label, value: argument.value)
+        }
+
+        return nil
+    }
+
+    static func indexedReference(
+        _ identifier: String,
+        prefix: String,
+        suffix: String
+    ) -> Int? {
+        guard identifier.hasPrefix(prefix), identifier.hasSuffix(suffix) else {
+            return nil
+        }
+        let start = identifier.index(identifier.startIndex, offsetBy: prefix.count)
+        let end = identifier.index(identifier.endIndex, offsetBy: -suffix.count)
+        guard start <= end else {
+            return nil
+        }
+        return Int(identifier[start..<end])
     }
 
     static func bootstrapLiteralType(for expression: Expression) -> BootstrapLiteralType? {
