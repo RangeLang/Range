@@ -1,5 +1,5 @@
 import Foundation
-import NeatSyntax
+@testable import NeatSyntax
 import Testing
 
 @Suite("Compiler fixtures")
@@ -81,6 +81,48 @@ struct CompilerFixtureTests {
         )
 
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
+    @Test("Init rewrite expression uses canonical initializer labels")
+    func initRewriteExpressionUsesCanonicalInitializerLabels() throws {
+        let expression = Expression.call(
+            name: "target.declaration.expression",
+            arguments: [
+                CallArgument(
+                    label: "arguments",
+                    value: .array([
+                        .identifier("target.application.arguments[0]"),
+                        .identifier("target.application.arguments[1]"),
+                    ])
+                )
+            ]
+        )
+
+        let rewritten = MacroExpander.executeInitRewriteExpression(
+            expression,
+            targetBinding: "target",
+            applicationArguments: [
+                CallArgument(label: nil, value: .string("Hello")),
+                CallArgument(label: nil, value: .integer(27)),
+            ],
+            initTarget: RealizedInitTarget(
+                constructName: "Greeting",
+                parameterLabels: ["text", "number"],
+                isCore: false
+            )
+        )
+
+        #expect(rewritten != nil)
+
+        guard case .call(let name, let arguments)? = rewritten else {
+            Issue.record("Expected rewritten init expression to be a call.")
+            return
+        }
+
+        #expect(name == "Greeting")
+        #expect(arguments.count == 2)
+        #expect(arguments[0].label == "text")
+        #expect(arguments[1].label == "number")
     }
 }
 

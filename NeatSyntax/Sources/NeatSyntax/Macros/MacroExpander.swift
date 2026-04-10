@@ -981,15 +981,15 @@ public enum MacroExpander {
 
         guard let rewritten = executeInitMacroRewrite(
             macroName: "literal",
-            bridge: bridge,
+            initTarget: bridge.initTarget,
             applicationArguments: [
-                CallArgument(label: bridge.parameterLabel, value: expression)
+                CallArgument(label: bridge.initTarget.parameterLabels.first ?? nil, value: expression)
             ],
             macros: macros
         )
         else {
             throw ParseError(
-                "Init macro #literal for \(bridge.constructName) could not be interpreted through declaration/application rewrite semantics."
+                "Init macro #literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/application rewrite semantics."
             )
         }
 
@@ -998,7 +998,7 @@ public enum MacroExpander {
 
     static func executeInitMacroRewrite(
         macroName: String,
-        bridge: RealizedLiteralBridge,
+        initTarget: RealizedInitTarget,
         applicationArguments: [CallArgument],
         macros: [String: MacroDeclaration]
     ) -> Expression? {
@@ -1014,7 +1014,7 @@ public enum MacroExpander {
             rewriteExpression,
             targetBinding: macro.bindings.target,
             applicationArguments: applicationArguments,
-            bridge: bridge
+            initTarget: initTarget
         )
     }
 
@@ -1040,7 +1040,7 @@ public enum MacroExpander {
         _ expression: Expression,
         targetBinding: String,
         applicationArguments: [CallArgument],
-        bridge: RealizedLiteralBridge
+        initTarget: RealizedInitTarget
     ) -> Expression? {
         guard case .call(let name, let arguments) = expression else {
             return nil
@@ -1054,27 +1054,32 @@ public enum MacroExpander {
             return nil
         }
 
-        let rewrittenArguments = values.compactMap {
-            resolveInitApplicationArgumentReference(
-                $0,
-                targetBinding: targetBinding,
-                applicationArguments: applicationArguments
-            )
-        }
-
-        guard rewrittenArguments.count == values.count, !rewrittenArguments.isEmpty else {
+        guard values.count == initTarget.parameterLabels.count else {
             return nil
         }
 
-        let fallbackLabel = rewrittenArguments.count == 1 ? bridge.parameterLabel : nil
-        return .call(
-            name: bridge.constructName,
-            arguments: rewrittenArguments.map { argument in
-                CallArgument(
-                    label: argument.label ?? fallbackLabel,
-                    value: argument.value
-                )
+        let rewrittenArguments: [CallArgument] = values.enumerated().compactMap { index, value in
+            guard let argument = resolveInitApplicationArgumentReference(
+                value,
+                targetBinding: targetBinding,
+                applicationArguments: applicationArguments
+            ) else {
+                return nil
             }
+
+            return CallArgument(
+                label: argument.label ?? initTarget.parameterLabels[index],
+                value: argument.value
+            )
+        }
+
+        guard rewrittenArguments.count == values.count else {
+            return nil
+        }
+
+        return .call(
+            name: initTarget.constructName,
+            arguments: rewrittenArguments
         )
     }
 

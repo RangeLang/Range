@@ -1,21 +1,46 @@
 import Foundation
 
-public struct RealizedLiteralBridge: Hashable, Sendable {
+public struct RealizedInitTarget: Hashable, Sendable {
     public let constructName: String
-    public let carrierTypeName: String
-    public let parameterLabel: String?
+    public let parameterLabels: [String?]
     public let isCore: Bool
 
     public init(
         constructName: String,
-        carrierTypeName: String,
-        parameterLabel: String?,
+        parameterLabels: [String?],
         isCore: Bool
     ) {
         self.constructName = constructName
-        self.carrierTypeName = carrierTypeName
-        self.parameterLabel = parameterLabel
+        self.parameterLabels = parameterLabels
         self.isCore = isCore
+    }
+}
+
+public struct RealizedLiteralBridge: Hashable, Sendable {
+    public let initTarget: RealizedInitTarget
+    public let carrierTypeName: String
+
+    public init(
+        initTarget: RealizedInitTarget,
+        carrierTypeName: String,
+    ) {
+        self.initTarget = initTarget
+        self.carrierTypeName = carrierTypeName
+    }
+
+    public var constructName: String {
+        initTarget.constructName
+    }
+
+    public var parameterLabel: String? {
+        guard initTarget.parameterLabels.count == 1 else {
+            return nil
+        }
+        return initTarget.parameterLabels[0]
+    }
+
+    public var isCore: Bool {
+        initTarget.isCore
     }
 }
 
@@ -177,10 +202,12 @@ public struct DeclarationGraph {
                 }
 
                 return RealizedLiteralBridge(
-                    constructName: construct.name,
-                    carrierTypeName: literalMacro.genericArguments[0].displayName,
-                    parameterLabel: initializer.parameters[0].externalLabel,
-                    isCore: construct.isCore
+                    initTarget: RealizedInitTarget(
+                        constructName: construct.name,
+                        parameterLabels: initializer.parameters.map(\.externalLabel),
+                        isCore: construct.isCore
+                    ),
+                    carrierTypeName: literalMacro.genericArguments[0].displayName
                 )
             }
         }
