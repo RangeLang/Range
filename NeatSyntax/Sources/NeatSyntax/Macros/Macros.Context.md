@@ -41,6 +41,8 @@ Init       -> declaration + application
 Function   -> declaration + application
 Construct  -> declaration-facing
 Enum       -> declaration-facing
+Protocol   -> declaration-facing
+Extension  -> declaration-facing
 ```
 
 This does not mean the compiler should attach application data directly onto the
@@ -171,6 +173,23 @@ macro iterable(): Enum { target, diagnostics in
     target.name
     target.self
     target.cases
+}
+```
+
+```neat
+macro equatable(): Protocol { target, diagnostics in
+    target.name
+    target.self
+    target.inits
+    target.functions
+}
+```
+
+```neat
+macro tracedExtension(): Extension { target, diagnostics in
+    target.target
+    target.protocols
+    target.functions
 }
 ```
 
