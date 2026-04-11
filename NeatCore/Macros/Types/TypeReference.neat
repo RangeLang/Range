@@ -1,4 +1,10 @@
 @core
-construct TypeReference: Syntax, SupportsRewrite<TypeReference> {
-    value displayName: String
+enum TypeReference: Syntax, SupportsRewrite<TypeReference> {
+    case named(name: String)
+    case member(base: TypeReference, name: String)
+    case generic(base: TypeReference, arguments: [TypeReference])
+    case array(element: TypeReference)
+    case function(parameters: [TypeReference], returnType: TypeReference)
+    case optional(wrapped: TypeReference)
+    case variadic(element: TypeReference)
 }

@@ -39,8 +39,7 @@ Current bootstrap rules:
 - Preferred target-surface design uses declaration/application facet values on
   target kinds such as `Init`, with nested `Declaration` and `Application`
   constructs defining those facet types.
-- `FunctionType` is the type-surface model for callable types like `() -> Int`; `Closure` remains the expression/value form.
-- `ArrayType` is the type-surface model for array types like `[Int]`.
+- Callable and array type shapes now belong to `TypeReference` itself, for example `TypeReference.function(...)` and `TypeReference.array(...)`; `Closure` remains the expression/value form.
 
 Current `Init`-targeted status:
 

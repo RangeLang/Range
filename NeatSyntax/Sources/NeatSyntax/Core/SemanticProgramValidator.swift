@@ -76,6 +76,11 @@ public struct SemanticProgramValidator {
                     "@core can only be used in NeatCore. Remove @core from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
                 )
             }
+            for declaration in enumerations(in: parsedFile.sourceFile) where declaration.isCore {
+                throw SemanticValidationError(
+                    "@core can only be used in NeatCore. Remove @core from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
+                )
+            }
         }
     }
 
@@ -201,6 +206,17 @@ public struct SemanticProgramValidator {
         case .module(let module):
             return module.protocols
         case .construct, .mainBlock, .extensions, .enumeration, .macro:
+            return []
+        }
+    }
+
+    private func enumerations(in sourceFile: SourceFileNode) -> [EnumDeclaration] {
+        switch sourceFile {
+        case .enumeration(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.enumerations
+        case .construct, .mainBlock, .extensions, .protocolDefinition, .macro:
             return []
         }
     }

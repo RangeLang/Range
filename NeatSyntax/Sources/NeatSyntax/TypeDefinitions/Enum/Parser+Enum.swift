@@ -18,9 +18,6 @@ extension Parser {
     {
         let macros = try parseMacroApplicationsIfPresent()
         let attribute = parseAttributeIfPresent(before: .enumeration)
-        if attribute?.name == "core" {
-            throw ParseError("@core can only be applied to construct declarations.")
-        }
 
         try consumeKeyword(.enumeration)
         let name = try consumeTypeName()
@@ -85,13 +82,16 @@ extension Parser {
 
             if peek() == .colon {
                 try consume(.colon)
-                let typeName = try consumeTypeName()
+                let typeReference = try parseTypeReferenceNode()
                 associatedValues.append(
-                    AssociatedValueDeclaration(label: firstIdentifier, typeName: typeName)
+                    AssociatedValueDeclaration(label: firstIdentifier, typeReference: typeReference)
                 )
             } else {
                 associatedValues.append(
-                    AssociatedValueDeclaration(label: nil, typeName: firstIdentifier)
+                    AssociatedValueDeclaration(
+                        label: nil,
+                        typeReference: .named(firstIdentifier)
+                    )
                 )
             }
 

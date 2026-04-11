@@ -1716,7 +1716,7 @@ public enum MacroExpander {
             }
             return .named(name)
         case .call(let name, let arguments):
-            if name == "ArrayType",
+            if name == "TypeReference.array",
                 arguments.count == 1,
                 arguments[0].label == "element" || arguments[0].label == nil,
                 let element = interpretTypeReferenceRewriteExpression(
@@ -1727,7 +1727,7 @@ public enum MacroExpander {
                 return .array(element)
             }
 
-            if name == "FunctionType",
+            if name == "TypeReference.function",
                 let parametersArgument = arguments.first(where: { $0.label == "parameters" }),
                 let returnTypeArgument = arguments.first(where: { $0.label == "returnType" }),
                 case .array(let parameterExpressions) = parametersArgument.value,

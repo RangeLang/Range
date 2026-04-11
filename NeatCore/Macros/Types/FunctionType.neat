@@ -1,5 +1,0 @@
-@core
-construct FunctionType {
-    value parameters: [TypeReference]
-    value returnType: TypeReference
-}

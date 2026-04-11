@@ -6,6 +6,10 @@ public struct EnumDeclaration {
     public let name: String
     public let conformances: [TypeReference]
     public let cases: [EnumCaseDeclaration]
+
+    public var isCore: Bool {
+        attribute?.name == "core"
+    }
 }
 
 public struct EnumCaseDeclaration {
@@ -15,5 +19,5 @@ public struct EnumCaseDeclaration {
 
 public struct AssociatedValueDeclaration {
     public let label: String?
-    public let typeName: String
+    public let typeReference: TypeReference
 }
