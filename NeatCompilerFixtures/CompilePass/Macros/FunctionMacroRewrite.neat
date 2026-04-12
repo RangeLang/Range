@@ -1,0 +1,12 @@
+macro secondArgument(): Function { target, diagnostics in
+    target.application.rewrite(target.application.arguments[1].expression)
+}
+
+#secondArgument
+function select(text text: String, number number: Int) -> String {
+    return text
+}
+
+@main {
+    value result: String = select(text: "Hello", number: 27)
+}

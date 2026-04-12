@@ -104,3 +104,12 @@ If continuing immediately, implement in this order:
 1. widen init rewrite expression interpreter beyond current subset
 2. add compile-fail fixtures for invalid init rewrite payloads
 3. declaration-target activation decision (`Function` or `Construct` first)
+
+Progress note:
+
+- `Function` target is now recognized by target-kind validation, including
+  rewrite-site diagnostics.
+- `Function` call-site execution through `target.application.rewrite(...)` is
+  still pending for official support.
+- next declaration-target decision is now effectively `Construct` vs `Enum`
+  for the next activation slice.

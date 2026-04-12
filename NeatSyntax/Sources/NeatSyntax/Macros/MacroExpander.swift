@@ -6,17 +6,25 @@ struct AttachedParameterMacroSignature {
     let attachedParameterMacrosByIndex: [Int: MacroDeclaration]
 }
 
+struct AttachedFunctionMacroSignature {
+    let name: String
+    let labels: [String?]
+    let attachedFunctionMacros: [MacroDeclaration]
+}
+
 enum MacroTargetKind: Equatable {
     case expression
     case block
     case parameter
     case initializer
+    case function
     case other(String)
 }
 
 enum ResolvedRewriteSite {
     case targetDirect
     case initApplication
+    case functionApplication
     case parameterDeclarationType
     case parameterApplicationArguments
     case parameterApplicationArgument
@@ -34,6 +42,8 @@ struct ParameterApplicationRewritePlan {
 
 public enum MacroExpander {
     nonisolated(unsafe) private static var activeInitMacroTargets: [RealizedInitMacroTarget] = []
+    nonisolated(unsafe) private static var activeFunctionMacroTargets: [AttachedFunctionMacroSignature] =
+        []
 
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
@@ -47,10 +57,16 @@ public enum MacroExpander {
             from: files,
             macros: registry
         )
+        let attachedFunctionCallables = collectAttachedFunctionCallables(
+            from: files,
+            macros: registry
+        )
         let attachedLiteralConstructs = declarationGraph.realizedLiteralBridges
         activeInitMacroTargets = declarationGraph.realizedInitMacroTargets
+        activeFunctionMacroTargets = attachedFunctionCallables
         defer {
             activeInitMacroTargets = []
+            activeFunctionMacroTargets = []
         }
         return try files.map { parsedFile in
             ParsedSourceFile(
@@ -198,6 +214,15 @@ public enum MacroExpander {
         }
     }
 
+    static func collectAttachedFunctionCallables(
+        from files: [ParsedSourceFile],
+        macros: [String: MacroDeclaration]
+    ) -> [AttachedFunctionMacroSignature] {
+        files.flatMap { parsedFile in
+            callablesWithAttachedFunctionMacros(in: parsedFile.sourceFile, macros: macros)
+        }
+    }
+
     static func macros(in sourceFile: SourceFileNode) -> [MacroDeclaration] {
         switch sourceFile {
         case .macro(let declaration):
@@ -219,6 +244,20 @@ public enum MacroExpander {
         case .module(let module):
             return module.callables.compactMap {
                 attachedParameterMacroSignature(for: $0, macros: macros)
+            }
+        default:
+            return []
+        }
+    }
+
+    static func callablesWithAttachedFunctionMacros(
+        in sourceFile: SourceFileNode,
+        macros: [String: MacroDeclaration]
+    ) -> [AttachedFunctionMacroSignature] {
+        switch sourceFile {
+        case .module(let module):
+            return module.callables.compactMap {
+                attachedFunctionMacroSignature(for: $0, macros: macros)
             }
         default:
             return []
@@ -255,6 +294,33 @@ public enum MacroExpander {
             name: callable.name,
             labels: callable.parameters.map(\.externalLabel),
             attachedParameterMacrosByIndex: attachedParameterMacrosByIndex
+        )
+    }
+
+    static func attachedFunctionMacroSignature(
+        for callable: CallableDeclaration,
+        macros: [String: MacroDeclaration]
+    ) -> AttachedFunctionMacroSignature? {
+        guard callable.targetType == nil else {
+            return nil
+        }
+
+        let attachedFunctionMacros: [MacroDeclaration] = callable.macros.compactMap { macroApplication in
+            guard let macro = macros[macroApplication.name], macroTargetKind(for: macro) == .function
+            else {
+                return nil
+            }
+            return macro
+        }
+
+        guard !attachedFunctionMacros.isEmpty else {
+            return nil
+        }
+
+        return AttachedFunctionMacroSignature(
+            name: callable.name,
+            labels: callable.parameters.map(\.externalLabel),
+            attachedFunctionMacros: attachedFunctionMacros
         )
     }
 
@@ -821,6 +887,13 @@ public enum MacroExpander {
                 return rewrittenByInitMacro
             }
 
+            if let rewrittenByFunctionMacro = try applyFunctionMacroRewritesIfNeeded(
+                callName: name,
+                callArguments: callArguments
+            ) {
+                return rewrittenByFunctionMacro
+            }
+
             return .call(name: name, arguments: callArguments)
         case .freestandingMacro(let name, let arguments):
             guard let macro = macros[name],
@@ -1137,6 +1210,66 @@ public enum MacroExpander {
             return coreMatches[0]
         }
 
+        return nil
+    }
+
+    static func applyFunctionMacroRewritesIfNeeded(
+        callName: String,
+        callArguments: [CallArgument]
+    ) throws -> Expression? {
+        guard
+            let target = matchingFunctionMacroTarget(
+                callName: callName,
+                callArguments: callArguments,
+                targets: activeFunctionMacroTargets
+            )
+        else {
+            return nil
+        }
+
+        for macro in target.attachedFunctionMacros {
+            guard let rewrite = try functionRewriteExpression(for: macro) else {
+                continue
+            }
+
+            let targetBinding = macro.bindings.target
+            var bindings: [String: Expression] = [
+                "\(targetBinding).application.arguments": .array(callArguments.map(\.value))
+            ]
+            for (index, argument) in callArguments.enumerated() {
+                bindings["\(targetBinding).application.arguments[\(index)].expression"] = argument.value
+            }
+
+            return substituteMacroBindings(in: rewrite, bindings: bindings)
+        }
+
+        return nil
+    }
+
+    static func matchingFunctionMacroTarget(
+        callName: String,
+        callArguments: [CallArgument],
+        targets: [AttachedFunctionMacroSignature]
+    ) -> AttachedFunctionMacroSignature? {
+        let matching = targets.filter {
+            $0.name == callName
+                && $0.labels.elementsEqual(callArguments.map(\.label), by: { $0 == $1 })
+        }
+        if matching.count == 1 {
+            return matching[0]
+        }
+
+        let byName = targets.filter { $0.name == callName }
+        guard byName.count == 1 else {
+            return nil
+        }
+        return byName[0]
+    }
+
+    static func functionRewriteExpression(for macro: MacroDeclaration) throws -> Expression? {
+        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .functionApplication {
+            return rewrite.payload
+        }
         return nil
     }
 
@@ -1839,6 +1972,8 @@ public enum MacroExpander {
             return .parameter
         case "Init":
             return .initializer
+        case "Function":
+            return .function
         default:
             return .other(name)
         }
@@ -1867,6 +2002,10 @@ public enum MacroExpander {
                 "\(targetBinding).rewrite"
             ]
         case .initializer:
+            return [
+                "\(targetBinding).application.rewrite"
+            ]
+        case .function:
             return [
                 "\(targetBinding).application.rewrite"
             ]
@@ -1934,6 +2073,10 @@ public enum MacroExpander {
         case .initializer:
             rewritePaths = [
                 ("\(targetBinding).application.rewrite", .initApplication)
+            ]
+        case .function:
+            rewritePaths = [
+                ("\(targetBinding).application.rewrite", .functionApplication)
             ]
         case .parameter:
             rewritePaths = [

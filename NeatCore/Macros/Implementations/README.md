@@ -81,6 +81,19 @@ Current status:
 - `Init` rewrite expression interpretation is still intentionally narrow in the
   bootstrap pass (focused on declaration-expression reconstruction).
 
+### `Function`
+
+Implemented macros:
+
+- fixture-level function-targeted rewrite macros (no core stdlib function macro yet)
+
+Current status:
+
+- attached function macros are now recognized by target kind.
+- rewrite-site validation is active for function-targeted macros.
+- call-site rewrite execution for function targets is still in-progress and not
+  yet locked as supported behavior.
+
 ## Current Rule Of Thumb
 
 - `Expression` and `Block` are the most complete macro targets today.

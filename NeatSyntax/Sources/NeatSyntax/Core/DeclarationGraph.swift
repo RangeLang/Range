@@ -261,6 +261,7 @@ public struct DeclarationGraph {
         }
     }
 
+
     static func protocols(in sourceFile: SourceFileNode) -> [ProtocolDeclaration] {
         switch sourceFile {
         case .protocolDefinition(let declaration):
