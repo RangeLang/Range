@@ -1,7 +1,0 @@
-// Exploratory call expression macro-facing compiler surface.
-// This file is for design iteration only.
-
-construct Call: Expression {
-    value callee: Expression
-    value arguments: [ExpressionArgument]
-}

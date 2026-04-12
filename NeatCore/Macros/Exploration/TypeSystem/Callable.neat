@@ -1,7 +1,0 @@
-protocol Callable {
-    value params: [Parameter]
-    value arguments: [Parameter.Application]
-    value body: Block?
-
-    function expression(arguments: [Parameter.Application]) -> Expression
-}
