@@ -1,13 +1,12 @@
 @core
 construct Function: Syntax {
-
     value declaration: Declaration
     value application: Application
 
     @core
     construct Declaration {
         value name: String
-        value parameters: [Parameter]
+        value parameters: [Parameter.Declaration]
         value returnType: TypeReference?
         value body: Block
     }
@@ -15,6 +14,6 @@ construct Function: Syntax {
     @core
     construct Application {
         value name: String
-        value arguments: [Argument]
+        value arguments: [Parameter.Application]
     }
 }

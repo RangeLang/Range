@@ -1,6 +1,5 @@
 @core
 construct Enum: Syntax {
-    value name: String
     value self: NominalTypeReference
     value cases: [Case]
 

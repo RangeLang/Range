@@ -1,6 +1,0 @@
-@core
-construct Argument {
-    value label: String?
-    value type: TypeReference
-    value expression: Expression
-}

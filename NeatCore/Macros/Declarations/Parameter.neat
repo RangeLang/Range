@@ -1,7 +1,20 @@
 @core
 construct Parameter: Syntax {
-  value externalName: String?
-  value localName: String
-  value type: TypeReference
-  value defaultValue: Expression?
+    value declaration: Declaration
+    value application: Application
+
+    @core
+    construct Declaration {
+        value externalName: String?
+        value localName: String
+        value type: TypeReference
+        value defaultValue: Expression?
+    }
+
+    @core
+    construct Application {
+        value label: String?
+        value type: TypeReference
+        value expression: Expression
+    }
 }

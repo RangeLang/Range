@@ -67,13 +67,14 @@ construct Init: Syntax {
     value application: Application
 
     construct Declaration {
-        value parameters: [Parameter]
+        value parameters: [Parameter.Declaration]
         value body: Block
+        function expression(arguments: [Parameter.Application]) -> Expression
     }
 
     construct Application: SupportsRewrite<Expression> {
         value type: TypeReference
-        value arguments: [Argument]
+        value arguments: [Parameter.Application]
     }
 }
 ```
@@ -84,7 +85,7 @@ This keeps the model clean:
 - `declaration` is a real facet value
 - `application` is a real facet value
 - `Declaration` owns initializer declaration data such as parameters and body
-- `Application` owns the applied target type plus call arguments
+- `Application` owns the applied target type plus argument-named parameter applications
 - `Application` remains the rewrite-capable expression boundary for init-targeted macros
 
 Current aligned `Parameter` shape:
@@ -92,10 +93,21 @@ Current aligned `Parameter` shape:
 ```neat
 @core
 construct Parameter: Syntax {
-    value externalName: String?
-    value localName: String
-    value type: TypeReference
-    value defaultValue: Expression?
+    value declaration: Declaration
+    value application: Application
+
+    construct Declaration {
+        value externalName: String?
+        value localName: String
+        value type: TypeReference
+        value defaultValue: Expression?
+    }
+
+    construct Application {
+        value label: String?
+        value type: TypeReference
+        value expression: Expression
+    }
 }
 ```
 
@@ -109,14 +121,14 @@ construct Function: Syntax {
 
     construct Declaration {
         value name: String
-        value parameters: [Parameter]
+        value parameters: [Parameter.Declaration]
         value returnType: TypeReference?
         value body: Block
     }
 
     construct Application {
         value name: String
-        value arguments: [Argument]
+        value arguments: [Parameter.Application]
     }
 }
 ```

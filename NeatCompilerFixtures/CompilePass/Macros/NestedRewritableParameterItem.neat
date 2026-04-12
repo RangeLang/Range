@@ -1,9 +1,7 @@
 macro nestedArgumentRewrite(): Parameter { target, diagnostics in
-    if target.application.argument != nil {
-        target.application.argument.rewrite(
-            target.application.argument.expression
-        )
-    }
+    target.application.expression.rewrite(
+        target.application.expression
+    )
 }
 
 function passthrough(#nestedArgumentRewrite value: Int) -> Int {

@@ -40,12 +40,12 @@ Status:
 Status:
 
 - declaration-side type rewrite remains the active behavior
-- `Parameter` has been collapsed toward a declaration-owned shape in NeatCore
-- older application-side parameter rewrite behavior is no longer the preferred model
+- `Parameter` now again models explicit `declaration` plus `application` facets
+- `Parameter.Application` is application-owned data, but the rewrite boundary should remain nested on `target.application.expression.rewrite(...)` rather than on `target.application.rewrite(...)`
 
 Constraint:
 
-- attached parameter macros still need follow-up alignment with the newer declaration-only direction
+- attached parameter macros still need follow-up alignment with the restored declaration/application shape
 
 ### Init target
 
@@ -55,7 +55,7 @@ Status:
 
 - declaration + application surface is active
 - `Init.Declaration` now carries `parameters` plus `body`
-- `Init.Application` now carries `type` plus `arguments`
+- `Init.Application` now carries `type` plus argument-named `[Parameter.Application]`
 - init application remains the expression rewrite boundary
 - literal bridge realization is graph-connected
 - malformed literal rewrite fails explicitly
@@ -109,7 +109,7 @@ Constraint:
 
 If continuing immediately, implement in this order:
 
-1. align attached parameter macro behavior with the newer declaration-only `Parameter` shape
+1. align attached parameter macro behavior with the restored `Parameter.Declaration` / `Parameter.Application` shape, keeping rewrite nested on `target.application.expression`
 2. widen init rewrite expression interpreter beyond current subset
 3. add compile-fail fixtures for invalid init rewrite payloads
 

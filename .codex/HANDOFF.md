@@ -24,7 +24,7 @@
 - `InitCall` is the initializer-level invocation view:
   - `init`
   - `calls: [CallContext]`
-- `InitCall` is rewritable; `Argument` remains rewritable for parameter-local transforms.
+- `InitCall` is rewritable; `Parameter.Application` is the semantic application-side concept for parameter-local transforms.
 - `FunctionType` was introduced to separate closure type syntax from closure expression syntax.
 - Literal handling direction:
   - compiler knows literal syntax forms

@@ -6,13 +6,11 @@ macro autoclosure(): Parameter { target, diagnostics in
         )
     )
 
-    if target.application.argument != nil {
-        target.application.argument.rewrite(
-            Closure(
-                body: {
-                    target.application.argument.expression
-                }
-            )
+    target.application.expression.rewrite(
+        Closure(
+            body: {
+                target.application.expression
+            }
         )
-    }
+    )
 }

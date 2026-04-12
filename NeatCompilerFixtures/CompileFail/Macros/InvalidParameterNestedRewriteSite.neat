@@ -1,6 +1,6 @@
 macro badNestedParameterRewrite(): Parameter { target, diagnostics in
-    target.application.argument.expression.rewrite(
-        target.application.argument.expression
+    target.application.expression.rewrite(
+        target.application.expression
     )
 }
 

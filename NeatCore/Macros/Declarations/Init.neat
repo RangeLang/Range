@@ -5,13 +5,14 @@ construct Init: Syntax {
 
     @core
     construct Declaration {
-        value parameters: [Parameter]
+        value parameters: [Parameter.Declaration]
         value body: Block
+        function expression(arguments: [Parameter.Application]) -> Expression
     }
 
     @core
     construct Application: SupportsRewrite<Expression> {
         value type: TypeReference
-        value arguments: [Argument]
+        value arguments: [Parameter.Application]
     }
 }
