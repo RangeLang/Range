@@ -1301,12 +1301,19 @@ public enum MacroExpander {
             return primaryArgument
         }
 
+        var bindings: [String: Expression] = [
+            "\(targetBinding).application.arguments": .array(arguments.map(\.value))
+        ]
+        for (index, argument) in arguments.enumerated() {
+            bindings["\(targetBinding).application.arguments[\(index)].expression"] = argument.value
+        }
+        if bindings["\(targetBinding).application.arguments[0].expression"] == nil {
+            bindings["\(targetBinding).application.arguments[0].expression"] = primaryArgument.value
+        }
+
         let substituted = substituteMacroBindings(
             in: plan.payload,
-            bindings: [
-                "\(targetBinding).application.arguments[0].expression": primaryArgument.value,
-                "\(targetBinding).application.arguments": .array(arguments.map(\.value)),
-            ]
+            bindings: bindings
         )
 
         return CallArgument(
@@ -1747,10 +1754,19 @@ public enum MacroExpander {
             guard name.hasPrefix(targetPrefix), name.hasSuffix(".rewrite") else {
                 continue
             }
-            guard !allowedPaths.contains(name) else {
+            guard
+                resolvedRewriteCall(
+                    from: expression,
+                    targetBinding: targetBinding,
+                    targetKind: targetKind
+                ) != nil
+            else {
+                invalidPaths.append(name)
                 continue
             }
-            invalidPaths.append(name)
+            guard !allowedPaths.isEmpty else {
+                continue
+            }
         }
 
         guard invalidPaths.isEmpty else {
@@ -1799,11 +1815,41 @@ public enum MacroExpander {
             rewritePaths = []
         }
 
-        guard let site = rewritePaths.first(where: { $0.0 == name })?.1 else {
-            return nil
+        if let site = rewritePaths.first(where: { $0.0 == name })?.1 {
+            return ResolvedRewriteCall(site: site, payload: arguments[0].value)
         }
 
-        return ResolvedRewriteCall(site: site, payload: arguments[0].value)
+        if targetKind == .parameter,
+            indexedReference(
+                name,
+                prefix: "\(targetBinding).application.arguments[",
+                suffix: "].rewrite"
+            ) != nil
+        {
+            return ResolvedRewriteCall(site: .parameterApplicationArgument, payload: arguments[0].value)
+        }
+
+        if targetKind == .initializer,
+            indexedReference(
+                name,
+                prefix: "\(targetBinding).application.arguments[",
+                suffix: "].rewrite"
+            ) != nil
+        {
+            return ResolvedRewriteCall(site: .initApplication, payload: arguments[0].value)
+        }
+
+        if targetKind == .function,
+            indexedReference(
+                name,
+                prefix: "\(targetBinding).application.arguments[",
+                suffix: "].rewrite"
+            ) != nil
+        {
+            return ResolvedRewriteCall(site: .functionApplication, payload: arguments[0].value)
+        }
+
+        return nil
     }
 
     static func substituteMacroTargetCalls(

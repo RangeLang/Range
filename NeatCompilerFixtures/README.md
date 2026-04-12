@@ -35,6 +35,7 @@ The current macro fixtures cover only the supported bootstrap surface:
 - init-targeted call-site rewrite from attached init macros
 - function-targeted macro attachment and rewrite-site validation
 - parameter-targeted `#autoclosure`
+- nested parameter argument rewrite (`target.application.arguments[i].rewrite(...)`)
 - expression-targeted `#stringify(...)`
 - expression-targeted rewrite through `target.rewrite(...)`, including
   `#unwrap(...)` and a custom macro fixture
