@@ -1,6 +1,6 @@
 macro rewriteSingleArgument(): Parameter { target, diagnostics in
     if target.application.argument != nil {
-        target.application.argument.expression.rewrite(
+        target.application.argument.rewrite(
             target.application.argument.expression
         )
     }

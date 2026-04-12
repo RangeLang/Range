@@ -1,6 +1,6 @@
 macro firstArgument(): Function { target, diagnostics in
     if !target.application.arguments.isEmpty {
-        target.application.arguments[0].expression.rewrite(
+        target.application.rewrite(
             target.application.arguments[0].expression
         )
     }
