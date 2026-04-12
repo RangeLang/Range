@@ -27,7 +27,7 @@ Current bootstrap rules:
 - Macro parameters can use `capture T` to request call-site syntax capture for
   syntax-category types such as `Expression`. Plain `Expression` is not syntax
   capture.
-- Parameter-targeted macros are bootstrap-executed from Neat macro bodies through declaration/application facets such as `target.declaration.type.rewrite(...)` and `target.application.arguments.rewrite(...)`.
+- Parameter-targeted macros currently rewrite parameter declaration data directly, for example `target.type.rewrite(...)`.
 - `Init`-targeted macros are graph-driven declaration macros. A concrete initializer may carry them directly, and protocol initializer requirements may carry them onto conforming initializers through graph realization.
 - For literal bridging, the base form is `#literal<T>` on `init(literal: T)`, where `T` is a compiler-recognized literal carrier type.
 - The compiler recognizes carrier types and literal categories; the macro model defines how the bridge is realized on concrete initializers, with protocol carry as an extension of that same rule.
@@ -36,14 +36,14 @@ Current bootstrap rules:
   `value declaration = target.declaration`, but bootstrap rewrite execution is
   currently path-driven and expects direct `target...rewrite(...)` paths for
   reliable behavior.
-- Parameter now uses explicit declaration/application facet values on its macro surface.
+- Parameter now models declaration-owned data directly on the parameter surface rather than through nested declaration/application facets.
 - `Init` literal lowering now also executes through explicit declaration/application facet semantics.
-- Single-argument attached rewrites should read from the explicit plural application surface, for example `target.application.arguments[0].expression`, with an enclosing emptiness check when needed.
+- Init-side attached rewrites should read from the application argument surface, for example `target.application.arguments[0].expression`, with an enclosing emptiness check when needed.
 - Rewrite and extension capability are modeled explicitly with macro-surface protocols such as `SupportsRewrite<T>` and same-type `SupportsExtension`.
 - Preferred target-surface design uses declaration/application facet values on
   target kinds such as `Init`, with nested `Declaration` and `Application`
   constructs defining those facet types.
-- Callable and array type shapes now belong to `TypeReference` itself, for example `TypeReference.function(...)` and `TypeReference.array(...)`; `Closure` remains the expression/value form.
+- Callable and array type shapes now use concrete type-reference constructs, for example `FunctionTypeReference(...)` and `ArrayTypeReference(...)`; `Closure` remains the expression/value form.
 
 Current `Init`-targeted status:
 

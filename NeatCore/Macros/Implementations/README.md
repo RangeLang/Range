@@ -48,14 +48,13 @@ Implemented macros:
 
 Current status:
 
-- Parameter-targeted macros currently work through bootstrap-interpreted rewrite
-  operations from macro bodies.
-- They already use declaration plus application-side behavior:
-  the macro is attached to a parameter declaration, while expansion rewrites the
-  callable signature and the invocation arguments together.
-- Rewrite-site matching is now centralized through a shared resolved
-  rewrite-target layer in the expander, though payload interpretation is still
-  narrower than the surface ultimately wants.
+- Parameter-targeted macros are still bootstrap-scoped rewrite features.
+- Declaration-side type rewrite remains the active stable behavior.
+- Parameter application-side rewrite behavior is currently being normalized and
+  should not be treated as a settled long-term surface.
+- Rewrite-site matching is still centralized through the shared resolved
+  rewrite-target layer in the expander, but the target model around parameter
+  application is intentionally in flux.
 
 ### `Init`
 
@@ -69,10 +68,10 @@ Current status:
   graph-backed literal bridge realization.
 - Protocol initializer requirements may also carry `#literal<T>` onto
   conforming initializers through declaration-graph realization.
-- The core `literal` declaration now uses declaration/application facet syntax
-  on `Init` to match the preferred target-surface model.
-- `literal` now executes through the `Init` declaration/application rewrite
-  path, and malformed `literal` rewrites fail explicitly rather than silently
+- The current `Init` surface models declaration-owned `parameters` plus `body`,
+  and application-owned `type` plus `arguments`.
+- `literal` executes through the `Init.Application` rewrite path, and malformed
+  init rewrite payloads fail explicitly rather than silently
   falling back.
 - construct call expansion now also runs attached `Init`-target macro rewrites
   through the same declaration/application execution path.

@@ -61,31 +61,19 @@ surface is for the target kind to expose:
 Current preferred `Init` shape:
 
 ```neat
-@core construct Init: Syntax {
+@core
+construct Init: Syntax {
     value declaration: Declaration
     value application: Application
 
     construct Declaration {
         value parameters: [Parameter]
-        function expression(arguments: [Argument]) -> Expression
+        value body: Block
     }
 
     construct Application: SupportsRewrite<Expression> {
+        value type: TypeReference
         value arguments: [Argument]
-    }
-}
-```
-
-Current `literal` declaration in that shape:
-
-```neat
-macro literal<T>(): Init { target, diagnostics in
-    if target.application.arguments.count == 1 && target.application.arguments[0].type == T.self {
-        target.application.rewrite(
-            target.declaration.expression(arguments: [
-                target.application.arguments[0]
-            ])
-        )
     }
 }
 ```
@@ -95,27 +83,19 @@ This keeps the model clean:
 - `Init` remains the target kind
 - `declaration` is a real facet value
 - `application` is a real facet value
-- `Declaration` describes declaration-side macro access
-- `Application` describes the single canonical application-side access
-- the compiler still owns how those surfaces are materialized during expansion
+- `Declaration` owns initializer declaration data such as parameters and body
+- `Application` owns the applied target type plus call arguments
+- `Application` remains the rewrite-capable expression boundary for init-targeted macros
 
 Current aligned `Parameter` shape:
 
 ```neat
-@core construct Parameter: Syntax {
-    value declaration: Declaration
-    value application: Application
-
-    construct Declaration {
-        value externalName: String?
-        value localName: String
-        value type: TypeReference
-        value defaultValue: Expression?
-    }
-
-    construct Application: SupportsRewrite<Expression> {
-        value arguments: [Argument]
-    }
+@core
+construct Parameter: Syntax {
+    value externalName: String?
+    value localName: String
+    value type: TypeReference
+    value defaultValue: Expression?
 }
 ```
 
@@ -131,9 +111,11 @@ construct Function: Syntax {
         value name: String
         value parameters: [Parameter]
         value returnType: TypeReference?
+        value body: Block
     }
 
-    construct Application: SupportsRewrite<Expression> {
+    construct Application {
+        value name: String
         value arguments: [Argument]
     }
 }

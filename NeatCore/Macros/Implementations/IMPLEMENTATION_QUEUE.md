@@ -39,13 +39,13 @@ Status:
 
 Status:
 
-- declaration-side type rewrite works
-- application-side argument rewrite works
-- variadic behavior works through `target.application.arguments`
+- declaration-side type rewrite remains the active behavior
+- `Parameter` has been collapsed toward a declaration-owned shape in NeatCore
+- older application-side parameter rewrite behavior is no longer the preferred model
 
 Constraint:
 
-- payload interpretation is still bootstrap-scoped, not fully general
+- attached parameter macros still need follow-up alignment with the newer declaration-only direction
 
 ### Init target
 
@@ -54,7 +54,9 @@ Constraint:
 Status:
 
 - declaration + application surface is active
-- rewrite path is active
+- `Init.Declaration` now carries `parameters` plus `body`
+- `Init.Application` now carries `type` plus `arguments`
+- init application remains the expression rewrite boundary
 - literal bridge realization is graph-connected
 - malformed literal rewrite fails explicitly
 
@@ -73,9 +75,10 @@ Constraint:
   `Init`) with compile-fail fixture coverage.
 
 2. Generalize `Init` execution from `literal` to reusable init-target pipeline
-- Support reusable init rewrite interpretation pattern:
+- Support reusable init rewrite interpretation around the current settled shape:
+  - read `target.application.type`
   - read `target.application.arguments`
-  - emit via `target.declaration.expression(arguments:)`
+  - treat `target.application.rewrite(...)` as the authoritative init rewrite boundary
 - keep literal as one implementation using that shared pipeline.
 - Status: base call-site pipeline implemented for attached init macros on
   matching construct calls; widening beyond current bootstrap rewrite
@@ -106,9 +109,9 @@ Constraint:
 
 If continuing immediately, implement in this order:
 
-1. widen init rewrite expression interpreter beyond current subset
-2. add compile-fail fixtures for invalid init rewrite payloads
-3. declaration-target activation decision (`Function` or `Construct` first)
+1. align attached parameter macro behavior with the newer declaration-only `Parameter` shape
+2. widen init rewrite expression interpreter beyond current subset
+3. add compile-fail fixtures for invalid init rewrite payloads
 
 Progress note:
 
