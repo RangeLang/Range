@@ -1,0 +1,13 @@
+macro badNestedParameterRewrite(): Parameter { target, diagnostics in
+    target.application.arguments[0].expression.rewrite(
+        target.application.arguments[0].expression
+    )
+}
+
+function broken(#badNestedParameterRewrite value: Int) -> Int {
+    return value
+}
+
+@main {
+    value output: Int = broken(1)
+}

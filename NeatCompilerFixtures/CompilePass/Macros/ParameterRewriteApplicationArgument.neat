@@ -1,0 +1,15 @@
+macro rewriteSingleArgument(): Parameter { target, diagnostics in
+    if !target.application.arguments.isEmpty {
+        target.application.argument.rewrite(
+            target.application.arguments[0].expression
+        )
+    }
+}
+
+function identity(#rewriteSingleArgument value: Int) -> Int {
+    return value
+}
+
+@main {
+    value output: Int = identity(7)
+}

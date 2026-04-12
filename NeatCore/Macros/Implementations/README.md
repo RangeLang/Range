@@ -120,6 +120,13 @@ Examples of contextual information include:
 - matched construction or call application
 - expected type during expansion
 
+Current bootstrap limitation:
+
+- Macro-body local aliases such as `value declaration = target.declaration` are
+  valid syntax, but rewrite execution currently resolves direct
+  `target...rewrite(...)` paths. Use direct target paths in active macro
+  implementations for predictable behavior.
+
 The main remaining gap is no longer `literal` itself, but widening the same
 execution model to arbitrary `Init` macros and then applying similar cleanup to
 other declaration-targeted targets.

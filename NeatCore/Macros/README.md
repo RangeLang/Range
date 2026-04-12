@@ -32,6 +32,10 @@ Current bootstrap rules:
 - For literal bridging, the base form is `#literal<T>` on `init(literal: T)`, where `T` is a compiler-recognized literal carrier type.
 - The compiler recognizes carrier types and literal categories; the macro model defines how the bridge is realized on concrete initializers, with protocol carry as an extension of that same rule.
 - Macro closures currently use only `target` and `diagnostics`; bootstrap work should not add extra bindings.
+- Local bindings inside macro bodies are syntactically valid, for example
+  `value declaration = target.declaration`, but bootstrap rewrite execution is
+  currently path-driven and expects direct `target...rewrite(...)` paths for
+  reliable behavior.
 - Parameter now uses explicit declaration/application facet values on its macro surface.
 - `Init` literal lowering now also executes through explicit declaration/application facet semantics.
 - Single-argument attached rewrites should read from the explicit plural application surface, for example `target.application.arguments[0].expression`, with an enclosing emptiness check when needed.

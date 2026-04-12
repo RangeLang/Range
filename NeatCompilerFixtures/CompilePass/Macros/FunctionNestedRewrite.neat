@@ -1,0 +1,16 @@
+macro forwardFirstArgument(): Function { target, diagnostics in
+    if !target.application.arguments.isEmpty {
+        target.application.arguments[0].rewrite(
+            target.application.arguments[0].expression
+        )
+    }
+}
+
+#forwardFirstArgument
+function passthrough(value value: Int) -> Int {
+    return value
+}
+
+@main {
+    value output: Int = passthrough(value: 10)
+}

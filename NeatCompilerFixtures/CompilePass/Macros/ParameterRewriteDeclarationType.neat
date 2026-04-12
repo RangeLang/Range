@@ -1,0 +1,17 @@
+macro arrayifyParameter(): Parameter { target, diagnostics in
+    target.declaration.type.rewrite(
+        TypeReference.array(
+            element: target.declaration.type
+        )
+    )
+
+    target.application.arguments.rewrite(target.application.arguments)
+}
+
+function collect(#arrayifyParameter values: Int) -> [Int] {
+    return values
+}
+
+@main {
+    value output: [Int] = collect(1, 2, 3)
+}

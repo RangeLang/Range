@@ -1,0 +1,16 @@
+macro firstArgument(): Function { target, diagnostics in
+    if !target.application.arguments.isEmpty {
+        target.application.arguments[0].rewrite(
+            target.application.arguments[0].expression
+        )
+    }
+}
+
+#firstArgument
+function select(text text: String, number number: Int) -> String {
+    return text
+}
+
+@main {
+    value result: Int = select(text: "Hello", number: 27)
+}
