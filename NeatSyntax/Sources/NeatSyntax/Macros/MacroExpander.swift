@@ -1090,6 +1090,14 @@ public enum MacroExpander {
         applicationArguments: [CallArgument],
         initTarget: RealizedInitTarget
     ) -> Expression? {
+        if let directArgument = resolveInitApplicationArgumentReference(
+            expression,
+            targetBinding: targetBinding,
+            applicationArguments: applicationArguments
+        ) {
+            return directArgument.value
+        }
+
         guard case .call(let name, let arguments) = expression else {
             return nil
         }
@@ -1333,7 +1341,8 @@ public enum MacroExpander {
         }
 
         var bindings: [String: Expression] = [
-            "\(targetBinding).application.arguments": .array(arguments.map(\.value))
+            "\(targetBinding).application.expression": primaryArgument.value,
+            "\(targetBinding).application.arguments": .array(arguments.map(\.value)),
         ]
         for (index, argument) in arguments.enumerated() {
             bindings["\(targetBinding).application.arguments[\(index)].expression"] = argument.value
@@ -1836,8 +1845,7 @@ public enum MacroExpander {
         case .parameter:
             return [
                 "\(targetBinding).declaration.type.rewrite",
-                "\(targetBinding).application.arguments.rewrite",
-                "\(targetBinding).application.argument.rewrite",
+                "\(targetBinding).application.expression.rewrite",
             ]
         case .other:
             return []
@@ -1916,8 +1924,7 @@ public enum MacroExpander {
         case .parameter:
             rewritePaths = [
                 ("\(targetBinding).declaration.type.rewrite", .parameterDeclarationType),
-                ("\(targetBinding).application.arguments.rewrite", .parameterApplicationArguments),
-                ("\(targetBinding).application.argument.rewrite", .parameterApplicationArgument),
+                ("\(targetBinding).application.expression.rewrite", .parameterApplicationArgument),
             ]
         case .other:
             rewritePaths = []
