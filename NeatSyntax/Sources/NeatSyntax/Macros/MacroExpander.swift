@@ -33,6 +33,8 @@ struct ParameterApplicationRewritePlan {
 }
 
 public enum MacroExpander {
+    nonisolated(unsafe) private static var activeInitMacroTargets: [RealizedInitMacroTarget] = []
+
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
         let declarationGraph = DeclarationGraph(files: files)
@@ -46,6 +48,10 @@ public enum MacroExpander {
             macros: registry
         )
         let attachedLiteralConstructs = declarationGraph.realizedLiteralBridges
+        activeInitMacroTargets = declarationGraph.realizedInitMacroTargets
+        defer {
+            activeInitMacroTargets = []
+        }
         return try files.map { parsedFile in
             ParsedSourceFile(
                 path: parsedFile.path,
@@ -340,7 +346,7 @@ public enum MacroExpander {
             name: callable.name,
             genericParameters: callable.genericParameters,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
-            parameters: expand(parameters: callable.parameters, macros: macros),
+            parameters: try expand(parameters: callable.parameters, macros: macros),
             returnType: callable.returnType,
             body: try callable.body.map {
                 try expand(
@@ -367,7 +373,7 @@ public enum MacroExpander {
     {
         InitializerDeclaration(
             macros: initializer.macros,
-            parameters: expand(parameters: initializer.parameters, macros: macros),
+            parameters: try expand(parameters: initializer.parameters, macros: macros),
             body: try initializer.body.map {
                 try expand(
                     statements: $0,
@@ -705,8 +711,8 @@ public enum MacroExpander {
     static func expand(
         parameters: [NeatFunctionParameter],
         macros: [String: MacroDeclaration]
-    ) -> [NeatFunctionParameter] {
-        parameters.map { parameter in
+    ) throws -> [NeatFunctionParameter] {
+        try parameters.map { parameter in
             let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
                 macroApplication in
                 guard let macro = macros[macroApplication.name],
@@ -723,9 +729,9 @@ public enum MacroExpander {
                 return parameter
             }
 
-            let rewrittenType = attachedParameterMacros.reduce(typeReference) {
+            let rewrittenType = try attachedParameterMacros.reduce(typeReference) {
                 currentType, macro in
-                applyAttachedParameterTypeRewrite(macro: macro, to: currentType)
+                try applyAttachedParameterTypeRewrite(macro: macro, to: currentType)
             }
 
             return NeatFunctionParameter(
@@ -761,53 +767,61 @@ public enum MacroExpander {
                 )
             }
 
-            guard
-                let signature = matchingAttachedParameterCallable(
-                    name: name,
-                    arguments: rewrittenArguments,
-                    signatures: attachedParameterCallables
-                )
-            else {
-                return .call(name: name, arguments: rewrittenArguments)
+            let callArguments: [CallArgument]
+            if let signature = try matchingAttachedParameterCallable(
+                name: name,
+                arguments: rewrittenArguments,
+                signatures: attachedParameterCallables
+            ) {
+                var wrappedArguments: [CallArgument] = []
+                var argumentIndex = 0
+
+                for parameterIndex in signature.labels.indices {
+                    if let macro = signature.attachedParameterMacrosByIndex[parameterIndex],
+                        try parameterApplicationRewritePlan(for: macro)?.isVariadic == true
+                    {
+                        let consumedArguments = Array(rewrittenArguments.dropFirst(argumentIndex))
+                        wrappedArguments.append(
+                            try applyParameterApplicationRewrite(
+                                macro: macro,
+                                arguments: consumedArguments
+                            )
+                        )
+                        argumentIndex = rewrittenArguments.count
+                        continue
+                    }
+
+                    guard argumentIndex < rewrittenArguments.count else {
+                        break
+                    }
+
+                    let argument = rewrittenArguments[argumentIndex]
+                    if let macro = signature.attachedParameterMacrosByIndex[parameterIndex] {
+                        wrappedArguments.append(
+                            try applyParameterApplicationRewrite(
+                                macro: macro,
+                                arguments: [argument]
+                            )
+                        )
+                    } else {
+                        wrappedArguments.append(argument)
+                    }
+                    argumentIndex += 1
+                }
+                callArguments = wrappedArguments
+            } else {
+                callArguments = rewrittenArguments
             }
 
-            var wrappedArguments: [CallArgument] = []
-            var argumentIndex = 0
-
-            for parameterIndex in signature.labels.indices {
-                if let macro = signature.attachedParameterMacrosByIndex[parameterIndex],
-                    parameterApplicationRewritePlan(for: macro)?.isVariadic == true
-                {
-                    let consumedArguments = Array(rewrittenArguments.dropFirst(argumentIndex))
-                    wrappedArguments.append(
-                        applyParameterApplicationRewrite(
-                            macro: macro,
-                            arguments: consumedArguments
-                        )
-                    )
-                    argumentIndex = rewrittenArguments.count
-                    continue
-                }
-
-                guard argumentIndex < rewrittenArguments.count else {
-                    break
-                }
-
-                let argument = rewrittenArguments[argumentIndex]
-                if let macro = signature.attachedParameterMacrosByIndex[parameterIndex] {
-                    wrappedArguments.append(
-                        applyParameterApplicationRewrite(
-                            macro: macro,
-                            arguments: [argument]
-                        )
-                    )
-                } else {
-                    wrappedArguments.append(argument)
-                }
-                argumentIndex += 1
+            if let rewrittenByInitMacro = try applyInitMacroRewritesIfNeeded(
+                callName: name,
+                callArguments: callArguments,
+                macros: macros
+            ) {
+                return rewrittenByInitMacro
             }
 
-            return .call(name: name, arguments: wrappedArguments)
+            return .call(name: name, arguments: callArguments)
         case .freestandingMacro(let name, let arguments):
             guard let macro = macros[name],
                 macroTargetKind(for: macro) == .expression
@@ -1000,7 +1014,7 @@ public enum MacroExpander {
             return expression
         }
 
-        guard let rewritten = executeInitMacroRewrite(
+        guard let rewritten = try executeInitMacroRewrite(
             macroName: "literal",
             initTarget: bridge.initTarget,
             applicationArguments: [
@@ -1022,12 +1036,12 @@ public enum MacroExpander {
         initTarget: RealizedInitTarget,
         applicationArguments: [CallArgument],
         macros: [String: MacroDeclaration]
-    ) -> Expression? {
+    ) throws -> Expression? {
         guard let macro = macros[macroName], macroTargetKind(for: macro) == .initializer else {
             return nil
         }
 
-        guard let rewriteExpression = initRewriteExpression(for: macro) else {
+        guard let rewriteExpression = try initRewriteExpression(for: macro) else {
             return nil
         }
 
@@ -1039,9 +1053,88 @@ public enum MacroExpander {
         )
     }
 
-    static func initRewriteExpression(for macro: MacroDeclaration) -> Expression? {
-        for rewrite in resolvedRewriteCalls(for: macro) where rewrite.site == .initApplication {
+    static func initRewriteExpression(for macro: MacroDeclaration) throws -> Expression? {
+        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .initApplication {
             return rewrite.payload
+        }
+
+        return nil
+    }
+
+    static func applyInitMacroRewritesIfNeeded(
+        callName: String,
+        callArguments: [CallArgument],
+        macros: [String: MacroDeclaration]
+    ) throws -> Expression? {
+        guard
+            let target = matchingInitMacroTarget(
+                callName: callName,
+                callArguments: callArguments,
+                targets: activeInitMacroTargets
+            )
+        else {
+            return nil
+        }
+
+        var currentArguments = callArguments
+        var changed = false
+
+        for macroApplication in target.macros {
+            guard let macro = macros[macroApplication.name], macroTargetKind(for: macro) == .initializer
+            else {
+                continue
+            }
+
+            guard
+                let rewritten = try executeInitMacroRewrite(
+                    macroName: macroApplication.name,
+                    initTarget: target.initTarget,
+                    applicationArguments: currentArguments,
+                    macros: macros
+                )
+            else {
+                continue
+            }
+
+            changed = true
+            if case .call(let rewrittenName, let rewrittenArguments) = rewritten,
+                rewrittenName == target.constructName
+            {
+                currentArguments = rewrittenArguments
+                continue
+            }
+
+            return rewritten
+        }
+
+        guard changed else {
+            return nil
+        }
+
+        return .call(name: callName, arguments: currentArguments)
+    }
+
+    static func matchingInitMacroTarget(
+        callName: String,
+        callArguments: [CallArgument],
+        targets: [RealizedInitMacroTarget]
+    ) -> RealizedInitMacroTarget? {
+        let matching = targets.filter {
+            $0.constructName == callName
+                && $0.parameterLabels.elementsEqual(callArguments.map(\.label), by: { $0 == $1 })
+        }
+
+        guard !matching.isEmpty else {
+            return nil
+        }
+
+        if matching.count == 1 {
+            return matching[0]
+        }
+
+        let coreMatches = matching.filter(\.isCore)
+        if coreMatches.count == 1 {
+            return coreMatches[0]
         }
 
         return nil
@@ -1202,45 +1295,56 @@ public enum MacroExpander {
         name: String,
         arguments: [CallArgument],
         signatures: [AttachedParameterMacroSignature]
-    ) -> AttachedParameterMacroSignature? {
-        signatures.first { signature in
+    ) throws -> AttachedParameterMacroSignature? {
+        for signature in signatures {
             guard signature.name == name else {
-                return false
+                continue
             }
 
-            let variadicIndex = signature.attachedParameterMacrosByIndex
-                .sorted { $0.key < $1.key }
-                .first { parameterApplicationRewritePlan(for: $0.value)?.isVariadic == true }?.key
+            var variadicIndex: Int?
+            for entry in signature.attachedParameterMacrosByIndex.sorted(by: { $0.key < $1.key }) {
+                if try parameterApplicationRewritePlan(for: entry.value)?.isVariadic == true {
+                    variadicIndex = entry.key
+                    break
+                }
+            }
 
             guard let variadicIndex else {
-                return signature.labels.elementsEqual(arguments.map(\.label), by: { $0 == $1 })
+                if signature.labels.elementsEqual(arguments.map(\.label), by: { $0 == $1 }) {
+                    return signature
+                }
+                continue
             }
 
             guard variadicIndex == signature.labels.count - 1 else {
-                return false
+                continue
             }
 
             guard arguments.count >= variadicIndex else {
-                return false
+                continue
             }
 
             let fixedLabels = Array(signature.labels.prefix(variadicIndex))
             let fixedArgumentLabels = Array(arguments.prefix(variadicIndex)).map(\.label)
             guard fixedLabels.elementsEqual(fixedArgumentLabels, by: { $0 == $1 }) else {
-                return false
+                continue
             }
 
             let variadicLabel = signature.labels[variadicIndex]
-            return arguments.dropFirst(variadicIndex).allSatisfy { $0.label == variadicLabel }
+            if arguments.dropFirst(variadicIndex).allSatisfy({ $0.label == variadicLabel }) {
+                return signature
+            }
         }
+
+        return nil
     }
 
     static func applyAttachedParameterTypeRewrite(
         macro: MacroDeclaration,
         to typeReference: TypeReference
-    ) -> TypeReference {
+    ) throws -> TypeReference {
         let targetBinding = macro.bindings.target
-        for rewrite in resolvedRewriteCalls(for: macro) where rewrite.site == .parameterDeclarationType {
+        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .parameterDeclarationType {
             if let rewrittenType = interpretTypeReferenceRewriteExpression(
                 rewrite.payload,
                 bindings: [
@@ -1257,10 +1361,10 @@ public enum MacroExpander {
     static func applyParameterApplicationRewrite(
         macro: MacroDeclaration,
         arguments: [CallArgument]
-    ) -> CallArgument {
+    ) throws -> CallArgument {
         let targetBinding = macro.bindings.target
         let primaryArgument = arguments.first ?? CallArgument(label: nil, value: .array([]))
-        guard let plan = parameterApplicationRewritePlan(for: macro) else {
+        guard let plan = try parameterApplicationRewritePlan(for: macro) else {
             return primaryArgument
         }
 
@@ -1280,9 +1384,9 @@ public enum MacroExpander {
 
     static func parameterApplicationRewritePlan(
         for macro: MacroDeclaration
-    ) -> ParameterApplicationRewritePlan? {
+    ) throws -> ParameterApplicationRewritePlan? {
         let targetBinding = macro.bindings.target
-        for rewrite in resolvedRewriteCalls(for: macro)
+        for rewrite in try resolvedRewriteCalls(for: macro)
         where rewrite.site == .parameterApplicationArguments
             || rewrite.site == .parameterApplicationArgument
         {
@@ -1366,7 +1470,7 @@ public enum MacroExpander {
     static func rewriteBody(for macro: MacroDeclaration) throws -> [Statement] {
         var rewriteCalls: [[Statement]] = []
 
-        for rewrite in resolvedRewriteCalls(for: macro) where rewrite.site == .targetDirect {
+        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .targetDirect {
             guard case .block(let body) = rewrite.payload else {
                 throw ParseError(
                     "Macro #\(macro.name) target.rewrite(...) must receive a block expression for Block-targeted macros."
@@ -1391,7 +1495,7 @@ public enum MacroExpander {
     static func rewriteExpression(for macro: MacroDeclaration) throws -> Expression {
         var rewriteExpressions: [Expression] = []
 
-        for rewrite in resolvedRewriteCalls(for: macro) where rewrite.site == .targetDirect {
+        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .targetDirect {
             rewriteExpressions.append(rewrite.payload)
         }
 
@@ -1740,14 +1844,74 @@ public enum MacroExpander {
         }
     }
 
-    static func resolvedRewriteCalls(for macro: MacroDeclaration) -> [ResolvedRewriteCall] {
+    static func resolvedRewriteCalls(for macro: MacroDeclaration) throws -> [ResolvedRewriteCall] {
         let targetBinding = macro.bindings.target
         let targetKind = macroTargetKind(for: macro)
+        try validateRewriteSites(for: macro, targetKind: targetKind)
         return macroOperationExpressions(in: macro.body).compactMap {
             resolvedRewriteCall(
                 from: $0,
                 targetBinding: targetBinding,
                 targetKind: targetKind
+            )
+        }
+    }
+
+    static func allowedRewritePaths(
+        targetBinding: String,
+        targetKind: MacroTargetKind
+    ) -> Set<String> {
+        switch targetKind {
+        case .expression, .block:
+            return [
+                "\(targetBinding).rewrite"
+            ]
+        case .initializer:
+            return [
+                "\(targetBinding).application.rewrite"
+            ]
+        case .parameter:
+            return [
+                "\(targetBinding).declaration.type.rewrite",
+                "\(targetBinding).application.arguments.rewrite",
+                "\(targetBinding).application.argument.rewrite",
+            ]
+        case .other:
+            return []
+        }
+    }
+
+    static func validateRewriteSites(
+        for macro: MacroDeclaration,
+        targetKind: MacroTargetKind
+    ) throws {
+        let targetBinding = macro.bindings.target
+        let targetPrefix = "\(targetBinding)."
+        let allowedPaths = allowedRewritePaths(targetBinding: targetBinding, targetKind: targetKind)
+
+        var invalidPaths: [String] = []
+        for expression in macroOperationExpressions(in: macro.body) {
+            guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
+                continue
+            }
+            guard name.hasPrefix(targetPrefix), name.hasSuffix(".rewrite") else {
+                continue
+            }
+            guard !allowedPaths.contains(name) else {
+                continue
+            }
+            invalidPaths.append(name)
+        }
+
+        guard invalidPaths.isEmpty else {
+            let allowedDescription: String
+            if allowedPaths.isEmpty {
+                allowedDescription = "no rewrite paths"
+            } else {
+                allowedDescription = allowedPaths.sorted().joined(separator: ", ")
+            }
+            throw ParseError(
+                "Macro #\(macro.name) targeting \(macro.target.typeReference.displayName) uses unsupported rewrite site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
             )
         }
     }

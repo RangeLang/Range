@@ -44,11 +44,37 @@ public struct RealizedLiteralBridge: Hashable, Sendable {
     }
 }
 
+public struct RealizedInitMacroTarget {
+    public let initTarget: RealizedInitTarget
+    public let macros: [MacroApplication]
+
+    public init(
+        initTarget: RealizedInitTarget,
+        macros: [MacroApplication]
+    ) {
+        self.initTarget = initTarget
+        self.macros = macros
+    }
+
+    public var constructName: String {
+        initTarget.constructName
+    }
+
+    public var parameterLabels: [String?] {
+        initTarget.parameterLabels
+    }
+
+    public var isCore: Bool {
+        initTarget.isCore
+    }
+}
+
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
     public let constructsByName: [String: ConstructDeclaration]
     public let callablesByName: [String: [CallableDeclaration]]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
+    public let realizedInitMacroTargets: [RealizedInitMacroTarget]
 
     public init(files: [ParsedSourceFile]) {
         let protocols = Self.collectProtocols(from: files)
@@ -59,6 +85,7 @@ public struct DeclarationGraph {
         self.constructsByName = constructs
         self.callablesByName = callables
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
+        self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
     }
 
     public var literalBridgeResolver: LiteralBridgeResolver {
@@ -208,6 +235,27 @@ public struct DeclarationGraph {
                         isCore: construct.isCore
                     ),
                     carrierTypeName: literalMacro.genericArguments[0].displayName
+                )
+            }
+        }
+    }
+
+    static func collectRealizedInitMacroTargets(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [RealizedInitMacroTarget] {
+        constructs.values.flatMap { construct in
+            construct.initializers.compactMap { initializer in
+                guard !initializer.macros.isEmpty else {
+                    return nil
+                }
+
+                return RealizedInitMacroTarget(
+                    initTarget: RealizedInitTarget(
+                        constructName: construct.name,
+                        parameterLabels: initializer.parameters.map(\.externalLabel),
+                        isCore: construct.isCore
+                    ),
+                    macros: initializer.macros
                 )
             }
         }

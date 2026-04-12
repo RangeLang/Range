@@ -1,0 +1,25 @@
+macro flipInitArguments(): Init { target, diagnostics in
+    if target.application.arguments.count == 2 {
+        target.application.rewrite(
+            target.declaration.expression(arguments: [
+                target.application.arguments[1],
+                target.application.arguments[0]
+            ])
+        )
+    }
+}
+
+construct SwappedInitFixture {
+    value text: String
+    value number: Int
+
+    #flipInitArguments
+    init(text _: String, number _: Int) {
+        self.text = text
+        self.number = number
+    }
+}
+
+@main {
+    value fixture: SwappedInitFixture = SwappedInitFixture(1, "Hello")
+}

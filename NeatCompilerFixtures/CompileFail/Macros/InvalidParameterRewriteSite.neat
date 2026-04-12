@@ -1,0 +1,7 @@
+macro badParameterRewrite(): Parameter { target, diagnostics in
+    target.rewrite(target.declaration.type)
+}
+
+function invalid(#badParameterRewrite value: Int) {
+    value
+}

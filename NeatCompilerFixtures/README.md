@@ -32,6 +32,7 @@ The current macro fixtures cover only the supported bootstrap surface:
 
 - direct literal bridge attachment through `#literal<T>` on a concrete `init`
 - literal bridge carry through `#literal<T>`
+- init-targeted call-site rewrite from attached init macros
 - parameter-targeted `#autoclosure`
 - expression-targeted `#stringify(...)`
 - expression-targeted rewrite through `target.rewrite(...)`, including
@@ -42,5 +43,7 @@ The current macro fixtures cover only the supported bootstrap surface:
 - syntax-category expression macro parameters must use `capture`, for example
   `value _: capture Expression`
 - invalid capture usage, for example `capture String`
+- invalid rewrite-site usage for a macro target kind, for example a
+  `Parameter` macro using `target.rewrite(...)`
 - parameter-targeted `#variadic` rewriting that now validates return semantics
   against the expanded parameter type

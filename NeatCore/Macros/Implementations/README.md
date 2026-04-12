@@ -74,10 +74,12 @@ Current status:
 - `literal` now executes through the `Init` declaration/application rewrite
   path, and malformed `literal` rewrites fail explicitly rather than silently
   falling back.
+- construct call expansion now also runs attached `Init`-target macro rewrites
+  through the same declaration/application execution path.
 - Rewrite-site matching for `Init` now also goes through the shared resolved
   rewrite-target layer rather than a separate ad hoc rewrite-call matcher.
-- Fully generalized `Init` macro execution for arbitrary init-targeted macros
-  is not implemented yet.
+- `Init` rewrite expression interpretation is still intentionally narrow in the
+  bootstrap pass (focused on declaration-expression reconstruction).
 
 ## Current Rule Of Thumb
 
@@ -130,3 +132,7 @@ Macro design is now large enough that implementation status should be visible
 without reading the compiler internals first.
 
 This file is the index for that status.
+
+Execution order for upcoming work is tracked in:
+
+- `IMPLEMENTATION_QUEUE.md`
