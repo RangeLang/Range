@@ -87,6 +87,11 @@ Constraint:
   - parser + surface validation
   - expander execution semantics
   - compile-pass and compile-fail fixtures
+- Status:
+  - `Function`: target-kind and rewrite-site validation active; execution still
+    pending full support.
+  - `Construct`: target attachment + rewrite-site validation active; execution
+    still pending.
 
 4. Remove remaining ad hoc macro-expander assumptions
 - Ensure rewrite capability is resolved from target-kind + surface semantics.

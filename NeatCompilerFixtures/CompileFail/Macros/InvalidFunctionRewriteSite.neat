@@ -3,10 +3,6 @@ macro badFunctionRewrite(): Function { target, diagnostics in
 }
 
 #badFunctionRewrite
-function example(value _: Int) -> Int {
-    return value
-}
-
-@main {
-    value result: Int = example(1)
+construct InvalidFunctionRewriteAttachmentFixture {
+    value number: Int
 }

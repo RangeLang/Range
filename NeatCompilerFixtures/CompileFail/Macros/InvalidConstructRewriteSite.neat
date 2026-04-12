@@ -1,0 +1,8 @@
+macro badConstructRewrite(): Construct { target, diagnostics in
+    target.rewrite(target)
+}
+
+#badConstructRewrite
+construct BrokenConstruct {
+    value number: Int
+}

@@ -4,6 +4,4 @@ macro variadic(): Parameter { target, diagnostics in
             element: target.declaration.type
         )
     )
-
-    target.application.arguments.rewrite(target.application.arguments)
 }

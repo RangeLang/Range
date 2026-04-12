@@ -39,7 +39,7 @@ Current bootstrap rules:
 - Parameter now uses explicit declaration/application facet values on its macro surface.
 - `Init` literal lowering now also executes through explicit declaration/application facet semantics.
 - Single-argument attached rewrites should read from the explicit plural application surface, for example `target.application.arguments[0].expression`, with an enclosing emptiness check when needed.
-- Rewrite and extension capability are modeled explicitly with macro-surface protocols such as `SupportsRewrite<T>` and `SupportsExtension<T>`.
+- Rewrite and extension capability are modeled explicitly with macro-surface protocols such as `SupportsRewrite<T>` and same-type `SupportsExtension`.
 - Preferred target-surface design uses declaration/application facet values on
   target kinds such as `Init`, with nested `Declaration` and `Application`
   constructs defining those facet types.

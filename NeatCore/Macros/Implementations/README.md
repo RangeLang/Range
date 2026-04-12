@@ -94,6 +94,19 @@ Current status:
 - call-site rewrite execution for function targets is still in-progress and not
   yet locked as supported behavior.
 
+### `Construct`
+
+Implemented macros:
+
+- fixture-level construct-target attachment and validation slices
+
+Current status:
+
+- construct-target macro attachment is recognized and validated.
+- construct-target rewrite-site diagnostics are active (invalid rewrite paths
+  fail explicitly).
+- construct-target execution semantics are still pending.
+
 ## Current Rule Of Thumb
 
 - `Expression` and `Block` are the most complete macro targets today.

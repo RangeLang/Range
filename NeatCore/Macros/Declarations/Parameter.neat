@@ -12,7 +12,7 @@ construct Parameter: Syntax {
     }
 
     @core
-    construct Application: SupportsRewrite<Expression> {
-        value arguments: [Argument]
+    construct Application {
+        value argument: Argument?
     }
 }

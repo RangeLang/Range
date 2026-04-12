@@ -35,6 +35,8 @@ The current macro fixtures cover only the supported bootstrap surface:
 - init-targeted call-site rewrite from attached init macros
 - function-targeted macro attachment and rewrite-site validation
 - function nested argument rewrite shape (`target.application.arguments[i].rewrite(...)`)
+- construct-target macro attachment validation
+- construct extension-surface call shape (`target.addExtension(...)`)
 - parameter-targeted `#autoclosure`
 - nested parameter argument rewrite (`target.application.arguments[i].rewrite(...)`)
 - parameter declaration type rewrite (`target.declaration.type.rewrite(...)`)
@@ -54,6 +56,8 @@ The current macro fixtures cover only the supported bootstrap surface:
   `target.application.arguments[0].expression.rewrite(...)`
 - invalid rewrite-site usage for `Function` target macros, for example
   `target.rewrite(...)` instead of `target.application.rewrite(...)`
+- invalid construct rewrite-site usage, for example `target.rewrite(...)` on a
+  `Construct` target macro
 - function nested rewrite execution gap fixture (expected fail until function
   call-site rewrite execution is fully enabled)
 - parameter-targeted `#variadic` rewriting that now validates return semantics

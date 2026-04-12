@@ -1,0 +1,12 @@
+macro extendConstructSurface(): Construct { target, diagnostics in
+    target.addExtension(target)
+}
+
+#extendConstructSurface
+construct ExtendableFixture {
+    value number: Int
+}
+
+@main {
+    value result: ExtendableFixture = ExtendableFixture(number: 1)
+}

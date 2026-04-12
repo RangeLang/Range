@@ -133,6 +133,11 @@ public enum MacroExpander {
     ) throws
         -> ConstructDeclaration
     {
+        try validateAttachedConstructMacros(
+            applications: construct.macros,
+            macros: macros
+        )
+
         let carriedInitializers = DeclarationGraph.carriedProtocolInitializerMacros(
             for: construct.initializers,
             conformances: construct.conformances,
@@ -1272,6 +1277,23 @@ public enum MacroExpander {
         return nil
     }
 
+    static func validateAttachedConstructMacros(
+        applications: [MacroApplication],
+        macros: [String: MacroDeclaration]
+    ) throws {
+        for application in applications {
+            guard let macro = macros[application.name] else {
+                continue
+            }
+            guard macroTargetKind(for: macro) == .construct else {
+                throw ParseError(
+                    "Macro #\(application.name) is attached to a construct but targets \(macro.target.typeReference.displayName)."
+                )
+            }
+            _ = try resolvedRewriteCalls(for: macro)
+        }
+    }
+
     static func applyAttachedParameterTypeRewrite(
         macro: MacroDeclaration,
         to typeReference: TypeReference
@@ -1692,6 +1714,8 @@ public enum MacroExpander {
             return .initializer
         case "Function":
             return .function
+        case "Construct":
+            return .construct
         default:
             return .other(name)
         }
@@ -1727,6 +1751,8 @@ public enum MacroExpander {
             return [
                 "\(targetBinding).application.rewrite"
             ]
+        case .construct:
+            return []
         case .parameter:
             return [
                 "\(targetBinding).declaration.type.rewrite",
@@ -1805,6 +1831,8 @@ public enum MacroExpander {
             rewritePaths = [
                 ("\(targetBinding).application.rewrite", .functionApplication)
             ]
+        case .construct:
+            rewritePaths = []
         case .parameter:
             rewritePaths = [
                 ("\(targetBinding).declaration.type.rewrite", .parameterDeclarationType),

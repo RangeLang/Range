@@ -18,6 +18,7 @@ enum MacroTargetKind: Equatable {
     case parameter
     case initializer
     case function
+    case construct
     case other(String)
 }
 

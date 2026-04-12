@@ -1,0 +1,10 @@
+macro inspectConstruct(): Construct { target, diagnostics in }
+
+#inspectConstruct
+construct FixtureConstruct {
+    value number: Int
+}
+
+@main {
+    value result: FixtureConstruct = FixtureConstruct(number: 1)
+}

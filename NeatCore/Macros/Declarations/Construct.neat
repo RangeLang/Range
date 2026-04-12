@@ -1,5 +1,5 @@
 @core
-construct Construct: Syntax {
+construct Construct: Syntax, SupportsExtension {
     value name: String
     value self: TypeReference
     value inits: [Init]
