@@ -5,7 +5,6 @@ construct Construct: Syntax, SupportsExtension {
 
     @core
     construct Declaration {
-        value name: String
         value self: TypeReference
         value inits: [Init.Declaration]
         value functions: [Function.Declaration]
@@ -14,6 +13,6 @@ construct Construct: Syntax, SupportsExtension {
 
     @core
     construct Application {
-        value initialization: Init.Application
+      value init: Init.Application
     }
 }
