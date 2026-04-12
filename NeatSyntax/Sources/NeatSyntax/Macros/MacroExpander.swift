@@ -6,11 +6,6 @@ struct AttachedParameterMacroSignature {
     let attachedParameterMacrosByIndex: [Int: MacroDeclaration]
 }
 
-enum AttachedParameterRewriteShape {
-    case single
-    case variadic
-}
-
 enum ResolvedRewriteSite {
     case targetDirect
     case initApplication
@@ -22,6 +17,11 @@ enum ResolvedRewriteSite {
 struct ResolvedRewriteCall {
     let site: ResolvedRewriteSite
     let payload: Expression
+}
+
+struct ParameterApplicationRewritePlan {
+    let payload: Expression
+    let isVariadic: Bool
 }
 
 public enum MacroExpander {
@@ -768,11 +768,11 @@ public enum MacroExpander {
 
             for parameterIndex in signature.labels.indices {
                 if let macro = signature.attachedParameterMacrosByIndex[parameterIndex],
-                    attachedParameterRewriteShape(for: macro) == .variadic
+                    parameterApplicationRewritePlan(for: macro)?.isVariadic == true
                 {
                     let consumedArguments = Array(rewrittenArguments.dropFirst(argumentIndex))
                     wrappedArguments.append(
-                        applyAttachedParameterArgumentRewrite(
+                        applyParameterApplicationRewrite(
                             macro: macro,
                             arguments: consumedArguments
                         )
@@ -788,7 +788,7 @@ public enum MacroExpander {
                 let argument = rewrittenArguments[argumentIndex]
                 if let macro = signature.attachedParameterMacrosByIndex[parameterIndex] {
                     wrappedArguments.append(
-                        applyAttachedParameterArgumentRewrite(
+                        applyParameterApplicationRewrite(
                             macro: macro,
                             arguments: [argument]
                         )
@@ -1211,7 +1211,7 @@ public enum MacroExpander {
 
             let variadicIndex = signature.attachedParameterMacrosByIndex
                 .sorted { $0.key < $1.key }
-                .first { attachedParameterRewriteShape(for: $0.value) == .variadic }?.key
+                .first { parameterApplicationRewritePlan(for: $0.value)?.isVariadic == true }?.key
 
             guard let variadicIndex else {
                 return signature.labels.elementsEqual(arguments.map(\.label), by: { $0 == $1 })
@@ -1264,44 +1264,33 @@ public enum MacroExpander {
         return typeReference
     }
 
-    static func applyAttachedParameterArgumentRewrite(
+    static func applyParameterApplicationRewrite(
         macro: MacroDeclaration,
         arguments: [CallArgument]
     ) -> CallArgument {
         let targetBinding = macro.bindings.target
         let primaryArgument = arguments.first ?? CallArgument(label: nil, value: .array([]))
-
-        for expression in macroOperationExpressions(in: macro.body) {
-            guard let rewrite = resolvedRewriteCall(
-                from: expression,
-                targetBinding: targetBinding
-            ),
-                rewrite.site == .parameterApplicationArguments
-                    || rewrite.site == .parameterApplicationArgument
-            else {
-                continue
-            }
-
-            let substituted = substituteMacroBindings(
-                in: rewrite.payload,
-                bindings: [
-                    "\(targetBinding).application.arguments[0].expression": primaryArgument.value,
-                    "\(targetBinding).application.arguments": .array(arguments.map(\.value)),
-                ]
-            )
-
-            return CallArgument(
-                label: primaryArgument.label,
-                value: interpretAttachedParameterArgumentRewriteExpression(substituted)
-            )
+        guard let plan = parameterApplicationRewritePlan(for: macro) else {
+            return primaryArgument
         }
 
-        return primaryArgument
+        let substituted = substituteMacroBindings(
+            in: plan.payload,
+            bindings: [
+                "\(targetBinding).application.arguments[0].expression": primaryArgument.value,
+                "\(targetBinding).application.arguments": .array(arguments.map(\.value)),
+            ]
+        )
+
+        return CallArgument(
+            label: primaryArgument.label,
+            value: interpretAttachedParameterArgumentRewriteExpression(substituted)
+        )
     }
 
-    static func attachedParameterRewriteShape(
+    static func parameterApplicationRewritePlan(
         for macro: MacroDeclaration
-    ) -> AttachedParameterRewriteShape {
+    ) -> ParameterApplicationRewritePlan? {
         let targetBinding = macro.bindings.target
         for expression in macroOperationExpressions(in: macro.body) {
             guard let rewrite = resolvedRewriteCall(
@@ -1314,14 +1303,20 @@ public enum MacroExpander {
                 continue
             }
 
-            if case .identifier(let identifier) = rewrite.payload,
+            let isVariadic: Bool
+            if rewrite.site == .parameterApplicationArguments,
+                case .identifier(let identifier) = rewrite.payload,
                 identifier == "\(targetBinding).application.arguments"
             {
-                return .variadic
+                isVariadic = true
+            } else {
+                isVariadic = false
             }
+
+            return ParameterApplicationRewritePlan(payload: rewrite.payload, isVariadic: isVariadic)
         }
 
-        return .single
+        return nil
     }
 
     static func macroOperationExpressions(in statements: [Statement]) -> [Expression] {
