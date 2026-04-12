@@ -5,7 +5,7 @@ construct Construct: Syntax, SupportsExtension {
 
     @core
     construct Declaration {
-        value self: TypeReference
+        value self: NominalTypeReference
         value inits: [Init.Declaration]
         value functions: [Function.Declaration]
         value constructs: [Construct.Declaration]

@@ -1,0 +1,4 @@
+@core
+construct VariadicTypeReference: TypeReference {
+    value element: TypeReference
+}

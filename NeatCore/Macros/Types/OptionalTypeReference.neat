@@ -1,0 +1,4 @@
+@core
+construct OptionalTypeReference: TypeReference {
+    value wrapped: TypeReference
+}

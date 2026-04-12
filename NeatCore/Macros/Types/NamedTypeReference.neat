@@ -1,0 +1,4 @@
+@core
+construct NamedTypeReference: NominalTypeReference {
+    value name: String
+}

@@ -1,7 +1,7 @@
 @core
 construct Protocol: Syntax {
     value name: String
-    value self: TypeReference
+    value self: NominalTypeReference
     value inits: [Init.Declaration]
     value functions: [Function.Declaration]
 }

@@ -1,7 +1,7 @@
 @core
 construct Enum: Syntax {
     value name: String
-    value self: TypeReference
+    value self: NominalTypeReference
     value cases: [Case]
 
     @core

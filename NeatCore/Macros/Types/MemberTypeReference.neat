@@ -1,0 +1,5 @@
+@core
+construct MemberTypeReference: NominalTypeReference {
+    value base: NominalTypeReference
+    value name: String
+}
