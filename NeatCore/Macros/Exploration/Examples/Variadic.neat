@@ -3,7 +3,7 @@
 
 macro variadic(): Parameter { target, diagnostics in
     if !target.application.arguments.isEmpty {
-        target.application.argument.rewrite(
+        target.application.argument.expression.rewrite(
             ArrayExpression(
                 elements: target.application.arguments.map { $0.value }
             )

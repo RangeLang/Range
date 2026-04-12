@@ -6,7 +6,7 @@ construct Function: Syntax {
     @core
     construct Declaration {
         value name: String
-        value parameters: [Parameter]
+        value parameters: [Parameter.Declaration]
         value returnType: TypeReference?
     }
 

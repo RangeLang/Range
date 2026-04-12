@@ -2,6 +2,6 @@
 construct Protocol: Syntax {
     value name: String
     value self: TypeReference
-    value inits: [Init]
-    value functions: [Function]
+    value inits: [Init.Declaration]
+    value functions: [Function.Declaration]
 }

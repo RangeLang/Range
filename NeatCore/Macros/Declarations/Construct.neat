@@ -1,8 +1,19 @@
 @core
 construct Construct: Syntax, SupportsExtension {
-    value name: String
-    value self: TypeReference
-    value inits: [Init]
-    value functions: [Function]
-    value constructs: [Construct]
+    value declaration: Declaration
+    value application: Application
+
+    @core
+    construct Declaration {
+        value name: String
+        value self: TypeReference
+        value inits: [Init.Declaration]
+        value functions: [Function.Declaration]
+        value constructs: [Construct.Declaration]
+    }
+
+    @core
+    construct Application {
+        value initialization: Init.Application
+    }
 }

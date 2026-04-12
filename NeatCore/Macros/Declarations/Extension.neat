@@ -2,5 +2,5 @@
 construct Extension: Syntax {
     value target: TypeReference
     value protocols: [TypeReference]
-    value functions: [Function]
+    value functions: [Function.Declaration]
 }

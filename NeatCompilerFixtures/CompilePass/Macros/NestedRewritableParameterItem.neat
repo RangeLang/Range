@@ -1,7 +1,7 @@
 macro nestedArgumentRewrite(): Parameter { target, diagnostics in
-    if !target.application.arguments.isEmpty {
-        target.application.arguments[0].rewrite(
-            target.application.arguments[0].expression
+    if target.application.argument != nil {
+        target.application.argument.expression.rewrite(
+            target.application.argument.expression
         )
     }
 }

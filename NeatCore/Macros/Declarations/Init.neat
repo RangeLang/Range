@@ -5,7 +5,7 @@ construct Init: Syntax {
 
     @core
     construct Declaration {
-        value parameters: [Parameter]
+        value parameters: [Parameter.Declaration]
         function expression(arguments: [Argument]) -> Expression
     }
 

@@ -1,5 +1,5 @@
 @core
-construct Argument: SupportsRewrite<Expression> {
+construct Argument {
     value label: String?
     value type: TypeReference
     value expression: Expression
