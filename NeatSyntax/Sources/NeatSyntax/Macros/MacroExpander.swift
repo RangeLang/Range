@@ -2,8 +2,9 @@ import Foundation
 
 public enum MacroExpander {
     nonisolated(unsafe) private static var activeInitMacroTargets: [RealizedInitMacroTarget] = []
-    nonisolated(unsafe) private static var activeFunctionMacroTargets: [AttachedFunctionMacroSignature] =
-        []
+    nonisolated(unsafe) private static var activeFunctionMacroTargets:
+        [AttachedFunctionMacroSignature] =
+            []
 
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
@@ -892,14 +893,16 @@ public enum MacroExpander {
             return expression
         }
 
-        guard let rewritten = try executeInitMacroRewrite(
-            macroName: "literal",
-            initTarget: bridge.initTarget,
-            applicationArguments: [
-                CallArgument(label: bridge.initTarget.parameterLabels.first ?? nil, value: expression)
-            ],
-            macros: macros
-        )
+        guard
+            let rewritten = try executeInitMacroRewrite(
+                macroName: "literal",
+                initTarget: bridge.initTarget,
+                applicationArguments: [
+                    CallArgument(
+                        label: bridge.initTarget.parameterLabels.first ?? nil, value: expression)
+                ],
+                macros: macros
+            )
         else {
             throw ParseError(
                 "Init macro #literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/application rewrite semantics."
@@ -958,7 +961,8 @@ public enum MacroExpander {
         var changed = false
 
         for macroApplication in target.macros {
-            guard let macro = macros[macroApplication.name], macroTargetKind(for: macro) == .initializer
+            guard let macro = macros[macroApplication.name],
+                macroTargetKind(for: macro) == .initializer
             else {
                 continue
             }
@@ -1042,7 +1046,8 @@ public enum MacroExpander {
                 "\(targetBinding).application.arguments": .array(callArguments.map(\.value))
             ]
             for (index, argument) in callArguments.enumerated() {
-                bindings["\(targetBinding).application.arguments[\(index)].expression"] = argument.value
+                bindings["\(targetBinding).application.arguments[\(index)].expression"] =
+                    argument.value
             }
 
             return substituteMacroBindings(in: rewrite, bindings: bindings)
@@ -1072,7 +1077,8 @@ public enum MacroExpander {
     }
 
     static func functionRewriteExpression(for macro: MacroDeclaration) throws -> Expression? {
-        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .functionApplication {
+        for rewrite in try resolvedRewriteCalls(for: macro)
+        where rewrite.site == .functionApplication {
             return rewrite.payload
         }
         return nil
@@ -1101,11 +1107,13 @@ public enum MacroExpander {
         }
 
         let rewrittenArguments: [CallArgument] = values.enumerated().compactMap { index, value in
-            guard let argument = resolveInitApplicationArgumentReference(
-                value,
-                targetBinding: targetBinding,
-                applicationArguments: applicationArguments
-            ) else {
+            guard
+                let argument = resolveInitApplicationArgumentReference(
+                    value,
+                    targetBinding: targetBinding,
+                    applicationArguments: applicationArguments
+                )
+            else {
                 return nil
             }
 
@@ -1299,7 +1307,8 @@ public enum MacroExpander {
         to typeReference: TypeReference
     ) throws -> TypeReference {
         let targetBinding = macro.bindings.target
-        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .parameterDeclarationType {
+        for rewrite in try resolvedRewriteCalls(for: macro)
+        where rewrite.site == .parameterDeclarationType {
             if let rewrittenType = interpretTypeReferenceRewriteExpression(
                 rewrite.payload,
                 bindings: [
@@ -1646,14 +1655,62 @@ public enum MacroExpander {
         _ expression: Expression,
         bindings: [String: TypeReference]
     ) -> TypeReference? {
+        func interpretTypeName(_ expression: Expression) -> String? {
+            switch expression {
+            case .identifier(let name):
+                return name
+            case .string(let value):
+                return value
+            default:
+                return nil
+            }
+        }
+
         switch expression {
         case .identifier(let name):
             if let bound = bindings[name] {
                 return bound
             }
             return .named(name)
+
         case .call(let name, let arguments):
-            if name == "TypeReference.array",
+            if name == "TypeReference.named" || name == "NamedTypeReference",
+                arguments.count == 1,
+                arguments[0].label == "name" || arguments[0].label == nil,
+                let typeName = interpretTypeName(arguments[0].value)
+            {
+                return .named(typeName)
+            }
+
+            if name == "TypeReference.member" || name == "MemberTypeReference",
+                let baseArgument = arguments.first(where: { $0.label == "base" }),
+                let nameArgument = arguments.first(where: { $0.label == "name" }),
+                let base = interpretTypeReferenceRewriteExpression(
+                    baseArgument.value,
+                    bindings: bindings
+                ),
+                let memberName = interpretTypeName(nameArgument.value)
+            {
+                return .member(base: base, name: memberName)
+            }
+
+            if name == "TypeReference.generic" || name == "GenericTypeReference",
+                let baseArgument = arguments.first(where: { $0.label == "base" }),
+                let argumentsArgument = arguments.first(where: { $0.label == "arguments" }),
+                let base = interpretTypeReferenceRewriteExpression(
+                    baseArgument.value,
+                    bindings: bindings
+                ),
+                case .array(let genericArgumentExpressions) = argumentsArgument.value,
+                let genericArguments = genericArgumentExpressions.compactMap({
+                    interpretTypeReferenceRewriteExpression($0, bindings: bindings)
+                }) as [TypeReference]?,
+                genericArguments.count == genericArgumentExpressions.count
+            {
+                return .generic(base: base, arguments: genericArguments)
+            }
+
+            if name == "TypeReference.array" || name == "ArrayTypeReference",
                 arguments.count == 1,
                 arguments[0].label == "element" || arguments[0].label == nil,
                 let element = interpretTypeReferenceRewriteExpression(
@@ -1664,7 +1721,7 @@ public enum MacroExpander {
                 return .array(element)
             }
 
-            if name == "TypeReference.function",
+            if name == "TypeReference.function" || name == "FunctionTypeReference",
                 let parametersArgument = arguments.first(where: { $0.label == "parameters" }),
                 let returnTypeArgument = arguments.first(where: { $0.label == "returnType" }),
                 case .array(let parameterExpressions) = parametersArgument.value,
@@ -1680,7 +1737,30 @@ public enum MacroExpander {
                 return .function(parameters: parameters, returnType: returnType)
             }
 
+            if name == "TypeReference.optional" || name == "OptionalTypeReference",
+                arguments.count == 1,
+                arguments[0].label == "wrapped" || arguments[0].label == nil,
+                let wrapped = interpretTypeReferenceRewriteExpression(
+                    arguments[0].value,
+                    bindings: bindings
+                )
+            {
+                return .optional(wrapped)
+            }
+
+            if name == "TypeReference.variadic" || name == "VariadicTypeReference",
+                arguments.count == 1,
+                arguments[0].label == "element" || arguments[0].label == nil,
+                let element = interpretTypeReferenceRewriteExpression(
+                    arguments[0].value,
+                    bindings: bindings
+                )
+            {
+                return .variadic(element)
+            }
+
             return nil
+
         default:
             return nil
         }
@@ -1854,7 +1934,8 @@ public enum MacroExpander {
                 suffix: "].rewrite"
             ) != nil
         {
-            return ResolvedRewriteCall(site: .parameterApplicationArgument, payload: arguments[0].value)
+            return ResolvedRewriteCall(
+                site: .parameterApplicationArgument, payload: arguments[0].value)
         }
 
         if targetKind == .initializer,
