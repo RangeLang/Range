@@ -1,5 +1,6 @@
 @core
 construct Function: Syntax {
+
     value declaration: Declaration
     value application: Application
 
@@ -8,10 +9,12 @@ construct Function: Syntax {
         value name: String
         value parameters: [Parameter.Declaration]
         value returnType: TypeReference?
+        value body: Block
     }
 
     @core
-    construct Application: SupportsRewrite<Expression> {
+    construct Application {
+        value name: String
         value arguments: [Argument]
     }
 }
