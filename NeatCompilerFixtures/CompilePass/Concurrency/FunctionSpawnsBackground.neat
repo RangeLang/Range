@@ -1,0 +1,15 @@
+function refreshCache() {
+    Logger.info("refresh requested")
+
+    @background {
+        Logger.info("background refresh started")
+        value finished = true
+        Logger.info("background refresh finished")
+    }
+
+    Logger.info("refresh function returned immediately")
+}
+
+@main {
+    refreshCache()
+}

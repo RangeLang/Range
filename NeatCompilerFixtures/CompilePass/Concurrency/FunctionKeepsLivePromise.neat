@@ -1,0 +1,26 @@
+enum FetchError {
+    case missing
+    case network
+}
+
+@background fetchUsername(id: Int) -> Promise<String, FetchError> {
+    if id == 0 {
+        return "system"
+    }
+
+    return "george"
+}
+
+function usePromise(request: Promise<String, FetchError>) {
+    Logger.info("promise typed")
+}
+
+function beginUserLoad(id: Int) {
+    state request: Promise<String, FetchError> = fetchUsername(id: id)
+    usePromise(request: request)
+    Logger.info("request started")
+}
+
+@main {
+    beginUserLoad(id: 1)
+}

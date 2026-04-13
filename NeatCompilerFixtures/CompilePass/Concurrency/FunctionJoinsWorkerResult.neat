@@ -1,0 +1,29 @@
+enum FetchError {
+    case missing
+    case network
+}
+
+@background fetchUsername(id: Int) -> Promise<String, FetchError> {
+    if id == 0 {
+        return "system"
+    }
+
+    return "george"
+}
+
+function useResult(result: Result<String, FetchError>) {
+    Logger.info("result typed")
+}
+
+function loadUserSynchronously(id: Int) {
+    Logger.info("before request")
+
+    value result: Result<String, FetchError> = fetchUsername(id: id)
+    useResult(result: result)
+
+    Logger.info("request finished")
+}
+
+@main {
+    loadUserSynchronously(id: 1)
+}
