@@ -12,6 +12,7 @@ struct SwiftBackendEmitter {
             .filter { $0.targetType == nil }
             .map(emitFunction)
             .joined(separator: "\n\n")
+        let enumerations = try program.enumerations.map(emitEnum).joined(separator: "\n\n")
         let declarations = try program.declarations.map(emitConstruct).joined(separator: "\n\n")
 
         let main = try emitMain(program.mainBlock)
@@ -19,6 +20,7 @@ struct SwiftBackendEmitter {
         let sections = [
             "import Foundation",
             emitRuntimeSupport(includeFoundationImport: false),
+            enumerations,
             declarations,
             functions,
             main,
@@ -149,6 +151,23 @@ struct SwiftBackendEmitter {
                 }
             }
 
+            func settle<Success, Failure>(_ result: Result<Success, Failure>) -> Result<Success, Failure> {
+                result
+            }
+
+            func settle<Success: Sendable, Failure>(_ promise: Promise<Success, Failure>) -> Result<Success, Failure> {
+                while true {
+                    switch promise.snapshot() {
+                    case .loading:
+                        Thread.sleep(forTimeInterval: 0.001)
+                    case .success(let value):
+                        return .success(value)
+                    case .failure(let error):
+                        return .failure(error)
+                    }
+                }
+            }
+
             enum Logger {
                 static func log(_ value: Any) {
                     print(String(describing: value))
@@ -185,6 +204,11 @@ struct SwiftBackendEmitter {
 
     private func emitSourceUnit(_ unit: LoweredSourceUnit) throws -> String {
         var sections: [String] = ["import Foundation"]
+
+        let enumerations = try unit.enumerations.map(emitEnum).joined(separator: "\n\n")
+        if !enumerations.isEmpty {
+            sections.append(enumerations)
+        }
 
         let declarations = try unit.declarations.map(emitConstruct).joined(separator: "\n\n")
         if !declarations.isEmpty {
@@ -274,6 +298,36 @@ struct SwiftBackendEmitter {
                 return promise
             }
             """
+    }
+
+    private func emitEnum(_ declaration: EnumDeclaration) throws -> String {
+        let genericClause = emitConstructGenericClause(declaration.genericParameters)
+        let renderedCases = try declaration.cases.map(emitEnumCase).joined(separator: "\n")
+
+        if renderedCases.isEmpty {
+            return "enum \(declaration.name)\(genericClause) {}"
+        }
+
+        return """
+            enum \(declaration.name)\(genericClause) {
+            \(indentBlock(renderedCases, level: 1))
+            }
+            """
+    }
+
+    private func emitEnumCase(_ declaration: EnumCaseDeclaration) throws -> String {
+        guard !declaration.associatedValues.isEmpty else {
+            return "case \(declaration.name)"
+        }
+
+        let associatedValues = declaration.associatedValues.map { associatedValue in
+            if let label = associatedValue.label {
+                return "\(label): \(emitTypeName(associatedValue.typeReference))"
+            }
+            return emitTypeName(associatedValue.typeReference)
+        }.joined(separator: ", ")
+
+        return "case \(declaration.name)(\(associatedValues))"
     }
 
     private func emitConstruct(_ declaration: ConstructDeclaration) throws -> String {
@@ -383,6 +437,31 @@ struct SwiftBackendEmitter {
         case .derived:
             throw SwiftBackendError("Swift backend does not support derived binding storage yet.")
         }
+    }
+
+    private func emitLocalBindingExpression(_ declaration: LocalBindingDeclaration) throws -> String
+    {
+        let expression = try emitExpression(declaration.expression)
+
+        guard declaration.kind == .constant, isResultType(declaration.type) else {
+            return expression
+        }
+
+        return "settle(\(expression))"
+    }
+
+    private func isResultType(_ typeReference: TypeReference) -> Bool {
+        guard case .generic(let base, let arguments) = typeReference,
+            arguments.count == 2
+        else {
+            return false
+        }
+
+        guard case .named(let baseName) = base else {
+            return false
+        }
+
+        return baseName == "Result"
     }
 
     private func emitDerivedMember(_ derived: DerivedDeclaration) throws -> String {
@@ -505,7 +584,7 @@ struct SwiftBackendEmitter {
             let typeAnnotation =
                 declaration.hasExplicitTypeAnnotation ? ": \(emitTypeName(declaration.type))" : ""
             return
-                "\(prefix)\(keyword) \(declaration.name)\(typeAnnotation) = \(try emitExpression(declaration.expression))"
+                "\(prefix)\(keyword) \(declaration.name)\(typeAnnotation) = \(try emitLocalBindingExpression(declaration))"
         case .derived(let name, let typeName, let body):
             let bodyText = try emitStatements(body, indent: indent + 2)
             return """

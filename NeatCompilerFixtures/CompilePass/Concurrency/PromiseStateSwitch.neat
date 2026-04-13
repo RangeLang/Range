@@ -1,25 +1,34 @@
-@background workerA(count: Int) -> Promise<String, String> {
-    if count == 0 {
-        return "zero"
-    }
-
-    return "done"
+enum FetchError {
+    case missing
+    case network
 }
 
-function useResult(result: Result<String, String>) {
+@background fetchUsername(id: Int) -> Promise<String, FetchError> {
+    if id == 0 {
+        return "system"
+    }
+
+    return "george"
+}
+
+function useResult(result: Result<String, FetchError>) {
     Logger.info("result typed")
 }
 
-function usePromise(promise: Promise<String, String>) {
+function usePromise(promise: Promise<String, FetchError>) {
     Logger.info("promise typed")
 }
 
-function useStream(stream: Stream<String, String>) {
+function useStream(stream: Stream<String, FetchError>) {
     Logger.info("stream typed")
 }
 
 @main {
-    value promise: Promise<String, String> = workerA(count: 2)
+    state promise: Promise<String, FetchError> = fetchUsername(id: 2)
     usePromise(promise: promise)
+
+    value settled: Result<String, FetchError> = fetchUsername(id: 2)
+    useResult(result: settled)
+
     Logger.info("flat async core types")
 }

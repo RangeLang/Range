@@ -1,0 +1,11 @@
+enum FetchError {
+    case missing
+}
+
+@background fetchUsername(id: Int) -> Promise<String, FetchError> {
+    return "george"
+}
+
+@main {
+    value request: Promise<String, FetchError> = fetchUsername(id: 1)
+}

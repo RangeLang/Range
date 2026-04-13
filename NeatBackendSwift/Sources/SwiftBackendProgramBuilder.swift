@@ -30,12 +30,14 @@ struct SwiftBackendProgramBuilder {
         case .mainBlock(let mainBlock):
             return .init(
                 callables: [],
+                enumerations: [],
                 declarations: [],
                 mainBlock: mainBlock,
                 units: [
                     .init(
                         outputFileName: fileURL.deletingPathExtension().lastPathComponent
                             + ".swift",
+                        enumerations: [],
                         declarations: [],
                         callables: [],
                         mainBlock: mainBlock
@@ -50,6 +52,7 @@ struct SwiftBackendProgramBuilder {
             }
             return .init(
                 callables: module.callables,
+                enumerations: module.enumerations,
                 declarations: module.constructs.filter {
                     $0.kind == .declaration || $0.kind == .entry
                 },
@@ -58,6 +61,7 @@ struct SwiftBackendProgramBuilder {
                     .init(
                         outputFileName: fileURL.deletingPathExtension().lastPathComponent
                             + ".swift",
+                        enumerations: module.enumerations,
                         declarations: module.constructs.filter {
                             $0.kind == .declaration || $0.kind == .entry
                         },
@@ -77,6 +81,7 @@ struct SwiftBackendProgramBuilder {
 
     private func build(semanticProgram: SemanticProgram) throws -> LoweredProgram {
         var callables: [CallableDeclaration] = []
+        var enumerations: [EnumDeclaration] = []
         var declarations: [ConstructDeclaration] = []
         var mainBlock: MainBlockNode?
         var units: [LoweredSourceUnit] = []
@@ -93,6 +98,7 @@ struct SwiftBackendProgramBuilder {
                 units.append(
                     .init(
                         outputFileName: outputFileName,
+                        enumerations: [],
                         declarations: declaration.kind == .declaration || declaration.kind == .entry
                             ? [declaration] : [],
                         callables: [],
@@ -101,9 +107,11 @@ struct SwiftBackendProgramBuilder {
                 )
             case .module(let module):
                 callables.append(contentsOf: module.callables)
+                enumerations.append(contentsOf: module.enumerations)
                 units.append(
                     .init(
                         outputFileName: outputFileName,
+                        enumerations: module.enumerations,
                         declarations: module.constructs.filter {
                             $0.kind == .declaration || $0.kind == .entry
                         },
@@ -131,6 +139,7 @@ struct SwiftBackendProgramBuilder {
                 units.append(
                     .init(
                         outputFileName: outputFileName,
+                        enumerations: [],
                         declarations: [],
                         callables: [],
                         mainBlock: block
@@ -147,6 +156,7 @@ struct SwiftBackendProgramBuilder {
 
         return .init(
             callables: callables,
+            enumerations: enumerations,
             declarations: declarations,
             mainBlock: mainBlock,
             units: units

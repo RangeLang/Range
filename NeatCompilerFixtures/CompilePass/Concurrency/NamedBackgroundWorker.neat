@@ -1,12 +1,30 @@
-@background workerA(count: Int) -> Promise<String, String> {
-    if count == 0 {
-        return "zero"
+enum FetchError {
+    case missing
+    case network
+}
+
+@background fetchUsername(id: Int) -> Promise<String, FetchError> {
+    if id == 0 {
+        return "system"
     }
 
-    return "done"
+    return "george"
+}
+
+function useLiveRequest(request: Promise<String, FetchError>) {
+    Logger.info("live request typed")
+}
+
+function useSettledResult(result: Result<String, FetchError>) {
+    Logger.info("settled result typed")
 }
 
 @main {
-    value promise: Promise<String, String> = workerA(count: 2)
-    Logger.info("started named worker")
+    state liveRequest: Promise<String, FetchError> = fetchUsername(id: 1)
+    useLiveRequest(request: liveRequest)
+    Logger.info("request started")
+
+    value settledResult: Result<String, FetchError> = fetchUsername(id: 1)
+    useSettledResult(result: settledResult)
+    Logger.info("request finished")
 }
