@@ -397,6 +397,19 @@ public enum MacroExpander {
                 attachedParameterCallables: attachedParameterCallables,
                 attachedLiteralConstructs: attachedLiteralConstructs
             )
+        case .background(let body):
+            return [
+                .background(
+                    body: try expand(
+                        statements: body,
+                        expectedReturnType: nil,
+                        macros: macros,
+                        protocols: protocols,
+                        attachedParameterCallables: attachedParameterCallables,
+                        attachedLiteralConstructs: attachedLiteralConstructs
+                    )
+                )
+            ]
         case .derived(let name, let typeName, let body):
             return [
                 .derived(
@@ -1404,7 +1417,8 @@ public enum MacroExpander {
                 for branch in branches {
                     expressions.append(contentsOf: macroOperationExpressions(in: branch.body))
                 }
-            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
+            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body),
+                .background(let body):
                 expressions.append(contentsOf: macroOperationExpressions(in: body))
             case .switchStatement(_, let cases, let defaultBody):
                 for switchCase in cases {
@@ -1528,6 +1542,10 @@ public enum MacroExpander {
             return .derived(
                 name: name,
                 typeName: typeName,
+                body: substituteMacroBindings(in: body, bindings: bindings)
+            )
+        case .background(let body):
+            return .background(
                 body: substituteMacroBindings(in: body, bindings: bindings)
             )
         case .assignment(let target, let expression):
@@ -2127,6 +2145,16 @@ public enum MacroExpander {
                 .derived(
                     name: name,
                     typeName: typeName,
+                    body: substituteMacroTargetCalls(
+                        in: body,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    )
+                )
+            ]
+        case .background(let body):
+            return [
+                .background(
                     body: substituteMacroTargetCalls(
                         in: body,
                         targetBinding: targetBinding,

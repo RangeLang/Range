@@ -1,7 +1,9 @@
 import Foundation
 
 extension Parser {
-    mutating func parseCallableDeclaration(signatureOnly: Bool = false) throws -> CallableDeclaration {
+    mutating func parseCallableDeclaration(signatureOnly: Bool = false) throws
+        -> CallableDeclaration
+    {
         if isBuilderCallableStart() {
             return try parseBuilderCallableDeclaration(signatureOnly: signatureOnly)
         }
@@ -66,7 +68,9 @@ extension Parser {
         )
     }
 
-    mutating func parseBuilderCallableDeclaration(signatureOnly: Bool = false) throws -> CallableDeclaration {
+    mutating func parseBuilderCallableDeclaration(signatureOnly: Bool = false) throws
+        -> CallableDeclaration
+    {
         try consume(.asterisk)
 
         let hookName: String
@@ -412,6 +416,9 @@ extension Parser {
                     expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
                 }
 
+            case .background:
+                continue
+
             default:
                 break
             }
@@ -446,7 +453,8 @@ extension Parser {
             guard let defaultBody else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
             return blockAlwaysReturnsValue(defaultBody)
-
+        case .background:
+            return false
         default:
             return false
         }

@@ -2,6 +2,7 @@ import Foundation
 
 public indirect enum Statement {
     case freestandingMacro(name: String, argumentClause: String?, body: [Statement])
+    case background(body: [Statement])
     case localBinding(LocalBindingDeclaration)
     case derived(name: String, typeName: String, body: [Statement])
     case environmentProvision(EnvironmentProvision)

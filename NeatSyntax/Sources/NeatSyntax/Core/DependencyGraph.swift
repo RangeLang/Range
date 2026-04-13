@@ -1349,6 +1349,9 @@ private struct GraphCollector {
             case .freestandingMacro(_, _, let body):
                 analyzeStatements(
                     body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
+            case .background(let body):
+                analyzeStatements(
+                    body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
             case .localBinding(let declaration):
                 let nodeKind: DependencyGraphNodeKind =
                     declaration.kind == .mutable ? .state : .value

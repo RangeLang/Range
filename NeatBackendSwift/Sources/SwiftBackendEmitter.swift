@@ -324,6 +324,7 @@ struct SwiftBackendEmitter {
             case .assignment, .compoundAssignment:
                 return true
             case .freestandingMacro(_, _, let body),
+                .background(let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body),
                 .derived(_, _, let body):
@@ -370,6 +371,13 @@ struct SwiftBackendEmitter {
         switch statement {
         case .freestandingMacro:
             throw SwiftBackendError("Freestanding macros must be expanded before Swift emission.")
+        case .background(let body):
+            let bodyText = try emitStatements(body, indent: indent + 1)
+            return """
+                \(prefix)Task {
+                \(bodyText)
+                \(prefix)}
+                """
         case .localBinding(let declaration):
             let keyword = declaration.kind == .constant ? "let" : "var"
             let typeAnnotation =
@@ -491,7 +499,8 @@ struct SwiftBackendEmitter {
         case .nilLiteral:
             return "nil"
         case .freestandingMacro(let name, _):
-            throw SwiftBackendError("Freestanding expression macro #\(name) must be expanded before Swift emission.")
+            throw SwiftBackendError(
+                "Freestanding expression macro #\(name) must be expanded before Swift emission.")
         case .block(let body):
             return try emitClosureExpression(body)
         case .identifier(let name):
@@ -535,7 +544,8 @@ struct SwiftBackendEmitter {
         return try arguments.map(emitCallArgument).joined(separator: ", ")
     }
 
-    private func emitKnownCollectionCall(name: String, arguments: [CallArgument]) throws -> String? {
+    private func emitKnownCollectionCall(name: String, arguments: [CallArgument]) throws -> String?
+    {
         guard let dot = name.lastIndex(of: ".") else {
             return nil
         }
@@ -562,7 +572,8 @@ struct SwiftBackendEmitter {
         case "insert":
             guard let element = argument("element") else { return nil }
             if let index = argument("index") {
-                return "\(base).insert(\(try emitExpression(element)), at: \(try emitExpression(index)))"
+                return
+                    "\(base).insert(\(try emitExpression(element)), at: \(try emitExpression(index)))"
             }
             return "\(base).insert(\(try emitExpression(element)))"
         case "remove":

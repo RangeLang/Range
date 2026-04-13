@@ -90,6 +90,8 @@ struct SwiftLoweredProgramAdapter {
                 argumentClause: argumentClause,
                 body: lower(statements: body)
             )
+        case .background(let body):
+            return .background(body: lower(statements: body))
         case .localBinding(let declaration):
             return .localBinding(
                 LocalBindingDeclaration(

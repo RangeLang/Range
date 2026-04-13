@@ -553,6 +553,8 @@ public struct SemanticProgramValidator {
                 if let defaultBody {
                     expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
                 }
+            case .background:
+                continue
             case .localBinding, .derived, .environmentProvision, .assignment, .compoundAssignment,
                 .expression, .break, .continue:
                 continue
@@ -599,6 +601,8 @@ public struct SemanticProgramValidator {
             guard let defaultBody else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
             return blockAlwaysReturnsValue(defaultBody)
+        case .background:
+            return false
         default:
             return false
         }
@@ -751,6 +755,12 @@ public struct SemanticProgramValidator {
                     )
                 }
             case .derived(_, _, let body):
+                try validateValueDeclarations(
+                    in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            case .background(let body):
                 try validateValueDeclarations(
                     in: body,
                     bindingConstructNames: bindingConstructNames,

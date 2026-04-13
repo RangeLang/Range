@@ -102,6 +102,8 @@ extension Parser {
                 continue
             case .derived:
                 continue
+            case .background(let body):
+                collectBuilderHooks(from: body, into: &hooks)
             case .assignment, .compoundAssignment:
                 continue
             case .environmentProvision:

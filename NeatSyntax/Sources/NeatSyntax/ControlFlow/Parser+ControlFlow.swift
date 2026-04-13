@@ -8,6 +8,10 @@ extension Parser {
             return try parseFreestandingMacroStatement(localBindings: &localBindings)
         }
 
+        if isBackgroundStatementStart() {
+            return try parseBackgroundStatement(localBindings: &localBindings)
+        }
+
         if isEnvironmentProvisionStart() {
             return .environmentProvision(try parseEnvironmentProvision())
         }
@@ -91,6 +95,24 @@ extension Parser {
         let argumentClause = try parseMacroArgumentClauseIfPresent()
         let body = try parseStatementBlock(baseLocalBindings: localBindings)
         return .freestandingMacro(name: name, argumentClause: argumentClause, body: body)
+    }
+
+    func isBackgroundStatementStart() -> Bool {
+        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+            return false
+        }
+        return peek(offset: 1) == .leftBrace
+    }
+
+    mutating func parseBackgroundStatement(
+        localBindings: inout [String: LocalBindingSymbol]
+    ) throws -> Statement {
+        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+            throw ParseError("Expected @background block.")
+        }
+        advance()
+        let body = try parseStatementBlock(baseLocalBindings: localBindings)
+        return .background(body: body)
     }
 
     func isStandaloneCallExpressionStart() -> Bool {
@@ -381,6 +403,9 @@ extension Parser {
     }
 
     func isStatementStart() -> Bool {
+        if isBackgroundStatementStart() {
+            return true
+        }
         if peek() == .keyword(NeatSyntax.Keyword.ifStatement.rawValue) {
             return true
         }

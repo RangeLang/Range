@@ -1,0 +1,11 @@
+function computeValue() -> Int {
+    return 42
+}
+
+@main {
+    @background {
+        value result = computeValue()
+    }
+
+    value finished = true
+}
