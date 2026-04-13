@@ -1,25 +1,20 @@
-macro flipInitArguments(): Init { target, diagnostics in
-    if target.application.arguments.count == 2 {
+macro forwardOnlyArgument(): Init { target, diagnostics in
+    if target.application.arguments.count == 1 {
         target.application.rewrite(
-            target.declaration.expression(arguments: [
-                target.application.arguments[1],
-                target.application.arguments[0]
-            ])
+            target.application.arguments[0].expression
         )
     }
 }
 
-construct SwappedInitFixture {
-    value text: String
+construct SingleInitRewriteFixture {
     value number: Int
 
-    #flipInitArguments
-    init(text _: String, number _: Int) {
-        self.text = text
+    #forwardOnlyArgument
+    init(number _: Int) {
         self.number = number
     }
 }
 
 @main {
-    value fixture: SwappedInitFixture = SwappedInitFixture(1, "Hello")
+    SingleInitRewriteFixture(1)
 }

@@ -69,7 +69,6 @@ construct Init: Syntax {
     construct Declaration {
         value parameters: [Parameter.Declaration]
         value body: Block
-        function expression(arguments: [Parameter.Application]) -> Expression
     }
 
     construct Application: SupportsRewrite<Expression> {
