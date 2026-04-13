@@ -5,6 +5,9 @@ public enum MacroExpander {
     nonisolated(unsafe) private static var activeFunctionMacroTargets:
         [AttachedFunctionMacroSignature] =
             []
+    nonisolated(unsafe) private static var activeSyntaxResolver: DeclarationSyntaxResolver?
+    nonisolated(unsafe) private static var activeConstructsByName: [String: ConstructDeclaration] =
+        [:]
 
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         let registry = collectMacros(from: files)
@@ -25,9 +28,13 @@ public enum MacroExpander {
         let attachedLiteralConstructs = declarationGraph.realizedLiteralBridges
         activeInitMacroTargets = declarationGraph.realizedInitMacroTargets
         activeFunctionMacroTargets = attachedFunctionCallables
+        activeSyntaxResolver = declarationGraph.syntaxResolver
+        activeConstructsByName = declarationGraph.constructsByName
         defer {
             activeInitMacroTargets = []
             activeFunctionMacroTargets = []
+            activeSyntaxResolver = nil
+            activeConstructsByName = [:]
         }
         return try files.map { parsedFile in
             ParsedSourceFile(
@@ -1825,31 +1832,152 @@ public enum MacroExpander {
 
     static func allowedRewritePaths(
         targetBinding: String,
-        targetKind: MacroTargetKind
+        targetType: TypeReference
     ) -> Set<String> {
-        switch targetKind {
-        case .expression, .block:
-            return [
-                "\(targetBinding).rewrite"
-            ]
-        case .initializer:
-            return [
-                "\(targetBinding).application.rewrite"
-            ]
-        case .function:
-            return [
-                "\(targetBinding).application.rewrite"
-            ]
-        case .construct:
-            return []
-        case .parameter:
-            return [
-                "\(targetBinding).declaration.type.rewrite",
-                "\(targetBinding).application.expression.rewrite",
-            ]
-        case .other:
+        guard
+            let syntaxResolver = activeSyntaxResolver,
+            let targetName = syntaxResolver.nominalName(of: targetType)
+        else {
             return []
         }
+
+        var paths: Set<String> = []
+
+        func supportsRewrite(_ typeName: String) -> Bool {
+            syntaxResolver.declaration(named: typeName, conformsTo: "SupportsRewrite")
+        }
+
+        func resolvedValueType(
+            named rawTypeName: String,
+            ownerTypeName: String
+        ) -> (typeName: String, isArray: Bool)? {
+            var text = rawTypeName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.hasSuffix("?") {
+                text.removeLast()
+                text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            let isArray = text.hasPrefix("[") && text.hasSuffix("]")
+            if isArray {
+                text.removeFirst()
+                text.removeLast()
+                text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            let qualifiedNestedName = "\(ownerTypeName).\(text)"
+            if activeConstructsByName[qualifiedNestedName] != nil {
+                return (qualifiedNestedName, isArray)
+            }
+
+            if activeConstructsByName[text] != nil {
+                return (text, isArray)
+            }
+
+            if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
+                || syntaxResolver.declaration(named: text, conformsTo: "SupportsRewrite")
+            {
+                return (text, isArray)
+            }
+
+            return nil
+        }
+
+        func collectRewritePaths(
+            for typeName: String,
+            path: String,
+            activeTypes: Set<String>
+        ) {
+            if supportsRewrite(typeName) {
+                paths.insert("\(path).rewrite")
+            }
+
+            guard !activeTypes.contains(typeName) else {
+                return
+            }
+
+            guard let construct = activeConstructsByName[typeName] else {
+                return
+            }
+
+            let nextActiveTypes = activeTypes.union([typeName])
+
+            for value in construct.values {
+                guard
+                    let resolvedType = resolvedValueType(
+                        named: value.typeName,
+                        ownerTypeName: typeName
+                    )
+                else {
+                    continue
+                }
+
+                let valuePath = "\(path).\(value.name)"
+                if resolvedType.isArray {
+                    collectRewritePaths(
+                        for: resolvedType.typeName,
+                        path: "\(valuePath)[]",
+                        activeTypes: nextActiveTypes
+                    )
+                } else {
+                    collectRewritePaths(
+                        for: resolvedType.typeName,
+                        path: valuePath,
+                        activeTypes: nextActiveTypes
+                    )
+                }
+            }
+        }
+
+        collectRewritePaths(for: targetName, path: targetBinding, activeTypes: [])
+        return paths
+    }
+
+    static func normalizedRewritePath(
+        _ name: String,
+        targetBinding: String
+    ) -> String? {
+        let directPath = "\(targetBinding).rewrite"
+        if name == directPath {
+            return directPath
+        }
+
+        let prefix = "\(targetBinding)."
+        let suffix = ".rewrite"
+        guard name.hasPrefix(prefix), name.hasSuffix(suffix) else {
+            return nil
+        }
+
+        let start = name.index(name.startIndex, offsetBy: prefix.count)
+        let end = name.index(name.endIndex, offsetBy: -suffix.count)
+        guard start <= end else {
+            return nil
+        }
+
+        let raw = name[start..<end]
+        if raw.isEmpty {
+            return directPath
+        }
+
+        var normalized = ""
+        var index = raw.startIndex
+        while index < raw.endIndex {
+            let character = raw[index]
+            if character == "[" {
+                normalized += "[]"
+                while index < raw.endIndex, raw[index] != "]" {
+                    index = raw.index(after: index)
+                }
+                if index < raw.endIndex {
+                    index = raw.index(after: index)
+                }
+                continue
+            }
+
+            normalized.append(character)
+            index = raw.index(after: index)
+        }
+
+        return "\(targetBinding).\(normalized).rewrite"
     }
 
     static func validateRewriteSites(
@@ -1858,7 +1986,10 @@ public enum MacroExpander {
     ) throws {
         let targetBinding = macro.bindings.target
         let targetPrefix = "\(targetBinding)."
-        let allowedPaths = allowedRewritePaths(targetBinding: targetBinding, targetKind: targetKind)
+        let allowedPaths = allowedRewritePaths(
+            targetBinding: targetBinding,
+            targetType: macro.target.typeReference
+        )
 
         var invalidPaths: [String] = []
         for expression in macroOperationExpressions(in: macro.body) {
@@ -1868,17 +1999,17 @@ public enum MacroExpander {
             guard name.hasPrefix(targetPrefix), name.hasSuffix(".rewrite") else {
                 continue
             }
+
             guard
+                let normalizedPath = normalizedRewritePath(name, targetBinding: targetBinding),
                 resolvedRewriteCall(
                     from: expression,
                     targetBinding: targetBinding,
                     targetKind: targetKind
-                ) != nil
+                ) != nil,
+                allowedPaths.contains(normalizedPath)
             else {
                 invalidPaths.append(name)
-                continue
-            }
-            guard !allowedPaths.isEmpty else {
                 continue
             }
         }
@@ -1959,10 +2090,13 @@ public enum MacroExpander {
             indexedReference(
                 name,
                 prefix: "\(targetBinding).application.arguments[",
-                suffix: "].rewrite"
+                suffix: "].expression.rewrite"
             ) != nil
         {
-            return ResolvedRewriteCall(site: .functionApplication, payload: arguments[0].value)
+            return ResolvedRewriteCall(
+                site: .functionArgumentExpression,
+                payload: arguments[0].value
+            )
         }
 
         return nil

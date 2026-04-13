@@ -26,6 +26,7 @@ enum ResolvedRewriteSite {
     case targetDirect
     case initApplication
     case functionApplication
+    case functionArgumentExpression
     case parameterDeclarationType
     case parameterApplicationArguments
     case parameterApplicationArgument

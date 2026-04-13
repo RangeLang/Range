@@ -1,5 +1,7 @@
 macro secondArgument(): Function { target, diagnostics in
-    target.application.rewrite(target.application.arguments[1].expression)
+    target.application.arguments[1].expression.rewrite(
+        target.application.arguments[1].expression
+    )
 }
 
 #secondArgument

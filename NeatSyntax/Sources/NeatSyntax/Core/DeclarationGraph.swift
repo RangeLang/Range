@@ -202,7 +202,8 @@ public struct DeclarationGraph {
         )
     }
 
-    static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]] {
+    static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]]
+    {
         var registry: [String: [CallableDeclaration]] = [:]
         for parsedFile in files {
             for declaration in callables(in: parsedFile.sourceFile) {
@@ -260,7 +261,6 @@ public struct DeclarationGraph {
             }
         }
     }
-
 
     static func protocols(in sourceFile: SourceFileNode) -> [ProtocolDeclaration] {
         switch sourceFile {
@@ -363,10 +363,25 @@ public struct DeclarationSyntaxResolver {
     }
 
     public func typeConformsToSyntax(_ typeReference: TypeReference?) -> Bool {
+        typeConforms(typeReference, to: "Syntax")
+    }
+
+    public func typeConforms(_ typeReference: TypeReference?, to targetProtocol: String) -> Bool {
         guard let typeName = nominalName(of: typeReference) else {
             return false
         }
-        return declaration(named: typeName, conformsTo: "Syntax", visited: [])
+        return declaration(named: typeName, conformsTo: targetProtocol)
+    }
+
+    public func declaration(
+        named name: String,
+        conformsTo targetProtocol: String
+    ) -> Bool {
+        declaration(
+            named: name,
+            conformsTo: targetProtocol,
+            visited: []
+        )
     }
 
     private func declaration(
@@ -414,7 +429,7 @@ public struct DeclarationSyntaxResolver {
         return false
     }
 
-    private func nominalName(of typeReference: TypeReference?) -> String? {
+    public func nominalName(of typeReference: TypeReference?) -> String? {
         guard let typeReference else {
             return nil
         }
@@ -510,12 +525,14 @@ public struct DeclarationMacroExpansionResolver: Sendable {
                 else {
                     return nil
                 }
-                guard typeMatches(
-                    actual: actualType,
-                    expected: expectedType,
-                    genericParameterNames: signature.genericParameterNames,
-                    bindings: &bindings
-                ) else {
+                guard
+                    typeMatches(
+                        actual: actualType,
+                        expected: expectedType,
+                        genericParameterNames: signature.genericParameterNames,
+                        bindings: &bindings
+                    )
+                else {
                     return nil
                 }
             }
@@ -595,12 +612,13 @@ public struct DeclarationMacroExpansionResolver: Sendable {
         case (.named(let actualName), .named(let expectedName)):
             return actualName == expectedName
         case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
-            return actualName == expectedName && typeMatches(
-                actual: actualBase,
-                expected: expectedBase,
-                genericParameterNames: genericParameterNames,
-                bindings: &bindings
-            )
+            return actualName == expectedName
+                && typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
         case (
             .generic(let actualBase, let actualArguments),
             .generic(let expectedBase, let expectedArguments)
@@ -615,7 +633,8 @@ public struct DeclarationMacroExpansionResolver: Sendable {
             else {
                 return false
             }
-            return zip(actualArguments, expectedArguments).allSatisfy { actualArgument, expectedArgument in
+            return zip(actualArguments, expectedArguments).allSatisfy {
+                actualArgument, expectedArgument in
                 typeMatches(
                     actual: actualArgument,
                     expected: expectedArgument,
@@ -639,19 +658,21 @@ public struct DeclarationMacroExpansionResolver: Sendable {
             guard actualParameters.count == expectedParameters.count else {
                 return false
             }
-            return zip(actualParameters, expectedParameters).allSatisfy { actualParameter, expectedParameter in
+            return zip(actualParameters, expectedParameters).allSatisfy {
+                actualParameter, expectedParameter in
                 typeMatches(
                     actual: actualParameter,
                     expected: expectedParameter,
                     genericParameterNames: genericParameterNames,
                     bindings: &bindings
                 )
-            } && typeMatches(
-                actual: actualReturn,
-                expected: expectedReturn,
-                genericParameterNames: genericParameterNames,
-                bindings: &bindings
-            )
+            }
+                && typeMatches(
+                    actual: actualReturn,
+                    expected: expectedReturn,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
         default:
             return false
         }
@@ -709,7 +730,8 @@ public struct DeclarationOperatorResolver: Sendable {
                 }
 
                 return OperatorSignature(
-                    genericParameterNames: Set(callable.genericParameters.map(Self.genericParameterName)),
+                    genericParameterNames: Set(
+                        callable.genericParameters.map(Self.genericParameterName)),
                     lhsType: lhsParameter,
                     rhsType: rhsParameter,
                     returnType: callable.returnType ?? .named("Void")
@@ -730,14 +752,16 @@ public struct DeclarationOperatorResolver: Sendable {
             return nil
         }
 
-        let matches: [TypeReference] = signaturesByName[symbol, default: []].compactMap { signature in
+        let matches: [TypeReference] = signaturesByName[symbol, default: []].compactMap {
+            signature in
             var bindings: [String: TypeReference] = [:]
-            guard typeMatches(
-                actual: lhsType,
-                expected: signature.lhsType,
-                genericParameterNames: signature.genericParameterNames,
-                bindings: &bindings
-            ),
+            guard
+                typeMatches(
+                    actual: lhsType,
+                    expected: signature.lhsType,
+                    genericParameterNames: signature.genericParameterNames,
+                    bindings: &bindings
+                ),
                 typeMatches(
                     actual: rhsType,
                     expected: signature.rhsType,
@@ -812,13 +836,17 @@ public struct DeclarationOperatorResolver: Sendable {
         case (.named(let actualName), .named(let expectedName)):
             return actualName == expectedName
         case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
-            return actualName == expectedName && typeMatches(
-                actual: actualBase,
-                expected: expectedBase,
-                genericParameterNames: genericParameterNames,
-                bindings: &bindings
-            )
-        case (.generic(let actualBase, let actualArguments), .generic(let expectedBase, let expectedArguments)):
+            return actualName == expectedName
+                && typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+        case (
+            .generic(let actualBase, let actualArguments),
+            .generic(let expectedBase, let expectedArguments)
+        ):
             guard actualArguments.count == expectedArguments.count,
                 typeMatches(
                     actual: actualBase,
@@ -829,7 +857,8 @@ public struct DeclarationOperatorResolver: Sendable {
             else {
                 return false
             }
-            return zip(actualArguments, expectedArguments).allSatisfy { actualArgument, expectedArgument in
+            return zip(actualArguments, expectedArguments).allSatisfy {
+                actualArgument, expectedArgument in
                 typeMatches(
                     actual: actualArgument,
                     expected: expectedArgument,
@@ -853,19 +882,21 @@ public struct DeclarationOperatorResolver: Sendable {
             guard actualParameters.count == expectedParameters.count else {
                 return false
             }
-            return zip(actualParameters, expectedParameters).allSatisfy { actualParameter, expectedParameter in
+            return zip(actualParameters, expectedParameters).allSatisfy {
+                actualParameter, expectedParameter in
                 typeMatches(
                     actual: actualParameter,
                     expected: expectedParameter,
                     genericParameterNames: genericParameterNames,
                     bindings: &bindings
                 )
-            } && typeMatches(
-                actual: actualReturn,
-                expected: expectedReturn,
-                genericParameterNames: genericParameterNames,
-                bindings: &bindings
-            )
+            }
+                && typeMatches(
+                    actual: actualReturn,
+                    expected: expectedReturn,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
         default:
             return false
         }
@@ -969,10 +1000,13 @@ public struct DeclarationMemberResolver: Sendable {
         }
     }
 
-    private static func nestedTypeMap(for construct: ConstructDeclaration) -> [String: TypeReference] {
+    private static func nestedTypeMap(for construct: ConstructDeclaration) -> [String:
+        TypeReference]
+    {
         Dictionary(
             uniqueKeysWithValues: construct.constructs.map { nested in
-                let localName = nested.name.split(separator: ".").last.map(String.init) ?? nested.name
+                let localName =
+                    nested.name.split(separator: ".").last.map(String.init) ?? nested.name
                 return (localName, .member(base: .named(construct.name), name: localName))
             }
         )
@@ -1013,7 +1047,8 @@ public struct DeclarationMemberResolver: Sendable {
         else {
             return nil
         }
-        return Self.substitute(type, using: genericSubstitution(for: members, arguments: context.arguments))
+        return Self.substitute(
+            type, using: genericSubstitution(for: members, arguments: context.arguments))
     }
 
     public func memberCallableReturnType(
@@ -1026,7 +1061,8 @@ public struct DeclarationMemberResolver: Sendable {
         else {
             return nil
         }
-        return Self.substitute(type, using: genericSubstitution(for: members, arguments: context.arguments))
+        return Self.substitute(
+            type, using: genericSubstitution(for: members, arguments: context.arguments))
     }
 
     private func genericSubstitution(
@@ -1036,7 +1072,9 @@ public struct DeclarationMemberResolver: Sendable {
         Dictionary(uniqueKeysWithValues: zip(members.genericParameterNames, arguments))
     }
 
-    private func constructContext(for type: TypeReference) -> (name: String, arguments: [TypeReference])? {
+    private func constructContext(for type: TypeReference) -> (
+        name: String, arguments: [TypeReference]
+    )? {
         switch type {
         case .named(let name):
             return (name, [])
