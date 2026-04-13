@@ -77,7 +77,7 @@ struct SwiftBackendEmitter {
         let support = """
             // Backend implementation for NeatCore's Promise and Logger surface.
             // NeatCore declares the language-visible API; Swift runtime support lives here.
-            enum PromiseState<Success, Failure> {
+            enum PromiseRuntimeState<Success, Failure> {
                 case loading
                 case success(Success)
                 case failure(Failure)
@@ -85,9 +85,9 @@ struct SwiftBackendEmitter {
 
             final class Promise<Success: Sendable, Failure>: @unchecked Sendable {
                 private let lock = NSLock()
-                private var state: PromiseState<Success, Failure>
+                private var state: PromiseRuntimeState<Success, Failure>
 
-                private init(state: PromiseState<Success, Failure>) {
+                private init(state: PromiseRuntimeState<Success, Failure>) {
                     self.state = state
                 }
 
@@ -103,7 +103,7 @@ struct SwiftBackendEmitter {
                     Promise(state: .failure(error))
                 }
 
-                func snapshot() -> PromiseState<Success, Failure> {
+                func snapshot() -> PromiseRuntimeState<Success, Failure> {
                     lock.lock()
                     defer { lock.unlock() }
                     return state

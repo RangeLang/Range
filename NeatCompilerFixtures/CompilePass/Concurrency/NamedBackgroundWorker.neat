@@ -7,10 +7,6 @@
 }
 
 @main {
-    value promise = workerA(count: 2)
-    value loading = promise.isLoading()
-    value currentValue = promise.value()
-    value currentError = promise.error()
-
-    Logger.info("checked promise state")
+    value promise: Promise<String, String> = workerA(count: 2)
+    Logger.info("started named worker")
 }

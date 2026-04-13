@@ -1,14 +1,20 @@
 @core
-enum PromiseState<Success, Failure> {
+enum Result<Success, Failure> {
+    case success(result: Success)
+    case failure(cause: Failure)
+}
+
+@core
+enum Promise<Success, Failure> {
     case loading
     case success(result: Success)
     case failure(cause: Failure)
 }
 
 @core
-construct Promise<Success, Failure> {
-    function snapshot() -> PromiseState<Success, Failure>
-    function isLoading() -> Bool
-    function value() -> Success?
-    function error() -> Failure?
+enum Stream<Element, Failure> {
+    case loading
+    case value(item: Element)
+    case failure(cause: Failure)
+    case completed
 }

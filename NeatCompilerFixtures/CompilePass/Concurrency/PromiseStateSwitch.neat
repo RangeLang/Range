@@ -6,16 +6,20 @@
     return "done"
 }
 
-@main {
-    value promise = workerA(count: 2)
-    value snapshot: PromiseState<String, String> = promise.snapshot()
+function useResult(result: Result<String, String>) {
+    Logger.info("result typed")
+}
 
-    switch snapshot {
-        case .loading {
-            Logger.info("promise is loading")
-        }
-        default {
-            Logger.info("promise has settled")
-        }
-    }
+function usePromise(promise: Promise<String, String>) {
+    Logger.info("promise typed")
+}
+
+function useStream(stream: Stream<String, String>) {
+    Logger.info("stream typed")
+}
+
+@main {
+    value promise: Promise<String, String> = workerA(count: 2)
+    usePromise(promise: promise)
+    Logger.info("flat async core types")
 }
