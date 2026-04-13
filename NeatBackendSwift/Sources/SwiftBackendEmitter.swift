@@ -18,6 +18,7 @@ struct SwiftBackendEmitter {
 
         let sections = [
             "import Foundation",
+            emitRuntimeSupport(includeFoundationImport: false),
             declarations,
             functions,
             main,
@@ -54,9 +55,28 @@ struct SwiftBackendEmitter {
             encoding: .utf8
         )
 
-        let runtimeSwift = """
-            import Foundation
+        let runtimeSwift = emitRuntimeSupport(includeFoundationImport: true)
 
+        try runtimeSwift.write(
+            to: sourcesDirectory.appendingPathComponent("Runtime.swift"),
+            atomically: true,
+            encoding: .utf8
+        )
+
+        for unit in program.units {
+            let content = try emitSourceUnit(unit)
+            try content.write(
+                to: sourcesDirectory.appendingPathComponent(unit.outputFileName),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
+    }
+
+    private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
+        let support = """
+            // Backend implementation for NeatCore's Logger surface.
+            // NeatCore declares the language-visible API; Swift runtime support lives here.
             enum Logger {
                 static func log(_ value: Any) {
                     print(String(describing: value))
@@ -84,20 +104,11 @@ struct SwiftBackendEmitter {
             }
             """
 
-        try runtimeSwift.write(
-            to: sourcesDirectory.appendingPathComponent("Runtime.swift"),
-            atomically: true,
-            encoding: .utf8
-        )
-
-        for unit in program.units {
-            let content = try emitSourceUnit(unit)
-            try content.write(
-                to: sourcesDirectory.appendingPathComponent(unit.outputFileName),
-                atomically: true,
-                encoding: .utf8
-            )
+        guard includeFoundationImport else {
+            return support
         }
+
+        return "import Foundation\n\n\(support)"
     }
 
     private func emitSourceUnit(_ unit: LoweredSourceUnit) throws -> String {
