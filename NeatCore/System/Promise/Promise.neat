@@ -1,2 +1,14 @@
 @core
-construct Promise<Success, Failure> { }
+enum PromiseState<Success, Failure> {
+    case loading
+    case success(result: Success)
+    case failure(cause: Failure)
+}
+
+@core
+construct Promise<Success, Failure> {
+    function snapshot() -> PromiseState<Success, Failure>
+    function isLoading() -> Bool
+    function value() -> Success?
+    function error() -> Failure?
+}

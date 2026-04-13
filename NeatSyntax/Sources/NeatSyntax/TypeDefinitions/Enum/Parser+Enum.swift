@@ -21,6 +21,7 @@ extension Parser {
 
         try consumeKeyword(.enumeration)
         let name = try consumeTypeName()
+        let genericParameters = try parseConstructGenericParameterClauseIfPresent()
         let conformances = try parseConformanceListIfPresent()
 
         var cases: [EnumCaseDeclaration] = []
@@ -40,6 +41,7 @@ extension Parser {
             macros: macros,
             attribute: attribute,
             name: name,
+            genericParameters: genericParameters,
             conformances: conformances,
             cases: cases
         )

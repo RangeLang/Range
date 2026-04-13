@@ -1,4 +1,4 @@
-@background workerA(count: Int) -> Promise<String, Void> {
+@background workerA(count: Int) -> Promise<String, String> {
     if count == 0 {
         return "zero"
     }
@@ -6,12 +6,11 @@
     return "done"
 }
 
-@background workerB() -> Promise<Void, Void> {
-    Logger.info("workerB started")
-    return
-}
-
 @main {
-    value a = workerA(count: 2)
-    value b = workerB()
+    value promise = workerA(count: 2)
+    value loading = promise.isLoading()
+    value currentValue = promise.value()
+    value currentError = promise.error()
+
+    Logger.info("checked promise state")
 }

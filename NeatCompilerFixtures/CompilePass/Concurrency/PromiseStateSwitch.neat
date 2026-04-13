@@ -1,0 +1,21 @@
+@background workerA(count: Int) -> Promise<String, String> {
+    if count == 0 {
+        return "zero"
+    }
+
+    return "done"
+}
+
+@main {
+    value promise = workerA(count: 2)
+    value snapshot: PromiseState<String, String> = promise.snapshot()
+
+    switch snapshot {
+        case .loading {
+            Logger.info("promise is loading")
+        }
+        default {
+            Logger.info("promise has settled")
+        }
+    }
+}

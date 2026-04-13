@@ -77,11 +77,75 @@ struct SwiftBackendEmitter {
         let support = """
             // Backend implementation for NeatCore's Promise and Logger surface.
             // NeatCore declares the language-visible API; Swift runtime support lives here.
-            struct Promise<Success: Sendable, Failure> {
-                fileprivate let task: Task<Success, Never>
+            enum PromiseState<Success, Failure> {
+                case loading
+                case success(Success)
+                case failure(Failure)
+            }
 
-                init(task: Task<Success, Never>) {
-                    self.task = task
+            final class Promise<Success: Sendable, Failure>: @unchecked Sendable {
+                private let lock = NSLock()
+                private var state: PromiseState<Success, Failure>
+
+                private init(state: PromiseState<Success, Failure>) {
+                    self.state = state
+                }
+
+                static func loading() -> Promise<Success, Failure> {
+                    Promise(state: .loading)
+                }
+
+                static func success(_ value: Success) -> Promise<Success, Failure> {
+                    Promise(state: .success(value))
+                }
+
+                static func failure(_ error: Failure) -> Promise<Success, Failure> {
+                    Promise(state: .failure(error))
+                }
+
+                func snapshot() -> PromiseState<Success, Failure> {
+                    lock.lock()
+                    defer { lock.unlock() }
+                    return state
+                }
+
+                func isLoading() -> Bool {
+                    lock.lock()
+                    defer { lock.unlock() }
+                    if case .loading = state {
+                        return true
+                    }
+                    return false
+                }
+
+                func value() -> Success? {
+                    lock.lock()
+                    defer { lock.unlock() }
+                    if case .success(let value) = state {
+                        return value
+                    }
+                    return nil
+                }
+
+                func error() -> Failure? {
+                    lock.lock()
+                    defer { lock.unlock() }
+                    if case .failure(let error) = state {
+                        return error
+                    }
+                    return nil
+                }
+
+                func resolveSuccess(_ value: Success) {
+                    lock.lock()
+                    state = .success(value)
+                    lock.unlock()
+                }
+
+                func resolveFailure(_ error: Failure) {
+                    lock.lock()
+                    state = .failure(error)
+                    lock.unlock()
                 }
             }
 
@@ -194,13 +258,20 @@ struct SwiftBackendEmitter {
         }
 
         let returnClause = try emitReturnClause(declaredReturnType)
-        let functionBody = try emitStatements(body, indent: 3)
+        let successTypeName = emitTypeName(successType)
+        let failureTypeName = emitTypeName(failureType)
+        let functionBody = try emitStatements(body, indent: 4)
 
         return """
             func \(callable.name)(\(parameters))\(returnClause) {
-                return Promise<\(emitTypeName(successType)), \(emitTypeName(failureType))>(task: Task {
+                let promise = Promise<\(successTypeName), \(failureTypeName)>.loading()
+                Task {
+                    let value: \(successTypeName) = {
             \(functionBody)
-                })
+                    }()
+                    promise.resolveSuccess(value)
+                }
+                return promise
             }
             """
     }
