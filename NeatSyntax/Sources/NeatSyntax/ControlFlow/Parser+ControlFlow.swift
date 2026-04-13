@@ -136,7 +136,7 @@ extension Parser {
         _ = localBindings
 
         guard case .atAttribute(let name, _) = peek(), name == "background" else {
-            throw ParseError("Expected named @background callable declaration.")
+            throw ParseError("Expected @background callable declaration.")
         }
 
         advance()
@@ -162,7 +162,7 @@ extension Parser {
         }
 
         throw ParseError(
-            "Local named @background workers were removed. Use function \(callableName)(...) for named work and spawn it explicitly with @background { \(callableName)(...) }."
+            "Named @background callables are not supported: \(callableName)."
         )
     }
 

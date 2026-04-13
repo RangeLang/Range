@@ -19,7 +19,7 @@ extension Parser {
             peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
         {
             throw ParseError(
-                "@background can only be used with anonymous @background { ... } blocks."
+                "Named @background callables are not supported."
             )
         }
 
@@ -112,7 +112,7 @@ extension Parser {
         }
 
         throw ParseError(
-            "Named @background callables were removed. Use function \(callableName)(...) for named work and spawn it explicitly with @background { \(callableName)(...) }."
+            "Named @background callables are not supported: \(callableName)."
         )
     }
 
