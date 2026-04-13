@@ -1,0 +1,24 @@
+@core
+construct Channel<Element> {
+    state storage: ChannelStorage<Element>
+
+    init() {
+        self.storage = ChannelStorage(capacity: 0)
+    }
+
+    init(capacity: Int) {
+        self.storage = ChannelStorage(capacity: capacity)
+    }
+
+    function send(element _: Element) {
+        storage.send(element: element)
+    }
+
+    function receive() -> Element {
+        return storage.receive()
+    }
+
+    function close() {
+        storage.close()
+    }
+}

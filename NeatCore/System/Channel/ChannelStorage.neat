@@ -1,0 +1,8 @@
+@core
+construct ChannelStorage<Element> {
+    init()
+    init(capacity: Int)
+    function send(element: Element)
+    function receive() -> Element
+    function close()
+}
