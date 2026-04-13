@@ -1,0 +1,7 @@
+@background workerA() -> String {
+    return "not allowed"
+}
+
+@main {
+    value result = workerA()
+}

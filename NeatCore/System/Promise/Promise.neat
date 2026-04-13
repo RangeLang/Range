@@ -1,0 +1,2 @@
+@core
+construct Promise<Success, Failure> { }

@@ -9,6 +9,14 @@ extension Parser {
         }
 
         let macros = try parseMacroApplicationsIfPresent()
+
+        if isBackgroundWorkerStart(at: 0) {
+            return try parseBackgroundCallableDeclaration(
+                macros: macros,
+                signatureOnly: signatureOnly
+            )
+        }
+
         let attribute = parseAttributeIfPresent(before: .function)
         var targetType: TypeReference?
         if case .identifier(let target) = peek(),
@@ -60,6 +68,68 @@ extension Parser {
             attribute: attribute,
             targetType: targetType,
             name: name,
+            genericParameters: genericParameters,
+            hasExplicitParameterClause: hasExplicitParameterClause,
+            parameters: parameters,
+            returnType: returnType,
+            body: body
+        )
+    }
+
+    mutating func parseBackgroundCallableDeclaration(
+        macros: [MacroApplication],
+        signatureOnly: Bool = false
+    ) throws -> CallableDeclaration {
+        guard case .atAttribute(let name, let argument) = peek(), name == "background" else {
+            throw ParseError("Expected @background worker declaration.")
+        }
+
+        let attribute = AttributeApplication(name: name, argument: argument)
+        advance()
+
+        let callableName = try consumeCallableName()
+        let genericParameters = try parseConstructGenericParameterClauseIfPresent()
+        let hasExplicitParameterClause = peek() == .leftParen
+        guard hasExplicitParameterClause else {
+            throw ParseError(
+                "Background worker declarations must declare an explicit parameter clause."
+            )
+        }
+
+        let parameters = try parseFunctionParameters()
+
+        guard peek() == .arrow else {
+            throw ParseError(
+                "Background worker \(callableName) must declare an explicit Promise return type."
+            )
+        }
+
+        try consume(.arrow)
+        let returnType = try parseTypeReferenceNode()
+
+        registerVisibleCallableReturnType(
+            targetType: nil,
+            name: callableName,
+            returnType: returnType
+        )
+
+        let body: [Statement]?
+        if signatureOnly {
+            if peek() == .leftBrace {
+                try consume(.leftBrace)
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+            }
+            body = nil
+        } else {
+            body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        }
+
+        return CallableDeclaration(
+            macros: macros,
+            attribute: attribute,
+            targetType: nil,
+            name: callableName,
             genericParameters: genericParameters,
             hasExplicitParameterClause: hasExplicitParameterClause,
             parameters: parameters,
@@ -231,6 +301,9 @@ extension Parser {
             return true
         }
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        if isBackgroundWorkerStart(at: offset) {
+            return true
+        }
         let attributeOffset = isCoreAttribute(at: offset) ? offset + 1 : offset
         if peek(offset: attributeOffset) == .keyword(NeatSyntax.Keyword.function.rawValue) {
             return true
@@ -241,6 +314,28 @@ extension Parser {
             return true
         }
         return false
+    }
+
+    private func isBackgroundWorkerStart(at offset: Int) -> Bool {
+        guard case .atAttribute(let name, _) = peek(offset: offset), name == "background" else {
+            return false
+        }
+
+        guard tokenCanStartCallableName(peek(offset: offset + 1)) else {
+            return false
+        }
+
+        let next = peek(offset: offset + 2)
+        return next == .leftParen || next == .less
+    }
+
+    private func tokenCanStartCallableName(_ token: Token) -> Bool {
+        switch token {
+        case .identifier, .keyword:
+            return true
+        default:
+            return false
+        }
     }
 
     private func isCoreAttribute(at offset: Int) -> Bool {

@@ -75,8 +75,16 @@ struct SwiftBackendEmitter {
 
     private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
         let support = """
-            // Backend implementation for NeatCore's Logger surface.
+            // Backend implementation for NeatCore's Promise and Logger surface.
             // NeatCore declares the language-visible API; Swift runtime support lives here.
+            struct Promise<Success: Sendable, Failure> {
+                fileprivate let task: Task<Success, Never>
+
+                init(task: Task<Success, Never>) {
+                    self.task = task
+                }
+            }
+
             enum Logger {
                 static func log(_ value: Any) {
                     print(String(describing: value))
@@ -155,12 +163,44 @@ struct SwiftBackendEmitter {
         }
 
         let parameters = try callable.parameters.map(emitParameter).joined(separator: ", ")
+
+        if callable.isBackground {
+            return try emitBackgroundFunction(callable, parameters: parameters, body: body)
+        }
+
         let returnClause = try emitReturnClause(callable.returnType)
         let functionBody = try emitStatements(body, indent: 1)
 
         return """
             func \(callable.name)(\(parameters))\(returnClause) {
             \(functionBody)
+            }
+            """
+    }
+
+    private func emitBackgroundFunction(
+        _ callable: CallableDeclaration,
+        parameters: String,
+        body: [NeatStatement]
+    ) throws -> String {
+        guard
+            let declaredReturnType = callable.returnType,
+            let successType = callable.backgroundPromiseSuccessType,
+            let failureType = callable.backgroundPromiseFailureType
+        else {
+            throw SwiftBackendError(
+                "Background worker \(callable.name) must declare return type Promise<Success, Failure>."
+            )
+        }
+
+        let returnClause = try emitReturnClause(declaredReturnType)
+        let functionBody = try emitStatements(body, indent: 3)
+
+        return """
+            func \(callable.name)(\(parameters))\(returnClause) {
+                return Promise<\(emitTypeName(successType)), \(emitTypeName(failureType))>(task: Task {
+            \(functionBody)
+                })
             }
             """
     }

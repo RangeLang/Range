@@ -1,0 +1,17 @@
+@background workerA(count: Int) -> Promise<String, Void> {
+    if count == 0 {
+        return "zero"
+    }
+
+    return "done"
+}
+
+@background workerB() -> Promise<Void, Void> {
+    Logger.info("workerB started")
+    return
+}
+
+@main {
+    value a = workerA(count: 2)
+    value b = workerB()
+}
