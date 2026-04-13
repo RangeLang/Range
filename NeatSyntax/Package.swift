@@ -33,9 +33,11 @@ let package = Package(
                 "GraphBindings/State/State.md",
                 "GraphBindings/Value/Value.md",
                 "ControlFlow/ControlFlow.md",
+                "Concurrency/Concurrency.md",
                 "Macros/Macros.Context.md",
                 "Macros/Macros.ExpressionBlock.md",
                 "Macros/Macros.Mapping.md",
+                "Macros/Macros.Phase.md",
                 "Macros/Macros.md",
                 "TypeSystem/Generics.md",
             ]
