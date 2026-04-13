@@ -209,6 +209,12 @@ public struct SemanticProgramValidator {
                     context: context.enteringBackground(),
                     fileName: fileName
                 )
+            case .localCallable(let declaration):
+                try validateControlFlow(
+                    in: declaration.body,
+                    context: .root,
+                    fileName: fileName
+                )
             case .derived(_, _, let body):
                 try validateControlFlow(
                     in: body,
@@ -533,6 +539,15 @@ public struct SemanticProgramValidator {
             return
         }
 
+        try validateLiteralBridgeCompatibilityInLocalCallables(
+            in: body,
+            accessibleTypes: accessibleTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver,
+            fileName: fileName
+        )
+
         let parameterTypes: [String: BootstrapLiteralType] = Dictionary(
             uniqueKeysWithValues: callable.parameters.compactMap { parameter in
                 guard let typeReference = parameter.typeReference else {
@@ -567,6 +582,87 @@ public struct SemanticProgramValidator {
                 throw SemanticValidationError(
                     "Callable \(callable.name) in \(fileName) expects return type \(explicitReturnType.displayName), got \(inferred.displayName)."
                 )
+            }
+        }
+    }
+
+    private func validateLiteralBridgeCompatibilityInLocalCallables(
+        in statements: [Statement],
+        accessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        for statement in statements {
+            switch statement {
+            case .localCallable(let declaration):
+                try validateLiteralBridgeCompatibility(
+                    in: CallableDeclaration(
+                        macros: declaration.macros,
+                        attribute: declaration.attribute,
+                        targetType: nil,
+                        name: declaration.name,
+                        genericParameters: declaration.genericParameters,
+                        hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+                        parameters: declaration.parameters,
+                        returnType: declaration.returnType,
+                        body: declaration.body
+                    ),
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .freestandingMacro(_, _, let body),
+                .background(let body),
+                .derived(_, _, let body),
+                .forEach(_, _, let body),
+                .whileLoop(_, let body):
+                try validateLiteralBridgeCompatibilityInLocalCallables(
+                    in: body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .conditional(let branches):
+                for branch in branches {
+                    try validateLiteralBridgeCompatibilityInLocalCallables(
+                        in: branch.body,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    try validateLiteralBridgeCompatibilityInLocalCallables(
+                        in: switchCase.body,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+                if let defaultBody {
+                    try validateLiteralBridgeCompatibilityInLocalCallables(
+                        in: defaultBody,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
+                .expression, .return, .break, .continue:
+                continue
             }
         }
     }
@@ -665,6 +761,15 @@ public struct SemanticProgramValidator {
             return
         }
 
+        try validateCallableReturnSemanticsInLocalCallables(
+            in: body,
+            accessibleTypes: accessibleTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver,
+            fileName: fileName
+        )
+
         let declaredReturnType = callable.returnType
         if callable.isBackground,
             callable.backgroundPromiseSuccessType == nil
@@ -760,6 +865,87 @@ public struct SemanticProgramValidator {
         }
     }
 
+    private func validateCallableReturnSemanticsInLocalCallables(
+        in statements: [Statement],
+        accessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        for statement in statements {
+            switch statement {
+            case .localCallable(let declaration):
+                try validateCallableReturnSemantics(
+                    CallableDeclaration(
+                        macros: declaration.macros,
+                        attribute: declaration.attribute,
+                        targetType: nil,
+                        name: declaration.name,
+                        genericParameters: declaration.genericParameters,
+                        hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+                        parameters: declaration.parameters,
+                        returnType: declaration.returnType,
+                        body: declaration.body
+                    ),
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .freestandingMacro(_, _, let body),
+                .background(let body),
+                .derived(_, _, let body),
+                .forEach(_, _, let body),
+                .whileLoop(_, let body):
+                try validateCallableReturnSemanticsInLocalCallables(
+                    in: body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .conditional(let branches):
+                for branch in branches {
+                    try validateCallableReturnSemanticsInLocalCallables(
+                        in: branch.body,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    try validateCallableReturnSemanticsInLocalCallables(
+                        in: switchCase.body,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+                if let defaultBody {
+                    try validateCallableReturnSemanticsInLocalCallables(
+                        in: defaultBody,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
+                .expression, .return, .break, .continue:
+                continue
+            }
+        }
+    }
+
     private func collectReturnExpressions(in statements: [Statement]) -> [Expression?] {
         var expressions: [Expression?] = []
 
@@ -785,6 +971,8 @@ public struct SemanticProgramValidator {
                     expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
                 }
             case .background:
+                continue
+            case .localCallable:
                 continue
             case .localBinding, .derived, .environmentProvision, .assignment, .compoundAssignment,
                 .expression, .break, .continue:
@@ -832,7 +1020,7 @@ public struct SemanticProgramValidator {
             guard let defaultBody else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
             return blockAlwaysReturnsValue(defaultBody)
-        case .background:
+        case .background, .localCallable:
             return false
         default:
             return false
@@ -988,6 +1176,12 @@ public struct SemanticProgramValidator {
             case .derived(_, _, let body):
                 try validateValueDeclarations(
                     in: body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
+            case .localCallable(let declaration):
+                try validateValueDeclarations(
+                    in: declaration.body,
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )

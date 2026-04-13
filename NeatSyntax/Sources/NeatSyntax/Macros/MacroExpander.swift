@@ -410,6 +410,29 @@ public enum MacroExpander {
                     )
                 )
             ]
+        case .localCallable(let declaration):
+            return [
+                .localCallable(
+                    LocalCallableDeclaration(
+                        macros: declaration.macros,
+                        attribute: declaration.attribute,
+                        name: declaration.name,
+                        genericParameters: declaration.genericParameters,
+                        hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+                        parameters: declaration.parameters,
+                        returnType: declaration.returnType,
+                        body: try expand(
+                            statements: declaration.body,
+                            expectedReturnType: declaration.backgroundPromiseSuccessType
+                                ?? declaration.returnType,
+                            macros: macros,
+                            protocols: protocols,
+                            attachedParameterCallables: attachedParameterCallables,
+                            attachedLiteralConstructs: attachedLiteralConstructs
+                        )
+                    )
+                )
+            ]
         case .derived(let name, let typeName, let body):
             return [
                 .derived(
@@ -1420,6 +1443,8 @@ public enum MacroExpander {
             case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body),
                 .background(let body):
                 expressions.append(contentsOf: macroOperationExpressions(in: body))
+            case .localCallable(let declaration):
+                expressions.append(contentsOf: macroOperationExpressions(in: declaration.body))
             case .switchStatement(_, let cases, let defaultBody):
                 for switchCase in cases {
                     expressions.append(contentsOf: macroOperationExpressions(in: switchCase.body))
@@ -1547,6 +1572,19 @@ public enum MacroExpander {
         case .background(let body):
             return .background(
                 body: substituteMacroBindings(in: body, bindings: bindings)
+            )
+        case .localCallable(let declaration):
+            return .localCallable(
+                LocalCallableDeclaration(
+                    macros: declaration.macros,
+                    attribute: declaration.attribute,
+                    name: declaration.name,
+                    genericParameters: declaration.genericParameters,
+                    hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+                    parameters: declaration.parameters,
+                    returnType: declaration.returnType,
+                    body: substituteMacroBindings(in: declaration.body, bindings: bindings)
+                )
             )
         case .assignment(let target, let expression):
             return .assignment(
@@ -2159,6 +2197,25 @@ public enum MacroExpander {
                         in: body,
                         targetBinding: targetBinding,
                         targetBlock: targetBlock
+                    )
+                )
+            ]
+        case .localCallable(let declaration):
+            return [
+                .localCallable(
+                    LocalCallableDeclaration(
+                        macros: declaration.macros,
+                        attribute: declaration.attribute,
+                        name: declaration.name,
+                        genericParameters: declaration.genericParameters,
+                        hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+                        parameters: declaration.parameters,
+                        returnType: declaration.returnType,
+                        body: substituteMacroTargetCalls(
+                            in: declaration.body,
+                            targetBinding: targetBinding,
+                            targetBlock: targetBlock
+                        )
                     )
                 )
             ]

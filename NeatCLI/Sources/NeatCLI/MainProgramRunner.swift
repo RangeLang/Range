@@ -166,6 +166,9 @@ private struct MainProgramInterpreter {
         case .background:
             throw ValidationError(
                 "@background blocks are not supported in the main program interpreter yet.")
+        case .localCallable:
+            throw ValidationError(
+                "Local @background workers are not supported in the main program interpreter yet.")
         case .localBinding(let declaration):
             let value = try evaluate(declaration.expression)
             try declare(name: declaration.name, kind: declaration.kind, value: value)

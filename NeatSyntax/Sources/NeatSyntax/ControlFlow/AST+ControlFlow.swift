@@ -4,6 +4,7 @@ public indirect enum Statement {
     case freestandingMacro(name: String, argumentClause: String?, body: [Statement])
     case background(body: [Statement])
     case localBinding(LocalBindingDeclaration)
+    case localCallable(LocalCallableDeclaration)
     case derived(name: String, typeName: String, body: [Statement])
     case environmentProvision(EnvironmentProvision)
     case assignment(target: AssignmentTarget, expression: Expression)
@@ -24,6 +25,71 @@ public indirect enum Statement {
         cases: [SwitchCase],
         defaultBody: [Statement]?
     )
+}
+
+public struct LocalCallableDeclaration {
+    public let macros: [MacroApplication]
+    public let attribute: AttributeApplication?
+    public let name: String
+    public let genericParameters: [GenericParameter]
+    public let hasExplicitParameterClause: Bool
+    public let parameters: [NeatFunctionParameter]
+    public let returnType: TypeReference?
+    public let body: [Statement]
+
+    public init(
+        macros: [MacroApplication],
+        attribute: AttributeApplication?,
+        name: String,
+        genericParameters: [GenericParameter],
+        hasExplicitParameterClause: Bool,
+        parameters: [NeatFunctionParameter],
+        returnType: TypeReference?,
+        body: [Statement]
+    ) {
+        self.macros = macros
+        self.attribute = attribute
+        self.name = name
+        self.genericParameters = genericParameters
+        self.hasExplicitParameterClause = hasExplicitParameterClause
+        self.parameters = parameters
+        self.returnType = returnType
+        self.body = body
+    }
+
+    public var isBackground: Bool {
+        attribute?.name == "background"
+    }
+
+    public var backgroundPromiseSuccessType: TypeReference? {
+        guard isBackground, let returnType else {
+            return nil
+        }
+
+        guard case .generic(let base, let arguments) = returnType,
+            base.displayName == "Promise",
+            arguments.count == 2
+        else {
+            return nil
+        }
+
+        return arguments[0]
+    }
+
+    public var backgroundPromiseFailureType: TypeReference? {
+        guard isBackground, let returnType else {
+            return nil
+        }
+
+        guard case .generic(let base, let arguments) = returnType,
+            base.displayName == "Promise",
+            arguments.count == 2
+        else {
+            return nil
+        }
+
+        return arguments[1]
+    }
 }
 
 public struct LocalBindingDeclaration {

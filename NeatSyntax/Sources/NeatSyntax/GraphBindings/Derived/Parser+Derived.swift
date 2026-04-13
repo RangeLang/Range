@@ -104,6 +104,8 @@ extension Parser {
                 continue
             case .background(let body):
                 collectBuilderHooks(from: body, into: &hooks)
+            case .localCallable(let declaration):
+                collectBuilderHooks(from: declaration.body, into: &hooks)
             case .assignment, .compoundAssignment:
                 continue
             case .environmentProvision:

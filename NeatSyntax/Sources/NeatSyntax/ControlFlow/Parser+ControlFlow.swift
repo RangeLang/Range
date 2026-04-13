@@ -8,6 +8,10 @@ extension Parser {
             return try parseFreestandingMacroStatement(localBindings: &localBindings)
         }
 
+        if isLocalBackgroundCallableStart() {
+            return try parseLocalBackgroundCallableDeclaration(localBindings: &localBindings)
+        }
+
         if isBackgroundStatementStart() {
             return try parseBackgroundStatement(localBindings: &localBindings)
         }
@@ -102,6 +106,63 @@ extension Parser {
             return false
         }
         return peek(offset: 1) == .leftBrace
+    }
+
+    func isLocalBackgroundCallableStart() -> Bool {
+        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+            return false
+        }
+
+        guard tokenCanStartLocalBackgroundCallableName(peek(offset: 1)) else {
+            return false
+        }
+
+        let next = peek(offset: 2)
+        return next == .leftParen || next == .less
+    }
+
+    func tokenCanStartLocalBackgroundCallableName(_ token: Token) -> Bool {
+        switch token {
+        case .identifier, .keyword:
+            return true
+        default:
+            return false
+        }
+    }
+
+    mutating func parseLocalBackgroundCallableDeclaration(
+        localBindings: inout [String: LocalBindingSymbol]
+    ) throws -> Statement {
+        let callable = try parseBackgroundCallableDeclaration(macros: [])
+
+        if localBindings[callable.name] != nil {
+            throw ParseError("'\(callable.name)' is already declared in this scope.")
+        }
+        if currentStateNames.contains(callable.name) {
+            throw ParseError("Local background worker '\(callable.name)' conflicts with state '\(callable.name)'.")
+        }
+        if currentEnvironmentNames.contains(callable.name) {
+            throw ParseError("Local background worker '\(callable.name)' conflicts with environment '\(callable.name)'.")
+        }
+
+        guard let body = callable.body else {
+            throw ParseError(
+                "Local background worker \(callable.name) must include a body."
+            )
+        }
+
+        return .localCallable(
+            LocalCallableDeclaration(
+                macros: callable.macros,
+                attribute: callable.attribute,
+                name: callable.name,
+                genericParameters: callable.genericParameters,
+                hasExplicitParameterClause: callable.hasExplicitParameterClause,
+                parameters: callable.parameters,
+                returnType: callable.returnType,
+                body: body
+            )
+        )
     }
 
     mutating func parseBackgroundStatement(
@@ -392,6 +453,9 @@ extension Parser {
         }
         try consume(.leftBrace)
 
+        let outerCallableReturnTypes = currentCallableReturnTypes
+        defer { currentCallableReturnTypes = outerCallableReturnTypes }
+
         var localBindings = baseLocalBindings
         var statements: [Statement] = []
         while peek() != .rightBrace {
@@ -403,6 +467,9 @@ extension Parser {
     }
 
     func isStatementStart() -> Bool {
+        if isLocalBackgroundCallableStart() {
+            return true
+        }
         if isBackgroundStatementStart() {
             return true
         }

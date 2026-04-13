@@ -1352,6 +1352,12 @@ private struct GraphCollector {
             case .background(let body):
                 analyzeStatements(
                     body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
+            case .localCallable(let declaration):
+                let callableID = "\(statementID)/localCallable:\(declaration.name)"
+                addNode(id: callableID, kind: .function, label: declaration.name)
+                addEdge(from: ownerID, to: callableID, kind: .contains)
+                analyzeStatements(
+                    declaration.body, ownerID: callableID, scope: scope, visitedCalls: visitedCalls)
             case .localBinding(let declaration):
                 let nodeKind: DependencyGraphNodeKind =
                     declaration.kind == .mutable ? .state : .value

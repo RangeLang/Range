@@ -104,6 +104,19 @@ struct SwiftLoweredProgramAdapter {
                     expression: lower(expression: declaration.expression)
                 )
             )
+        case .localCallable(let declaration):
+            return .localCallable(
+                LocalCallableDeclaration(
+                    macros: declaration.macros,
+                    attribute: declaration.attribute,
+                    name: declaration.name,
+                    genericParameters: declaration.genericParameters,
+                    hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+                    parameters: declaration.parameters,
+                    returnType: declaration.returnType,
+                    body: lower(statements: declaration.body)
+                )
+            )
         case .derived(let name, let typeName, let body):
             return .derived(name: name, typeName: typeName, body: lower(statements: body))
         case .environmentProvision:

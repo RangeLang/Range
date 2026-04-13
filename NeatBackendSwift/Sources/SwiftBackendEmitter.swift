@@ -266,6 +266,25 @@ struct SwiftBackendEmitter {
             """
     }
 
+    private func emitLocalCallableDeclaration(
+        _ declaration: LocalCallableDeclaration,
+        indent: Int
+    ) throws -> String {
+        let callable = CallableDeclaration(
+            macros: declaration.macros,
+            attribute: declaration.attribute,
+            targetType: nil,
+            name: declaration.name,
+            genericParameters: declaration.genericParameters,
+            hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+            parameters: declaration.parameters,
+            returnType: declaration.returnType,
+            body: declaration.body
+        )
+
+        return indentBlock(try emitFunction(callable), level: indent)
+    }
+
     private func emitBackgroundFunction(
         _ callable: CallableDeclaration,
         parameters: String,
@@ -543,7 +562,7 @@ struct SwiftBackendEmitter {
                 if let defaultBody, statementsContainMutation(defaultBody) {
                     return true
                 }
-            case .localBinding, .environmentProvision, .expression, .return, .break, .continue:
+            case .localBinding, .localCallable, .environmentProvision, .expression, .return, .break, .continue:
                 continue
             }
         }
@@ -579,6 +598,8 @@ struct SwiftBackendEmitter {
                 \(bodyText)
                 \(prefix)}
                 """
+        case .localCallable(let declaration):
+            return try emitLocalCallableDeclaration(declaration, indent: indent)
         case .localBinding(let declaration):
             let keyword = declaration.kind == .constant ? "let" : "var"
             let typeAnnotation =

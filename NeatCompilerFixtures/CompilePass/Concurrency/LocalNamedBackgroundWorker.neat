@@ -1,0 +1,34 @@
+enum FetchError {
+    case missing
+    case network
+}
+
+function usePromise(request: Promise<String, FetchError>) {
+    Logger.info("local promise typed")
+}
+
+function useResult(result: Result<String, FetchError>) {
+    Logger.info("local result typed")
+}
+
+function loadUser(id: Int) {
+    @background fetchLocal(userID: Int) -> Promise<String, FetchError> {
+        if userID == 0 {
+            return "system"
+        }
+
+        return "george"
+    }
+
+    state liveRequest: Promise<String, FetchError> = fetchLocal(userID: id)
+    usePromise(request: liveRequest)
+    Logger.info("local worker request started")
+
+    value settledResult: Result<String, FetchError> = fetchLocal(userID: id)
+    useResult(result: settledResult)
+    Logger.info("local worker request finished")
+}
+
+@main {
+    loadUser(id: 1)
+}
