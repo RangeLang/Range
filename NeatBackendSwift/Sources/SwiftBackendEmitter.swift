@@ -77,94 +77,106 @@ struct SwiftBackendEmitter {
 
     private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
         let support = """
-            // Backend implementation for NeatCore's Promise and Logger surface.
+            // Backend implementation for NeatCore's Channel, Result, and Logger surface.
             // NeatCore declares the language-visible API; Swift runtime support lives here.
-            enum PromiseRuntimeState<Success, Failure> {
-                case loading
-                case success(Success)
-                case failure(Failure)
+            enum Result<Success, Failure> {
+                case success(result: Success)
+                case failure(cause: Failure)
             }
 
-            final class Promise<Success: Sendable, Failure>: @unchecked Sendable {
-                private let lock = NSLock()
-                private var state: PromiseRuntimeState<Success, Failure>
+            final class ChannelStorage<Element>: @unchecked Sendable {
+                private let condition = NSCondition()
+                private var buffer: [Element] = []
+                private let capacity: Int
+                private var closed = false
 
-                private init(state: PromiseRuntimeState<Success, Failure>) {
-                    self.state = state
+                init() {
+                    self.capacity = 0
                 }
 
-                static func loading() -> Promise<Success, Failure> {
-                    Promise(state: .loading)
+                init(capacity: Int) {
+                    self.capacity = max(0, capacity)
                 }
 
-                static func success(_ value: Success) -> Promise<Success, Failure> {
-                    Promise(state: .success(value))
-                }
+                func send(element: Element) {
+                    condition.lock()
+                    defer { condition.unlock() }
 
-                static func failure(_ error: Failure) -> Promise<Success, Failure> {
-                    Promise(state: .failure(error))
-                }
+                    precondition(!closed, "Cannot send to a closed channel.")
 
-                func snapshot() -> PromiseRuntimeState<Success, Failure> {
-                    lock.lock()
-                    defer { lock.unlock() }
-                    return state
-                }
+                    if capacity == 0 {
+                        while !closed && !buffer.isEmpty {
+                            condition.wait()
+                        }
 
-                func isLoading() -> Bool {
-                    lock.lock()
-                    defer { lock.unlock() }
-                    if case .loading = state {
-                        return true
+                        precondition(!closed, "Cannot send to a closed channel.")
+
+                        buffer.append(element)
+                        condition.broadcast()
+
+                        while !closed && !buffer.isEmpty {
+                            condition.wait()
+                        }
+                        return
                     }
-                    return false
-                }
 
-                func value() -> Success? {
-                    lock.lock()
-                    defer { lock.unlock() }
-                    if case .success(let value) = state {
-                        return value
+                    while !closed && buffer.count >= capacity {
+                        condition.wait()
                     }
-                    return nil
+
+                    precondition(!closed, "Cannot send to a closed channel.")
+
+                    buffer.append(element)
+                    condition.broadcast()
                 }
 
-                func error() -> Failure? {
-                    lock.lock()
-                    defer { lock.unlock() }
-                    if case .failure(let error) = state {
-                        return error
+                func receive() -> Element {
+                    condition.lock()
+                    defer { condition.unlock() }
+
+                    while buffer.isEmpty {
+                        if closed {
+                            preconditionFailure(
+                                "Cannot receive from a closed channel with no remaining elements."
+                            )
+                        }
+                        condition.wait()
                     }
-                    return nil
+
+                    let element = buffer.removeFirst()
+                    condition.broadcast()
+                    return element
                 }
 
-                func resolveSuccess(_ value: Success) {
-                    lock.lock()
-                    state = .success(value)
-                    lock.unlock()
-                }
-
-                func resolveFailure(_ error: Failure) {
-                    lock.lock()
-                    state = .failure(error)
-                    lock.unlock()
+                func close() {
+                    condition.lock()
+                    closed = true
+                    condition.broadcast()
+                    condition.unlock()
                 }
             }
 
-            func settle<Success, Failure>(_ result: Result<Success, Failure>) -> Result<Success, Failure> {
-                result
-            }
+            struct Channel<Element>: @unchecked Sendable {
+                private let storage: ChannelStorage<Element>
 
-            func settle<Success: Sendable, Failure>(_ promise: Promise<Success, Failure>) -> Result<Success, Failure> {
-                while true {
-                    switch promise.snapshot() {
-                    case .loading:
-                        Thread.sleep(forTimeInterval: 0.001)
-                    case .success(let value):
-                        return .success(value)
-                    case .failure(let error):
-                        return .failure(error)
-                    }
+                init() {
+                    self.storage = ChannelStorage(capacity: 0)
+                }
+
+                init(capacity: Int) {
+                    self.storage = ChannelStorage(capacity: capacity)
+                }
+
+                func send(element: Element) {
+                    storage.send(element: element)
+                }
+
+                func receive() -> Element {
+                    storage.receive()
+                }
+
+                func close() {
+                    storage.close()
                 }
             }
 
@@ -251,11 +263,6 @@ struct SwiftBackendEmitter {
         }
 
         let parameters = try callable.parameters.map(emitParameter).joined(separator: ", ")
-
-        if callable.isBackground {
-            return try emitBackgroundFunction(callable, parameters: parameters, body: body)
-        }
-
         let returnClause = try emitReturnClause(callable.returnType)
         let functionBody = try emitStatements(body, indent: 1)
 
@@ -285,39 +292,7 @@ struct SwiftBackendEmitter {
         return indentBlock(try emitFunction(callable), level: indent)
     }
 
-    private func emitBackgroundFunction(
-        _ callable: CallableDeclaration,
-        parameters: String,
-        body: [NeatStatement]
-    ) throws -> String {
-        guard
-            let declaredReturnType = callable.returnType,
-            let successType = callable.backgroundPromiseSuccessType,
-            let failureType = callable.backgroundPromiseFailureType
-        else {
-            throw SwiftBackendError(
-                "Background worker \(callable.name) must declare return type Promise<Success, Failure>."
-            )
-        }
 
-        let returnClause = try emitReturnClause(declaredReturnType)
-        let successTypeName = emitTypeName(successType)
-        let failureTypeName = emitTypeName(failureType)
-        let functionBody = try emitStatements(body, indent: 4)
-
-        return """
-            func \(callable.name)(\(parameters))\(returnClause) {
-                let promise = Promise<\(successTypeName), \(failureTypeName)>.loading()
-                Task {
-                    let value: \(successTypeName) = {
-            \(functionBody)
-                    }()
-                    promise.resolveSuccess(value)
-                }
-                return promise
-            }
-            """
-    }
 
     private func emitEnum(_ declaration: EnumDeclaration) throws -> String {
         let genericClause = emitConstructGenericClause(declaration.genericParameters)
@@ -460,27 +435,7 @@ struct SwiftBackendEmitter {
 
     private func emitLocalBindingExpression(_ declaration: LocalBindingDeclaration) throws -> String
     {
-        let expression = try emitExpression(declaration.expression)
-
-        guard declaration.kind == .constant, isResultType(declaration.type) else {
-            return expression
-        }
-
-        return "settle(\(expression))"
-    }
-
-    private func isResultType(_ typeReference: TypeReference) -> Bool {
-        guard case .generic(let base, let arguments) = typeReference,
-            arguments.count == 2
-        else {
-            return false
-        }
-
-        guard case .named(let baseName) = base else {
-            return false
-        }
-
-        return baseName == "Result"
+        try emitExpression(declaration.expression)
     }
 
     private func emitDerivedMember(_ derived: DerivedDeclaration) throws -> String {

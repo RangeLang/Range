@@ -1,0 +1,7 @@
+@background fetchUsername(id: Int) -> String {
+    return "george"
+}
+
+@main {
+    value name = fetchUsername(id: 1)
+}

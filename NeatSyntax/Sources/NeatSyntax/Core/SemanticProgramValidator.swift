@@ -168,12 +168,6 @@ public struct SemanticProgramValidator {
         }
 
         for callable in declaration.callables {
-            if callable.isBackground {
-                throw SemanticValidationError(
-                    "Background worker \(renderCallableSignature(callable)) in \(fileName) is only supported at top level for now."
-                )
-            }
-
             guard let body = callable.body else {
                 continue
             }
@@ -532,7 +526,7 @@ public struct SemanticProgramValidator {
         fileName: String
     ) throws {
         guard
-            let explicitReturnType = callable.backgroundPromiseSuccessType ?? callable.returnType,
+            let explicitReturnType = callable.returnType,
             explicitReturnType.displayName != "Void",
             let body = callable.body
         else {
@@ -770,18 +764,7 @@ public struct SemanticProgramValidator {
             fileName: fileName
         )
 
-        let declaredReturnType = callable.returnType
-        if callable.isBackground,
-            callable.backgroundPromiseSuccessType == nil
-                || callable.backgroundPromiseFailureType == nil
-        {
-            let declared = declaredReturnType?.displayName ?? "_"
-            throw SemanticValidationError(
-                "Background worker \(renderCallableSignature(callable)) in \(fileName) must declare return type Promise<Success, Failure>, got \(declared)."
-            )
-        }
-
-        let explicitReturnType = callable.backgroundPromiseSuccessType ?? declaredReturnType
+        let explicitReturnType = callable.returnType
         let needsValueReturn = callableRequiresValueReturn(
             explicitReturnType: explicitReturnType,
             expectedReturnType: explicitReturnType

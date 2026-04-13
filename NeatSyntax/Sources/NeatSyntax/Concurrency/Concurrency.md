@@ -1,28 +1,47 @@
 # Neat Concurrency
 
-This document describes the current intended direction for Neat's concurrency model inside `NeatSyntax`.
+This document describes the current intended direction for Neat concurrency.
 
-The goal is a model that feels closer to Go than Swift:
+The model is intentionally moving toward a simpler, more Go-like shape:
 
-- lightweight background work
-- explicit data flow
-- minimal ceremony
-- strong static structure
-- backend implementation details must not become language truth
+- explicit spawning
+- explicit communication
+- explicit blocking points
+- ordinary functions stay ordinary
+- channels are the main concurrency primitive
+
+The goal is to keep concurrency understandable at the source level and avoid hiding synchronization inside ordinary-looking declarations or bindings.
 
 ## Design Principles
 
-- Concurrency is a language feature, not a backend feature.
-- A backend such as Swift may use runtime primitives like `Task`, but Neat semantics must stay source-defined.
-- Background work should be easy to spawn and easy to reason about.
-- Shared-state safety should come from the dependency graph and effect analysis, not from user-facing lock APIs.
-- Async result flow should use a small core set of language-visible types.
+- Concurrency is a language feature, not a backend-specific feature.
+- Backend implementation details must not become source-language truth.
+- Work should start explicitly.
+- Communication and synchronization should happen explicitly.
+- Ordinary procedural code should remain ordinary procedural code.
+- Concurrency structure should scale beyond one-shot async results.
 
-## Current Direction
+## Core Direction
 
-Neat currently centers concurrency around named and anonymous background work.
+Neat concurrency centers on two ideas:
 
-### Anonymous background block
+1. `@background { ... }` starts concurrent work
+2. `Channel<T>` is used to communicate between concurrent parts of the program
+
+This means the language does **not** treat Promise-like result types as the core concurrency abstraction.
+
+Instead of returning live async handles and implicitly settling them later, Neat prefers:
+
+- spawn work explicitly
+- send values explicitly
+- receive values explicitly
+- block only at obvious operations such as `receive()`
+
+## Anonymous Background Blocks
+
+Anonymous background blocks remain the spawn primitive.
+
+Example:
 
 ```neat
 @background {
@@ -32,257 +51,351 @@ Neat currently centers concurrency around named and anonymous background work.
 
 Intended meaning:
 
-- starts background work immediately
-- fire-and-forget
-- no handle is returned
-- body is its own control-flow boundary
+- start concurrent work immediately
+- no special named async declaration is introduced
+- no implicit result handle is returned
+- the block body is its own control-flow boundary
 
-Control flow inside anonymous background blocks follows the Go-style intuition:
+This is the explicit "start work now" operation.
 
-- `return` exits the background body
-- `break` applies only to loops or switches inside that background body
-- `continue` applies only to loops inside that background body
+## Control Flow Inside Background Blocks
 
-Anonymous background blocks do not return values.
+Control flow inside an anonymous background block follows straightforward structured rules:
 
-### Named background worker
+- `return` exits the background block body
+- `break` applies only to loops or switches inside that background block
+- `continue` applies only to loops inside that background block
+
+Anonymous background blocks do not produce a direct return value.
+
+So this is allowed:
 
 ```neat
-@background fetchUsername(id: Int) -> Promise<String, FetchError> {
-    return "george"
+@background {
+    if shouldStop {
+        return
+    }
+
+    Logger.info("continuing background work")
 }
 ```
 
-Intended meaning:
-
-- each call starts fresh background work immediately
-- the worker declaration is not a normal `function`
-- the worker explicitly declares `Promise<T, E>`
-- the worker body returns the success payload type `T`
-
-So:
+And this is not part of the model:
 
 ```neat
-@background loadName() -> Promise<String, LoadError> {
-    return "George"
+@background {
+    return 42
 }
 ```
 
-means:
+A background block is for concurrent execution, not for implicitly returning an async value to the surrounding expression context.
 
-- the call expression produces async work
-- the body returns `String`
-- the language-visible async result type is `Promise<String, LoadError>`
+## Ordinary Functions Remain Ordinary
 
-## Core Async Types
+Functions do not become special just because they may be used from concurrent code.
 
-Neat should expose a small core async type family in `NeatCore`.
-
-Current direction:
+Example:
 
 ```neat
-enum Result<Success, Failure> {
-    case success(result: Success)
-    case failure(cause: Failure)
-}
-
-enum Promise<Success, Failure> {
-    case loading
-    case success(result: Success)
-    case failure(cause: Failure)
-}
-
-enum Stream<Element, Failure> {
-    case loading
-    case value(item: Element)
-    case failure(cause: Failure)
-    case completed
-}
-```
-
-These are core language-facing types. A backend may internally represent them with runtime-managed state, but that is an implementation detail.
-
-## Binding Rules
-
-A key design rule is that `state` and `value` interact with background results differently.
-
-### `state` keeps async work live
-
-```neat
-state request = fetchUsername(id: 1)
-```
-
-Intended meaning:
-
-- the worker starts immediately
-- the binding is established immediately
-- the bound type is `Promise<String, FetchError>`
-- the promise may be `.loading`, then later `.success(...)` or `.failure(...)`
-
-This is the non-blocking form.
-
-### `value` joins async work into a settled result
-
-```neat
-value result = fetchUsername(id: 1)
-```
-
-Intended meaning:
-
-- the worker starts
-- evaluation does not continue until the worker settles
-- the bound type is `Result<String, FetchError>`
-- the value is never `.loading`
-
-This is the settling or joining form.
-
-That means the same worker call expression behaves differently depending on binding context:
-
-- `state <- Promise`
-- `value <- Result`
-
-### Example
-
-```neat
-enum FetchError {
-    case missing
-    case network
-}
-
-@background fetchUsername(id: Int) -> Promise<String, FetchError> {
+function fetchUserName(id: Int) -> String {
     if id == 0 {
         return "system"
     }
 
     return "george"
 }
-
-@main {
-    state liveRequest: Promise<String, FetchError> = fetchUsername(id: 1)
-    Logger.info("request started")
-
-    value settledResult: Result<String, FetchError> = fetchUsername(id: 1)
-    Logger.info("request finished")
-}
 ```
 
-The intended reading is:
+This is just a normal function.
 
-- `liveRequest` is a live async value
-- `settledResult` is a final settled outcome
-
-## Why This Split Exists
-
-The language wants both:
-
-- a live async state model
-- a simple final settled result model
-
-`Promise<T, E>` represents ongoing background work.
-
-`Result<T, E>` represents a settled outcome.
-
-This keeps the type story clean:
-
-- `Promise` may still be loading
-- `Result` is already settled
-
-## Switching
-
-Long-term intended syntax should be straightforward:
+If you want to run it concurrently, you do that at the use site:
 
 ```neat
-switch liveRequest {
-    case .loading { ... }
-    case .success(name) { ... }
-    case .failure(error) { ... }
+value names = Channel<String>()
+
+@background {
+    value name = fetchUserName(id: 1)
+    names.send(element: name)
 }
 
-switch settledResult {
-    case .success(name) { ... }
-    case .failure(error) { ... }
+value received = names.receive()
+```
+
+The concurrency is visible where it happens:
+
+- the spawn is visible
+- the send is visible
+- the receive is visible
+
+The function itself does not need Promise-returning syntax or a special async declaration form.
+
+## Channels
+
+`Channel<T>` is the main communication primitive.
+
+Current surface shape:
+
+```neat
+construct Channel<Element> {
+    init()
+    init(capacity: Int)
+    function send(element _: Element)
+    function receive() -> Element
+    function close()
 }
 ```
 
-The source language should stay simple even if the backend uses helper runtime structures underneath.
+Channels are intended to support:
+
+- one concurrent part sending data to another
+- explicit handoff of work or results
+- producer/consumer patterns
+- worker coordination
+- buffered or unbuffered communication depending on capacity
+
+This is closer to message passing than to future/promise result plumbing.
+
+## Explicit Communication
+
+The intended style is explicit communication through channel operations.
+
+Example:
+
+```neat
+function loadUser(id: Int) {
+    value output = Channel<String>()
+
+    @background {
+        value name = fetchUserName(id: id)
+        output.send(element: name)
+    }
+
+    value name = output.receive()
+    Logger.info(name)
+}
+```
+
+Reading this code should make synchronization obvious:
+
+- the background block starts concurrent work
+- `send(...)` communicates the produced value
+- `receive()` is the explicit synchronization point
+
+There is no hidden join disguised as an ordinary binding.
+
+## Blocking and Synchronization
+
+Blocking should happen at explicit concurrency operations.
+
+Most importantly:
+
+- `receive()` is an explicit synchronization point
+- a send on some channels may also synchronize, depending on channel capacity and runtime behavior
+
+This is preferred over designs where something like:
+
+```neat
+value result = worker()
+```
+
+looks like an ordinary binding but secretly waits for background work to finish.
+
+In the channel-first model, waiting should be visible in the source.
+
+## Buffered and Unbuffered Channels
+
+`Channel(capacity: ...)` exists to support different communication shapes.
+
+Intended reading:
+
+- `Channel()` or `Channel(capacity: 0)` represents direct handoff behavior
+- `Channel(capacity: n)` allows bounded buffering
+
+This gives the language room to express:
+
+- synchronous handoff
+- bounded queues
+- staged pipelines
+- worker pools
+- backpressure-oriented designs
+
+Exact backend implementation can vary, but the source model remains channel-based rather than Promise-based.
+
+## Close Semantics
+
+Channels support `close()`.
+
+Close exists so channel-based coordination can model completion and shutdown, not just single-value handoff.
+
+The exact source-level closed-channel behavior should remain clearly specified by Neat itself, not inferred from backend runtime conventions.
+
+That means any final semantics around:
+
+- receiving after close
+- sending after close
+- draining buffered values after close
+
+must be defined as Neat behavior.
+
+## Result as a Normal Data Type
+
+`Result<T, E>` may still be useful as an ordinary data type for success/failure modeling.
+
+Example:
+
+```neat
+enum LoadError {
+    case missing
+    case denied
+}
+
+function parseUser(id: Int) -> Result<String, LoadError> {
+    if id == 0 {
+        return .success(result: "system")
+    }
+
+    return .failure(cause: .missing)
+}
+```
+
+What changes is its role:
+
+- `Result` is a normal value type
+- it is **not** the language's hidden async-join result form
+- it does not imply background execution by itself
+
+## What Is Not the Core Model
+
+The concurrency model should avoid centering around:
+
+- named background worker declarations
+- Promise-returning callable forms
+- special binding semantics where `value` joins async work
+- hidden synchronization points
+- backend-shaped async concepts leaking into source semantics
+
+Neat may still have useful general-purpose types for success/failure or streaming data in the future, but those should not define the core concurrency story.
+
+## Why This Direction
+
+This spawn-plus-channel direction is preferred because it makes concurrency structure more obvious.
+
+It avoids several problems that arise in Promise-centered designs:
+
+- ordinary-looking bindings hiding joins
+- declarations carrying too much async meaning
+- local live async handles with weak practical value
+- drift toward a Swift-style future/async-result model
+- poor fit for pipelines, queues, and coordination patterns
+
+A channel-first model better fits:
+
+- explicit message passing
+- richer concurrent structure
+- clearer blocking behavior
+- systems-ish or OS-ish coordination patterns
 
 ## Shared State
 
-The intended direction is to avoid user-facing lock ceremony.
+The intended direction is still to avoid user-facing lock ceremony.
 
-Instead of requiring explicit lock syntax, Neat should rely on:
+The long-term goal is that concurrency safety comes from:
 
 - the dependency graph
 - effect classification
 - concurrency-aware validation
+- explicit communication structure
 
-Target behavior:
+The user-facing model should prefer message passing and structured concurrent behavior over manual synchronization APIs.
 
-- safe concurrent access is allowed
-- conflicting concurrent access is rejected
-- serialization should come from dependency structure, not manual mutex APIs
+## Backend Notes
 
-This keeps the model closer to:
+A backend may implement `@background` using runtime mechanisms such as tasks or threads.
 
-- Go-like in execution feel
-- stronger than Go in static safety
-- simpler than Swift in ceremony
+A backend may implement channels using locks, conditions, queues, or other runtime support.
 
-## Non-Goals
+Those details are implementation choices.
 
-The model should avoid drifting toward backend-specific concurrency concepts such as:
+They must not redefine the language model.
 
-- executor-specific annotations
-- actor-style ceremony everywhere
-- source semantics that depend on Swift runtime terminology
-- exposing implementation details just because the backend uses them
+Neat source semantics should stay stable even if different backends realize the runtime differently.
 
-If Neat later needs concepts for UI affinity, scheduling domains, or cancellation, those should be introduced as Neat concepts, not imported backend concepts.
+## Example Shapes
 
-## Current Scope in `NeatSyntax`
+### Fire-and-forget work
 
-At this stage, concurrency-related behavior is spread across several areas:
+```neat
+function refreshCache() {
+    @background {
+        Logger.info("refresh started")
+        performRefresh()
+        Logger.info("refresh finished")
+    }
 
-- control-flow parsing and validation
-- callable parsing
-- local binding and state binding inference
-- semantic validation
-- backend lowering support
+    Logger.info("caller continues immediately")
+}
+```
 
-This folder exists to give concurrency a clear home as the model grows.
+### Single result handoff
 
-## Planned Responsibilities for This Folder
+```neat
+function loadName(id: Int) {
+    value output = Channel<String>()
 
-Over time, the `Concurrency` area should become the home for:
+    @background {
+        output.send(element: fetchUserName(id: id))
+    }
 
-- concurrency design notes
-- background worker rules
-- promise and result binding rules
-- future worker chaining rules
-- future stream rules
-- future concurrency-specific validation helpers
+    value name = output.receive()
+    Logger.info(name)
+}
+```
 
-## Future Work
+### Producer / consumer shape
 
-Likely next steps include:
+```neat
+function processJobs() {
+    value jobs = Channel<Int>(capacity: 8)
 
-- formalizing direct switch pattern handling for `Promise` and `Result`
-- worker chaining semantics
-- typed failure production
-- stream production rules
-- dependency-graph-based race validation
-- clearer specification of how live async values interact with observation and reevaluation
+    @background {
+        jobs.send(element: 1)
+        jobs.send(element: 2)
+        jobs.close()
+    }
+
+    value first = jobs.receive()
+    value second = jobs.receive()
+
+    Logger.info(first)
+    Logger.info(second)
+}
+```
+
+## Current Scope
+
+At this stage, concurrency-related behavior lives across several areas:
+
+- parsing of anonymous background blocks
+- control-flow validation for background bodies
+- core channel surface definitions
+- backend lowering/runtime support for spawning and channels
+
+This document exists to keep the intended language direction clear as implementation continues.
 
 ## Summary
 
-Neat concurrency should aim for:
+Neat concurrency is moving toward:
 
-- Go-like spawning
-- explicit async result types
-- `state` for live async values
-- `value` for settled outcomes
-- compiler-owned safety rules
-- minimal ceremony
-- no backend leakage into source semantics
+- anonymous `@background { ... }` for explicit spawning
+- `Channel<T>` for communication
+- explicit blocking at channel operations
+- ordinary functions staying ordinary
+- no Promise-centered core concurrency model
+- no hidden join semantics in ordinary bindings
 
-That is the current intended direction for `NeatSyntax`.
+In short:
+
+- spawn explicitly
+- communicate explicitly
+- block explicitly
+- keep the source model simple

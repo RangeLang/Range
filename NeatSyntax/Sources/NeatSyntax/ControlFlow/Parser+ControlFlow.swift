@@ -133,35 +133,36 @@ extension Parser {
     mutating func parseLocalBackgroundCallableDeclaration(
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
-        let callable = try parseBackgroundCallableDeclaration(macros: [])
+        _ = localBindings
 
-        if localBindings[callable.name] != nil {
-            throw ParseError("'\(callable.name)' is already declared in this scope.")
-        }
-        if currentStateNames.contains(callable.name) {
-            throw ParseError("Local background worker '\(callable.name)' conflicts with state '\(callable.name)'.")
-        }
-        if currentEnvironmentNames.contains(callable.name) {
-            throw ParseError("Local background worker '\(callable.name)' conflicts with environment '\(callable.name)'.")
+        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+            throw ParseError("Expected named @background callable declaration.")
         }
 
-        guard let body = callable.body else {
-            throw ParseError(
-                "Local background worker \(callable.name) must include a body."
-            )
+        advance()
+        let callableName = try consumeCallableName()
+
+        if peek() == .less {
+            try skipGenericParameterClauseIfPresent()
         }
 
-        return .localCallable(
-            LocalCallableDeclaration(
-                macros: callable.macros,
-                attribute: callable.attribute,
-                name: callable.name,
-                genericParameters: callable.genericParameters,
-                hasExplicitParameterClause: callable.hasExplicitParameterClause,
-                parameters: callable.parameters,
-                returnType: callable.returnType,
-                body: body
-            )
+        if peek() == .leftParen {
+            _ = try parseFunctionParameters()
+        }
+
+        if peek() == .arrow {
+            try consume(.arrow)
+            _ = try parseTypeReferenceNode()
+        }
+
+        if peek() == .leftBrace {
+            try consume(.leftBrace)
+            try skipUnknownBlockBody()
+            try consume(.rightBrace)
+        }
+
+        throw ParseError(
+            "Local named @background workers were removed. Use function \(callableName)(...) for named work and spawn it explicitly with @background { \(callableName)(...) }."
         )
     }
 

@@ -1,0 +1,20 @@
+function enqueueBufferedValues(queue: Channel<Int>) {
+    @background {
+        queue.send(element: 1)
+        queue.send(element: 2)
+        queue.close()
+        Logger.info("buffered queue filled")
+    }
+}
+
+@main {
+    value queue: Channel<Int> = Channel<Int>(capacity: 2)
+
+    enqueueBufferedValues(queue: queue)
+
+    value first = queue.receive()
+    value second = queue.receive()
+
+    Logger.info(first)
+    Logger.info(second)
+}

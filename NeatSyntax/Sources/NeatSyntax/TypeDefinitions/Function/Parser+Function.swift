@@ -11,9 +11,15 @@ extension Parser {
         let macros = try parseMacroApplicationsIfPresent()
 
         if isBackgroundWorkerStart(at: 0) {
-            return try parseBackgroundCallableDeclaration(
-                macros: macros,
-                signatureOnly: signatureOnly
+            return try rejectNamedBackgroundCallableDeclaration()
+        }
+
+        if case .atAttribute(let name, _) = peek(),
+            name == "background",
+            peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+        {
+            throw ParseError(
+                "@background can only be used with anonymous @background { ... } blocks."
             )
         }
 
@@ -76,65 +82,37 @@ extension Parser {
         )
     }
 
-    mutating func parseBackgroundCallableDeclaration(
-        macros: [MacroApplication],
-        signatureOnly: Bool = false
-    ) throws -> CallableDeclaration {
-        guard case .atAttribute(let name, let argument) = peek(), name == "background" else {
-            throw ParseError("Expected @background worker declaration.")
+    mutating func rejectNamedBackgroundCallableDeclaration() throws
+        -> CallableDeclaration
+    {
+        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+            throw ParseError("Expected named @background callable declaration.")
         }
 
-        let attribute = AttributeApplication(name: name, argument: argument)
         advance()
-
         let callableName = try consumeCallableName()
-        let genericParameters = try parseConstructGenericParameterClauseIfPresent()
-        let hasExplicitParameterClause = peek() == .leftParen
-        guard hasExplicitParameterClause else {
-            throw ParseError(
-                "Background worker declarations must declare an explicit parameter clause."
-            )
+
+        if peek() == .less {
+            try skipGenericParameterClauseIfPresent()
         }
 
-        let parameters = try parseFunctionParameters()
-
-        guard peek() == .arrow else {
-            throw ParseError(
-                "Background worker \(callableName) must declare an explicit Promise return type."
-            )
+        if peek() == .leftParen {
+            _ = try parseFunctionParameters()
         }
 
-        try consume(.arrow)
-        let returnType = try parseTypeReferenceNode()
-
-        registerVisibleCallableReturnType(
-            targetType: nil,
-            name: callableName,
-            returnType: returnType
-        )
-
-        let body: [Statement]?
-        if signatureOnly {
-            if peek() == .leftBrace {
-                try consume(.leftBrace)
-                try skipUnknownBlockBody()
-                try consume(.rightBrace)
-            }
-            body = nil
-        } else {
-            body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        if peek() == .arrow {
+            try consume(.arrow)
+            _ = try parseTypeReferenceNode()
         }
 
-        return CallableDeclaration(
-            macros: macros,
-            attribute: attribute,
-            targetType: nil,
-            name: callableName,
-            genericParameters: genericParameters,
-            hasExplicitParameterClause: hasExplicitParameterClause,
-            parameters: parameters,
-            returnType: returnType,
-            body: body
+        if peek() == .leftBrace {
+            try consume(.leftBrace)
+            try skipUnknownBlockBody()
+            try consume(.rightBrace)
+        }
+
+        throw ParseError(
+            "Named @background callables were removed. Use function \(callableName)(...) for named work and spawn it explicitly with @background { \(callableName)(...) }."
         )
     }
 
@@ -304,7 +282,14 @@ extension Parser {
         if isBackgroundWorkerStart(at: offset) {
             return true
         }
-        let attributeOffset = isCoreAttribute(at: offset) ? offset + 1 : offset
+        let attributeOffset: Int
+        if case .atAttribute = peek(offset: offset),
+            peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+        {
+            attributeOffset = offset + 1
+        } else {
+            attributeOffset = offset
+        }
         if peek(offset: attributeOffset) == .keyword(NeatSyntax.Keyword.function.rawValue) {
             return true
         }
@@ -338,12 +323,7 @@ extension Parser {
         }
     }
 
-    private func isCoreAttribute(at offset: Int) -> Bool {
-        guard case .atAttribute(let name, _) = peek(offset: offset) else {
-            return false
-        }
-        return name == "core"
-    }
+
 
     func isBuilderDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0

@@ -1,0 +1,19 @@
+function fetchUserName(id: Int) -> String {
+    if id == 0 {
+        return "system"
+    }
+
+    return "george"
+}
+
+@main {
+    value output: Channel<String> = Channel()
+
+    @background {
+        value name: String = fetchUserName(id: 1)
+        output.send(element: name)
+    }
+
+    value received: String = output.receive()
+    Logger.info(received)
+}

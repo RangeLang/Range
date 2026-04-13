@@ -1,0 +1,5 @@
+@core
+enum Result<Success, Failure> {
+    case success(result: Success)
+    case failure(cause: Failure)
+}

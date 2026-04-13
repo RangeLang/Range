@@ -423,8 +423,7 @@ public enum MacroExpander {
                         returnType: declaration.returnType,
                         body: try expand(
                             statements: declaration.body,
-                            expectedReturnType: declaration.backgroundPromiseSuccessType
-                                ?? declaration.returnType,
+                            expectedReturnType: declaration.returnType,
                             macros: macros,
                             protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables,

@@ -80,40 +80,6 @@ public struct CallableDeclaration {
     public var isCore: Bool {
         attribute?.name == "core"
     }
-
-    public var isBackground: Bool {
-        attribute?.name == "background"
-    }
-
-    public var backgroundPromiseSuccessType: TypeReference? {
-        guard isBackground, let returnType else {
-            return nil
-        }
-
-        guard case .generic(let base, let arguments) = returnType,
-            base.displayName == "Promise",
-            arguments.count == 2
-        else {
-            return nil
-        }
-
-        return arguments[0]
-    }
-
-    public var backgroundPromiseFailureType: TypeReference? {
-        guard isBackground, let returnType else {
-            return nil
-        }
-
-        guard case .generic(let base, let arguments) = returnType,
-            base.displayName == "Promise",
-            arguments.count == 2
-        else {
-            return nil
-        }
-
-        return arguments[1]
-    }
 }
 
 public struct InitializerDeclaration {

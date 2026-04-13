@@ -1,0 +1,7 @@
+function loadUser(id: Int) {
+    @background fetchLocal(userID: Int) {
+        Logger.info("loading user")
+    }
+
+    Logger.info("requested user")
+}

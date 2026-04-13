@@ -1,0 +1,18 @@
+function fetchUsername(id: Int) -> String {
+    if id == 0 {
+        return "system"
+    }
+
+    return "george"
+}
+
+function refreshUser(id: Int) {
+    Logger.info("before background work")
+
+    @background {
+        value username = fetchUsername(id: id)
+        Logger.info(username)
+    }
+
+    Logger.info("after background work")
+}

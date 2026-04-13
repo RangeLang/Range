@@ -113,35 +113,25 @@ extension Parser {
             return explicitType
         }
 
-        if let explicitType {
-            let bypassExplicitCompatibilityShortcut =
-                bindingKindDescription == "value"
-                && expressionProducesPromiseForValueJoin(expression)
-
-            if !bypassExplicitCompatibilityShortcut,
-                try BootstrapExpressionSemantics.isExpressionCompatible(
-                    expression,
-                    expected: explicitType,
-                    accessibleTypes: accessibleTypes.mapValues(BootstrapLiteralType.typed),
-                    callableReturnTypes: currentCallableReturnTypes,
-                    macroExpansionTypes: macroExpansionTypes,
-                    resolver: literalBridgeResolver,
-                    memberResolver: declarationMemberResolver,
-                    operatorResolver: declarationOperatorResolver,
-                    macroExpansionResolver: declarationMacroExpansionResolver
-                )
-            {
-                return explicitType
-            }
+        if let explicitType,
+            try BootstrapExpressionSemantics.isExpressionCompatible(
+                expression,
+                expected: explicitType,
+                accessibleTypes: accessibleTypes.mapValues(BootstrapLiteralType.typed),
+                callableReturnTypes: currentCallableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: literalBridgeResolver,
+                memberResolver: declarationMemberResolver,
+                operatorResolver: declarationOperatorResolver,
+                macroExpansionResolver: declarationMacroExpansionResolver
+            )
+        {
+            return explicitType
         }
 
-        let rawInferred = try inferBootstrapExpressionType(
+        let inferred = try inferBootstrapExpressionType(
             of: expression,
             accessibleTypes: accessibleTypes
-        )
-        let inferred = settledBindingBootstrapTypeIfNeeded(
-            rawInferred,
-            bindingKindDescription: bindingKindDescription
         )
 
         if let explicitType {
@@ -166,46 +156,7 @@ extension Parser {
         return inferredReference
     }
 
-    func settledBindingBootstrapTypeIfNeeded(
-        _ inferred: BootstrapLiteralType,
-        bindingKindDescription: String
-    ) -> BootstrapLiteralType {
-        guard bindingKindDescription == "value" else {
-            return inferred
-        }
 
-        guard case .typed(let typeReference) = inferred,
-            let resultType = resultTypeForPromiseType(typeReference)
-        else {
-            return inferred
-        }
-
-        return .typed(resultType)
-    }
-
-    func expressionProducesPromiseForValueJoin(_ expression: Expression) -> Bool {
-        guard case .call(let name, _) = expression,
-            let returnType = currentCallableReturnTypes[name]
-        else {
-            return false
-        }
-
-        return resultTypeForPromiseType(returnType) != nil
-    }
-
-    func resultTypeForPromiseType(_ typeReference: TypeReference) -> TypeReference? {
-        guard case .generic(let base, let arguments) = typeReference,
-            arguments.count == 2
-        else {
-            return nil
-        }
-
-        guard case .named(let baseName) = base, baseName == "Promise" else {
-            return nil
-        }
-
-        return .generic(base: .named("Result"), arguments: arguments)
-    }
 
     func isEmptyArrayLiteral(_ expression: Expression) -> Bool {
         if case .array(let elements) = expression {
