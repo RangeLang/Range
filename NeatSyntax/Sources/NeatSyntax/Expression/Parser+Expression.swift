@@ -344,14 +344,14 @@ extension Parser {
         }
     }
 
-    func inferBootstrapExpressionType(
+    func inferExpressionType(
         of expression: Expression,
         accessibleTypes: [String: TypeReference]
     ) throws -> BootstrapLiteralType {
-        let bootstrapAccessibleTypes = accessibleTypes.mapValues { BootstrapLiteralType.typed($0) }
-        return try BootstrapExpressionSemantics.inferType(
+        let typedAccessibleTypes = accessibleTypes.mapValues { BootstrapLiteralType.typed($0) }
+        return try ExpressionTypeSemantics.inferType(
             of: expression,
-            accessibleTypes: bootstrapAccessibleTypes,
+            accessibleTypes: typedAccessibleTypes,
             callableReturnTypes: currentCallableReturnTypes,
             macroExpansionTypes: macroExpansionTypes,
             resolver: literalBridgeResolver,
@@ -362,31 +362,31 @@ extension Parser {
     }
 
     func isNilLiteral(_ expression: Expression) -> Bool {
-        BootstrapExpressionSemantics.isNilLiteral(expression)
+        ExpressionTypeSemantics.isNilLiteral(expression)
     }
 
     func defaultDestinationTypeReference(for type: BootstrapLiteralType) -> TypeReference? {
-        BootstrapExpressionSemantics.defaultDestinationTypeReference(
+        ExpressionTypeSemantics.defaultDestinationTypeReference(
             for: type,
             resolver: literalBridgeResolver
         )
     }
 
-    func isOptionalBootstrapExpressionType(_ type: BootstrapLiteralType) -> Bool {
-        BootstrapExpressionSemantics.isOptionalExpressionType(type)
+    func isOptionalExpressionType(_ type: BootstrapLiteralType) -> Bool {
+        ExpressionTypeSemantics.isOptionalExpressionType(type)
     }
 
-    func bootstrapExpressionTypesMatch(
+    func expressionTypesMatch(
         _ lhs: BootstrapLiteralType,
         _ rhs: BootstrapLiteralType
     ) -> Bool {
-        BootstrapExpressionSemantics.expressionTypesMatch(lhs, rhs)
+        ExpressionTypeSemantics.expressionTypesMatch(lhs, rhs)
     }
 
     func isCompatibleWithExpectedType(_ actual: BootstrapLiteralType, expected: TypeReference)
         -> Bool
     {
-        BootstrapExpressionSemantics.isCompatible(
+        ExpressionTypeSemantics.isCompatible(
             actual: actual,
             expected: expected,
             resolver: literalBridgeResolver
@@ -394,7 +394,7 @@ extension Parser {
     }
 
     func isCompatibleNamedType(expected: TypeReference, actual: TypeReference) -> Bool {
-        BootstrapExpressionSemantics.isCompatibleNamedType(expected: expected, actual: actual)
+        ExpressionTypeSemantics.isCompatibleNamedType(expected: expected, actual: actual)
     }
 
     func currentPrefixOperator() -> UnaryOperator? {

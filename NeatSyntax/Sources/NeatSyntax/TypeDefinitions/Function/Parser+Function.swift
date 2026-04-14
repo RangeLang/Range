@@ -427,7 +427,7 @@ extension Parser {
 
             for expression in returnExpressions.compactMap({ $0 }) {
                 guard
-                    let inferred = try? inferBootstrapExpressionType(
+                    let inferred = try? inferExpressionType(
                         of: expression,
                         accessibleTypes: accessibleTypes
                     )

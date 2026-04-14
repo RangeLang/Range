@@ -494,7 +494,7 @@ public struct SemanticProgramValidator {
         for state in states {
             if state.hasExplicitTypeAnnotation,
                 case .stored(let expression) = state.storage,
-                let inferred = try? BootstrapExpressionSemantics.inferType(
+                let inferred = try? ExpressionTypeSemantics.inferType(
                     of: expression,
                     accessibleTypes: accessibleTypes,
                     resolver: resolver,
@@ -502,7 +502,7 @@ public struct SemanticProgramValidator {
                     operatorResolver: operatorResolver
                 ),
                 inferred.isLiteralLike,
-                !BootstrapExpressionSemantics.isCompatible(
+                !ExpressionTypeSemantics.isCompatible(
                     actual: inferred,
                     expected: state.type,
                     resolver: resolver
@@ -554,20 +554,20 @@ public struct SemanticProgramValidator {
 
         for expression in collectReturnExpressions(in: body).compactMap({ $0 }) {
             guard
-                let inferred = try? BootstrapExpressionSemantics.inferType(
+                let inferred = try? ExpressionTypeSemantics.inferType(
                     of: expression,
                     accessibleTypes: visibleTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
                 ),
-                BootstrapExpressionSemantics.isLiteralExpression(expression)
+                ExpressionTypeSemantics.isLiteralExpression(expression)
             else {
                 continue
             }
 
             guard
-                BootstrapExpressionSemantics.isCompatible(
+                ExpressionTypeSemantics.isCompatible(
                     actual: inferred,
                     expected: explicitReturnType,
                     resolver: resolver
@@ -819,7 +819,7 @@ public struct SemanticProgramValidator {
 
         for expression in returnExpressions.compactMap({ $0 }) {
             guard
-                let inferred = try? BootstrapExpressionSemantics.inferType(
+                let inferred = try? ExpressionTypeSemantics.inferType(
                     of: expression,
                     accessibleTypes: visibleTypes,
                     resolver: resolver,
@@ -835,7 +835,7 @@ public struct SemanticProgramValidator {
             }
 
             guard
-                BootstrapExpressionSemantics.isCompatible(
+                ExpressionTypeSemantics.isCompatible(
                     actual: inferred,
                     expected: explicitReturnType,
                     resolver: resolver

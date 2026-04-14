@@ -1,6 +1,6 @@
 import Foundation
 
-public enum BootstrapExpressionSemantics {
+public enum ExpressionTypeSemantics {
     public static func inferType(
         of expression: Expression,
         accessibleTypes: [String: BootstrapLiteralType],

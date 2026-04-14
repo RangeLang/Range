@@ -114,7 +114,7 @@ extension Parser {
         }
 
         if let explicitType,
-            try BootstrapExpressionSemantics.isExpressionCompatible(
+            try ExpressionTypeSemantics.isExpressionCompatible(
                 expression,
                 expected: explicitType,
                 accessibleTypes: accessibleTypes.mapValues(BootstrapLiteralType.typed),
@@ -129,7 +129,7 @@ extension Parser {
             return explicitType
         }
 
-        let inferred = try inferBootstrapExpressionType(
+        let inferred = try inferExpressionType(
             of: expression,
             accessibleTypes: accessibleTypes
         )
