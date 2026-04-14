@@ -59,12 +59,14 @@ module.exports = grammar({
     main_block: ($) => seq("@", "main", field("body", $.block)),
 
     macro_application: ($) =>
-      prec.right(seq(
-        field("sigil", "#"),
-        field("name", $.identifier),
-        optional(field("generics", $.generic_argument_clause)),
-        optional(field("arguments", $.argument_clause)),
-      )),
+      prec.right(
+        seq(
+          field("sigil", "#"),
+          field("name", $.identifier),
+          optional(field("generics", $.generic_argument_clause)),
+          optional(field("arguments", $.argument_clause)),
+        ),
+      ),
 
     attribute_application: ($) =>
       seq(
@@ -85,8 +87,7 @@ module.exports = grammar({
         field("body", $.macro_body),
       ),
 
-    macro_target: ($) =>
-      field("type", $.type),
+    macro_target: ($) => field("type", $.type),
 
     macro_body: ($) =>
       seq(
@@ -176,7 +177,11 @@ module.exports = grammar({
         repeat(
           choice(
             seq("associativity", ":", choice("left", "right", "none")),
-            seq(choice("higherThan", "lowerThan"), ":", commaSep1($.type_identifier)),
+            seq(
+              choice("higherThan", "lowerThan"),
+              ":",
+              commaSep1($.type_identifier),
+            ),
             seq("assignment", ":", $.boolean_literal),
           ),
         ),

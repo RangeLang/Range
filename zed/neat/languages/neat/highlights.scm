@@ -6,7 +6,7 @@
 ; When syntax is incomplete, tree-sitter can fall back to plain identifiers
 ; inside ERROR nodes. Keep core keywords colored by text anyway.
 ((identifier) @keyword
- (#match? @keyword "^(construct|enum|case|extension|macro|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|get|set|on|builder|capture|precedencegroup|prefix|infix|postfix|operator)$"))
+ (#match? @keyword "^(construct|enum|case|extension|macro|func|function|protocol|state|environment|binding|derived|value|var|if|else|for|in|while|switch|default|return|break|continue|background|get|set|on|builder|capture|precedencegroup|prefix|infix|postfix|operator)$"))
 
 ((identifier) @keyword
  (#match? @keyword "^(core|main)$"))
@@ -18,10 +18,17 @@
 (return_statement
   "return" @keyword.control)
 
+; ── Attribute applications ───────────────────────────────────────────────────
+(attribute_application
+  sigil: "@" @keyword
+  name: (identifier) @keyword)
+
 ; ── @main entry point ────────────────────────────────────────────────────────
 (main_block
   "@" @keyword
   "main" @keyword)
+
+
 
 (macro_declaration
   "macro" @keyword)
@@ -60,7 +67,6 @@
 
 (macro_declaration
   target: (macro_target
-    kind: _ @type
     type: (_) @type))
 
 (macro_declaration
