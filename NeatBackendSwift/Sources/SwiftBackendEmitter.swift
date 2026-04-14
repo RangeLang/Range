@@ -525,7 +525,7 @@ struct SwiftBackendEmitter {
         case .background(let body):
             let bodyText = try emitStatements(body, indent: indent + 1)
             return """
-                \(prefix)Task {
+                \(prefix)Task.detached {
                 \(bodyText)
                 \(prefix)}
                 """

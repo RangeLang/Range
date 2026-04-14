@@ -115,7 +115,7 @@ value names = Channel<String>()
 
 @background {
     value name = fetchUserName(id: 1)
-    names.send(element: name)
+    names.send(name)
 }
 
 value received = names.receive()
@@ -167,7 +167,7 @@ function loadUser(id: Int) {
 
     @background {
         value name = fetchUserName(id: id)
-        output.send(element: name)
+        output.send(name)
     }
 
     value name = output.receive()
@@ -343,7 +343,7 @@ function loadName(id: Int) {
     value output = Channel<String>()
 
     @background {
-        output.send(element: fetchUserName(id: id))
+        output.send(fetchUserName(id: id))
     }
 
     value name = output.receive()
@@ -358,8 +358,8 @@ function processJobs() {
     value jobs = Channel<Int>(capacity: 8)
 
     @background {
-        jobs.send(element: 1)
-        jobs.send(element: 2)
+        jobs.send(1)
+        jobs.send(2)
         jobs.close()
     }
 

@@ -1,7 +1,7 @@
 function enqueueBufferedValues(queue: Channel<Int>) {
     @background {
-        queue.send(element: 1)
-        queue.send(element: 2)
+        queue.send(1)
+        queue.send(2)
         queue.close()
         Logger.info("buffered queue filled")
     }
