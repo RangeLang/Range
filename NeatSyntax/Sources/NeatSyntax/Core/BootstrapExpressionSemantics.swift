@@ -57,7 +57,7 @@ public enum BootstrapExpressionSemantics {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
             return type
-        case .call(let name, let arguments):
+        case .call(let name, _):
             if let returnType = callableReturnTypes[name] {
                 return .typed(returnType)
             }
@@ -68,15 +68,9 @@ public enum BootstrapExpressionSemantics {
             ) {
                 return .typed(memberType)
             }
-            if let constructorType = try inferKnownConstructorType(
+            if let constructorType = inferKnownConstructorType(
                 name: name,
-                arguments: arguments,
-                accessibleTypes: accessibleTypes,
-                callableReturnTypes: callableReturnTypes,
-                macroExpansionTypes: macroExpansionTypes,
-                resolver: resolver,
-                memberResolver: memberResolver,
-                operatorResolver: operatorResolver
+                memberResolver: memberResolver
             ) {
                 return .typed(constructorType)
             }
@@ -341,7 +335,7 @@ public enum BootstrapExpressionSemantics {
                 )
             }
         case .call(let name, _):
-            if constructorCall(name: name, matches: expected) {
+            if constructorCall(name: name, matches: expected, memberResolver: memberResolver) {
                 return true
             }
             let inferred = try inferType(
@@ -686,80 +680,21 @@ public enum BootstrapExpressionSemantics {
 
     private static func inferKnownConstructorType(
         name: String,
-        arguments: [CallArgument],
-        accessibleTypes: [String: BootstrapLiteralType],
-        callableReturnTypes: [String: TypeReference],
-        macroExpansionTypes: [String: TypeReference],
-        resolver: LiteralBridgeResolver,
-        memberResolver: DeclarationMemberResolver,
-        operatorResolver: DeclarationOperatorResolver
-    ) throws -> TypeReference? {
-        if let constructedType = memberResolver.constructedType(forCallName: name) {
-            return constructedType
-        }
-
-        guard name == "String" else {
-            return nil
-        }
-        guard arguments.count == 1 else {
-            throw ParseError("String initializer inference expects one argument.")
-        }
-
-        let argumentType = try inferType(
-            of: arguments[0].value,
-            accessibleTypes: accessibleTypes,
-            callableReturnTypes: callableReturnTypes,
-            macroExpansionTypes: macroExpansionTypes,
-            resolver: resolver,
-            memberResolver: memberResolver,
-            operatorResolver: operatorResolver
-        )
-        guard isStringCompatible(argumentType, resolver: resolver) else {
-            throw ParseError(
-                "String initializer expects String-compatible argument, got \(argumentType.displayName)."
-            )
-        }
-
-        return .named("String")
+        memberResolver: DeclarationMemberResolver
+    ) -> TypeReference? {
+        memberResolver.constructedType(forCallName: name)
     }
 
-    private static func constructorCall(name: String, matches expected: TypeReference) -> Bool {
-        guard let constructorName = normalizedConstructorName(name) else {
+    private static func constructorCall(
+        name: String,
+        matches expected: TypeReference,
+        memberResolver: DeclarationMemberResolver
+    ) -> Bool {
+        guard let actual = memberResolver.constructedType(forCallName: name) else {
             return false
         }
 
-        switch expected {
-        case .named(let expectedName):
-            return constructorName == expectedName
-        case .member(_, let expectedName):
-            return constructorName == expectedName
-        case .generic(let base, _):
-            return constructorCall(name: name, matches: base)
-        case .optional(let wrapped), .variadic(let wrapped):
-            return constructorCall(name: name, matches: wrapped)
-        case .array, .function:
-            return false
-        }
-    }
-
-    private static func normalizedConstructorName(_ raw: String) -> String? {
-        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return nil }
-
-        if let genericStart = text.firstIndex(of: "<") {
-            text = String(text[..<genericStart])
-        }
-        if let lastDot = text.lastIndex(of: ".") {
-            text = String(text[text.index(after: lastDot)...])
-        }
-
-        guard let firstScalar = text.unicodeScalars.first,
-            CharacterSet.uppercaseLetters.contains(firstScalar)
-        else {
-            return nil
-        }
-
-        return text
+        return isCompatibleNamedType(expected: expected, actual: actual)
     }
 
     private static func inferNilCoalescingType(
