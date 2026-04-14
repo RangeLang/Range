@@ -117,7 +117,7 @@ extension Parser {
         }
     }
 
-    mutating func skipMainBlockForSignatureDiscovery() throws {
+    mutating func skipMainBlockForDeclarationDiscovery() throws {
         guard case .atAttribute(let name, _) = peek(), name == "main" else {
             throw ParseError("Expected @main block.")
         }
@@ -127,7 +127,9 @@ extension Parser {
         try consume(.rightBrace)
     }
 
-    mutating func skipStateDeclarationForSignatureDiscovery() throws {
+
+
+    mutating func skipStateDeclarationForDeclarationDiscovery() throws {
         _ = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.state)
         _ = try consumeIdentifier()
@@ -141,7 +143,9 @@ extension Parser {
         }
     }
 
-    mutating func parseConstructSignatureForSignatureDiscovery() throws -> ConstructDeclaration {
+
+
+    mutating func parseConstructDeclarationForDeclarationDiscovery() throws -> ConstructDeclaration {
         if isBuilderDeclarationStart() {
             try consume(.asterisk)
             guard case .identifier(let keyword) = peek(), keyword == "builder" else {
@@ -199,7 +203,11 @@ extension Parser {
         )
     }
 
-    mutating func skipConstructDeclarationForSignatureDiscovery() throws {
-        _ = try parseConstructSignatureForSignatureDiscovery()
+
+
+    mutating func skipConstructDeclarationForDeclarationDiscovery() throws {
+        _ = try parseConstructDeclarationForDeclarationDiscovery()
     }
+
+
 }

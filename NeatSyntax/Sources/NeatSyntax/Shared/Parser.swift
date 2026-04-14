@@ -392,7 +392,7 @@ public struct Parser {
         )
     }
 
-    public mutating func parseSourceFileForSignatureDiscovery() throws -> SourceFileNode {
+    public mutating func parseSourceFileForDeclarationDiscovery() throws -> SourceFileNode {
         currentStateTypes = [:]
         currentCallableReturnTypes = [:]
 
@@ -404,12 +404,12 @@ public struct Parser {
 
         while peek() != .eof {
             if isMainBlockStart() {
-                try skipMainBlockForSignatureDiscovery()
+                try skipMainBlockForDeclarationDiscovery()
                 continue
             }
 
             if isStateDeclarationStart() {
-                try skipStateDeclarationForSignatureDiscovery()
+                try skipStateDeclarationForDeclarationDiscovery()
                 continue
             }
 
@@ -445,7 +445,7 @@ public struct Parser {
             }
 
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
-                constructs.append(try parseConstructSignatureForSignatureDiscovery())
+                constructs.append(try parseConstructDeclarationForDeclarationDiscovery())
                 continue
             }
 

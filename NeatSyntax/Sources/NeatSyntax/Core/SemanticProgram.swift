@@ -80,18 +80,20 @@ public struct CompilerPipeline {
 
         let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
         let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(from: parsedCoreFiles)
-        let discoveredProjectSignatureFiles = try discoverDeclarationSignatures(inputs: projectInputs)
+        let discoveredProjectDeclarationFiles = try discoverProjectDeclarationFiles(
+            inputs: projectInputs
+        )
         let discoveredProjectGraph = DeclarationGraph(
-            files: parsedCoreFiles + discoveredProjectSignatureFiles
+            files: parsedCoreFiles + discoveredProjectDeclarationFiles
         )
         let discoveredProjectCallableReturnTypes = collectCallableReturnTypes(
-            from: discoveredProjectSignatureFiles
+            from: discoveredProjectDeclarationFiles
         )
         let discoveredProjectMacrosByName = MacroExpander.collectMacros(
-            from: discoveredProjectSignatureFiles
+            from: discoveredProjectDeclarationFiles
         )
         let discoveredProjectMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
-            from: discoveredProjectSignatureFiles
+            from: discoveredProjectDeclarationFiles
         )
         let projectMacrosByName = coreMacrosByName.merging(discoveredProjectMacrosByName) { _, new in
             new
@@ -182,12 +184,12 @@ public struct CompilerPipeline {
         return parsedFiles
     }
 
-    private func discoverDeclarationSignatures(inputs: [SourceInput]) throws -> [ParsedSourceFile] {
+    private func discoverProjectDeclarationFiles(inputs: [SourceInput]) throws -> [ParsedSourceFile] {
         try inputs.map { input in
             var parser = try Parser(source: input.source)
             return ParsedSourceFile(
                 path: input.path,
-                sourceFile: try parser.parseSourceFileForSignatureDiscovery()
+                sourceFile: try parser.parseSourceFileForDeclarationDiscovery()
             )
         }
     }
