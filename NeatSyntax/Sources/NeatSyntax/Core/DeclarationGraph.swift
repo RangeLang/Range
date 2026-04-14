@@ -1065,9 +1065,13 @@ public struct DeclarationMemberResolver: Sendable {
             type, using: genericSubstitution(for: members, arguments: context.arguments))
     }
 
-    public func constructedType(forCallName name: String) -> TypeReference? {
-        guard let parsedType = Self.parseConstructedType(from: name),
-            let context = constructContext(for: parsedType),
+    public func constructType(forConstructorCallName name: String) -> TypeReference? {
+        resolveConstructType(forConstructorCallName: name)
+    }
+
+    private func resolveConstructType(forConstructorCallName name: String) -> TypeReference? {
+        guard let constructType = Self.parseConstructTypeReference(from: name),
+            let context = constructContext(for: constructType),
             let members = membersByConstructName[context.name]
         else {
             return nil
@@ -1075,15 +1079,15 @@ public struct DeclarationMemberResolver: Sendable {
 
         guard
             members.genericParameterNames.isEmpty
-                || Self.hasResolvedGenericArguments(
-                    in: parsedType,
+                || Self.hasResolvedConstructGenericArguments(
+                    in: constructType,
                     expectedCount: members.genericParameterNames.count
                 )
         else {
             return nil
         }
 
-        return parsedType
+        return constructType
     }
 
     private func genericSubstitution(
@@ -1124,7 +1128,7 @@ public struct DeclarationMemberResolver: Sendable {
         return .named(trimmed)
     }
 
-    private static func hasResolvedGenericArguments(
+    private static func hasResolvedConstructGenericArguments(
         in type: TypeReference,
         expectedCount: Int
     ) -> Bool {
@@ -1135,7 +1139,7 @@ public struct DeclarationMemberResolver: Sendable {
         return arguments.count == expectedCount
     }
 
-    private static func parseConstructedType(from raw: String) -> TypeReference? {
+    private static func parseConstructTypeReference(from raw: String) -> TypeReference? {
         do {
             var parser = try Parser(source: raw)
             let type = try parser.parseTypeReferenceNode()

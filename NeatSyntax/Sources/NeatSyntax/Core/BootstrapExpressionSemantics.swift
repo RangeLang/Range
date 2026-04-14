@@ -68,7 +68,7 @@ public enum BootstrapExpressionSemantics {
             ) {
                 return .typed(memberType)
             }
-            if let constructorType = inferKnownConstructorType(
+            if let constructorType = inferGraphResolvedConstructCallType(
                 name: name,
                 memberResolver: memberResolver
             ) {
@@ -335,7 +335,11 @@ public enum BootstrapExpressionSemantics {
                 )
             }
         case .call(let name, _):
-            if constructorCall(name: name, matches: expected, memberResolver: memberResolver) {
+            if constructCallMatchesExpectedType(
+                name: name,
+                expected: expected,
+                memberResolver: memberResolver
+            ) {
                 return true
             }
             let inferred = try inferType(
@@ -678,19 +682,19 @@ public enum BootstrapExpressionSemantics {
         return (base, member)
     }
 
-    private static func inferKnownConstructorType(
+    private static func inferGraphResolvedConstructCallType(
         name: String,
         memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
-        memberResolver.constructedType(forCallName: name)
+        memberResolver.constructType(forConstructorCallName: name)
     }
 
-    private static func constructorCall(
+    private static func constructCallMatchesExpectedType(
         name: String,
-        matches expected: TypeReference,
+        expected: TypeReference,
         memberResolver: DeclarationMemberResolver
     ) -> Bool {
-        guard let actual = memberResolver.constructedType(forCallName: name) else {
+        guard let actual = memberResolver.constructType(forConstructorCallName: name) else {
             return false
         }
 
