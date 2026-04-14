@@ -77,7 +77,7 @@ struct SwiftBackendEmitter {
 
     private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
         let support = """
-            // Backend implementation for NeatCore's Channel, Result, and Logger surface.
+            // Backend implementation for NeatCore's ChannelStorage, Result, and Logger surface.
             // NeatCore declares the language-visible API; Swift runtime support lives here.
             enum Result<Success, Failure> {
                 case success(result: Success)
@@ -153,30 +153,6 @@ struct SwiftBackendEmitter {
                     closed = true
                     condition.broadcast()
                     condition.unlock()
-                }
-            }
-
-            struct Channel<Element>: @unchecked Sendable {
-                private let storage: ChannelStorage<Element>
-
-                init() {
-                    self.storage = ChannelStorage(capacity: 0)
-                }
-
-                init(capacity: Int) {
-                    self.storage = ChannelStorage(capacity: capacity)
-                }
-
-                func send(element: Element) {
-                    storage.send(element: element)
-                }
-
-                func receive() -> Element {
-                    storage.receive()
-                }
-
-                func close() {
-                    storage.close()
                 }
             }
 

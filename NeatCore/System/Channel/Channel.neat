@@ -1,6 +1,6 @@
 @core
 construct Channel<Element> {
-    state storage: ChannelStorage<Element>
+    value storage: ChannelStorage<Element>
 
     init() {
         self.storage = ChannelStorage(capacity: 0)
