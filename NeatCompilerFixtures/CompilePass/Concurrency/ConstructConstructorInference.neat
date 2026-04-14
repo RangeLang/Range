@@ -1,0 +1,8 @@
+construct User {
+    init() { }
+}
+
+@main {
+    value user = User()
+    Logger.info("constructed user")
+}

@@ -7,7 +7,7 @@ function fetchUserName(id: Int) -> String {
 }
 
 @main {
-    value output: Channel<String> = Channel()
+    value output = Channel<String>()
 
     @background {
         value name: String = fetchUserName(id: 1)

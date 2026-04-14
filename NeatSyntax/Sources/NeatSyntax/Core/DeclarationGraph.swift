@@ -1065,6 +1065,27 @@ public struct DeclarationMemberResolver: Sendable {
             type, using: genericSubstitution(for: members, arguments: context.arguments))
     }
 
+    public func constructedType(forCallName name: String) -> TypeReference? {
+        guard let parsedType = Self.parseConstructedType(from: name),
+            let context = constructContext(for: parsedType),
+            let members = membersByConstructName[context.name]
+        else {
+            return nil
+        }
+
+        guard
+            members.genericParameterNames.isEmpty
+                || Self.hasResolvedGenericArguments(
+                    in: parsedType,
+                    expectedCount: members.genericParameterNames.count
+                )
+        else {
+            return nil
+        }
+
+        return parsedType
+    }
+
     private func genericSubstitution(
         for members: ConstructMembers,
         arguments: [TypeReference]
@@ -1101,6 +1122,28 @@ public struct DeclarationMemberResolver: Sendable {
             return .optional(simpleTypeReference(named: trimmed))
         }
         return .named(trimmed)
+    }
+
+    private static func hasResolvedGenericArguments(
+        in type: TypeReference,
+        expectedCount: Int
+    ) -> Bool {
+        guard case .generic(_, let arguments) = type else {
+            return false
+        }
+
+        return arguments.count == expectedCount
+    }
+
+    private static func parseConstructedType(from raw: String) -> TypeReference? {
+        do {
+            var parser = try Parser(source: raw)
+            let type = try parser.parseTypeReferenceNode()
+            try parser.consume(.eof)
+            return type
+        } catch {
+            return nil
+        }
     }
 
     private static func genericParameterName(_ parameter: GenericParameter) -> String {

@@ -694,6 +694,10 @@ public enum BootstrapExpressionSemantics {
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
     ) throws -> TypeReference? {
+        if let constructedType = memberResolver.constructedType(forCallName: name) {
+            return constructedType
+        }
+
         guard name == "String" else {
             return nil
         }

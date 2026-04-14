@@ -8,7 +8,7 @@ function enqueueBufferedValues(queue: Channel<Int>) {
 }
 
 @main {
-    value queue: Channel<Int> = Channel<Int>(capacity: 2)
+    value queue = Channel<Int>(capacity: 2)
 
     enqueueBufferedValues(queue: queue)
 

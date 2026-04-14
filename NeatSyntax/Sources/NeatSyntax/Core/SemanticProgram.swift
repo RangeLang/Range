@@ -77,13 +77,13 @@ public struct CompilerPipeline {
             declarationMemberResolver: .empty,
             declarationOperatorResolver: .empty
         )
-        let coreGraph = DeclarationGraph(files: parsedCoreFiles)
-        let coreResolver = coreGraph.literalBridgeResolver
-        let coreMemberResolver = coreGraph.memberResolver
-        let coreOperatorResolver = coreGraph.operatorResolver
+
         let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
         let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(from: parsedCoreFiles)
         let discoveredProjectSignatureFiles = try discoverDeclarationSignatures(inputs: projectInputs)
+        let discoveredProjectGraph = DeclarationGraph(
+            files: parsedCoreFiles + discoveredProjectSignatureFiles
+        )
         let discoveredProjectCallableReturnTypes = collectCallableReturnTypes(
             from: discoveredProjectSignatureFiles
         )
@@ -98,9 +98,9 @@ public struct CompilerPipeline {
         }
         let parsedProjectFiles = try parse(
             inputs: projectInputs,
-            literalBridgeResolver: coreResolver,
-            declarationMemberResolver: coreMemberResolver,
-            declarationOperatorResolver: coreOperatorResolver,
+            literalBridgeResolver: discoveredProjectGraph.literalBridgeResolver,
+            declarationMemberResolver: discoveredProjectGraph.memberResolver,
+            declarationOperatorResolver: discoveredProjectGraph.operatorResolver,
             declarationMacroExpansionResolver: DeclarationMacroExpansionResolver(
                 macrosByName: projectMacrosByName
             ),

@@ -397,6 +397,7 @@ public struct Parser {
         currentCallableReturnTypes = [:]
 
         var topLevelCallables: [CallableDeclaration] = []
+        var constructs: [ConstructDeclaration] = []
         var macros: [MacroDeclaration] = []
         var precedenceGroups: [PrecedenceGroupDeclaration] = []
         var operators: [OperatorDeclaration] = []
@@ -444,7 +445,7 @@ public struct Parser {
             }
 
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
-                try skipConstructDeclarationForSignatureDiscovery()
+                constructs.append(try parseConstructSignatureForSignatureDiscovery())
                 continue
             }
 
@@ -468,7 +469,7 @@ public struct Parser {
                 mainBlock: nil,
                 states: [],
                 callables: topLevelCallables,
-                constructs: [],
+                constructs: constructs,
                 enumerations: [],
                 protocols: [],
                 macros: macros,

@@ -141,28 +141,65 @@ extension Parser {
         }
     }
 
-    mutating func skipConstructDeclarationForSignatureDiscovery() throws {
+    mutating func parseConstructSignatureForSignatureDiscovery() throws -> ConstructDeclaration {
         if isBuilderDeclarationStart() {
             try consume(.asterisk)
             guard case .identifier(let keyword) = peek(), keyword == "builder" else {
                 throw ParseError("Expected declaration starting with '*builder'.")
             }
             advance()
-            _ = try consumeTypeName()
+            let name = try consumeTypeName()
             try consume(.leftBrace)
             try skipUnknownBlockBody()
             try consume(.rightBrace)
-            return
+
+            return ConstructDeclaration(
+                macros: [],
+                kind: .builder,
+                attribute: nil,
+                name: name,
+                genericParameters: [],
+                conformances: [],
+                states: [],
+                environments: [],
+                bindings: [],
+                deriveds: [],
+                values: [],
+                initializers: [],
+                callables: [],
+                constructs: []
+            )
         }
 
-        _ = try parseMacroApplicationsIfPresent()
+        let macros = try parseMacroApplicationsIfPresent()
         let attribute = parseAttributeIfPresent(before: .construct)
-        _ = try parseConstructKind(attribute: attribute)
-        _ = try parseConstructHeader()
+        let kind = try parseConstructKind(attribute: attribute)
+        let header = try parseConstructHeader()
         if peek() == .leftBrace {
             try consume(.leftBrace)
             try skipUnknownBlockBody()
             try consume(.rightBrace)
         }
+
+        return ConstructDeclaration(
+            macros: macros,
+            kind: kind,
+            attribute: attribute,
+            name: header.name,
+            genericParameters: header.genericParameters,
+            conformances: header.conformances,
+            states: [],
+            environments: [],
+            bindings: [],
+            deriveds: [],
+            values: [],
+            initializers: [],
+            callables: [],
+            constructs: []
+        )
+    }
+
+    mutating func skipConstructDeclarationForSignatureDiscovery() throws {
+        _ = try parseConstructSignatureForSignatureDiscovery()
     }
 }
