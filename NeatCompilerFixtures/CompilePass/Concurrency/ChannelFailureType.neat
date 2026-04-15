@@ -1,0 +1,14 @@
+enum LoadError {
+    case missing
+}
+
+@main {
+    value output = Channel<String, LoadError>()
+
+    @background {
+        output.send("george")
+    }
+
+    value received: String = output.receive()
+    Logger.info(received)
+}

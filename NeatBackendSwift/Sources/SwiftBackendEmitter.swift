@@ -358,7 +358,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitTypeName(_ typeReference: TypeReference) -> String {
-        let typeName = typeReference.displayName
+        let typeName = normalizedSwiftTypeName(typeReference.displayName)
         switch typeName {
         case "Int", "Double", "Float", "String", "Bool", "Void":
             return typeName
@@ -663,7 +663,7 @@ struct SwiftBackendEmitter {
                 return lowered
             }
             let rendered = try emitCallArguments(arguments, for: name)
-            return "\(name)(\(rendered))"
+            return "\(normalizedSwiftTypeName(name))(\(rendered))"
         case .bindingReference(let name):
             return name
         case .array(let elements):
@@ -683,6 +683,32 @@ struct SwiftBackendEmitter {
             return
                 "\(try emitExpression(lhs)) \(operatorSymbol.rawValue) \(try emitExpression(rhs))"
         }
+    }
+
+    private func normalizedSwiftTypeName(_ rawName: String) -> String {
+        guard rawName.hasPrefix("Channel<"), rawName.hasSuffix(">") else {
+            return rawName
+        }
+
+        let start = rawName.index(rawName.startIndex, offsetBy: "Channel<".count)
+        let end = rawName.index(before: rawName.endIndex)
+        let argumentsText = String(rawName[start..<end])
+
+        var depth = 0
+        for character in argumentsText {
+            switch character {
+            case "<":
+                depth += 1
+            case ">":
+                depth -= 1
+            case "," where depth == 0:
+                return rawName
+            default:
+                break
+            }
+        }
+
+        return "Channel<\(argumentsText), Never>"
     }
 
     private func emitCallArgument(_ argument: CallArgument) throws -> String {

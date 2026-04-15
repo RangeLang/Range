@@ -943,6 +943,7 @@ public struct DeclarationMemberResolver: Sendable {
 
     private struct ConstructMembers: Sendable {
         var genericParameterNames: [String]
+        var genericDefaultArguments: [TypeReference?]
         var propertyTypes: [String: TypeReference]
         var callableReturnTypes: [String: TypeReference]
     }
@@ -994,6 +995,14 @@ public struct DeclarationMemberResolver: Sendable {
 
             return ConstructMembers(
                 genericParameterNames: construct.genericParameters.map(Self.genericParameterName),
+                genericDefaultArguments: construct.genericParameters.map {
+                    switch $0 {
+                    case .type(_, _, let defaultArgument):
+                        return defaultArgument
+                    case .value:
+                        return nil
+                    }
+                },
                 propertyTypes: propertyTypes,
                 callableReturnTypes: callableReturnTypes
             )
@@ -1079,22 +1088,63 @@ public struct DeclarationMemberResolver: Sendable {
 
         guard
             members.genericParameterNames.isEmpty
-                || Self.hasResolvedConstructGenericArguments(
-                    in: constructType,
-                    expectedCount: members.genericParameterNames.count
-                )
+                || resolvedGenericArguments(
+                    for: members,
+                    providedArguments: context.arguments
+                ) != nil
         else {
             return nil
         }
 
-        return constructType
+        guard let resolvedArguments = resolvedGenericArguments(
+            for: members,
+            providedArguments: context.arguments
+        ) else {
+            return constructType
+        }
+
+        guard !resolvedArguments.isEmpty else {
+            return constructType
+        }
+
+        return .generic(base: .named(context.name), arguments: resolvedArguments)
     }
 
     private func genericSubstitution(
         for members: ConstructMembers,
         arguments: [TypeReference]
     ) -> [String: TypeReference] {
-        Dictionary(uniqueKeysWithValues: zip(members.genericParameterNames, arguments))
+        guard let resolvedArguments = resolvedGenericArguments(
+            for: members,
+            providedArguments: arguments
+        ) else {
+            return [:]
+        }
+
+        return Dictionary(uniqueKeysWithValues: zip(members.genericParameterNames, resolvedArguments))
+    }
+
+    private func resolvedGenericArguments(
+        for members: ConstructMembers,
+        providedArguments: [TypeReference]
+    ) -> [TypeReference]? {
+        guard providedArguments.count <= members.genericParameterNames.count else {
+            return nil
+        }
+
+        var resolvedArguments = providedArguments
+        if providedArguments.count == members.genericParameterNames.count {
+            return resolvedArguments
+        }
+
+        for defaultArgument in members.genericDefaultArguments.dropFirst(providedArguments.count) {
+            guard let defaultArgument else {
+                return nil
+            }
+            resolvedArguments.append(defaultArgument)
+        }
+
+        return resolvedArguments
     }
 
     private func constructContext(for type: TypeReference) -> (
@@ -1126,17 +1176,6 @@ public struct DeclarationMemberResolver: Sendable {
             return .optional(simpleTypeReference(named: trimmed))
         }
         return .named(trimmed)
-    }
-
-    private static func hasResolvedConstructGenericArguments(
-        in type: TypeReference,
-        expectedCount: Int
-    ) -> Bool {
-        guard case .generic(_, let arguments) = type else {
-            return false
-        }
-
-        return arguments.count == expectedCount
     }
 
     private static func parseConstructTypeReference(from raw: String) -> TypeReference? {

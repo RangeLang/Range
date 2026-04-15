@@ -1,5 +1,5 @@
 @core
-construct Channel<Element> {
+construct Channel<Element, Failure = Never> {
     value storage: ChannelStorage<Element>
 
     init() {
