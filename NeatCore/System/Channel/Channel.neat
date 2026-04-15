@@ -1,6 +1,6 @@
 @core
 construct Channel<Element, Failure = Never> {
-    value storage: ChannelStorage<Element>
+    value storage: ChannelStorage<Promise<Element, Failure>>
 
     init() {
         self.storage = ChannelStorage(capacity: 0)
@@ -11,10 +11,14 @@ construct Channel<Element, Failure = Never> {
     }
 
     function send(element _: Element) {
-        storage.send(element: element)
+        storage.send(element: .success(result: element))
     }
 
-    function receive() -> Element {
+    function send(promise _: Promise<Element, Failure>) {
+        storage.send(element: promise)
+    }
+
+    function receive() -> Promise<Element, Failure> {
         return storage.receive()
     }
 

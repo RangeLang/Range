@@ -243,7 +243,8 @@ extension Parser {
             explicitType: explicitType,
             expression: expression,
             accessibleTypes: accessibleLocalTypes(localBindings),
-            bindingKindDescription: kind == .constant ? "value" : "state"
+            bindingKindDescription: kind == .constant ? "value" : "state",
+            allowPromiseResolution: kind == .constant
         )
         let declaration = LocalBindingDeclaration(
             kind: kind,

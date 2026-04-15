@@ -77,8 +77,27 @@ struct SwiftBackendEmitter {
 
     private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
         let support = """
-            // Backend implementation for NeatCore's ChannelStorage, Result, and Logger surface.
+            // Backend implementation for NeatCore's Promise, Result, ChannelStorage, and Logger surface.
             // NeatCore declares the language-visible API; Swift runtime support lives here.
+            enum Promise<Success, Failure> {
+                case loading
+                case success(result: Success)
+                case failure(cause: Failure)
+
+                func resolvedValue() -> Success {
+                    switch self {
+                    case .success(let result):
+                        return result
+                    case .failure(let cause):
+                        preconditionFailure(
+                            "Cannot resolve failed promise: \\(String(describing: cause))"
+                        )
+                    case .loading:
+                        preconditionFailure("Cannot resolve a loading promise.")
+                    }
+                }
+            }
+
             enum Result<Success, Failure> {
                 case success(result: Success)
                 case failure(cause: Failure)
@@ -394,7 +413,7 @@ struct SwiftBackendEmitter {
         switch state.storage {
         case .stored(let expression):
             return
-                "var \(state.name): \(emitTypeName(state.type)) = \(try emitExpression(expression))"
+                "var \(state.name): \(emitTypeName(state.type)) = \(try emitExpression(expression, preserveReceivePromise: true))"
         case .declared:
             return "var \(state.name): \(emitTypeName(state.type))"
         }
@@ -411,7 +430,10 @@ struct SwiftBackendEmitter {
 
     private func emitLocalBindingExpression(_ declaration: LocalBindingDeclaration) throws -> String
     {
-        try emitExpression(declaration.expression)
+        try emitExpression(
+            declaration.expression,
+            preserveReceivePromise: declaration.kind == .mutable || isPromiseTypeName(declaration.type)
+        )
     }
 
     private func emitDerivedMember(_ derived: DerivedDeclaration) throws -> String {
@@ -546,7 +568,7 @@ struct SwiftBackendEmitter {
                 """
         case .assignment(let target, let expression):
             return
-                "\(prefix)\(try emitAssignmentTarget(target)) = \(try emitExpression(expression))"
+                "\(prefix)\(try emitAssignmentTarget(target)) = \(try emitExpression(expression, preserveReceivePromise: shouldPreserveReceivePromise(for: target)))"
         case .compoundAssignment(let target, .plusEquals, let expression):
             return
                 "\(prefix)\(try emitAssignmentTarget(target)) += \(try emitExpression(expression))"
@@ -554,7 +576,8 @@ struct SwiftBackendEmitter {
             return "\(prefix)\(try emitExpression(expression))"
         case .return(let expression):
             if let expression {
-                return "\(prefix)return \(try emitExpression(expression))"
+                return
+                    "\(prefix)return \(try emitExpression(expression, preserveReceivePromise: true))"
             }
             return "\(prefix)return"
         case .conditional(let branches):
@@ -637,7 +660,23 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func emitExpression(_ expression: NeatExpression) throws -> String {
+    private func emitExpression(
+        _ expression: NeatExpression,
+        preserveReceivePromise: Bool = false
+    ) throws -> String {
+        if !preserveReceivePromise, case .call(let name, let arguments) = expression,
+            isDirectReceiveCall(name)
+        {
+            return "\(try emitRawCall(name: name, arguments: arguments, preserveReceivePromise: false)).resolvedValue()"
+        }
+
+        return try emitRawExpression(expression, preserveReceivePromise: preserveReceivePromise)
+    }
+
+    private func emitRawExpression(
+        _ expression: NeatExpression,
+        preserveReceivePromise: Bool
+    ) throws -> String {
         switch expression {
         case .integer(let value):
             return "\(value)"
@@ -659,29 +698,38 @@ struct SwiftBackendEmitter {
         case .identifier(let name):
             return name
         case .call(let name, let arguments):
-            if let lowered = try emitKnownCollectionCall(name: name, arguments: arguments) {
+            if let lowered = try emitKnownCollectionCall(
+                name: name,
+                arguments: arguments,
+                preserveReceivePromise: preserveReceivePromise
+            ) {
                 return lowered
             }
-            let rendered = try emitCallArguments(arguments, for: name)
-            return "\(normalizedSwiftTypeName(name))(\(rendered))"
+            return try emitRawCall(
+                name: name,
+                arguments: arguments,
+                preserveReceivePromise: preserveReceivePromise
+            )
         case .bindingReference(let name):
             return name
         case .array(let elements):
-            let rendered = try elements.map(emitExpression).joined(separator: ", ")
+            let rendered = try elements.map {
+                try emitExpression($0, preserveReceivePromise: preserveReceivePromise)
+            }.joined(separator: ", ")
             return "[\(rendered)]"
         case .dictionary(let elements):
             let rendered = try elements.map { element in
-                "\(try emitExpression(element.key)): \(try emitExpression(element.value))"
+                "\(try emitExpression(element.key, preserveReceivePromise: preserveReceivePromise)): \(try emitExpression(element.value, preserveReceivePromise: preserveReceivePromise))"
             }.joined(separator: ", ")
             return "[\(rendered)]"
         case .ternary(let condition, let trueExpression, let falseExpression):
             return
-                "\(try emitExpression(condition)) ? \(try emitExpression(trueExpression)) : \(try emitExpression(falseExpression))"
+                "\(try emitExpression(condition, preserveReceivePromise: preserveReceivePromise)) ? \(try emitExpression(trueExpression, preserveReceivePromise: preserveReceivePromise)) : \(try emitExpression(falseExpression, preserveReceivePromise: preserveReceivePromise))"
         case .unary(let operatorSymbol, let nested):
-            return "\(operatorSymbol.rawValue)\(try emitExpression(nested))"
+            return "\(operatorSymbol.rawValue)\(try emitExpression(nested, preserveReceivePromise: preserveReceivePromise))"
         case .binary(let lhs, let operatorSymbol, let rhs):
             return
-                "\(try emitExpression(lhs)) \(operatorSymbol.rawValue) \(try emitExpression(rhs))"
+                "\(try emitExpression(lhs, preserveReceivePromise: preserveReceivePromise)) \(operatorSymbol.rawValue) \(try emitExpression(rhs, preserveReceivePromise: preserveReceivePromise))"
         }
     }
 
@@ -711,20 +759,35 @@ struct SwiftBackendEmitter {
         return "Channel<\(argumentsText), Never>"
     }
 
-    private func emitCallArgument(_ argument: CallArgument) throws -> String {
+    private func emitCallArgument(
+        _ argument: CallArgument,
+        preserveReceivePromise: Bool
+    ) throws -> String {
         if let label = argument.label {
-            return "\(label): \(try emitExpression(argument.value))"
+            return
+                "\(label): \(try emitExpression(argument.value, preserveReceivePromise: preserveReceivePromise))"
         }
-        return try emitExpression(argument.value)
+        return try emitExpression(argument.value, preserveReceivePromise: preserveReceivePromise)
     }
 
-    private func emitCallArguments(_ arguments: [CallArgument], for callee: String) throws -> String
-    {
-        return try arguments.map(emitCallArgument).joined(separator: ", ")
+    private func emitCallArguments(
+        _ arguments: [CallArgument],
+        for callee: String,
+        preserveReceivePromise: Bool
+    ) throws -> String {
+        return try arguments.map {
+            let shouldPreserveReceivePromise =
+                preserveReceivePromise
+                || (callee.hasSuffix(".send") && callArgumentIsDirectReceive($0))
+            return try emitCallArgument($0, preserveReceivePromise: shouldPreserveReceivePromise)
+        }.joined(separator: ", ")
     }
 
-    private func emitKnownCollectionCall(name: String, arguments: [CallArgument]) throws -> String?
-    {
+    private func emitKnownCollectionCall(
+        name: String,
+        arguments: [CallArgument],
+        preserveReceivePromise: Bool
+    ) throws -> String? {
         guard let dot = name.lastIndex(of: ".") else {
             return nil
         }
@@ -739,28 +802,31 @@ struct SwiftBackendEmitter {
         switch member {
         case "append":
             guard let element = argument("element") else { return nil }
-            return "\(base).append(\(try emitExpression(element)))"
+            return "\(base).append(\(try emitExpression(element, preserveReceivePromise: preserveReceivePromise)))"
         case "element":
             guard let index = argument("index") else { return nil }
-            return "\(base)[\(try emitExpression(index))]"
+            return "\(base)[\(try emitExpression(index, preserveReceivePromise: preserveReceivePromise))]"
         case "update":
             guard let element = argument("element"), let index = argument("index") else {
                 return nil
             }
-            return "\(base)[\(try emitExpression(index))] = \(try emitExpression(element))"
+            return
+                "\(base)[\(try emitExpression(index, preserveReceivePromise: preserveReceivePromise))] = \(try emitExpression(element, preserveReceivePromise: preserveReceivePromise))"
         case "insert":
             guard let element = argument("element") else { return nil }
             if let index = argument("index") {
                 return
-                    "\(base).insert(\(try emitExpression(element)), at: \(try emitExpression(index)))"
+                    "\(base).insert(\(try emitExpression(element, preserveReceivePromise: preserveReceivePromise)), at: \(try emitExpression(index, preserveReceivePromise: preserveReceivePromise)))"
             }
-            return "\(base).insert(\(try emitExpression(element)))"
+            return
+                "\(base).insert(\(try emitExpression(element, preserveReceivePromise: preserveReceivePromise)))"
         case "remove":
             if let index = argument("index") {
-                return "\(base).remove(at: \(try emitExpression(index)))"
+                return
+                    "\(base).remove(at: \(try emitExpression(index, preserveReceivePromise: preserveReceivePromise)))"
             }
             guard let element = argument("element") else { return nil }
-            return "\(base).remove(\(try emitExpression(element)))"
+            return "\(base).remove(\(try emitExpression(element, preserveReceivePromise: preserveReceivePromise)))"
         case "removeLast":
             guard arguments.isEmpty else { return nil }
             return "\(base).popLast()"
@@ -775,23 +841,27 @@ struct SwiftBackendEmitter {
             return "\(base).last"
         case "filter":
             guard let include = argument("include") else { return nil }
-            return "\(base).filter(\(try emitExpression(include)))"
+            return
+                "\(base).filter(\(try emitExpression(include, preserveReceivePromise: preserveReceivePromise)))"
         case "value":
             guard let key = argument("key") else { return nil }
-            return "\(base)[\(try emitExpression(key))]"
+            return "\(base)[\(try emitExpression(key, preserveReceivePromise: preserveReceivePromise))]"
         case "updateValue":
             guard let value = argument("value"), let key = argument("key") else { return nil }
             return
-                "\(base).updateValue(\(try emitExpression(value)), forKey: \(try emitExpression(key)))"
+                "\(base).updateValue(\(try emitExpression(value, preserveReceivePromise: preserveReceivePromise)), forKey: \(try emitExpression(key, preserveReceivePromise: preserveReceivePromise)))"
         case "removeValue":
             guard let key = argument("key") else { return nil }
-            return "\(base).removeValue(forKey: \(try emitExpression(key)))"
+            return
+                "\(base).removeValue(forKey: \(try emitExpression(key, preserveReceivePromise: preserveReceivePromise)))"
         case "contains":
             if let key = argument("key") {
-                return "\(base).keys.contains(\(try emitExpression(key)))"
+                return
+                    "\(base).keys.contains(\(try emitExpression(key, preserveReceivePromise: preserveReceivePromise)))"
             }
             guard let element = argument("element") else { return nil }
-            return "\(base).contains(\(try emitExpression(element)))"
+            return
+                "\(base).contains(\(try emitExpression(element, preserveReceivePromise: preserveReceivePromise)))"
         default:
             return nil
         }
@@ -826,5 +896,46 @@ struct SwiftBackendEmitter {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\n", with: "\\n")
+    }
+
+    private func emitRawCall(
+        name: String,
+        arguments: [CallArgument],
+        preserveReceivePromise: Bool
+    ) throws -> String {
+        let rendered = try emitCallArguments(
+            arguments,
+            for: name,
+            preserveReceivePromise: preserveReceivePromise
+        )
+        return "\(normalizedSwiftTypeName(name))(\(rendered))"
+    }
+
+    private func isPromiseTypeName(_ typeReference: TypeReference) -> Bool {
+        switch typeReference {
+        case .generic(let base, let arguments):
+            guard case .named(let baseName) = base else { return false }
+            return baseName == "Promise" && arguments.count == 2
+        default:
+            return false
+        }
+    }
+
+    private func isDirectReceiveCall(_ name: String) -> Bool {
+        name.hasSuffix(".receive")
+    }
+
+    private func callArgumentIsDirectReceive(_ argument: CallArgument) -> Bool {
+        guard case .call(let name, _) = argument.value else { return false }
+        return isDirectReceiveCall(name)
+    }
+
+    private func shouldPreserveReceivePromise(for target: AssignmentTarget) -> Bool {
+        switch target {
+        case .state:
+            return true
+        case .binding, .environment, .local, .member:
+            return false
+        }
     }
 }

@@ -26,7 +26,8 @@ extension Parser {
                 explicitType: explicitType,
                 expression: initialValue,
                 accessibleTypes: accessibleContextTypes(),
-                bindingKindDescription: "state"
+                bindingKindDescription: "state",
+                allowPromiseResolution: false
             )
             storage = .stored(initialValue)
         } else if allowDeclaredStorage, let explicitType {
@@ -69,7 +70,8 @@ extension Parser {
         explicitType: TypeReference?,
         expression: Expression,
         accessibleTypes: [String: TypeReference],
-        bindingKindDescription: String
+        bindingKindDescription: String,
+        allowPromiseResolution: Bool = false
     ) throws -> TypeReference {
         if isEmptyArrayLiteral(expression) {
             guard let explicitType else {
@@ -137,6 +139,12 @@ extension Parser {
         if let explicitType {
             switch inferred {
             case .typed(let actualType):
+                if allowPromiseResolution,
+                    let successType = unwrappedPromiseSuccessType(actualType),
+                    isCompatibleStateType(explicitType, inferredType: successType)
+                {
+                    return explicitType
+                }
                 guard isCompatibleStateType(explicitType, inferredType: actualType) else {
                     throw ParseError(
                         "\(bindingKindDescription) '\(name)' expects \(explicitType.displayName), got \(actualType.displayName)."
@@ -153,7 +161,23 @@ extension Parser {
                 "\(bindingKindDescription) '\(name)' could not infer a destination type from \(inferred.displayName)."
             )
         }
+        if allowPromiseResolution, let successType = unwrappedPromiseSuccessType(inferredReference) {
+            return successType
+        }
         return inferredReference
+    }
+
+    func unwrappedPromiseSuccessType(_ typeReference: TypeReference) -> TypeReference? {
+        guard
+            case .generic(let base, let arguments) = typeReference,
+            case .named(let baseName) = base,
+            baseName == "Promise",
+            arguments.count == 2
+        else {
+            return nil
+        }
+
+        return arguments[0]
     }
 
 
