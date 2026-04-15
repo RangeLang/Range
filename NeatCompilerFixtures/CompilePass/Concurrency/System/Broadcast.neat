@@ -1,0 +1,21 @@
+@main {
+    value source = Channel<String>()
+    value listenerA = Channel<String>()
+    value listenerB = Channel<String>()
+
+    @background {
+        value message = source.receive()
+        listenerA.send(message)
+        listenerB.send(message)
+    }
+
+    @background {
+        Logger.info(listenerA.receive())
+    }
+
+    @background {
+        Logger.info(listenerB.receive())
+    }
+
+    source.send("update")
+}

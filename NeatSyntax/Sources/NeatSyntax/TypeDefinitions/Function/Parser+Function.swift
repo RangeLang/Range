@@ -1,6 +1,20 @@
 import Foundation
 
 extension Parser {
+    func localBindings(for parameters: [NeatFunctionParameter]) -> [String: LocalBindingSymbol] {
+        Dictionary(
+            uniqueKeysWithValues: parameters.compactMap { parameter in
+                guard let typeReference = parameter.typeReference else {
+                    return nil
+                }
+                return (
+                    parameter.localName,
+                    LocalBindingSymbol(kind: .constant, type: typeReference)
+                )
+            }
+        )
+    }
+
     mutating func parseCallableDeclaration(signatureOnly: Bool = false) throws
         -> CallableDeclaration
     {
@@ -67,7 +81,9 @@ extension Parser {
             }
             body = nil
         } else {
-            body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+            body =
+                peek() == .leftBrace
+                ? try parseStatementBlock(baseLocalBindings: localBindings(for: parameters)) : nil
         }
         return CallableDeclaration(
             macros: macros,
@@ -168,7 +184,9 @@ extension Parser {
             }
             body = nil
         } else {
-            body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+            body =
+                peek() == .leftBrace
+                ? try parseStatementBlock(baseLocalBindings: localBindings(for: parameters)) : nil
         }
         return CallableDeclaration(
             macros: [],
@@ -263,14 +281,12 @@ extension Parser {
         name: String,
         returnType: TypeReference?
     ) {
-        guard let returnType else {
-            return
-        }
+        let resolvedReturnType = returnType ?? .named("Void")
 
-        currentCallableReturnTypes[name] = returnType
+        currentCallableReturnTypes[name] = resolvedReturnType
 
         if let targetType {
-            currentCallableReturnTypes["\(targetType.displayName).\(name)"] = returnType
+            currentCallableReturnTypes["\(targetType.displayName).\(name)"] = resolvedReturnType
         }
     }
 

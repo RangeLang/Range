@@ -1,0 +1,17 @@
+function logIncoming(messages: Channel<String>) {
+    @background {
+        Logger.info(messages.receive())
+        Logger.info(messages.receive())
+        Logger.info(messages.receive())
+    }
+}
+
+@main {
+    value messages = Channel<String>(capacity: 3)
+
+    logIncoming(messages: messages)
+
+    messages.send("connected")
+    messages.send("message")
+    messages.send("disconnected")
+}

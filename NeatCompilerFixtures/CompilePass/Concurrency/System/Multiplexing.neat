@@ -1,0 +1,19 @@
+@main {
+    value sourceA = Channel<String>(capacity: 1)
+    value sourceB = Channel<String>(capacity: 1)
+    value merged = Channel<String>(capacity: 2)
+
+    @background {
+        merged.send(sourceA.receive())
+    }
+
+    @background {
+        merged.send(sourceB.receive())
+    }
+
+    sourceA.send("from A")
+    sourceB.send("from B")
+
+    Logger.info(merged.receive())
+    Logger.info(merged.receive())
+}

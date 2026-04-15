@@ -1,0 +1,14 @@
+@main {
+    value queue = Channel<Int>(capacity: 2)
+
+    @background {
+        queue.send(1)
+        queue.send(2)
+        queue.send(3)
+        Logger.info("producer finished")
+    }
+
+    Logger.info(queue.receive())
+    Logger.info(queue.receive())
+    Logger.info(queue.receive())
+}

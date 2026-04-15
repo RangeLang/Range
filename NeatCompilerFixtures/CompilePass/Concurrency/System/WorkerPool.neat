@@ -1,0 +1,38 @@
+function process(value: Int) -> Int {
+    return value * 100
+}
+
+function worker(jobs: Channel<Int>, results: Channel<Int>) {
+    @background {
+        value first: Int = jobs.receive()
+        value firstResult: Int = process(value: first)
+        results.send(firstResult)
+
+        value second: Int = jobs.receive()
+        value secondResult: Int = process(value: second)
+        results.send(secondResult)
+    }
+}
+
+@main {
+    value jobs = Channel<Int>(capacity: 4)
+    value results = Channel<Int>(capacity: 4)
+
+    worker(jobs: jobs, results: results)
+    worker(jobs: jobs, results: results)
+
+    jobs.send(1)
+    jobs.send(2)
+    jobs.send(3)
+    jobs.send(4)
+
+    value a: Int = results.receive()
+    value b: Int = results.receive()
+    value c: Int = results.receive()
+    value d: Int = results.receive()
+
+    Logger.info(a)
+    Logger.info(b)
+    Logger.info(c)
+    Logger.info(d)
+}

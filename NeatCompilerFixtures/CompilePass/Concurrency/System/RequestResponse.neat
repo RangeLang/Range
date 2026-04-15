@@ -1,0 +1,38 @@
+construct Request {
+    value id: Int
+    value replyTo: Channel<String>
+}
+
+function fetchUserName(id: Int) -> String {
+    if id == 0 {
+        return "system"
+    }
+
+    return "george"
+}
+
+function server(requests: Channel<Request>) {
+    @background {
+        value first: Request = requests.receive()
+        first.replyTo.send(fetchUserName(id: first.id))
+
+        value second: Request = requests.receive()
+        second.replyTo.send(fetchUserName(id: second.id))
+    }
+}
+
+@main {
+    value requests = Channel<Request>(capacity: 2)
+    value replyA = Channel<String>()
+    value replyB = Channel<String>()
+    value requestA: Request = Request(id: 0, replyTo: replyA)
+    value requestB: Request = Request(id: 1, replyTo: replyB)
+
+    server(requests: requests)
+
+    requests.send(requestA)
+    requests.send(requestB)
+
+    Logger.info(replyA.receive())
+    Logger.info(replyB.receive())
+}
