@@ -1,0 +1,4 @@
+@core
+construct Background: Statement {
+    value body: Block
+}
