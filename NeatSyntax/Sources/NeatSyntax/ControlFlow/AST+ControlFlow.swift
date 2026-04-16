@@ -2,7 +2,7 @@ import Foundation
 
 public indirect enum Statement {
     case freestandingMacro(name: String, argumentClause: String?, body: [Statement])
-    case background(body: [Statement])
+    case background(Background)
     case localBinding(LocalBindingDeclaration)
     case localCallable(LocalCallableDeclaration)
     case derived(name: String, typeName: String, body: [Statement])
@@ -25,6 +25,14 @@ public indirect enum Statement {
         cases: [SwitchCase],
         defaultBody: [Statement]?
     )
+}
+
+public struct Background {
+    public let body: [Statement]
+
+    public init(body: [Statement]) {
+        self.body = body
+    }
 }
 
 public struct LocalCallableDeclaration {

@@ -1349,9 +1349,9 @@ private struct GraphCollector {
             case .freestandingMacro(_, _, let body):
                 analyzeStatements(
                     body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
-            case .background(let body):
+            case .background(let background):
                 analyzeStatements(
-                    body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
+                    background.body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
             case .localCallable(let declaration):
                 let callableID = "\(statementID)/localCallable:\(declaration.name)"
                 addNode(id: callableID, kind: .function, label: declaration.name)

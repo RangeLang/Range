@@ -397,17 +397,17 @@ public enum MacroExpander {
                 attachedParameterCallables: attachedParameterCallables,
                 attachedLiteralConstructs: attachedLiteralConstructs
             )
-        case .background(let body):
+        case .background(let background):
             return [
                 .background(
-                    body: try expand(
-                        statements: body,
+                    Background(body: try expand(
+                        statements: background.body,
                         expectedReturnType: nil,
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
                         attachedLiteralConstructs: attachedLiteralConstructs
-                    )
+                    ))
                 )
             ]
         case .localCallable(let declaration):
@@ -1439,9 +1439,10 @@ public enum MacroExpander {
                 for branch in branches {
                     expressions.append(contentsOf: macroOperationExpressions(in: branch.body))
                 }
-            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body),
-                .background(let body):
+            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
                 expressions.append(contentsOf: macroOperationExpressions(in: body))
+            case .background(let background):
+                expressions.append(contentsOf: macroOperationExpressions(in: background.body))
             case .localCallable(let declaration):
                 expressions.append(contentsOf: macroOperationExpressions(in: declaration.body))
             case .switchStatement(_, let cases, let defaultBody):
@@ -1568,9 +1569,9 @@ public enum MacroExpander {
                 typeName: typeName,
                 body: substituteMacroBindings(in: body, bindings: bindings)
             )
-        case .background(let body):
+        case .background(let background):
             return .background(
-                body: substituteMacroBindings(in: body, bindings: bindings)
+                Background(body: substituteMacroBindings(in: background.body, bindings: bindings))
             )
         case .localCallable(let declaration):
             return .localCallable(
@@ -2189,14 +2190,14 @@ public enum MacroExpander {
                     )
                 )
             ]
-        case .background(let body):
+        case .background(let background):
             return [
                 .background(
-                    body: substituteMacroTargetCalls(
-                        in: body,
+                    Background(body: substituteMacroTargetCalls(
+                        in: background.body,
                         targetBinding: targetBinding,
                         targetBlock: targetBlock
-                    )
+                    ))
                 )
             ]
         case .localCallable(let declaration):

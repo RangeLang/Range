@@ -174,7 +174,7 @@ extension Parser {
         }
         advance()
         let body = try parseStatementBlock(baseLocalBindings: localBindings)
-        return .background(body: body)
+        return .background(Background(body: body))
     }
 
     func isStandaloneCallExpressionStart() -> Bool {

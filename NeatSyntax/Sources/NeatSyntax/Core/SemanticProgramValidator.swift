@@ -197,9 +197,9 @@ public struct SemanticProgramValidator {
                     context: context,
                     fileName: fileName
                 )
-            case .background(let body):
+            case .background(let background):
                 try validateControlFlow(
-                    in: body,
+                    in: background.body,
                     context: context.enteringBackground(),
                     fileName: fileName
                 )
@@ -610,12 +610,20 @@ public struct SemanticProgramValidator {
                     fileName: fileName
                 )
             case .freestandingMacro(_, _, let body),
-                .background(let body),
                 .derived(_, _, let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body):
                 try validateLiteralBridgeCompatibilityInLocalCallables(
                     in: body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .background(let background):
+                try validateLiteralBridgeCompatibilityInLocalCallables(
+                    in: background.body,
                     accessibleTypes: accessibleTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
@@ -878,12 +886,20 @@ public struct SemanticProgramValidator {
                     fileName: fileName
                 )
             case .freestandingMacro(_, _, let body),
-                .background(let body),
                 .derived(_, _, let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body):
                 try validateCallableReturnSemanticsInLocalCallables(
                     in: body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .background(let background):
+                try validateCallableReturnSemanticsInLocalCallables(
+                    in: background.body,
                     accessibleTypes: accessibleTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
@@ -1168,9 +1184,9 @@ public struct SemanticProgramValidator {
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )
-            case .background(let body):
+            case .background(let background):
                 try validateValueDeclarations(
-                    in: body,
+                    in: background.body,
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )
