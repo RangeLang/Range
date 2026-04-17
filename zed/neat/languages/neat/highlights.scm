@@ -15,6 +15,45 @@
 ((identifier) @keyword
  (#match? @keyword "^(core|main)$"))
 
+[
+  "background"
+  "binding"
+  "break"
+  "builder"
+  "capture"
+  "case"
+  "construct"
+  "continue"
+  "default"
+  "derived"
+  "else"
+  "enum"
+  "environment"
+  "extension"
+  "for"
+  "func"
+  "function"
+  "get"
+  "if"
+  "in"
+  "infix"
+  "macro"
+  "main"
+  "on"
+  "operator"
+  "postfix"
+  "precedencegroup"
+  "prefix"
+  "protocol"
+  "return"
+  "set"
+  "state"
+  "switch"
+  "value"
+  "var"
+  "while"
+] @keyword
+
 
 [
   "if"
@@ -42,66 +81,20 @@
   "default" @keyword)
 
 
-; ── Attribute applications ───────────────────────────────────────────────────
-(attribute_application
-  sigil: "@" @keyword
-  name: (identifier) @keyword)
-
 ; ── @main entry point ────────────────────────────────────────────────────────
 (main_block
   "@" @keyword
   "main" @keyword)
 
 
-(macro_declaration
-  "macro" @keyword)
-
-(macro_bindings
-  "in" @keyword)
-
-(macro_application
-  sigil: "#" @type
-  name: (identifier) @type)
-
-(macro_declaration
-  name: (identifier) @function.special)
-
-(macro_declaration
-  target: (macro_target
-    type: (_) @type))
-
-(macro_declaration
-  "->" @operator
-  expansion_type: (_) @type)
+; Macro-specific syntax falls back to token highlighting for now because the
+; runtime grammar shipped to Zed does not expose the macro node names that the
+; source grammar declares.
 
 
-; ── Builder sigils ───────────────────────────────────────────────────────────
-(builder_declaration
-  "*" @keyword
-  "builder" @keyword)
-
-(builder_hook_declaration
-  "*" @keyword)
-
-(derived_declaration
-  builder: (builder_application
-    "*" @keyword))
-
-(builder_declaration
-  name: (type_identifier) @type.definition)
-
-(builder_hook_declaration
-  hook: [
-    "expression"
-    "block"
-    "optional"
-    "either"
-    "array"
-  ] @function.special)
-
-(derived_declaration
-  builder: (builder_application
-    name: (type_identifier) @type))
+; Builder-specific syntax falls back to token highlighting for now because the
+; runtime grammar shipped to Zed does not expose the builder node names that
+; the source grammar declares.
 
 
 ; ── Declarations ─────────────────────────────────────────────────────────────
@@ -123,22 +116,6 @@
   "function" @keyword
   name: (callable_name
     (callable_operator_symbol) @operator))
-
-(precedence_group_declaration
-  "precedencegroup" @keyword
-  name: (type_identifier) @type.definition)
-
-(operator_declaration
-  [
-    "prefix"
-    "infix"
-    "postfix"
-  ] @keyword
-  "operator" @keyword
-  symbol: (operator_symbol) @operator)
-
-(operator_declaration
-  precedence: (type_identifier) @type)
 
 ((identifier) @function.method
  (#eq? @function.method "init"))
@@ -162,11 +139,6 @@
 ; ── Parameters & variables ───────────────────────────────────────────────────
 (parameter
   name: (identifier) @variable.parameter)
-
-(parameter
-  type: (capture_type
-    "capture" @keyword
-    captured: (_) @type))
 
 (variable_declaration
   [
