@@ -3,6 +3,11 @@ enum LoadError {
     case network
 }
 
+construct User {
+    value id: Int
+    value name: String
+}
+
 enum Loadable<Value, Failure> {
     case idle
     case loading
@@ -10,33 +15,34 @@ enum Loadable<Value, Failure> {
     case failed(error: Failure)
 }
 
-function fetchUser(id: Int) -> Loadable<String, LoadError> {
+function fetchUser(id: Int) -> Loadable<User, LoadError> {
     if id == 0 {
         return .failed(error: .missing)
     }
 
-    return .loaded(value: "George")
+    return .loaded(value: User(id: id, name: "George"))
+}
+
+function load<Value, Failure>(
+    state _: binding Loadable<Value, Failure>,
+    #autoclosure task: Loadable<Value, Failure>
+) {
+    state = .loading
+
+    @background {
+        state = task()
+    }
 }
 
 construct UserView {
-    value id: Int
-    state user: Loadable<String, LoadError> = .idle
+    state user: Loadable<User, LoadError> = .idle
 
     init(id: Int) {
-        self.id = id
-        load(fetchUser(id: id))
-    }
-
-    function load(#autoclosure task: Loadable<String, LoadError>) {
-        self.user = .loading
-
-        @background {
-            self.user = task()
-        }
+        load($self.user, fetchUser(id: id))
     }
 
     function reload() {
-        load(fetchUser(id: id))
+        load($self.user, fetchUser(id: user.id))
     }
 }
 
