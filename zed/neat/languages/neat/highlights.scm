@@ -14,6 +14,11 @@
 ("macro" @keyword)
 
 [
+  "if"
+  "else"
+  "for"
+  "in"
+  "while"
   "switch"
   "case"
   "default"
