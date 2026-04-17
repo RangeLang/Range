@@ -27,7 +27,7 @@ neat lsp
 
 1. In Zed, open the command palette.
 2. Run `zed: install dev extension`.
-3. Select this folder: `zed/neat`.
+3. Select this folder: `Zed/Neat`.
 4. Reload Zed if the language does not appear immediately.
 
 ## Dev Workflow
@@ -41,12 +41,12 @@ Whenever changing this extension, use:
 The script:
 
 - bumps `version` in `extension.toml`
-- updates the grammar `rev` to `HEAD` when `zed/neat` is clean
+- updates the grammar `rev` to `HEAD` when `Zed/Neat` is clean
 - rebuilds the Rust extension
 - recompiles the Zed grammar WASM
 - refreshes Zed's installed extension cache
 
-If `zed/neat` still has uncommitted changes, the script leaves `rev` unchanged and prints a warning.
+If `Zed/Neat` still has uncommitted changes, the script leaves `rev` unchanged and prints a warning.
 
 This applies especially to:
 
@@ -59,9 +59,9 @@ Zed caches extension manifests, compiled extension output, and checked-out gramm
 
 ## Grammar Source
 
-The authored Tree-sitter grammar lives in `zed/neat/grammars/tree-sitter-neat`.
+The authored Tree-sitter grammar lives in `Zed/Neat/grammars/tree-sitter-neat`.
 
-Zed may create `zed/neat/grammars/neat` during dev-extension installs as a local checkout/build workspace. That directory is transient extension state, not a source directory, and should not be edited or committed.
+Zed may create `Zed/Neat/grammars/neat` during dev-extension installs as a local checkout/build workspace. That directory is transient extension state, not a source directory, and should not be edited or committed.
 
 ## Notes on colors
 

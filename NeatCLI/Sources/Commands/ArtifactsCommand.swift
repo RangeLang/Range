@@ -22,7 +22,7 @@ extension NeatCLI {
                 let project = try ProjectLoader.load(
                     at: input ?? ".",
                     options: .init(
-                        excludedPathFragments: ["/zed/neat/grammars/_stale_neat_checkout/"]
+                        excludedPathFragments: ["/Zed/Neat/grammars/_stale_neat_checkout/"]
                     )
                 )
                 let outputRoot =
