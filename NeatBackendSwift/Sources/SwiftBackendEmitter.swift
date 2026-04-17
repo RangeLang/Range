@@ -481,11 +481,14 @@ struct SwiftBackendEmitter {
             case .assignment, .compoundAssignment:
                 return true
             case .freestandingMacro(_, _, let body),
-                .background(let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body),
                 .derived(_, _, let body):
                 if statementsContainMutation(body) {
+                    return true
+                }
+            case .background(let background):
+                if statementsContainMutation(background.body) {
                     return true
                 }
             case .conditional(let branches):
@@ -528,8 +531,8 @@ struct SwiftBackendEmitter {
         switch statement {
         case .freestandingMacro:
             throw SwiftBackendError("Freestanding macros must be expanded before Swift emission.")
-        case .background(let body):
-            let bodyText = try emitStatements(body, indent: indent + 1)
+        case .background(let background):
+            let bodyText = try emitStatements(background.body, indent: indent + 1)
             return """
                 \(prefix)Task.detached {
                 \(bodyText)
@@ -621,7 +624,7 @@ struct SwiftBackendEmitter {
         var lines: [String] = ["\(prefix)switch \(try emitExpression(subject)) {"]
 
         for switchCase in cases {
-            lines.append("\(prefix)case \(try emitExpression(switchCase.value)):")
+            lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
             lines.append(try emitStatements(switchCase.body, indent: indent + 1))
         }
 
@@ -632,6 +635,19 @@ struct SwiftBackendEmitter {
 
         lines.append("\(prefix)}")
         return lines.joined(separator: "\n")
+    }
+
+    private func emitSwitchCasePattern(_ pattern: SwitchCasePattern) throws -> String {
+        switch pattern {
+        case .expression(let expression):
+            return try emitExpression(expression)
+        case .enumCase(let name, let binding):
+            if let binding {
+                let bindingKeyword = binding.kind == .constant ? "value" : "state"
+                return ".\(name)(\(bindingKeyword) \(binding.name))"
+            }
+            return ".\(name)"
+        }
     }
 
     private func emitAssignmentTarget(_ target: AssignmentTarget) throws -> String {

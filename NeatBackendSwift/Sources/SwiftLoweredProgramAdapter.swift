@@ -92,8 +92,8 @@ struct SwiftLoweredProgramAdapter {
                 argumentClause: argumentClause,
                 body: lower(statements: body)
             )
-        case .background(let body):
-            return .background(body: lower(statements: body))
+        case .background(let background):
+            return .background(Background(body: lower(statements: background.body)))
         case .localBinding(let declaration):
             return .localBinding(
                 LocalBindingDeclaration(
@@ -158,12 +158,21 @@ struct SwiftLoweredProgramAdapter {
                 expression: lower(expression: expression),
                 cases: cases.map { switchCase in
                     SwitchCase(
-                        value: lower(expression: switchCase.value),
+                        pattern: lower(switchCasePattern: switchCase.pattern),
                         body: lower(statements: switchCase.body)
                     )
                 },
                 defaultBody: defaultBody.map(lower(statements:))
             )
+        }
+    }
+
+    private func lower(switchCasePattern: SwitchCasePattern) -> SwitchCasePattern {
+        switch switchCasePattern {
+        case .expression(let expression):
+            return .expression(lower(expression: expression))
+        case .enumCase(let name, let binding):
+            return .enumCase(name: name, binding: binding)
         }
     }
 

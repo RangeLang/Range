@@ -1,0 +1,9 @@
+macro rewriteSingleArgument(): Parameter { target, diagnostics in
+    target.application.expression.rewrite(
+        target.application.expression
+    )
+}
+
+function identity(#rewriteSingleArgument value: Int) -> Int {
+    return value
+}

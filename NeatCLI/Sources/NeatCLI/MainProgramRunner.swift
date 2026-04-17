@@ -284,9 +284,9 @@ private struct MainProgramInterpreter {
             let subject = try evaluate(expression)
 
             for switchCase in cases {
-                let caseValue = try evaluate(switchCase.value)
-                if valuesEqual(subject, caseValue) {
+                if try switchCaseMatches(subject: subject, switchCase.pattern) {
                     pushScope()
+                    try bindSwitchCasePattern(switchCase.pattern, subject: subject)
                     let flow = try executeStatements(switchCase.body)
                     popScope()
 
@@ -318,6 +318,34 @@ private struct MainProgramInterpreter {
             try executeExpressionStatement(expression)
             return .none
 
+        }
+    }
+
+    private mutating func switchCaseMatches(
+        subject: RuntimeValue,
+        _ pattern: SwitchCasePattern
+    ) throws -> Bool {
+        switch pattern {
+        case .expression(let expression):
+            return valuesEqual(subject, try evaluate(expression))
+        case .enumCase:
+            throw ValidationError(
+                "Enum switch case patterns are not supported in the main program interpreter yet."
+            )
+        }
+    }
+
+    private mutating func bindSwitchCasePattern(
+        _ pattern: SwitchCasePattern,
+        subject: RuntimeValue
+    ) throws {
+        switch pattern {
+        case .expression:
+            return
+        case .enumCase(_, let binding):
+            if let binding {
+                try declare(name: binding.name, kind: binding.kind, value: subject)
+            }
         }
     }
 

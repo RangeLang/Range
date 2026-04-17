@@ -27,6 +27,7 @@ struct NeatLanguageServer {
     private mutating func handle(message: [String: Any]) throws {
         let id = message["id"]
         let method = message["method"] as? String
+        debugLog("handle method=\(method ?? "<response>") id=\(id.map { "\($0)" } ?? "nil")")
 
         switch method {
         case "initialize":
@@ -43,6 +44,14 @@ struct NeatLanguageServer {
                         "completionProvider": [
                             "resolveProvider": false,
                             "triggerCharacters": [".", "@", "#"],
+                        ],
+                        "semanticTokensProvider": [
+                            "legend": [
+                                "tokenTypes": SemanticTokenType.allCases.map(\.rawValue),
+                                "tokenModifiers": SemanticTokenModifier.allCases.map(\.rawValue),
+                            ],
+                            "range": false,
+                            "full": true,
                         ],
                     ],
                     "serverInfo": [
@@ -86,6 +95,10 @@ struct NeatLanguageServer {
             try sendResponse(id: id, result: result)
         case "textDocument/formatting":
             let result = formattingResult(for: message)
+            try sendResponse(id: id, result: result)
+        case "textDocument/semanticTokens/full":
+            debugLog("semanticTokens/full requested")
+            let result = semanticTokensResult(for: message)
             try sendResponse(id: id, result: result)
         default:
             if id != nil {
@@ -299,6 +312,16 @@ struct NeatLanguageServer {
         ]
     }
 
+    private func semanticTokensResult(for message: [String: Any]) -> [String: Any] {
+        guard let state = documentState(from: message) else {
+            debugLog("semanticTokens/full -> no document state")
+            return ["data": []]
+        }
+
+        debugLog("semanticTokens/full -> \(state.semanticTokens.count / 5) tokens")
+        return ["data": state.semanticTokens]
+    }
+
     private func hoverDescription(for symbol: Symbol) -> String {
         switch symbol.kind {
         case .attribute:
@@ -326,7 +349,7 @@ struct NeatLanguageServer {
 
     private func buildDocumentState(uri: String, text: String) -> DocumentState {
         let index = DocumentIndex(text: text, uri: uri)
-        let diagnostics = diagnosticPayload(for: text, index: index)
+        let diagnostics = diagnosticPayload(for: uri, text: text, index: index)
         return DocumentState(uri: uri, text: text, index: index, diagnostics: diagnostics)
     }
 
@@ -340,11 +363,10 @@ struct NeatLanguageServer {
         )
     }
 
-    private func diagnosticPayload(for text: String, index: DocumentIndex) -> [[String: Any]] {
+    private func diagnosticPayload(for uri: String, text: String, index: DocumentIndex) -> [[String: Any]] {
         do {
-            let resolver = (try? NeatCoreLoader.literalBridgeResolver()) ?? .empty
-            var parser = try Parser(source: text, literalBridgeResolver: resolver)
-            _ = try parser.parseSourceFile()
+            let inputs = try diagnosticInputs(for: uri, text: text)
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
             return []
         } catch {
             let fallbackRange = index.firstNonWhitespaceRange ?? index.fullDocumentRange
@@ -356,6 +378,45 @@ struct NeatLanguageServer {
                     "message": String(describing: error),
                 ]
             ]
+        }
+    }
+
+    private func diagnosticInputs(for uri: String, text: String) throws -> [SourceInput] {
+        guard
+            let fileURL = URL(string: uri),
+            fileURL.isFileURL
+        else {
+            return try NeatCoreLoader.sourceInputs() + [
+                SourceInput(path: uri, source: text, role: .project)
+            ]
+        }
+
+        let standardizedFileURL = fileURL.standardizedFileURL
+        let loadedProject: LoadedProject
+        do {
+            loadedProject = try ProjectLoader.load(at: standardizedFileURL.path)
+        } catch {
+            return try NeatCoreLoader.sourceInputs() + [
+                SourceInput(path: standardizedFileURL.path, source: text, role: .project)
+            ]
+        }
+
+        let openDocumentSources = Dictionary(
+            uniqueKeysWithValues: documents.compactMap { uri, state -> (String, String)? in
+                guard let url = URL(string: uri), url.isFileURL else { return nil }
+                return (url.standardizedFileURL.path, state.text)
+            }
+        )
+
+        return loadedProject.sourceInputs.map { input in
+            guard input.role == .project else { return input }
+            if input.path == standardizedFileURL.path {
+                return SourceInput(path: input.path, source: text, role: input.role)
+            }
+            if let override = openDocumentSources[input.path] {
+                return SourceInput(path: input.path, source: override, role: input.role)
+            }
+            return input
         }
     }
 
@@ -373,6 +434,18 @@ struct NeatLanguageServer {
         }
 
         return RequestContext(state: state, position: Position(line: line, character: character))
+    }
+
+    private func documentState(from message: [String: Any]) -> DocumentState? {
+        guard
+            let params = message["params"] as? [String: Any],
+            let textDocument = params["textDocument"] as? [String: Any],
+            let uri = textDocument["uri"] as? String
+        else {
+            return nil
+        }
+
+        return documents[uri]
     }
 
     private func location(uri: String, range: RangePosition) -> [String: Any] {
@@ -551,7 +624,22 @@ struct NeatLanguageServer {
             output.write(headerData)
         }
         output.write(payload)
-        output.synchronizeFile()
+    }
+
+    private func debugLog(_ message: String) {
+        let path = "/tmp/neat-lsp-debug.log"
+        let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
+        if let data = line.data(using: .utf8) {
+            if FileManager.default.fileExists(atPath: path) {
+                if let handle = FileHandle(forWritingAtPath: path) {
+                    try? handle.seekToEnd()
+                    try? handle.write(contentsOf: data)
+                    try? handle.close()
+                }
+            } else {
+                FileManager.default.createFile(atPath: path, contents: data)
+            }
+        }
     }
 }
 
@@ -568,6 +656,7 @@ private struct DocumentState {
 
     var symbols: [Symbol] { index.symbols }
     var fullDocumentRange: RangePosition { index.fullDocumentRange }
+    var semanticTokens: [Int] { index.semanticTokens }
 
     func symbol(at position: Position) -> Symbol? {
         index.symbol(at: position)
@@ -596,6 +685,7 @@ private struct DocumentIndex {
     let lines: [String]
     let symbols: [Symbol]
     let referencesByName: [String: [ReferenceOccurrence]]
+    let semanticTokens: [Int]
     let fullDocumentRange: RangePosition
     let firstNonWhitespaceRange: RangePosition?
 
@@ -605,6 +695,7 @@ private struct DocumentIndex {
         self.lines = text.components(separatedBy: .newlines)
         self.symbols = DocumentIndex.collectSymbols(in: lines, uri: uri)
         self.referencesByName = DocumentIndex.collectReferences(in: lines)
+        self.semanticTokens = DocumentIndex.collectSemanticTokens(in: lines)
         let lastLine = max(0, lines.count - 1)
         let lastChar = lines.last?.count ?? 0
         self.fullDocumentRange = RangePosition(
@@ -797,6 +888,132 @@ private struct DocumentIndex {
         return result
     }
 
+    private static func collectSemanticTokens(in lines: [String]) -> [Int] {
+        var seen: Set<SemanticTokenOccurrence> = []
+        var tokens: [SemanticTokenOccurrence] = []
+
+        func record(_ token: SemanticTokenOccurrence) {
+            guard seen.insert(token).inserted else { return }
+            tokens.append(token)
+        }
+
+        func overlapsExisting(line: Int, start: Int, length: Int) -> Bool {
+            let end = start + length
+            return tokens.contains { token in
+                guard token.line == line else { return false }
+                let tokenEnd = token.startCharacter + token.length
+                return start < tokenEnd && token.startCharacter < end
+            }
+        }
+
+        let declarationPatterns: [String] = [
+            #"\bconstruct\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\bprotocol\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\benum\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\*builder\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\bprecedencegroup\s+([A-Z][A-Za-z0-9_]*)"#,
+        ]
+
+        let typePattern = #"\b[A-Z][A-Za-z0-9_]*\b"#
+        let macroPattern = #"#([a-z_][A-Za-z0-9_]*)\b"#
+
+        for (lineIndex, line) in lines.enumerated() {
+            for pattern in declarationPatterns {
+                guard let match = firstMatch(in: line, pattern: pattern), match.count > 1 else {
+                    continue
+                }
+
+                let name = match[1]
+                let range = nsRange(in: line, value: name)
+                record(
+                    SemanticTokenOccurrence(
+                        line: lineIndex,
+                        startCharacter: range.location,
+                        length: range.length,
+                        type: .type,
+                        modifiers: [.declaration]
+                    )
+                )
+            }
+
+            guard let typeRegex = try? NSRegularExpression(pattern: typePattern) else {
+                continue
+            }
+            let nsLine = line as NSString
+            let typeMatches = typeRegex.matches(
+                in: line,
+                range: NSRange(location: 0, length: nsLine.length)
+            )
+            for match in typeMatches {
+                if overlapsExisting(
+                    line: lineIndex,
+                    start: match.range.location,
+                    length: match.range.length
+                ) {
+                    continue
+                }
+                record(
+                    SemanticTokenOccurrence(
+                        line: lineIndex,
+                        startCharacter: match.range.location,
+                        length: match.range.length,
+                        type: .type,
+                        modifiers: []
+                    )
+                )
+            }
+
+            guard let macroRegex = try? NSRegularExpression(pattern: macroPattern) else {
+                continue
+            }
+            let macroMatches = macroRegex.matches(
+                in: line,
+                range: NSRange(location: 0, length: nsLine.length)
+            )
+            for match in macroMatches {
+                guard match.numberOfRanges > 1 else { continue }
+                let nameRange = match.range(at: 1)
+                record(
+                    SemanticTokenOccurrence(
+                        line: lineIndex,
+                        startCharacter: nameRange.location,
+                        length: nameRange.length,
+                        type: .macro,
+                        modifiers: []
+                    )
+                )
+            }
+        }
+
+        let sorted = tokens.sorted {
+            if $0.line != $1.line { return $0.line < $1.line }
+            if $0.startCharacter != $1.startCharacter { return $0.startCharacter < $1.startCharacter }
+            if $0.length != $1.length { return $0.length < $1.length }
+            if $0.type != $1.type { return $0.type.rawValue < $1.type.rawValue }
+            return $0.modifierMask < $1.modifierMask
+        }
+
+        var encoded: [Int] = []
+        var previousLine = 0
+        var previousStart = 0
+
+        for token in sorted {
+            let deltaLine = token.line - previousLine
+            let deltaStart = deltaLine == 0 ? token.startCharacter - previousStart : token.startCharacter
+            encoded.append(contentsOf: [
+                deltaLine,
+                deltaStart,
+                token.length,
+                token.typeIndex,
+                token.modifierMask,
+            ])
+            previousLine = token.line
+            previousStart = token.startCharacter
+        }
+
+        return encoded
+    }
+
     private static func firstNonWhitespaceRange(in lines: [String]) -> RangePosition? {
         for (lineIndex, line) in lines.enumerated() {
             if let offset = line.firstIndex(where: { !$0.isWhitespace })?.utf16Offset(in: line) {
@@ -828,12 +1045,47 @@ private struct DocumentIndex {
 
     private static func range(in line: String, line lineIndex: Int, value: String) -> RangePosition
     {
-        let nsLine = line as NSString
-        let range = nsLine.range(of: value)
+        let range = nsRange(in: line, value: value)
         return RangePosition(
             start: Position(line: lineIndex, character: max(0, range.location)),
             end: Position(line: lineIndex, character: max(0, range.location + range.length))
         )
+    }
+
+    private static func nsRange(in line: String, value: String) -> NSRange {
+        let nsLine = line as NSString
+        return nsLine.range(of: value)
+    }
+}
+
+private enum SemanticTokenType: String, CaseIterable {
+    case type
+    case function
+    case macro
+}
+
+private enum SemanticTokenModifier: String, CaseIterable {
+    case declaration
+}
+
+private struct SemanticTokenOccurrence: Hashable {
+    let line: Int
+    let startCharacter: Int
+    let length: Int
+    let type: SemanticTokenType
+    let modifiers: Set<SemanticTokenModifier>
+
+    var typeIndex: Int {
+        SemanticTokenType.allCases.firstIndex(of: type) ?? 0
+    }
+
+    var modifierMask: Int {
+        modifiers.reduce(0) { partial, modifier in
+            guard let index = SemanticTokenModifier.allCases.firstIndex(of: modifier) else {
+                return partial
+            }
+            return partial | (1 << index)
+        }
     }
 }
 
