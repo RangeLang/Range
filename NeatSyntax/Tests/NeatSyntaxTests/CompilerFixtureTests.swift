@@ -232,6 +232,133 @@ struct CompilerFixtureTests {
             // Expected with the current storage binding model.
         }
     }
+
+    @Test("Autoclosure load helper accepts unlabeled second argument")
+    func autoclosureLoadHelperAcceptsUnlabeledSecondArgument() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/AutoclosureLoadUnlabeled.neat",
+                source: """
+                enum LoadError {
+                    case missing
+                }
+
+                construct User {
+                    value id: Int
+                }
+
+                enum Loadable<Value, Failure> {
+                    case idle
+                    case loading
+                    case loaded(value: Value)
+                    case failed(error: Failure)
+                }
+
+                function fetchUser(id: Int) -> Loadable<User, LoadError> {
+                    return .loaded(value: User(id: id))
+                }
+
+                function load<Value, Failure>(
+                    state _: binding Loadable<Value, Failure>,
+                    #autoclosure task: Loadable<Value, Failure>
+                ) {
+                    state = .loading
+
+                    @background {
+                        state = task()
+                    }
+                }
+
+                construct UserView {
+                    state user: Loadable<User, LoadError> = .idle
+
+                    init(id: Int) {
+                        load($self.user, fetchUser(id: id))
+                    }
+                }
+
+                @main {
+                    value view = UserView(id: 1)
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
+    @Test("Autoclosure load helper rejects labeled second argument")
+    func autoclosureLoadHelperRejectsLabeledSecondArgument() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/AutoclosureLoadLabeled.neat",
+                source: """
+                enum LoadError {
+                    case missing
+                }
+
+                construct User {
+                    value id: Int
+                }
+
+                enum Loadable<Value, Failure> {
+                    case idle
+                    case loading
+                    case loaded(value: Value)
+                    case failed(error: Failure)
+                }
+
+                function fetchUser(id: Int) -> Loadable<User, LoadError> {
+                    return .loaded(value: User(id: id))
+                }
+
+                function load<Value, Failure>(
+                    state _: binding Loadable<Value, Failure>,
+                    #autoclosure task: Loadable<Value, Failure>
+                ) {
+                    state = .loading
+
+                    @background {
+                        state = task()
+                    }
+                }
+
+                construct UserView {
+                    state user: Loadable<User, LoadError> = .idle
+
+                    init(id: Int) {
+                        load($self.user, task: fetchUser(id: id))
+                    }
+                }
+
+                @main {
+                    value view = UserView(id: 1)
+                }
+                """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected labeled second argument form to fail.")
+        } catch {
+            // Expected with the current parser/signature model.
+        }
+    }
+
+    @Test("Current load helper fixture parses as written")
+    func currentLoadHelperFixtureParsesAsWritten() throws {
+        _ = try compile(
+            fixture: try repositoryRoot()
+                .appendingPathComponent("NeatCompilerFixtures", isDirectory: true)
+                .appendingPathComponent("CompilePass/System/LoadHelper.neat"),
+            expectedRole: .pass
+        )
+    }
 }
 
 private enum FixtureRole {
