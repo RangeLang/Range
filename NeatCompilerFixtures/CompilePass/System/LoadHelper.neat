@@ -8,13 +8,6 @@ construct User {
     value name: String
 }
 
-enum Loadable<Value, Failure> {
-    case idle
-    case loading
-    case loaded(item: Value)
-    case failed(reason: Failure)
-}
-
 function fetchUser(id: Int) -> Result<User, LoadError> {
     if id == 0 {
         return .failure(cause: .missing)
@@ -24,7 +17,7 @@ function fetchUser(id: Int) -> Result<User, LoadError> {
 }
 
 function load<Value, Failure>(
-    target _: binding Loadable<Value, Failure>,
+    target _: binding Promise<Value, Failure>,
     #autoclosure task: Result<Value, Failure>
 ) {
     target = .loading
@@ -32,17 +25,17 @@ function load<Value, Failure>(
     @background {
         switch task() {
         case .success(value item):
-            target = .loaded(item: item)
+            target = .success(result: item)
 
         case .failure(value reason):
-            target = .failed(reason: reason)
+            target = .failure(cause: reason)
         }
     }
 }
 
 construct UserView {
     value id: Int
-    state user: Loadable<User, LoadError> = .idle
+    state user: Promise<User, LoadError> = .loading
 
     init(id: Int) {
         self.id = id
