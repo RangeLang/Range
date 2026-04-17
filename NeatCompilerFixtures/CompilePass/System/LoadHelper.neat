@@ -15,34 +15,42 @@ enum Loadable<Value, Failure> {
     case failed(reason: Failure)
 }
 
-function fetchUser(id: Int) -> Loadable<User, LoadError> {
+function fetchUser(id: Int) -> Result<User, LoadError> {
     if id == 0 {
-        return .failed(reason: .missing)
+        return .failure(cause: .missing)
     }
 
-    return .loaded(item: User(id: id, name: "George"))
+    return .success(result: User(id: id, name: "George"))
 }
 
 function load<Value, Failure>(
     target _: binding Loadable<Value, Failure>,
-    #autoclosure task: Loadable<Value, Failure>
+    #autoclosure task: Result<Value, Failure>
 ) {
     target = .loading
 
     @background {
-        target = task()
+        switch task() {
+        case .success(value item):
+            target = .loaded(item: item)
+
+        case .failure(value reason):
+            target = .failed(reason: reason)
+        }
     }
 }
 
 construct UserView {
+    value id: Int
     state user: Loadable<User, LoadError> = .idle
 
     init(id: Int) {
+        self.id = id
         load($self.user, fetchUser(id: id))
     }
 
     function reload() {
-        load($self.user, fetchUser(id: user.id))
+        load($self.user, fetchUser(id: id))
     }
 }
 

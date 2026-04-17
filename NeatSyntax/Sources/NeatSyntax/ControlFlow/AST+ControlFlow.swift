@@ -100,12 +100,27 @@ public struct StatementConditionalBranch {
 }
 
 public struct SwitchCase {
-    public let value: Expression
+    public let pattern: SwitchCasePattern
     public let body: [Statement]
 
-    public init(value: Expression, body: [Statement]) {
-        self.value = value
+    public init(pattern: SwitchCasePattern, body: [Statement]) {
+        self.pattern = pattern
         self.body = body
+    }
+}
+
+public enum SwitchCasePattern {
+    case expression(Expression)
+    case enumCase(name: String, binding: SwitchCaseBinding?)
+}
+
+public struct SwitchCaseBinding {
+    public let kind: LocalBindingKind
+    public let name: String
+
+    public init(kind: LocalBindingKind, name: String) {
+        self.kind = kind
+        self.name = name
     }
 }
 

@@ -1445,8 +1445,11 @@ private struct GraphCollector {
                 analyzeExpression(
                     expression, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
                 for switchCase in cases {
-                    analyzeExpression(
-                        switchCase.value, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls
+                    analyzeSwitchCasePattern(
+                        switchCase.pattern,
+                        ownerID: ownerID,
+                        scope: scope,
+                        visitedCalls: visitedCalls
                     )
                     analyzeStatements(
                         switchCase.body, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
@@ -1459,6 +1462,22 @@ private struct GraphCollector {
             case .environmentProvision, .break, .continue:
                 continue
             }
+        }
+    }
+
+    private mutating func analyzeSwitchCasePattern(
+        _ pattern: SwitchCasePattern,
+        ownerID: String,
+        scope: MemoryScope,
+        visitedCalls: Set<String>
+    ) {
+        if case .expression(let expression) = pattern {
+            analyzeExpression(
+                expression,
+                ownerID: ownerID,
+                scope: scope,
+                visitedCalls: visitedCalls
+            )
         }
     }
 

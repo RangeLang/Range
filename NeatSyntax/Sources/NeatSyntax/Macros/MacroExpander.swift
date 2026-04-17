@@ -588,9 +588,8 @@ public enum MacroExpander {
                     ),
                     cases: try cases.map { switchCase in
                         SwitchCase(
-                            value: try expand(
-                                expression: switchCase.value,
-                                expectedType: nil,
+                            pattern: try expand(
+                                switchCasePattern: switchCase.pattern,
                                 macros: macros,
                                 attachedParameterCallables: attachedParameterCallables,
                                 attachedLiteralConstructs: attachedLiteralConstructs
@@ -619,6 +618,28 @@ public enum MacroExpander {
             ]
         default:
             return [statement]
+        }
+    }
+
+    static func expand(
+        switchCasePattern pattern: SwitchCasePattern,
+        macros: [String: MacroDeclaration],
+        attachedParameterCallables: [AttachedParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge]
+    ) throws -> SwitchCasePattern {
+        switch pattern {
+        case .expression(let expression):
+            return .expression(
+                try expand(
+                    expression: expression,
+                    expectedType: nil,
+                    macros: macros,
+                    attachedParameterCallables: attachedParameterCallables,
+                    attachedLiteralConstructs: attachedLiteralConstructs
+                )
+            )
+        case .enumCase:
+            return pattern
         }
     }
 
@@ -1629,7 +1650,7 @@ public enum MacroExpander {
                 expression: substituteMacroBindings(in: expression, bindings: bindings),
                 cases: cases.map { switchCase in
                     SwitchCase(
-                        value: substituteMacroBindings(in: switchCase.value, bindings: bindings),
+                        pattern: substituteMacroBindings(in: switchCase.pattern, bindings: bindings),
                         body: substituteMacroBindings(in: switchCase.body, bindings: bindings)
                     )
                 },
@@ -1721,6 +1742,18 @@ public enum MacroExpander {
             return .block(substituteMacroBindings(in: body, bindings: bindings))
         case .integer, .double, .string, .boolean, .nilLiteral, .bindingReference:
             return expression
+        }
+    }
+
+    static func substituteMacroBindings(
+        in pattern: SwitchCasePattern,
+        bindings: [String: Expression]
+    ) -> SwitchCasePattern {
+        switch pattern {
+        case .expression(let expression):
+            return .expression(substituteMacroBindings(in: expression, bindings: bindings))
+        case .enumCase:
+            return pattern
         }
     }
 
@@ -2264,7 +2297,7 @@ public enum MacroExpander {
                     expression: expression,
                     cases: cases.map { switchCase in
                         SwitchCase(
-                            value: switchCase.value,
+                            pattern: switchCase.pattern,
                             body: substituteMacroTargetCalls(
                                 in: switchCase.body,
                                 targetBinding: targetBinding,

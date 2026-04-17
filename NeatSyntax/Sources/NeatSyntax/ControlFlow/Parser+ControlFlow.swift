@@ -346,9 +346,12 @@ extension Parser {
         while peek() != .rightBrace {
             if case .keyword(NeatSyntax.Keyword.caseBranch.rawValue) = peek() {
                 try consumeKeyword(.caseBranch)
-                let value = try parseExpression()
-                let body = try parseSwitchBodyStatements(baseLocalBindings: localBindings)
-                cases.append(SwitchCase(value: value, body: body))
+                let pattern = try parseSwitchCasePattern()
+                let body = try parseSwitchBodyStatements(
+                    baseLocalBindings: localBindings,
+                    pattern: pattern
+                )
+                cases.append(SwitchCase(pattern: pattern, body: body))
                 continue
             }
 
@@ -357,7 +360,10 @@ extension Parser {
                 if defaultBody != nil {
                     throw ParseError("Switch can only contain one default block.")
                 }
-                defaultBody = try parseSwitchBodyStatements(baseLocalBindings: localBindings)
+                defaultBody = try parseSwitchBodyStatements(
+                    baseLocalBindings: localBindings,
+                    pattern: .expression(.identifier("_"))
+                )
                 continue
             }
 
@@ -437,14 +443,70 @@ extension Parser {
         return .forEach(name: name, sequence: sequence, body: body)
     }
 
-    mutating func parseSwitchBodyStatements(baseLocalBindings: [String: LocalBindingSymbol])
-        throws -> [Statement]
-    {
-        if peek() == .colon {
-            try consume(.colon)
+    mutating func parseSwitchCasePattern() throws -> SwitchCasePattern {
+        if peek() == .dot {
+            try consume(.dot)
+            let name = try consumeCallableName()
+
+            if peek() == .leftParen {
+                try consume(.leftParen)
+                let bindingKind: LocalBindingKind
+                switch peek() {
+                case .keyword(NeatSyntax.Keyword.value.rawValue):
+                    bindingKind = .constant
+                    advance()
+                case .keyword(NeatSyntax.Keyword.state.rawValue):
+                    bindingKind = .mutable
+                    advance()
+                default:
+                    throw ParseError("Expected value or state in switch case binding.")
+                }
+
+                let bindingName = try consumeIdentifier()
+                try consume(.rightParen)
+                return .enumCase(
+                    name: ".\(name)",
+                    binding: SwitchCaseBinding(kind: bindingKind, name: bindingName)
+                )
+            }
+
+            return .enumCase(name: ".\(name)", binding: nil)
         }
 
-        return try parseStatementBlock(baseLocalBindings: baseLocalBindings)
+        return .expression(try parseExpression())
+    }
+
+    mutating func parseSwitchBodyStatements(
+        baseLocalBindings: [String: LocalBindingSymbol],
+        pattern: SwitchCasePattern
+    )
+        throws -> [Statement]
+    {
+        try consume(.colon)
+
+        var localBindings = baseLocalBindings
+        if case .enumCase(_, let binding?) = pattern {
+            localBindings[binding.name] = LocalBindingSymbol(
+                kind: binding.kind,
+                type: .named("Never")
+            )
+        }
+
+        var statements: [Statement] = []
+        while true {
+            if peek() == .rightBrace {
+                break
+            }
+            if case .keyword(let keyword) = peek(),
+                keyword == NeatSyntax.Keyword.caseBranch.rawValue
+                    || keyword == NeatSyntax.Keyword.defaultBranch.rawValue
+            {
+                break
+            }
+            statements.append(try parseStatement(localBindings: &localBindings))
+        }
+
+        return statements
     }
 
     mutating func parseStatementBlock(baseLocalBindings: [String: LocalBindingSymbol]) throws

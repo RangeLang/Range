@@ -647,7 +647,10 @@ public struct SemanticProgramValidator {
                 for switchCase in cases {
                     try validateLiteralBridgeCompatibilityInLocalCallables(
                         in: switchCase.body,
-                        accessibleTypes: accessibleTypes,
+                        accessibleTypes: accessibleTypesForSwitchCasePattern(
+                            switchCase.pattern,
+                            base: accessibleTypes
+                        ),
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
@@ -923,7 +926,10 @@ public struct SemanticProgramValidator {
                 for switchCase in cases {
                     try validateCallableReturnSemanticsInLocalCallables(
                         in: switchCase.body,
-                        accessibleTypes: accessibleTypes,
+                        accessibleTypes: accessibleTypesForSwitchCasePattern(
+                            switchCase.pattern,
+                            base: accessibleTypes
+                        ),
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
@@ -1316,7 +1322,7 @@ public struct SemanticProgramValidator {
                 )
                 for switchCase in cases {
                     try validateCallArgumentLabels(
-                        in: switchCase.value,
+                        in: switchCase.pattern,
                         environment: environment,
                         context: context,
                         fileName: fileName
@@ -1324,7 +1330,7 @@ public struct SemanticProgramValidator {
                     try validateCallArgumentLabels(
                         in: switchCase.body,
                         environment: environment,
-                        context: context,
+                        context: contextForSwitchCasePattern(switchCase.pattern, base: context),
                         fileName: fileName
                     )
                 }
@@ -1339,6 +1345,22 @@ public struct SemanticProgramValidator {
             case .break, .continue:
                 continue
             }
+        }
+    }
+
+    private func validateCallArgumentLabels(
+        in pattern: SwitchCasePattern,
+        environment: CallLabelValidationEnvironment,
+        context: CallLabelValidationContext,
+        fileName: String
+    ) throws {
+        if case .expression(let expression) = pattern {
+            try validateCallArgumentLabels(
+                in: expression,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
         }
     }
 
@@ -1606,6 +1628,13 @@ public struct SemanticProgramValidator {
             .joined(separator: " or ")
     }
 
+    private func contextForSwitchCasePattern(
+        _ pattern: SwitchCasePattern,
+        base: CallLabelValidationContext
+    ) -> CallLabelValidationContext {
+        base
+    }
+
     private func localCallableMap(_ callables: [CallableDeclaration]) -> [String: [CallLabelCandidate]]
     {
         Dictionary(
@@ -1823,13 +1852,16 @@ public struct SemanticProgramValidator {
                 try validateBindingReferences(in: expression, context: context, fileName: fileName)
                 for switchCase in cases {
                     try validateBindingReferences(
-                        in: switchCase.value,
+                        in: switchCase.pattern,
                         context: context,
                         fileName: fileName
                     )
                     try validateBindingReferences(
                         in: switchCase.body,
-                        context: context,
+                        context: bindingReferenceContext(
+                            for: switchCase.pattern,
+                            base: context
+                        ),
                         fileName: fileName
                     )
                 }
@@ -1843,6 +1875,16 @@ public struct SemanticProgramValidator {
             case .break, .continue:
                 continue
             }
+        }
+    }
+
+    private func validateBindingReferences(
+        in pattern: SwitchCasePattern,
+        context: BindingReferenceContext,
+        fileName: String
+    ) throws {
+        if case .expression(let expression) = pattern {
+            try validateBindingReferences(in: expression, context: context, fileName: fileName)
         }
     }
 
@@ -1900,6 +1942,22 @@ public struct SemanticProgramValidator {
         case .integer, .double, .string, .boolean, .nilLiteral, .identifier:
             break
         }
+    }
+
+    private func bindingReferenceContext(
+        for pattern: SwitchCasePattern,
+        base: BindingReferenceContext
+    ) -> BindingReferenceContext {
+        guard case .enumCase(_, let binding?) = pattern,
+            binding.kind == .mutable
+        else {
+            return base
+        }
+
+        return BindingReferenceContext(
+            mutableNames: base.mutableNames.union([binding.name]),
+            selfAvailable: base.selfAvailable
+        )
     }
 
     private func validateValueBindings(in parsedFiles: [ParsedSourceFile]) throws {
@@ -2090,6 +2148,19 @@ public struct SemanticProgramValidator {
     private func inferredConstructName(from expression: Expression) -> String? {
         guard case .call(let name, _) = expression else { return nil }
         return normalizedTypeName(name)
+    }
+
+    private func accessibleTypesForSwitchCasePattern(
+        _ pattern: SwitchCasePattern,
+        base: [String: BootstrapLiteralType]
+    ) -> [String: BootstrapLiteralType] {
+        guard case .enumCase(_, let binding?) = pattern else {
+            return base
+        }
+
+        var extended = base
+        extended[binding.name] = .typed(.named("Never"))
+        return extended
     }
 
     private func normalizedTypeName(_ raw: String) -> String? {
