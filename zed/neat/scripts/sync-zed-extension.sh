@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-REPO_ROOT="$(cd "${EXT_DIR}/../.." && pwd)"
+GRAMMAR_REPO="${EXT_DIR}/grammars/tree-sitter-neat"
 EXT_TOML="${EXT_DIR}/extension.toml"
 INSTALL_DIR="${HOME}/Library/Application Support/Zed/extensions/installed/neat"
 TRANSIENT_GRAMMAR_CHECKOUT="${EXT_DIR}/grammars/neat"
@@ -24,20 +24,20 @@ fi
 
 IFS='.' read -r MAJOR MINOR PATCH <<< "${CURRENT_VERSION}"
 NEXT_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
-HEAD_REV="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
+GRAMMAR_REV="$(git -C "${GRAMMAR_REPO}" rev-parse HEAD)"
 
-DIRTY_ZED_FILES="$(git -C "${REPO_ROOT}" status --porcelain zed/neat)"
+DIRTY_GRAMMAR_FILES="$(git -C "${GRAMMAR_REPO}" status --porcelain)"
 
 (cd "${EXT_DIR}" && ./scripts/build-highlights.sh)
 
 perl -0pi -e 's/version = "\Q'"${CURRENT_VERSION}"'\E"/version = "'"${NEXT_VERSION}"'"/' "${EXT_TOML}"
 
-if [[ -z "${DIRTY_ZED_FILES}" ]]; then
-  perl -0pi -e 's/rev = "[0-9a-f]{40}"/rev = "'"${HEAD_REV}"'"/' "${EXT_TOML}"
-  echo "Updated extension version to ${NEXT_VERSION} and rev to ${HEAD_REV}"
+if [[ -z "${DIRTY_GRAMMAR_FILES}" ]]; then
+  perl -0pi -e 's/rev = "[0-9a-f]{40}"/rev = "'"${GRAMMAR_REV}"'"/' "${EXT_TOML}"
+  echo "Updated extension version to ${NEXT_VERSION} and grammar rev to ${GRAMMAR_REV}"
 else
   echo "Updated extension version to ${NEXT_VERSION}"
-  echo "warning: zed/neat has uncommitted changes, so rev was left unchanged" >&2
+  echo "warning: tree-sitter-neat has uncommitted changes, so grammar rev was left unchanged" >&2
 fi
 
 (cd "${EXT_DIR}" && cargo build)
@@ -59,10 +59,10 @@ rsync -a --delete \
 echo
 echo "Synced Zed extension cache:"
 echo "  version: ${NEXT_VERSION}"
-if [[ -z "${DIRTY_ZED_FILES}" ]]; then
-  echo "  rev:     ${HEAD_REV}"
+if [[ -z "${DIRTY_GRAMMAR_FILES}" ]]; then
+  echo "  rev:     ${GRAMMAR_REV}"
 else
-  echo "  rev:     unchanged (dirty zed/neat worktree)"
+  echo "  rev:     unchanged (dirty tree-sitter-neat worktree)"
 fi
 echo
 echo "Next step: zed: reload extensions"

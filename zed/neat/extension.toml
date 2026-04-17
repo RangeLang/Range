@@ -1,6 +1,6 @@
 id = "neat"
 name = "Neat"
-version = "0.2.34"
+version = "0.2.35"
 schema_version = 1
 authors = ["Neat Team"]
 description = "Neat language support for .neat files."
@@ -12,9 +12,8 @@ kind = "Rust"
 version = "0.7.0"
 
 [grammars.neat]
-repository = "file:///Users/george/Documents/Neat"
-rev = "038e140d8ca03db2cb94ccd10f3c33b44af908d5"
-path = "zed/neat/grammars/tree-sitter-neat"
+repository = "file:///Users/george/Documents/Neat/zed/neat/grammars/tree-sitter-neat"
+rev = "89eeca67dc6a237945dbe54b2defe6c4bd54589a"
 
 [language_servers.neat-lsp]
 name = "Neat LSP"
