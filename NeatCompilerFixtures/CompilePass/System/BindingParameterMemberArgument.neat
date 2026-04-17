@@ -1,0 +1,15 @@
+function write(target _: binding Int, value _: Int) {
+    target = value
+}
+
+construct Counter {
+    state count: Int = 0
+
+    init() {
+        write($self.count, 3)
+    }
+}
+
+@main {
+    value counter = Counter()
+}

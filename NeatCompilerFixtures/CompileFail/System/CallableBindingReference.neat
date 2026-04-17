@@ -1,0 +1,11 @@
+function compute() -> Int {
+    return 1
+}
+
+function replace(task _: binding () -> Int, replacement _: () -> Int) {
+    task = replacement
+}
+
+@main {
+    replace($compute, compute)
+}

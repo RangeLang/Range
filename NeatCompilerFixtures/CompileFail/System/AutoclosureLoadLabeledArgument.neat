@@ -1,11 +1,9 @@
 enum LoadError {
     case missing
-    case network
 }
 
 construct User {
     value id: Int
-    value name: String
 }
 
 enum Loadable<Value, Failure> {
@@ -16,11 +14,7 @@ enum Loadable<Value, Failure> {
 }
 
 function fetchUser(id: Int) -> Loadable<User, LoadError> {
-    if id == 0 {
-        return .failed(reason: .missing)
-    }
-
-    return .loaded(item: User(id: id, name: "George"))
+    return .loaded(item: User(id: id))
 }
 
 function load<Value, Failure>(
@@ -38,11 +32,7 @@ construct UserView {
     state user: Loadable<User, LoadError>
 
     init(id: Int) {
-        load($self.user, fetchUser(id: id))
-    }
-
-    function reload() {
-        load($self.user, fetchUser(id: user.id))
+        load($self.user, task: fetchUser(id: id))
     }
 }
 

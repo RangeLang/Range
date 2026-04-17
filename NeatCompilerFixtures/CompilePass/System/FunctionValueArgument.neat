@@ -1,0 +1,11 @@
+function compute() -> Int {
+    return 1
+}
+
+function accept(task _: () -> Int) -> Int {
+    return task()
+}
+
+@main {
+    value result = accept(compute)
+}
