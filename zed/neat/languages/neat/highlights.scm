@@ -18,19 +18,38 @@
 
 (break_statement) @keyword.control
 (continue_statement) @keyword.control
-(return_statement) @keyword.control
+(return_statement
+  "return" @keyword.control)
 
-(if_statement) @keyword
+(if_statement
+  "if" @keyword)
 
-(for_statement) @keyword
-(while_statement) @keyword
-(switch_statement) @keyword
-(switch_case) @keyword
-(switch_default) @keyword
+(if_statement
+  "else" @keyword)
+
+(for_statement
+  "for" @keyword)
+
+(for_statement
+  "in" @keyword)
+
+(while_statement
+  "while" @keyword)
+
+(switch_statement
+  "switch" @keyword)
+
+(switch_case
+  "case" @keyword)
+
+(switch_default
+  "default" @keyword)
 
 
 ; ── @main entry point ────────────────────────────────────────────────────────
-(main_block) @keyword
+(main_block
+  "@" @keyword
+  "main" @keyword)
 
 
 ; Macro-specific syntax falls back to token highlighting for now because the
@@ -44,16 +63,26 @@
 
 
 ; ── Declarations ─────────────────────────────────────────────────────────────
-(sigiled_declaration) @keyword
+(sigiled_declaration
+  "construct" @keyword)
 
-(protocol_declaration) @keyword
+(protocol_declaration
+  "protocol" @keyword)
 
 ((identifier) @function.method
  (#eq? @function.method "init"))
 
-(enum_declaration) @keyword
-(extension_declaration) @keyword
-(function_declaration) @keyword
+(enum_declaration
+  "enum" @keyword)
+
+(extension_declaration
+  "extension" @keyword)
+
+(callable_declaration
+  "function" @keyword)
+
+(function_declaration
+  "func" @keyword)
 
 
 ; ── Parameters & variables ───────────────────────────────────────────────────
@@ -61,11 +90,19 @@
   name: (identifier) @variable.parameter)
 
 (variable_declaration
+  [
+    "state"
+    "environment"
+    "binding"
+    "value"
+  ] @keyword
   name: (identifier) @variable)
 
-(derived_declaration) @keyword
+(derived_declaration
+  "derived" @keyword)
 
 (member_declaration
+  "var" @keyword
   name: (identifier) @property)
 
 
@@ -86,7 +123,9 @@
 
 (assignment
   left: (identifier) @variable)
-(enum_case) @keyword.control
+
+(enum_case
+  "case" @keyword.control)
 
 
 ; ── Types ────────────────────────────────────────────────────────────────────
