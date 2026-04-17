@@ -18,22 +18,6 @@
   name: (callable_name
     (callable_operator_symbol) @operator))
 
-(precedence_group_declaration
-  "precedencegroup" @keyword
-  name: (type_identifier) @type.definition)
-
-(operator_declaration
-  [
-    "prefix"
-    "infix"
-    "postfix"
-  ] @keyword
-  "operator" @keyword
-  symbol: (operator_symbol) @operator)
-
-(operator_declaration
-  precedence: (type_identifier) @type)
-
 ((identifier) @function.method
  (#eq? @function.method "init"))
 

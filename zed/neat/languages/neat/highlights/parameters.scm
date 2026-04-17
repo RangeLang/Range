@@ -2,11 +2,6 @@
 (parameter
   name: (identifier) @variable.parameter)
 
-(parameter
-  type: (capture_type
-    "capture" @keyword
-    captured: (_) @type))
-
 (variable_declaration
   [
     "state"
