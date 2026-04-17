@@ -35,7 +35,7 @@ function load<Value, Failure>(
 }
 
 construct UserView {
-    state user: Loadable<User, LoadError>
+    state user: Loadable<User, LoadError> = .idle
 
     init(id: Int) {
         load($self.user, fetchUser(id: id))

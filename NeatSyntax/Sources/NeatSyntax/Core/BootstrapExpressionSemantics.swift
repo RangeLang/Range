@@ -362,6 +362,20 @@ public enum ExpressionTypeSemantics {
                 operatorResolver: operatorResolver
             )
             return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+        case .identifier(let name):
+            if isLeadingDotMemberShorthand(name), canUseLeadingDotMemberShorthand(for: expected) {
+                return true
+            }
+            let inferred = try inferType(
+                of: expression,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
+            return isCompatible(actual: inferred, expected: expected, resolver: resolver)
         default:
             let inferred = try inferType(
                 of: expression,
@@ -373,6 +387,24 @@ public enum ExpressionTypeSemantics {
                 operatorResolver: operatorResolver
             )
             return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+        }
+    }
+
+    private static func isLeadingDotMemberShorthand(_ name: String) -> Bool {
+        guard name.hasPrefix(".") else {
+            return false
+        }
+        return name.count > 1
+    }
+
+    private static func canUseLeadingDotMemberShorthand(for expected: TypeReference) -> Bool {
+        switch expected {
+        case .named, .member, .generic:
+            return true
+        case .optional(let wrapped):
+            return canUseLeadingDotMemberShorthand(for: wrapped)
+        case .array, .function, .variadic:
+            return false
         }
     }
 
