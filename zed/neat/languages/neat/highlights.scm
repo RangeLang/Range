@@ -1,5 +1,9 @@
+; GENERATED FILE. Do not edit directly.
+; Source fragments live under languages/neat/highlights/.
+
 ; ── Comments ────────────────────────────────────────────────────────────────
 (comment) @comment
+
 
 ("@" @keyword)
 
@@ -11,7 +15,6 @@
 ((identifier) @keyword
  (#match? @keyword "^(core|main)$"))
 
-("macro" @keyword)
 
 [
   "if"
@@ -38,6 +41,7 @@
 (switch_default
   "default" @keyword)
 
+
 ; ── Attribute applications ───────────────────────────────────────────────────
 (attribute_application
   sigil: "@" @keyword
@@ -49,7 +53,6 @@
   "main" @keyword)
 
 
-
 (macro_declaration
   "macro" @keyword)
 
@@ -59,6 +62,18 @@
 (macro_application
   sigil: "#" @type
   name: (identifier) @type)
+
+(macro_declaration
+  name: (identifier) @function.special)
+
+(macro_declaration
+  target: (macro_target
+    type: (_) @type))
+
+(macro_declaration
+  "->" @operator
+  expansion_type: (_) @type)
+
 
 ; ── Builder sigils ───────────────────────────────────────────────────────────
 (builder_declaration
@@ -72,6 +87,23 @@
   builder: (builder_application
     "*" @keyword))
 
+(builder_declaration
+  name: (type_identifier) @type.definition)
+
+(builder_hook_declaration
+  hook: [
+    "expression"
+    "block"
+    "optional"
+    "either"
+    "array"
+  ] @function.special)
+
+(derived_declaration
+  builder: (builder_application
+    name: (type_identifier) @type))
+
+
 ; ── Declarations ─────────────────────────────────────────────────────────────
 (sigiled_declaration
   "construct" @keyword)
@@ -81,20 +113,6 @@
 
 (protocol_declaration
   "protocol" @keyword)
-
-(macro_declaration
-  name: (identifier) @function.special)
-
-(macro_declaration
-  target: (macro_target
-    type: (_) @type))
-
-(macro_declaration
-  "->" @operator
-  expansion_type: (_) @type)
-
-(builder_declaration
-  name: (type_identifier) @type.definition)
 
 (callable_declaration
   "function" @keyword
@@ -122,19 +140,6 @@
 (operator_declaration
   precedence: (type_identifier) @type)
 
-(builder_hook_declaration
-  hook: [
-    "expression"
-    "block"
-    "optional"
-    "either"
-    "array"
-  ] @function.special)
-
-(derived_declaration
-  builder: (builder_application
-    name: (type_identifier) @type))
-
 ((identifier) @function.method
  (#eq? @function.method "init"))
 
@@ -152,6 +157,7 @@
 (function_declaration
   "func" @keyword
   name: (identifier) @function)
+
 
 ; ── Parameters & variables ───────────────────────────────────────────────────
 (parameter
@@ -178,6 +184,7 @@
   "var" @keyword
   name: (identifier) @property)
 
+
 ; ── Call sites ───────────────────────────────────────────────────────────────
 (call_expression
   function: (identifier) @function.call)
@@ -187,6 +194,7 @@
 
 (modifier_call
   name: (identifier) @function.method)
+
 
 ; ── Arguments & assignment ───────────────────────────────────────────────────
 (argument
@@ -198,8 +206,10 @@
 (enum_case
   "case" @keyword.control)
 
+
 ; ── Types ────────────────────────────────────────────────────────────────────
 (type_identifier) @type
+
 
 ; ── Literals ─────────────────────────────────────────────────────────────────
 (string_literal
@@ -213,3 +223,5 @@
 (float_literal) @number.float
 (boolean_literal) @boolean
 (nil_literal) @keyword
+
+

@@ -28,6 +28,8 @@ HEAD_REV="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
 
 DIRTY_ZED_FILES="$(git -C "${REPO_ROOT}" status --porcelain zed/neat)"
 
+(cd "${EXT_DIR}" && ./scripts/build-highlights.sh)
+
 perl -0pi -e 's/version = "\Q'"${CURRENT_VERSION}"'\E"/version = "'"${NEXT_VERSION}"'"/' "${EXT_TOML}"
 
 if [[ -z "${DIRTY_ZED_FILES}" ]]; then
