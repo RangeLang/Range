@@ -41,12 +41,12 @@ Whenever changing this extension, use:
 The script:
 
 - bumps `version` in `extension.toml`
-- updates the grammar `rev` to `HEAD` when `Zed/Neat` is clean
+- updates the grammar `rev` to the current `tree-sitter-neat` commit when the grammar repo is clean
 - rebuilds the Rust extension
 - recompiles the Zed grammar WASM
 - refreshes Zed's installed extension cache
 
-If `Zed/Neat` still has uncommitted changes, the script leaves `rev` unchanged and prints a warning.
+If `Zed/Neat/grammars/tree-sitter-neat` still has uncommitted changes, the script leaves `rev` unchanged and prints a warning.
 
 This applies especially to:
 
