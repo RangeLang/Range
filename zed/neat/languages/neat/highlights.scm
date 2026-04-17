@@ -15,61 +15,26 @@
 ((identifier) @keyword
  (#match? @keyword "^(core|main)$"))
 
-[
-  "background"
-  "binding"
-  "break"
-  "builder"
-  "capture"
-  "case"
-  "construct"
-  "continue"
-  "default"
-  "derived"
-  "else"
-  "enum"
-  "environment"
-  "extension"
-  "for"
-  "func"
-  "function"
-  "get"
-  "if"
-  "in"
-  "infix"
-  "macro"
-  "main"
-  "on"
-  "operator"
-  "postfix"
-  "precedencegroup"
-  "prefix"
-  "protocol"
-  "return"
-  "set"
-  "state"
-  "switch"
-  "value"
-  "var"
-  "while"
-] @keyword
-
-
-[
-  "if"
-  "else"
-  "for"
-  "in"
-  "while"
-  "switch"
-  "case"
-  "default"
-] @keyword
 
 (break_statement) @keyword.control
 (continue_statement) @keyword.control
 (return_statement
   "return" @keyword.control)
+
+(if_statement
+  "if" @keyword)
+
+(if_statement
+  "else" @keyword)
+
+(for_statement
+  "for" @keyword)
+
+(for_statement
+  "in" @keyword)
+
+(while_statement
+  "while" @keyword)
 
 (switch_statement
   "switch" @keyword)
