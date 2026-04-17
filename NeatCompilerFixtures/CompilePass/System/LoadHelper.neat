@@ -30,7 +30,7 @@ function load<Value, Failure>(
     target = .loading
 
     @background {
-        state = task()
+        target = task()
     }
 }
 
