@@ -24,10 +24,10 @@ function fetchUser(id: Int) -> Loadable<User, LoadError> {
 }
 
 function load<Value, Failure>(
-    state _: binding Loadable<Value, Failure>,
+    target _: binding Loadable<Value, Failure>,
     #autoclosure task: Loadable<Value, Failure>
 ) {
-    state = .loading
+    target = .loading
 
     @background {
         state = task()
