@@ -20,6 +20,7 @@ public struct SemanticProgramValidator {
             memberResolver: program.declarationGraph.memberResolver,
             operatorResolver: program.declarationGraph.operatorResolver
         )
+        try validateBindingReferences(in: program.expandedFiles)
         try validateEnvironmentStateResolution(in: program.expandedFiles)
         try validateValueBindings(in: program.expandedFiles)
     }
@@ -1045,6 +1046,283 @@ public struct SemanticProgramValidator {
             return "\(externalLabel) \(parameter.localName): \(typeName)"
         }
         return "\(parameter.localName): \(typeName)"
+    }
+
+    private struct BindingReferenceContext {
+        var mutableNames: Set<String>
+        var selfAvailable: Bool
+    }
+
+    private func validateBindingReferences(in parsedFiles: [ParsedSourceFile]) throws {
+        for parsedFile in parsedFiles {
+            let fileName = lastPathComponent(of: parsedFile.path)
+
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                try validateBindingReferences(in: declaration, fileName: fileName)
+            case .module(let module):
+                let topLevelMutable = Set(module.states.map(\.name))
+                if let mainBlock = module.mainBlock {
+                    try validateBindingReferences(
+                        in: mainBlock.body,
+                        context: BindingReferenceContext(
+                            mutableNames: topLevelMutable,
+                            selfAvailable: false
+                        ),
+                        fileName: fileName
+                    )
+                }
+                for callable in module.callables {
+                    guard let body = callable.body else { continue }
+                    try validateBindingReferences(
+                        in: body,
+                        context: bindingReferenceContext(
+                            mutableNames: topLevelMutable,
+                            selfAvailable: false,
+                            parameters: callable.parameters
+                        ),
+                        fileName: fileName
+                    )
+                }
+                for declaration in module.constructs {
+                    try validateBindingReferences(in: declaration, fileName: fileName)
+                }
+            case .mainBlock(let mainBlock):
+                try validateBindingReferences(
+                    in: mainBlock.body,
+                    context: BindingReferenceContext(mutableNames: [], selfAvailable: false),
+                    fileName: fileName
+                )
+            case .enumeration, .protocolDefinition, .macro, .extensions:
+                break
+            }
+        }
+    }
+
+    private func validateBindingReferences(
+        in declaration: ConstructDeclaration,
+        fileName: String
+    ) throws {
+        let memberMutableNames =
+            Set(declaration.states.map(\.name))
+            .union(declaration.bindings.map(\.name))
+            .union(declaration.environments.filter(\.isState).map(\.name))
+
+        for derived in declaration.deriveds {
+            if let body = derived.body {
+                try validateBindingReferences(
+                    in: body,
+                    context: BindingReferenceContext(
+                        mutableNames: memberMutableNames,
+                        selfAvailable: true
+                    ),
+                    fileName: fileName
+                )
+            }
+        }
+
+        for initializer in declaration.initializers {
+            if let body = initializer.body {
+                try validateBindingReferences(
+                    in: body,
+                    context: bindingReferenceContext(
+                        mutableNames: memberMutableNames,
+                        selfAvailable: true,
+                        parameters: initializer.parameters
+                    ),
+                    fileName: fileName
+                )
+            }
+        }
+
+        for callable in declaration.callables {
+            if let body = callable.body {
+                try validateBindingReferences(
+                    in: body,
+                    context: bindingReferenceContext(
+                        mutableNames: memberMutableNames,
+                        selfAvailable: true,
+                        parameters: callable.parameters
+                    ),
+                    fileName: fileName
+                )
+            }
+        }
+
+        for nested in declaration.constructs {
+            try validateBindingReferences(in: nested, fileName: fileName)
+        }
+    }
+
+    private func bindingReferenceContext(
+        mutableNames: Set<String>,
+        selfAvailable: Bool,
+        parameters: [NeatFunctionParameter]
+    ) -> BindingReferenceContext {
+        let parameterMutableNames = Set(parameters.filter(\.isBinding).map(\.localName))
+        return BindingReferenceContext(
+            mutableNames: mutableNames.union(parameterMutableNames),
+            selfAvailable: selfAvailable
+        )
+    }
+
+    private func validateBindingReferences(
+        in statements: [Statement],
+        context: BindingReferenceContext,
+        fileName: String
+    ) throws {
+        var context = context
+
+        for statement in statements {
+            switch statement {
+            case .freestandingMacro(_, _, let body):
+                try validateBindingReferences(in: body, context: context, fileName: fileName)
+            case .background(let background):
+                try validateBindingReferences(
+                    in: background.body,
+                    context: context,
+                    fileName: fileName
+                )
+            case .localBinding(let declaration):
+                try validateBindingReferences(
+                    in: declaration.expression,
+                    context: context,
+                    fileName: fileName
+                )
+                if declaration.kind == .mutable {
+                    context.mutableNames.insert(declaration.name)
+                }
+            case .localCallable(let declaration):
+                try validateBindingReferences(
+                    in: declaration.body,
+                    context: bindingReferenceContext(
+                        mutableNames: context.mutableNames,
+                        selfAvailable: context.selfAvailable,
+                        parameters: declaration.parameters
+                    ),
+                    fileName: fileName
+                )
+            case .derived(_, _, let body):
+                try validateBindingReferences(in: body, context: context, fileName: fileName)
+            case .environmentProvision(let provision):
+                try validateBindingReferences(
+                    in: provision.expression,
+                    context: context,
+                    fileName: fileName
+                )
+            case .assignment(_, let expression), .compoundAssignment(_, _, let expression),
+                .expression(let expression):
+                try validateBindingReferences(in: expression, context: context, fileName: fileName)
+            case .forEach(_, let sequence, let body):
+                try validateBindingReferences(in: sequence, context: context, fileName: fileName)
+                try validateBindingReferences(in: body, context: context, fileName: fileName)
+            case .whileLoop(let condition, let body):
+                try validateBindingReferences(in: condition, context: context, fileName: fileName)
+                try validateBindingReferences(in: body, context: context, fileName: fileName)
+            case .conditional(let branches):
+                for branch in branches {
+                    if let condition = branch.condition {
+                        try validateBindingReferences(
+                            in: condition,
+                            context: context,
+                            fileName: fileName
+                        )
+                    }
+                    try validateBindingReferences(
+                        in: branch.body,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+            case .return(let expression):
+                if let expression {
+                    try validateBindingReferences(
+                        in: expression,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+            case .switchStatement(let expression, let cases, let defaultBody):
+                try validateBindingReferences(in: expression, context: context, fileName: fileName)
+                for switchCase in cases {
+                    try validateBindingReferences(
+                        in: switchCase.value,
+                        context: context,
+                        fileName: fileName
+                    )
+                    try validateBindingReferences(
+                        in: switchCase.body,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+                if let defaultBody {
+                    try validateBindingReferences(
+                        in: defaultBody,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+            case .break, .continue:
+                continue
+            }
+        }
+    }
+
+    private func validateBindingReferences(
+        in expression: Expression,
+        context: BindingReferenceContext,
+        fileName: String
+    ) throws {
+        switch expression {
+        case .bindingReference(let path):
+            let root = path.split(separator: ".").first.map(String.init) ?? path
+            if root == "self" {
+                guard context.selfAvailable else {
+                    throw SemanticValidationError(
+                        "Binding reference '$\(path)' in \(fileName) is invalid because self is not available in this scope."
+                    )
+                }
+                return
+            }
+            guard context.mutableNames.contains(root) else {
+                throw SemanticValidationError(
+                    "Binding reference '$\(path)' in \(fileName) must reference mutable storage."
+                )
+            }
+        case .freestandingMacro(_, let arguments), .call(_, let arguments):
+            for argument in arguments {
+                try validateBindingReferences(in: argument.value, context: context, fileName: fileName)
+            }
+        case .array(let elements):
+            for element in elements {
+                try validateBindingReferences(in: element, context: context, fileName: fileName)
+            }
+        case .dictionary(let elements):
+            for element in elements {
+                try validateBindingReferences(in: element.key, context: context, fileName: fileName)
+                try validateBindingReferences(in: element.value, context: context, fileName: fileName)
+            }
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            try validateBindingReferences(in: condition, context: context, fileName: fileName)
+            try validateBindingReferences(in: trueExpression, context: context, fileName: fileName)
+            try validateBindingReferences(in: falseExpression, context: context, fileName: fileName)
+        case .unary(_, let nested):
+            try validateBindingReferences(in: nested, context: context, fileName: fileName)
+        case .binary(let lhs, _, let rhs):
+            try validateBindingReferences(in: lhs, context: context, fileName: fileName)
+            try validateBindingReferences(in: rhs, context: context, fileName: fileName)
+        case .interpolatedString(let string):
+            for segment in string.segments {
+                if case .expression(let nested) = segment {
+                    try validateBindingReferences(in: nested, context: context, fileName: fileName)
+                }
+            }
+        case .block(let body):
+            try validateBindingReferences(in: body, context: context, fileName: fileName)
+        case .integer, .double, .string, .boolean, .nilLiteral, .identifier:
+            break
+        }
     }
 
     private func validateValueBindings(in parsedFiles: [ParsedSourceFile]) throws {

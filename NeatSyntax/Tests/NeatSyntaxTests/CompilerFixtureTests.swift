@@ -154,6 +154,84 @@ struct CompilerFixtureTests {
 
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
+
+    @Test("Function-typed binding parameters compile")
+    func functionTypedBindingParametersCompile() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/FunctionTypedBindingParameters.neat",
+                source: """
+                function replace(task _: binding () -> Int, replacement _: () -> Int) {
+                    task = replacement
+                }
+
+                @main {
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
+    @Test("Function values can be passed as callable arguments")
+    func functionValuesCanBePassedAsCallableArguments() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/FunctionValueArgument.neat",
+                source: """
+                function compute() -> Int {
+                    return 1
+                }
+
+                function accept(task _: () -> Int) -> Int {
+                    return task()
+                }
+
+                @main {
+                    value result = accept(compute)
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
+    @Test("Callable declarations cannot be passed as binding references")
+    func callableDeclarationsCannotBePassedAsBindingReferences() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/CallableBindingReference.neat",
+                source: """
+                function compute() -> Int {
+                    return 1
+                }
+
+                function replace(task _: binding () -> Int, replacement _: () -> Int) {
+                    task = replacement
+                }
+
+                @main {
+                    replace($compute, compute)
+                }
+                """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected passing a callable declaration as a binding reference to fail.")
+        } catch {
+            // Expected with the current storage binding model.
+        }
+    }
 }
 
 private enum FixtureRole {
