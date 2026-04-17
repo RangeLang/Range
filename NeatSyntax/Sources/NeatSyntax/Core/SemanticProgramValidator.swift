@@ -8,6 +8,7 @@ public struct SemanticProgramValidator {
         try validatePrimaryDeclarations(in: program.parsedFiles)
         try validateTopLevelStates(in: program.parsedFiles)
         try validateControlFlow(in: program.expandedFiles)
+        try validateCallArgumentLabels(in: program.expandedFiles)
         try validateCallableReturnSemantics(
             in: program.expandedFiles,
             resolver: program.literalBridgeResolver,
@@ -1048,9 +1049,585 @@ public struct SemanticProgramValidator {
         return "\(parameter.localName): \(typeName)"
     }
 
+    private struct CallLabelValidationContext {
+        let currentConstruct: ConstructDeclaration?
+        var localCallablesByName: [String: [CallLabelCandidate]]
+    }
+
+    private struct CallLabelValidationEnvironment {
+        let topLevelCallablesByName: [String: [CallLabelCandidate]]
+        let constructsByName: [String: ConstructDeclaration]
+    }
+
+    private struct CallLabelCandidate {
+        let name: String
+        let parameters: [NeatFunctionParameter]
+    }
+
     private struct BindingReferenceContext {
         var mutableNames: Set<String>
         var selfAvailable: Bool
+    }
+
+    private func validateCallArgumentLabels(in parsedFiles: [ParsedSourceFile]) throws {
+        let environment = callLabelValidationEnvironment(from: parsedFiles)
+
+        for parsedFile in parsedFiles {
+            let fileName = lastPathComponent(of: parsedFile.path)
+
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                try validateCallArgumentLabels(
+                    in: declaration,
+                    environment: environment,
+                    fileName: fileName
+                )
+            case .module(let module):
+                if let mainBlock = module.mainBlock {
+                    try validateCallArgumentLabels(
+                        in: mainBlock.body,
+                        environment: environment,
+                        context: CallLabelValidationContext(
+                            currentConstruct: nil,
+                            localCallablesByName: [:]
+                        ),
+                        fileName: fileName
+                    )
+                }
+
+                for callable in module.callables {
+                    guard let body = callable.body else { continue }
+                    try validateCallArgumentLabels(
+                        in: body,
+                        environment: environment,
+                        context: CallLabelValidationContext(
+                            currentConstruct: nil,
+                            localCallablesByName: localCallableMap([callable])
+                        ),
+                        fileName: fileName
+                    )
+                }
+
+                for declaration in module.constructs {
+                    try validateCallArgumentLabels(
+                        in: declaration,
+                        environment: environment,
+                        fileName: fileName
+                    )
+                }
+            case .mainBlock(let mainBlock):
+                try validateCallArgumentLabels(
+                    in: mainBlock.body,
+                    environment: environment,
+                    context: CallLabelValidationContext(
+                        currentConstruct: nil,
+                        localCallablesByName: [:]
+                    ),
+                    fileName: fileName
+                )
+            case .enumeration, .protocolDefinition, .macro, .extensions:
+                break
+            }
+        }
+    }
+
+    private func validateCallArgumentLabels(
+        in declaration: ConstructDeclaration,
+        environment: CallLabelValidationEnvironment,
+        fileName: String
+    ) throws {
+        let constructContext = CallLabelValidationContext(
+            currentConstruct: declaration,
+            localCallablesByName: [:]
+        )
+
+        for derived in declaration.deriveds {
+            if let body = derived.body {
+                try validateCallArgumentLabels(
+                    in: body,
+                    environment: environment,
+                    context: constructContext,
+                    fileName: fileName
+                )
+            }
+        }
+
+        for initializer in declaration.initializers {
+            if let body = initializer.body {
+                try validateCallArgumentLabels(
+                    in: body,
+                    environment: environment,
+                    context: constructContext,
+                    fileName: fileName
+                )
+            }
+        }
+
+        for callable in declaration.callables {
+            if let body = callable.body {
+                try validateCallArgumentLabels(
+                    in: body,
+                    environment: environment,
+                    context: CallLabelValidationContext(
+                        currentConstruct: declaration,
+                        localCallablesByName: localCallableMap([callable])
+                    ),
+                    fileName: fileName
+                )
+            }
+        }
+
+        for nested in declaration.constructs {
+            try validateCallArgumentLabels(
+                in: nested,
+                environment: environment,
+                fileName: fileName
+            )
+        }
+    }
+
+    private func validateCallArgumentLabels(
+        in statements: [Statement],
+        environment: CallLabelValidationEnvironment,
+        context: CallLabelValidationContext,
+        fileName: String
+    ) throws {
+        var context = context
+
+        for statement in statements {
+            switch statement {
+            case .freestandingMacro(_, _, let body):
+                try validateCallArgumentLabels(
+                    in: body,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            case .background(let background):
+                try validateCallArgumentLabels(
+                    in: background.body,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            case .localBinding(let declaration):
+                try validateCallArgumentLabels(
+                    in: declaration.expression,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            case .localCallable(let declaration):
+                context.localCallablesByName[declaration.name, default: []].append(
+                    CallLabelCandidate(
+                        name: declaration.name,
+                        parameters: declaration.parameters
+                    )
+                )
+                try validateCallArgumentLabels(
+                    in: declaration.body,
+                    environment: environment,
+                    context: CallLabelValidationContext(
+                        currentConstruct: context.currentConstruct,
+                        localCallablesByName: context.localCallablesByName
+                    ),
+                    fileName: fileName
+                )
+            case .derived(_, _, let body):
+                try validateCallArgumentLabels(
+                    in: body,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            case .environmentProvision(let provision):
+                try validateCallArgumentLabels(
+                    in: provision.expression,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            case .assignment(_, let expression), .compoundAssignment(_, _, let expression),
+                .expression(let expression):
+                try validateCallArgumentLabels(
+                    in: expression,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            case .forEach(_, let sequence, let body):
+                try validateCallArgumentLabels(
+                    in: sequence,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+                try validateCallArgumentLabels(
+                    in: body,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            case .whileLoop(let condition, let body):
+                try validateCallArgumentLabels(
+                    in: condition,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+                try validateCallArgumentLabels(
+                    in: body,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            case .conditional(let branches):
+                for branch in branches {
+                    if let condition = branch.condition {
+                        try validateCallArgumentLabels(
+                            in: condition,
+                            environment: environment,
+                            context: context,
+                            fileName: fileName
+                        )
+                    }
+                    try validateCallArgumentLabels(
+                        in: branch.body,
+                        environment: environment,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+            case .return(let expression):
+                if let expression {
+                    try validateCallArgumentLabels(
+                        in: expression,
+                        environment: environment,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+            case .switchStatement(let expression, let cases, let defaultBody):
+                try validateCallArgumentLabels(
+                    in: expression,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+                for switchCase in cases {
+                    try validateCallArgumentLabels(
+                        in: switchCase.value,
+                        environment: environment,
+                        context: context,
+                        fileName: fileName
+                    )
+                    try validateCallArgumentLabels(
+                        in: switchCase.body,
+                        environment: environment,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+                if let defaultBody {
+                    try validateCallArgumentLabels(
+                        in: defaultBody,
+                        environment: environment,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+            case .break, .continue:
+                continue
+            }
+        }
+    }
+
+    private func validateCallArgumentLabels(
+        in expression: Expression,
+        environment: CallLabelValidationEnvironment,
+        context: CallLabelValidationContext,
+        fileName: String
+    ) throws {
+        switch expression {
+        case .call(let name, let arguments):
+            if let candidates = callLabelCandidates(
+                for: name,
+                environment: environment,
+                context: context
+            ), !candidates.isEmpty {
+                guard candidates.contains(where: { callArguments(arguments, match: $0.parameters) }) else {
+                    throw SemanticValidationError(
+                        "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) does not match any available parameter labels. Expected one of: \(renderExpectedCallShapes(for: candidates))."
+                    )
+                }
+            }
+
+            for argument in arguments {
+                try validateCallArgumentLabels(
+                    in: argument.value,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            }
+        case .freestandingMacro(_, let arguments):
+            for argument in arguments {
+                try validateCallArgumentLabels(
+                    in: argument.value,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            }
+        case .array(let elements):
+            for element in elements {
+                try validateCallArgumentLabels(
+                    in: element,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            }
+        case .dictionary(let elements):
+            for element in elements {
+                try validateCallArgumentLabels(
+                    in: element.key,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+                try validateCallArgumentLabels(
+                    in: element.value,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
+            }
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            try validateCallArgumentLabels(
+                in: condition,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+            try validateCallArgumentLabels(
+                in: trueExpression,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+            try validateCallArgumentLabels(
+                in: falseExpression,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+        case .unary(_, let nested):
+            try validateCallArgumentLabels(
+                in: nested,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+        case .binary(let lhs, _, let rhs):
+            try validateCallArgumentLabels(
+                in: lhs,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+            try validateCallArgumentLabels(
+                in: rhs,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+        case .interpolatedString(let string):
+            for segment in string.segments {
+                if case .expression(let nested) = segment {
+                    try validateCallArgumentLabels(
+                        in: nested,
+                        environment: environment,
+                        context: context,
+                        fileName: fileName
+                    )
+                }
+            }
+        case .block(let body):
+            try validateCallArgumentLabels(
+                in: body,
+                environment: environment,
+                context: context,
+                fileName: fileName
+            )
+        case .integer, .double, .string, .boolean, .nilLiteral, .identifier, .bindingReference:
+            break
+        }
+    }
+
+    private func callLabelValidationEnvironment(from parsedFiles: [ParsedSourceFile])
+        -> CallLabelValidationEnvironment
+    {
+        var topLevelCallablesByName: [String: [CallLabelCandidate]] = [:]
+        var constructsByName: [String: ConstructDeclaration] = [:]
+
+        func record(construct: ConstructDeclaration) {
+            constructsByName[construct.name] = construct
+            for nested in construct.constructs {
+                record(construct: nested)
+            }
+        }
+
+        for parsedFile in parsedFiles {
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                record(construct: declaration)
+            case .module(let module):
+                for callable in module.callables {
+                    topLevelCallablesByName[callable.name, default: []].append(
+                        CallLabelCandidate(name: callable.name, parameters: callable.parameters)
+                    )
+                }
+                for declaration in module.constructs {
+                    record(construct: declaration)
+                }
+            case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
+                break
+            }
+        }
+
+        return CallLabelValidationEnvironment(
+            topLevelCallablesByName: topLevelCallablesByName,
+            constructsByName: constructsByName
+        )
+    }
+
+    private func callLabelCandidates(
+        for name: String,
+        environment: CallLabelValidationEnvironment,
+        context: CallLabelValidationContext
+    ) -> [CallLabelCandidate]? {
+        if let (baseName, memberName) = splitMemberName(name) {
+            if baseName == "self", let currentConstruct = context.currentConstruct {
+                let candidates = currentConstruct.callables
+                    .filter { $0.name == memberName }
+                    .map { CallLabelCandidate(name: $0.name, parameters: $0.parameters) }
+                return candidates.isEmpty ? nil : candidates
+            }
+            return nil
+        }
+
+        if let local = context.localCallablesByName[name], !local.isEmpty {
+            return local
+        }
+
+        if let callables = environment.topLevelCallablesByName[name], !callables.isEmpty {
+            return callables
+        }
+
+        if let construct = environment.constructsByName[name] {
+            let candidates = construct.initializers.map {
+                CallLabelCandidate(
+                    name: name,
+                    parameters: $0.parameters
+                )
+            }
+            return candidates.isEmpty ? nil : candidates
+        }
+
+        return nil
+    }
+
+    private func callArguments(_ arguments: [CallArgument], match parameters: [NeatFunctionParameter])
+        -> Bool
+    {
+        if arguments.count != parameters.count,
+            parameters.contains(where: { !$0.macros.isEmpty }),
+            arguments.allSatisfy({ $0.label == nil })
+        {
+            return true
+        }
+
+        let parameterSequence: [NeatFunctionParameter]
+
+        if let variadicIndex = parameters.firstIndex(where: { parameter in
+            if case .variadic = parameter.typeReference {
+                return true
+            }
+            return false
+        }) {
+            guard variadicIndex == parameters.count - 1 else { return false }
+            guard arguments.count >= variadicIndex else { return false }
+
+            var expanded = Array(parameters.prefix(variadicIndex))
+            let variadicParameter = parameters[variadicIndex]
+            expanded.append(
+                contentsOf: Array(
+                    repeating: variadicParameter,
+                    count: arguments.count - variadicIndex
+                )
+            )
+            parameterSequence = expanded
+        } else {
+            guard arguments.count == parameters.count else { return false }
+            parameterSequence = parameters
+        }
+
+        for (argument, parameter) in zip(arguments, parameterSequence) {
+            if let actualLabel = argument.label {
+                guard actualLabel == parameter.externalLabel else {
+                    return false
+                }
+            }
+        }
+        return true
+    }
+
+    private func renderCallArguments(_ arguments: [CallArgument]) -> String {
+        arguments.map { argument in
+            if let label = argument.label {
+                return "\(label): ..."
+            }
+            return "..."
+        }.joined(separator: ", ")
+    }
+
+    private func renderExpectedCallShapes(for candidates: [CallLabelCandidate]) -> String {
+        candidates
+            .map { callable in
+                let labels = callable.parameters.map { parameter in
+                    if let label = parameter.externalLabel {
+                        return "\(label): ..."
+                    }
+                    return "..."
+                }.joined(separator: ", ")
+                return "\(callable.name)(\(labels))"
+            }
+            .joined(separator: " or ")
+    }
+
+    private func localCallableMap(_ callables: [CallableDeclaration]) -> [String: [CallLabelCandidate]]
+    {
+        Dictionary(
+            grouping: callables.map {
+                CallLabelCandidate(name: $0.name, parameters: $0.parameters)
+            },
+            by: \.name
+        )
+    }
+
+    private func splitMemberName(_ name: String) -> (base: String, member: String)? {
+        guard let dot = name.lastIndex(of: ".") else {
+            return nil
+        }
+
+        let base = String(name[..<dot])
+        let member = String(name[name.index(after: dot)...])
+        guard !base.isEmpty, !member.isEmpty else {
+            return nil
+        }
+
+        return (base, member)
     }
 
     private func validateBindingReferences(in parsedFiles: [ParsedSourceFile]) throws {
