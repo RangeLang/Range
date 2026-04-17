@@ -18,38 +18,19 @@
 
 (break_statement) @keyword.control
 (continue_statement) @keyword.control
-(return_statement
-  "return" @keyword.control)
+(return_statement) @keyword.control
 
-(if_statement
-  "if" @keyword)
+(if_statement) @keyword
 
-(if_statement
-  "else" @keyword)
-
-(for_statement
-  "for" @keyword)
-
-(for_statement
-  "in" @keyword)
-
-(while_statement
-  "while" @keyword)
-
-(switch_statement
-  "switch" @keyword)
-
-(switch_case
-  "case" @keyword)
-
-(switch_default
-  "default" @keyword)
+(for_statement) @keyword
+(while_statement) @keyword
+(switch_statement) @keyword
+(switch_case) @keyword
+(switch_default) @keyword
 
 
 ; ── @main entry point ────────────────────────────────────────────────────────
-(main_block
-  "@" @keyword
-  "main" @keyword)
+(main_block) @keyword
 
 
 ; Macro-specific syntax falls back to token highlighting for now because the
@@ -63,42 +44,16 @@
 
 
 ; ── Declarations ─────────────────────────────────────────────────────────────
-(sigiled_declaration
-  "construct" @keyword)
+(sigiled_declaration) @keyword
 
-(sigiled_declaration
-  name: (type_identifier) @type.definition)
-
-(protocol_declaration
-  "protocol" @keyword)
-
-(callable_declaration
-  "function" @keyword
-  name: (callable_name
-    (identifier) @function.method))
-
-(callable_declaration
-  "function" @keyword
-  name: (callable_name
-    (callable_operator_symbol) @operator))
+(protocol_declaration) @keyword
 
 ((identifier) @function.method
  (#eq? @function.method "init"))
 
-(enum_declaration
-  "enum" @keyword
-  name: (type_identifier) @type.definition)
-
-(extension_declaration
-  "extension" @keyword
-  type: (_) @type)
-
-(protocol_declaration
-  name: (type_identifier) @type.definition)
-
-(function_declaration
-  "func" @keyword
-  name: (identifier) @function)
+(enum_declaration) @keyword
+(extension_declaration) @keyword
+(function_declaration) @keyword
 
 
 ; ── Parameters & variables ───────────────────────────────────────────────────
@@ -106,19 +61,11 @@
   name: (identifier) @variable.parameter)
 
 (variable_declaration
-  [
-    "state"
-    "environment"
-    "binding"
-    "value"
-  ] @keyword
   name: (identifier) @variable)
 
-(derived_declaration
-  "derived" @keyword)
+(derived_declaration) @keyword
 
 (member_declaration
-  "var" @keyword
   name: (identifier) @property)
 
 
@@ -139,9 +86,7 @@
 
 (assignment
   left: (identifier) @variable)
-
-(enum_case
-  "case" @keyword.control)
+(enum_case) @keyword.control
 
 
 ; ── Types ────────────────────────────────────────────────────────────────────

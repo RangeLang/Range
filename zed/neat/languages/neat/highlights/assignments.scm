@@ -4,6 +4,4 @@
 
 (assignment
   left: (identifier) @variable)
-
-(enum_case
-  "case" @keyword.control)
+(enum_case) @keyword.control

@@ -1,37 +1,11 @@
 ; ── Declarations ─────────────────────────────────────────────────────────────
-(sigiled_declaration
-  "construct" @keyword)
+(sigiled_declaration) @keyword
 
-(sigiled_declaration
-  name: (type_identifier) @type.definition)
-
-(protocol_declaration
-  "protocol" @keyword)
-
-(callable_declaration
-  "function" @keyword
-  name: (callable_name
-    (identifier) @function.method))
-
-(callable_declaration
-  "function" @keyword
-  name: (callable_name
-    (callable_operator_symbol) @operator))
+(protocol_declaration) @keyword
 
 ((identifier) @function.method
  (#eq? @function.method "init"))
 
-(enum_declaration
-  "enum" @keyword
-  name: (type_identifier) @type.definition)
-
-(extension_declaration
-  "extension" @keyword
-  type: (_) @type)
-
-(protocol_declaration
-  name: (type_identifier) @type.definition)
-
-(function_declaration
-  "func" @keyword
-  name: (identifier) @function)
+(enum_declaration) @keyword
+(extension_declaration) @keyword
+(function_declaration) @keyword
