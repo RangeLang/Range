@@ -654,6 +654,7 @@ public enum MacroExpander {
                 externalLabel: parameter.externalLabel,
                 typeReference: rewrittenType,
                 slotName: parameter.slotName,
+                isBinding: parameter.isBinding,
                 capturesSyntax: parameter.capturesSyntax
             )
         }

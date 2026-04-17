@@ -1724,7 +1724,7 @@ private struct GraphCollector {
         case .identifier(let name):
             return resolvePath(name, scope: scope)
         case .bindingReference(let name):
-            return resolveSimpleName(name, scope: scope)
+            return resolvePath(name, scope: scope)
         default:
             return nil
         }

@@ -9,7 +9,10 @@ extension Parser {
                 }
                 return (
                     parameter.localName,
-                    LocalBindingSymbol(kind: .constant, type: typeReference)
+                    LocalBindingSymbol(
+                        kind: parameter.isBinding ? .mutable : .constant,
+                        type: typeReference
+                    )
                 )
             }
         )
@@ -217,6 +220,7 @@ extension Parser {
 
                 var typeReference: TypeReference?
                 var slotName: String?
+                var isBinding = false
                 var capturesSyntax = false
                 if peek() == .colon {
                     try consume(.colon)
@@ -224,7 +228,16 @@ extension Parser {
                         advance()
                         slotName = slot
                     } else {
+                        if case .keyword(NeatSyntax.Keyword.binding.rawValue) = peek() {
+                            advance()
+                            isBinding = true
+                        }
                         if case .identifier(let name) = peek(), name == "capture" {
+                            if isBinding {
+                                throw ParseError(
+                                    "binding capture parameters are not supported."
+                                )
+                            }
                             guard allowSyntaxCapture else {
                                 throw ParseError(
                                     "capture parameters are only valid in macro declarations."
@@ -244,6 +257,7 @@ extension Parser {
                         externalLabel: externalLabel,
                         typeReference: typeReference,
                         slotName: slotName,
+                        isBinding: isBinding,
                         capturesSyntax: capturesSyntax
                     )
                 )
@@ -603,6 +617,7 @@ extension Parser {
             $0.externalLabel == $1.externalLabel
                 && $0.typeReference == $1.typeReference
                 && $0.slotName == $1.slotName
+                && $0.isBinding == $1.isBinding
                 && $0.capturesSyntax == $1.capturesSyntax
         }
     }

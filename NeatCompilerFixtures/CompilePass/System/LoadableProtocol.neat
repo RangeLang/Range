@@ -1,0 +1,29 @@
+enum LoadError {
+    case missing
+    case network
+}
+
+protocol Loadable<Value, Failure> {
+    state value: Value?
+    state error: Failure?
+    state isLoading: Bool
+    function load()
+}
+
+construct UserLoader: Loadable<String, LoadError> {
+    state value: String? = nil
+    state error: LoadError? = nil
+    state isLoading: Bool = false
+
+    function load() {
+        isLoading = true
+        value = "George"
+        error = nil
+        isLoading = false
+    }
+}
+
+@main {
+    state loader: UserLoader = UserLoader()
+    loader.load()
+}

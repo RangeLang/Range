@@ -124,6 +124,36 @@ struct CompilerFixtureTests {
         #expect(arguments[0].label == "text")
         #expect(arguments[1].label == "number")
     }
+
+    @Test("Binding parameters accept $ member arguments")
+    func bindingParametersAcceptMemberBindingArguments() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/BindingArguments.neat",
+                source: """
+                function write(target _: binding Int, value _: Int) {
+                    target = value
+                }
+
+                construct Counter {
+                    state count: Int = 0
+
+                    init() {
+                        write($self.count, 3)
+                    }
+                }
+
+                @main {
+                    value counter = Counter()
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
 }
 
 private enum FixtureRole {

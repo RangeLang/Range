@@ -142,7 +142,10 @@ extension Parser {
             return .identifier(fullName)
         case .dollar:
             try consume(.dollar)
-            return .bindingReference(try consumeIdentifier())
+            let name = try consumeIdentifier()
+            var fullName = name
+            try appendPostfixAccesses(to: &fullName)
+            return .bindingReference(fullName)
         case .dot:
             advance()
             let name = try consumeCallableName()

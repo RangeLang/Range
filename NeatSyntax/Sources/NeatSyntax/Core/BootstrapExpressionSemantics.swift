@@ -78,6 +78,16 @@ public enum ExpressionTypeSemantics {
                 "Callable expressions are not supported in state initializer inference yet."
             )
         case .bindingReference(let name):
+            if let type = accessibleTypes[name] {
+                return type
+            }
+            if let memberType = inferKnownMemberIdentifierType(
+                name: name,
+                accessibleTypes: accessibleTypes,
+                memberResolver: memberResolver
+            ) {
+                return .typed(memberType)
+            }
             throw ParseError("Binding reference '$\(name)' is not valid in a state initializer.")
         case .array(let elements):
             return try inferArrayType(

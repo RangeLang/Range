@@ -6,6 +6,7 @@ public struct NeatFunctionParameter {
     public let externalLabel: String?
     public let typeReference: TypeReference?
     public let slotName: String?
+    public let isBinding: Bool
     public let capturesSyntax: Bool
 
     public init(
@@ -14,6 +15,7 @@ public struct NeatFunctionParameter {
         externalLabel: String?,
         typeReference: TypeReference?,
         slotName: String?,
+        isBinding: Bool = false,
         capturesSyntax: Bool = false
     ) {
         self.macros = macros
@@ -21,6 +23,7 @@ public struct NeatFunctionParameter {
         self.externalLabel = externalLabel
         self.typeReference = typeReference
         self.slotName = slotName
+        self.isBinding = isBinding
         self.capturesSyntax = capturesSyntax
     }
 
@@ -36,6 +39,9 @@ public struct NeatFunctionParameter {
     public var renderedTypeName: String? {
         guard let typeReference else {
             return nil
+        }
+        if isBinding {
+            return "binding \(typeReference.displayName)"
         }
         if capturesSyntax {
             return "capture \(typeReference.displayName)"

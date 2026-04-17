@@ -1,0 +1,45 @@
+enum LoadError {
+    case missing
+    case network
+}
+
+enum Loadable<Value, Failure> {
+    case idle
+    case loading
+    case loaded(value: Value)
+    case failed(error: Failure)
+}
+
+function fetchUser(id: Int) -> Loadable<String, LoadError> {
+    if id == 0 {
+        return .failed(error: .missing)
+    }
+
+    return .loaded(value: "George")
+}
+
+construct UserView {
+    value id: Int
+    state user: Loadable<String, LoadError> = .idle
+
+    init(id: Int) {
+        self.id = id
+        load(fetchUser(id: id))
+    }
+
+    function load(#autoclosure task: Loadable<String, LoadError>) {
+        self.user = .loading
+
+        @background {
+            self.user = task()
+        }
+    }
+
+    function reload() {
+        load(fetchUser(id: id))
+    }
+}
+
+@main {
+    value view = UserView(id: 1)
+}

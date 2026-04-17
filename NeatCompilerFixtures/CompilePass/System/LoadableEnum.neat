@@ -1,0 +1,18 @@
+enum LoadError {
+    case missing
+    case network
+}
+
+enum Loadable<Value, Failure> {
+    case idle
+    case loading
+    case loaded(value: Value)
+    case failed(error: Failure)
+}
+
+@main {
+    state user: Loadable<String, LoadError> = .idle
+
+    user = .loading
+    user = .loaded(value: "George")
+}

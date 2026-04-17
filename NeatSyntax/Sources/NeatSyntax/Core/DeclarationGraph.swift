@@ -346,6 +346,7 @@ public struct DeclarationGraph {
                     && $0.externalLabel == $1.externalLabel
                     && $0.typeReference == $1.typeReference
                     && $0.slotName == $1.slotName
+                    && $0.isBinding == $1.isBinding
             })
     }
 }
@@ -463,6 +464,7 @@ public struct DeclarationMacroExpansionResolver: Sendable {
         var localName: String
         var externalLabel: String?
         var typeReference: TypeReference?
+        var isBinding: Bool
         var capturesSyntax: Bool
     }
 
@@ -487,6 +489,7 @@ public struct DeclarationMacroExpansionResolver: Sendable {
                             localName: $0.localName,
                             externalLabel: $0.externalLabel,
                             typeReference: $0.typeReference,
+                            isBinding: $0.isBinding,
                             capturesSyntax: $0.capturesSyntax
                         )
                     },
