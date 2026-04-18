@@ -686,6 +686,7 @@ private struct DocumentIndex {
     let symbols: [Symbol]
     let referencesByName: [String: [ReferenceOccurrence]]
     let semanticTokens: [Int]
+    let semanticTokenOccurrences: [SemanticTokenOccurrence]
     let fullDocumentRange: RangePosition
     let firstNonWhitespaceRange: RangePosition?
 
@@ -695,7 +696,8 @@ private struct DocumentIndex {
         self.lines = text.components(separatedBy: .newlines)
         self.symbols = DocumentIndex.collectSymbols(in: lines, uri: uri)
         self.referencesByName = DocumentIndex.collectReferences(in: lines)
-        self.semanticTokens = DocumentIndex.collectSemanticTokens(in: lines)
+        self.semanticTokenOccurrences = DocumentIndex.collectSemanticTokenOccurrences(in: lines)
+        self.semanticTokens = DocumentIndex.encodeSemanticTokens(semanticTokenOccurrences)
         let lastLine = max(0, lines.count - 1)
         let lastChar = lines.last?.count ?? 0
         self.fullDocumentRange = RangePosition(
@@ -888,13 +890,31 @@ private struct DocumentIndex {
         return result
     }
 
-    private static func collectSemanticTokens(in lines: [String]) -> [Int] {
+    fileprivate static func collectSemanticTokenOccurrences(in lines: [String]) -> [SemanticTokenOccurrence] {
         var seen: Set<SemanticTokenOccurrence> = []
         var tokens: [SemanticTokenOccurrence] = []
 
         func record(_ token: SemanticTokenOccurrence) {
             guard seen.insert(token).inserted else { return }
             tokens.append(token)
+        }
+
+        func record(
+            line: Int,
+            range: NSRange,
+            type: SemanticTokenType,
+            modifiers: Set<SemanticTokenModifier> = []
+        ) {
+            guard range.location != NSNotFound, range.length > 0 else { return }
+            record(
+                SemanticTokenOccurrence(
+                    line: line,
+                    startCharacter: range.location,
+                    length: range.length,
+                    type: type,
+                    modifiers: modifiers
+                )
+            )
         }
 
         func overlapsExisting(line: Int, start: Int, length: Int) -> Bool {
@@ -915,9 +935,27 @@ private struct DocumentIndex {
         ]
 
         let typePattern = #"\b[A-Z][A-Za-z0-9_]*\b"#
+        let functionDeclarationPattern = #"\b(?:function|func)\s+([a-z_][A-Za-z0-9_]*)\s*\("#
+        let macroDeclarationPattern = #"\bmacro\s+([a-z_][A-Za-z0-9_]*)\s*\("#
+        let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
+        let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
         let macroPattern = #"#([a-z_][A-Za-z0-9_]*)\b"#
+        let argumentValuePattern = #"(?:\(\s*|,\s*|:\s*)([a-z_][A-Za-z0-9_]*)\s*(?=[,)])"#
+        let localIdentifierPattern = #"\b([a-z_][A-Za-z0-9_]*)\b"#
+        let variableDeclarationPattern =
+            #"\b(state|environment|binding|value|var|derived)\s+([a-z][A-Za-z0-9_]*)\b"#
+        let localVariableNames = collectDeclaredVariableNames(in: lines)
+        let parameterNames = collectDeclaredParameterNames(in: lines)
+        let identifierKeywordExclusions: Set<String> = [
+            "if", "for", "while", "switch", "return", "macro", "function", "func", "init",
+            "construct", "enum", "protocol", "extension", "background", "state",
+            "environment", "binding", "derived", "var", "case", "default", "break",
+            "continue", "true", "false", "nil", "self",
+        ]
 
         for (lineIndex, line) in lines.enumerated() {
+            let nsLine = line as NSString
+
             for pattern in declarationPatterns {
                 guard let match = firstMatch(in: line, pattern: pattern), match.count > 1 else {
                     continue
@@ -925,21 +963,52 @@ private struct DocumentIndex {
 
                 let name = match[1]
                 let range = nsRange(in: line, value: name)
+                var modifiers: Set<SemanticTokenModifier> = [.declaration]
+                if DefaultLibrarySymbols.typeNames.contains(name) {
+                    modifiers.insert(.defaultLibrary)
+                }
+                record(line: lineIndex, range: range, type: .type, modifiers: modifiers)
+            }
+
+            if let match = firstMatch(in: line, pattern: functionDeclarationPattern), match.count > 1 {
+                let name = match[1]
                 record(
-                    SemanticTokenOccurrence(
+                    line: lineIndex,
+                    range: nsRange(in: line, value: name),
+                    type: .function,
+                    modifiers: [.declaration]
+                )
+            }
+
+            if let match = firstMatch(in: line, pattern: macroDeclarationPattern), match.count > 1 {
+                let name = match[1]
+                record(
+                    line: lineIndex,
+                    range: nsRange(in: line, value: name),
+                    type: .macro,
+                    modifiers: [.declaration]
+                )
+            }
+
+            if let variableRegex = try? NSRegularExpression(pattern: variableDeclarationPattern) {
+                let matches = variableRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in matches {
+                    guard match.numberOfRanges > 2 else { continue }
+                    record(
                         line: lineIndex,
-                        startCharacter: range.location,
-                        length: range.length,
-                        type: .type,
+                        range: match.range(at: 2),
+                        type: .variable,
                         modifiers: [.declaration]
                     )
-                )
+                }
             }
 
             guard let typeRegex = try? NSRegularExpression(pattern: typePattern) else {
                 continue
             }
-            let nsLine = line as NSString
             let typeMatches = typeRegex.matches(
                 in: line,
                 range: NSRange(location: 0, length: nsLine.length)
@@ -952,14 +1021,142 @@ private struct DocumentIndex {
                 ) {
                     continue
                 }
-                record(
-                    SemanticTokenOccurrence(
+                let typeName = nsLine.substring(with: match.range)
+                var modifiers: Set<SemanticTokenModifier> =
+                    DefaultLibrarySymbols.typeNames.contains(typeName) ? [.defaultLibrary] : []
+                let afterLocation = match.range.location + match.range.length
+                var cursor = afterLocation
+                while cursor < nsLine.length {
+                    let character = nsLine.substring(with: NSRange(location: cursor, length: 1))
+                    guard character.rangeOfCharacter(from: .whitespacesAndNewlines) != nil else {
+                        break
+                    }
+                    cursor += 1
+                }
+                if cursor < nsLine.length,
+                    nsLine.substring(with: NSRange(location: cursor, length: 1)) == "("
+                {
+                    modifiers.insert(.application)
+                }
+                record(line: lineIndex, range: match.range, type: .type, modifiers: modifiers)
+            }
+
+            if let callRegex = try? NSRegularExpression(pattern: localCallPattern) {
+                let callMatches = callRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in callMatches {
+                    guard match.numberOfRanges > 1 else { continue }
+                    let nameRange = match.range(at: 1)
+                    let name = nsLine.substring(with: nameRange)
+                    guard !identifierKeywordExclusions.contains(name) else { continue }
+                    if nameRange.location > 0 {
+                        let previous = nsLine.substring(
+                            with: NSRange(location: nameRange.location - 1, length: 1)
+                        )
+                        if previous == "#" || previous == "." {
+                            continue
+                        }
+                    }
+                    if overlapsExisting(
                         line: lineIndex,
-                        startCharacter: match.range.location,
-                        length: match.range.length,
-                        type: .type,
-                        modifiers: []
+                        start: nameRange.location,
+                        length: nameRange.length
+                    ) {
+                        continue
+                    }
+                    let modifiers: Set<SemanticTokenModifier> =
+                        DefaultLibrarySymbols.functionNames.contains(name) ? [.defaultLibrary] : []
+                    record(line: lineIndex, range: nameRange, type: .function, modifiers: modifiers)
+                }
+            }
+
+            if let memberRegex = try? NSRegularExpression(pattern: memberPattern) {
+                let memberMatches = memberRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in memberMatches {
+                    guard match.numberOfRanges > 1 else { continue }
+                    let nameRange = match.range(at: 1)
+                    if overlapsExisting(
+                        line: lineIndex,
+                        start: nameRange.location,
+                        length: nameRange.length
+                    ) {
+                        continue
+                    }
+
+                    let tokenType: SemanticTokenType
+                    let afterLocation = nameRange.location + nameRange.length
+                    var cursor = afterLocation
+                    while cursor < nsLine.length {
+                        let character = nsLine.substring(with: NSRange(location: cursor, length: 1))
+                        guard character.rangeOfCharacter(from: .whitespacesAndNewlines) != nil else {
+                            break
+                        }
+                        cursor += 1
+                    }
+                    if cursor < nsLine.length,
+                        nsLine.substring(with: NSRange(location: cursor, length: 1)) == "("
+                    {
+                        tokenType = .method
+                    } else {
+                        tokenType = .property
+                    }
+                    record(line: lineIndex, range: nameRange, type: tokenType)
+                }
+            }
+
+            if let argumentValueRegex = try? NSRegularExpression(
+                pattern: argumentValuePattern
+            ) {
+                let argumentMatches = argumentValueRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in argumentMatches {
+                    guard match.numberOfRanges > 1 else { continue }
+                    let nameRange = match.range(at: 1)
+                    let name = nsLine.substring(with: nameRange)
+                    let tokenType: SemanticTokenType
+                    if parameterNames.contains(name) {
+                        tokenType = .parameter
+                    } else if localVariableNames.contains(name) {
+                        tokenType = .variable
+                    } else {
+                        continue
+                    }
+                    if overlapsExisting(
+                        line: lineIndex,
+                        start: nameRange.location,
+                        length: nameRange.length
+                    ) {
+                        continue
+                    }
+                    record(
+                        line: lineIndex,
+                        range: nameRange,
+                        type: tokenType,
+                        modifiers: [.argument]
                     )
+                }
+            }
+
+            for parameter in collectParameterDeclarationRanges(in: line) {
+                if overlapsExisting(
+                    line: lineIndex,
+                    start: parameter.range.location,
+                    length: parameter.range.length
+                ) {
+                    continue
+                }
+                record(
+                    line: lineIndex,
+                    range: parameter.range,
+                    type: .parameter,
+                    modifiers: [.declaration]
                 )
             }
 
@@ -973,31 +1170,76 @@ private struct DocumentIndex {
             for match in macroMatches {
                 guard match.numberOfRanges > 1 else { continue }
                 let nameRange = match.range(at: 1)
-                record(
-                    SemanticTokenOccurrence(
-                        line: lineIndex,
-                        startCharacter: nameRange.location,
-                        length: nameRange.length,
-                        type: .macro,
-                        modifiers: []
-                    )
+                let name = nsLine.substring(with: nameRange)
+                let modifiers: Set<SemanticTokenModifier> =
+                    DefaultLibrarySymbols.macroNames.contains(name) ? [.defaultLibrary] : []
+                record(line: lineIndex, range: nameRange, type: .macro, modifiers: modifiers)
+            }
+
+            if let localIdentifierRegex = try? NSRegularExpression(pattern: localIdentifierPattern) {
+                let localMatches = localIdentifierRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
                 )
+                for match in localMatches {
+                    guard match.numberOfRanges > 1 else { continue }
+                    let nameRange = match.range(at: 1)
+                    let name = nsLine.substring(with: nameRange)
+                    guard !identifierKeywordExclusions.contains(name) else { continue }
+                    guard localVariableNames.contains(name) || parameterNames.contains(name) else {
+                        continue
+                    }
+                    if overlapsExisting(
+                        line: lineIndex,
+                        start: nameRange.location,
+                        length: nameRange.length
+                    ) {
+                        continue
+                    }
+                    if nameRange.location > 0 {
+                        let previous = nsLine.substring(
+                            with: NSRange(location: nameRange.location - 1, length: 1)
+                        )
+                        if previous == "." || previous == "#" {
+                            continue
+                        }
+                    }
+
+                    var cursor = nameRange.location + nameRange.length
+                    while cursor < nsLine.length {
+                        let character = nsLine.substring(with: NSRange(location: cursor, length: 1))
+                        guard character.rangeOfCharacter(from: .whitespacesAndNewlines) != nil else {
+                            break
+                        }
+                        cursor += 1
+                    }
+                    if cursor < nsLine.length,
+                        nsLine.substring(with: NSRange(location: cursor, length: 1)) == ":"
+                    {
+                        continue
+                    }
+
+                    let tokenType: SemanticTokenType = parameterNames.contains(name) ? .parameter : .variable
+                    record(line: lineIndex, range: nameRange, type: tokenType)
+                }
             }
         }
 
-        let sorted = tokens.sorted {
+        return tokens.sorted {
             if $0.line != $1.line { return $0.line < $1.line }
             if $0.startCharacter != $1.startCharacter { return $0.startCharacter < $1.startCharacter }
             if $0.length != $1.length { return $0.length < $1.length }
             if $0.type != $1.type { return $0.type.rawValue < $1.type.rawValue }
             return $0.modifierMask < $1.modifierMask
         }
+    }
 
+    fileprivate static func encodeSemanticTokens(_ tokens: [SemanticTokenOccurrence]) -> [Int] {
         var encoded: [Int] = []
         var previousLine = 0
         var previousStart = 0
 
-        for token in sorted {
+        for token in tokens {
             let deltaLine = token.line - previousLine
             let deltaStart = deltaLine == 0 ? token.startCharacter - previousStart : token.startCharacter
             encoded.append(contentsOf: [
@@ -1014,6 +1256,89 @@ private struct DocumentIndex {
         return encoded
     }
 
+    private static func collectParameterDeclarationRanges(in line: String) -> [(name: String, range: NSRange)] {
+        let nsLine = line as NSString
+        guard
+            let openRange = line.range(of: "("),
+            let closeRange = line.range(of: ")", range: openRange.upperBound..<line.endIndex)
+        else {
+            return []
+        }
+
+        let paramsStart = openRange.upperBound.utf16Offset(in: line)
+        let paramsEnd = closeRange.lowerBound.utf16Offset(in: line)
+        guard paramsEnd > paramsStart else { return [] }
+
+        let paramsNSRange = NSRange(location: paramsStart, length: paramsEnd - paramsStart)
+        let paramsText = nsLine.substring(with: paramsNSRange)
+        let segments = paramsText.split(separator: ",", omittingEmptySubsequences: false)
+
+        var results: [(String, NSRange)] = []
+        var searchLocation = paramsStart
+
+        for rawSegment in segments {
+            let segmentText = String(rawSegment)
+            let fullSegmentRange = nsLine.range(
+                of: segmentText,
+                options: [],
+                range: NSRange(location: searchLocation, length: paramsEnd - searchLocation)
+            )
+            guard fullSegmentRange.location != NSNotFound else { continue }
+            searchLocation = fullSegmentRange.location + fullSegmentRange.length
+
+            var trimmed = segmentText.trimmingCharacters(in: .whitespacesAndNewlines)
+            while trimmed.hasPrefix("#") {
+                guard let firstSpace = trimmed.firstIndex(where: \.isWhitespace) else { break }
+                trimmed = String(trimmed[firstSpace...]).trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            guard
+                let match = firstMatch(
+                    in: trimmed,
+                    pattern: #"^([a-z_][A-Za-z0-9_]*)(?:\s+_)?\s*:"#
+                ),
+                match.count > 1
+            else {
+                continue
+            }
+
+            let name = match[1]
+            let nameRange = nsLine.range(
+                of: name,
+                options: [],
+                range: fullSegmentRange
+            )
+            guard nameRange.location != NSNotFound else { continue }
+            results.append((name, nameRange))
+        }
+
+        return results
+    }
+
+    private static func collectDeclaredVariableNames(in lines: [String]) -> Set<String> {
+        let pattern = #"\b(state|environment|binding|value|var|derived)\s+([a-z][A-Za-z0-9_]*)\b"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+
+        var result: Set<String> = []
+        for line in lines {
+            let nsLine = line as NSString
+            let matches = regex.matches(
+                in: line,
+                range: NSRange(location: 0, length: nsLine.length)
+            )
+            for match in matches where match.numberOfRanges > 2 {
+                result.insert(nsLine.substring(with: match.range(at: 2)))
+            }
+        }
+        return result
+    }
+
+    private static func collectDeclaredParameterNames(in lines: [String]) -> Set<String> {
+        Set(lines.flatMap { line in
+            collectParameterDeclarationRanges(in: line).map(\.name)
+        })
+    }
+
     private static func firstNonWhitespaceRange(in lines: [String]) -> RangePosition? {
         for (lineIndex, line) in lines.enumerated() {
             if let offset = line.firstIndex(where: { !$0.isWhitespace })?.utf16Offset(in: line) {
@@ -1026,7 +1351,7 @@ private struct DocumentIndex {
         return nil
     }
 
-    private static func firstMatch(in line: String, pattern: String) -> [String]? {
+    fileprivate static func firstMatch(in line: String, pattern: String) -> [String]? {
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
         let nsLine = line as NSString
         guard
@@ -1058,17 +1383,28 @@ private struct DocumentIndex {
     }
 }
 
-private enum SemanticTokenType: String, CaseIterable {
+// Semantic highlighting in Neat should stay semantic-first and editor-agnostic.
+// Keep this taxonomy intentionally small and prefer standard LSP token types
+// plus modifiers before adding custom distinctions. See:
+// Zed/Neat/docs/SemanticHighlightingPlan.md
+enum SemanticTokenType: String, CaseIterable {
     case type
     case function
+    case method
     case macro
+    case variable
+    case property
+    case parameter
 }
 
-private enum SemanticTokenModifier: String, CaseIterable {
+enum SemanticTokenModifier: String, CaseIterable {
     case declaration
+    case defaultLibrary
+    case application
+    case argument
 }
 
-private struct SemanticTokenOccurrence: Hashable {
+struct SemanticTokenOccurrence: Hashable {
     let line: Int
     let startCharacter: Int
     let length: Int
@@ -1086,6 +1422,82 @@ private struct SemanticTokenOccurrence: Hashable {
             }
             return partial | (1 << index)
         }
+    }
+}
+
+struct SemanticTokenSnapshot: Equatable {
+    let text: String
+    let line: Int
+    let startCharacter: Int
+    let length: Int
+    let type: SemanticTokenType
+    let modifiers: Set<SemanticTokenModifier>
+}
+
+extension NeatLanguageServer {
+    static func debugSemanticTokenSnapshots(in text: String) -> [SemanticTokenSnapshot] {
+        let lines = text.components(separatedBy: .newlines)
+        return DocumentIndex.collectSemanticTokenOccurrences(in: lines).map { occurrence in
+            let line = lines[occurrence.line]
+            let nsLine = line as NSString
+            let tokenText = nsLine.substring(
+                with: NSRange(location: occurrence.startCharacter, length: occurrence.length)
+            )
+            return SemanticTokenSnapshot(
+                text: tokenText,
+                line: occurrence.line,
+                startCharacter: occurrence.startCharacter,
+                length: occurrence.length,
+                type: occurrence.type,
+                modifiers: occurrence.modifiers
+            )
+        }
+    }
+}
+
+private enum DefaultLibrarySymbols {
+    static let typeNames: Set<String> = {
+        collect(patterns: [
+            #"\bconstruct\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\bprotocol\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\benum\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\*builder\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\bprecedencegroup\s+([A-Z][A-Za-z0-9_]*)"#,
+        ])
+    }()
+
+    static let functionNames: Set<String> = {
+        collect(patterns: [
+            #"\bfunction\s+([a-z_][A-Za-z0-9_]*)\s*\("#,
+            #"\bfunc\s+([a-z_][A-Za-z0-9_]*)\s*\("#,
+        ])
+    }()
+
+    static let macroNames: Set<String> = {
+        collect(patterns: [
+            #"\bmacro\s+([a-z_][A-Za-z0-9_]*)\s*\("#,
+        ])
+    }()
+
+    private static func collect(
+        patterns: [String],
+        transform: (([String]) -> String)? = nil
+    ) -> Set<String> {
+        guard let inputs = try? NeatCoreLoader.sourceInputs() else { return [] }
+
+        var result: Set<String> = []
+        for input in inputs where input.role == .core {
+            let lines = input.source.components(separatedBy: .newlines)
+            for line in lines {
+                for pattern in patterns {
+                    guard let match = DocumentIndex.firstMatch(in: line, pattern: pattern), match.count > 1 else {
+                        continue
+                    }
+                    result.insert(transform?(match) ?? match[1])
+                }
+            }
+        }
+        return result
     }
 }
 

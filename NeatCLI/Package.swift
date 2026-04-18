@@ -27,6 +27,11 @@ let package = Package(
                 "NeatCLI",
                 "Terminal",
             ]
+        ),
+        .testTarget(
+            name: "NeatCLITests",
+            dependencies: ["NeatCLI"],
+            path: "Tests/NeatCLITests"
         )
     ]
 )
