@@ -1957,138 +1957,23 @@ public enum MacroExpander {
     ) throws -> [ResolvedRewriteCall] {
         let targetBinding = macro.bindings.target
         let targetKind = macroTargetKind(for: macro)
-        try validateRewriteSites(for: macro, targetKind: targetKind, context: context)
-        return macroOperationExpressions(in: macro.body).compactMap {
+        let operationExpressions = macroOperationExpressions(in: macro.body)
+        try context.validateRewriteSites(
+            for: macro,
+            targetKind: targetKind,
+            operationExpressions: operationExpressions
+        ) { expression in
+            resolvedRewriteCall(
+                from: expression,
+                targetBinding: targetBinding,
+                targetKind: targetKind
+            ) != nil
+        }
+        return operationExpressions.compactMap {
             resolvedRewriteCall(
                 from: $0,
                 targetBinding: targetBinding,
                 targetKind: targetKind
-            )
-        }
-    }
-
-    static func allowedRewritePaths(
-        targetBinding: String,
-        targetType: TypeReference,
-        context: MacroExpansionContext
-    ) -> Set<String> {
-        context.rewriteSurfaceView.allowedPaths(
-            targetBinding: targetBinding,
-            targetType: targetType
-        )
-    }
-
-    static func normalizedRewritePath(
-        _ name: String,
-        targetBinding: String
-    ) -> String? {
-        let directPath = "\(targetBinding).rewrite"
-        if name == directPath {
-            return directPath
-        }
-
-        let prefix = "\(targetBinding)."
-        let suffix = ".rewrite"
-        guard name.hasPrefix(prefix), name.hasSuffix(suffix) else {
-            return nil
-        }
-
-        let start = name.index(name.startIndex, offsetBy: prefix.count)
-        let end = name.index(name.endIndex, offsetBy: -suffix.count)
-        guard start <= end else {
-            return nil
-        }
-
-        let raw = name[start..<end]
-        if raw.isEmpty {
-            return directPath
-        }
-
-        var normalized = ""
-        var index = raw.startIndex
-        while index < raw.endIndex {
-            let character = raw[index]
-            if character == "[" {
-                normalized += "[]"
-                while index < raw.endIndex, raw[index] != "]" {
-                    index = raw.index(after: index)
-                }
-                if index < raw.endIndex {
-                    index = raw.index(after: index)
-                }
-                continue
-            }
-
-            normalized.append(character)
-            index = raw.index(after: index)
-        }
-
-        return "\(targetBinding).\(normalized).rewrite"
-    }
-
-    static func declaredRewritePathExists(
-        _ normalizedPath: String,
-        targetBinding: String,
-        targetType: TypeReference,
-        context: MacroExpansionContext
-    ) -> Bool {
-        context.rewriteSurfaceView.declaredRewritePathExists(
-            normalizedPath,
-            targetBinding: targetBinding,
-            targetType: targetType
-        )
-    }
-
-    static func validateRewriteSites(
-        for macro: MacroDeclaration,
-        targetKind: MacroTargetKind,
-        context: MacroExpansionContext
-    ) throws {
-        let targetBinding = macro.bindings.target
-        let targetPrefix = "\(targetBinding)."
-        let allowedPaths = allowedRewritePaths(
-            targetBinding: targetBinding,
-            targetType: macro.target.typeReference,
-            context: context
-        )
-
-        var invalidPaths: [String] = []
-        for expression in macroOperationExpressions(in: macro.body) {
-            guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
-                continue
-            }
-            guard name.hasPrefix(targetPrefix), name.hasSuffix(".rewrite") else {
-                continue
-            }
-
-            guard
-                let normalizedPath = normalizedRewritePath(name, targetBinding: targetBinding),
-                resolvedRewriteCall(
-                    from: expression,
-                    targetBinding: targetBinding,
-                    targetKind: targetKind
-                ) != nil,
-                declaredRewritePathExists(
-                    normalizedPath,
-                    targetBinding: targetBinding,
-                    targetType: macro.target.typeReference,
-                    context: context
-                )
-            else {
-                invalidPaths.append(name)
-                continue
-            }
-        }
-
-        guard invalidPaths.isEmpty else {
-            let allowedDescription: String
-            if allowedPaths.isEmpty {
-                allowedDescription = "no rewrite paths"
-            } else {
-                allowedDescription = allowedPaths.sorted().joined(separator: ", ")
-            }
-            throw ParseError(
-                "Macro #\(macro.name) targeting \(macro.target.typeReference.displayName) uses unsupported rewrite site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
             )
         }
     }
