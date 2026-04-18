@@ -125,6 +125,16 @@ struct CompilerFixtureTests {
         #expect(arguments[1].label == "number")
     }
 
+    @Test("Init application surface is present in declaration graph")
+    func initApplicationSurfaceIsPresentInDeclarationGraph() throws {
+        let program = try CompilerPipeline().build(inputs: neatCoreInputs())
+        let graph = program.declarationGraph
+
+        #expect(graph.constructsByName["Init"] != nil)
+        #expect(graph.constructsByName["Init.Application"] != nil)
+        #expect(graph.syntaxResolver.declaration(named: "Init.Application", conformsTo: "SupportsRewrite"))
+    }
+
 }
 
 private enum FixtureRole {

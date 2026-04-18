@@ -1,6 +1,7 @@
 import Foundation
 
 public enum MacroExpander {
+    private static let expansionLock = NSLock()
     nonisolated(unsafe) private static var activeInitMacroTargets: [RealizedInitMacroTarget] = []
     nonisolated(unsafe) private static var activeFunctionMacroTargets:
         [AttachedFunctionMacroSignature] =
@@ -10,6 +11,9 @@ public enum MacroExpander {
         [:]
 
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
+        expansionLock.lock()
+        defer { expansionLock.unlock() }
+
         let registry = collectMacros(from: files)
         let declarationGraph = DeclarationGraph(files: files)
         let protocols = declarationGraph.protocolsByName
@@ -2070,6 +2074,102 @@ public enum MacroExpander {
         return "\(targetBinding).\(normalized).rewrite"
     }
 
+    static func resolvedDeclaredValueType(
+        named rawTypeName: String,
+        ownerTypeName: String,
+        syntaxResolver: DeclarationSyntaxResolver
+    ) -> (typeName: String, isArray: Bool)? {
+        var text = rawTypeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.hasSuffix("?") {
+            text.removeLast()
+            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let isArray = text.hasPrefix("[") && text.hasSuffix("]")
+        if isArray {
+            text.removeFirst()
+            text.removeLast()
+            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let qualifiedNestedName = "\(ownerTypeName).\(text)"
+        if activeConstructsByName[qualifiedNestedName] != nil {
+            return (qualifiedNestedName, isArray)
+        }
+
+        if activeConstructsByName[text] != nil {
+            return (text, isArray)
+        }
+
+        if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
+            || syntaxResolver.declaration(named: text, conformsTo: "SupportsRewrite")
+        {
+            return (text, isArray)
+        }
+
+        return nil
+    }
+
+    static func declaredRewritePathExists(
+        _ normalizedPath: String,
+        targetBinding: String,
+        targetType: TypeReference
+    ) -> Bool {
+        guard
+            let syntaxResolver = activeSyntaxResolver,
+            let targetName = syntaxResolver.nominalName(of: targetType)
+        else {
+            return false
+        }
+
+        let directPath = "\(targetBinding).rewrite"
+        if normalizedPath == directPath {
+            return syntaxResolver.declaration(named: targetName, conformsTo: "SupportsRewrite")
+        }
+
+        let prefix = "\(targetBinding)."
+        let suffix = ".rewrite"
+        guard normalizedPath.hasPrefix(prefix), normalizedPath.hasSuffix(suffix) else {
+            return false
+        }
+
+        let start = normalizedPath.index(normalizedPath.startIndex, offsetBy: prefix.count)
+        let end = normalizedPath.index(normalizedPath.endIndex, offsetBy: -suffix.count)
+        let memberPath = normalizedPath[start..<end]
+        guard !memberPath.isEmpty else {
+            return false
+        }
+
+        var currentTypeName = targetName
+        for rawSegment in memberPath.split(separator: ".") {
+            var segment = String(rawSegment)
+            let expectsArray = segment.hasSuffix("[]")
+            if expectsArray {
+                segment.removeLast(2)
+            }
+
+            guard
+                let currentConstruct = activeConstructsByName[currentTypeName],
+                let value = currentConstruct.values.first(where: { $0.name == segment }),
+                let resolvedType = resolvedDeclaredValueType(
+                    named: value.typeName,
+                    ownerTypeName: currentTypeName,
+                    syntaxResolver: syntaxResolver
+                )
+            else {
+                return false
+            }
+
+            if expectsArray != resolvedType.isArray {
+                return false
+            }
+
+            currentTypeName = resolvedType.typeName
+        }
+
+        return syntaxResolver.declaration(named: currentTypeName, conformsTo: "SupportsRewrite")
+    }
+
     static func validateRewriteSites(
         for macro: MacroDeclaration,
         targetKind: MacroTargetKind
@@ -2097,7 +2197,11 @@ public enum MacroExpander {
                     targetBinding: targetBinding,
                     targetKind: targetKind
                 ) != nil,
-                allowedPaths.contains(normalizedPath)
+                declaredRewritePathExists(
+                    normalizedPath,
+                    targetBinding: targetBinding,
+                    targetType: macro.target.typeReference
+                )
             else {
                 invalidPaths.append(name)
                 continue
