@@ -23,7 +23,7 @@ extension MacroExpander {
             return value ? "true" : "false"
         case .nilLiteral:
             return "nil"
-        case .freestandingMacro(let name, let arguments):
+        case .macroInvocation(let name, let arguments):
             return "#\(name)(\(renderArgumentsForStringify(arguments)))"
         case .block:
             return "{ ... }"

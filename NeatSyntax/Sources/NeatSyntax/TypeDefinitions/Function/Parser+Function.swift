@@ -497,7 +497,7 @@ extension Parser {
 
         for statement in statements {
             switch statement {
-            case .freestandingMacro(_, _, let body):
+            case .macroInvocation(_, _, let body):
                 expressions.append(contentsOf: collectReturnExpressions(in: body))
             case .return(let expression):
                 expressions.append(expression)
@@ -543,7 +543,7 @@ extension Parser {
 
     func statementAlwaysReturnsValue(_ statement: Statement) -> Bool {
         switch statement {
-        case .freestandingMacro(_, _, let body):
+        case .macroInvocation(_, _, let body):
             return blockAlwaysReturnsValue(body)
         case .return(let expression):
             return expression != nil

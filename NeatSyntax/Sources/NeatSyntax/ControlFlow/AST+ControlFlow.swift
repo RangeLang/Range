@@ -1,7 +1,7 @@
 import Foundation
 
 public indirect enum Statement {
-    case freestandingMacro(name: String, argumentClause: String?, body: [Statement])
+    case macroInvocation(name: String, argumentClause: String?, body: [Statement])
     case background(Background)
     case localBinding(LocalBindingDeclaration)
     case localCallable(LocalCallableDeclaration)

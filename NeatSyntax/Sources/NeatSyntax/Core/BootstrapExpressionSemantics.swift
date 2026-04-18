@@ -22,7 +22,7 @@ public enum ExpressionTypeSemantics {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
-        case .freestandingMacro(let name, let arguments):
+        case .macroInvocation(let name, let arguments):
             if let expansionType = try inferMacroExpansionType(
                 name: name,
                 arguments: arguments,
@@ -272,7 +272,7 @@ public enum ExpressionTypeSemantics {
         macroExpansionResolver: DeclarationMacroExpansionResolver = .empty
     ) throws -> Bool {
         switch expression {
-        case .freestandingMacro:
+        case .macroInvocation:
             // Expression-targeted macros expand before semantic validation. In an explicit
             // context, defer compatibility to the expanded expression instead of rejecting the
             // use site during bootstrap inference.
@@ -465,7 +465,7 @@ public enum ExpressionTypeSemantics {
         case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral, .array,
             .dictionary:
             return true
-        case .block, .freestandingMacro, .identifier, .call, .bindingReference, .ternary, .unary,
+        case .block, .macroInvocation, .identifier, .call, .bindingReference, .ternary, .unary,
             .binary:
             return false
         }

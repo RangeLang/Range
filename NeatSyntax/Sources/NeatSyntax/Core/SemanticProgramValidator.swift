@@ -193,7 +193,7 @@ public struct SemanticProgramValidator {
     ) throws {
         for statement in statements {
             switch statement {
-            case .freestandingMacro(_, _, let body):
+            case .macroInvocation(_, _, let body):
                 try validateControlFlow(
                     in: body,
                     context: context,
@@ -611,7 +611,7 @@ public struct SemanticProgramValidator {
                     operatorResolver: operatorResolver,
                     fileName: fileName
                 )
-            case .freestandingMacro(_, _, let body),
+            case .macroInvocation(_, _, let body),
                 .derived(_, _, let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body):
@@ -890,7 +890,7 @@ public struct SemanticProgramValidator {
                     operatorResolver: operatorResolver,
                     fileName: fileName
                 )
-            case .freestandingMacro(_, _, let body),
+            case .macroInvocation(_, _, let body),
                 .derived(_, _, let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body):
@@ -958,7 +958,7 @@ public struct SemanticProgramValidator {
 
         for statement in statements {
             switch statement {
-            case .freestandingMacro(_, _, let body):
+            case .macroInvocation(_, _, let body):
                 expressions.append(contentsOf: collectReturnExpressions(in: body))
             case .return(let expression):
                 expressions.append(expression)
@@ -1014,7 +1014,7 @@ public struct SemanticProgramValidator {
 
     private func statementAlwaysReturnsValue(_ statement: Statement) -> Bool {
         switch statement {
-        case .freestandingMacro(_, _, let body):
+        case .macroInvocation(_, _, let body):
             return blockAlwaysReturnsValue(body)
         case .return(let expression):
             return expression != nil
@@ -1202,7 +1202,7 @@ public struct SemanticProgramValidator {
 
         for statement in statements {
             switch statement {
-            case .freestandingMacro(_, _, let body):
+            case .macroInvocation(_, _, let body):
                 try validateCallArgumentLabels(
                     in: body,
                     environment: environment,
@@ -1392,7 +1392,7 @@ public struct SemanticProgramValidator {
                     fileName: fileName
                 )
             }
-        case .freestandingMacro(_, let arguments):
+        case .macroInvocation(_, let arguments):
             for argument in arguments {
                 try validateCallArgumentLabels(
                     in: argument.value,
@@ -1781,7 +1781,7 @@ public struct SemanticProgramValidator {
 
         for statement in statements {
             switch statement {
-            case .freestandingMacro(_, _, let body):
+            case .macroInvocation(_, _, let body):
                 try validateBindingReferences(in: body, context: context, fileName: fileName)
             case .background(let background):
                 try validateBindingReferences(
@@ -1909,7 +1909,7 @@ public struct SemanticProgramValidator {
                     "Binding reference '$\(path)' in \(fileName) must reference mutable storage."
                 )
             }
-        case .freestandingMacro(_, let arguments), .call(_, let arguments):
+        case .macroInvocation(_, let arguments), .call(_, let arguments):
             for argument in arguments {
                 try validateBindingReferences(in: argument.value, context: context, fileName: fileName)
             }
@@ -2069,7 +2069,7 @@ public struct SemanticProgramValidator {
     ) throws {
         for statement in statements {
             switch statement {
-            case .freestandingMacro(_, _, let body):
+            case .macroInvocation(_, _, let body):
                 try validateValueDeclarations(
                     in: body,
                     bindingConstructNames: bindingConstructNames,

@@ -118,7 +118,7 @@ extension Parser {
             return .string(value)
         case .hashDirective(let name):
             advance()
-            return .freestandingMacro(
+            return .macroInvocation(
                 name: name,
                 arguments: try parseInvocationArgumentsIfPresent()
             )

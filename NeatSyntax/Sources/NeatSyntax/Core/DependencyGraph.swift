@@ -1346,7 +1346,7 @@ private struct GraphCollector {
         for (index, statement) in statements.enumerated() {
             let statementID = "\(ownerID)/stmt:\(index)"
             switch statement {
-            case .freestandingMacro(_, _, let body):
+            case .macroInvocation(_, _, let body):
                 analyzeStatements(
                     body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
             case .background(let background):
@@ -1517,7 +1517,7 @@ private struct GraphCollector {
             if let resolved = resolveSimpleName(name, scope: scope) {
                 addEdge(from: ownerID, to: resolved, kind: .dependsOn)
             }
-        case .freestandingMacro(_, let arguments):
+        case .macroInvocation(_, let arguments):
             for argument in arguments {
                 analyzeExpression(
                     argument.value, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)

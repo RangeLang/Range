@@ -370,7 +370,7 @@ public enum MacroExpander {
         -> [Statement]
     {
         switch statement {
-        case .freestandingMacro(let name, let argumentClause, let body):
+        case .macroInvocation(let name, let argumentClause, let body):
             guard let macro = macros[name] else {
                 throw ParseError("Unknown block-targeted macro #\(name).")
             }
@@ -804,7 +804,7 @@ public enum MacroExpander {
             }
 
             return .call(name: name, arguments: callArguments)
-        case .freestandingMacro(let name, let arguments):
+        case .macroInvocation(let name, let arguments):
             guard let macro = macros[name],
                 macroTargetKind(for: macro) == .expression
             else {
@@ -821,7 +821,7 @@ public enum MacroExpander {
                         )
                     )
                 }
-                return .freestandingMacro(name: name, arguments: rewrittenArguments)
+                return .macroInvocation(name: name, arguments: rewrittenArguments)
             }
 
             let argumentBindings = try expressionMacroArgumentBindings(
@@ -1350,7 +1350,7 @@ public enum MacroExpander {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
-        case .block, .freestandingMacro, .identifier, .call, .bindingReference, .array,
+        case .block, .macroInvocation, .identifier, .call, .bindingReference, .array,
             .dictionary, .ternary, .unary, .binary:
             return nil
         }
@@ -1547,7 +1547,7 @@ public enum MacroExpander {
                 if let defaultBody {
                     expressions.append(contentsOf: macroOperationExpressions(in: defaultBody))
                 }
-            case .localBinding, .assignment, .compoundAssignment, .return, .freestandingMacro,
+            case .localBinding, .assignment, .compoundAssignment, .return, .macroInvocation,
                 .environmentProvision, .break, .continue:
                 continue
             }
@@ -1741,8 +1741,8 @@ public enum MacroExpander {
                     substituteMacroBindings(in: $0, bindings: bindings)
                 }
             )
-        case .freestandingMacro(let name, let argumentClause, let body):
-            return .freestandingMacro(
+        case .macroInvocation(let name, let argumentClause, let body):
+            return .macroInvocation(
                 name: name,
                 argumentClause: argumentClause,
                 body: substituteMacroBindings(in: body, bindings: bindings)
@@ -1769,8 +1769,8 @@ public enum MacroExpander {
                     )
                 }
             )
-        case .freestandingMacro(let name, let arguments):
-            return .freestandingMacro(
+        case .macroInvocation(let name, let arguments):
+            return .macroInvocation(
                 name: name,
                 arguments: arguments.map { argument in
                     CallArgument(

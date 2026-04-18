@@ -5,7 +5,7 @@ extension Parser {
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         if isMacroApplicationStart() {
-            return try parseFreestandingMacroStatement(localBindings: &localBindings)
+            return try parseMacroInvocationStatement(localBindings: &localBindings)
         }
 
         if isLocalBackgroundCallableStart() {
@@ -89,7 +89,7 @@ extension Parser {
         }
     }
 
-    mutating func parseFreestandingMacroStatement(
+    mutating func parseMacroInvocationStatement(
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         guard case .hashDirective(let name) = peek() else {
@@ -98,7 +98,7 @@ extension Parser {
         advance()
         let argumentClause = try parseMacroArgumentClauseIfPresent()
         let body = try parseStatementBlock(baseLocalBindings: localBindings)
-        return .freestandingMacro(name: name, argumentClause: argumentClause, body: body)
+        return .macroInvocation(name: name, argumentClause: argumentClause, body: body)
     }
 
     func isBackgroundStatementStart() -> Bool {
