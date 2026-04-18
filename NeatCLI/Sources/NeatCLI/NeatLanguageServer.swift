@@ -1025,7 +1025,7 @@ private struct DocumentIndex {
 
         let typePattern = #"\b[A-Z][A-Za-z0-9_]*\b"#
         let functionDeclarationPattern =
-            #"\b(?:function|func)\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
+            #"\bfunction\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let macroDeclarationPattern =
             #"\bmacro\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
@@ -1053,7 +1053,7 @@ private struct DocumentIndex {
         let keywordNames: Set<String> = [
             "background", "binding", "break", "builder", "capture", "case", "construct",
             "continue", "core", "default", "derived", "else", "enum", "environment",
-            "extension", "for", "func", "function", "get", "if", "in", "infix", "init",
+            "extension", "for", "function", "get", "if", "in", "infix", "init",
             "macro", "main", "nil", "on", "operator", "postfix", "precedencegroup", "prefix",
             "protocol", "return", "self", "set", "state", "switch", "value", "var",
             "while",
@@ -1062,7 +1062,7 @@ private struct DocumentIndex {
             keywordNames
         )
         let identifierKeywordExclusions: Set<String> = [
-            "if", "for", "while", "switch", "return", "macro", "function", "func", "init",
+            "if", "for", "while", "switch", "return", "macro", "function", "init",
             "construct", "enum", "protocol", "extension", "background", "state",
             "environment", "binding", "derived", "var", "case", "default", "break",
             "continue", "true", "false", "nil", "self",
@@ -1589,7 +1589,6 @@ private struct DocumentIndex {
 
         let declarationPatterns = [
             #"\bfunction\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
-            #"\bfunc\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
             #"\bmacro\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
         ]
 
