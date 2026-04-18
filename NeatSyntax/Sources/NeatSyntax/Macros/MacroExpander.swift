@@ -2,13 +2,6 @@ import Foundation
 
 public enum MacroExpander {
     private static let expansionLock = NSLock()
-    nonisolated(unsafe) private static var activeInitMacroTargets: [RealizedInitMacroTarget] = []
-    nonisolated(unsafe) private static var activeFunctionMacroTargets:
-        [AttachedFunctionMacroSignature] =
-            []
-    nonisolated(unsafe) private static var activeSyntaxResolver: DeclarationSyntaxResolver?
-    nonisolated(unsafe) private static var activeConstructsByName: [String: ConstructDeclaration] =
-        [:]
 
     public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
         expansionLock.lock()
@@ -21,25 +14,11 @@ public enum MacroExpander {
             macros: Array(registry.values),
             syntaxResolver: declarationGraph.syntaxResolver
         )
-        let attachedParameterCallables = collectAttachedParameterCallables(
-            from: files,
-            macros: registry
+        let macroRealizationView = declarationGraph.macroRealizationView(macrosByName: registry)
+        let context = MacroExpansionContext(
+            macroRealizationView: macroRealizationView,
+            rewriteSurfaceView: declarationGraph.rewriteSurfaceView
         )
-        let attachedFunctionCallables = collectAttachedFunctionCallables(
-            from: files,
-            macros: registry
-        )
-        let attachedLiteralConstructs = declarationGraph.realizedLiteralBridges
-        activeInitMacroTargets = declarationGraph.realizedInitMacroTargets
-        activeFunctionMacroTargets = attachedFunctionCallables
-        activeSyntaxResolver = declarationGraph.syntaxResolver
-        activeConstructsByName = declarationGraph.constructsByName
-        defer {
-            activeInitMacroTargets = []
-            activeFunctionMacroTargets = []
-            activeSyntaxResolver = nil
-            activeConstructsByName = [:]
-        }
         return try files.map { parsedFile in
             ParsedSourceFile(
                 path: parsedFile.path,
@@ -47,8 +26,9 @@ public enum MacroExpander {
                     sourceFile: parsedFile.sourceFile,
                     macros: registry,
                     protocols: protocols,
-                    attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedParameterCallables: macroRealizationView.parameterMacroSignatures,
+                    attachedLiteralConstructs: macroRealizationView.realizedLiteralBridges,
+                    context: context
                 )
             )
         }
@@ -58,8 +38,9 @@ public enum MacroExpander {
         sourceFile: SourceFileNode,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws -> SourceFileNode {
         switch sourceFile {
         case .mainBlock(let mainBlock):
@@ -71,7 +52,8 @@ public enum MacroExpander {
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     ))
             )
         case .module(let module):
@@ -85,7 +67,8 @@ public enum MacroExpander {
                                 macros: macros,
                                 protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables,
-                                attachedLiteralConstructs: attachedLiteralConstructs
+                                attachedLiteralConstructs: attachedLiteralConstructs,
+                                context: context
                             ))
                     },
                     states: try module.states.map {
@@ -93,7 +76,8 @@ public enum MacroExpander {
                             state: $0,
                             macros: macros,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         )
                     },
                     callables: try module.callables.map {
@@ -102,7 +86,8 @@ public enum MacroExpander {
                             macros: macros,
                             protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         )
                     },
                     constructs: try module.constructs.map {
@@ -111,7 +96,8 @@ public enum MacroExpander {
                             macros: macros,
                             protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         )
                     },
                     enumerations: module.enumerations,
@@ -129,7 +115,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 ))
         case .macro, .enumeration, .protocolDefinition, .extensions:
             return sourceFile
@@ -140,14 +127,16 @@ public enum MacroExpander {
         construct: ConstructDeclaration,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws
         -> ConstructDeclaration
     {
-        try validateAttachedConstructMacros(
+        try validateConstructMacros(
             applications: construct.macros,
-            macros: macros
+            macros: macros,
+            context: context
         )
 
         let carriedInitializers = DeclarationGraph.carriedProtocolInitializerMacros(
@@ -168,7 +157,8 @@ public enum MacroExpander {
                     state: $0,
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             },
             environments: construct.environments,
@@ -179,7 +169,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             },
             values: construct.values,
@@ -189,7 +180,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             },
             callables: try construct.callables.map {
@@ -198,7 +190,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             },
             constructs: try construct.constructs.map {
@@ -207,7 +200,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             }
         )
@@ -217,8 +211,9 @@ public enum MacroExpander {
         callable: CallableDeclaration,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws
         -> CallableDeclaration
     {
@@ -229,7 +224,7 @@ public enum MacroExpander {
             name: callable.name,
             genericParameters: callable.genericParameters,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
-            parameters: try expand(parameters: callable.parameters, macros: macros),
+            parameters: try expand(parameters: callable.parameters, macros: macros, context: context),
             returnType: callable.returnType,
             body: try callable.body.map {
                 try expand(
@@ -238,7 +233,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             }
         )
@@ -248,15 +244,16 @@ public enum MacroExpander {
         initializer: InitializerDeclaration,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     )
         throws
         -> InitializerDeclaration
     {
         InitializerDeclaration(
             macros: initializer.macros,
-            parameters: try expand(parameters: initializer.parameters, macros: macros),
+            parameters: try expand(parameters: initializer.parameters, macros: macros, context: context),
             body: try initializer.body.map {
                 try expand(
                     statements: $0,
@@ -264,7 +261,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             }
         )
@@ -274,8 +272,9 @@ public enum MacroExpander {
         derived: DerivedDeclaration,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws
         -> DerivedDeclaration
     {
@@ -291,7 +290,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             }
         )
@@ -300,8 +300,9 @@ public enum MacroExpander {
     static func expand(
         state: StateDeclaration,
         macros: [String: MacroDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws -> StateDeclaration {
         let storage: StateStorage
 
@@ -313,7 +314,8 @@ public enum MacroExpander {
                     expectedType: state.type,
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             )
         case .declared:
@@ -334,8 +336,9 @@ public enum MacroExpander {
         expectedReturnType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws
         -> [Statement]
     {
@@ -348,7 +351,8 @@ public enum MacroExpander {
                     macros: macros,
                     protocols: protocols,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 ))
         }
         return expanded
@@ -359,8 +363,9 @@ public enum MacroExpander {
         expectedReturnType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
         protocols: [String: ProtocolDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws
         -> [Statement]
     {
@@ -378,13 +383,14 @@ public enum MacroExpander {
                 macros: macros,
                 protocols: protocols,
                 attachedParameterCallables: attachedParameterCallables,
-                attachedLiteralConstructs: attachedLiteralConstructs
+                attachedLiteralConstructs: attachedLiteralConstructs,
+                context: context
             )
             let argumentBindings = try parseMacroArgumentBindings(
                 for: macro,
                 argumentClause: argumentClause
             )
-            let rewriteBody = try rewriteBody(for: macro)
+            let rewriteBody = try rewriteBody(for: macro, context: context)
             let bindingSubstituted = substituteMacroBindings(
                 in: rewriteBody,
                 bindings: argumentBindings
@@ -399,7 +405,8 @@ public enum MacroExpander {
                 macros: macros,
                 protocols: protocols,
                 attachedParameterCallables: attachedParameterCallables,
-                attachedLiteralConstructs: attachedLiteralConstructs
+                attachedLiteralConstructs: attachedLiteralConstructs,
+                context: context
             )
         case .background(let background):
             return [
@@ -410,7 +417,8 @@ public enum MacroExpander {
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     ))
                 )
             ]
@@ -431,7 +439,8 @@ public enum MacroExpander {
                             macros: macros,
                             protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         )
                     )
                 )
@@ -445,7 +454,8 @@ public enum MacroExpander {
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     ))
             ]
         case .forEach(let name, let sequence, let body):
@@ -457,7 +467,8 @@ public enum MacroExpander {
                         expectedType: nil,
                         macros: macros,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     ),
                     body: try expand(
                         statements: body,
@@ -465,7 +476,8 @@ public enum MacroExpander {
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     ))
             ]
         case .whileLoop(let condition, let body):
@@ -476,7 +488,8 @@ public enum MacroExpander {
                         expectedType: .named("Bool"),
                         macros: macros,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     ),
                     body: try expand(
                         statements: body,
@@ -484,7 +497,8 @@ public enum MacroExpander {
                         macros: macros,
                         protocols: protocols,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     ))
             ]
         case .conditional(let branches):
@@ -498,7 +512,8 @@ public enum MacroExpander {
                                     expectedType: .named("Bool"),
                                     macros: macros,
                                     attachedParameterCallables: attachedParameterCallables,
-                                    attachedLiteralConstructs: attachedLiteralConstructs)
+                                    attachedLiteralConstructs: attachedLiteralConstructs,
+                                    context: context)
                             },
                             body: try expand(
                                 statements: branch.body,
@@ -506,7 +521,8 @@ public enum MacroExpander {
                                 macros: macros,
                                 protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables,
-                                attachedLiteralConstructs: attachedLiteralConstructs
+                                attachedLiteralConstructs: attachedLiteralConstructs,
+                                context: context
                             )
                         )
                     }
@@ -526,7 +542,8 @@ public enum MacroExpander {
                                 ? declaration.type : nil,
                             macros: macros,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         )
                     )
                 )
@@ -540,7 +557,8 @@ public enum MacroExpander {
                         expectedType: nil,
                         macros: macros,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     )
                 )
             ]
@@ -554,7 +572,8 @@ public enum MacroExpander {
                         expectedType: nil,
                         macros: macros,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     )
                 )
             ]
@@ -566,7 +585,8 @@ public enum MacroExpander {
                         expectedType: nil,
                         macros: macros,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs))
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context))
             ]
         case .return(let expression):
             return [
@@ -577,7 +597,8 @@ public enum MacroExpander {
                             expectedType: expectedReturnType,
                             macros: macros,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs)
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context)
                     })
             ]
         case .switchStatement(let expression, let cases, let defaultBody):
@@ -588,7 +609,8 @@ public enum MacroExpander {
                         expectedType: nil,
                         macros: macros,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     ),
                     cases: try cases.map { switchCase in
                         SwitchCase(
@@ -596,7 +618,8 @@ public enum MacroExpander {
                                 switchCasePattern: switchCase.pattern,
                                 macros: macros,
                                 attachedParameterCallables: attachedParameterCallables,
-                                attachedLiteralConstructs: attachedLiteralConstructs
+                                attachedLiteralConstructs: attachedLiteralConstructs,
+                                context: context
                             ),
                             body: try expand(
                                 statements: switchCase.body,
@@ -604,7 +627,8 @@ public enum MacroExpander {
                                 macros: macros,
                                 protocols: protocols,
                                 attachedParameterCallables: attachedParameterCallables,
-                                attachedLiteralConstructs: attachedLiteralConstructs
+                                attachedLiteralConstructs: attachedLiteralConstructs,
+                                context: context
                             )
                         )
                     },
@@ -615,7 +639,8 @@ public enum MacroExpander {
                             macros: macros,
                             protocols: protocols,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         )
                     }
                 )
@@ -628,8 +653,9 @@ public enum MacroExpander {
     static func expand(
         switchCasePattern pattern: SwitchCasePattern,
         macros: [String: MacroDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws -> SwitchCasePattern {
         switch pattern {
         case .expression(let expression):
@@ -639,7 +665,8 @@ public enum MacroExpander {
                     expectedType: nil,
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             )
         case .enumCase:
@@ -649,7 +676,8 @@ public enum MacroExpander {
 
     static func expand(
         parameters: [NeatFunctionParameter],
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
     ) throws -> [NeatFunctionParameter] {
         try parameters.map { parameter in
             let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
@@ -670,7 +698,7 @@ public enum MacroExpander {
 
             let rewrittenType = try attachedParameterMacros.reduce(typeReference) {
                 currentType, macro in
-                try applyAttachedParameterTypeRewrite(macro: macro, to: currentType)
+                try applyAttachedParameterTypeRewrite(macro: macro, to: currentType, context: context)
             }
 
             return NeatFunctionParameter(
@@ -689,8 +717,9 @@ public enum MacroExpander {
         expression: Expression,
         expectedType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
-        attachedParameterCallables: [AttachedParameterMacroSignature],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedParameterCallables: [ParameterMacroSignature],
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws -> Expression {
         switch expression {
         case .call(let name, let arguments):
@@ -702,29 +731,32 @@ public enum MacroExpander {
                         expectedType: nil,
                         macros: macros,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     )
                 )
             }
 
             let callArguments: [CallArgument]
-            if let signature = try matchingAttachedParameterCallable(
+            if let signature = try matchingParameterMacroSignature(
                 name: name,
                 arguments: rewrittenArguments,
-                signatures: attachedParameterCallables
+                signatures: attachedParameterCallables,
+                context: context
             ) {
                 var wrappedArguments: [CallArgument] = []
                 var argumentIndex = 0
 
                 for parameterIndex in signature.labels.indices {
-                    if let macro = signature.attachedParameterMacrosByIndex[parameterIndex],
-                        try parameterApplicationRewritePlan(for: macro)?.isVariadic == true
+                    if let macro = signature.parameterMacrosByIndex[parameterIndex],
+                        try parameterApplicationRewritePlan(for: macro, context: context)?.isVariadic == true
                     {
                         let consumedArguments = Array(rewrittenArguments.dropFirst(argumentIndex))
                         wrappedArguments.append(
                             try applyParameterApplicationRewrite(
                                 macro: macro,
-                                arguments: consumedArguments
+                                arguments: consumedArguments,
+                                context: context
                             )
                         )
                         argumentIndex = rewrittenArguments.count
@@ -736,11 +768,12 @@ public enum MacroExpander {
                     }
 
                     let argument = rewrittenArguments[argumentIndex]
-                    if let macro = signature.attachedParameterMacrosByIndex[parameterIndex] {
+                    if let macro = signature.parameterMacrosByIndex[parameterIndex] {
                         wrappedArguments.append(
                             try applyParameterApplicationRewrite(
                                 macro: macro,
-                                arguments: [argument]
+                                arguments: [argument],
+                                context: context
                             )
                         )
                     } else {
@@ -756,14 +789,16 @@ public enum MacroExpander {
             if let rewrittenByInitMacro = try applyInitMacroRewritesIfNeeded(
                 callName: name,
                 callArguments: callArguments,
-                macros: macros
+                macros: macros,
+                context: context
             ) {
                 return rewrittenByInitMacro
             }
 
             if let rewrittenByFunctionMacro = try applyFunctionMacroRewritesIfNeeded(
                 callName: name,
-                callArguments: callArguments
+                callArguments: callArguments,
+                context: context
             ) {
                 return rewrittenByFunctionMacro
             }
@@ -781,7 +816,8 @@ public enum MacroExpander {
                             expectedType: nil,
                             macros: macros,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         )
                     )
                 }
@@ -792,7 +828,7 @@ public enum MacroExpander {
                 for: macro,
                 arguments: arguments
             )
-            let rewrite = try rewriteExpression(for: macro)
+            let rewrite = try rewriteExpression(for: macro, context: context)
             let interpreted = interpretExpressionMacroRewrite(rewrite, bindings: argumentBindings)
             let substituted = substituteMacroBindings(in: interpreted, bindings: argumentBindings)
             return try expand(
@@ -800,7 +836,8 @@ public enum MacroExpander {
                 expectedType: expectedType,
                 macros: macros,
                 attachedParameterCallables: attachedParameterCallables,
-                attachedLiteralConstructs: attachedLiteralConstructs
+                attachedLiteralConstructs: attachedLiteralConstructs,
+                context: context
             )
         case .array(let elements):
             return .array(
@@ -810,7 +847,8 @@ public enum MacroExpander {
                         expectedType: nil,
                         macros: macros,
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     )
                 }
             )
@@ -823,14 +861,16 @@ public enum MacroExpander {
                             expectedType: nil,
                             macros: macros,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         ),
                         value: try expand(
                             expression: element.value,
                             expectedType: nil,
                             macros: macros,
                             attachedParameterCallables: attachedParameterCallables,
-                            attachedLiteralConstructs: attachedLiteralConstructs
+                            attachedLiteralConstructs: attachedLiteralConstructs,
+                            context: context
                         )
                     )
                 }
@@ -842,20 +882,23 @@ public enum MacroExpander {
                     expectedType: .named("Bool"),
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs),
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context),
                 trueExpression: try expand(
                     expression: trueExpression,
                     expectedType: expectedType,
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 ),
                 falseExpression: try expand(
                     expression: falseExpression,
                     expectedType: expectedType,
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context
                 )
             )
         case .unary(let operatorSymbol, let nested):
@@ -866,7 +909,8 @@ public enum MacroExpander {
                     expectedType: operatorSymbol == .not ? .named("Bool") : nil,
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs)
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context)
             )
         case .binary(let lhs, let operatorSymbol, let rhs):
             return .binary(
@@ -875,14 +919,16 @@ public enum MacroExpander {
                     expectedType: nil,
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs),
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context),
                 operatorSymbol: operatorSymbol,
                 rhs: try expand(
                     expression: rhs,
                     expectedType: nil,
                     macros: macros,
                     attachedParameterCallables: attachedParameterCallables,
-                    attachedLiteralConstructs: attachedLiteralConstructs)
+                    attachedLiteralConstructs: attachedLiteralConstructs,
+                    context: context)
             )
         case .interpolatedString(let string):
             let expanded: Expression = .interpolatedString(
@@ -898,7 +944,8 @@ public enum MacroExpander {
                                     expectedType: nil,
                                     macros: macros,
                                     attachedParameterCallables: attachedParameterCallables,
-                                    attachedLiteralConstructs: attachedLiteralConstructs
+                                    attachedLiteralConstructs: attachedLiteralConstructs,
+                                    context: context
                                 ))
                         }
                     }
@@ -908,7 +955,8 @@ public enum MacroExpander {
                 expanded,
                 expectedType: expectedType,
                 macros: macros,
-                attachedLiteralConstructs: attachedLiteralConstructs
+                attachedLiteralConstructs: attachedLiteralConstructs,
+                context: context
             )
         case .block(let body):
             return .block(
@@ -919,7 +967,8 @@ public enum MacroExpander {
                         macros: macros,
                         protocols: [:],
                         attachedParameterCallables: attachedParameterCallables,
-                        attachedLiteralConstructs: attachedLiteralConstructs
+                        attachedLiteralConstructs: attachedLiteralConstructs,
+                        context: context
                     )
                 }
             )
@@ -928,7 +977,8 @@ public enum MacroExpander {
                 expression,
                 expectedType: expectedType,
                 macros: macros,
-                attachedLiteralConstructs: attachedLiteralConstructs
+                attachedLiteralConstructs: attachedLiteralConstructs,
+                context: context
             )
         case .identifier, .bindingReference:
             return expression
@@ -939,7 +989,8 @@ public enum MacroExpander {
         _ expression: Expression,
         expectedType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
-        attachedLiteralConstructs: [RealizedLiteralBridge]
+        attachedLiteralConstructs: [RealizedLiteralBridge],
+        context: MacroExpansionContext
     ) throws -> Expression {
         guard let literalType = bootstrapLiteralType(for: expression)
         else {
@@ -969,7 +1020,8 @@ public enum MacroExpander {
                     CallArgument(
                         label: bridge.initTarget.parameterLabels.first ?? nil, value: expression)
                 ],
-                macros: macros
+                macros: macros,
+                context: context
             )
         else {
             throw ParseError(
@@ -984,13 +1036,14 @@ public enum MacroExpander {
         macroName: String,
         initTarget: RealizedInitTarget,
         applicationArguments: [CallArgument],
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
     ) throws -> Expression? {
         guard let macro = macros[macroName], macroTargetKind(for: macro) == .initializer else {
             return nil
         }
 
-        guard let rewriteExpression = try initRewriteExpression(for: macro) else {
+        guard let rewriteExpression = try initRewriteExpression(for: macro, context: context) else {
             return nil
         }
 
@@ -1002,8 +1055,13 @@ public enum MacroExpander {
         )
     }
 
-    static func initRewriteExpression(for macro: MacroDeclaration) throws -> Expression? {
-        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .initApplication {
+    static func initRewriteExpression(
+        for macro: MacroDeclaration,
+        context: MacroExpansionContext
+    ) throws -> Expression? {
+        for rewrite in try resolvedRewriteCalls(for: macro, context: context)
+        where rewrite.site == .initApplication
+        {
             return rewrite.payload
         }
 
@@ -1013,13 +1071,14 @@ public enum MacroExpander {
     static func applyInitMacroRewritesIfNeeded(
         callName: String,
         callArguments: [CallArgument],
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
     ) throws -> Expression? {
         guard
             let target = matchingInitMacroTarget(
                 callName: callName,
                 callArguments: callArguments,
-                targets: activeInitMacroTargets
+                targets: context.macroRealizationView.realizedInitMacroTargets
             )
         else {
             return nil
@@ -1040,7 +1099,8 @@ public enum MacroExpander {
                     macroName: macroApplication.name,
                     initTarget: target.initTarget,
                     applicationArguments: currentArguments,
-                    macros: macros
+                    macros: macros,
+                    context: context
                 )
             else {
                 continue
@@ -1092,20 +1152,21 @@ public enum MacroExpander {
 
     static func applyFunctionMacroRewritesIfNeeded(
         callName: String,
-        callArguments: [CallArgument]
+        callArguments: [CallArgument],
+        context: MacroExpansionContext
     ) throws -> Expression? {
         guard
             let target = matchingFunctionMacroTarget(
                 callName: callName,
                 callArguments: callArguments,
-                targets: activeFunctionMacroTargets
+                targets: context.macroRealizationView.functionMacroSignatures
             )
         else {
             return nil
         }
 
-        for macro in target.attachedFunctionMacros {
-            guard let rewrite = try functionRewriteExpression(for: macro) else {
+        for macro in target.functionMacros {
+            guard let rewrite = try functionRewriteExpression(for: macro, context: context) else {
                 continue
             }
 
@@ -1127,8 +1188,8 @@ public enum MacroExpander {
     static func matchingFunctionMacroTarget(
         callName: String,
         callArguments: [CallArgument],
-        targets: [AttachedFunctionMacroSignature]
-    ) -> AttachedFunctionMacroSignature? {
+        targets: [FunctionMacroSignature]
+    ) -> FunctionMacroSignature? {
         let matching = targets.filter {
             $0.name == callName
                 && $0.labels.elementsEqual(callArguments.map(\.label), by: { $0 == $1 })
@@ -1144,8 +1205,11 @@ public enum MacroExpander {
         return byName[0]
     }
 
-    static func functionRewriteExpression(for macro: MacroDeclaration) throws -> Expression? {
-        for rewrite in try resolvedRewriteCalls(for: macro)
+    static func functionRewriteExpression(
+        for macro: MacroDeclaration,
+        context: MacroExpansionContext
+    ) throws -> Expression? {
+        for rewrite in try resolvedRewriteCalls(for: macro, context: context)
         where rewrite.site == .functionApplication {
             return rewrite.payload
         }
@@ -1313,19 +1377,20 @@ public enum MacroExpander {
             .bridge(expected: expectedType, carrierTypeName: carrierTypeName)
     }
 
-    static func matchingAttachedParameterCallable(
+    static func matchingParameterMacroSignature(
         name: String,
         arguments: [CallArgument],
-        signatures: [AttachedParameterMacroSignature]
-    ) throws -> AttachedParameterMacroSignature? {
+        signatures: [ParameterMacroSignature],
+        context: MacroExpansionContext
+    ) throws -> ParameterMacroSignature? {
         for signature in signatures {
             guard signature.name == name else {
                 continue
             }
 
             var variadicIndex: Int?
-            for entry in signature.attachedParameterMacrosByIndex.sorted(by: { $0.key < $1.key }) {
-                if try parameterApplicationRewritePlan(for: entry.value)?.isVariadic == true {
+            for entry in signature.parameterMacrosByIndex.sorted(by: { $0.key < $1.key }) {
+                if try parameterApplicationRewritePlan(for: entry.value, context: context)?.isVariadic == true {
                     variadicIndex = entry.key
                     break
                 }
@@ -1361,9 +1426,10 @@ public enum MacroExpander {
         return nil
     }
 
-    static func validateAttachedConstructMacros(
+    static func validateConstructMacros(
         applications: [MacroApplication],
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
     ) throws {
         for application in applications {
             guard let macro = macros[application.name] else {
@@ -1371,19 +1437,20 @@ public enum MacroExpander {
             }
             guard macroTargetKind(for: macro) == .construct else {
                 throw ParseError(
-                    "Macro #\(application.name) is attached to a construct but targets \(macro.target.typeReference.displayName)."
+                    "Macro #\(application.name) is used on a construct but targets \(macro.target.typeReference.displayName)."
                 )
             }
-            _ = try resolvedRewriteCalls(for: macro)
+            _ = try resolvedRewriteCalls(for: macro, context: context)
         }
     }
 
     static func applyAttachedParameterTypeRewrite(
         macro: MacroDeclaration,
-        to typeReference: TypeReference
+        to typeReference: TypeReference,
+        context: MacroExpansionContext
     ) throws -> TypeReference {
         let targetBinding = macro.bindings.target
-        for rewrite in try resolvedRewriteCalls(for: macro)
+        for rewrite in try resolvedRewriteCalls(for: macro, context: context)
         where rewrite.site == .parameterDeclarationType {
             if let rewrittenType = interpretTypeReferenceRewriteExpression(
                 rewrite.payload,
@@ -1400,11 +1467,12 @@ public enum MacroExpander {
 
     static func applyParameterApplicationRewrite(
         macro: MacroDeclaration,
-        arguments: [CallArgument]
+        arguments: [CallArgument],
+        context: MacroExpansionContext
     ) throws -> CallArgument {
         let targetBinding = macro.bindings.target
         let primaryArgument = arguments.first ?? CallArgument(label: nil, value: .array([]))
-        guard let plan = try parameterApplicationRewritePlan(for: macro) else {
+        guard let plan = try parameterApplicationRewritePlan(for: macro, context: context) else {
             return primaryArgument
         }
 
@@ -1431,10 +1499,11 @@ public enum MacroExpander {
     }
 
     static func parameterApplicationRewritePlan(
-        for macro: MacroDeclaration
+        for macro: MacroDeclaration,
+        context: MacroExpansionContext
     ) throws -> ParameterApplicationRewritePlan? {
         let targetBinding = macro.bindings.target
-        for rewrite in try resolvedRewriteCalls(for: macro)
+        for rewrite in try resolvedRewriteCalls(for: macro, context: context)
         where rewrite.site == .parameterApplicationArguments
             || rewrite.site == .parameterApplicationArgument
         {
@@ -1519,10 +1588,15 @@ public enum MacroExpander {
         return nil
     }
 
-    static func rewriteBody(for macro: MacroDeclaration) throws -> [Statement] {
+    static func rewriteBody(
+        for macro: MacroDeclaration,
+        context: MacroExpansionContext
+    ) throws -> [Statement] {
         var rewriteCalls: [[Statement]] = []
 
-        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .targetDirect {
+        for rewrite in try resolvedRewriteCalls(for: macro, context: context)
+        where rewrite.site == .targetDirect
+        {
             guard case .block(let body) = rewrite.payload else {
                 throw ParseError(
                     "Macro #\(macro.name) target.rewrite(...) must receive a block expression for Block-targeted macros."
@@ -1544,10 +1618,15 @@ public enum MacroExpander {
         return rewriteBody
     }
 
-    static func rewriteExpression(for macro: MacroDeclaration) throws -> Expression {
+    static func rewriteExpression(
+        for macro: MacroDeclaration,
+        context: MacroExpansionContext
+    ) throws -> Expression {
         var rewriteExpressions: [Expression] = []
 
-        for rewrite in try resolvedRewriteCalls(for: macro) where rewrite.site == .targetDirect {
+        for rewrite in try resolvedRewriteCalls(for: macro, context: context)
+        where rewrite.site == .targetDirect
+        {
             rewriteExpressions.append(rewrite.payload)
         }
 
@@ -1911,10 +1990,13 @@ public enum MacroExpander {
         }
     }
 
-    static func resolvedRewriteCalls(for macro: MacroDeclaration) throws -> [ResolvedRewriteCall] {
+    static func resolvedRewriteCalls(
+        for macro: MacroDeclaration,
+        context: MacroExpansionContext
+    ) throws -> [ResolvedRewriteCall] {
         let targetBinding = macro.bindings.target
         let targetKind = macroTargetKind(for: macro)
-        try validateRewriteSites(for: macro, targetKind: targetKind)
+        try validateRewriteSites(for: macro, targetKind: targetKind, context: context)
         return macroOperationExpressions(in: macro.body).compactMap {
             resolvedRewriteCall(
                 from: $0,
@@ -1926,104 +2008,13 @@ public enum MacroExpander {
 
     static func allowedRewritePaths(
         targetBinding: String,
-        targetType: TypeReference
+        targetType: TypeReference,
+        context: MacroExpansionContext
     ) -> Set<String> {
-        guard
-            let syntaxResolver = activeSyntaxResolver,
-            let targetName = syntaxResolver.nominalName(of: targetType)
-        else {
-            return []
-        }
-
-        var paths: Set<String> = []
-
-        func supportsRewrite(_ typeName: String) -> Bool {
-            syntaxResolver.declaration(named: typeName, conformsTo: "SupportsRewrite")
-        }
-
-        func resolvedValueType(
-            named rawTypeName: String,
-            ownerTypeName: String
-        ) -> (typeName: String, isArray: Bool)? {
-            var text = rawTypeName.trimmingCharacters(in: .whitespacesAndNewlines)
-            if text.hasSuffix("?") {
-                text.removeLast()
-                text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-
-            let isArray = text.hasPrefix("[") && text.hasSuffix("]")
-            if isArray {
-                text.removeFirst()
-                text.removeLast()
-                text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-
-            let qualifiedNestedName = "\(ownerTypeName).\(text)"
-            if activeConstructsByName[qualifiedNestedName] != nil {
-                return (qualifiedNestedName, isArray)
-            }
-
-            if activeConstructsByName[text] != nil {
-                return (text, isArray)
-            }
-
-            if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
-                || syntaxResolver.declaration(named: text, conformsTo: "SupportsRewrite")
-            {
-                return (text, isArray)
-            }
-
-            return nil
-        }
-
-        func collectRewritePaths(
-            for typeName: String,
-            path: String,
-            activeTypes: Set<String>
-        ) {
-            if supportsRewrite(typeName) {
-                paths.insert("\(path).rewrite")
-            }
-
-            guard !activeTypes.contains(typeName) else {
-                return
-            }
-
-            guard let construct = activeConstructsByName[typeName] else {
-                return
-            }
-
-            let nextActiveTypes = activeTypes.union([typeName])
-
-            for value in construct.values {
-                guard
-                    let resolvedType = resolvedValueType(
-                        named: value.typeName,
-                        ownerTypeName: typeName
-                    )
-                else {
-                    continue
-                }
-
-                let valuePath = "\(path).\(value.name)"
-                if resolvedType.isArray {
-                    collectRewritePaths(
-                        for: resolvedType.typeName,
-                        path: "\(valuePath)[]",
-                        activeTypes: nextActiveTypes
-                    )
-                } else {
-                    collectRewritePaths(
-                        for: resolvedType.typeName,
-                        path: valuePath,
-                        activeTypes: nextActiveTypes
-                    )
-                }
-            }
-        }
-
-        collectRewritePaths(for: targetName, path: targetBinding, activeTypes: [])
-        return paths
+        context.rewriteSurfaceView.allowedPaths(
+            targetBinding: targetBinding,
+            targetType: targetType
+        )
     }
 
     static func normalizedRewritePath(
@@ -2074,111 +2065,30 @@ public enum MacroExpander {
         return "\(targetBinding).\(normalized).rewrite"
     }
 
-    static func resolvedDeclaredValueType(
-        named rawTypeName: String,
-        ownerTypeName: String,
-        syntaxResolver: DeclarationSyntaxResolver
-    ) -> (typeName: String, isArray: Bool)? {
-        var text = rawTypeName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.hasSuffix("?") {
-            text.removeLast()
-            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        let isArray = text.hasPrefix("[") && text.hasSuffix("]")
-        if isArray {
-            text.removeFirst()
-            text.removeLast()
-            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
-
-        let qualifiedNestedName = "\(ownerTypeName).\(text)"
-        if activeConstructsByName[qualifiedNestedName] != nil {
-            return (qualifiedNestedName, isArray)
-        }
-
-        if activeConstructsByName[text] != nil {
-            return (text, isArray)
-        }
-
-        if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
-            || syntaxResolver.declaration(named: text, conformsTo: "SupportsRewrite")
-        {
-            return (text, isArray)
-        }
-
-        return nil
-    }
-
     static func declaredRewritePathExists(
         _ normalizedPath: String,
         targetBinding: String,
-        targetType: TypeReference
+        targetType: TypeReference,
+        context: MacroExpansionContext
     ) -> Bool {
-        guard
-            let syntaxResolver = activeSyntaxResolver,
-            let targetName = syntaxResolver.nominalName(of: targetType)
-        else {
-            return false
-        }
-
-        let directPath = "\(targetBinding).rewrite"
-        if normalizedPath == directPath {
-            return syntaxResolver.declaration(named: targetName, conformsTo: "SupportsRewrite")
-        }
-
-        let prefix = "\(targetBinding)."
-        let suffix = ".rewrite"
-        guard normalizedPath.hasPrefix(prefix), normalizedPath.hasSuffix(suffix) else {
-            return false
-        }
-
-        let start = normalizedPath.index(normalizedPath.startIndex, offsetBy: prefix.count)
-        let end = normalizedPath.index(normalizedPath.endIndex, offsetBy: -suffix.count)
-        let memberPath = normalizedPath[start..<end]
-        guard !memberPath.isEmpty else {
-            return false
-        }
-
-        var currentTypeName = targetName
-        for rawSegment in memberPath.split(separator: ".") {
-            var segment = String(rawSegment)
-            let expectsArray = segment.hasSuffix("[]")
-            if expectsArray {
-                segment.removeLast(2)
-            }
-
-            guard
-                let currentConstruct = activeConstructsByName[currentTypeName],
-                let value = currentConstruct.values.first(where: { $0.name == segment }),
-                let resolvedType = resolvedDeclaredValueType(
-                    named: value.typeName,
-                    ownerTypeName: currentTypeName,
-                    syntaxResolver: syntaxResolver
-                )
-            else {
-                return false
-            }
-
-            if expectsArray != resolvedType.isArray {
-                return false
-            }
-
-            currentTypeName = resolvedType.typeName
-        }
-
-        return syntaxResolver.declaration(named: currentTypeName, conformsTo: "SupportsRewrite")
+        context.rewriteSurfaceView.declaredRewritePathExists(
+            normalizedPath,
+            targetBinding: targetBinding,
+            targetType: targetType
+        )
     }
 
     static func validateRewriteSites(
         for macro: MacroDeclaration,
-        targetKind: MacroTargetKind
+        targetKind: MacroTargetKind,
+        context: MacroExpansionContext
     ) throws {
         let targetBinding = macro.bindings.target
         let targetPrefix = "\(targetBinding)."
         let allowedPaths = allowedRewritePaths(
             targetBinding: targetBinding,
-            targetType: macro.target.typeReference
+            targetType: macro.target.typeReference,
+            context: context
         )
 
         var invalidPaths: [String] = []
@@ -2200,7 +2110,8 @@ public enum MacroExpander {
                 declaredRewritePathExists(
                     normalizedPath,
                     targetBinding: targetBinding,
-                    targetType: macro.target.typeReference
+                    targetType: macro.target.typeReference,
+                    context: context
                 )
             else {
                 invalidPaths.append(name)
