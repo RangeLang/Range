@@ -117,7 +117,7 @@ struct NeatLanguageServer {
             return
         }
 
-        try updateDocument(uri: uri, text: text)
+        try updateDocument(uri: uri, text: text, diagnosticsMode: .none)
     }
 
     private mutating func applyDocumentChange(from message: [String: Any]) throws {
@@ -131,7 +131,7 @@ struct NeatLanguageServer {
             return
         }
 
-        try updateDocument(uri: uri, text: latest)
+        try updateDocument(uri: uri, text: latest, diagnosticsMode: .none)
     }
 
     private mutating func refreshSavedDocument(from message: [String: Any]) throws {
@@ -139,11 +139,17 @@ struct NeatLanguageServer {
             let params = message["params"] as? [String: Any],
             let textDocument = params["textDocument"] as? [String: Any],
             let uri = textDocument["uri"] as? String,
-            let state = documents[uri]
+            let existingState = documents[uri]
         else {
             return
         }
 
+        let state = buildDocumentState(
+            uri: uri,
+            text: existingState.text,
+            diagnosticsMode: .validated
+        )
+        documents[uri] = state
         try publishDiagnostics(for: uri, diagnostics: state.diagnostics)
     }
 
@@ -159,8 +165,12 @@ struct NeatLanguageServer {
         documents.removeValue(forKey: uri)
     }
 
-    private mutating func updateDocument(uri: String, text: String) throws {
-        let state = buildDocumentState(uri: uri, text: text)
+    private mutating func updateDocument(
+        uri: String,
+        text: String,
+        diagnosticsMode: DiagnosticMode
+    ) throws {
+        let state = buildDocumentState(uri: uri, text: text, diagnosticsMode: diagnosticsMode)
         documents[uri] = state
         try publishDiagnostics(for: uri, diagnostics: state.diagnostics)
     }
@@ -270,10 +280,11 @@ struct NeatLanguageServer {
             items = modifierCompletions()
         } else if previousCharacter == "@" {
             items = attributeCompletions()
+        } else if previousCharacter == "#" {
+            items = macroCompletions()
         } else {
             items =
                 keywordCompletions()
-                + builtinViewCompletions()
                 + request.state.symbols.map { symbol in
                     completionItem(
                         label: symbol.name,
@@ -326,6 +337,8 @@ struct NeatLanguageServer {
         switch symbol.kind {
         case .attribute:
             return "Neat callable sigil"
+        case .macro:
+            return "Neat macro"
         case .declaration:
             return "Neat declaration"
         case .callable:
@@ -347,9 +360,19 @@ struct NeatLanguageServer {
         }
     }
 
-    private func buildDocumentState(uri: String, text: String) -> DocumentState {
+    private func buildDocumentState(
+        uri: String,
+        text: String,
+        diagnosticsMode: DiagnosticMode
+    ) -> DocumentState {
         let index = DocumentIndex(text: text, uri: uri)
-        let diagnostics = diagnosticPayload(for: uri, text: text, index: index)
+        let diagnostics: [[String: Any]]
+        switch diagnosticsMode {
+        case .none:
+            diagnostics = []
+        case .validated:
+            diagnostics = diagnosticPayload(for: uri, text: text, index: index)
+        }
         return DocumentState(uri: uri, text: text, index: index, diagnostics: diagnostics)
     }
 
@@ -464,15 +487,19 @@ struct NeatLanguageServer {
 
     private func attributeCompletions() -> [[String: Any]] {
         [
-            "@init", "@run", "@background",
+            "@main", "@background", "@core",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
     }
 
-    private func builtinViewCompletions() -> [[String: Any]] {
-        [
-            "Body", "Button", "Div", "ForEach", "HStack", "Image", "List", "Portal",
-            "ScrollArea", "Spacer", "Text", "TextField", "Toggle", "VStack", "ZStack",
-        ].map { completionItem(label: $0, kind: 7, detail: "built-in view") }
+    private func macroCompletions() -> [[String: Any]] {
+        uniqueCompletionItems(
+            documents.values
+                .flatMap(\.symbols)
+                .filter { $0.kind == .macro }
+                .map { symbol in
+                    completionItem(label: symbol.name, kind: symbol.kind.completionKind, detail: symbol.detail)
+                }
+        )
     }
 
     private func modifierCompletions() -> [[String: Any]] {
@@ -617,6 +644,7 @@ struct NeatLanguageServer {
     }
 
     private func send(message: [String: Any]) throws {
+        debugLog(outboundSummary(for: message))
         let payload = try JSONSerialization.data(withJSONObject: message)
         let header = "Content-Length: \(payload.count)\r\n\r\n"
         let output = FileHandle.standardOutput
@@ -641,11 +669,53 @@ struct NeatLanguageServer {
             }
         }
     }
+
+    private func outboundSummary(for message: [String: Any]) -> String {
+        if let method = message["method"] as? String {
+            let paramsDescription: String
+            switch message["params"] {
+            case nil:
+                paramsDescription = "none"
+            case is NSNull:
+                paramsDescription = "null"
+            case let dictionary as [String: Any]:
+                paramsDescription = "object keys=\(dictionary.keys.sorted())"
+            case let array as [Any]:
+                paramsDescription = "array count=\(array.count)"
+            default:
+                paramsDescription = "scalar"
+            }
+
+            return "send notification method=\(method) params=\(paramsDescription)"
+        }
+
+        let idDescription = message["id"].map { "\($0)" } ?? "nil"
+        let resultDescription: String
+        switch message["result"] {
+        case nil:
+            resultDescription = "none"
+        case is NSNull:
+            resultDescription = "null"
+        case let dictionary as [String: Any]:
+            resultDescription = "object keys=\(dictionary.keys.sorted())"
+        case let array as [Any]:
+            resultDescription = "array count=\(array.count)"
+        default:
+            resultDescription = "scalar"
+        }
+
+        return "send response id=\(idDescription) result=\(resultDescription)"
+    }
 }
 
 private struct RequestContext {
     let state: DocumentState
     let position: Position
+}
+
+private enum DiagnosticMode {
+    case none
+    case validated
 }
 
 private struct DocumentState {
@@ -794,6 +864,25 @@ private struct DocumentIndex {
 
             if let match = firstMatch(
                 in: line,
+                pattern: #"\bmacro\s+([a-z_][A-Za-z0-9_]*)\s*\("#
+            ) {
+                let name = match[1]
+                let symbolRange = range(in: line, line: lineIndex, value: name)
+                symbols.append(
+                    Symbol(
+                        name: name,
+                        kind: .macro,
+                        detail: "macro",
+                        uri: uri,
+                        range: symbolRange,
+                        selectionRange: symbolRange
+                    )
+                )
+                continue
+            }
+
+            if let match = firstMatch(
+                in: line,
                 pattern: #"\bvalue\s+([a-z_][A-Za-z0-9_]*)\s*:\s*([A-Z][A-Za-z0-9_.]*)\s*\{"#
             ) {
                 let name = match[1]
@@ -935,17 +1024,43 @@ private struct DocumentIndex {
         ]
 
         let typePattern = #"\b[A-Z][A-Za-z0-9_]*\b"#
-        let functionDeclarationPattern = #"\b(?:function|func)\s+([a-z_][A-Za-z0-9_]*)\s*\("#
-        let macroDeclarationPattern = #"\bmacro\s+([a-z_][A-Za-z0-9_]*)\s*\("#
+        let functionDeclarationPattern =
+            #"\b(?:function|func)\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
+        let macroDeclarationPattern =
+            #"\bmacro\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
         let macroPattern = #"#([a-z_][A-Za-z0-9_]*)\b"#
+        let macroTokenPattern = #"(#[a-z_][A-Za-z0-9_]*)\b"#
+        let attributeKeywordPattern = #"@[A-Za-z_][A-Za-z0-9_]*\b"#
         let argumentValuePattern = #"(?:\(\s*|,\s*|:\s*)([a-z_][A-Za-z0-9_]*)\s*(?=[,)])"#
+        let argumentLabelPattern = #"(?:\(\s*|,\s*|^\s*)([a-z_][A-Za-z0-9_]*)\s*:"#
         let localIdentifierPattern = #"\b([a-z_][A-Za-z0-9_]*)\b"#
+        let stringPattern = #""(?:\\.|[^"\\])*""#
+        let numberPattern = #"\b(?:\d+(?:\.\d+)?|true|false)\b"#
+        let lineCommentPattern = #"//.*$"#
+        let declarationKeywordPattern =
+            #"\b(state|environment|binding|value|var|derived)\b(?=\s+[a-z][A-Za-z0-9_]*\b)"#
         let variableDeclarationPattern =
-            #"\b(state|environment|binding|value|var|derived)\s+([a-z][A-Za-z0-9_]*)\b"#
+            #"\b(?:state|environment|binding|value|var|derived)\s+([a-z][A-Za-z0-9_]*)\b"#
         let localVariableNames = collectDeclaredVariableNames(in: lines)
-        let parameterNames = collectDeclaredParameterNames(in: lines)
+        let parameterDeclarationsByLine = collectParameterDeclarationRanges(in: lines)
+        let parameterNames = Set(
+            parameterDeclarationsByLine.values.flatMap { declarations in
+                declarations.map(\.name)
+            }
+        )
+        let keywordNames: Set<String> = [
+            "background", "binding", "break", "builder", "capture", "case", "construct",
+            "continue", "core", "default", "derived", "else", "enum", "environment",
+            "extension", "for", "func", "function", "get", "if", "in", "infix", "init",
+            "macro", "main", "nil", "on", "operator", "postfix", "precedencegroup", "prefix",
+            "protocol", "return", "self", "set", "state", "switch", "value", "var",
+            "while",
+        ]
+        let keywordLikeIdentifierNames = Set(localVariableNames.union(parameterNames)).intersection(
+            keywordNames
+        )
         let identifierKeywordExclusions: Set<String> = [
             "if", "for", "while", "switch", "return", "macro", "function", "func", "init",
             "construct", "enum", "protocol", "extension", "background", "state",
@@ -956,6 +1071,60 @@ private struct DocumentIndex {
         for (lineIndex, line) in lines.enumerated() {
             let nsLine = line as NSString
 
+            if let commentRegex = try? NSRegularExpression(pattern: lineCommentPattern) {
+                let matches = commentRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in matches {
+                    record(line: lineIndex, range: match.range, type: .comment)
+                }
+            }
+
+            if let stringRegex = try? NSRegularExpression(pattern: stringPattern) {
+                let matches = stringRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in matches {
+                    record(line: lineIndex, range: match.range, type: .string)
+                }
+            }
+
+            if let numberRegex = try? NSRegularExpression(pattern: numberPattern) {
+                let matches = numberRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in matches {
+                    if overlapsExisting(
+                        line: lineIndex,
+                        start: match.range.location,
+                        length: match.range.length
+                    ) {
+                        continue
+                    }
+                    record(line: lineIndex, range: match.range, type: .number)
+                }
+            }
+
+            if let attributeKeywordRegex = try? NSRegularExpression(pattern: attributeKeywordPattern) {
+                let matches = attributeKeywordRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in matches {
+                    if overlapsExisting(
+                        line: lineIndex,
+                        start: match.range.location,
+                        length: match.range.length
+                    ) {
+                        continue
+                    }
+                    record(line: lineIndex, range: match.range, type: .keyword)
+                }
+            }
+
             for pattern in declarationPatterns {
                 guard let match = firstMatch(in: line, pattern: pattern), match.count > 1 else {
                     continue
@@ -963,10 +1132,7 @@ private struct DocumentIndex {
 
                 let name = match[1]
                 let range = nsRange(in: line, value: name)
-                var modifiers: Set<SemanticTokenModifier> = [.declaration]
-                if DefaultLibrarySymbols.typeNames.contains(name) {
-                    modifiers.insert(.defaultLibrary)
-                }
+                let modifiers: Set<SemanticTokenModifier> = [.declaration]
                 record(line: lineIndex, range: range, type: .type, modifiers: modifiers)
             }
 
@@ -990,19 +1156,66 @@ private struct DocumentIndex {
                 )
             }
 
+            if let declarationKeywordRegex = try? NSRegularExpression(pattern: declarationKeywordPattern) {
+                let matches = declarationKeywordRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in matches {
+                    if overlapsExisting(
+                        line: lineIndex,
+                        start: match.range.location,
+                        length: match.range.length
+                    ) {
+                        continue
+                    }
+                    record(
+                        line: lineIndex,
+                        range: match.range,
+                        type: .keyword
+                    )
+                }
+            }
+
             if let variableRegex = try? NSRegularExpression(pattern: variableDeclarationPattern) {
                 let matches = variableRegex.matches(
                     in: line,
                     range: NSRange(location: 0, length: nsLine.length)
                 )
                 for match in matches {
-                    guard match.numberOfRanges > 2 else { continue }
+                    guard match.numberOfRanges > 1 else { continue }
+                    let name = nsLine.substring(with: match.range(at: 1))
+                    if keywordLikeIdentifierNames.contains(name) {
+                        continue
+                    }
                     record(
                         line: lineIndex,
-                        range: match.range(at: 2),
+                        range: match.range(at: 1),
                         type: .variable,
                         modifiers: [.declaration]
                     )
+                }
+            }
+
+            if let keywordRegex = try? NSRegularExpression(pattern: #"\b[A-Za-z_][A-Za-z0-9_]*\b"#) {
+                let matches = keywordRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in matches {
+                    let word = nsLine.substring(with: match.range)
+                    guard keywordNames.contains(word) else { continue }
+                    if keywordLikeIdentifierNames.contains(word) {
+                        continue
+                    }
+                    if overlapsExisting(
+                        line: lineIndex,
+                        start: match.range.location,
+                        length: match.range.length
+                    ) {
+                        continue
+                    }
+                    record(line: lineIndex, range: match.range, type: .keyword)
                 }
             }
 
@@ -1021,24 +1234,7 @@ private struct DocumentIndex {
                 ) {
                     continue
                 }
-                let typeName = nsLine.substring(with: match.range)
-                var modifiers: Set<SemanticTokenModifier> =
-                    DefaultLibrarySymbols.typeNames.contains(typeName) ? [.defaultLibrary] : []
-                let afterLocation = match.range.location + match.range.length
-                var cursor = afterLocation
-                while cursor < nsLine.length {
-                    let character = nsLine.substring(with: NSRange(location: cursor, length: 1))
-                    guard character.rangeOfCharacter(from: .whitespacesAndNewlines) != nil else {
-                        break
-                    }
-                    cursor += 1
-                }
-                if cursor < nsLine.length,
-                    nsLine.substring(with: NSRange(location: cursor, length: 1)) == "("
-                {
-                    modifiers.insert(.application)
-                }
-                record(line: lineIndex, range: match.range, type: .type, modifiers: modifiers)
+                record(line: lineIndex, range: match.range, type: .type)
             }
 
             if let callRegex = try? NSRegularExpression(pattern: localCallPattern) {
@@ -1066,9 +1262,7 @@ private struct DocumentIndex {
                     ) {
                         continue
                     }
-                    let modifiers: Set<SemanticTokenModifier> =
-                        DefaultLibrarySymbols.functionNames.contains(name) ? [.defaultLibrary] : []
-                    record(line: lineIndex, range: nameRange, type: .function, modifiers: modifiers)
+                    record(line: lineIndex, range: nameRange, type: .function, modifiers: [])
                 }
             }
 
@@ -1109,6 +1303,34 @@ private struct DocumentIndex {
                 }
             }
 
+            if !isParameterDeclarationContext(line),
+                let argumentLabelRegex = try? NSRegularExpression(pattern: argumentLabelPattern)
+            {
+                let labelMatches = argumentLabelRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in labelMatches {
+                    guard match.numberOfRanges > 1 else { continue }
+                    let nameRange = match.range(at: 1)
+                    if overlapsExisting(
+                        line: lineIndex,
+                        start: nameRange.location,
+                        length: nameRange.length
+                    ) {
+                        continue
+                    }
+                    guard let (tokenType, modifiers) = argumentLabelTokenKind(
+                        in: lines,
+                        lineIndex: lineIndex,
+                        labelStart: nameRange.location
+                    ) else {
+                        continue
+                    }
+                    record(line: lineIndex, range: nameRange, type: tokenType, modifiers: modifiers)
+                }
+            }
+
             if let argumentValueRegex = try? NSRegularExpression(
                 pattern: argumentValuePattern
             ) {
@@ -1144,7 +1366,10 @@ private struct DocumentIndex {
                 }
             }
 
-            for parameter in collectParameterDeclarationRanges(in: line) {
+            for parameter in parameterDeclarationsByLine[lineIndex] ?? [] {
+                if keywordLikeIdentifierNames.contains(parameter.name) {
+                    continue
+                }
                 if overlapsExisting(
                     line: lineIndex,
                     start: parameter.range.location,
@@ -1160,20 +1385,17 @@ private struct DocumentIndex {
                 )
             }
 
-            guard let macroRegex = try? NSRegularExpression(pattern: macroPattern) else {
+            guard let macroTokenRegex = try? NSRegularExpression(pattern: macroTokenPattern) else {
                 continue
             }
-            let macroMatches = macroRegex.matches(
+            let macroMatches = macroTokenRegex.matches(
                 in: line,
                 range: NSRange(location: 0, length: nsLine.length)
             )
             for match in macroMatches {
                 guard match.numberOfRanges > 1 else { continue }
                 let nameRange = match.range(at: 1)
-                let name = nsLine.substring(with: nameRange)
-                let modifiers: Set<SemanticTokenModifier> =
-                    DefaultLibrarySymbols.macroNames.contains(name) ? [.defaultLibrary] : []
-                record(line: lineIndex, range: nameRange, type: .macro, modifiers: modifiers)
+                record(line: lineIndex, range: nameRange, type: .macro, modifiers: [])
             }
 
             if let localIdentifierRegex = try? NSRegularExpression(pattern: localIdentifierPattern) {
@@ -1187,6 +1409,9 @@ private struct DocumentIndex {
                     let name = nsLine.substring(with: nameRange)
                     guard !identifierKeywordExclusions.contains(name) else { continue }
                     guard localVariableNames.contains(name) || parameterNames.contains(name) else {
+                        continue
+                    }
+                    if keywordLikeIdentifierNames.contains(name) {
                         continue
                     }
                     if overlapsExisting(
@@ -1212,6 +1437,11 @@ private struct DocumentIndex {
                             break
                         }
                         cursor += 1
+                    }
+                    if cursor < nsLine.length,
+                        nsLine.substring(with: NSRange(location: cursor, length: 1)) == "."
+                    {
+                        continue
                     }
                     if cursor < nsLine.length,
                         nsLine.substring(with: NSRange(location: cursor, length: 1)) == ":"
@@ -1256,63 +1486,223 @@ private struct DocumentIndex {
         return encoded
     }
 
-    private static func collectParameterDeclarationRanges(in line: String) -> [(name: String, range: NSRange)] {
-        let nsLine = line as NSString
-        guard
-            let openRange = line.range(of: "("),
-            let closeRange = line.range(of: ")", range: openRange.upperBound..<line.endIndex)
-        else {
-            return []
-        }
+    private static func collectParameterDeclarationRanges(in lines: [String]) -> [Int: [(name: String, range: NSRange)]] {
+        var results: [Int: [(name: String, range: NSRange)]] = [:]
+        var insideParameterClause = false
 
-        let paramsStart = openRange.upperBound.utf16Offset(in: line)
-        let paramsEnd = closeRange.lowerBound.utf16Offset(in: line)
-        guard paramsEnd > paramsStart else { return [] }
+        for (lineIndex, line) in lines.enumerated() {
+            let nsLine = line as NSString
 
-        let paramsNSRange = NSRange(location: paramsStart, length: paramsEnd - paramsStart)
-        let paramsText = nsLine.substring(with: paramsNSRange)
-        let segments = paramsText.split(separator: ",", omittingEmptySubsequences: false)
+            if !insideParameterClause {
+                guard isParameterDeclarationContext(line) else {
+                    continue
+                }
 
-        var results: [(String, NSRange)] = []
-        var searchLocation = paramsStart
-
-        for rawSegment in segments {
-            let segmentText = String(rawSegment)
-            let fullSegmentRange = nsLine.range(
-                of: segmentText,
-                options: [],
-                range: NSRange(location: searchLocation, length: paramsEnd - searchLocation)
-            )
-            guard fullSegmentRange.location != NSNotFound else { continue }
-            searchLocation = fullSegmentRange.location + fullSegmentRange.length
-
-            var trimmed = segmentText.trimmingCharacters(in: .whitespacesAndNewlines)
-            while trimmed.hasPrefix("#") {
-                guard let firstSpace = trimmed.firstIndex(where: \.isWhitespace) else { break }
-                trimmed = String(trimmed[firstSpace...]).trimmingCharacters(in: .whitespacesAndNewlines)
-            }
-
-            guard
-                let match = firstMatch(
-                    in: trimmed,
-                    pattern: #"^([a-z_][A-Za-z0-9_]*)(?:\s+_)?\s*:"#
-                ),
-                match.count > 1
-            else {
+                if let openRange = line.range(of: "(") {
+                    insideParameterClause = true
+                    let start = openRange.upperBound.utf16Offset(in: line)
+                    let end: Int
+                    if let closeRange = line.range(of: ")", range: openRange.upperBound..<line.endIndex) {
+                        end = closeRange.lowerBound.utf16Offset(in: line)
+                        insideParameterClause = false
+                    } else {
+                        end = nsLine.length
+                    }
+                    appendParameterDeclarations(
+                        in: NSRange(location: start, length: max(0, end - start)),
+                        line: line,
+                        lineIndex: lineIndex,
+                        into: &results
+                    )
+                }
                 continue
             }
 
-            let name = match[1]
-            let nameRange = nsLine.range(
-                of: name,
-                options: [],
-                range: fullSegmentRange
+            let end: Int
+            if let closeRange = line.range(of: ")") {
+                end = closeRange.lowerBound.utf16Offset(in: line)
+                insideParameterClause = false
+            } else {
+                end = nsLine.length
+            }
+
+            appendParameterDeclarations(
+                in: NSRange(location: 0, length: end),
+                line: line,
+                lineIndex: lineIndex,
+                into: &results
             )
-            guard nameRange.location != NSNotFound else { continue }
-            results.append((name, nameRange))
         }
 
         return results
+    }
+
+    private static func appendParameterDeclarations(
+        in searchRange: NSRange,
+        line: String,
+        lineIndex: Int,
+        into results: inout [Int: [(name: String, range: NSRange)]]
+    ) {
+        guard searchRange.length > 0 else { return }
+
+        let nsLine = line as NSString
+        let segment = nsLine.substring(with: searchRange).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !segment.isEmpty else { return }
+
+        var trimmed = segment
+        while trimmed.hasPrefix("#") {
+            guard let firstSpace = trimmed.firstIndex(where: \.isWhitespace) else { break }
+            trimmed = String(trimmed[firstSpace...]).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        guard
+            let match = firstMatch(
+                in: trimmed,
+                pattern: #"^([a-z_][A-Za-z0-9_]*)(?:\s+_)?\s*:"#
+            ),
+            match.count > 1
+        else {
+            return
+        }
+
+        let name = match[1]
+        let nameRange = nsLine.range(
+            of: name,
+            options: [],
+            range: searchRange
+        )
+        guard nameRange.location != NSNotFound else { return }
+        results[lineIndex, default: []].append((name, nameRange))
+    }
+
+    private static func isParameterDeclarationContext(_ line: String) -> Bool {
+        guard let openRange = line.range(of: "(") else {
+            return false
+        }
+
+        let prefix = String(line[..<openRange.lowerBound])
+        let trimmedPrefix = prefix.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmedPrefix.hasPrefix("init") {
+            return true
+        }
+
+        let declarationPatterns = [
+            #"\bfunction\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
+            #"\bfunc\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
+            #"\bmacro\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
+        ]
+
+        return declarationPatterns.contains { pattern in
+            guard let regex = try? NSRegularExpression(pattern: pattern) else { return false }
+            let nsPrefix = trimmedPrefix as NSString
+            let range = NSRange(location: 0, length: nsPrefix.length)
+            return regex.firstMatch(in: trimmedPrefix, range: range) != nil
+        }
+    }
+
+    private static func argumentLabelTokenKind(
+        in lines: [String],
+        lineIndex: Int,
+        labelStart: Int
+    ) -> (SemanticTokenType, Set<SemanticTokenModifier>)? {
+        guard isArgumentLabelContext(in: lines, lineIndex: lineIndex, labelStart: labelStart) else {
+            return nil
+        }
+        if isTypeReferenceArgumentLabelContext(in: lines, lineIndex: lineIndex, labelStart: labelStart) {
+            return (.type, [.application])
+        }
+        return (.method, [])
+    }
+
+    private static func isArgumentLabelContext(
+        in lines: [String],
+        lineIndex: Int,
+        labelStart: Int
+    ) -> Bool {
+        let line = lines[lineIndex]
+        let prefix = String(line.prefix(labelStart))
+
+        if prefix.range(
+            of: #"(?:\(\s*|,\s*)$"#,
+            options: .regularExpression
+        ) != nil {
+            return true
+        }
+
+        if !prefix.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return false
+        }
+
+        var prior = lineIndex - 1
+        while prior >= 0 {
+            let trimmed = lines[prior].trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                prior -= 1
+                continue
+            }
+            if trimmed.contains(")") {
+                return false
+            }
+            if trimmed.range(
+                of: #"^(?:[A-Z][A-Za-z0-9_]*|[a-z_][A-Za-z0-9_]*|(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.[a-z_][A-Za-z0-9_]*)\s*\($"#,
+                options: .regularExpression
+            ) != nil {
+                return true
+            }
+            if trimmed.contains("{") || trimmed.contains("}") {
+                return false
+            }
+            prior -= 1
+        }
+
+        return false
+    }
+
+    private static func isTypeReferenceArgumentLabelContext(
+        in lines: [String],
+        lineIndex: Int,
+        labelStart: Int
+    ) -> Bool {
+        let line = lines[lineIndex]
+        let prefix = String(line.prefix(labelStart))
+
+        if prefix.range(
+            of: #"(?:^|[=(,\s])[A-Z][A-Za-z0-9_]*\s*\([^()]*$"#,
+            options: .regularExpression
+        ) != nil {
+            return prefix.range(
+                of: #"(?:^|[=(,\s])[A-Z][A-Za-z0-9_]*TypeReference\s*\([^()]*$"#,
+                options: .regularExpression
+            ) != nil
+        }
+
+        var prior = lineIndex - 1
+        while prior >= 0 {
+            let trimmed = lines[prior].trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                prior -= 1
+                continue
+            }
+            if trimmed.contains(")") {
+                return false
+            }
+            if trimmed.range(
+                of: #"^[A-Z][A-Za-z0-9_]*TypeReference\s*\($"#,
+                options: .regularExpression
+            ) != nil {
+                return true
+            }
+            if trimmed.range(
+                of: #"^(?:[a-z_][A-Za-z0-9_]*|(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.[a-z_][A-Za-z0-9_]*)\s*\($"#,
+                options: .regularExpression
+            ) != nil {
+                return false
+            }
+            prior -= 1
+        }
+
+        return false
     }
 
     private static func collectDeclaredVariableNames(in lines: [String]) -> Set<String> {
@@ -1334,8 +1724,8 @@ private struct DocumentIndex {
     }
 
     private static func collectDeclaredParameterNames(in lines: [String]) -> Set<String> {
-        Set(lines.flatMap { line in
-            collectParameterDeclarationRanges(in: line).map(\.name)
+        Set(collectParameterDeclarationRanges(in: lines).values.flatMap { declarations in
+            declarations.map(\.name)
         })
     }
 
@@ -1395,11 +1785,14 @@ enum SemanticTokenType: String, CaseIterable {
     case variable
     case property
     case parameter
+    case keyword
+    case comment
+    case string
+    case number
 }
 
 enum SemanticTokenModifier: String, CaseIterable {
     case declaration
-    case defaultLibrary
     case application
     case argument
 }
@@ -1514,6 +1907,7 @@ private enum SymbolKind {
     case attribute
     case declaration
     case callable
+    case macro
     case variable
     case state
     case styleModifier
@@ -1528,7 +1922,7 @@ private enum SymbolKind {
             return 8
         case .declaration, .typeExtension, .view:
             return 5
-        case .callable, .modifier:
+        case .callable, .modifier, .macro:
             return 12
         case .variable, .state:
             return 13
@@ -1541,7 +1935,7 @@ private enum SymbolKind {
 
     var completionKind: Int {
         switch self {
-        case .callable, .modifier:
+        case .callable, .modifier, .macro:
             return 3
         case .attribute, .keyword:
             return 14

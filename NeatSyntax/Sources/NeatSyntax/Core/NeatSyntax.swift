@@ -1,6 +1,12 @@
 import Foundation
 
 enum NeatSyntax {
+    enum Attribute: String, CaseIterable {
+        case main = "main"
+        case background = "background"
+        case core = "core"
+    }
+
     enum Keyword: String {
         case value = "value"
         case state = "state"
@@ -33,6 +39,7 @@ enum NeatSyntax {
         case operatorKeyword = "operator"
     }
     static let keywordIdentifiers: Set<String> = Set(Keyword.allCases.map(\.rawValue))
+    static let attributeIdentifiers: Set<String> = Set(Attribute.allCases.map(\.rawValue))
 
     static func constructKind(for token: Token) -> ConstructKind? {
         switch token {

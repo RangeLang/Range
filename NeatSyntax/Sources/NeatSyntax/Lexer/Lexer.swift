@@ -136,6 +136,9 @@ struct Lexer {
                 tokens.append(.hashDirective(identifier))
             case "@":
                 let identifier = try readSigilIdentifier()
+                guard NeatSyntax.attributeIdentifiers.contains(identifier) else {
+                    throw ParseError("Unknown attribute @\(identifier).")
+                }
                 tokens.append(.atAttribute(name: identifier, argument: nil))
             case "`":
                 let identifier = try readEscapedIdentifier()

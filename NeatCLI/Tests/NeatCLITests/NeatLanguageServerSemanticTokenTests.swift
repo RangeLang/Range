@@ -18,9 +18,10 @@ struct NeatLanguageServerSemanticTokenTests {
 
         let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
 
+        #expect(containsExactToken(tokens, text: "@main", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "Something", type: .type, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "Int", type: .type, modifiers: [.defaultLibrary]))
-        #expect(containsToken(tokens, text: "Something", type: .type, modifiers: [.application]))
+        #expect(containsToken(tokens, text: "Int", type: .type, modifiers: []))
+        #expect(containsExactToken(tokens, text: "Something", type: .type, modifiers: []))
     }
 
     @Test("Functions, variables, parameters, and member semantics are emitted")
@@ -53,15 +54,72 @@ struct NeatLanguageServerSemanticTokenTests {
         let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsToken(tokens, text: "identity", type: .function, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "value", type: .parameter, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "number", type: .variable, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "number", type: .variable, modifiers: [.argument]))
-        #expect(containsExactToken(tokens, text: "value", type: .parameter, modifiers: []))
         #expect(containsToken(tokens, text: "id", type: .parameter, modifiers: [.argument]))
         #expect(containsToken(tokens, text: "username", type: .variable, modifiers: [.argument]))
         #expect(containsToken(tokens, text: "arrayifyParameter", type: .macro, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "declaration", type: .property, modifiers: []))
         #expect(containsToken(tokens, text: "rewrite", type: .method, modifiers: []))
+    }
+
+    @Test("Constructor argument labels are method-style tokens, not parameter declarations")
+    func constructorArgumentLabelsEmitMethodTokens() {
+        let source = """
+        construct FixtureConstruct {
+            value number: Int
+        }
+
+        @main {
+            value result: FixtureConstruct = FixtureConstruct(number: 1)
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "number", type: .method, modifiers: []))
+        #expect(!containsToken(tokens, text: "number", type: .parameter, modifiers: [.declaration]))
+    }
+
+    @Test("Type reference argument labels emit type application tokens")
+    func typeReferenceArgumentLabelsEmitTypeApplicationTokens() {
+        let source = """
+        macro arrayifyParameter(): Parameter { target, diagnostics in
+            target.declaration.type.rewrite(
+                ArrayTypeReference(
+                    element: target.declaration.type
+                )
+            )
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "ArrayTypeReference", type: .type, modifiers: []))
+        #expect(containsExactToken(tokens, text: "element", type: .type, modifiers: [.application]))
+    }
+
+    @Test("Generic function declarations emit function and parameter declaration tokens")
+    func genericFunctionDeclarationsEmitDeclarationTokens() {
+        let source = """
+        function load<Value, Failure>(
+            target _: binding Promise<Value, Failure>,
+            #autoclosure task: Result<Value, Failure>
+        ) {
+            switch task() {
+            case .success(value item):
+                target = .success(result: item)
+            }
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsToken(tokens, text: "load", type: .function, modifiers: [.declaration]))
+        #expect(containsToken(tokens, text: "target", type: .parameter, modifiers: [.declaration]))
+        #expect(containsToken(tokens, text: "task", type: .parameter, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "target", type: .method, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "task", type: .method, modifiers: []))
     }
 
     @Test("Macro applications, including parameter macros, emit semantic tokens")
@@ -78,8 +136,38 @@ struct NeatLanguageServerSemanticTokenTests {
 
         let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsToken(tokens, text: "variadic", type: .macro, modifiers: [.defaultLibrary]))
-        #expect(containsToken(tokens, text: "stringify", type: .macro, modifiers: [.defaultLibrary]))
+        #expect(containsToken(tokens, text: "#variadic", type: .macro, modifiers: []))
+        #expect(containsToken(tokens, text: "#stringify", type: .macro, modifiers: []))
+    }
+
+    @Test("Nil emits a keyword semantic token")
+    func nilEmitsKeywordToken() {
+        let source = """
+        function fallback() -> String? {
+            return nil
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "nil", type: .keyword, modifiers: []))
+    }
+
+    @Test("Member call receivers do not emit plain variable read tokens")
+    func memberCallReceiversDoNotEmitVariableReadTokens() {
+        let source = """
+        @main {
+            value output = Channel<String>()
+            output.send("george")
+            state received = output.receive()
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "send", type: .method, modifiers: []))
+        #expect(containsExactToken(tokens, text: "receive", type: .method, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "output", type: .variable, modifiers: []))
     }
 }
 
