@@ -22,6 +22,41 @@ enum MacroTargetKind: Equatable {
     case other(String)
 }
 
+func macroTargetKind(for macro: MacroDeclaration) -> MacroTargetKind {
+    macroTargetKind(for: macro.target.typeReference)
+}
+
+func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
+    let name: String
+    switch typeReference {
+    case .named(let named):
+        name = named
+    case .member(_, let member):
+        name = member
+    case .generic(let base, _):
+        return macroTargetKind(for: base)
+    case .array, .function, .optional, .variadic:
+        name = typeReference.displayName
+    }
+
+    switch name {
+    case "Expression":
+        return .expression
+    case "Block":
+        return .block
+    case "Parameter":
+        return .parameter
+    case "Init":
+        return .initializer
+    case "Function":
+        return .function
+    case "Construct":
+        return .construct
+    default:
+        return .other(name)
+    }
+}
+
 enum ResolvedRewriteSite {
     case targetDirect
     case initApplication

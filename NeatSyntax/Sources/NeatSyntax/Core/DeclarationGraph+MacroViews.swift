@@ -1,6 +1,13 @@
 import Foundation
 
 extension DeclarationGraph {
+    func macroExpansionContext(macrosByName: [String: MacroDeclaration]) -> MacroExpansionContext {
+        MacroExpansionContext(
+            macroRealizationView: macroRealizationView(macrosByName: macrosByName),
+            rewriteSurfaceView: rewriteSurfaceView
+        )
+    }
+
     func macroRealizationView(macrosByName: [String: MacroDeclaration]) -> MacroRealizationView {
         MacroRealizationView(
             parameterMacroSignatures: parameterMacroSignatures(macrosByName: macrosByName),
@@ -56,7 +63,7 @@ extension DeclarationGraph {
                 index, parameter -> (Int, MacroDeclaration)? in
                 guard
                     let macro = parameter.macros.lazy.compactMap({ macrosByName[$0.name] }).first(where: {
-                        MacroExpander.macroTargetKind(for: $0) == .parameter
+                        macroTargetKind(for: $0) == .parameter
                     })
                 else {
                     return nil
@@ -88,7 +95,7 @@ extension DeclarationGraph {
         let functionMacros: [MacroDeclaration] = callable.macros.compactMap { macroApplication in
             guard
                 let macro = macrosByName[macroApplication.name],
-                MacroExpander.macroTargetKind(for: macro) == .function
+                macroTargetKind(for: macro) == .function
             else {
                 return nil
             }
