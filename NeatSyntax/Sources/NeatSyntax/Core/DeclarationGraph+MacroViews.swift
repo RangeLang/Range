@@ -9,9 +9,10 @@ extension DeclarationGraph {
     }
 
     func macroRealizationView(macrosByName: [String: MacroDeclaration]) -> MacroRealizationView {
-        MacroRealizationView(
-            parameterMacroSignatures: parameterMacroSignatures(macrosByName: macrosByName),
-            functionMacroSignatures: functionMacroSignatures(macrosByName: macrosByName),
+        let registryView = MacroRegistryView(macrosByName: macrosByName)
+        return MacroRealizationView(
+            parameterMacroSignatures: parameterMacroSignatures(registryView: registryView),
+            functionMacroSignatures: functionMacroSignatures(registryView: registryView),
             realizedLiteralBridges: realizedLiteralBridges,
             realizedInitMacroTargets: realizedInitMacroTargets
         )
@@ -25,34 +26,34 @@ extension DeclarationGraph {
     }
 
     private func parameterMacroSignatures(
-        macrosByName: [String: MacroDeclaration]
+        registryView: MacroRegistryView
     ) -> [ParameterMacroSignature] {
         callablesByName.values
             .flatMap { $0 }
             .compactMap { callable in
                 parameterMacroSignature(
                     for: callable,
-                    macrosByName: macrosByName
+                    registryView: registryView
                 )
             }
     }
 
     private func functionMacroSignatures(
-        macrosByName: [String: MacroDeclaration]
+        registryView: MacroRegistryView
     ) -> [FunctionMacroSignature] {
         callablesByName.values
             .flatMap { $0 }
             .compactMap { callable in
                 functionMacroSignature(
                     for: callable,
-                    macrosByName: macrosByName
+                    registryView: registryView
                 )
             }
     }
 
     private func parameterMacroSignature(
         for callable: CallableDeclaration,
-        macrosByName: [String: MacroDeclaration]
+        registryView: MacroRegistryView
     ) -> ParameterMacroSignature? {
         guard callable.targetType == nil else {
             return nil
@@ -62,9 +63,10 @@ extension DeclarationGraph {
             uniqueKeysWithValues: callable.parameters.enumerated().compactMap {
                 index, parameter -> (Int, MacroDeclaration)? in
                 guard
-                    let macro = parameter.macros.lazy.compactMap({ macrosByName[$0.name] }).first(where: {
-                        macroTargetKind(for: $0) == .parameter
-                    })
+                    let macro = registryView.firstMacro(
+                        in: parameter.macros,
+                        targetKind: .parameter
+                    )
                 else {
                     return nil
                 }
@@ -86,22 +88,16 @@ extension DeclarationGraph {
 
     private func functionMacroSignature(
         for callable: CallableDeclaration,
-        macrosByName: [String: MacroDeclaration]
+        registryView: MacroRegistryView
     ) -> FunctionMacroSignature? {
         guard callable.targetType == nil else {
             return nil
         }
 
-        let functionMacros: [MacroDeclaration] = callable.macros.compactMap { macroApplication in
-            guard
-                let macro = macrosByName[macroApplication.name],
-                macroTargetKind(for: macro) == .function
-            else {
-                return nil
-            }
-
-            return macro
-        }
+        let functionMacros = registryView.macros(
+            in: callable.macros,
+            targetKind: .function
+        )
 
         guard !functionMacros.isEmpty else {
             return nil

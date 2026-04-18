@@ -84,6 +84,33 @@ struct MacroRealizationView {
     let realizedInitMacroTargets: [RealizedInitMacroTarget]
 }
 
+struct MacroRegistryView {
+    let macrosByName: [String: MacroDeclaration]
+
+    func firstMacro(
+        in applications: [MacroApplication],
+        targetKind: MacroTargetKind
+    ) -> MacroDeclaration? {
+        applications.lazy.compactMap { macrosByName[$0.name] }.first(where: {
+            macroTargetKind(for: $0) == targetKind
+        })
+    }
+
+    func macros(
+        in applications: [MacroApplication],
+        targetKind: MacroTargetKind
+    ) -> [MacroDeclaration] {
+        applications.compactMap { application in
+            guard let macro = macrosByName[application.name], macroTargetKind(for: macro) == targetKind
+            else {
+                return nil
+            }
+
+            return macro
+        }
+    }
+}
+
 struct RewriteSurfaceView {
     let syntaxResolver: DeclarationSyntaxResolver
     let constructsByName: [String: ConstructDeclaration]
