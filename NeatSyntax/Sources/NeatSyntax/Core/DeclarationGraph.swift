@@ -75,6 +75,15 @@ public struct DeclarationGraph {
     public let enumsByName: [String: EnumDeclaration]
     public let macrosByName: [String: MacroDeclaration]
     public let extensionsByTargetName: [String: [ExtensionDeclaration]]
+    public let topLevelStatesByFilePath: [String: [StateDeclaration]]
+    public let statesByConstructName: [String: [StateDeclaration]]
+    public let environmentsByConstructName: [String: [EnvironmentDeclaration]]
+    public let bindingsByConstructName: [String: [BindingDeclaration]]
+    public let derivedsByConstructName: [String: [DerivedDeclaration]]
+    public let valuesByConstructName: [String: [ValueDeclaration]]
+    public let initializersByConstructName: [String: [InitializerDeclaration]]
+    public let parametersByCallableIdentity: [String: [NeatFunctionParameter]]
+    public let parametersByInitializerIdentity: [String: [NeatFunctionParameter]]
     public let callablesByName: [String: [CallableDeclaration]]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
     public let realizedInitMacroTargets: [RealizedInitMacroTarget]
@@ -86,13 +95,33 @@ public struct DeclarationGraph {
         let enumerations = Self.collectEnums(from: files)
         let macros = Self.collectMacros(from: files)
         let extensions = Self.collectExtensions(from: files)
+        let topLevelStates = Self.collectTopLevelStates(from: files)
+        let statesByConstructName = Self.collectStatesByConstructName(from: constructs)
+        let environmentsByConstructName = Self.collectEnvironmentsByConstructName(from: constructs)
+        let bindingsByConstructName = Self.collectBindingsByConstructName(from: constructs)
+        let derivedsByConstructName = Self.collectDerivedsByConstructName(from: constructs)
+        let valuesByConstructName = Self.collectValuesByConstructName(from: constructs)
+        let initializersByConstructName = Self.collectInitializersByConstructName(from: constructs)
         let callables = Self.collectCallables(from: files)
+        let parametersByCallableIdentity = Self.collectParametersByCallableIdentity(from: files)
+        let parametersByInitializerIdentity = Self.collectParametersByInitializerIdentity(
+            from: constructs
+        )
 
         self.protocolsByName = protocols
         self.constructsByName = constructs
         self.enumsByName = enumerations
         self.macrosByName = macros
         self.extensionsByTargetName = extensions
+        self.topLevelStatesByFilePath = topLevelStates
+        self.statesByConstructName = statesByConstructName
+        self.environmentsByConstructName = environmentsByConstructName
+        self.bindingsByConstructName = bindingsByConstructName
+        self.derivedsByConstructName = derivedsByConstructName
+        self.valuesByConstructName = valuesByConstructName
+        self.initializersByConstructName = initializersByConstructName
+        self.parametersByCallableIdentity = parametersByCallableIdentity
+        self.parametersByInitializerIdentity = parametersByInitializerIdentity
         self.callablesByName = callables
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
@@ -110,6 +139,15 @@ public struct DeclarationGraph {
                 enumsByName: enumsByName,
                 macrosByName: macrosByName,
                 extensionsByTargetName: extensionsByTargetName,
+                topLevelStatesByFilePath: topLevelStatesByFilePath,
+                statesByConstructName: statesByConstructName,
+                environmentsByConstructName: environmentsByConstructName,
+                bindingsByConstructName: bindingsByConstructName,
+                derivedsByConstructName: derivedsByConstructName,
+                valuesByConstructName: valuesByConstructName,
+                initializersByConstructName: initializersByConstructName,
+                parametersByCallableIdentity: parametersByCallableIdentity,
+                parametersByInitializerIdentity: parametersByInitializerIdentity,
                 callablesByName: callablesByName
             ),
             syntaxResolver: DeclarationSyntaxResolver(
@@ -200,6 +238,125 @@ public struct DeclarationGraph {
         for parsedFile in files {
             for declaration in extensions(in: parsedFile.sourceFile) {
                 registry[declaration.targetType.displayName, default: []].append(declaration)
+            }
+        }
+        return registry
+    }
+
+    static func collectTopLevelStates(from files: [ParsedSourceFile]) -> [String: [StateDeclaration]] {
+        var registry: [String: [StateDeclaration]] = [:]
+        for parsedFile in files {
+            registry[parsedFile.path] = topLevelStates(in: parsedFile.sourceFile)
+        }
+        return registry.filter { !$0.value.isEmpty }
+    }
+
+    static func collectStatesByConstructName(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [String: [StateDeclaration]] {
+        Dictionary(
+            uniqueKeysWithValues: constructs.map { name, declaration in
+                (name, declaration.states)
+            }.filter { !$0.1.isEmpty }
+        )
+    }
+
+    static func collectEnvironmentsByConstructName(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [String: [EnvironmentDeclaration]] {
+        Dictionary(
+            uniqueKeysWithValues: constructs.map { name, declaration in
+                (name, declaration.environments)
+            }.filter { !$0.1.isEmpty }
+        )
+    }
+
+    static func collectBindingsByConstructName(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [String: [BindingDeclaration]] {
+        Dictionary(
+            uniqueKeysWithValues: constructs.map { name, declaration in
+                (name, declaration.bindings)
+            }.filter { !$0.1.isEmpty }
+        )
+    }
+
+    static func collectDerivedsByConstructName(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [String: [DerivedDeclaration]] {
+        Dictionary(
+            uniqueKeysWithValues: constructs.map { name, declaration in
+                (name, declaration.deriveds)
+            }.filter { !$0.1.isEmpty }
+        )
+    }
+
+    static func collectValuesByConstructName(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [String: [ValueDeclaration]] {
+        Dictionary(
+            uniqueKeysWithValues: constructs.map { name, declaration in
+                (name, declaration.values)
+            }.filter { !$0.1.isEmpty }
+        )
+    }
+
+    static func collectInitializersByConstructName(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [String: [InitializerDeclaration]] {
+        Dictionary(
+            uniqueKeysWithValues: constructs.map { name, declaration in
+                (name, declaration.initializers)
+            }.filter { !$0.1.isEmpty }
+        )
+    }
+
+    static func collectParametersByCallableIdentity(
+        from files: [ParsedSourceFile]
+    ) -> [String: [NeatFunctionParameter]] {
+        var registry: [String: [NeatFunctionParameter]] = [:]
+
+        for parsedFile in files {
+            switch parsedFile.sourceFile {
+            case .module(let module):
+                for callable in module.callables {
+                    let identity = callableIdentity(
+                        ownerName: nil,
+                        declaration: callable
+                    )
+                    registry[identity] = callable.parameters
+                }
+                for construct in module.constructs {
+                    collectCallableParameters(
+                        in: construct,
+                        registry: &registry,
+                        ownerName: construct.name
+                    )
+                }
+            case .construct(let construct):
+                collectCallableParameters(
+                    in: construct,
+                    registry: &registry,
+                    ownerName: construct.name
+                )
+            case .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+                continue
+            }
+        }
+
+        return registry
+    }
+
+    static func collectParametersByInitializerIdentity(
+        from constructs: [String: ConstructDeclaration]
+    ) -> [String: [NeatFunctionParameter]] {
+        var registry: [String: [NeatFunctionParameter]] = [:]
+        for (constructName, declaration) in constructs {
+            for initializer in declaration.initializers {
+                registry[initializerIdentity(
+                    constructName: constructName,
+                    declaration: initializer
+                )] = initializer.parameters
             }
         }
         return registry
@@ -354,6 +511,15 @@ public struct DeclarationGraph {
         }
     }
 
+    static func topLevelStates(in sourceFile: SourceFileNode) -> [StateDeclaration] {
+        switch sourceFile {
+        case .module(let module):
+            return module.states
+        case .construct, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+            return []
+        }
+    }
+
     static func enumerations(in sourceFile: SourceFileNode) -> [EnumDeclaration] {
         switch sourceFile {
         case .enumeration(let declaration):
@@ -394,6 +560,51 @@ public struct DeclarationGraph {
         case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
+    }
+
+    private static func collectCallableParameters(
+        in construct: ConstructDeclaration,
+        registry: inout [String: [NeatFunctionParameter]],
+        ownerName: String
+    ) {
+        for callable in construct.callables {
+            registry[callableIdentity(ownerName: ownerName, declaration: callable)] =
+                callable.parameters
+        }
+
+        for child in construct.constructs {
+            let childOwnerName = "\(ownerName).\(child.name)"
+            collectCallableParameters(
+                in: child,
+                registry: &registry,
+                ownerName: childOwnerName
+            )
+        }
+    }
+
+    static func callableIdentity(
+        ownerName: String?,
+        declaration: CallableDeclaration
+    ) -> String {
+        let owner = ownerName ?? "<top-level>"
+        return "\(owner)::\(declaration.name)(\(renderParameterList(declaration.parameters)))"
+    }
+
+    static func initializerIdentity(
+        constructName: String,
+        declaration: InitializerDeclaration
+    ) -> String {
+        "\(constructName)::init(\(renderParameterList(declaration.parameters)))"
+    }
+
+    static func renderParameterList(_ parameters: [NeatFunctionParameter]) -> String {
+        parameters.map { parameter in
+            let typeName =
+                parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+                ?? "_"
+            let label = parameter.externalLabel ?? "_"
+            return "\(label):\(typeName)"
+        }.joined(separator: ",")
     }
 
     static func carriedProtocolInitializerMacros(
@@ -759,6 +970,15 @@ public struct DeclarationRegistryView {
     private let enumsByName: [String: EnumDeclaration]
     private let macrosByName: [String: MacroDeclaration]
     private let extensionsByTargetName: [String: [ExtensionDeclaration]]
+    private let topLevelStatesByFilePath: [String: [StateDeclaration]]
+    private let statesByConstructName: [String: [StateDeclaration]]
+    private let environmentsByConstructName: [String: [EnvironmentDeclaration]]
+    private let bindingsByConstructName: [String: [BindingDeclaration]]
+    private let derivedsByConstructName: [String: [DerivedDeclaration]]
+    private let valuesByConstructName: [String: [ValueDeclaration]]
+    private let initializersByConstructName: [String: [InitializerDeclaration]]
+    private let parametersByCallableIdentity: [String: [NeatFunctionParameter]]
+    private let parametersByInitializerIdentity: [String: [NeatFunctionParameter]]
     private let callablesByName: [String: [CallableDeclaration]]
 
     public init(
@@ -767,6 +987,15 @@ public struct DeclarationRegistryView {
         enumsByName: [String: EnumDeclaration],
         macrosByName: [String: MacroDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]],
+        topLevelStatesByFilePath: [String: [StateDeclaration]],
+        statesByConstructName: [String: [StateDeclaration]],
+        environmentsByConstructName: [String: [EnvironmentDeclaration]],
+        bindingsByConstructName: [String: [BindingDeclaration]],
+        derivedsByConstructName: [String: [DerivedDeclaration]],
+        valuesByConstructName: [String: [ValueDeclaration]],
+        initializersByConstructName: [String: [InitializerDeclaration]],
+        parametersByCallableIdentity: [String: [NeatFunctionParameter]],
+        parametersByInitializerIdentity: [String: [NeatFunctionParameter]],
         callablesByName: [String: [CallableDeclaration]]
     ) {
         self.protocolsByName = protocolsByName
@@ -774,6 +1003,15 @@ public struct DeclarationRegistryView {
         self.enumsByName = enumsByName
         self.macrosByName = macrosByName
         self.extensionsByTargetName = extensionsByTargetName
+        self.topLevelStatesByFilePath = topLevelStatesByFilePath
+        self.statesByConstructName = statesByConstructName
+        self.environmentsByConstructName = environmentsByConstructName
+        self.bindingsByConstructName = bindingsByConstructName
+        self.derivedsByConstructName = derivedsByConstructName
+        self.valuesByConstructName = valuesByConstructName
+        self.initializersByConstructName = initializersByConstructName
+        self.parametersByCallableIdentity = parametersByCallableIdentity
+        self.parametersByInitializerIdentity = parametersByInitializerIdentity
         self.callablesByName = callablesByName
     }
 
@@ -797,8 +1035,73 @@ public struct DeclarationRegistryView {
         extensionsByTargetName[targetName, default: []]
     }
 
+    public func topLevelStates(inFilePath path: String) -> [StateDeclaration] {
+        topLevelStatesByFilePath[path, default: []]
+    }
+
+    public func states(onConstruct named: String) -> [StateDeclaration] {
+        statesByConstructName[named, default: []]
+    }
+
+    public func environments(onConstruct named: String) -> [EnvironmentDeclaration] {
+        environmentsByConstructName[named, default: []]
+    }
+
+    public func bindings(onConstruct named: String) -> [BindingDeclaration] {
+        bindingsByConstructName[named, default: []]
+    }
+
+    public func deriveds(onConstruct named: String) -> [DerivedDeclaration] {
+        derivedsByConstructName[named, default: []]
+    }
+
+    public func values(onConstruct named: String) -> [ValueDeclaration] {
+        valuesByConstructName[named, default: []]
+    }
+
+    public func initializers(onConstruct named: String) -> [InitializerDeclaration] {
+        initializersByConstructName[named, default: []]
+    }
+
     public func callables(named name: String) -> [CallableDeclaration] {
         callablesByName[name, default: []]
+    }
+
+    public func callableIdentity(
+        ownerName: String?,
+        declaration: CallableDeclaration
+    ) -> String {
+        DeclarationGraph.callableIdentity(ownerName: ownerName, declaration: declaration)
+    }
+
+    public func initializerIdentity(
+        constructName: String,
+        declaration: InitializerDeclaration
+    ) -> String {
+        DeclarationGraph.initializerIdentity(
+            constructName: constructName,
+            declaration: declaration
+        )
+    }
+
+    public func parameters(
+        ofCallable declaration: CallableDeclaration,
+        ownerName: String?
+    ) -> [NeatFunctionParameter] {
+        parametersByCallableIdentity[
+            callableIdentity(ownerName: ownerName, declaration: declaration),
+            default: []
+        ]
+    }
+
+    public func parameters(
+        ofInitializer declaration: InitializerDeclaration,
+        constructName: String
+    ) -> [NeatFunctionParameter] {
+        parametersByInitializerIdentity[
+            initializerIdentity(constructName: constructName, declaration: declaration),
+            default: []
+        ]
     }
 
     public func hasProtocol(named name: String) -> Bool {
@@ -819,6 +1122,34 @@ public struct DeclarationRegistryView {
 
     public func hasExtensions(targeting targetName: String) -> Bool {
         !(extensionsByTargetName[targetName] ?? []).isEmpty
+    }
+
+    public func hasTopLevelStates(inFilePath path: String) -> Bool {
+        !(topLevelStatesByFilePath[path] ?? []).isEmpty
+    }
+
+    public func hasStates(onConstruct named: String) -> Bool {
+        !(statesByConstructName[named] ?? []).isEmpty
+    }
+
+    public func hasEnvironments(onConstruct named: String) -> Bool {
+        !(environmentsByConstructName[named] ?? []).isEmpty
+    }
+
+    public func hasBindings(onConstruct named: String) -> Bool {
+        !(bindingsByConstructName[named] ?? []).isEmpty
+    }
+
+    public func hasDeriveds(onConstruct named: String) -> Bool {
+        !(derivedsByConstructName[named] ?? []).isEmpty
+    }
+
+    public func hasValues(onConstruct named: String) -> Bool {
+        !(valuesByConstructName[named] ?? []).isEmpty
+    }
+
+    public func hasInitializers(onConstruct named: String) -> Bool {
+        !(initializersByConstructName[named] ?? []).isEmpty
     }
 }
 
