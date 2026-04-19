@@ -17,13 +17,13 @@ extension NeatCLI {
                     at: input ?? ".",
                     options: .init(requireManifestForDirectory: true)
                 )
-                let programModel = try ProjectSourceValidator.validatedProgramModel(
+                let compiledProgram = try ProjectSourceValidator.validatedCompiledProgram(
                     for: project
                 )
                 let backend = BackendRegistry.default()
                 let workspace = try backend.emitWorkspace(
                     project: project,
-                    programModel: programModel
+                    compiledProgram: compiledProgram
                 )
                 try backend.run(workspace: workspace)
             } catch {

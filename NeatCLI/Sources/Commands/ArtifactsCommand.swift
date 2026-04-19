@@ -36,9 +36,9 @@ extension NeatCLI {
                     withIntermediateDirectories: true
                 )
 
-                let program = try ProjectSourceValidator.programModel(for: project)
+                let compiledProgram = try ProjectSourceValidator.compiledProgram(for: project)
                 let expandedByPath = Dictionary(
-                    uniqueKeysWithValues: program.projectExpandedFiles.map {
+                    uniqueKeysWithValues: compiledProgram.projectExpandedFiles.map {
                         ($0.path, $0.sourceFile)
                     }
                 )
@@ -85,15 +85,15 @@ extension NeatCLI {
                     }
                 }
 
-                let graph = renderer.renderGraph(files: program.expandedFiles)
+                let graph = renderer.renderGraph(files: compiledProgram.expandedFiles)
                 try graph.write(
                     to: outputRoot.appendingPathComponent("03-graph.txt"),
                     atomically: true,
                     encoding: .utf8
                 )
                 let graphHTML = renderer.renderGraphHTML(
-                    files: program.expandedFiles,
-                    title: "Neat Playground Dependency Graph"
+                    files: compiledProgram.expandedFiles,
+                    title: "Neat Playground Application Graph"
                 )
                 try graphHTML.write(
                     to: outputRoot.appendingPathComponent("04-graph.html"),

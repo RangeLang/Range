@@ -20,7 +20,7 @@ extension NeatCLI {
                     at: input ?? ".",
                     options: .init(requireManifestForDirectory: true)
                 )
-                let programModel = try ProjectSourceValidator.validatedProgramModel(
+                let compiledProgram = try ProjectSourceValidator.validatedCompiledProgram(
                     for: project
                 )
                 let backend = BackendRegistry.default()
@@ -28,14 +28,14 @@ extension NeatCLI {
                     let outputURL = URL(fileURLWithPath: output).standardizedFileURL
                     _ = try backend.emitSourceFile(
                         project: project,
-                        programModel: programModel,
+                        compiledProgram: compiledProgram,
                         outputURL: outputURL
                     )
                     TerminalLog.out("Generated Swift at \(output).", level: .success)
                 } else {
                     let workspace = try backend.emitWorkspace(
                         project: project,
-                        programModel: programModel
+                        compiledProgram: compiledProgram
                     )
                     TerminalLog.out(
                         "Generated Swift workspace at \(workspace.root.path).",

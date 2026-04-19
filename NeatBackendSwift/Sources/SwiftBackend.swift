@@ -22,9 +22,9 @@ public struct SwiftBackend {
 
     public func emitWorkspace(
         project: SwiftBackendProject,
-        programModel: CompiledProgram
+        compiledProgram: CompiledProgram
     ) throws -> URL {
-        let program = try programBuilder.build(project: project, programModel: programModel)
+        let program = try programBuilder.build(project: project, compiledProgram: compiledProgram)
         let buildRoot = project.buildRoot
         if FileManager.default.fileExists(atPath: buildRoot.path) {
             try FileManager.default.removeItem(at: buildRoot)
@@ -36,10 +36,13 @@ public struct SwiftBackend {
 
     public func emitSourceFile(
         project: SwiftBackendProject,
-        programModel: CompiledProgram,
+        compiledProgram: CompiledProgram,
         outputURL: URL
     ) throws -> URL {
-        let program = try programBuilder.build(project: project, programModel: programModel)
+        let program = try programBuilder.build(
+            project: project,
+            compiledProgram: compiledProgram
+        )
         let parent = outputURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         let loweredProgram = adapter.adapt(program: program)

@@ -4,31 +4,31 @@ import NeatSyntax
 struct SwiftBackendProgramBuilder {
     func build(
         project: SwiftBackendProject,
-        programModel: CompiledProgram
+        compiledProgram: CompiledProgram
     ) throws -> LoweredProgram {
         if project.isSingleFile {
             return try build(
                 fromSingleFile: project.projectFiles[0],
-                programModel: programModel
+                compiledProgram: compiledProgram
             )
         }
 
-        return try build(programModel: programModel)
+        return try build(compiledProgram: compiledProgram)
     }
 
     private func build(
         fromSingleFile fileURL: URL,
-        programModel: CompiledProgram
+        compiledProgram: CompiledProgram
     ) throws -> LoweredProgram {
         guard
-            let parsedFile = programModel.projectExpandedFiles.first(where: {
+            let parsedFile = compiledProgram.projectExpandedFiles.first(where: {
                 $0.path == fileURL.path
             })
         else {
             throw SwiftBackendError("Failed to expand \(fileURL.lastPathComponent).")
         }
 
-        let supportDeclarations = coreSupportDeclarations(in: programModel)
+        let supportDeclarations = coreSupportDeclarations(in: compiledProgram)
         let supportUnits = coreSupportUnits(for: supportDeclarations)
         let sourceFile = parsedFile.sourceFile
 
@@ -87,8 +87,8 @@ struct SwiftBackendProgramBuilder {
         }
     }
 
-    private func build(programModel: CompiledProgram) throws -> LoweredProgram {
-        let supportDeclarations = coreSupportDeclarations(in: programModel)
+    private func build(compiledProgram: CompiledProgram) throws -> LoweredProgram {
+        let supportDeclarations = coreSupportDeclarations(in: compiledProgram)
 
         var callables: [CallableDeclaration] = []
         var enumerations: [EnumDeclaration] = []
@@ -96,7 +96,7 @@ struct SwiftBackendProgramBuilder {
         var mainBlock: MainBlockNode?
         var units: [LoweredSourceUnit] = coreSupportUnits(for: supportDeclarations)
 
-        for parsedFile in programModel.projectExpandedFiles {
+        for parsedFile in compiledProgram.projectExpandedFiles {
             let fileURL = URL(fileURLWithPath: parsedFile.path)
             let sourceFile = parsedFile.sourceFile
             let outputFileName = fileURL.deletingPathExtension().lastPathComponent + ".swift"
@@ -181,9 +181,9 @@ struct SwiftBackendProgramBuilder {
         )
     }
 
-    private func coreSupportDeclarations(in programModel: CompiledProgram) -> [ConstructDeclaration] {
-        programModel.expandedFiles.compactMap { parsedFile in
-            guard programModel.sourceRole(forPath: parsedFile.path) == .core else {
+    private func coreSupportDeclarations(in compiledProgram: CompiledProgram) -> [ConstructDeclaration] {
+        compiledProgram.expandedFiles.compactMap { parsedFile in
+            guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core else {
                 return nil
             }
 

@@ -4,12 +4,12 @@ import NeatSyntax
 
 struct MainProgramRunner {
     private let project: LoadedProject
-    private let programModel: CompiledProgram
+    private let compiledProgram: CompiledProgram
     private let showSummary: Bool
 
-    init(project: LoadedProject, programModel: CompiledProgram, showSummary: Bool = true) {
+    init(project: LoadedProject, compiledProgram: CompiledProgram, showSummary: Bool = true) {
         self.project = project
-        self.programModel = programModel
+        self.compiledProgram = compiledProgram
         self.showSummary = showSummary
     }
 
@@ -89,7 +89,7 @@ struct MainProgramRunner {
 
     private func expandedProjectSourceFile(at fileURL: URL) throws -> SourceFileNode {
         guard
-            let parsedFile = programModel.projectExpandedFiles.first(where: {
+            let parsedFile = compiledProgram.projectExpandedFiles.first(where: {
                 URL(fileURLWithPath: $0.path).standardizedFileURL == fileURL.standardizedFileURL
             })
         else {
