@@ -44,12 +44,20 @@ public struct SemanticProgram {
         declarationGraph.views
     }
 
+    public var programGraph: ProgramGraph {
+        declarationGraph.programGraph
+    }
+
     public var literalBridgeResolver: LiteralBridgeResolver {
         declarationViews.literalBridgeResolver
     }
 
+    public var applicationGraph: ApplicationGraph {
+        ApplicationGraphBuilder().build(program: self)
+    }
+
     public var dependencyGraph: DependencyGraph {
-        DependencyGraphBuilder().build(program: self)
+        applicationGraph.dependencyGraph
     }
 
     public var projectParsedFiles: [ParsedSourceFile] {

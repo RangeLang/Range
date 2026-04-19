@@ -970,6 +970,22 @@ public struct DependencyGraph {
     }
 }
 
+public struct ApplicationGraph {
+    public let dependencyGraph: DependencyGraph
+
+    public init(dependencyGraph: DependencyGraph) {
+        self.dependencyGraph = dependencyGraph
+    }
+
+    public func render() -> String {
+        dependencyGraph.render()
+    }
+
+    public func renderHTML(title: String = "Neat Application Graph") -> String {
+        dependencyGraph.renderHTML(title: title)
+    }
+}
+
 public struct DependencyGraphBuilder {
     public init() {}
 
@@ -997,6 +1013,34 @@ public struct DependencyGraphBuilder {
             collector.add(file)
         }
         return collector.build()
+    }
+}
+
+public struct ApplicationGraphBuilder {
+    public init() {}
+
+    public func build(program: SemanticProgram) -> ApplicationGraph {
+        ApplicationGraph(
+            dependencyGraph: DependencyGraphBuilder().build(program: program)
+        )
+    }
+
+    public func build(files: [ParsedSourceFile]) -> ApplicationGraph {
+        ApplicationGraph(
+            dependencyGraph: DependencyGraphBuilder().build(files: files)
+        )
+    }
+
+    public func build(
+        files: [ParsedSourceFile],
+        declarationGraph: DeclarationGraph
+    ) -> ApplicationGraph {
+        ApplicationGraph(
+            dependencyGraph: DependencyGraphBuilder().build(
+                files: files,
+                declarationGraph: declarationGraph
+            )
+        )
     }
 }
 

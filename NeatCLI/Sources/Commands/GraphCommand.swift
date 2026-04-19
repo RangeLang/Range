@@ -5,7 +5,7 @@ import NeatSyntax
 extension NeatCLI {
     struct Graph: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Build and print the structural dependency graph for a Neat file or project."
+            abstract: "Build and print the application graph for a Neat file or project."
         )
 
         @Argument(help: "Project directory or source .neat file to inspect.")
@@ -15,7 +15,7 @@ extension NeatCLI {
             do {
                 let project = try ProjectLoader.load(at: input ?? ".")
                 let program = try ProjectSourceValidator.semanticProgram(for: project)
-                print(program.dependencyGraph.render())
+                print(program.applicationGraph.render())
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure

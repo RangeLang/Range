@@ -85,6 +85,14 @@ public struct SemanticGraph: Sendable {
     }
 }
 
+public struct ProgramGraph: Sendable {
+    public let semanticGraph: SemanticGraph
+
+    public init(semanticGraph: SemanticGraph) {
+        self.semanticGraph = semanticGraph
+    }
+}
+
 public struct RealizedInitTarget: Hashable, Sendable {
     public let constructName: String
     public let parameterLabels: [String?]
@@ -205,6 +213,10 @@ public struct DeclarationGraph {
 
     public var dependencySourceView: DependencySourceView {
         DependencySourceView(constructsByName: constructsByName)
+    }
+
+    public var programGraph: ProgramGraph {
+        ProgramGraph(semanticGraph: semanticGraph)
     }
 
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
