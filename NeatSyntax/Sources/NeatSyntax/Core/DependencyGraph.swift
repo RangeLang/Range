@@ -956,17 +956,13 @@ private struct GraphCollector {
     private var nodesByID: [String: DependencyGraphNode] = [:]
     private var edges: Set<DependencyGraphEdge> = []
     private var declarationNodeIDsByName: [String: Set<String>] = [:]
-    private var constructDeclarationsByName: [String: ConstructDeclaration] = [:]
+    private let dependencySourceView: DependencySourceView
     private var constructCallableNodeIDsByName: [String: [String: String]] = [:]
     private var aliasTargetByNodeID: [String: String] = [:]
     private var constructTypeByNodeID: [String: String] = [:]
-    private var coreConstructNames: Set<String> = []
 
     init(declarationGraph: DeclarationGraph) {
-        self.constructDeclarationsByName = declarationGraph.constructsByName
-        self.coreConstructNames = Set(
-            declarationGraph.constructsByName.values.lazy.filter(\.isCore).map(\.name)
-        )
+        self.dependencySourceView = declarationGraph.dependencySourceView
     }
 
     mutating func build() -> DependencyGraph {
@@ -1173,7 +1169,7 @@ private struct GraphCollector {
         addEdge(from: parentID, to: bindingID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: bindingID)
         addStorageTypeReference(.named(declaration.typeName), from: bindingID)
-        if constructDeclarationsByName[declaration.typeName] != nil {
+        if dependencySourceView.hasConstruct(named: declaration.typeName) {
             constructTypeByNodeID[bindingID] = declaration.typeName
         }
     }
@@ -1195,7 +1191,7 @@ private struct GraphCollector {
         addEdge(from: parentID, to: valueID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: valueID)
         addStorageTypeReference(.named(declaration.typeName), from: valueID)
-        if constructDeclarationsByName[declaration.typeName] != nil {
+        if dependencySourceView.hasConstruct(named: declaration.typeName) {
             constructTypeByNodeID[valueID] = declaration.typeName
         }
     }
@@ -1242,7 +1238,7 @@ private struct GraphCollector {
         addMacroApplications(parameter.macros, parentID: parameterID)
         if let typeReference = parameter.typeReference {
             addStorageTypeReference(typeReference, from: parameterID)
-            if case .named(let name) = typeReference, constructDeclarationsByName[name] != nil {
+            if case .named(let name) = typeReference, dependencySourceView.hasConstruct(named: name) {
                 constructTypeByNodeID[parameterID] = name
             }
         }
@@ -1252,8 +1248,8 @@ private struct GraphCollector {
     {
         let edgeKind: DependencyGraphEdgeKind
         if case .named(let name) = reference,
-            constructDeclarationsByName[name] != nil,
-            !coreConstructNames.contains(name)
+            dependencySourceView.hasConstruct(named: name),
+            !dependencySourceView.isCoreConstruct(named: name)
         {
             edgeKind = .referencesIdentity
         } else {
@@ -1363,7 +1359,7 @@ private struct GraphCollector {
                 addNode(id: localID, kind: nodeKind, label: declaration.name)
                 addEdge(from: ownerID, to: localID, kind: .contains)
                 addStorageTypeReference(declaration.type, from: localID)
-                if constructDeclarationsByName[declaration.type.displayName] != nil {
+                if dependencySourceView.hasConstruct(named: declaration.type.displayName) {
                     constructTypeByNodeID[localID] = declaration.type.displayName
                 }
                 captureConstructType(for: localID, from: declaration.expression)
@@ -1492,7 +1488,7 @@ private struct GraphCollector {
             addAlias(from: ownerID, to: sourceID)
         }
         if case .call(let name, let arguments) = expression,
-            constructDeclarationsByName[name] != nil
+            dependencySourceView.hasConstruct(named: name)
         {
             constructTypeByNodeID[ownerID] = name
             bindConstructArguments(
@@ -1586,7 +1582,7 @@ private struct GraphCollector {
             return
         }
         guard
-            let declaration = constructDeclarationsByName[constructName],
+            let declaration = dependencySourceView.construct(named: constructName),
             let callable = declaration.callables.first(where: { $0.name == methodName }),
             let callableNodeID = constructCallableNodeIDsByName[constructName]?[methodName]
         else {
@@ -1631,7 +1627,7 @@ private struct GraphCollector {
         arguments: [CallArgument],
         scope: MemoryScope
     ) {
-        guard let declaration = constructDeclarationsByName[constructName] else { return }
+        guard let declaration = dependencySourceView.construct(named: constructName) else { return }
         let memberKinds = self.memberKinds(for: declaration)
 
         for argument in arguments {
@@ -1677,7 +1673,7 @@ private struct GraphCollector {
         for binding in declaration.bindings {
             let nodeID = ensureMemberNode(
                 baseID: instanceNodeID, name: binding.name, kind: .binding)
-            if constructDeclarationsByName[binding.typeName] != nil {
+            if dependencySourceView.hasConstruct(named: binding.typeName) {
                 constructTypeByNodeID[nodeID] = binding.typeName
             }
             scope.symbols[binding.name] = nodeID
@@ -1688,7 +1684,7 @@ private struct GraphCollector {
         }
         for value in declaration.values {
             let nodeID = ensureMemberNode(baseID: instanceNodeID, name: value.name, kind: .value)
-            if constructDeclarationsByName[value.typeName] != nil {
+            if dependencySourceView.hasConstruct(named: value.typeName) {
                 constructTypeByNodeID[nodeID] = value.typeName
             }
             scope.symbols[value.name] = nodeID
@@ -1697,7 +1693,7 @@ private struct GraphCollector {
     }
 
     private mutating func captureConstructType(for nodeID: String, from expression: Expression) {
-        guard case .call(let name, _) = expression, constructDeclarationsByName[name] != nil else {
+        guard case .call(let name, _) = expression, dependencySourceView.hasConstruct(named: name) else {
             return
         }
         constructTypeByNodeID[nodeID] = name
@@ -1709,12 +1705,12 @@ private struct GraphCollector {
         nodeID: String
     ) {
         if let binding = declaration.bindings.first(where: { $0.name == memberName }),
-            constructDeclarationsByName[binding.typeName] != nil
+            dependencySourceView.hasConstruct(named: binding.typeName)
         {
             constructTypeByNodeID[nodeID] = binding.typeName
         }
         if let value = declaration.values.first(where: { $0.name == memberName }),
-            constructDeclarationsByName[value.typeName] != nil
+            dependencySourceView.hasConstruct(named: value.typeName)
         {
             constructTypeByNodeID[nodeID] = value.typeName
         }

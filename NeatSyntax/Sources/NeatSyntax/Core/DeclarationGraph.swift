@@ -116,6 +116,10 @@ public struct DeclarationGraph {
         views.syntaxResolver
     }
 
+    public var dependencySourceView: DependencySourceView {
+        DependencySourceView(constructsByName: constructsByName)
+    }
+
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
         var registry: [String: ProtocolDeclaration] = [:]
         for parsedFile in files {
@@ -376,6 +380,26 @@ public struct DeclarationGraphViews {
         self.memberResolver = memberResolver
         self.operatorResolver = operatorResolver
         self.syntaxResolver = syntaxResolver
+    }
+}
+
+public struct DependencySourceView {
+    private let constructsByName: [String: ConstructDeclaration]
+
+    public init(constructsByName: [String: ConstructDeclaration]) {
+        self.constructsByName = constructsByName
+    }
+
+    public func construct(named name: String) -> ConstructDeclaration? {
+        constructsByName[name]
+    }
+
+    public func hasConstruct(named name: String) -> Bool {
+        constructsByName[name] != nil
+    }
+
+    public func isCoreConstruct(named name: String) -> Bool {
+        constructsByName[name]?.isCore == true
     }
 }
 
