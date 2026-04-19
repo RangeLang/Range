@@ -1019,58 +1019,127 @@ private struct GraphCollector {
 
     mutating func add(_ parsedFile: ParsedSourceFile) {
         let fileID = "file:\(parsedFile.path)"
-        let fileLabel = URL(fileURLWithPath: parsedFile.path).lastPathComponent
-        addNode(id: fileID, kind: .file, label: fileLabel)
 
         switch parsedFile.sourceFile {
         case .construct(let declaration):
-            addConstruct(declaration, parentID: fileID)
-        case .enumeration(let declaration):
-            addEnum(declaration, parentID: fileID)
-        case .protocolDefinition(let declaration):
-            addProtocol(declaration, parentID: fileID)
-        case .macro(let declaration):
-            addMacroDeclaration(declaration, parentID: fileID)
-        case .extensions(let declarations):
-            for declaration in declarations {
-                addExtension(declaration, parentID: fileID)
-            }
+            analyzeConstructDeclaration(declaration, parentID: fileID)
+        case .enumeration, .protocolDefinition, .macro, .extensions:
+            return
         case .module(let module):
-            if module.mainBlock != nil {
-                let mainID = "\(fileID)/main"
-                addNode(id: mainID, kind: .mainBlock, label: "@main")
-                addEdge(from: fileID, to: mainID, kind: .contains)
-            }
             for state in module.states {
-                addState(state, parentID: fileID)
-            }
-            for callable in module.callables {
-                addCallable(callable, parentID: fileID)
+                analyzeStateDeclaration(state, parentID: fileID)
             }
             for declaration in module.constructs {
-                addConstruct(declaration, parentID: fileID)
+                analyzeConstructDeclaration(declaration, parentID: fileID)
             }
-            for declaration in module.enumerations {
-                addEnum(declaration, parentID: fileID)
-            }
-            for declaration in module.protocols {
-                addProtocol(declaration, parentID: fileID)
-            }
-            for declaration in module.macros {
-                addMacroDeclaration(declaration, parentID: fileID)
-            }
-            for declaration in module.extensions {
-                addExtension(declaration, parentID: fileID)
+            let moduleScope = MemoryScope(
+                symbols: Dictionary(uniqueKeysWithValues: module.states.map { state in
+                    (state.name, "\(fileID)/state:\(state.name)")
+                })
+            )
+            for callable in module.callables {
+                analyzeCallableDeclaration(callable, parentID: fileID, scope: moduleScope)
             }
 
             if let mainBlock = module.mainBlock {
                 analyzeMainBlock(mainBlock, parentID: fileID, module: module)
             }
         case .mainBlock(let mainBlock):
-            let mainID = "\(fileID)/main"
-            addNode(id: mainID, kind: .mainBlock, label: "@main")
-            addEdge(from: fileID, to: mainID, kind: .contains)
             analyzeMainBlock(mainBlock, parentID: fileID, module: nil)
+        }
+    }
+
+    private mutating func analyzeConstructDeclaration(
+        _ declaration: ConstructDeclaration,
+        parentID: String
+    ) {
+        let constructID = "\(parentID)/construct:\(declaration.name)"
+        let scope = makeScope(
+            bindings: declaration.bindings.map { ($0.name, "\(constructID)/binding:\($0.name)") },
+            deriveds: declaration.deriveds.map { ($0.name, "\(constructID)/derived:\($0.name)") },
+            environments: declaration.environments.map {
+                ($0.name, "\(constructID)/environment:\($0.name)")
+            },
+            states: declaration.states.map { ($0.name, "\(constructID)/state:\($0.name)") },
+            values: declaration.values.map { ($0.name, "\(constructID)/value:\($0.name)") },
+            selfID: constructID
+        )
+
+        for binding in declaration.bindings where dependencySourceView.hasConstruct(named: binding.typeName) {
+            flowState.inferredConstructTypeByNodeID["\(constructID)/binding:\(binding.name)"] =
+                binding.typeName
+        }
+        for value in declaration.values where dependencySourceView.hasConstruct(named: value.typeName) {
+            flowState.inferredConstructTypeByNodeID["\(constructID)/value:\(value.name)"] =
+                value.typeName
+        }
+        for state in declaration.states {
+            analyzeStateDeclaration(state, parentID: constructID)
+        }
+        for derived in declaration.deriveds {
+            let derivedID = "\(constructID)/derived:\(derived.name)"
+            if let body = derived.body {
+                analyzeStatements(body, ownerID: derivedID, scope: scope)
+            }
+        }
+        for initializer in declaration.initializers {
+            let initializerID = "\(constructID)/init:\(renderParameterList(initializer.parameters))"
+            var initializerScope = scope
+            for parameter in initializer.parameters {
+                let label = parameter.externalLabel ?? "_"
+                let parameterID = "\(initializerID)/parameter:\(label):\(parameter.localName)"
+                initializerScope.symbols[parameter.name] = parameterID
+                if let typeReference = parameter.typeReference,
+                    case .named(let name) = typeReference,
+                    dependencySourceView.hasConstruct(named: name)
+                {
+                    flowState.inferredConstructTypeByNodeID[parameterID] = name
+                }
+            }
+            if let body = initializer.body {
+                analyzeStatements(body, ownerID: initializerID, scope: initializerScope)
+            }
+        }
+        for callable in declaration.callables {
+            analyzeCallableDeclaration(callable, parentID: constructID, scope: scope)
+        }
+        for nested in declaration.constructs {
+            analyzeConstructDeclaration(nested, parentID: constructID)
+        }
+    }
+
+    private mutating func analyzeStateDeclaration(
+        _ declaration: StateDeclaration,
+        parentID: String
+    ) {
+        let stateID = "\(parentID)/state:\(declaration.name)"
+        if case .stored(let expression) = declaration.storage {
+            captureConstructType(for: stateID, from: expression)
+            analyzeInitializer(expression, ownerID: stateID, scope: MemoryScope(), visitedCalls: [])
+        }
+    }
+
+    private mutating func analyzeCallableDeclaration(
+        _ declaration: CallableDeclaration,
+        parentID: String,
+        scope: MemoryScope
+    ) {
+        let callableID =
+            "\(parentID)/function:\(declaration.name)(\(renderParameterList(declaration.parameters)))"
+        var callableScope = scope
+        for parameter in declaration.parameters {
+            let label = parameter.externalLabel ?? "_"
+            let parameterID = "\(callableID)/parameter:\(label):\(parameter.localName)"
+            callableScope.symbols[parameter.name] = parameterID
+            if let typeReference = parameter.typeReference,
+                case .named(let name) = typeReference,
+                dependencySourceView.hasConstruct(named: name)
+            {
+                flowState.inferredConstructTypeByNodeID[parameterID] = name
+            }
+        }
+        if let body = declaration.body {
+            analyzeStatements(body, ownerID: callableID, scope: callableScope)
         }
     }
 
@@ -1413,6 +1482,16 @@ private struct GraphCollector {
         case .construct, .enumeration, .protocolDefinition, .macro:
             let name = declarationName(for: entityID, fallbackLabel: label)
             resolutionIndex.declarationProjectionNodeIDsByName[name, default: []].insert(entityID)
+        case .function:
+            guard
+                let parentComponent = entityID.split(separator: "/").dropLast().last,
+                parentComponent.hasPrefix("construct:")
+            else {
+                break
+            }
+            let constructName = String(parentComponent.dropFirst("construct:".count))
+            resolutionIndex.constructCallableProjectionNodeIDs[constructName, default: [:]][label] =
+                entityID
         default:
             break
         }
