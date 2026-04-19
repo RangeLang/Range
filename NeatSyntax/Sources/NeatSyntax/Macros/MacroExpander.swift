@@ -1318,22 +1318,6 @@ public enum MacroExpander {
         return nil
     }
 
-    static func indexedReference(
-        _ identifier: String,
-        prefix: String,
-        suffix: String
-    ) -> Int? {
-        guard identifier.hasPrefix(prefix), identifier.hasSuffix(suffix) else {
-            return nil
-        }
-        let start = identifier.index(identifier.startIndex, offsetBy: prefix.count)
-        let end = identifier.index(identifier.endIndex, offsetBy: -suffix.count)
-        guard start <= end else {
-            return nil
-        }
-        return Int(identifier[start..<end])
-    }
-
     static func bootstrapLiteralType(for expression: Expression) -> BootstrapLiteralType? {
         switch expression {
         case .integer:
@@ -1963,94 +1947,19 @@ public enum MacroExpander {
             targetKind: targetKind,
             operationExpressions: operationExpressions
         ) { expression in
-            resolvedRewriteCall(
+            context.resolvedRewriteCall(
                 from: expression,
                 targetBinding: targetBinding,
                 targetKind: targetKind
             ) != nil
         }
         return operationExpressions.compactMap {
-            resolvedRewriteCall(
+            context.resolvedRewriteCall(
                 from: $0,
                 targetBinding: targetBinding,
                 targetKind: targetKind
             )
         }
-    }
-
-    static func resolvedRewriteCall(
-        from expression: Expression,
-        targetBinding: String,
-        targetKind: MacroTargetKind
-    ) -> ResolvedRewriteCall? {
-        guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
-            return nil
-        }
-
-        let rewritePaths: [(String, ResolvedRewriteSite)]
-        switch targetKind {
-        case .expression, .block:
-            rewritePaths = [
-                ("\(targetBinding).rewrite", .targetDirect)
-            ]
-        case .initializer:
-            rewritePaths = [
-                ("\(targetBinding).application.rewrite", .initApplication)
-            ]
-        case .function:
-            rewritePaths = [
-                ("\(targetBinding).application.rewrite", .functionApplication)
-            ]
-        case .construct:
-            rewritePaths = []
-        case .parameter:
-            rewritePaths = [
-                ("\(targetBinding).declaration.type.rewrite", .parameterDeclarationType),
-                ("\(targetBinding).application.expression.rewrite", .parameterApplicationArgument),
-            ]
-        case .other:
-            rewritePaths = []
-        }
-
-        if let site = rewritePaths.first(where: { $0.0 == name })?.1 {
-            return ResolvedRewriteCall(site: site, payload: arguments[0].value)
-        }
-
-        if targetKind == .parameter,
-            indexedReference(
-                name,
-                prefix: "\(targetBinding).application.arguments[",
-                suffix: "].rewrite"
-            ) != nil
-        {
-            return ResolvedRewriteCall(
-                site: .parameterApplicationArgument, payload: arguments[0].value)
-        }
-
-        if targetKind == .initializer,
-            indexedReference(
-                name,
-                prefix: "\(targetBinding).application.arguments[",
-                suffix: "].rewrite"
-            ) != nil
-        {
-            return ResolvedRewriteCall(site: .initApplication, payload: arguments[0].value)
-        }
-
-        if targetKind == .function,
-            indexedReference(
-                name,
-                prefix: "\(targetBinding).application.arguments[",
-                suffix: "].expression.rewrite"
-            ) != nil
-        {
-            return ResolvedRewriteCall(
-                site: .functionArgumentExpression,
-                payload: arguments[0].value
-            )
-        }
-
-        return nil
     }
 
     static func substituteMacroTargetCalls(

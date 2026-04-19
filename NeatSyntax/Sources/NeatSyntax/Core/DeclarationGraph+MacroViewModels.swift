@@ -57,6 +57,22 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
     }
 }
 
+func indexedReference(
+    _ identifier: String,
+    prefix: String,
+    suffix: String
+) -> Int? {
+    guard identifier.hasPrefix(prefix), identifier.hasSuffix(suffix) else {
+        return nil
+    }
+    let start = identifier.index(identifier.startIndex, offsetBy: prefix.count)
+    let end = identifier.index(identifier.endIndex, offsetBy: -suffix.count)
+    guard start <= end else {
+        return nil
+    }
+    return Int(identifier[start..<end])
+}
+
 struct MacroRealizationView {
     let parameterMacroSignatures: [ParameterMacroSignature]
     let functionMacroSignatures: [FunctionMacroSignature]
@@ -384,4 +400,92 @@ struct MacroExpansionContext {
 
         return "\(targetBinding).\(normalized).rewrite"
     }
+
+    func resolvedRewriteCall(
+        from expression: Expression,
+        targetBinding: String,
+        targetKind: MacroTargetKind
+    ) -> ResolvedRewriteCall? {
+        guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
+            return nil
+        }
+
+        let explicitSites = explicitRewriteSites(
+            targetBinding: targetBinding,
+            targetKind: targetKind
+        )
+
+        if let site = explicitSites.first(where: { $0.0 == name })?.1 {
+            return ResolvedRewriteCall(site: site, payload: arguments[0].value)
+        }
+
+        if targetKind == .parameter,
+            indexedReference(
+                name,
+                prefix: "\(targetBinding).application.arguments[",
+                suffix: "].rewrite"
+            ) != nil
+        {
+            return ResolvedRewriteCall(
+                site: .parameterApplicationArgument,
+                payload: arguments[0].value
+            )
+        }
+
+        if targetKind == .initializer,
+            indexedReference(
+                name,
+                prefix: "\(targetBinding).application.arguments[",
+                suffix: "].rewrite"
+            ) != nil
+        {
+            return ResolvedRewriteCall(
+                site: .initApplication,
+                payload: arguments[0].value
+            )
+        }
+
+        if targetKind == .function,
+            indexedReference(
+                name,
+                prefix: "\(targetBinding).application.arguments[",
+                suffix: "].expression.rewrite"
+            ) != nil
+        {
+            return ResolvedRewriteCall(
+                site: .functionArgumentExpression,
+                payload: arguments[0].value
+            )
+        }
+
+        return nil
+    }
+
+    private func explicitRewriteSites(
+        targetBinding: String,
+        targetKind: MacroTargetKind
+    ) -> [(String, ResolvedRewriteSite)] {
+        switch targetKind {
+        case .expression, .block:
+            return [
+                ("\(targetBinding).rewrite", .targetDirect)
+            ]
+        case .initializer:
+            return [
+                ("\(targetBinding).application.rewrite", .initApplication)
+            ]
+        case .function:
+            return [
+                ("\(targetBinding).application.rewrite", .functionApplication)
+            ]
+        case .parameter:
+            return [
+                ("\(targetBinding).declaration.type.rewrite", .parameterDeclarationType),
+                ("\(targetBinding).application.expression.rewrite", .parameterApplicationArgument),
+            ]
+        case .construct, .other:
+            return []
+        }
+    }
+
 }
