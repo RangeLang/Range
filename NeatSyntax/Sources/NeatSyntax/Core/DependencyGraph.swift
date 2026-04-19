@@ -1166,221 +1166,17 @@ private struct GraphCollector {
         }
     }
 
-    private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
-        let constructID = "\(parentID)/construct:\(declaration.name)"
-        let constructLabel = declaration.isCore ? "@core \(declaration.name)" : declaration.name
-        addNode(id: constructID, kind: .construct, label: constructLabel)
-        registerDeclaration(name: declaration.name, nodeID: constructID)
-        addEdge(from: parentID, to: constructID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: constructID)
-        addTypeReferences(declaration.conformances, from: constructID, kind: .conformsTo)
-
-        for state in declaration.states {
-            addState(state, parentID: constructID)
-        }
-        for environment in declaration.environments {
-            addEnvironment(environment, parentID: constructID)
-        }
-        for binding in declaration.bindings {
-            addBinding(binding, parentID: constructID)
-        }
-        for derived in declaration.deriveds {
-            addDerived(derived, parentID: constructID)
-        }
-        for value in declaration.values {
-            addValue(value, parentID: constructID)
-        }
-        for initializer in declaration.initializers {
-            addInitializer(initializer, parentID: constructID)
-        }
-        for callable in declaration.callables {
-            addCallable(callable, parentID: constructID)
-        }
-        for nested in declaration.constructs {
-            addConstruct(nested, parentID: constructID)
-        }
-
-        let scope = makeScope(
-            bindings: declaration.bindings.map { ($0.name, "\(constructID)/binding:\($0.name)") },
-            deriveds: declaration.deriveds.map { ($0.name, "\(constructID)/derived:\($0.name)") },
-            environments: declaration.environments.map {
-                ($0.name, "\(constructID)/environment:\($0.name)")
-            },
-            states: declaration.states.map { ($0.name, "\(constructID)/state:\($0.name)") },
-            values: declaration.values.map { ($0.name, "\(constructID)/value:\($0.name)") },
-            selfID: constructID
-        )
-
-        for derived in declaration.deriveds {
-            let derivedID = "\(constructID)/derived:\(derived.name)"
-            if let body = derived.body {
-                analyzeStatements(body, ownerID: derivedID, scope: scope)
-            }
-        }
-
-        for initializer in declaration.initializers {
-            let initializerID = "\(constructID)/init:\(renderParameterList(initializer.parameters))"
-            var initializerScope = scope
-            for parameter in initializer.parameters {
-                let label = parameter.externalLabel ?? "_"
-                initializerScope.symbols[parameter.name] =
-                    "\(initializerID)/parameter:\(label):\(parameter.localName)"
-            }
-            if let body = initializer.body {
-                analyzeStatements(body, ownerID: initializerID, scope: initializerScope)
-            }
-        }
-
-        for callable in declaration.callables {
-            let callableID =
-                "\(constructID)/function:\(callable.name)(\(renderParameterList(callable.parameters)))"
-            var callableScope = scope
-            for parameter in callable.parameters {
-                let label = parameter.externalLabel ?? "_"
-                callableScope.symbols[parameter.name] =
-                    "\(callableID)/parameter:\(label):\(parameter.localName)"
-            }
-            if let body = callable.body {
-                analyzeStatements(body, ownerID: callableID, scope: callableScope)
-            }
-        }
+    private mutating func addNode(id: String, kind: DependencyGraphNodeKind, label: String) {
+        guard !baseEntityIDs.contains(id) else { return }
+        nodesByID[id] = DependencyGraphNode(id: id, kind: kind, label: label)
     }
 
-    private mutating func addEnum(_ declaration: EnumDeclaration, parentID: String) {
-        let enumID = "\(parentID)/enum:\(declaration.name)"
-        addNode(id: enumID, kind: .enumeration, label: declaration.name)
-        registerDeclaration(name: declaration.name, nodeID: enumID)
-        addEdge(from: parentID, to: enumID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: enumID)
-        addTypeReferences(declaration.conformances, from: enumID, kind: .conformsTo)
-    }
-
-    private mutating func addProtocol(_ declaration: ProtocolDeclaration, parentID: String) {
-        let protocolID = "\(parentID)/protocol:\(declaration.name)"
-        let label = declaration.isCore ? "@core \(declaration.name)" : declaration.name
-        addNode(id: protocolID, kind: .protocolDefinition, label: label)
-        registerDeclaration(name: declaration.name, nodeID: protocolID)
-        addEdge(from: parentID, to: protocolID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: protocolID)
-        addTypeReferences(declaration.conformances, from: protocolID, kind: .conformsTo)
-    }
-
-    private mutating func addMacroDeclaration(_ declaration: MacroDeclaration, parentID: String) {
-        let macroID = "\(parentID)/macro:\(declaration.name)"
-        addNode(id: macroID, kind: .macro, label: declaration.name)
-        registerDeclaration(name: declaration.name, nodeID: macroID)
-        addEdge(from: parentID, to: macroID, kind: .contains)
-
-        addTypeReference(declaration.target.typeReference, from: macroID, kind: .targetsMacro)
-    }
-
-    private mutating func addExtension(_ declaration: ExtensionDeclaration, parentID: String) {
-        let extensionID = "\(parentID)/extension:\(declaration.targetType.displayName)"
-        addNode(id: extensionID, kind: .typeExtension, label: declaration.targetType.displayName)
-        addEdge(from: parentID, to: extensionID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: extensionID)
-        addTypeReference(declaration.targetType, from: extensionID, kind: .extends)
-    }
-
-    private mutating func addState(_ declaration: StateDeclaration, parentID: String) {
-        let stateID = "\(parentID)/state:\(declaration.name)"
-        addNode(id: stateID, kind: .state, label: declaration.name)
-        addEdge(from: parentID, to: stateID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: stateID)
-        addStorageTypeReference(declaration.type, from: stateID)
-        if case .stored(let expression) = declaration.storage {
-            captureConstructType(for: stateID, from: expression)
-            analyzeInitializer(expression, ownerID: stateID, scope: MemoryScope(), visitedCalls: [])
-        }
-    }
-
-    private mutating func addEnvironment(_ declaration: EnvironmentDeclaration, parentID: String) {
-        let environmentID = "\(parentID)/environment:\(declaration.name)"
-        addNode(id: environmentID, kind: .environment, label: declaration.name)
-        addEdge(from: parentID, to: environmentID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: environmentID)
-        addStorageTypeReference(.named(declaration.typeName), from: environmentID)
-    }
-
-    private mutating func addBinding(_ declaration: BindingDeclaration, parentID: String) {
-        let bindingID = "\(parentID)/binding:\(declaration.name)"
-        addNode(id: bindingID, kind: .binding, label: declaration.name)
-        addEdge(from: parentID, to: bindingID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: bindingID)
-        addStorageTypeReference(.named(declaration.typeName), from: bindingID)
-        if dependencySourceView.hasConstruct(named: declaration.typeName) {
-            flowState.inferredConstructTypeByNodeID[bindingID] = declaration.typeName
-        }
-    }
-
-    private mutating func addDerived(_ declaration: DerivedDeclaration, parentID: String) {
-        let derivedID = "\(parentID)/derived:\(declaration.name)"
-        addNode(id: derivedID, kind: .derived, label: declaration.name)
-        addEdge(from: parentID, to: derivedID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: derivedID)
-        addStorageTypeReference(.named(declaration.typeName), from: derivedID)
-        if let builderName = declaration.builderName {
-            addTypeReference(.named(builderName), from: derivedID, kind: .referencesType)
-        }
-    }
-
-    private mutating func addValue(_ declaration: ValueDeclaration, parentID: String) {
-        let valueID = "\(parentID)/value:\(declaration.name)"
-        addNode(id: valueID, kind: .value, label: declaration.name)
-        addEdge(from: parentID, to: valueID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: valueID)
-        addStorageTypeReference(.named(declaration.typeName), from: valueID)
-        if dependencySourceView.hasConstruct(named: declaration.typeName) {
-            flowState.inferredConstructTypeByNodeID[valueID] = declaration.typeName
-        }
-    }
-
-    private mutating func addInitializer(_ declaration: InitializerDeclaration, parentID: String) {
-        let initializerID = "\(parentID)/init:\(renderParameterList(declaration.parameters))"
-        addNode(id: initializerID, kind: .initializer, label: "init")
-        addEdge(from: parentID, to: initializerID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: initializerID)
-        for parameter in declaration.parameters {
-            addParameter(parameter, parentID: initializerID)
-        }
-    }
-
-    private mutating func addCallable(_ declaration: CallableDeclaration, parentID: String) {
-        let callableID =
-            "\(parentID)/function:\(declaration.name)(\(renderParameterList(declaration.parameters)))"
-        addNode(id: callableID, kind: .function, label: declaration.name)
-        addEdge(from: parentID, to: callableID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: callableID)
-        if parentID.contains("/construct:"),
-            let suffix = parentID.split(separator: "/").last
-        {
-            let constructName = String(suffix.dropFirst("construct:".count))
-            resolutionIndex.constructCallableProjectionNodeIDs[constructName, default: [:]][declaration.name] =
-                callableID
-        }
-        if let targetType = declaration.targetType {
-            addTypeReference(targetType, from: callableID, kind: .referencesType)
-        }
-        if let returnType = declaration.returnType {
-            addTypeReference(returnType, from: callableID, kind: .referencesType)
-        }
-        for parameter in declaration.parameters {
-            addParameter(parameter, parentID: callableID)
-        }
-    }
-
-    private mutating func addParameter(_ parameter: NeatFunctionParameter, parentID: String) {
-        let label = parameter.externalLabel ?? "_"
-        let parameterID = "\(parentID)/parameter:\(label):\(parameter.localName)"
-        addNode(id: parameterID, kind: .parameter, label: parameter.localName)
-        addEdge(from: parentID, to: parameterID, kind: .contains)
-        addMacroApplications(parameter.macros, parentID: parameterID)
-        if let typeReference = parameter.typeReference {
-            addStorageTypeReference(typeReference, from: parameterID)
-            if case .named(let name) = typeReference, dependencySourceView.hasConstruct(named: name) {
-                flowState.inferredConstructTypeByNodeID[parameterID] = name
-            }
-        }
+    private mutating func addEdge(
+        from sourceID: String, to targetID: String, kind: DependencyGraphEdgeKind
+    ) {
+        let edge = DependencyGraphEdge(sourceID: sourceID, targetID: targetID, kind: kind)
+        guard !baseEdges.contains(edge) else { return }
+        edges.insert(edge)
     }
 
     private mutating func addStorageTypeReference(_ reference: TypeReference, from sourceID: String)
@@ -1394,51 +1190,10 @@ private struct GraphCollector {
         } else {
             edgeKind = .referencesType
         }
-        addTypeReference(reference, from: sourceID, kind: edgeKind)
-    }
 
-    private mutating func addMacroApplications(
-        _ macros: [MacroApplication],
-        parentID: String
-    ) {
-        for macro in macros {
-            let macroID = "\(parentID)/macro-application:#\(macro.name)"
-            addNode(id: macroID, kind: .macroApplication, label: "#\(macro.name)")
-            addEdge(from: parentID, to: macroID, kind: .appliesMacro)
-        }
-    }
-
-    private mutating func addTypeReferences(
-        _ references: [TypeReference],
-        from sourceID: String,
-        kind: DependencyGraphEdgeKind
-    ) {
-        for reference in references {
-            addTypeReference(reference, from: sourceID, kind: kind)
-        }
-    }
-
-    private mutating func addTypeReference(
-        _ reference: TypeReference,
-        from sourceID: String,
-        kind: DependencyGraphEdgeKind
-    ) {
         let typeID = "type:\(reference.displayName)"
         addNode(id: typeID, kind: .typeReference, label: reference.displayName)
-        addEdge(from: sourceID, to: typeID, kind: kind)
-    }
-
-    private mutating func addNode(id: String, kind: DependencyGraphNodeKind, label: String) {
-        guard !baseEntityIDs.contains(id) else { return }
-        nodesByID[id] = DependencyGraphNode(id: id, kind: kind, label: label)
-    }
-
-    private mutating func addEdge(
-        from sourceID: String, to targetID: String, kind: DependencyGraphEdgeKind
-    ) {
-        let edge = DependencyGraphEdge(sourceID: sourceID, targetID: targetID, kind: kind)
-        guard !baseEdges.contains(edge) else { return }
-        edges.insert(edge)
+        addEdge(from: sourceID, to: typeID, kind: edgeKind)
     }
 
     private mutating func indexBaseSemanticGraph() {
@@ -1534,10 +1289,6 @@ private struct GraphCollector {
             }
         }
         return fallbackLabel
-    }
-
-    private mutating func registerDeclaration(name: String, nodeID: String) {
-        resolutionIndex.declarationProjectionNodeIDsByName[name, default: []].insert(nodeID)
     }
 
     private mutating func addResolutionEdges() {
