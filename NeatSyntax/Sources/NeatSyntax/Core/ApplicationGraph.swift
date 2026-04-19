@@ -971,6 +971,12 @@ public struct ApplicationGraph {
 }
 
 public struct ApplicationGraphBuilder {
+    private let passes: [any ApplicationGraphBuildPass] = [
+        ApplicationGraphSeedPass(),
+        ApplicationGraphFileAnalysisPass(),
+        ApplicationGraphResolutionPass(),
+    ]
+
     public init() {}
 
     public func build(program: CompiledProgram) -> ApplicationGraph {
@@ -993,10 +999,42 @@ public struct ApplicationGraphBuilder {
     ) -> ApplicationGraph {
         var collector = GraphCollector(declarationGraph: declarationGraph)
         let sortedFiles = files.sorted(by: { $0.path < $1.path })
-        for file in sortedFiles {
+        for pass in passes {
+            pass.apply(to: &collector, files: sortedFiles)
+        }
+        return collector.materialize()
+    }
+}
+
+private protocol ApplicationGraphBuildPass {
+    var name: String { get }
+
+    func apply(to collector: inout GraphCollector, files: [ParsedSourceFile])
+}
+
+private struct ApplicationGraphSeedPass: ApplicationGraphBuildPass {
+    let name = "ApplicationGraphSeed"
+
+    func apply(to collector: inout GraphCollector, files: [ParsedSourceFile]) {
+        collector.seedDeclarationProjection()
+    }
+}
+
+private struct ApplicationGraphFileAnalysisPass: ApplicationGraphBuildPass {
+    let name = "ApplicationGraphFileAnalysis"
+
+    func apply(to collector: inout GraphCollector, files: [ParsedSourceFile]) {
+        for file in files {
             collector.add(file)
         }
-        return collector.build()
+    }
+}
+
+private struct ApplicationGraphResolutionPass: ApplicationGraphBuildPass {
+    let name = "ApplicationGraphResolution"
+
+    func apply(to collector: inout GraphCollector, files: [ParsedSourceFile]) {
+        collector.resolveApplicationEdges()
     }
 }
 
@@ -1026,11 +1064,17 @@ private struct GraphCollector {
             }
         )
         self.dependencySourceView = declarationGraph.dependencySourceView
+    }
+
+    mutating func seedDeclarationProjection() {
         indexBaseSemanticGraph()
     }
 
-    mutating func build() -> ApplicationGraph {
+    mutating func resolveApplicationEdges() {
         addResolutionEdges()
+    }
+
+    func materialize() -> ApplicationGraph {
         let baseNodes = baseSemanticGraph.entities.compactMap { entity in
             applicationNode(for: entity)
         }
