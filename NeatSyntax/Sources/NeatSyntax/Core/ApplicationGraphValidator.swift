@@ -4,8 +4,21 @@ public struct ApplicationGraphValidator {
     public init() {}
 
     public func validate(_ program: CompiledProgram) throws {
+        let graphViews = program.declarationViews
         try validateControlFlow(in: program.expandedFiles)
         try validateCallArgumentLabels(in: program.expandedFiles)
+        try validateCallableReturnSemantics(
+            in: program.expandedFiles,
+            resolver: program.literalBridgeResolver,
+            memberResolver: graphViews.memberResolver,
+            operatorResolver: graphViews.operatorResolver
+        )
+        try validateLiteralBridgeCompatibility(
+            in: program.parsedFiles,
+            resolver: program.literalBridgeResolver,
+            memberResolver: graphViews.memberResolver,
+            operatorResolver: graphViews.operatorResolver
+        )
         try validateBindingReferences(in: program.expandedFiles)
         try validateEnvironmentStateResolution(in: program.expandedFiles)
         try validateValueBindings(in: program.expandedFiles)
@@ -1371,6 +1384,692 @@ public struct ApplicationGraphValidator {
         }
 
         return text.isEmpty ? nil : text
+    }
+
+    private func validateLiteralBridgeCompatibility(
+        in parsedFiles: [ParsedSourceFile],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) throws {
+        for parsedFile in parsedFiles {
+            let fileName = lastPathComponent(of: parsedFile.path)
+
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                try validateLiteralBridgeCompatibility(
+                    in: declaration,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .module(let module):
+                try validateLiteralBridgeCompatibility(
+                    in: module.states,
+                    accessibleTypes: [:],
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+
+                let topLevelStateTypes = Dictionary(
+                    uniqueKeysWithValues: module.states.map {
+                        ($0.name, BootstrapLiteralType.typed($0.type))
+                    }
+                )
+
+                for callable in module.callables {
+                    try validateLiteralBridgeCompatibility(
+                        in: callable,
+                        accessibleTypes: topLevelStateTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+
+                for declaration in module.constructs {
+                    try validateLiteralBridgeCompatibility(
+                        in: declaration,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
+                break
+            }
+        }
+    }
+
+    private func validateLiteralBridgeCompatibility(
+        in declaration: ConstructDeclaration,
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        let environmentTypes = Dictionary(
+            uniqueKeysWithValues: declaration.environments.map {
+                ($0.name, BootstrapLiteralType.typed($0.type))
+            }
+        )
+
+        try validateLiteralBridgeCompatibility(
+            in: declaration.states,
+            accessibleTypes: environmentTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver,
+            fileName: fileName
+        )
+
+        let stateTypes = Dictionary(
+            uniqueKeysWithValues: declaration.states.map {
+                ($0.name, BootstrapLiteralType.typed($0.type))
+            }
+        )
+        let accessibleTypes = stateTypes.merging(environmentTypes) { current, _ in current }
+
+        for callable in declaration.callables {
+            try validateLiteralBridgeCompatibility(
+                in: callable,
+                accessibleTypes: accessibleTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                fileName: fileName
+            )
+        }
+    }
+
+    private func validateLiteralBridgeCompatibility(
+        in states: [StateDeclaration],
+        accessibleTypes initialAccessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        var accessibleTypes = initialAccessibleTypes
+
+        for state in states {
+            if state.hasExplicitTypeAnnotation,
+                case .stored(let expression) = state.storage,
+                let inferred = try? ExpressionTypeSemantics.inferType(
+                    of: expression,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                ),
+                inferred.isLiteralLike,
+                !ExpressionTypeSemantics.isCompatible(
+                    actual: inferred,
+                    expected: state.type,
+                    resolver: resolver
+                )
+            {
+                throw SemanticValidationError(
+                    "state '\(state.name)' in \(fileName) expects \(state.type.displayName), got \(inferred.displayName)."
+                )
+            }
+
+            accessibleTypes[state.name] = .typed(state.type)
+        }
+    }
+
+    private func validateLiteralBridgeCompatibility(
+        in callable: CallableDeclaration,
+        accessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        guard
+            let explicitReturnType = callable.returnType,
+            explicitReturnType.displayName != "Void",
+            let body = callable.body
+        else {
+            return
+        }
+
+        try validateLiteralBridgeCompatibilityInLocalCallables(
+            in: body,
+            accessibleTypes: accessibleTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver,
+            fileName: fileName
+        )
+
+        let parameterTypes: [String: BootstrapLiteralType] = Dictionary(
+            uniqueKeysWithValues: callable.parameters.compactMap { parameter in
+                guard let typeReference = parameter.typeReference else {
+                    return nil
+                }
+                return (parameter.localName, BootstrapLiteralType.typed(typeReference))
+            }
+        )
+        let visibleTypes = accessibleTypes.merging(parameterTypes) { current, _ in current }
+
+        for expression in collectReturnExpressions(in: body).compactMap({ $0 }) {
+            guard
+                let inferred = try? ExpressionTypeSemantics.inferType(
+                    of: expression,
+                    accessibleTypes: visibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                ),
+                ExpressionTypeSemantics.isLiteralExpression(expression)
+            else {
+                continue
+            }
+
+            guard
+                ExpressionTypeSemantics.isCompatible(
+                    actual: inferred,
+                    expected: explicitReturnType,
+                    resolver: resolver
+                )
+            else {
+                throw SemanticValidationError(
+                    "Callable \(callable.name) in \(fileName) expects return type \(explicitReturnType.displayName), got \(inferred.displayName)."
+                )
+            }
+        }
+    }
+
+    private func validateLiteralBridgeCompatibilityInLocalCallables(
+        in statements: [Statement],
+        accessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        for statement in statements {
+            switch statement {
+            case .localCallable(let declaration):
+                try validateLiteralBridgeCompatibility(
+                    in: CallableDeclaration(
+                        macros: declaration.macros,
+                        attribute: declaration.attribute,
+                        targetType: nil,
+                        name: declaration.name,
+                        genericParameters: declaration.genericParameters,
+                        hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+                        parameters: declaration.parameters,
+                        returnType: declaration.returnType,
+                        body: declaration.body
+                    ),
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .macroInvocation(_, _, let body),
+                .derived(_, _, let body),
+                .forEach(_, _, let body),
+                .whileLoop(_, let body):
+                try validateLiteralBridgeCompatibilityInLocalCallables(
+                    in: body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .background(let background):
+                try validateLiteralBridgeCompatibilityInLocalCallables(
+                    in: background.body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .conditional(let branches):
+                for branch in branches {
+                    try validateLiteralBridgeCompatibilityInLocalCallables(
+                        in: branch.body,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    try validateLiteralBridgeCompatibilityInLocalCallables(
+                        in: switchCase.body,
+                        accessibleTypes: accessibleTypesForSwitchCasePattern(
+                            switchCase.pattern,
+                            base: accessibleTypes
+                        ),
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+                if let defaultBody {
+                    try validateLiteralBridgeCompatibilityInLocalCallables(
+                        in: defaultBody,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
+                .expression, .return, .break, .continue:
+                continue
+            }
+        }
+    }
+
+    private func validateCallableReturnSemantics(
+        in parsedFiles: [ParsedSourceFile],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) throws {
+        for parsedFile in parsedFiles {
+            let fileName = lastPathComponent(of: parsedFile.path)
+
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                try validateCallableReturnSemantics(
+                    in: declaration,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .module(let module):
+                let topLevelAccessibleTypes = Dictionary(
+                    uniqueKeysWithValues: module.states.map {
+                        ($0.name, BootstrapLiteralType.typed($0.type))
+                    }
+                )
+
+                for callable in module.callables {
+                    try validateCallableReturnSemantics(
+                        callable,
+                        accessibleTypes: topLevelAccessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+
+                for declaration in module.constructs {
+                    try validateCallableReturnSemantics(
+                        in: declaration,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
+                break
+            }
+        }
+    }
+
+    private func validateCallableReturnSemantics(
+        in declaration: ConstructDeclaration,
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        let environmentTypes = Dictionary(
+            uniqueKeysWithValues: declaration.environments.map {
+                ($0.name, BootstrapLiteralType.typed($0.type))
+            }
+        )
+        let stateTypes = Dictionary(
+            uniqueKeysWithValues: declaration.states.map {
+                ($0.name, BootstrapLiteralType.typed($0.type))
+            }
+        )
+        let accessibleTypes = stateTypes.merging(environmentTypes) { current, _ in current }
+
+        for callable in declaration.callables {
+            try validateCallableReturnSemantics(
+                callable,
+                accessibleTypes: accessibleTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                fileName: fileName
+            )
+        }
+    }
+
+    private func validateCallableReturnSemantics(
+        _ callable: CallableDeclaration,
+        accessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        guard let body = callable.body else {
+            return
+        }
+
+        try validateCallableReturnSemanticsInLocalCallables(
+            in: body,
+            accessibleTypes: accessibleTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver,
+            fileName: fileName
+        )
+
+        let explicitReturnType = callable.returnType
+        let needsValueReturn = callableRequiresValueReturn(
+            explicitReturnType: explicitReturnType,
+            expectedReturnType: explicitReturnType
+        )
+        let returnExpressions = collectReturnExpressions(in: body)
+
+        if explicitReturnType == nil {
+            if returnExpressions.contains(where: { $0 != nil }) {
+                throw SemanticValidationError(
+                    "Callable \(renderCallableSignature(callable)) in \(fileName) has no return type and cannot return a value."
+                )
+            }
+            return
+        }
+
+        if isVoidType(explicitReturnType!) {
+            if returnExpressions.contains(where: { $0 != nil }) {
+                throw SemanticValidationError(
+                    "Callable \(renderCallableSignature(callable)) in \(fileName) declares return type Void and cannot return a value."
+                )
+            }
+            return
+        }
+
+        if needsValueReturn {
+            guard blockAlwaysReturnsValue(body) else {
+                throw SemanticValidationError(
+                    "Callable \(renderCallableSignature(callable)) in \(fileName) declares return type \(explicitReturnType!.displayName) but does not return a value on all paths."
+                )
+            }
+
+            if returnExpressions.contains(where: { $0 == nil }) {
+                throw SemanticValidationError(
+                    "Callable \(renderCallableSignature(callable)) in \(fileName) declares return type \(explicitReturnType!.displayName) and cannot use bare return."
+                )
+            }
+        }
+
+        guard let explicitReturnType, explicitReturnType.displayName != "Void" else {
+            return
+        }
+
+        let parameterTypes: [String: BootstrapLiteralType] = Dictionary(
+            uniqueKeysWithValues: callable.parameters.compactMap { parameter in
+                guard let typeReference = parameter.typeReference else {
+                    return nil
+                }
+                return (parameter.localName, BootstrapLiteralType.typed(typeReference))
+            }
+        )
+        let visibleTypes = accessibleTypes.merging(parameterTypes) { current, _ in current }
+
+        for expression in returnExpressions.compactMap({ $0 }) {
+            guard
+                let inferred = try? ExpressionTypeSemantics.inferType(
+                    of: expression,
+                    accessibleTypes: visibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                )
+            else {
+                continue
+            }
+
+            if inferred.isLiteralLike {
+                continue
+            }
+
+            guard
+                ExpressionTypeSemantics.isCompatible(
+                    actual: inferred,
+                    expected: explicitReturnType,
+                    resolver: resolver
+                )
+            else {
+                throw SemanticValidationError(
+                    "Callable \(renderCallableSignature(callable)) in \(fileName) expects return type \(explicitReturnType.displayName), got \(inferred.displayName)."
+                )
+            }
+        }
+    }
+
+    private func validateCallableReturnSemanticsInLocalCallables(
+        in statements: [Statement],
+        accessibleTypes: [String: BootstrapLiteralType],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        for statement in statements {
+            switch statement {
+            case .localCallable(let declaration):
+                try validateCallableReturnSemantics(
+                    CallableDeclaration(
+                        macros: declaration.macros,
+                        attribute: declaration.attribute,
+                        targetType: nil,
+                        name: declaration.name,
+                        genericParameters: declaration.genericParameters,
+                        hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+                        parameters: declaration.parameters,
+                        returnType: declaration.returnType,
+                        body: declaration.body
+                    ),
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .macroInvocation(_, _, let body),
+                .derived(_, _, let body),
+                .forEach(_, _, let body),
+                .whileLoop(_, let body):
+                try validateCallableReturnSemanticsInLocalCallables(
+                    in: body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .background(let background):
+                try validateCallableReturnSemanticsInLocalCallables(
+                    in: background.body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
+            case .conditional(let branches):
+                for branch in branches {
+                    try validateCallableReturnSemanticsInLocalCallables(
+                        in: branch.body,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    try validateCallableReturnSemanticsInLocalCallables(
+                        in: switchCase.body,
+                        accessibleTypes: accessibleTypesForSwitchCasePattern(
+                            switchCase.pattern,
+                            base: accessibleTypes
+                        ),
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+                if let defaultBody {
+                    try validateCallableReturnSemanticsInLocalCallables(
+                        in: defaultBody,
+                        accessibleTypes: accessibleTypes,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
+            case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
+                .expression, .return, .break, .continue:
+                continue
+            }
+        }
+    }
+
+    private func collectReturnExpressions(in statements: [Statement]) -> [Expression?] {
+        var expressions: [Expression?] = []
+
+        for statement in statements {
+            switch statement {
+            case .macroInvocation(_, _, let body):
+                expressions.append(contentsOf: collectReturnExpressions(in: body))
+            case .return(let expression):
+                expressions.append(expression)
+            case .forEach(_, _, let body):
+                expressions.append(contentsOf: collectReturnExpressions(in: body))
+            case .whileLoop(_, let body):
+                expressions.append(contentsOf: collectReturnExpressions(in: body))
+            case .conditional(let branches):
+                for branch in branches {
+                    expressions.append(contentsOf: collectReturnExpressions(in: branch.body))
+                }
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    expressions.append(contentsOf: collectReturnExpressions(in: switchCase.body))
+                }
+                if let defaultBody {
+                    expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
+                }
+            case .background:
+                continue
+            case .localCallable:
+                continue
+            case .localBinding, .derived, .environmentProvision, .assignment, .compoundAssignment,
+                .expression, .break, .continue:
+                continue
+            }
+        }
+
+        return expressions
+    }
+
+    private func callableRequiresValueReturn(
+        explicitReturnType: TypeReference?,
+        expectedReturnType: TypeReference?
+    ) -> Bool {
+        guard explicitReturnType != nil else { return false }
+        guard let expectedReturnType else { return true }
+        return !isVoidType(expectedReturnType)
+    }
+
+    private func isVoidType(_ typeReference: TypeReference) -> Bool {
+        typeReference.displayName == "Void"
+    }
+
+    private func blockAlwaysReturnsValue(_ statements: [Statement]) -> Bool {
+        for statement in statements {
+            if statementAlwaysReturnsValue(statement) {
+                return true
+            }
+        }
+        return false
+    }
+
+    private func statementAlwaysReturnsValue(_ statement: Statement) -> Bool {
+        switch statement {
+        case .macroInvocation(_, _, let body):
+            return blockAlwaysReturnsValue(body)
+        case .return(let expression):
+            return expression != nil
+        case .conditional(let branches):
+            guard branches.contains(where: { $0.condition == nil }) else {
+                return false
+            }
+            return branches.allSatisfy { blockAlwaysReturnsValue($0.body) }
+        case .switchStatement(_, let cases, let defaultBody):
+            guard let defaultBody else { return false }
+            guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
+            return blockAlwaysReturnsValue(defaultBody)
+        case .background, .localCallable:
+            return false
+        default:
+            return false
+        }
+    }
+
+    private func renderCallableSignature(_ callable: CallableDeclaration) -> String {
+        let rendered = callable.parameters.map(renderParameterSignature).joined(separator: ", ")
+        if let targetType = callable.targetType {
+            return "\(targetType.displayName)@\(callable.name)(\(rendered))"
+        }
+        return "@\(callable.name)(\(rendered))"
+    }
+
+    private func renderParameterSignature(_ parameter: NeatFunctionParameter) -> String {
+        let typeName =
+            parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
+            ?? "_"
+        if let externalLabel = parameter.externalLabel {
+            if externalLabel == parameter.localName {
+                return "\(parameter.localName): \(typeName)"
+            }
+            return "\(externalLabel) \(parameter.localName): \(typeName)"
+        }
+        return "\(parameter.localName): \(typeName)"
+    }
+
+    private func accessibleTypesForSwitchCasePattern(
+        _ pattern: SwitchCasePattern,
+        base: [String: BootstrapLiteralType]
+    ) -> [String: BootstrapLiteralType] {
+        guard case .enumCase(_, let binding?) = pattern else {
+            return base
+        }
+
+        var extended = base
+        extended[binding.name] = .typed(.named("Never"))
+        return extended
     }
 
     private func declarations(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {

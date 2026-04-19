@@ -7,19 +7,6 @@ public struct CompiledProgramValidator {
         try ProgramGraphValidator().validate(program.programGraph)
         try DeclarationGraphValidator().validate(program)
         try ApplicationGraphValidator().validate(program)
-        let graphViews = program.declarationViews
-        try validateCallableReturnSemantics(
-            in: program.expandedFiles,
-            resolver: program.literalBridgeResolver,
-            memberResolver: graphViews.memberResolver,
-            operatorResolver: graphViews.operatorResolver
-        )
-        try validateLiteralBridgeCompatibility(
-            in: program.parsedFiles,
-            resolver: program.literalBridgeResolver,
-            memberResolver: graphViews.memberResolver,
-            operatorResolver: graphViews.operatorResolver
-        )
     }
 
     public func validatePrimaryDeclarations(in program: CompiledProgram) throws {
