@@ -72,6 +72,9 @@ public struct RealizedInitMacroTarget {
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
     public let constructsByName: [String: ConstructDeclaration]
+    public let enumsByName: [String: EnumDeclaration]
+    public let macrosByName: [String: MacroDeclaration]
+    public let extensionsByTargetName: [String: [ExtensionDeclaration]]
     public let callablesByName: [String: [CallableDeclaration]]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
     public let realizedInitMacroTargets: [RealizedInitMacroTarget]
@@ -80,10 +83,16 @@ public struct DeclarationGraph {
     public init(files: [ParsedSourceFile]) {
         let protocols = Self.collectProtocols(from: files)
         let constructs = Self.collectConstructs(from: files, protocols: protocols)
+        let enumerations = Self.collectEnums(from: files)
+        let macros = Self.collectMacros(from: files)
+        let extensions = Self.collectExtensions(from: files)
         let callables = Self.collectCallables(from: files)
 
         self.protocolsByName = protocols
         self.constructsByName = constructs
+        self.enumsByName = enumerations
+        self.macrosByName = macros
+        self.extensionsByTargetName = extensions
         self.callablesByName = callables
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
@@ -95,6 +104,14 @@ public struct DeclarationGraph {
             literalBridgeResolver: LiteralBridgeResolver(realizedLiteralBridges: realizedLiteralBridges),
             memberResolver: DeclarationMemberResolver(constructsByName: constructsByName),
             operatorResolver: DeclarationOperatorResolver(callablesByName: callablesByName),
+            registryView: DeclarationRegistryView(
+                protocolsByName: protocolsByName,
+                constructsByName: constructsByName,
+                enumsByName: enumsByName,
+                macrosByName: macrosByName,
+                extensionsByTargetName: extensionsByTargetName,
+                callablesByName: callablesByName
+            ),
             syntaxResolver: DeclarationSyntaxResolver(
                 protocolsByName: protocolsByName,
                 constructsByName: constructsByName
@@ -116,6 +133,10 @@ public struct DeclarationGraph {
 
     public var syntaxResolver: DeclarationSyntaxResolver {
         views.syntaxResolver
+    }
+
+    public var registryView: DeclarationRegistryView {
+        views.registryView
     }
 
     public var dependencySourceView: DependencySourceView {
@@ -149,6 +170,36 @@ public struct DeclarationGraph {
                     into: &registry,
                     protocols: protocols
                 )
+            }
+        }
+        return registry
+    }
+
+    static func collectEnums(from files: [ParsedSourceFile]) -> [String: EnumDeclaration] {
+        var registry: [String: EnumDeclaration] = [:]
+        for parsedFile in files {
+            for declaration in enumerations(in: parsedFile.sourceFile) {
+                registry[declaration.name] = declaration
+            }
+        }
+        return registry
+    }
+
+    static func collectMacros(from files: [ParsedSourceFile]) -> [String: MacroDeclaration] {
+        var registry: [String: MacroDeclaration] = [:]
+        for parsedFile in files {
+            for declaration in macros(in: parsedFile.sourceFile) {
+                registry[declaration.name] = declaration
+            }
+        }
+        return registry
+    }
+
+    static func collectExtensions(from files: [ParsedSourceFile]) -> [String: [ExtensionDeclaration]] {
+        var registry: [String: [ExtensionDeclaration]] = [:]
+        for parsedFile in files {
+            for declaration in extensions(in: parsedFile.sourceFile) {
+                registry[declaration.targetType.displayName, default: []].append(declaration)
             }
         }
         return registry
@@ -299,6 +350,39 @@ public struct DeclarationGraph {
         case .module(let module):
             return module.constructs
         case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+            return []
+        }
+    }
+
+    static func enumerations(in sourceFile: SourceFileNode) -> [EnumDeclaration] {
+        switch sourceFile {
+        case .enumeration(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.enumerations
+        case .construct, .mainBlock, .macro, .protocolDefinition, .extensions:
+            return []
+        }
+    }
+
+    static func macros(in sourceFile: SourceFileNode) -> [MacroDeclaration] {
+        switch sourceFile {
+        case .macro(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.macros
+        case .construct, .enumeration, .mainBlock, .protocolDefinition, .extensions:
+            return []
+        }
+    }
+
+    static func extensions(in sourceFile: SourceFileNode) -> [ExtensionDeclaration] {
+        switch sourceFile {
+        case .extensions(let declarations):
+            return declarations
+        case .module(let module):
+            return module.extensions
+        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition:
             return []
         }
     }
@@ -651,18 +735,90 @@ public struct DeclarationGraphViews {
     public let literalBridgeResolver: LiteralBridgeResolver
     public let memberResolver: DeclarationMemberResolver
     public let operatorResolver: DeclarationOperatorResolver
+    public let registryView: DeclarationRegistryView
     public let syntaxResolver: DeclarationSyntaxResolver
 
     public init(
         literalBridgeResolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
+        registryView: DeclarationRegistryView,
         syntaxResolver: DeclarationSyntaxResolver
     ) {
         self.literalBridgeResolver = literalBridgeResolver
         self.memberResolver = memberResolver
         self.operatorResolver = operatorResolver
+        self.registryView = registryView
         self.syntaxResolver = syntaxResolver
+    }
+}
+
+public struct DeclarationRegistryView {
+    private let protocolsByName: [String: ProtocolDeclaration]
+    private let constructsByName: [String: ConstructDeclaration]
+    private let enumsByName: [String: EnumDeclaration]
+    private let macrosByName: [String: MacroDeclaration]
+    private let extensionsByTargetName: [String: [ExtensionDeclaration]]
+    private let callablesByName: [String: [CallableDeclaration]]
+
+    public init(
+        protocolsByName: [String: ProtocolDeclaration],
+        constructsByName: [String: ConstructDeclaration],
+        enumsByName: [String: EnumDeclaration],
+        macrosByName: [String: MacroDeclaration],
+        extensionsByTargetName: [String: [ExtensionDeclaration]],
+        callablesByName: [String: [CallableDeclaration]]
+    ) {
+        self.protocolsByName = protocolsByName
+        self.constructsByName = constructsByName
+        self.enumsByName = enumsByName
+        self.macrosByName = macrosByName
+        self.extensionsByTargetName = extensionsByTargetName
+        self.callablesByName = callablesByName
+    }
+
+    public func `protocol`(named name: String) -> ProtocolDeclaration? {
+        protocolsByName[name]
+    }
+
+    public func construct(named name: String) -> ConstructDeclaration? {
+        constructsByName[name]
+    }
+
+    public func enumeration(named name: String) -> EnumDeclaration? {
+        enumsByName[name]
+    }
+
+    public func macro(named name: String) -> MacroDeclaration? {
+        macrosByName[name]
+    }
+
+    public func extensions(targeting targetName: String) -> [ExtensionDeclaration] {
+        extensionsByTargetName[targetName, default: []]
+    }
+
+    public func callables(named name: String) -> [CallableDeclaration] {
+        callablesByName[name, default: []]
+    }
+
+    public func hasProtocol(named name: String) -> Bool {
+        protocolsByName[name] != nil
+    }
+
+    public func hasConstruct(named name: String) -> Bool {
+        constructsByName[name] != nil
+    }
+
+    public func hasEnumeration(named name: String) -> Bool {
+        enumsByName[name] != nil
+    }
+
+    public func hasMacro(named name: String) -> Bool {
+        macrosByName[name] != nil
+    }
+
+    public func hasExtensions(targeting targetName: String) -> Bool {
+        !(extensionsByTargetName[targetName] ?? []).isEmpty
     }
 }
 
