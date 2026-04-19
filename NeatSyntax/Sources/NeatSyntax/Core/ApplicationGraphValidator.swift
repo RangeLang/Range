@@ -14,6 +14,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         )
         try validateCallableReturnSemantics(
             in: program.expandedFiles,
+            declarationGraph: program.declarationGraph,
             registryView: graphViews.registryView,
             resolver: program.literalBridgeResolver,
             memberResolver: graphViews.memberResolver,
@@ -2001,6 +2002,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateCallableReturnSemantics(
         in parsedFiles: [ParsedSourceFile],
+        declarationGraph: DeclarationGraph,
         registryView: DeclarationRegistryView,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
@@ -2013,6 +2015,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             case .construct(let declaration):
                 try validateCallableReturnSemantics(
                     in: declaration,
+                    declarationGraph: declarationGraph,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
@@ -2039,6 +2042,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 for declaration in module.constructs {
                     try validateCallableReturnSemantics(
                         in: declaration,
+                        declarationGraph: declarationGraph,
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
@@ -2053,24 +2057,25 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateCallableReturnSemantics(
         in declaration: ConstructDeclaration,
+        declarationGraph: DeclarationGraph,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
         fileName: String
     ) throws {
         let environmentTypes = Dictionary(
-            uniqueKeysWithValues: declaration.environments.map {
+            uniqueKeysWithValues: declarationGraph.environments(onConstruct: declaration.name).map {
                 ($0.name, BootstrapLiteralType.typed($0.type))
             }
         )
         let stateTypes = Dictionary(
-            uniqueKeysWithValues: declaration.states.map {
+            uniqueKeysWithValues: declarationGraph.states(onConstruct: declaration.name).map {
                 ($0.name, BootstrapLiteralType.typed($0.type))
             }
         )
         let accessibleTypes = stateTypes.merging(environmentTypes) { current, _ in current }
 
-        for callable in declaration.callables {
+        for callable in declarationGraph.callables(onConstruct: declaration.name) {
             try validateCallableReturnSemantics(
                 callable,
                 accessibleTypes: accessibleTypes,
