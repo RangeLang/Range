@@ -1,6 +1,8 @@
 import Foundation
 
-public struct ApplicationGraphValidator {
+public struct ApplicationGraphValidator: CompiledProgramValidationPass {
+    public let name = "ApplicationGraph"
+
     public init() {}
 
     public func validate(_ program: CompiledProgram) throws {

@@ -1,12 +1,18 @@
 import Foundation
 
 public struct CompiledProgramValidator {
+    private let passes: [any CompiledProgramValidationPass] = [
+        ProgramGraphValidationPass(),
+        DeclarationGraphValidator(),
+        ApplicationGraphValidator(),
+    ]
+
     public init() {}
 
     public func validate(_ program: CompiledProgram) throws {
-        try ProgramGraphValidator().validate(program.programGraph)
-        try DeclarationGraphValidator().validate(program)
-        try ApplicationGraphValidator().validate(program)
+        for pass in passes {
+            try pass.validate(program)
+        }
     }
 
     public func validatePrimaryDeclarations(in program: CompiledProgram) throws {
@@ -1924,5 +1930,13 @@ public struct CompiledProgramValidator {
 
     private func lastPathComponent(of path: String) -> String {
         URL(fileURLWithPath: path).lastPathComponent
+    }
+}
+
+private struct ProgramGraphValidationPass: CompiledProgramValidationPass {
+    let name = "ProgramGraph"
+
+    func validate(_ program: CompiledProgram) throws {
+        try ProgramGraphValidator().validate(program.programGraph)
     }
 }
