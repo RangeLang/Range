@@ -49,11 +49,11 @@ public struct CompilationArtifactsEmitter {
     }
 
     public func renderGraph(files: [ParsedSourceFile]) -> String {
-        DependencyGraphBuilder().build(files: files).render()
+        ApplicationGraphBuilder().build(files: files).render()
     }
 
     public func renderGraphHTML(files: [ParsedSourceFile], title: String) -> String {
-        DependencyGraphBuilder().build(files: files).renderHTML(title: title)
+        ApplicationGraphBuilder().build(files: files).renderHTML(title: title)
     }
 
     private func render(_ token: Token) -> String {

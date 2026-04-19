@@ -3,19 +3,19 @@ import Foundation
 import NeatSyntax
 
 enum ProjectSourceValidator {
-    static func programModel(for project: LoadedProject) throws -> ProgramModel {
+    static func programModel(for project: LoadedProject) throws -> CompiledProgram {
         try programModel(for: project.sourceInputs)
     }
 
-    static func programModel(for inputs: [SourceInput]) throws -> ProgramModel {
+    static func programModel(for inputs: [SourceInput]) throws -> CompiledProgram {
         try CompilerPipeline().build(inputs: inputs)
     }
 
-    static func validatedProgramModel(for project: LoadedProject) throws -> ProgramModel {
+    static func validatedProgramModel(for project: LoadedProject) throws -> CompiledProgram {
         try validatedProgramModel(for: project.sourceInputs)
     }
 
-    static func validatedProgramModel(for inputs: [SourceInput]) throws -> ProgramModel {
+    static func validatedProgramModel(for inputs: [SourceInput]) throws -> CompiledProgram {
         try CompilerPipeline().buildValidated(inputs: inputs)
     }
 

@@ -63,7 +63,7 @@ enum NeatCoreLoader {
         }
     }
 
-    static func programModel() throws -> ProgramModel {
+    static func programModel() throws -> CompiledProgram {
         try CompilerPipeline().build(inputs: sourceInputs())
     }
 

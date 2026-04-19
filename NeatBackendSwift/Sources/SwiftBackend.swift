@@ -22,7 +22,7 @@ public struct SwiftBackend {
 
     public func emitWorkspace(
         project: SwiftBackendProject,
-        programModel: ProgramModel
+        programModel: CompiledProgram
     ) throws -> URL {
         let program = try programBuilder.build(project: project, programModel: programModel)
         let buildRoot = project.buildRoot
@@ -36,7 +36,7 @@ public struct SwiftBackend {
 
     public func emitSourceFile(
         project: SwiftBackendProject,
-        programModel: ProgramModel,
+        programModel: CompiledProgram,
         outputURL: URL
     ) throws -> URL {
         let program = try programBuilder.build(project: project, programModel: programModel)

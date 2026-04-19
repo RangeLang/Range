@@ -10,7 +10,7 @@ public struct ParsedSourceFile {
     }
 }
 
-public enum DependencyGraphNodeKind: String {
+public enum ApplicationGraphNodeKind: String {
     case file
     case construct
     case enumeration
@@ -54,9 +54,9 @@ public enum DependencyGraphNodeKind: String {
     }
 }
 
-public struct DependencyGraphNode: Hashable {
+public struct ApplicationGraphNode: Hashable {
     public let id: String
-    public let kind: DependencyGraphNodeKind
+    public let kind: ApplicationGraphNodeKind
     public let label: String
 
     public var semanticKind: SemanticGraphEntityKind {
@@ -64,7 +64,7 @@ public struct DependencyGraphNode: Hashable {
     }
 }
 
-public enum DependencyGraphEdgeKind: String {
+public enum ApplicationGraphEdgeKind: String {
     case contains
     case conformsTo
     case extends
@@ -96,21 +96,21 @@ public enum DependencyGraphEdgeKind: String {
     }
 }
 
-public struct DependencyGraphEdge: Hashable {
+public struct ApplicationGraphEdge: Hashable {
     public let sourceID: String
     public let targetID: String
-    public let kind: DependencyGraphEdgeKind
+    public let kind: ApplicationGraphEdgeKind
 
     public var semanticKind: SemanticGraphRelationKind {
         kind.semanticKind
     }
 }
 
-public struct DependencyGraph {
-    public let nodes: [DependencyGraphNode]
-    public let edges: [DependencyGraphEdge]
+public struct ApplicationGraph {
+    public let nodes: [ApplicationGraphNode]
+    public let edges: [ApplicationGraphEdge]
 
-    public init(nodes: [DependencyGraphNode], edges: [DependencyGraphEdge]) {
+    public init(nodes: [ApplicationGraphNode], edges: [ApplicationGraphEdge]) {
         self.nodes = nodes.sorted {
             if $0.kind.rawValue != $1.kind.rawValue {
                 return $0.kind.rawValue < $1.kind.rawValue
@@ -145,7 +145,7 @@ public struct DependencyGraph {
             """
     }
 
-    public func renderHTML(title: String = "Neat Dependency Graph") -> String {
+    public func renderHTML(title: String = "Neat Application Graph") -> String {
         let payload = makeHTMLPayload()
 
         return """
@@ -970,33 +970,17 @@ public struct DependencyGraph {
     }
 }
 
-public struct ApplicationGraph {
-    public let dependencyGraph: DependencyGraph
-
-    public init(dependencyGraph: DependencyGraph) {
-        self.dependencyGraph = dependencyGraph
-    }
-
-    public func render() -> String {
-        dependencyGraph.render()
-    }
-
-    public func renderHTML(title: String = "Neat Application Graph") -> String {
-        dependencyGraph.renderHTML(title: title)
-    }
-}
-
-public struct DependencyGraphBuilder {
+public struct ApplicationGraphBuilder {
     public init() {}
 
-    public func build(program: ProgramModel) -> DependencyGraph {
+    public func build(program: CompiledProgram) -> ApplicationGraph {
         build(
             files: program.expandedFiles,
             declarationGraph: program.declarationGraph
         )
     }
 
-    public func build(files: [ParsedSourceFile]) -> DependencyGraph {
+    public func build(files: [ParsedSourceFile]) -> ApplicationGraph {
         build(
             files: files,
             declarationGraph: DeclarationGraph(files: files)
@@ -1006,7 +990,7 @@ public struct DependencyGraphBuilder {
     public func build(
         files: [ParsedSourceFile],
         declarationGraph: DeclarationGraph
-    ) -> DependencyGraph {
+    ) -> ApplicationGraph {
         var collector = GraphCollector(declarationGraph: declarationGraph)
         let sortedFiles = files.sorted(by: { $0.path < $1.path })
         for file in sortedFiles {
@@ -1016,40 +1000,12 @@ public struct DependencyGraphBuilder {
     }
 }
 
-public struct ApplicationGraphBuilder {
-    public init() {}
-
-    public func build(program: ProgramModel) -> ApplicationGraph {
-        ApplicationGraph(
-            dependencyGraph: DependencyGraphBuilder().build(program: program)
-        )
-    }
-
-    public func build(files: [ParsedSourceFile]) -> ApplicationGraph {
-        ApplicationGraph(
-            dependencyGraph: DependencyGraphBuilder().build(files: files)
-        )
-    }
-
-    public func build(
-        files: [ParsedSourceFile],
-        declarationGraph: DeclarationGraph
-    ) -> ApplicationGraph {
-        ApplicationGraph(
-            dependencyGraph: DependencyGraphBuilder().build(
-                files: files,
-                declarationGraph: declarationGraph
-            )
-        )
-    }
-}
-
 private struct GraphCollector {
     private let baseSemanticGraph: SemanticGraph
     private let baseEntityIDs: Set<String>
-    private let baseEdges: Set<DependencyGraphEdge>
-    private var nodesByID: [String: DependencyGraphNode] = [:]
-    private var edges: Set<DependencyGraphEdge> = []
+    private let baseEdges: Set<ApplicationGraphEdge>
+    private var nodesByID: [String: ApplicationGraphNode] = [:]
+    private var edges: Set<ApplicationGraphEdge> = []
     private let dependencySourceView: DependencySourceView
     private var resolutionIndex = DependencyResolutionIndex()
     private var flowState = DependencyFlowState()
@@ -1059,13 +1015,13 @@ private struct GraphCollector {
         self.baseEntityIDs = Set(declarationGraph.semanticGraph.entities.map(\.id))
         self.baseEdges = Set(
             declarationGraph.semanticGraph.relations.compactMap { relation in
-                guard let dependencyKind = Self.dependencyEdgeKind(for: relation.kind) else {
+                guard let applicationKind = Self.applicationEdgeKind(for: relation.kind) else {
                     return nil
                 }
-                return DependencyGraphEdge(
+                return ApplicationGraphEdge(
                     sourceID: relation.sourceID,
                     targetID: relation.targetID,
-                    kind: dependencyKind
+                    kind: applicationKind
                 )
             }
         )
@@ -1073,12 +1029,12 @@ private struct GraphCollector {
         indexBaseSemanticGraph()
     }
 
-    mutating func build() -> DependencyGraph {
+    mutating func build() -> ApplicationGraph {
         addResolutionEdges()
         let baseNodes = baseSemanticGraph.entities.compactMap { entity in
-            dependencyNode(for: entity)
+            applicationNode(for: entity)
         }
-        return DependencyGraph(
+        return ApplicationGraph(
             nodes: baseNodes + Array(nodesByID.values),
             edges: Array(baseEdges.union(edges))
         )
@@ -1210,22 +1166,22 @@ private struct GraphCollector {
         }
     }
 
-    private mutating func addNode(id: String, kind: DependencyGraphNodeKind, label: String) {
+    private mutating func addNode(id: String, kind: ApplicationGraphNodeKind, label: String) {
         guard !baseEntityIDs.contains(id) else { return }
-        nodesByID[id] = DependencyGraphNode(id: id, kind: kind, label: label)
+        nodesByID[id] = ApplicationGraphNode(id: id, kind: kind, label: label)
     }
 
     private mutating func addEdge(
-        from sourceID: String, to targetID: String, kind: DependencyGraphEdgeKind
+        from sourceID: String, to targetID: String, kind: ApplicationGraphEdgeKind
     ) {
-        let edge = DependencyGraphEdge(sourceID: sourceID, targetID: targetID, kind: kind)
+        let edge = ApplicationGraphEdge(sourceID: sourceID, targetID: targetID, kind: kind)
         guard !baseEdges.contains(edge) else { return }
         edges.insert(edge)
     }
 
     private mutating func addStorageTypeReference(_ reference: TypeReference, from sourceID: String)
     {
-        let edgeKind: DependencyGraphEdgeKind
+        let edgeKind: ApplicationGraphEdgeKind
         if case .named(let name) = reference,
             dependencySourceView.hasConstruct(named: name),
             !dependencySourceView.isCoreConstruct(named: name)
@@ -1242,25 +1198,25 @@ private struct GraphCollector {
 
     private mutating func indexBaseSemanticGraph() {
         for entity in baseSemanticGraph.entities {
-            guard let dependencyKind = Self.dependencyNodeKind(for: entity.kind) else {
+            guard let applicationKind = Self.applicationNodeKind(for: entity.kind) else {
                 continue
             }
             registerDeclarationProjectionIfNeeded(
                 entityID: entity.id,
-                kind: dependencyKind,
+                kind: applicationKind,
                 label: entity.label
             )
         }
     }
 
-    private func dependencyNode(for entity: SemanticGraphEntity) -> DependencyGraphNode? {
-        guard let dependencyKind = Self.dependencyNodeKind(for: entity.kind) else {
+    private func applicationNode(for entity: SemanticGraphEntity) -> ApplicationGraphNode? {
+        guard let applicationKind = Self.applicationNodeKind(for: entity.kind) else {
             return nil
         }
-        return DependencyGraphNode(id: entity.id, kind: dependencyKind, label: entity.label)
+        return ApplicationGraphNode(id: entity.id, kind: applicationKind, label: entity.label)
     }
 
-    private static func dependencyNodeKind(for kind: SemanticGraphEntityKind) -> DependencyGraphNodeKind? {
+    private static func applicationNodeKind(for kind: SemanticGraphEntityKind) -> ApplicationGraphNodeKind? {
         switch kind {
         case .file: return .file
         case .construct: return .construct
@@ -1284,7 +1240,7 @@ private struct GraphCollector {
         }
     }
 
-    private static func dependencyEdgeKind(for kind: SemanticGraphRelationKind) -> DependencyGraphEdgeKind? {
+    private static func applicationEdgeKind(for kind: SemanticGraphRelationKind) -> ApplicationGraphEdgeKind? {
         switch kind {
         case .contains: return .contains
         case .conformsTo: return .conformsTo
@@ -1303,7 +1259,7 @@ private struct GraphCollector {
 
     private mutating func registerDeclarationProjectionIfNeeded(
         entityID: String,
-        kind: DependencyGraphNodeKind,
+        kind: ApplicationGraphNodeKind,
         label: String
     ) {
         switch kind {
@@ -1337,7 +1293,7 @@ private struct GraphCollector {
 
     private mutating func addResolutionEdges() {
         let typeNodes =
-            baseSemanticGraph.entities.compactMap { dependencyNode(for: $0) }.filter {
+            baseSemanticGraph.entities.compactMap { applicationNode(for: $0) }.filter {
                 $0.kind == .typeReference
             }
             + nodesByID.values.filter { $0.kind == .typeReference }
@@ -1389,7 +1345,7 @@ private struct GraphCollector {
                 analyzeStatements(
                     declaration.body, ownerID: callableID, scope: scope, visitedCalls: visitedCalls)
             case .localBinding(let declaration):
-                let nodeKind: DependencyGraphNodeKind =
+                let nodeKind: ApplicationGraphNodeKind =
                     declaration.kind == .mutable ? .state : .value
                 let localID = "\(ownerID)/local:\(declaration.name)"
                 addNode(id: localID, kind: nodeKind, label: declaration.name)
@@ -1780,7 +1736,7 @@ private struct GraphCollector {
     private mutating func ensureMemberNode(
         baseID: String,
         name: String,
-        kind: DependencyGraphNodeKind
+        kind: ApplicationGraphNodeKind
     ) -> String {
         let memberID = "\(baseID)/member:\(name)"
         if nodesByID[memberID] == nil {

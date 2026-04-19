@@ -4,10 +4,10 @@ import NeatSyntax
 
 struct MainProgramRunner {
     private let project: LoadedProject
-    private let programModel: ProgramModel
+    private let programModel: CompiledProgram
     private let showSummary: Bool
 
-    init(project: LoadedProject, programModel: ProgramModel, showSummary: Bool = true) {
+    init(project: LoadedProject, programModel: CompiledProgram, showSummary: Bool = true) {
         self.project = project
         self.programModel = programModel
         self.showSummary = showSummary

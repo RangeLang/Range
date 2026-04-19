@@ -1,9 +1,9 @@
 import Foundation
 
-public struct ProgramModelValidator {
+public struct CompiledProgramValidator {
     public init() {}
 
-    public func validate(_ program: ProgramModel) throws {
+    public func validate(_ program: CompiledProgram) throws {
         let graphViews = program.declarationViews
         try validateCoreAttributeUsage(in: program.projectParsedFiles)
         try validatePrimaryDeclarations(in: program.parsedFiles)
@@ -27,7 +27,7 @@ public struct ProgramModelValidator {
         try validateValueBindings(in: program.expandedFiles)
     }
 
-    public func validatePrimaryDeclarations(in program: ProgramModel) throws {
+    public func validatePrimaryDeclarations(in program: CompiledProgram) throws {
         try validatePrimaryDeclarations(in: program.expandedFiles)
     }
 

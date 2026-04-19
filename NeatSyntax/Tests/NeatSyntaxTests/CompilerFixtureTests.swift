@@ -142,7 +142,7 @@ private enum FixtureRole {
     case fail
 }
 
-private func compile(fixture: URL, expectedRole: FixtureRole) throws -> ProgramModel {
+private func compile(fixture: URL, expectedRole: FixtureRole) throws -> CompiledProgram {
     var inputs = try neatCoreInputs()
     inputs.append(
         SourceInput(

@@ -17,7 +17,7 @@ public struct SourceInput {
     }
 }
 
-public struct ProgramModel {
+public struct CompiledProgram {
     public let inputs: [SourceInput]
     public let parsedFiles: [ParsedSourceFile]
     public let expandedFiles: [ParsedSourceFile]
@@ -56,10 +56,6 @@ public struct ProgramModel {
         ApplicationGraphBuilder().build(program: self)
     }
 
-    public var dependencyGraph: DependencyGraph {
-        applicationGraph.dependencyGraph
-    }
-
     public var projectParsedFiles: [ParsedSourceFile] {
         parsedFiles.filter { inputRoleByPath[$0.path] == .project }
     }
@@ -76,7 +72,7 @@ public struct ProgramModel {
 public struct CompilerPipeline {
     public init() {}
 
-    public func build(inputs: [SourceInput]) throws -> ProgramModel {
+    public func build(inputs: [SourceInput]) throws -> CompiledProgram {
         let orderedInputs = inputs.sorted { lhs, rhs in
             if lhs.role != rhs.role {
                 return lhs.role == .core
@@ -134,7 +130,7 @@ public struct CompilerPipeline {
         let expandedFiles = try MacroExpander.expand(files: parsedFiles)
         let declarationGraph = DeclarationGraph(files: expandedFiles)
 
-        return ProgramModel(
+        return CompiledProgram(
             inputs: orderedInputs,
             parsedFiles: parsedFiles,
             expandedFiles: expandedFiles,
@@ -142,15 +138,15 @@ public struct CompilerPipeline {
         )
     }
 
-    public func buildValidated(inputs: [SourceInput]) throws -> ProgramModel {
+    public func buildValidated(inputs: [SourceInput]) throws -> CompiledProgram {
         let program = try build(inputs: inputs)
-        try ProgramModelValidator().validate(program)
+        try CompiledProgramValidator().validate(program)
         return program
     }
 
     public func validatePrimaryDeclarations(inputs: [SourceInput]) throws {
         let program = try build(inputs: inputs)
-        try ProgramModelValidator().validatePrimaryDeclarations(in: program)
+        try CompiledProgramValidator().validatePrimaryDeclarations(in: program)
     }
 
     private func parse(

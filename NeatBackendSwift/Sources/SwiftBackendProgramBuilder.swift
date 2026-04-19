@@ -4,7 +4,7 @@ import NeatSyntax
 struct SwiftBackendProgramBuilder {
     func build(
         project: SwiftBackendProject,
-        programModel: ProgramModel
+        programModel: CompiledProgram
     ) throws -> LoweredProgram {
         if project.isSingleFile {
             return try build(
@@ -18,7 +18,7 @@ struct SwiftBackendProgramBuilder {
 
     private func build(
         fromSingleFile fileURL: URL,
-        programModel: ProgramModel
+        programModel: CompiledProgram
     ) throws -> LoweredProgram {
         guard
             let parsedFile = programModel.projectExpandedFiles.first(where: {
@@ -87,7 +87,7 @@ struct SwiftBackendProgramBuilder {
         }
     }
 
-    private func build(programModel: ProgramModel) throws -> LoweredProgram {
+    private func build(programModel: CompiledProgram) throws -> LoweredProgram {
         let supportDeclarations = coreSupportDeclarations(in: programModel)
 
         var callables: [CallableDeclaration] = []
@@ -181,7 +181,7 @@ struct SwiftBackendProgramBuilder {
         )
     }
 
-    private func coreSupportDeclarations(in programModel: ProgramModel) -> [ConstructDeclaration] {
+    private func coreSupportDeclarations(in programModel: CompiledProgram) -> [ConstructDeclaration] {
         programModel.expandedFiles.compactMap { parsedFile in
             guard programModel.sourceRole(forPath: parsedFile.path) == .core else {
                 return nil
