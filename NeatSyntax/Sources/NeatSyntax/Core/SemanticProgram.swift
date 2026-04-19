@@ -40,8 +40,12 @@ public struct SemanticProgram {
         )
     }
 
+    public var declarationViews: DeclarationGraphViews {
+        declarationGraph.views
+    }
+
     public var literalBridgeResolver: LiteralBridgeResolver {
-        declarationGraph.literalBridgeResolver
+        declarationViews.literalBridgeResolver
     }
 
     public var projectParsedFiles: [ParsedSourceFile] {
@@ -86,6 +90,7 @@ public struct CompilerPipeline {
         let discoveredProjectGraph = DeclarationGraph(
             files: parsedCoreFiles + discoveredProjectDeclarationFiles
         )
+        let discoveredProjectViews = discoveredProjectGraph.views
         let discoveredProjectCallableReturnTypes = collectCallableReturnTypes(
             from: discoveredProjectDeclarationFiles
         )
@@ -100,9 +105,9 @@ public struct CompilerPipeline {
         }
         let parsedProjectFiles = try parse(
             inputs: projectInputs,
-            literalBridgeResolver: discoveredProjectGraph.literalBridgeResolver,
-            declarationMemberResolver: discoveredProjectGraph.memberResolver,
-            declarationOperatorResolver: discoveredProjectGraph.operatorResolver,
+            literalBridgeResolver: discoveredProjectViews.literalBridgeResolver,
+            declarationMemberResolver: discoveredProjectViews.memberResolver,
+            declarationOperatorResolver: discoveredProjectViews.operatorResolver,
             declarationMacroExpansionResolver: DeclarationMacroExpansionResolver(
                 macrosByName: projectMacrosByName
             ),

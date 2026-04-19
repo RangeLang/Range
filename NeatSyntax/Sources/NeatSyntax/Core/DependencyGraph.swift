@@ -925,12 +925,26 @@ public struct DependencyGraph {
 public struct DependencyGraphBuilder {
     public init() {}
 
+    public func build(program: SemanticProgram) -> DependencyGraph {
+        build(
+            files: program.expandedFiles,
+            declarationGraph: program.declarationGraph
+        )
+    }
+
     public func build(files: [ParsedSourceFile]) -> DependencyGraph {
-        var collector = GraphCollector()
+        build(
+            files: files,
+            declarationGraph: DeclarationGraph(files: files)
+        )
+    }
+
+    public func build(
+        files: [ParsedSourceFile],
+        declarationGraph: DeclarationGraph
+    ) -> DependencyGraph {
+        var collector = GraphCollector(declarationGraph: declarationGraph)
         let sortedFiles = files.sorted(by: { $0.path < $1.path })
-        for file in sortedFiles {
-            collector.registerDeclarations(in: file)
-        }
         for file in sortedFiles {
             collector.add(file)
         }
@@ -948,17 +962,11 @@ private struct GraphCollector {
     private var constructTypeByNodeID: [String: String] = [:]
     private var coreConstructNames: Set<String> = []
 
-    mutating func registerDeclarations(in parsedFile: ParsedSourceFile) {
-        switch parsedFile.sourceFile {
-        case .construct(let declaration):
-            registerConstructDeclaration(declaration)
-        case .module(let module):
-            for declaration in module.constructs {
-                registerConstructDeclaration(declaration)
-            }
-        default:
-            break
-        }
+    init(declarationGraph: DeclarationGraph) {
+        self.constructDeclarationsByName = declarationGraph.constructsByName
+        self.coreConstructNames = Set(
+            declarationGraph.constructsByName.values.lazy.filter(\.isCore).map(\.name)
+        )
     }
 
     mutating func build() -> DependencyGraph {
@@ -1297,16 +1305,6 @@ private struct GraphCollector {
 
     private mutating func registerDeclaration(name: String, nodeID: String) {
         declarationNodeIDsByName[name, default: []].insert(nodeID)
-    }
-
-    private mutating func registerConstructDeclaration(_ declaration: ConstructDeclaration) {
-        constructDeclarationsByName[declaration.name] = declaration
-        if declaration.isCore {
-            coreConstructNames.insert(declaration.name)
-        }
-        for nested in declaration.constructs {
-            registerConstructDeclaration(nested)
-        }
     }
 
     private mutating func addResolutionEdges() {

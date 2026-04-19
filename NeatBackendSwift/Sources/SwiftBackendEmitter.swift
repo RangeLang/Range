@@ -480,7 +480,7 @@ struct SwiftBackendEmitter {
             switch statement {
             case .assignment, .compoundAssignment:
                 return true
-            case .freestandingMacro(_, _, let body),
+            case .macroInvocation(_, _, let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body),
                 .derived(_, _, let body):
@@ -529,8 +529,8 @@ struct SwiftBackendEmitter {
         let prefix = String(repeating: "    ", count: indent)
 
         switch statement {
-        case .freestandingMacro:
-            throw SwiftBackendError("Freestanding macros must be expanded before Swift emission.")
+        case .macroInvocation:
+            throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
         case .background(let background):
             let bodyText = try emitStatements(background.body, indent: indent + 1)
             return """
@@ -681,9 +681,9 @@ struct SwiftBackendEmitter {
             return value ? "true" : "false"
         case .nilLiteral:
             return "nil"
-        case .freestandingMacro(let name, _):
+        case .macroInvocation(let name, _):
             throw SwiftBackendError(
-                "Freestanding expression macro #\(name) must be expanded before Swift emission.")
+                "Expression macro invocation #\(name) must be expanded before Swift emission.")
         case .block(let body):
             return try emitClosureExpression(body)
         case .identifier(let name):

@@ -88,23 +88,32 @@ public struct DeclarationGraph {
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
     }
 
+    public var views: DeclarationGraphViews {
+        DeclarationGraphViews(
+            literalBridgeResolver: LiteralBridgeResolver(realizedLiteralBridges: realizedLiteralBridges),
+            memberResolver: DeclarationMemberResolver(constructsByName: constructsByName),
+            operatorResolver: DeclarationOperatorResolver(callablesByName: callablesByName),
+            syntaxResolver: DeclarationSyntaxResolver(
+                protocolsByName: protocolsByName,
+                constructsByName: constructsByName
+            )
+        )
+    }
+
     public var literalBridgeResolver: LiteralBridgeResolver {
-        LiteralBridgeResolver(realizedLiteralBridges: realizedLiteralBridges)
+        views.literalBridgeResolver
     }
 
     public var memberResolver: DeclarationMemberResolver {
-        DeclarationMemberResolver(constructsByName: constructsByName)
+        views.memberResolver
     }
 
     public var operatorResolver: DeclarationOperatorResolver {
-        DeclarationOperatorResolver(callablesByName: callablesByName)
+        views.operatorResolver
     }
 
     public var syntaxResolver: DeclarationSyntaxResolver {
-        DeclarationSyntaxResolver(
-            protocolsByName: protocolsByName,
-            constructsByName: constructsByName
-        )
+        views.syntaxResolver
     }
 
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
@@ -348,6 +357,25 @@ public struct DeclarationGraph {
                     && $0.slotName == $1.slotName
                     && $0.isBinding == $1.isBinding
             })
+    }
+}
+
+public struct DeclarationGraphViews {
+    public let literalBridgeResolver: LiteralBridgeResolver
+    public let memberResolver: DeclarationMemberResolver
+    public let operatorResolver: DeclarationOperatorResolver
+    public let syntaxResolver: DeclarationSyntaxResolver
+
+    public init(
+        literalBridgeResolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        syntaxResolver: DeclarationSyntaxResolver
+    ) {
+        self.literalBridgeResolver = literalBridgeResolver
+        self.memberResolver = memberResolver
+        self.operatorResolver = operatorResolver
+        self.syntaxResolver = syntaxResolver
     }
 }
 

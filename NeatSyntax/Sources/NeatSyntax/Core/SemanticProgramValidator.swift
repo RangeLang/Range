@@ -4,6 +4,7 @@ public struct SemanticProgramValidator {
     public init() {}
 
     public func validate(_ program: SemanticProgram) throws {
+        let graphViews = program.declarationViews
         try validateCoreAttributeUsage(in: program.projectParsedFiles)
         try validatePrimaryDeclarations(in: program.parsedFiles)
         try validateTopLevelStates(in: program.parsedFiles)
@@ -12,14 +13,14 @@ public struct SemanticProgramValidator {
         try validateCallableReturnSemantics(
             in: program.expandedFiles,
             resolver: program.literalBridgeResolver,
-            memberResolver: program.declarationGraph.memberResolver,
-            operatorResolver: program.declarationGraph.operatorResolver
+            memberResolver: graphViews.memberResolver,
+            operatorResolver: graphViews.operatorResolver
         )
         try validateLiteralBridgeCompatibility(
             in: program.parsedFiles,
             resolver: program.literalBridgeResolver,
-            memberResolver: program.declarationGraph.memberResolver,
-            operatorResolver: program.declarationGraph.operatorResolver
+            memberResolver: graphViews.memberResolver,
+            operatorResolver: graphViews.operatorResolver
         )
         try validateBindingReferences(in: program.expandedFiles)
         try validateEnvironmentStateResolution(in: program.expandedFiles)

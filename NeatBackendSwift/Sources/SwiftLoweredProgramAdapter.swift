@@ -86,8 +86,8 @@ struct SwiftLoweredProgramAdapter {
 
     private func lower(statement: NeatStatement) -> NeatStatement {
         switch statement {
-        case .freestandingMacro(let name, let argumentClause, let body):
-            return .freestandingMacro(
+        case .macroInvocation(let name, let argumentClause, let body):
+            return .macroInvocation(
                 name: name,
                 argumentClause: argumentClause,
                 body: lower(statements: body)
@@ -180,7 +180,7 @@ struct SwiftLoweredProgramAdapter {
         let lowered: NeatExpression
 
         switch expression {
-        case .freestandingMacro:
+        case .macroInvocation:
             lowered = expression
         case .call(let name, let arguments):
             lowered = .call(

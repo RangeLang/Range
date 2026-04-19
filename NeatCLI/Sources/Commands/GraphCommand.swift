@@ -15,7 +15,7 @@ extension NeatCLI {
             do {
                 let project = try ProjectLoader.load(at: input ?? ".")
                 let program = try ProjectSourceValidator.semanticProgram(for: project)
-                let graph = DependencyGraphBuilder().build(files: program.expandedFiles)
+                let graph = DependencyGraphBuilder().build(program: program)
                 print(graph.render())
             } catch {
                 ErrorPresenter.printError(error)

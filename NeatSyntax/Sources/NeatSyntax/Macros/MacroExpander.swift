@@ -10,9 +10,10 @@ public enum MacroExpander {
         let registry = collectMacros(from: files)
         let declarationGraph = DeclarationGraph(files: files)
         let protocols = declarationGraph.protocolsByName
+        let graphViews = declarationGraph.views
         try validateMacroSyntaxCaptures(
             macros: Array(registry.values),
-            syntaxResolver: declarationGraph.syntaxResolver
+            syntaxResolver: graphViews.syntaxResolver
         )
         let context = declarationGraph.macroExpansionContext(macrosByName: registry)
         return try files.map { parsedFile in

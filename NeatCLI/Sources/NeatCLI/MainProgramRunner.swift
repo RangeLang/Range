@@ -161,8 +161,8 @@ private struct MainProgramInterpreter {
 
     private mutating func executeStatement(_ statement: Statement) throws -> ControlFlow {
         switch statement {
-        case .freestandingMacro:
-            throw ValidationError("Freestanding macros must be expanded before interpretation.")
+        case .macroInvocation:
+            throw ValidationError("Macro invocations must be expanded before interpretation.")
         case .background:
             throw ValidationError(
                 "@background blocks are not supported in the main program interpreter yet.")
@@ -446,9 +446,9 @@ private struct MainProgramInterpreter {
         case .nilLiteral:
             return .nilLiteral
 
-        case .freestandingMacro(let name, _):
+        case .macroInvocation(let name, _):
             throw ValidationError(
-                "Freestanding expression macro #\(name) must be expanded before interpretation."
+                "Expression macro invocation #\(name) must be expanded before interpretation."
             )
 
         case .block:
