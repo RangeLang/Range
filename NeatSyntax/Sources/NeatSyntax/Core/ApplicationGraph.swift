@@ -1039,17 +1039,18 @@ private struct ApplicationGraphResolutionPass: ApplicationGraphBuildPass {
 }
 
 private struct GraphCollector {
+    private let declarationGraph: DeclarationGraph
     private let baseSemanticGraph: SemanticGraph
     private let baseEntityIDs: Set<String>
     private let baseEdges: Set<ApplicationGraphEdge>
     private var nodesByID: [String: ApplicationGraphNode] = [:]
     private var edges: Set<ApplicationGraphEdge> = []
     private let registryView: DeclarationRegistryView
-    private let declarationView: ApplicationDeclarationView
     private var resolutionIndex = DependencyResolutionIndex()
     private var flowState = DependencyFlowState()
 
     init(declarationGraph: DeclarationGraph) {
+        self.declarationGraph = declarationGraph
         self.baseSemanticGraph = declarationGraph.semanticGraph
         self.baseEntityIDs = Set(declarationGraph.semanticGraph.entities.map(\.id))
         self.baseEdges = Set(
@@ -1065,7 +1066,6 @@ private struct GraphCollector {
             }
         )
         self.registryView = declarationGraph.registryView
-        self.declarationView = declarationGraph.applicationDeclarationView
     }
 
     mutating func seedDeclarationProjection() {
@@ -1095,7 +1095,7 @@ private struct GraphCollector {
         case .enumeration, .protocolDefinition, .macro, .extensions:
             return
         case .module(let module):
-            let topLevelStates = declarationView.topLevelStates(inFilePath: parsedFile.path)
+            let topLevelStates = declarationGraph.topLevelStates(inFilePath: parsedFile.path)
             for state in topLevelStates {
                 analyzeStateDeclaration(state, parentID: fileID)
             }
@@ -1139,11 +1139,11 @@ private struct GraphCollector {
             selfID: constructID
         )
 
-        for binding in declaration.bindings where declarationView.hasConstruct(named: binding.typeName) {
+        for binding in declaration.bindings where declarationGraph.hasConstruct(named: binding.typeName) {
             flowState.inferredConstructTypeByNodeID["\(constructID)/binding:\(binding.name)"] =
                 binding.typeName
         }
-        for value in declaration.values where declarationView.hasConstruct(named: value.typeName) {
+        for value in declaration.values where declarationGraph.hasConstruct(named: value.typeName) {
             flowState.inferredConstructTypeByNodeID["\(constructID)/value:\(value.name)"] =
                 value.typeName
         }
@@ -1165,7 +1165,7 @@ private struct GraphCollector {
                 initializerScope.symbols[parameter.name] = parameterID
                 if let typeReference = parameter.typeReference,
                     case .named(let name) = typeReference,
-                    declarationView.hasConstruct(named: name)
+                    declarationGraph.hasConstruct(named: name)
                 {
                     flowState.inferredConstructTypeByNodeID[parameterID] = name
                 }
@@ -1207,7 +1207,7 @@ private struct GraphCollector {
             callableScope.symbols[parameter.name] = parameterID
             if let typeReference = parameter.typeReference,
                 case .named(let name) = typeReference,
-                declarationView.hasConstruct(named: name)
+                declarationGraph.hasConstruct(named: name)
             {
                 flowState.inferredConstructTypeByNodeID[parameterID] = name
             }
@@ -1234,8 +1234,8 @@ private struct GraphCollector {
     {
         let edgeKind: ApplicationGraphEdgeKind
         if case .named(let name) = reference,
-            declarationView.hasConstruct(named: name),
-            !declarationView.isCoreConstruct(named: name)
+            declarationGraph.hasConstruct(named: name),
+            !declarationGraph.isCoreConstruct(named: name)
         {
             edgeKind = .referencesIdentity
         } else {
@@ -1400,7 +1400,7 @@ private struct GraphCollector {
                 addNode(id: localID, kind: nodeKind, label: declaration.name)
                 addEdge(from: ownerID, to: localID, kind: .contains)
                 addStorageTypeReference(declaration.type, from: localID)
-                if declarationView.hasConstruct(named: declaration.type.displayName) {
+                if declarationGraph.hasConstruct(named: declaration.type.displayName) {
                     flowState.inferredConstructTypeByNodeID[localID] = declaration.type.displayName
                 }
                 captureConstructType(for: localID, from: declaration.expression)
@@ -1529,7 +1529,7 @@ private struct GraphCollector {
             addAlias(from: ownerID, to: sourceID)
         }
         if case .call(let name, let arguments) = expression,
-            declarationView.hasConstruct(named: name)
+            declarationGraph.hasConstruct(named: name)
         {
             flowState.inferredConstructTypeByNodeID[ownerID] = name
             bindConstructArguments(
@@ -1623,7 +1623,7 @@ private struct GraphCollector {
             return
         }
         guard
-            let callable = declarationView.callable(named: methodName, onConstruct: constructName),
+            let callable = declarationGraph.callable(named: methodName, onConstruct: constructName),
             let callableNodeID = resolutionIndex.constructCallableProjectionNodeIDs[constructName]?[methodName]
         else {
             return
@@ -1669,7 +1669,7 @@ private struct GraphCollector {
         arguments: [CallArgument],
         scope: MemoryScope
     ) {
-        let memberKinds = declarationView.memberKinds(forConstruct: constructName)
+        let memberKinds = declarationGraph.memberKinds(forConstruct: constructName)
 
         for argument in arguments {
             guard let label = argument.label, let kind = memberKinds[label] else { continue }
@@ -1695,8 +1695,8 @@ private struct GraphCollector {
     ) -> MemoryScope {
         var scope = MemoryScope()
         scope.symbols["self"] = instanceNodeID
-        let memberKinds = declarationView.memberKinds(forConstruct: constructName)
-        let constructTypedMembers = declarationView.constructTypedMemberNames(
+        let memberKinds = declarationGraph.memberKinds(forConstruct: constructName)
+        let constructTypedMembers = declarationGraph.constructTypedMemberNames(
             forConstruct: constructName
         )
 
@@ -1722,7 +1722,7 @@ private struct GraphCollector {
     }
 
     private mutating func captureConstructType(for nodeID: String, from expression: Expression) {
-        guard case .call(let name, _) = expression, declarationView.hasConstruct(named: name) else {
+        guard case .call(let name, _) = expression, declarationGraph.hasConstruct(named: name) else {
             return
         }
         flowState.inferredConstructTypeByNodeID[nodeID] = name
@@ -1733,7 +1733,7 @@ private struct GraphCollector {
         onConstruct constructName: String,
         nodeID: String
     ) {
-        if let typeName = declarationView.constructTypedMemberNames(
+        if let typeName = declarationGraph.constructTypedMemberNames(
             forConstruct: constructName
         )[memberName] {
             flowState.inferredConstructTypeByNodeID[nodeID] = typeName

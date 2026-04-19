@@ -177,15 +177,64 @@ public struct DeclarationGraph {
         views.registryView
     }
 
-    public var applicationDeclarationView: ApplicationDeclarationView {
-        ApplicationDeclarationView(
-            registryView: registryView,
-            constructsByName: constructsByName
-        )
-    }
-
     public var programGraph: ProgramGraph {
         ProgramGraph(semanticGraph: semanticGraph)
+    }
+
+    public func topLevelStates(inFilePath path: String) -> [StateDeclaration] {
+        registryView.topLevelStates(inFilePath: path)
+    }
+
+    public func construct(named name: String) -> ConstructDeclaration? {
+        constructsByName[name]
+    }
+
+    public func hasConstruct(named name: String) -> Bool {
+        constructsByName[name] != nil
+    }
+
+    public func isCoreConstruct(named name: String) -> Bool {
+        constructsByName[name]?.isCore == true
+    }
+
+    public func callable(
+        named callableName: String,
+        onConstruct named: String
+    ) -> CallableDeclaration? {
+        constructsByName[named]?.callables.first(where: { $0.name == callableName })
+    }
+
+    public func memberKinds(
+        forConstruct named: String
+    ) -> [String: ApplicationGraphNodeKind] {
+        guard let declaration = constructsByName[named] else {
+            return [:]
+        }
+
+        var result: [String: ApplicationGraphNodeKind] = [:]
+        for state in declaration.states { result[state.name] = .state }
+        for environment in declaration.environments { result[environment.name] = .environment }
+        for binding in declaration.bindings { result[binding.name] = .binding }
+        for derived in declaration.deriveds { result[derived.name] = .derived }
+        for value in declaration.values { result[value.name] = .value }
+        return result
+    }
+
+    public func constructTypedMemberNames(
+        forConstruct named: String
+    ) -> [String: String] {
+        guard let declaration = constructsByName[named] else {
+            return [:]
+        }
+
+        var result: [String: String] = [:]
+        for binding in declaration.bindings where hasConstruct(named: binding.typeName) {
+            result[binding.name] = binding.typeName
+        }
+        for value in declaration.values where hasConstruct(named: value.typeName) {
+            result[value.name] = value.typeName
+        }
+        return result
     }
 
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
@@ -1157,75 +1206,6 @@ public struct DeclarationRegistryView {
 
     public func hasInitializers(onConstruct named: String) -> Bool {
         !(initializersByConstructName[named] ?? []).isEmpty
-    }
-}
-
-public struct ApplicationDeclarationView {
-    private let registryView: DeclarationRegistryView
-    private let constructsByName: [String: ConstructDeclaration]
-
-    public init(
-        registryView: DeclarationRegistryView,
-        constructsByName: [String: ConstructDeclaration]
-    ) {
-        self.registryView = registryView
-        self.constructsByName = constructsByName
-    }
-
-    public func topLevelStates(inFilePath path: String) -> [StateDeclaration] {
-        registryView.topLevelStates(inFilePath: path)
-    }
-
-    public func construct(named name: String) -> ConstructDeclaration? {
-        constructsByName[name]
-    }
-
-    public func hasConstruct(named name: String) -> Bool {
-        constructsByName[name] != nil
-    }
-
-    public func isCoreConstruct(named name: String) -> Bool {
-        constructsByName[name]?.isCore == true
-    }
-
-    public func callable(
-        named callableName: String,
-        onConstruct named: String
-    ) -> CallableDeclaration? {
-        constructsByName[named]?.callables.first(where: { $0.name == callableName })
-    }
-
-    public func memberKinds(
-        forConstruct named: String
-    ) -> [String: ApplicationGraphNodeKind] {
-        guard let declaration = constructsByName[named] else {
-            return [:]
-        }
-
-        var result: [String: ApplicationGraphNodeKind] = [:]
-        for state in declaration.states { result[state.name] = .state }
-        for environment in declaration.environments { result[environment.name] = .environment }
-        for binding in declaration.bindings { result[binding.name] = .binding }
-        for derived in declaration.deriveds { result[derived.name] = .derived }
-        for value in declaration.values { result[value.name] = .value }
-        return result
-    }
-
-    public func constructTypedMemberNames(
-        forConstruct named: String
-    ) -> [String: String] {
-        guard let declaration = constructsByName[named] else {
-            return [:]
-        }
-
-        var result: [String: String] = [:]
-        for binding in declaration.bindings where hasConstruct(named: binding.typeName) {
-            result[binding.name] = binding.typeName
-        }
-        for value in declaration.values where hasConstruct(named: value.typeName) {
-            result[value.name] = value.typeName
-        }
-        return result
     }
 }
 
