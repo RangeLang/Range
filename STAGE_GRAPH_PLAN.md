@@ -428,6 +428,78 @@ The architectural rule going forward is:
 - `DeclarationGraph` owns what exists and what is valid in principle
 - `ApplicationGraph` owns what is used and whether that use is valid here
 
+### Current Practical Boundary
+
+As of the current refactor state, the intended boundary is:
+
+- `DeclarationGraph` owns:
+  - construct-owned declaration inventories
+    - states
+    - environments
+    - bindings
+    - deriveds
+    - values
+    - initializers
+    - callables
+  - declaration-backed valid surfaces
+    - member paths
+    - callable surfaces
+    - initializer surfaces
+  - declaration-backed “what exists?” queries used by downstream layers
+
+- `ApplicationGraph` owns:
+  - body traversal
+  - use-site resolution
+  - local scope construction
+  - alias/type-flow inference
+  - late application edges such as:
+    - `calls`
+    - `dependsOn`
+    - `aliases`
+    - `mutates`
+
+- `ApplicationGraphValidator` should only keep:
+  - file/declaration/body traversal
+  - use-site diagnostics
+  - validation of actual accesses/calls/binding references against
+    declaration-backed facts
+
+In other words:
+
+- declaration graph answers:
+  - what members does `User` have?
+  - what callable/init surfaces exist on `User`?
+  - is `User.name` a valid declared path?
+- application graph and validator answer:
+  - is `user.name` being used here?
+  - does that use resolve to `User.name`?
+  - is this call/access valid at this use site?
+
+### What Should Stay Out Of ApplicationGraphValidator
+
+`ApplicationGraphValidator` should not own construct inventory discovery.
+
+It should not be the place that decides, from raw declaration containers:
+
+- what states/environments/bindings/values exist on a construct
+- what callables/initializers a construct declares
+- what member paths are valid in principle
+
+Those answers should come from `DeclarationGraph`.
+
+What remains acceptable in `ApplicationGraphValidator` is:
+
+- iterating source files
+- iterating declarations in order to reach bodies
+- iterating statements/expressions for validation
+- emitting diagnostics when actual use sites fail against declaration-backed
+  facts
+
+That is the line between:
+
+- declaration-owned inventory
+- application-owned traversal and diagnostics
+
 This means:
 
 - declaration answers:
