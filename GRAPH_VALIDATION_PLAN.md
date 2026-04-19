@@ -22,19 +22,25 @@ This fits the current graph architecture:
 
 ## Current State
 
-Today, validation is still centralized in
-[CompiledProgramValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgramValidator.swift).
+The validation split now exists in code:
 
-It currently mixes:
+- [CompiledProgramValidationPass.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgramValidationPass.swift)
+- [ProgramGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ProgramGraphValidator.swift)
+- [DeclarationGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraphValidator.swift)
+- [ApplicationGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ApplicationGraphValidator.swift)
+- [CompiledProgramValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgramValidator.swift)
 
-- structural/declaration uniqueness checks
-- declaration-side semantic checks
-- post-expansion control-flow checks
-- call and label validation
-- literal bridge compatibility
-- binding/environment/value resolution
+`CompiledProgramValidator` is now a small orchestrator over an ordered pass
+list, not a catch-all implementation file.
 
-That file is still useful, but architecturally it is acting as a catch-all.
+The current active pass order is:
+
+1. `ProgramGraphValidationPass`
+2. `DeclarationGraphValidator`
+3. `ApplicationGraphValidator`
+
+What still remains is ongoing refinement of which checks belong to which pass,
+not the basic pass structure itself.
 
 ## Target Validation Split
 
@@ -147,15 +153,14 @@ Questions it should answer:
 - is the reactive dependency graph coherent?
 - are there impossible or unsupported propagation relationships?
 
-## Proposed Validator Types
+## Current Validator Types
 
-Introduce explicit pass validators.
-
-Initial target names:
+Current pass-oriented validator types:
 
 - `ProgramGraphValidator`
 - `DeclarationGraphValidator`
 - `ApplicationGraphValidator`
+- `CompiledProgramValidationPass`
 - later `MemoryGraphValidator`
 - later `ReactivityGraphValidator`
 
@@ -163,7 +168,7 @@ And keep:
 
 - `CompiledProgramValidator`
 
-But reduce its role to orchestration:
+Its role is now orchestration:
 
 1. run root graph validation
 2. run declaration validation
@@ -171,32 +176,56 @@ But reduce its role to orchestration:
 4. later run memory validation
 5. later run reactivity validation
 
-## Near-Term Mapping From Current Validator
+## Current Protocolized Flow
 
-The current [CompiledProgramValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgramValidator.swift)
-should be decomposed by responsibility.
+The validation boundary is protocolized at the compiled-program pass level:
 
-Likely declaration-side candidates:
+```swift
+public protocol CompiledProgramValidationPass {
+    var name: String { get }
+    func validate(_ program: CompiledProgram) throws
+}
+```
+
+This keeps the orchestration shape uniform without forcing the internal
+validation logic of each graph pass into the same abstraction.
+
+Current conformance shape:
+
+- `DeclarationGraphValidator: CompiledProgramValidationPass`
+- `ApplicationGraphValidator: CompiledProgramValidationPass`
+- `ProgramGraphValidator` remains focused on `ProgramGraph` itself and is
+  adapted into the compiled-program pass list via a small
+  `ProgramGraphValidationPass`
+
+This is intentional:
+
+- protocolize the pass boundary
+- do not over-protocolize the internal validation implementation
+
+## Current Mapping
+
+The current split now looks like this.
+
+Declaration-side:
 
 - `validatePrimaryDeclarations`
 - `validateTopLevelStates`
-- declaration-surface legality checks
+- `validateCoreAttributeUsage`
 
-Likely application-side candidates:
+Application-side:
 
+- `validateControlFlow`
 - `validateCallArgumentLabels`
+- `validateCallableReturnSemantics`
+- `validateLiteralBridgeCompatibility`
 - binding reference resolution
 - environment/state resolution
 - value binding resolution
-- use-site compatibility checks
 
-Mixed or transitional candidates:
+Root graph:
 
-- `validateControlFlow`
-- `validateCallableReturnSemantics`
-- `validateLiteralBridgeCompatibility`
-
-These should be classified explicitly during refactor rather than moved blindly.
+- entity/relation coherence checks in `ProgramGraphValidator`
 
 ## Validation Boundary Rule
 
@@ -225,17 +254,16 @@ The immediate goal is clarity before code movement.
 
 ### Phase 2: Introduce Validator Shell Types
 
-Add empty or lightly wired types:
+Completed.
 
-- `ProgramGraphValidator`
-- `DeclarationGraphValidator`
-- `ApplicationGraphValidator`
-
-Keep `CompiledProgramValidator` delegating to them.
+The explicit validator types exist, and `CompiledProgramValidator` delegates to
+them through a pass list.
 
 ### Phase 3: Move Clearly Scoped Checks First
 
-Move the easiest unambiguous checks first:
+Completed.
+
+The first obvious declaration/application checks have already moved.
 
 - declaration uniqueness checks -> `DeclarationGraphValidator`
 - top-level declaration/state checks -> `DeclarationGraphValidator`
@@ -243,21 +271,26 @@ Move the easiest unambiguous checks first:
 
 ### Phase 4: Classify Mixed Checks
 
-Audit and split the harder validations:
+Largely completed for the currently implemented validation surface:
 
-- control flow
-- callable return semantics
-- literal bridge compatibility
-
-Some of these may stay temporarily in `CompiledProgramValidator` until their
-graph ownership becomes clearer.
+- control flow -> `ApplicationGraphValidator`
+- callable return semantics -> `ApplicationGraphValidator`
+- literal bridge compatibility -> `ApplicationGraphValidator`
 
 ### Phase 5: Reduce CompiledProgramValidator To Orchestration
 
-The long-term goal:
+Completed for the current graph stack.
 
 - `CompiledProgramValidator` just sequences graph-pass validators
 - pass-specific validator files own the actual validation logic
+
+## Next Validation Slice
+
+The next useful work is not another large split. It is one of:
+
+1. add pass-level diagnostics/reporting metadata using the `name` field
+2. introduce `MemoryGraphValidator` once the first memory-domain facts exist
+3. decide whether graph substages also need lightweight protocol boundaries
 
 ## Immediate Next Slice
 
