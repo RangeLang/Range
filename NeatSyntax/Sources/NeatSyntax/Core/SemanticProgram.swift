@@ -48,6 +48,10 @@ public struct SemanticProgram {
         declarationViews.literalBridgeResolver
     }
 
+    public var dependencyGraph: DependencyGraph {
+        DependencyGraphBuilder().build(program: self)
+    }
+
     public var projectParsedFiles: [ParsedSourceFile] {
         parsedFiles.filter { inputRoleByPath[$0.path] == .project }
     }
