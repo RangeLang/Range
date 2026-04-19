@@ -1128,35 +1128,42 @@ private struct GraphCollector {
         parentID: String
     ) {
         let constructID = "\(parentID)/construct:\(declaration.name)"
+        let bindings = declarationGraph.bindings(onConstruct: declaration.name)
+        let deriveds = declarationGraph.deriveds(onConstruct: declaration.name)
+        let environments = declarationGraph.environments(onConstruct: declaration.name)
+        let states = declarationGraph.states(onConstruct: declaration.name)
+        let values = declarationGraph.values(onConstruct: declaration.name)
+        let initializers = declarationGraph.initializers(onConstruct: declaration.name)
+        let callables = declarationGraph.callables(onConstruct: declaration.name)
         let scope = makeScope(
-            bindings: declaration.bindings.map { ($0.name, "\(constructID)/binding:\($0.name)") },
-            deriveds: declaration.deriveds.map { ($0.name, "\(constructID)/derived:\($0.name)") },
-            environments: declaration.environments.map {
+            bindings: bindings.map { ($0.name, "\(constructID)/binding:\($0.name)") },
+            deriveds: deriveds.map { ($0.name, "\(constructID)/derived:\($0.name)") },
+            environments: environments.map {
                 ($0.name, "\(constructID)/environment:\($0.name)")
             },
-            states: declaration.states.map { ($0.name, "\(constructID)/state:\($0.name)") },
-            values: declaration.values.map { ($0.name, "\(constructID)/value:\($0.name)") },
+            states: states.map { ($0.name, "\(constructID)/state:\($0.name)") },
+            values: values.map { ($0.name, "\(constructID)/value:\($0.name)") },
             selfID: constructID
         )
 
-        for binding in declaration.bindings where declarationGraph.hasConstruct(named: binding.typeName) {
+        for binding in bindings where declarationGraph.hasConstruct(named: binding.typeName) {
             flowState.inferredConstructTypeByNodeID["\(constructID)/binding:\(binding.name)"] =
                 binding.typeName
         }
-        for value in declaration.values where declarationGraph.hasConstruct(named: value.typeName) {
+        for value in values where declarationGraph.hasConstruct(named: value.typeName) {
             flowState.inferredConstructTypeByNodeID["\(constructID)/value:\(value.name)"] =
                 value.typeName
         }
-        for state in declaration.states {
+        for state in states {
             analyzeStateDeclaration(state, parentID: constructID)
         }
-        for derived in declaration.deriveds {
+        for derived in deriveds {
             let derivedID = "\(constructID)/derived:\(derived.name)"
             if let body = derived.body {
                 analyzeStatements(body, ownerID: derivedID, scope: scope)
             }
         }
-        for initializer in declaration.initializers {
+        for initializer in initializers {
             let initializerID = "\(constructID)/init:\(renderParameterList(initializer.parameters))"
             var initializerScope = scope
             for parameter in initializer.parameters {
@@ -1174,7 +1181,7 @@ private struct GraphCollector {
                 analyzeStatements(body, ownerID: initializerID, scope: initializerScope)
             }
         }
-        for callable in declaration.callables {
+        for callable in callables {
             analyzeCallableDeclaration(callable, parentID: constructID, scope: scope)
         }
         for nested in declaration.constructs {

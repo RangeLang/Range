@@ -21,6 +21,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         )
         try validateLiteralBridgeCompatibility(
             in: program.parsedFiles,
+            declarationGraph: program.declarationGraph,
             registryView: graphViews.registryView,
             resolver: program.literalBridgeResolver,
             memberResolver: graphViews.memberResolver,
@@ -31,8 +32,14 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             declarationGraph: program.declarationGraph,
             registryView: graphViews.registryView
         )
-        try validateEnvironmentStateResolution(in: program.expandedFiles)
-        try validateValueBindings(in: program.expandedFiles)
+        try validateEnvironmentStateResolution(
+            in: program.expandedFiles,
+            declarationGraph: program.declarationGraph
+        )
+        try validateValueBindings(
+            in: program.expandedFiles,
+            declarationGraph: program.declarationGraph
+        )
     }
 
     private struct ControlFlowContext {
@@ -275,18 +282,25 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         }
     }
 
-    private func validateEnvironmentStateResolution(in parsedFiles: [ParsedSourceFile]) throws {
+    private func validateEnvironmentStateResolution(
+        in parsedFiles: [ParsedSourceFile],
+        declarationGraph: DeclarationGraph
+    ) throws {
         let topLevelStateNames = Set(
             parsedFiles.flatMap { parsedFile in
-                topLevelStates(in: parsedFile.sourceFile).map(\.name)
+                declarationGraph.topLevelStates(inFilePath: parsedFile.path).map(\.name)
             }
         )
 
         for parsedFile in parsedFiles {
             for declaration in declarations(in: parsedFile.sourceFile) {
-                let localStateNames = Set(declaration.states.map(\.name))
+                let localStateNames = Set(
+                    declarationGraph.states(onConstruct: declaration.name).map(\.name)
+                )
 
-                for environment in declaration.environments where environment.isState {
+                for environment in declarationGraph.environments(onConstruct: declaration.name)
+                where environment.isState
+                {
                     if localStateNames.contains(environment.name) {
                         continue
                     }
@@ -1061,11 +1075,15 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         fileName: String
     ) throws {
         let memberMutableNames =
-            Set(declaration.states.map(\.name))
-            .union(declaration.bindings.map(\.name))
-            .union(declaration.environments.filter(\.isState).map(\.name))
+            Set(declarationGraph.states(onConstruct: declaration.name).map(\.name))
+            .union(declarationGraph.bindings(onConstruct: declaration.name).map(\.name))
+            .union(
+                declarationGraph.environments(onConstruct: declaration.name)
+                    .filter(\.isState)
+                    .map(\.name)
+            )
 
-        for derived in declaration.deriveds {
+        for derived in declarationGraph.deriveds(onConstruct: declaration.name) {
             if let body = derived.body {
                 try validateBindingReferences(
                     in: body,
@@ -1080,7 +1098,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             }
         }
 
-        for initializer in declaration.initializers {
+        for initializer in declarationGraph.initializers(onConstruct: declaration.name) {
             if let body = initializer.body {
                 try validateBindingReferences(
                     in: body,
@@ -1096,7 +1114,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             }
         }
 
-        for callable in declaration.callables {
+        for callable in declarationGraph.callables(onConstruct: declaration.name) {
             if let body = callable.body {
                 try validateBindingReferences(
                     in: body,
@@ -1462,11 +1480,14 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         )
     }
 
-    private func validateValueBindings(in parsedFiles: [ParsedSourceFile]) throws {
+    private func validateValueBindings(
+        in parsedFiles: [ParsedSourceFile],
+        declarationGraph: DeclarationGraph
+    ) throws {
         let bindingConstructNames = Set(
             parsedFiles
                 .flatMap { declarations(in: $0.sourceFile) }
-                .filter { !$0.bindings.isEmpty }
+                .filter { !declarationGraph.bindings(onConstruct: $0.name).isEmpty }
                 .map(\.name)
         )
 
@@ -1479,6 +1500,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             case .construct(let declaration):
                 try validateValueBindings(
                     in: declaration,
+                    declarationGraph: declarationGraph,
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )
@@ -1486,6 +1508,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 for declaration in module.constructs {
                     try validateValueBindings(
                         in: declaration,
+                        declarationGraph: declarationGraph,
                         bindingConstructNames: bindingConstructNames,
                         fileName: fileName
                     )
@@ -1520,10 +1543,11 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateValueBindings(
         in declaration: ConstructDeclaration,
+        declarationGraph: DeclarationGraph,
         bindingConstructNames: Set<String>,
         fileName: String
     ) throws {
-        for value in declaration.values {
+        for value in declarationGraph.values(onConstruct: declaration.name) {
             if let constructName = normalizedTypeName(value.typeName),
                 bindingConstructNames.contains(constructName)
             {
@@ -1533,7 +1557,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             }
         }
 
-        for derived in declaration.deriveds {
+        for derived in declarationGraph.deriveds(onConstruct: declaration.name) {
             if let body = derived.body {
                 try validateValueDeclarations(
                     in: body,
@@ -1543,7 +1567,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             }
         }
 
-        for initializer in declaration.initializers {
+        for initializer in declarationGraph.initializers(onConstruct: declaration.name) {
             if let body = initializer.body {
                 try validateValueDeclarations(
                     in: body,
@@ -1553,7 +1577,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             }
         }
 
-        for callable in declaration.callables {
+        for callable in declarationGraph.callables(onConstruct: declaration.name) {
             if let body = callable.body {
                 try validateValueDeclarations(
                     in: body,
@@ -1680,6 +1704,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateLiteralBridgeCompatibility(
         in parsedFiles: [ParsedSourceFile],
+        declarationGraph: DeclarationGraph,
         registryView: DeclarationRegistryView,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
@@ -1692,6 +1717,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             case .construct(let declaration):
                 try validateLiteralBridgeCompatibility(
                     in: declaration,
+                    declarationGraph: declarationGraph,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
@@ -1727,6 +1753,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 for declaration in module.constructs {
                     try validateLiteralBridgeCompatibility(
                         in: declaration,
+                        declarationGraph: declarationGraph,
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
@@ -1741,19 +1768,20 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateLiteralBridgeCompatibility(
         in declaration: ConstructDeclaration,
+        declarationGraph: DeclarationGraph,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
         fileName: String
     ) throws {
         let environmentTypes = Dictionary(
-            uniqueKeysWithValues: declaration.environments.map {
+            uniqueKeysWithValues: declarationGraph.environments(onConstruct: declaration.name).map {
                 ($0.name, BootstrapLiteralType.typed($0.type))
             }
         )
 
         try validateLiteralBridgeCompatibility(
-            in: declaration.states,
+            in: declarationGraph.states(onConstruct: declaration.name),
             accessibleTypes: environmentTypes,
             resolver: resolver,
             memberResolver: memberResolver,
@@ -1762,13 +1790,13 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         )
 
         let stateTypes = Dictionary(
-            uniqueKeysWithValues: declaration.states.map {
+            uniqueKeysWithValues: declarationGraph.states(onConstruct: declaration.name).map {
                 ($0.name, BootstrapLiteralType.typed($0.type))
             }
         )
         let accessibleTypes = stateTypes.merging(environmentTypes) { current, _ in current }
 
-        for callable in declaration.callables {
+        for callable in declarationGraph.callables(onConstruct: declaration.name) {
             try validateLiteralBridgeCompatibility(
                 in: callable,
                 accessibleTypes: accessibleTypes,

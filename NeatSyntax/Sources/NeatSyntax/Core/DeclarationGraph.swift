@@ -261,6 +261,34 @@ public struct DeclarationGraph {
         registryView.topLevelStates(inFilePath: path)
     }
 
+    public func states(onConstruct named: String) -> [StateDeclaration] {
+        statesByConstructName[named, default: []]
+    }
+
+    public func environments(onConstruct named: String) -> [EnvironmentDeclaration] {
+        environmentsByConstructName[named, default: []]
+    }
+
+    public func bindings(onConstruct named: String) -> [BindingDeclaration] {
+        bindingsByConstructName[named, default: []]
+    }
+
+    public func deriveds(onConstruct named: String) -> [DerivedDeclaration] {
+        derivedsByConstructName[named, default: []]
+    }
+
+    public func values(onConstruct named: String) -> [ValueDeclaration] {
+        valuesByConstructName[named, default: []]
+    }
+
+    public func initializers(onConstruct named: String) -> [InitializerDeclaration] {
+        initializersByConstructName[named, default: []]
+    }
+
+    public func callables(onConstruct named: String) -> [CallableDeclaration] {
+        constructsByName[named]?.callables ?? []
+    }
+
     public func construct(named name: String) -> ConstructDeclaration? {
         constructsByName[name]
     }
@@ -277,37 +305,29 @@ public struct DeclarationGraph {
         named callableName: String,
         onConstruct named: String
     ) -> CallableDeclaration? {
-        constructsByName[named]?.callables.first(where: { $0.name == callableName })
+        callables(onConstruct: named).first(where: { $0.name == callableName })
     }
 
     public func memberKinds(
         forConstruct named: String
     ) -> [String: ApplicationGraphNodeKind] {
-        guard let declaration = constructsByName[named] else {
-            return [:]
-        }
-
         var result: [String: ApplicationGraphNodeKind] = [:]
-        for state in declaration.states { result[state.name] = .state }
-        for environment in declaration.environments { result[environment.name] = .environment }
-        for binding in declaration.bindings { result[binding.name] = .binding }
-        for derived in declaration.deriveds { result[derived.name] = .derived }
-        for value in declaration.values { result[value.name] = .value }
+        for state in states(onConstruct: named) { result[state.name] = .state }
+        for environment in environments(onConstruct: named) { result[environment.name] = .environment }
+        for binding in bindings(onConstruct: named) { result[binding.name] = .binding }
+        for derived in deriveds(onConstruct: named) { result[derived.name] = .derived }
+        for value in values(onConstruct: named) { result[value.name] = .value }
         return result
     }
 
     public func constructTypedMemberNames(
         forConstruct named: String
     ) -> [String: String] {
-        guard let declaration = constructsByName[named] else {
-            return [:]
-        }
-
         var result: [String: String] = [:]
-        for binding in declaration.bindings where hasConstruct(named: binding.typeName) {
+        for binding in bindings(onConstruct: named) where hasConstruct(named: binding.typeName) {
             result[binding.name] = binding.typeName
         }
-        for value in declaration.values where hasConstruct(named: value.typeName) {
+        for value in values(onConstruct: named) where hasConstruct(named: value.typeName) {
             result[value.name] = value.typeName
         }
         return result
@@ -316,12 +336,8 @@ public struct DeclarationGraph {
     public func declaredMemberSurfaces(
         forConstruct named: String
     ) -> [DeclaredMemberSurface] {
-        guard let declaration = constructsByName[named] else {
-            return []
-        }
-
         var result: [DeclaredMemberSurface] = []
-        result.append(contentsOf: declaration.states.map {
+        result.append(contentsOf: states(onConstruct: named).map {
             DeclaredMemberSurface(
                 ownerConstructName: named,
                 name: $0.name,
@@ -329,7 +345,7 @@ public struct DeclarationGraph {
                 declaredTypeName: $0.type.displayName
             )
         })
-        result.append(contentsOf: declaration.environments.map {
+        result.append(contentsOf: environments(onConstruct: named).map {
             DeclaredMemberSurface(
                 ownerConstructName: named,
                 name: $0.name,
@@ -337,7 +353,7 @@ public struct DeclarationGraph {
                 declaredTypeName: $0.typeName
             )
         })
-        result.append(contentsOf: declaration.bindings.map {
+        result.append(contentsOf: bindings(onConstruct: named).map {
             DeclaredMemberSurface(
                 ownerConstructName: named,
                 name: $0.name,
@@ -345,7 +361,7 @@ public struct DeclarationGraph {
                 declaredTypeName: $0.typeName
             )
         })
-        result.append(contentsOf: declaration.deriveds.map {
+        result.append(contentsOf: deriveds(onConstruct: named).map {
             DeclaredMemberSurface(
                 ownerConstructName: named,
                 name: $0.name,
@@ -353,7 +369,7 @@ public struct DeclarationGraph {
                 declaredTypeName: $0.typeName
             )
         })
-        result.append(contentsOf: declaration.values.map {
+        result.append(contentsOf: values(onConstruct: named).map {
             DeclaredMemberSurface(
                 ownerConstructName: named,
                 name: $0.name,
@@ -424,11 +440,7 @@ public struct DeclarationGraph {
     public func callableSurfaces(
         onConstruct named: String
     ) -> [DeclaredCallableSurface] {
-        guard let declaration = constructsByName[named] else {
-            return []
-        }
-
-        return declaration.callables.map { callable in
+        return callables(onConstruct: named).map { callable in
             DeclaredCallableSurface(
                 ownerConstructName: named,
                 name: callable.name,
@@ -471,11 +483,7 @@ public struct DeclarationGraph {
     public func initializerSurfaces(
         onConstruct named: String
     ) -> [DeclaredInitializerSurface] {
-        guard let declaration = constructsByName[named] else {
-            return []
-        }
-
-        return declaration.initializers.map { initializer in
+        return initializers(onConstruct: named).map { initializer in
             DeclaredInitializerSurface(
                 ownerConstructName: named,
                 labels: initializer.parameters.map(\.externalLabel),
