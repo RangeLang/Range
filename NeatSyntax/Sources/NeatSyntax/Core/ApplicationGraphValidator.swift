@@ -403,7 +403,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             )
         )
 
-        for derived in declaration.deriveds {
+        for derived in environment.declarationGraph.deriveds(onConstruct: declaration.name) {
             if let body = derived.body {
                 try validateCallArgumentLabels(
                     in: body,
@@ -414,7 +414,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             }
         }
 
-        for initializer in declaration.initializers {
+        for initializer in environment.declarationGraph.initializers(onConstruct: declaration.name) {
             if let body = initializer.body {
                 try validateCallArgumentLabels(
                     in: body,
@@ -425,7 +425,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             }
         }
 
-        for callable in declaration.callables {
+        for callable in environment.declarationGraph.callables(onConstruct: declaration.name) {
             if let body = callable.body {
                 try validateCallArgumentLabels(
                     in: body,
@@ -2406,15 +2406,6 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         case .module(let module):
             return module.constructs
         case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
-            return []
-        }
-    }
-
-    private func topLevelStates(in sourceFile: SourceFileNode) -> [StateDeclaration] {
-        switch sourceFile {
-        case .module(let module):
-            return module.states
-        case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
             return []
         }
     }
