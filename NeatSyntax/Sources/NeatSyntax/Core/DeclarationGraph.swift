@@ -177,8 +177,11 @@ public struct DeclarationGraph {
         views.registryView
     }
 
-    public var dependencySourceView: DependencySourceView {
-        DependencySourceView(constructsByName: constructsByName)
+    public var applicationDeclarationView: ApplicationDeclarationView {
+        ApplicationDeclarationView(
+            registryView: registryView,
+            constructsByName: constructsByName
+        )
     }
 
     public var programGraph: ProgramGraph {
@@ -1157,11 +1160,20 @@ public struct DeclarationRegistryView {
     }
 }
 
-public struct DependencySourceView {
+public struct ApplicationDeclarationView {
+    private let registryView: DeclarationRegistryView
     private let constructsByName: [String: ConstructDeclaration]
 
-    public init(constructsByName: [String: ConstructDeclaration]) {
+    public init(
+        registryView: DeclarationRegistryView,
+        constructsByName: [String: ConstructDeclaration]
+    ) {
+        self.registryView = registryView
         self.constructsByName = constructsByName
+    }
+
+    public func topLevelStates(inFilePath path: String) -> [StateDeclaration] {
+        registryView.topLevelStates(inFilePath: path)
     }
 
     public func construct(named name: String) -> ConstructDeclaration? {
