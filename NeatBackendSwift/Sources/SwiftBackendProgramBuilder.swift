@@ -4,31 +4,31 @@ import NeatSyntax
 struct SwiftBackendProgramBuilder {
     func build(
         project: SwiftBackendProject,
-        semanticProgram: SemanticProgram
+        programModel: ProgramModel
     ) throws -> LoweredProgram {
         if project.isSingleFile {
             return try build(
                 fromSingleFile: project.projectFiles[0],
-                semanticProgram: semanticProgram
+                programModel: programModel
             )
         }
 
-        return try build(semanticProgram: semanticProgram)
+        return try build(programModel: programModel)
     }
 
     private func build(
         fromSingleFile fileURL: URL,
-        semanticProgram: SemanticProgram
+        programModel: ProgramModel
     ) throws -> LoweredProgram {
         guard
-            let parsedFile = semanticProgram.projectExpandedFiles.first(where: {
+            let parsedFile = programModel.projectExpandedFiles.first(where: {
                 $0.path == fileURL.path
             })
         else {
             throw SwiftBackendError("Failed to expand \(fileURL.lastPathComponent).")
         }
 
-        let supportDeclarations = coreSupportDeclarations(in: semanticProgram)
+        let supportDeclarations = coreSupportDeclarations(in: programModel)
         let supportUnits = coreSupportUnits(for: supportDeclarations)
         let sourceFile = parsedFile.sourceFile
 
@@ -87,8 +87,8 @@ struct SwiftBackendProgramBuilder {
         }
     }
 
-    private func build(semanticProgram: SemanticProgram) throws -> LoweredProgram {
-        let supportDeclarations = coreSupportDeclarations(in: semanticProgram)
+    private func build(programModel: ProgramModel) throws -> LoweredProgram {
+        let supportDeclarations = coreSupportDeclarations(in: programModel)
 
         var callables: [CallableDeclaration] = []
         var enumerations: [EnumDeclaration] = []
@@ -96,7 +96,7 @@ struct SwiftBackendProgramBuilder {
         var mainBlock: MainBlockNode?
         var units: [LoweredSourceUnit] = coreSupportUnits(for: supportDeclarations)
 
-        for parsedFile in semanticProgram.projectExpandedFiles {
+        for parsedFile in programModel.projectExpandedFiles {
             let fileURL = URL(fileURLWithPath: parsedFile.path)
             let sourceFile = parsedFile.sourceFile
             let outputFileName = fileURL.deletingPathExtension().lastPathComponent + ".swift"
@@ -181,9 +181,9 @@ struct SwiftBackendProgramBuilder {
         )
     }
 
-    private func coreSupportDeclarations(in semanticProgram: SemanticProgram) -> [ConstructDeclaration] {
-        semanticProgram.expandedFiles.compactMap { parsedFile in
-            guard semanticProgram.sourceRole(forPath: parsedFile.path) == .core else {
+    private func coreSupportDeclarations(in programModel: ProgramModel) -> [ConstructDeclaration] {
+        programModel.expandedFiles.compactMap { parsedFile in
+            guard programModel.sourceRole(forPath: parsedFile.path) == .core else {
                 return nil
             }
 

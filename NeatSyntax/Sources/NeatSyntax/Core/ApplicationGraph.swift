@@ -989,7 +989,7 @@ public struct ApplicationGraph {
 public struct DependencyGraphBuilder {
     public init() {}
 
-    public func build(program: SemanticProgram) -> DependencyGraph {
+    public func build(program: ProgramModel) -> DependencyGraph {
         build(
             files: program.expandedFiles,
             declarationGraph: program.declarationGraph
@@ -1019,7 +1019,7 @@ public struct DependencyGraphBuilder {
 public struct ApplicationGraphBuilder {
     public init() {}
 
-    public func build(program: SemanticProgram) -> ApplicationGraph {
+    public func build(program: ProgramModel) -> ApplicationGraph {
         ApplicationGraph(
             dependencyGraph: DependencyGraphBuilder().build(program: program)
         )

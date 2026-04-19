@@ -36,7 +36,7 @@ extension NeatCLI {
                     withIntermediateDirectories: true
                 )
 
-                let program = try ProjectSourceValidator.semanticProgram(for: project)
+                let program = try ProjectSourceValidator.programModel(for: project)
                 let expandedByPath = Dictionary(
                     uniqueKeysWithValues: program.projectExpandedFiles.map {
                         ($0.path, $0.sourceFile)

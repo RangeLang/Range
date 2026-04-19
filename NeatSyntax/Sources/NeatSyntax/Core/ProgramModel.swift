@@ -17,7 +17,7 @@ public struct SourceInput {
     }
 }
 
-public struct SemanticProgram {
+public struct ProgramModel {
     public let inputs: [SourceInput]
     public let parsedFiles: [ParsedSourceFile]
     public let expandedFiles: [ParsedSourceFile]
@@ -76,7 +76,7 @@ public struct SemanticProgram {
 public struct CompilerPipeline {
     public init() {}
 
-    public func build(inputs: [SourceInput]) throws -> SemanticProgram {
+    public func build(inputs: [SourceInput]) throws -> ProgramModel {
         let orderedInputs = inputs.sorted { lhs, rhs in
             if lhs.role != rhs.role {
                 return lhs.role == .core
@@ -134,7 +134,7 @@ public struct CompilerPipeline {
         let expandedFiles = try MacroExpander.expand(files: parsedFiles)
         let declarationGraph = DeclarationGraph(files: expandedFiles)
 
-        return SemanticProgram(
+        return ProgramModel(
             inputs: orderedInputs,
             parsedFiles: parsedFiles,
             expandedFiles: expandedFiles,
@@ -142,15 +142,15 @@ public struct CompilerPipeline {
         )
     }
 
-    public func buildValidated(inputs: [SourceInput]) throws -> SemanticProgram {
+    public func buildValidated(inputs: [SourceInput]) throws -> ProgramModel {
         let program = try build(inputs: inputs)
-        try SemanticProgramValidator().validate(program)
+        try ProgramModelValidator().validate(program)
         return program
     }
 
     public func validatePrimaryDeclarations(inputs: [SourceInput]) throws {
         let program = try build(inputs: inputs)
-        try SemanticProgramValidator().validatePrimaryDeclarations(in: program)
+        try ProgramModelValidator().validatePrimaryDeclarations(in: program)
     }
 
     private func parse(

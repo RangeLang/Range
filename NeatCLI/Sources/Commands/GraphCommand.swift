@@ -14,7 +14,7 @@ extension NeatCLI {
         mutating func run() throws {
             do {
                 let project = try ProjectLoader.load(at: input ?? ".")
-                let program = try ProjectSourceValidator.semanticProgram(for: project)
+                let program = try ProjectSourceValidator.programModel(for: project)
                 print(program.applicationGraph.render())
             } catch {
                 ErrorPresenter.printError(error)

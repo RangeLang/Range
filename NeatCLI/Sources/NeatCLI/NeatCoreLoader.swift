@@ -63,15 +63,15 @@ enum NeatCoreLoader {
         }
     }
 
-    static func semanticProgram() throws -> SemanticProgram {
+    static func programModel() throws -> ProgramModel {
         try CompilerPipeline().build(inputs: sourceInputs())
     }
 
-    static func parsedDependencyFiles() throws -> [ParsedSourceFile] {
-        try semanticProgram().parsedFiles
+    static func parsedProgramFiles() throws -> [ParsedSourceFile] {
+        try programModel().parsedFiles
     }
 
     static func literalBridgeResolver() throws -> LiteralBridgeResolver {
-        try semanticProgram().literalBridgeResolver
+        try programModel().literalBridgeResolver
     }
 }

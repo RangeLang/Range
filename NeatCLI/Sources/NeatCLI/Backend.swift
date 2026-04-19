@@ -15,12 +15,12 @@ protocol Backend {
 
     func emitWorkspace(
         project: LoadedProject,
-        semanticProgram: SemanticProgram
+        programModel: ProgramModel
     ) throws -> EmittedWorkspace
 
     func emitSourceFile(
         project: LoadedProject,
-        semanticProgram: SemanticProgram,
+        programModel: ProgramModel,
         outputURL: URL
     ) throws -> EmittedSourceFile
 }
@@ -42,7 +42,7 @@ private struct SwiftCLIBackendAdapter: RunnableWorkspaceBackend {
 
     func emitWorkspace(
         project: LoadedProject,
-        semanticProgram: SemanticProgram
+        programModel: ProgramModel
     ) throws -> EmittedWorkspace {
         let root = try backend.emitWorkspace(
             project: .init(
@@ -50,14 +50,14 @@ private struct SwiftCLIBackendAdapter: RunnableWorkspaceBackend {
                 isSingleFile: project.isSingleFile,
                 buildRoot: project.defaultBuildRoot
             ),
-            semanticProgram: semanticProgram
+            programModel: programModel
         )
         return EmittedWorkspace(root: root)
     }
 
     func emitSourceFile(
         project: LoadedProject,
-        semanticProgram: SemanticProgram,
+        programModel: ProgramModel,
         outputURL: URL
     ) throws -> EmittedSourceFile {
         let emittedURL = try backend.emitSourceFile(
@@ -66,7 +66,7 @@ private struct SwiftCLIBackendAdapter: RunnableWorkspaceBackend {
                 isSingleFile: project.isSingleFile,
                 buildRoot: project.defaultBuildRoot
             ),
-            semanticProgram: semanticProgram,
+            programModel: programModel,
             outputURL: outputURL
         )
         return EmittedSourceFile(outputURL: emittedURL)
