@@ -271,6 +271,156 @@ Those belong downstream in:
 - later `MemoryGraph`
 - later `ReactivityGraph`
 
+## DeclarationGraph Backlog
+
+The current code already has broad raw declaration coverage in
+`ProgramGraph.semanticGraph`, but only part of the declaration inventory is
+truly first-class in `DeclarationGraph` itself.
+
+This backlog tracks the gap between:
+
+- raw declaration entities existing somewhere in graph storage
+- declaration facts being first-class, queryable, and semantically owned by
+  `DeclarationGraph`
+
+### Already First-Class Enough
+
+These are currently strong enough to be treated as first-class declaration
+facts:
+
+- constructs
+- protocols
+- top-level callables
+- realized literal bridges
+- realized init macro targets
+- construct qualification and nested construct flattening
+- carried initializer macros across protocol conformance
+
+These are backed today by:
+
+- `constructsByName`
+- `protocolsByName`
+- `callablesByName`
+- `realizedLiteralBridges`
+- `realizedInitMacroTargets`
+
+### Present But Still View-Like
+
+These exist today, but primarily through helper resolvers or graph views rather
+than as first-class declaration storage/query surfaces:
+
+- member lookup
+- conformance reasoning
+- declaration syntax/capability lookup
+- operator/callable signature lookup
+- application-facing construct/member queries
+- macro realization lookup for parameters/functions
+- rewrite-capable declaration surface traversal
+
+These are currently represented by things like:
+
+- `DeclarationMemberResolver`
+- `DeclarationSyntaxResolver`
+- `DeclarationOperatorResolver`
+- `DependencySourceView`
+- `MacroRealizationView`
+- `RewriteSurfaceView`
+
+The architectural direction is:
+
+- keep these query/view types where they help
+- but strengthen the underlying declaration facts they depend on
+
+### Present In Raw Graph Storage But Not First-Class Enough
+
+These declaration categories are already represented in `semanticGraph`, but do
+not yet have strong declaration-side registries/query APIs parallel to
+constructs and protocols:
+
+- enums
+- macros
+- extensions
+- top-level states
+- environments
+- bindings
+- deriveds
+- values
+- initializers
+- parameters
+- macro applications
+- type references used as declaration-side facts
+
+The problem here is not absence of data. The problem is that the data is still
+thin:
+
+- available as raw graph entities/relations
+- but not yet exposed as declaration-owned semantic surfaces
+
+### Missing Or Not Explicitly Modeled Yet
+
+These declaration facts still need clearer first-class modeling:
+
+- uniform declaration metadata across all declaration categories
+  - kind
+  - `@core` identity
+  - enclosing declaration/file
+  - declared signature metadata
+  - declared type metadata
+- requirement declarations
+- requirement satisfaction relations
+- declaration/application facet relations
+- carried macro relations as first-class facts
+- macro target relations richer than raw target type references
+- declared member/type relationships richer than raw `referencesType` edges
+
+### Implementation Sequence
+
+The next declaration-side work should happen in this order:
+
+1. Add first-class declaration registries or query views for:
+   - enums
+   - macros
+   - extensions
+
+2. Add uniform declaration query surfaces for:
+   - states
+   - environments
+   - bindings
+   - deriveds
+   - values
+   - initializers
+   - parameters
+
+3. Introduce explicit declaration relations for:
+   - `facetOf`
+   - `satisfiesRequirement`
+   - `carriesMacro`
+
+4. Strengthen declaration metadata so all declaration categories can answer:
+   - what kind of declaration is this?
+   - is it core?
+   - what contains it?
+   - what type/signature metadata does it expose?
+
+5. Rebuild declaration-side resolvers/views on top of those stronger facts
+   rather than on ad hoc traversal of declaration structs
+
+### Immediate Declaration Slice
+
+The first concrete declaration refactor slice should be:
+
+- add enum/macro/extension registries or dedicated query views to
+  `DeclarationGraph`
+- make those queryable in the same style as constructs/protocols/callables
+- use that work to establish the pattern for the remaining declaration
+  categories
+
+That is the smallest useful move because it:
+
+- strengthens `DeclarationGraph` without redesigning everything at once
+- reduces the gap between raw graph storage and declaration-side ownership
+- gives the next declaration categories an obvious implementation template
+
 ## Current State Audit
 
 ### What Is Better Than Before
