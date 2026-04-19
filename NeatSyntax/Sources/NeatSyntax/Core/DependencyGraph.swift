@@ -955,11 +955,8 @@ public struct DependencyGraphBuilder {
 private struct GraphCollector {
     private var nodesByID: [String: DependencyGraphNode] = [:]
     private var edges: Set<DependencyGraphEdge> = []
-    private var declarationNodeIDsByName: [String: Set<String>] = [:]
     private let dependencySourceView: DependencySourceView
-    private var constructCallableNodeIDsByName: [String: [String: String]] = [:]
-    private var aliasTargetByNodeID: [String: String] = [:]
-    private var constructTypeByNodeID: [String: String] = [:]
+    private var projectionState = DependencyProjectionState()
 
     init(declarationGraph: DeclarationGraph) {
         self.dependencySourceView = declarationGraph.dependencySourceView
@@ -1170,7 +1167,7 @@ private struct GraphCollector {
         addMacroApplications(declaration.macros, parentID: bindingID)
         addStorageTypeReference(.named(declaration.typeName), from: bindingID)
         if dependencySourceView.hasConstruct(named: declaration.typeName) {
-            constructTypeByNodeID[bindingID] = declaration.typeName
+            projectionState.constructTypeByNodeID[bindingID] = declaration.typeName
         }
     }
 
@@ -1192,7 +1189,7 @@ private struct GraphCollector {
         addMacroApplications(declaration.macros, parentID: valueID)
         addStorageTypeReference(.named(declaration.typeName), from: valueID)
         if dependencySourceView.hasConstruct(named: declaration.typeName) {
-            constructTypeByNodeID[valueID] = declaration.typeName
+            projectionState.constructTypeByNodeID[valueID] = declaration.typeName
         }
     }
 
@@ -1216,7 +1213,7 @@ private struct GraphCollector {
             let suffix = parentID.split(separator: "/").last
         {
             let constructName = String(suffix.dropFirst("construct:".count))
-            constructCallableNodeIDsByName[constructName, default: [:]][declaration.name] =
+            projectionState.constructCallableNodeIDsByName[constructName, default: [:]][declaration.name] =
                 callableID
         }
         if let targetType = declaration.targetType {
@@ -1239,7 +1236,7 @@ private struct GraphCollector {
         if let typeReference = parameter.typeReference {
             addStorageTypeReference(typeReference, from: parameterID)
             if case .named(let name) = typeReference, dependencySourceView.hasConstruct(named: name) {
-                constructTypeByNodeID[parameterID] = name
+                projectionState.constructTypeByNodeID[parameterID] = name
             }
         }
     }
@@ -1300,13 +1297,13 @@ private struct GraphCollector {
     }
 
     private mutating func registerDeclaration(name: String, nodeID: String) {
-        declarationNodeIDsByName[name, default: []].insert(nodeID)
+        projectionState.declarationNodeIDsByName[name, default: []].insert(nodeID)
     }
 
     private mutating func addResolutionEdges() {
         let typeNodes = nodesByID.values.filter { $0.kind == .typeReference }
         for typeNode in typeNodes {
-            guard let targetNodeIDs = declarationNodeIDsByName[typeNode.label] else {
+            guard let targetNodeIDs = projectionState.declarationNodeIDsByName[typeNode.label] else {
                 continue
             }
             for targetNodeID in targetNodeIDs {
@@ -1360,7 +1357,7 @@ private struct GraphCollector {
                 addEdge(from: ownerID, to: localID, kind: .contains)
                 addStorageTypeReference(declaration.type, from: localID)
                 if dependencySourceView.hasConstruct(named: declaration.type.displayName) {
-                    constructTypeByNodeID[localID] = declaration.type.displayName
+                    projectionState.constructTypeByNodeID[localID] = declaration.type.displayName
                 }
                 captureConstructType(for: localID, from: declaration.expression)
                 scope.symbols[declaration.name] = localID
@@ -1490,7 +1487,7 @@ private struct GraphCollector {
         if case .call(let name, let arguments) = expression,
             dependencySourceView.hasConstruct(named: name)
         {
-            constructTypeByNodeID[ownerID] = name
+            projectionState.constructTypeByNodeID[ownerID] = name
             bindConstructArguments(
                 ownerID: ownerID, constructName: name, arguments: arguments, scope: scope)
         }
@@ -1576,15 +1573,15 @@ private struct GraphCollector {
         guard let baseNodeID = resolvePath(basePath, scope: scope) else { return }
         let canonicalBaseID = resolvedAlias(of: baseNodeID)
         guard
-            let constructName = constructTypeByNodeID[canonicalBaseID]
-                ?? constructTypeByNodeID[baseNodeID]
+            let constructName = projectionState.constructTypeByNodeID[canonicalBaseID]
+                ?? projectionState.constructTypeByNodeID[baseNodeID]
         else {
             return
         }
         guard
             let declaration = dependencySourceView.construct(named: constructName),
             let callable = declaration.callables.first(where: { $0.name == methodName }),
-            let callableNodeID = constructCallableNodeIDsByName[constructName]?[methodName]
+            let callableNodeID = projectionState.constructCallableNodeIDsByName[constructName]?[methodName]
         else {
             return
         }
@@ -1674,7 +1671,7 @@ private struct GraphCollector {
             let nodeID = ensureMemberNode(
                 baseID: instanceNodeID, name: binding.name, kind: .binding)
             if dependencySourceView.hasConstruct(named: binding.typeName) {
-                constructTypeByNodeID[nodeID] = binding.typeName
+                projectionState.constructTypeByNodeID[nodeID] = binding.typeName
             }
             scope.symbols[binding.name] = nodeID
         }
@@ -1685,7 +1682,7 @@ private struct GraphCollector {
         for value in declaration.values {
             let nodeID = ensureMemberNode(baseID: instanceNodeID, name: value.name, kind: .value)
             if dependencySourceView.hasConstruct(named: value.typeName) {
-                constructTypeByNodeID[nodeID] = value.typeName
+                projectionState.constructTypeByNodeID[nodeID] = value.typeName
             }
             scope.symbols[value.name] = nodeID
         }
@@ -1696,7 +1693,7 @@ private struct GraphCollector {
         guard case .call(let name, _) = expression, dependencySourceView.hasConstruct(named: name) else {
             return
         }
-        constructTypeByNodeID[nodeID] = name
+        projectionState.constructTypeByNodeID[nodeID] = name
     }
 
     private mutating func captureConstructTypeForMember(
@@ -1707,12 +1704,12 @@ private struct GraphCollector {
         if let binding = declaration.bindings.first(where: { $0.name == memberName }),
             dependencySourceView.hasConstruct(named: binding.typeName)
         {
-            constructTypeByNodeID[nodeID] = binding.typeName
+            projectionState.constructTypeByNodeID[nodeID] = binding.typeName
         }
         if let value = declaration.values.first(where: { $0.name == memberName }),
             dependencySourceView.hasConstruct(named: value.typeName)
         {
-            constructTypeByNodeID[nodeID] = value.typeName
+            projectionState.constructTypeByNodeID[nodeID] = value.typeName
         }
     }
 
@@ -1774,8 +1771,8 @@ private struct GraphCollector {
             let canonicalMemberID = ensureMemberNode(
                 baseID: canonicalBaseID, name: name, kind: kind)
             addAlias(from: memberID, to: canonicalMemberID)
-            if let constructName = constructTypeByNodeID[canonicalMemberID] {
-                constructTypeByNodeID[memberID] = constructName
+            if let constructName = projectionState.constructTypeByNodeID[canonicalMemberID] {
+                projectionState.constructTypeByNodeID[memberID] = constructName
             }
         }
 
@@ -1783,17 +1780,17 @@ private struct GraphCollector {
     }
 
     private mutating func addAlias(from sourceID: String, to targetID: String) {
-        aliasTargetByNodeID[sourceID] = targetID
+        projectionState.aliasTargetByNodeID[sourceID] = targetID
         addEdge(from: sourceID, to: targetID, kind: .aliases)
-        if let constructName = constructTypeByNodeID[targetID] {
-            constructTypeByNodeID[sourceID] = constructName
+        if let constructName = projectionState.constructTypeByNodeID[targetID] {
+            projectionState.constructTypeByNodeID[sourceID] = constructName
         }
     }
 
     private func resolvedAlias(of nodeID: String) -> String {
         var current = nodeID
         var seen: Set<String> = []
-        while let next = aliasTargetByNodeID[current], !seen.contains(next) {
+        while let next = projectionState.aliasTargetByNodeID[current], !seen.contains(next) {
             seen.insert(current)
             current = next
         }
@@ -1835,6 +1832,13 @@ private struct GraphCollector {
             return "\(label):\(typeName)"
         }.joined(separator: ",")
     }
+}
+
+private struct DependencyProjectionState {
+    var declarationNodeIDsByName: [String: Set<String>] = [:]
+    var constructCallableNodeIDsByName: [String: [String: String]] = [:]
+    var aliasTargetByNodeID: [String: String] = [:]
+    var constructTypeByNodeID: [String: String] = [:]
 }
 
 private struct MemoryScope {
