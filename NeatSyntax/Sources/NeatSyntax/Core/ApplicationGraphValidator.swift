@@ -10,7 +10,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         try validateControlFlow(in: program.expandedFiles)
         try validateCallArgumentLabels(
             in: program.expandedFiles,
-            registryView: graphViews.registryView
+            declarationGraph: program.declarationGraph
         )
         try validateCallableReturnSemantics(
             in: program.expandedFiles,
@@ -71,13 +71,13 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
     }
 
     private struct CallLabelValidationContext {
-        let currentConstruct: ConstructDeclaration?
+        let currentConstructName: String?
         var localCallablesByName: [String: [CallLabelCandidate]]
     }
 
     private struct CallLabelValidationEnvironment {
         let topLevelCallablesByName: [String: [CallLabelCandidate]]
-        let constructsByName: [String: ConstructDeclaration]
+        let declarationGraph: DeclarationGraph
     }
 
     private struct CallLabelCandidate {
@@ -300,11 +300,11 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateCallArgumentLabels(
         in parsedFiles: [ParsedSourceFile],
-        registryView: DeclarationRegistryView
+        declarationGraph: DeclarationGraph
     ) throws {
         let environment = callLabelValidationEnvironment(
             from: parsedFiles,
-            registryView: registryView
+            declarationGraph: declarationGraph
         )
 
         for parsedFile in parsedFiles {
@@ -323,7 +323,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                         in: mainBlock.body,
                         environment: environment,
                         context: CallLabelValidationContext(
-                            currentConstruct: nil,
+                            currentConstructName: nil,
                             localCallablesByName: [:]
                         ),
                         fileName: fileName
@@ -336,7 +336,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                         in: body,
                         environment: environment,
                         context: CallLabelValidationContext(
-                            currentConstruct: nil,
+                            currentConstructName: nil,
                             localCallablesByName: localCallableMap([callable])
                         ),
                         fileName: fileName
@@ -355,7 +355,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                     in: mainBlock.body,
                     environment: environment,
                     context: CallLabelValidationContext(
-                        currentConstruct: nil,
+                        currentConstructName: nil,
                         localCallablesByName: [:]
                     ),
                     fileName: fileName
@@ -372,7 +372,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         fileName: String
     ) throws {
         let constructContext = CallLabelValidationContext(
-            currentConstruct: declaration,
+            currentConstructName: declaration.name,
             localCallablesByName: [:]
         )
 
@@ -404,7 +404,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                     in: body,
                     environment: environment,
                     context: CallLabelValidationContext(
-                        currentConstruct: declaration,
+                        currentConstructName: declaration.name,
                         localCallablesByName: localCallableMap([callable])
                     ),
                     fileName: fileName
@@ -463,7 +463,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                     in: declaration.body,
                     environment: environment,
                     context: CallLabelValidationContext(
-                        currentConstruct: context.currentConstruct,
+                        currentConstructName: context.currentConstructName,
                         localCallablesByName: context.localCallablesByName
                     ),
                     fileName: fileName
@@ -718,30 +718,21 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func callLabelValidationEnvironment(
         from parsedFiles: [ParsedSourceFile],
-        registryView: DeclarationRegistryView
+        declarationGraph: DeclarationGraph
     )
         -> CallLabelValidationEnvironment
     {
         var topLevelCallablesByName: [String: [CallLabelCandidate]] = [:]
 
-        for parsedFile in parsedFiles {
-            switch parsedFile.sourceFile {
-            case .construct:
-                break
-            case .module(let module):
-                for callable in module.callables {
-                    topLevelCallablesByName[callable.name, default: []].append(
-                        CallLabelCandidate(name: callable.name, parameters: callable.parameters)
-                    )
-                }
-            case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
-                break
-            }
+        for surface in declarationGraph.topLevelCallableSurfaces() {
+            topLevelCallablesByName[surface.name, default: []].append(
+                CallLabelCandidate(name: surface.name, parameters: surface.parameters)
+            )
         }
 
         return CallLabelValidationEnvironment(
             topLevelCallablesByName: topLevelCallablesByName,
-            constructsByName: registryView.allConstructsByName
+            declarationGraph: declarationGraph
         )
     }
 
@@ -751,8 +742,8 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         context: CallLabelValidationContext
     ) -> [CallLabelCandidate]? {
         if let (baseName, memberName) = splitMemberName(name) {
-            if baseName == "self", let currentConstruct = context.currentConstruct {
-                let candidates = currentConstruct.callables
+            if baseName == "self", let currentConstructName = context.currentConstructName {
+                let candidates = environment.declarationGraph.callableSurfaces(onConstruct: currentConstructName)
                     .filter { $0.name == memberName }
                     .map { CallLabelCandidate(name: $0.name, parameters: $0.parameters) }
                 return candidates.isEmpty ? nil : candidates
@@ -768,8 +759,8 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             return callables
         }
 
-        if let construct = environment.constructsByName[name] {
-            let candidates = construct.initializers.map {
+        if environment.declarationGraph.hasConstruct(named: name) {
+            let candidates = environment.declarationGraph.initializerSurfaces(onConstruct: name).map {
                 CallLabelCandidate(name: name, parameters: $0.parameters)
             }
             return candidates.isEmpty ? nil : candidates

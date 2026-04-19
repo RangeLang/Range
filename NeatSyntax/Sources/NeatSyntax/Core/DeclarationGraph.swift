@@ -69,7 +69,7 @@ public struct RealizedInitMacroTarget {
     }
 }
 
-public struct DeclaredMemberSurface: Hashable, Sendable {
+public struct DeclaredMemberSurface {
     public let ownerConstructName: String
     public let name: String
     public let kind: ApplicationGraphNodeKind
@@ -92,11 +92,12 @@ public struct DeclaredMemberSurface: Hashable, Sendable {
     }
 }
 
-public struct DeclaredCallableSurface: Hashable, Sendable {
+public struct DeclaredCallableSurface {
     public let ownerConstructName: String?
     public let name: String
     public let labels: [String?]
     public let parameterTypeNames: [String?]
+    public let parameters: [NeatFunctionParameter]
     public let returnTypeName: String?
 
     public init(
@@ -104,12 +105,14 @@ public struct DeclaredCallableSurface: Hashable, Sendable {
         name: String,
         labels: [String?],
         parameterTypeNames: [String?],
+        parameters: [NeatFunctionParameter],
         returnTypeName: String?
     ) {
         self.ownerConstructName = ownerConstructName
         self.name = name
         self.labels = labels
         self.parameterTypeNames = parameterTypeNames
+        self.parameters = parameters
         self.returnTypeName = returnTypeName
     }
 
@@ -119,19 +122,22 @@ public struct DeclaredCallableSurface: Hashable, Sendable {
     }
 }
 
-public struct DeclaredInitializerSurface: Hashable, Sendable {
+public struct DeclaredInitializerSurface {
     public let ownerConstructName: String
     public let labels: [String?]
     public let parameterTypeNames: [String?]
+    public let parameters: [NeatFunctionParameter]
 
     public init(
         ownerConstructName: String,
         labels: [String?],
-        parameterTypeNames: [String?]
+        parameterTypeNames: [String?],
+        parameters: [NeatFunctionParameter]
     ) {
         self.ownerConstructName = ownerConstructName
         self.labels = labels
         self.parameterTypeNames = parameterTypeNames
+        self.parameters = parameters
     }
 
     public var identity: String {
@@ -430,6 +436,7 @@ public struct DeclarationGraph {
                 parameterTypeNames: callable.parameters.map {
                     $0.typeReference?.displayName ?? $0.slotName
                 },
+                parameters: callable.parameters,
                 returnTypeName: callable.returnType?.displayName
             )
         }
@@ -454,6 +461,7 @@ public struct DeclarationGraph {
                     parameterTypeNames: callable.parameters.map {
                         $0.typeReference?.displayName ?? $0.slotName
                     },
+                    parameters: callable.parameters,
                     returnTypeName: callable.returnType?.displayName
                 )
             }
@@ -473,7 +481,8 @@ public struct DeclarationGraph {
                 labels: initializer.parameters.map(\.externalLabel),
                 parameterTypeNames: initializer.parameters.map {
                     $0.typeReference?.displayName ?? $0.slotName
-                }
+                },
+                parameters: initializer.parameters
             )
         }
     }
