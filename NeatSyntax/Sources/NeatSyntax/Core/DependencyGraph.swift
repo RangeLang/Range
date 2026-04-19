@@ -1001,6 +1001,9 @@ public struct DependencyGraphBuilder {
 }
 
 private struct GraphCollector {
+    private let baseSemanticGraph: SemanticGraph
+    private let baseEntityIDs: Set<String>
+    private let baseEdges: Set<DependencyGraphEdge>
     private var nodesByID: [String: DependencyGraphNode] = [:]
     private var edges: Set<DependencyGraphEdge> = []
     private let dependencySourceView: DependencySourceView
@@ -1008,13 +1011,33 @@ private struct GraphCollector {
     private var flowState = DependencyFlowState()
 
     init(declarationGraph: DeclarationGraph) {
+        self.baseSemanticGraph = declarationGraph.semanticGraph
+        self.baseEntityIDs = Set(declarationGraph.semanticGraph.entities.map(\.id))
+        self.baseEdges = Set(
+            declarationGraph.semanticGraph.relations.compactMap { relation in
+                guard let dependencyKind = Self.dependencyEdgeKind(for: relation.kind) else {
+                    return nil
+                }
+                return DependencyGraphEdge(
+                    sourceID: relation.sourceID,
+                    targetID: relation.targetID,
+                    kind: dependencyKind
+                )
+            }
+        )
         self.dependencySourceView = declarationGraph.dependencySourceView
-        seed(from: declarationGraph.semanticGraph)
+        indexBaseSemanticGraph()
     }
 
     mutating func build() -> DependencyGraph {
         addResolutionEdges()
-        return DependencyGraph(nodes: Array(nodesByID.values), edges: Array(edges))
+        let baseNodes = baseSemanticGraph.entities.compactMap { entity in
+            dependencyNode(for: entity)
+        }
+        return DependencyGraph(
+            nodes: baseNodes + Array(nodesByID.values),
+            edges: Array(baseEdges.union(edges))
+        )
     }
 
     mutating func add(_ parsedFile: ParsedSourceFile) {
@@ -1406,33 +1429,39 @@ private struct GraphCollector {
     }
 
     private mutating func addNode(id: String, kind: DependencyGraphNodeKind, label: String) {
+        guard !baseEntityIDs.contains(id) else { return }
         nodesByID[id] = DependencyGraphNode(id: id, kind: kind, label: label)
     }
 
     private mutating func addEdge(
         from sourceID: String, to targetID: String, kind: DependencyGraphEdgeKind
     ) {
-        edges.insert(DependencyGraphEdge(sourceID: sourceID, targetID: targetID, kind: kind))
+        let edge = DependencyGraphEdge(sourceID: sourceID, targetID: targetID, kind: kind)
+        guard !baseEdges.contains(edge) else { return }
+        edges.insert(edge)
     }
 
-    private mutating func seed(from semanticGraph: SemanticGraph) {
-        for entity in semanticGraph.entities {
-            guard let dependencyKind = dependencyNodeKind(for: entity.kind) else {
+    private mutating func indexBaseSemanticGraph() {
+        for entity in baseSemanticGraph.entities {
+            guard let dependencyKind = Self.dependencyNodeKind(for: entity.kind) else {
                 continue
             }
-            addNode(id: entity.id, kind: dependencyKind, label: entity.label)
-            registerDeclarationProjectionIfNeeded(entityID: entity.id, kind: dependencyKind, label: entity.label)
-        }
-
-        for relation in semanticGraph.relations {
-            guard let dependencyKind = dependencyEdgeKind(for: relation.kind) else {
-                continue
-            }
-            addEdge(from: relation.sourceID, to: relation.targetID, kind: dependencyKind)
+            registerDeclarationProjectionIfNeeded(
+                entityID: entity.id,
+                kind: dependencyKind,
+                label: entity.label
+            )
         }
     }
 
-    private func dependencyNodeKind(for kind: SemanticGraphEntityKind) -> DependencyGraphNodeKind? {
+    private func dependencyNode(for entity: SemanticGraphEntity) -> DependencyGraphNode? {
+        guard let dependencyKind = Self.dependencyNodeKind(for: entity.kind) else {
+            return nil
+        }
+        return DependencyGraphNode(id: entity.id, kind: dependencyKind, label: entity.label)
+    }
+
+    private static func dependencyNodeKind(for kind: SemanticGraphEntityKind) -> DependencyGraphNodeKind? {
         switch kind {
         case .file: return .file
         case .construct: return .construct
@@ -1456,7 +1485,7 @@ private struct GraphCollector {
         }
     }
 
-    private func dependencyEdgeKind(for kind: SemanticGraphRelationKind) -> DependencyGraphEdgeKind? {
+    private static func dependencyEdgeKind(for kind: SemanticGraphRelationKind) -> DependencyGraphEdgeKind? {
         switch kind {
         case .contains: return .contains
         case .conformsTo: return .conformsTo
@@ -1512,7 +1541,11 @@ private struct GraphCollector {
     }
 
     private mutating func addResolutionEdges() {
-        let typeNodes = nodesByID.values.filter { $0.kind == .typeReference }
+        let typeNodes =
+            baseSemanticGraph.entities.compactMap { dependencyNode(for: $0) }.filter {
+                $0.kind == .typeReference
+            }
+            + nodesByID.values.filter { $0.kind == .typeReference }
         for typeNode in typeNodes {
             guard let targetNodeIDs = resolutionIndex.declarationProjectionNodeIDsByName[typeNode.label] else {
                 continue
