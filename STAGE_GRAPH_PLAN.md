@@ -146,6 +146,131 @@ Or:
 So `ApplicationGraph` is not just “extra structure after parsing.” It is the
 resolved use-site interpretation of the program against declaration facts.
 
+## DeclarationGraph Inventory
+
+`DeclarationGraph` should be the place where declaration truth is registered and
+queryable.
+
+At minimum, it should know:
+
+- what declaration entities exist
+- what category each declaration belongs to
+- whether each declaration is core or project-defined
+- how declarations relate to each other
+- what declaration surfaces they expose
+
+This is not just “parsed syntax that happened to be declarations.” It is the
+resolved declaration world.
+
+### Declaration Categories It Should Hold
+
+Top-level and nested declaration entities:
+
+- core constructs
+- core enums
+- core protocols
+- project constructs
+- project enums
+- project protocols
+- macros
+- extensions
+- top-level callables
+- initializers
+- parameters
+- states
+- environments
+- bindings
+- deriveds
+- values
+- declaration/application facet declarations such as:
+  - `Init.Declaration`
+  - `Init.Application`
+  - `Function.Declaration`
+  - `Function.Application`
+  - `Parameter.Declaration`
+  - `Parameter.Application`
+
+### Metadata It Should Carry
+
+For each declaration entity, `DeclarationGraph` should be able to answer things
+like:
+
+- declaration name
+- declaration kind/category
+- whether it is `@core`
+- enclosing declaration or file/module
+- declared type information where relevant
+- declared labels/signatures where relevant
+- declaration surface/facet identity where relevant
+- protocol conformance state
+- macro attachments or carried macro semantics where relevant
+
+Examples:
+
+- construct `User` exists
+- protocol `Equatable` exists
+- enum `Result` exists
+- construct `String` is core
+- initializer `User.init(name:)` exists
+- callable `print(_:)` exists
+- `Init.Application` exists as a declaration-surface entity
+
+### Relations It Should Hold As First-Class Facts
+
+`DeclarationGraph` should own declaration-to-declaration relationships such as:
+
+- containment
+- nesting
+- declaration membership
+- conformance
+- extension of declaration surfaces
+- requirement declarations
+- satisfaction of requirements
+- declaration/application facet relationships
+- macro target relationships
+- carried macro relationships
+- literal bridge realization
+- declared type/member relationships
+
+Concrete examples:
+
+- construct `User` contains value `name`
+- construct `Int` conforms to protocol `ExpressibleByIntLiteral`
+- initializer `Int.init(literal:)` satisfies a protocol requirement
+- macro `literal` targets `Init`
+- `Init.Application` conforms to `SupportsRewrite`
+
+### Questions DeclarationGraph Should Answer
+
+`DeclarationGraph` should be the source for questions like:
+
+- does `User` exist?
+- is `String` core?
+- what members does `User` declare?
+- what protocols does `User` conform to?
+- what initializers does `User` have?
+- what callables are declared here?
+- what declaration/application facets exist for this target kind?
+- which macros are carried through this protocol/declaration relationship?
+- which declaration satisfies this requirement?
+- does this target surface conform to `SupportsRewrite`?
+
+### What It Should Not Primarily Hold
+
+`DeclarationGraph` should not primarily own:
+
+- body/use-site resolution
+- call-site dependency flow
+- alias flow
+- mutation behavior
+- runtime storage identity
+
+Those belong downstream in:
+
+- `ApplicationGraph`
+- later `MemoryGraph`
+- later `ReactivityGraph`
+
 ## Current State Audit
 
 ### What Is Better Than Before
