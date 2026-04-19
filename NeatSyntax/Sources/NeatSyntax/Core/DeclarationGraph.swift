@@ -69,6 +69,76 @@ public struct RealizedInitMacroTarget {
     }
 }
 
+public struct DeclaredMemberSurface: Hashable, Sendable {
+    public let ownerConstructName: String
+    public let name: String
+    public let kind: ApplicationGraphNodeKind
+    public let declaredTypeName: String?
+
+    public init(
+        ownerConstructName: String,
+        name: String,
+        kind: ApplicationGraphNodeKind,
+        declaredTypeName: String?
+    ) {
+        self.ownerConstructName = ownerConstructName
+        self.name = name
+        self.kind = kind
+        self.declaredTypeName = declaredTypeName
+    }
+
+    public var path: String {
+        "\(ownerConstructName).\(name)"
+    }
+}
+
+public struct DeclaredCallableSurface: Hashable, Sendable {
+    public let ownerConstructName: String?
+    public let name: String
+    public let labels: [String?]
+    public let parameterTypeNames: [String?]
+    public let returnTypeName: String?
+
+    public init(
+        ownerConstructName: String?,
+        name: String,
+        labels: [String?],
+        parameterTypeNames: [String?],
+        returnTypeName: String?
+    ) {
+        self.ownerConstructName = ownerConstructName
+        self.name = name
+        self.labels = labels
+        self.parameterTypeNames = parameterTypeNames
+        self.returnTypeName = returnTypeName
+    }
+
+    public var identity: String {
+        let owner = ownerConstructName ?? "<top-level>"
+        return "\(owner)::\(name)(\(labels.map { $0 ?? "_" }.joined(separator: ",")))"
+    }
+}
+
+public struct DeclaredInitializerSurface: Hashable, Sendable {
+    public let ownerConstructName: String
+    public let labels: [String?]
+    public let parameterTypeNames: [String?]
+
+    public init(
+        ownerConstructName: String,
+        labels: [String?],
+        parameterTypeNames: [String?]
+    ) {
+        self.ownerConstructName = ownerConstructName
+        self.labels = labels
+        self.parameterTypeNames = parameterTypeNames
+    }
+
+    public var identity: String {
+        "\(ownerConstructName)::init(\(labels.map { $0 ?? "_" }.joined(separator: ",")))"
+    }
+}
+
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
     public let constructsByName: [String: ConstructDeclaration]
@@ -235,6 +305,177 @@ public struct DeclarationGraph {
             result[value.name] = value.typeName
         }
         return result
+    }
+
+    public func declaredMemberSurfaces(
+        forConstruct named: String
+    ) -> [DeclaredMemberSurface] {
+        guard let declaration = constructsByName[named] else {
+            return []
+        }
+
+        var result: [DeclaredMemberSurface] = []
+        result.append(contentsOf: declaration.states.map {
+            DeclaredMemberSurface(
+                ownerConstructName: named,
+                name: $0.name,
+                kind: .state,
+                declaredTypeName: $0.type.displayName
+            )
+        })
+        result.append(contentsOf: declaration.environments.map {
+            DeclaredMemberSurface(
+                ownerConstructName: named,
+                name: $0.name,
+                kind: .environment,
+                declaredTypeName: $0.typeName
+            )
+        })
+        result.append(contentsOf: declaration.bindings.map {
+            DeclaredMemberSurface(
+                ownerConstructName: named,
+                name: $0.name,
+                kind: .binding,
+                declaredTypeName: $0.typeName
+            )
+        })
+        result.append(contentsOf: declaration.deriveds.map {
+            DeclaredMemberSurface(
+                ownerConstructName: named,
+                name: $0.name,
+                kind: .derived,
+                declaredTypeName: $0.typeName
+            )
+        })
+        result.append(contentsOf: declaration.values.map {
+            DeclaredMemberSurface(
+                ownerConstructName: named,
+                name: $0.name,
+                kind: .value,
+                declaredTypeName: $0.typeName
+            )
+        })
+        return result
+    }
+
+    public func declaresMember(
+        named memberName: String,
+        onConstruct named: String
+    ) -> Bool {
+        !declaredMemberSurfaces(forConstruct: named).filter { $0.name == memberName }.isEmpty
+    }
+
+    public func declaredMemberPaths(
+        forConstruct named: String
+    ) -> Set<String> {
+        guard constructsByName[named] != nil else {
+            return []
+        }
+
+        var paths: Set<String> = []
+
+        func collect(
+            constructName: String,
+            prefix: String,
+            activeTypes: Set<String>
+        ) {
+            guard !activeTypes.contains(constructName) else {
+                return
+            }
+
+            let nextActiveTypes = activeTypes.union([constructName])
+            for surface in declaredMemberSurfaces(forConstruct: constructName) {
+                let memberPath = "\(prefix).\(surface.name)"
+                paths.insert(memberPath)
+
+                guard
+                    let declaredTypeName = surface.declaredTypeName,
+                    hasConstruct(named: declaredTypeName),
+                    surface.kind == .binding || surface.kind == .value
+                else {
+                    continue
+                }
+
+                collect(
+                    constructName: declaredTypeName,
+                    prefix: memberPath,
+                    activeTypes: nextActiveTypes
+                )
+            }
+        }
+
+        collect(constructName: named, prefix: named, activeTypes: [])
+        return paths
+    }
+
+    public func declaresMemberPath(
+        _ memberPath: String,
+        onConstruct named: String
+    ) -> Bool {
+        declaredMemberPaths(forConstruct: named).contains(memberPath)
+    }
+
+    public func callableSurfaces(
+        onConstruct named: String
+    ) -> [DeclaredCallableSurface] {
+        guard let declaration = constructsByName[named] else {
+            return []
+        }
+
+        return declaration.callables.map { callable in
+            DeclaredCallableSurface(
+                ownerConstructName: named,
+                name: callable.name,
+                labels: callable.parameters.map(\.externalLabel),
+                parameterTypeNames: callable.parameters.map {
+                    $0.typeReference?.displayName ?? $0.slotName
+                },
+                returnTypeName: callable.returnType?.displayName
+            )
+        }
+    }
+
+    public func topLevelCallableSurfaces(
+        named callableName: String? = nil
+    ) -> [DeclaredCallableSurface] {
+        let names: [String]
+        if let callableName {
+            names = [callableName]
+        } else {
+            names = Array(callablesByName.keys).sorted()
+        }
+
+        return names.flatMap { name in
+            callablesByName[name, default: []].map { callable in
+                DeclaredCallableSurface(
+                    ownerConstructName: nil,
+                    name: callable.name,
+                    labels: callable.parameters.map(\.externalLabel),
+                    parameterTypeNames: callable.parameters.map {
+                        $0.typeReference?.displayName ?? $0.slotName
+                    },
+                    returnTypeName: callable.returnType?.displayName
+                )
+            }
+        }
+    }
+
+    public func initializerSurfaces(
+        onConstruct named: String
+    ) -> [DeclaredInitializerSurface] {
+        guard let declaration = constructsByName[named] else {
+            return []
+        }
+
+        return declaration.initializers.map { initializer in
+            DeclaredInitializerSurface(
+                ownerConstructName: named,
+                labels: initializer.parameters.map(\.externalLabel),
+                parameterTypeNames: initializer.parameters.map {
+                    $0.typeReference?.displayName ?? $0.slotName
+                }
+            )
+        }
     }
 
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {

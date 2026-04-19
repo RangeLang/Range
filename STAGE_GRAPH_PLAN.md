@@ -421,6 +421,61 @@ That is the smallest useful move because it:
 - reduces the gap between raw graph storage and declaration-side ownership
 - gives the next declaration categories an obvious implementation template
 
+## Declaration/Application Boundary Checklist
+
+The architectural rule going forward is:
+
+- `DeclarationGraph` owns what exists and what is valid in principle
+- `ApplicationGraph` owns what is used and whether that use is valid here
+
+This means:
+
+- declaration answers:
+  - does `User` exist?
+  - does `User.name` exist?
+  - what initializers does `User` declare?
+  - what callables does `User` declare?
+  - what member paths are valid on `User`?
+- application answers:
+  - is `user.name` being accessed here?
+  - does this use-site resolve `user` to `User`?
+  - is this access/call valid at this use site?
+  - what does this use depend on, mutate, alias, or call?
+
+### Implementation Sequence
+
+To reach that boundary cleanly, do the declaration/application work in this
+order:
+
+1. Add declaration-side queries for valid member paths and callable/init
+   surfaces.
+2. Move more construct/member inventory ownership into `DeclarationGraph`.
+3. Make application validation call declaration queries for member/call
+   existence instead of reconstructing those facts locally.
+4. Keep `ApplicationGraph` focused on:
+   - use-site resolution
+   - access validation
+   - dependency/call/alias/mutation edges
+5. Only then derive `MemoryGraph` from declaration facts plus application facts.
+
+### Immediate Next Step
+
+The next concrete implementation slice is:
+
+- add declaration-side member-path queries
+- add declaration-side callable/init surface queries
+- make those available as direct `DeclarationGraph` APIs
+
+That gives the compiler a clear declaration-backed answer to questions like:
+
+- does `User.name` exist?
+- what members are valid on `User`?
+- what callable names/signatures exist on `User`?
+- what initializer signatures exist on `User`?
+
+Once those exist, application-side validation can become thinner and more
+explicitly declaration-backed.
+
 ## Current State Audit
 
 ### What Is Better Than Before

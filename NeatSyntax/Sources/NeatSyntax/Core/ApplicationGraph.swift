@@ -10,7 +10,7 @@ public struct ParsedSourceFile {
     }
 }
 
-public enum ApplicationGraphNodeKind: String {
+public enum ApplicationGraphNodeKind: String, Sendable {
     case file
     case construct
     case enumeration
