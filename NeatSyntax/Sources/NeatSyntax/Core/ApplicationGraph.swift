@@ -1044,6 +1044,7 @@ private struct GraphCollector {
     private let baseEdges: Set<ApplicationGraphEdge>
     private var nodesByID: [String: ApplicationGraphNode] = [:]
     private var edges: Set<ApplicationGraphEdge> = []
+    private let registryView: DeclarationRegistryView
     private let dependencySourceView: DependencySourceView
     private var resolutionIndex = DependencyResolutionIndex()
     private var flowState = DependencyFlowState()
@@ -1063,6 +1064,7 @@ private struct GraphCollector {
                 )
             }
         )
+        self.registryView = declarationGraph.registryView
         self.dependencySourceView = declarationGraph.dependencySourceView
     }
 
@@ -1093,14 +1095,15 @@ private struct GraphCollector {
         case .enumeration, .protocolDefinition, .macro, .extensions:
             return
         case .module(let module):
-            for state in module.states {
+            let topLevelStates = registryView.topLevelStates(inFilePath: parsedFile.path)
+            for state in topLevelStates {
                 analyzeStateDeclaration(state, parentID: fileID)
             }
             for declaration in module.constructs {
                 analyzeConstructDeclaration(declaration, parentID: fileID)
             }
             let moduleScope = MemoryScope(
-                symbols: Dictionary(uniqueKeysWithValues: module.states.map { state in
+                symbols: Dictionary(uniqueKeysWithValues: topLevelStates.map { state in
                     (state.name, "\(fileID)/state:\(state.name)")
                 })
             )
@@ -1109,10 +1112,14 @@ private struct GraphCollector {
             }
 
             if let mainBlock = module.mainBlock {
-                analyzeMainBlock(mainBlock, parentID: fileID, module: module)
+                analyzeMainBlock(
+                    mainBlock,
+                    parentID: fileID,
+                    topLevelStates: topLevelStates
+                )
             }
         case .mainBlock(let mainBlock):
-            analyzeMainBlock(mainBlock, parentID: fileID, module: nil)
+            analyzeMainBlock(mainBlock, parentID: fileID, topLevelStates: [])
         }
     }
 
@@ -1354,14 +1361,12 @@ private struct GraphCollector {
     private mutating func analyzeMainBlock(
         _ mainBlock: MainBlockNode,
         parentID: String,
-        module: ModuleFileNode?
+        topLevelStates: [StateDeclaration]
     ) {
         let mainID = "\(parentID)/main"
         var scope = MemoryScope()
-        if let module {
-            for state in module.states {
-                scope.symbols[state.name] = "\(parentID)/state:\(state.name)"
-            }
+        for state in topLevelStates {
+            scope.symbols[state.name] = "\(parentID)/state:\(state.name)"
         }
         analyzeStatements(mainBlock.body, ownerID: mainID, scope: scope)
     }
