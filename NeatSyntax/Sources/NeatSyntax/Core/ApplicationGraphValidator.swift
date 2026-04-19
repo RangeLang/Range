@@ -74,6 +74,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
     private struct CallLabelValidationContext {
         let currentConstructName: String?
         var localCallablesByName: [String: [CallLabelCandidate]]
+        var accessibleConstructTypesByName: [String: String]
     }
 
     private struct CallLabelValidationEnvironment {
@@ -326,7 +327,8 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                         environment: environment,
                         context: CallLabelValidationContext(
                             currentConstructName: nil,
-                            localCallablesByName: [:]
+                            localCallablesByName: [:],
+                            accessibleConstructTypesByName: [:]
                         ),
                         fileName: fileName
                     )
@@ -339,7 +341,11 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                         environment: environment,
                         context: CallLabelValidationContext(
                             currentConstructName: nil,
-                            localCallablesByName: localCallableMap([callable])
+                            localCallablesByName: localCallableMap([callable]),
+                            accessibleConstructTypesByName: parameterConstructTypes(
+                                callable.parameters,
+                                declarationGraph: declarationGraph
+                            )
                         ),
                         fileName: fileName
                     )
@@ -358,7 +364,8 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                     environment: environment,
                     context: CallLabelValidationContext(
                         currentConstructName: nil,
-                        localCallablesByName: [:]
+                        localCallablesByName: [:],
+                        accessibleConstructTypesByName: [:]
                     ),
                     fileName: fileName
                 )
@@ -375,7 +382,10 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
     ) throws {
         let constructContext = CallLabelValidationContext(
             currentConstructName: declaration.name,
-            localCallablesByName: [:]
+            localCallablesByName: [:],
+            accessibleConstructTypesByName: environment.declarationGraph.constructTypedMemberNames(
+                forConstruct: declaration.name
+            )
         )
 
         for derived in declaration.deriveds {
@@ -407,7 +417,14 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                     environment: environment,
                     context: CallLabelValidationContext(
                         currentConstructName: declaration.name,
-                        localCallablesByName: localCallableMap([callable])
+                        localCallablesByName: localCallableMap([callable]),
+                        accessibleConstructTypesByName: constructContext.accessibleConstructTypesByName
+                            .merging(
+                                parameterConstructTypes(
+                                    callable.parameters,
+                                    declarationGraph: environment.declarationGraph
+                                )
+                            ) { current, _ in current }
                     ),
                     fileName: fileName
                 )
@@ -454,6 +471,12 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                     context: context,
                     fileName: fileName
                 )
+                if let constructTypeName = constructTypeName(
+                    from: declaration.type,
+                    declarationGraph: environment.declarationGraph
+                ) {
+                    context.accessibleConstructTypesByName[declaration.name] = constructTypeName
+                }
             case .localCallable(let declaration):
                 context.localCallablesByName[declaration.name, default: []].append(
                     CallLabelCandidate(
@@ -466,7 +489,8 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                     environment: environment,
                     context: CallLabelValidationContext(
                         currentConstructName: context.currentConstructName,
-                        localCallablesByName: context.localCallablesByName
+                        localCallablesByName: context.localCallablesByName,
+                        accessibleConstructTypesByName: context.accessibleConstructTypesByName
                     ),
                     fileName: fileName
                 )
@@ -604,8 +628,10 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         switch expression {
         case .call(let name, let arguments):
             if let (baseName, memberName) = splitMemberName(name),
-                baseName == "self",
-                let currentConstructName = context.currentConstructName
+                let constructName =
+                    baseName == "self"
+                    ? context.currentConstructName
+                    : context.accessibleConstructTypesByName[baseName]
             {
                 let candidates = callLabelCandidates(
                     for: name,
@@ -615,7 +641,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
                 guard let candidates else {
                     throw SemanticValidationError(
-                        "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) is invalid because \(currentConstructName).\(memberName) is not a declared callable surface."
+                        "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) is invalid because \(constructName).\(memberName) is not a declared callable surface."
                     )
                 }
 
@@ -734,7 +760,26 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 context: context,
                 fileName: fileName
             )
-        case .integer, .double, .string, .boolean, .nilLiteral, .identifier, .bindingReference:
+        case .identifier(let name):
+            if let (baseName, memberName) = splitMemberName(name),
+                let constructName =
+                    baseName == "self"
+                    ? context.currentConstructName
+                    : context.accessibleConstructTypesByName[baseName]
+            {
+                let declaredPath = "\(constructName).\(memberName)"
+                guard
+                    environment.declarationGraph.declaresMemberPath(
+                        declaredPath,
+                        onConstruct: constructName
+                    )
+                else {
+                    throw SemanticValidationError(
+                        "Access \(name) in \(fileName) is invalid because \(declaredPath) is not a declared member path."
+                    )
+                }
+            }
+        case .integer, .double, .string, .boolean, .nilLiteral, .bindingReference:
             break
         }
     }
@@ -767,6 +812,12 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         if let (baseName, memberName) = splitMemberName(name) {
             if baseName == "self", let currentConstructName = context.currentConstructName {
                 let candidates = environment.declarationGraph.callableSurfaces(onConstruct: currentConstructName)
+                    .filter { $0.name == memberName }
+                    .map { CallLabelCandidate(name: $0.name, parameters: $0.parameters) }
+                return candidates.isEmpty ? nil : candidates
+            }
+            if let constructName = context.accessibleConstructTypesByName[baseName] {
+                let candidates = environment.declarationGraph.callableSurfaces(onConstruct: constructName)
                     .filter { $0.name == memberName }
                     .map { CallLabelCandidate(name: $0.name, parameters: $0.parameters) }
                 return candidates.isEmpty ? nil : candidates
@@ -889,6 +940,50 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         }
 
         return (base, member)
+    }
+
+    private func constructTypeName(
+        from typeReference: TypeReference?,
+        declarationGraph: DeclarationGraph
+    ) -> String? {
+        guard let typeReference else {
+            return nil
+        }
+
+        let typeName: String?
+        switch typeReference {
+        case .named(let name):
+            typeName = name
+        case .generic(let base, _):
+            return constructTypeName(from: base, declarationGraph: declarationGraph)
+        case .member:
+            typeName = typeReference.displayName
+        case .array, .function, .optional, .variadic:
+            typeName = nil
+        }
+
+        guard let typeName, declarationGraph.hasConstruct(named: typeName) else {
+            return nil
+        }
+
+        return typeName
+    }
+
+    private func parameterConstructTypes(
+        _ parameters: [NeatFunctionParameter],
+        declarationGraph: DeclarationGraph
+    ) -> [String: String] {
+        Dictionary(
+            uniqueKeysWithValues: parameters.compactMap { parameter in
+                guard let typeName = constructTypeName(
+                    from: parameter.typeReference,
+                    declarationGraph: declarationGraph
+                ) else {
+                    return nil
+                }
+                return (parameter.localName, typeName)
+            }
+        )
     }
 
     private func validateBindingReferences(
