@@ -2,116 +2,173 @@
 
 ## Objective
 
-Collapse the current split between `DeclarationGraph` and `DependencyGraph` into
-one staged semantic graph substrate that is enriched over time.
+Center the compiler on a graph-first architecture with one root graph substrate
+and progressively derived domain views.
+
+The current intended stack is:
+
+- `ProgramGraph`
+- `DeclarationGraph`
+- `ApplicationGraph`
+- `MemoryGraph`
+- `ReactivityGraph`
+
+Where:
+
+- `ProgramGraph` is the canonical graph storage root
+- `DeclarationGraph` is the declaration-domain graph view and enrichment layer
+- `ApplicationGraph` is the application/use-site graph view and enrichment layer
+- `MemoryGraph` is a later layer derived from declaration + application facts
+- `ReactivityGraph` is a later layer derived from memory facts
 
 The key rule is:
 
 - the compiler should progressively read the program into more settled meaning
 - later stages should enrich earlier graph facts, not rebuild parallel models
-- `NeatCore` should remain the language-visible source of truth for macro target
-  surfaces such as `Init`, `Init.Declaration`, and `Init.Application`
+- `NeatCore` should remain the language-visible source of truth for declaration
+  and application surfaces such as `Init`, `Init.Declaration`, and
+  `Init.Application`
 
-This plan is intended to align Swift-hosted compiler internals with the same
-declaration/application model exposed by `NeatCore`, reduce bespoke compiler
-logic, and make the self-hosting path cleaner.
+## Current Architecture
 
-## Current State Audit
+### What Exists In Code Now
 
-### What Exists Today
+Core files:
 
-- `DeclarationGraph` in
-  `NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraph.swift`
-- `DependencyGraph` in
-  `NeatSyntax/Sources/NeatSyntax/Core/DependencyGraph.swift`
-- declaration-driven macro target docs in
-  `NeatSyntax/Sources/NeatSyntax/Macros/Macros.Context.md`
-- declaration-graph intent docs in
-  `NeatSyntax/Sources/NeatSyntax/GraphBindings/MemoryGraph/DeclarationGraph.md`
+- [ProgramGraph.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ProgramGraph.swift)
+- [DeclarationGraph.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraph.swift)
+- [ApplicationGraph.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ApplicationGraph.swift)
+- [CompiledProgram.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgram.swift)
+- [CompiledProgramValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgramValidator.swift)
 
-### What The Current Pipeline Actually Does
+Macro graph view files:
 
-The current pipeline already behaves like staged reading:
+- [DeclarationGraph+MacroViewModels.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraph+MacroViewModels.swift)
+- [DeclarationGraph+MacroViews.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraph+MacroViews.swift)
+
+Supporting docs:
+
+- [Macros.Context.md](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Macros/Macros.Context.md)
+- [DeclarationGraph.md](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/MemoryGraph/DeclarationGraph.md)
+
+### Current Roles
+
+`ProgramGraph`
+
+- owns canonical graph entity/relation vocabulary and root storage
+- is the graph-root concept the rest of the stack should hang off
+
+`DeclarationGraph`
+
+- owns declaration-side graph construction and declaration query views
+- exposes `programGraph`
+- exposes declaration-backed views such as syntax/member/operator/macro views
+- is the declaration-domain interpretation layer over `ProgramGraph`
+
+`ApplicationGraph`
+
+- is the application/use-site graph projection built from:
+  - `DeclarationGraph` facts
+  - expanded files
+  - application-local flow and resolution analysis
+- is the successor to the old dependency graph concept
+
+`CompiledProgram`
+
+- is not a graph
+- it is the pipeline/container artifact
+- it carries:
+  - source inputs
+  - parsed files
+  - expanded files
+  - `declarationGraph`
+  - derived accessors for `programGraph` and `applicationGraph`
+
+This split is important:
+
+- `ProgramGraph` is the semantic graph root
+- `CompiledProgram` is the compiler pipeline result object
+
+### Current Pipeline
+
+The current pipeline already behaves like staged graph enrichment:
 
 1. parse `NeatCore`
 2. discover project declarations with a lighter parse
-3. build an early declaration-level view
-4. parse project files with declaration-level help
+3. build an early declaration graph
+4. parse project files with declaration-backed help
 5. macro-expand parsed files
-6. rebuild declaration-level semantics from expanded files
+6. rebuild declaration graph semantics from expanded files
 7. validate
-8. optionally build a structural dependency graph
+8. derive an application graph from expanded files plus declaration facts
 
-This means the compiler already needs staged enrichment. The main issue is that
-those stages are currently represented by multiple overlapping models rather
-than one shared graph substrate.
+This means staged enrichment is already real in the compiler. The work now is
+to keep making the graph stack explicit and reduce parallel models.
 
-### Where The Current Split Is Weak
+## Graph Domains
 
-- `DeclarationGraph` is still mostly AST-shaped declarations plus a few
-  compiler-owned derived tables.
-- `DependencyGraph` already carries declaration structure such as containment,
-  conformance, macro application, and macro target edges.
-- macro support is still partly bespoke through collector functions and
-  resolver-style helpers.
-- `MacroExpander` still owns graph-derived state and semantic glue that should
-  come from graph views.
+There is a larger language graph domain conceptually, but we do not need a
+concrete `LanguageGraph` type right now.
 
-### Why The Split Happened
+The practical structure is:
 
-The original split was useful as a bootstrap convenience:
+- `ProgramGraph` as the root graph
+- declaration/application as one major semantic domain
+- memory/reactivity as one later runtime/behavior domain
 
-- declaration semantics needed to exist before full body/dependency analysis
-- Swift-side compiler code kept AST declarations as the easiest internal truth
-- `NeatCore` defined the language-facing model, but Swift internals did not
-  fully align with it
+Operational dependency order:
 
-That was acceptable early on, but it is now a limiting factor for macro work,
-graph clarity, and self-hosting alignment.
+- `ProgramGraph` -> `DeclarationGraph`
+- `DeclarationGraph` -> `ApplicationGraph`
+- `DeclarationGraph` + `ApplicationGraph` -> `MemoryGraph`
+- `MemoryGraph` -> `ReactivityGraph`
 
-## Target Model
+Conceptually, declaration and application are paired halves of the language
+model. Operationally, application depends on declaration because use-site
+resolution only makes sense after declaration facts exist.
 
-Use one semantic graph substrate with staged enrichment passes.
+## Why Application Depends On Declaration
 
-`DeclarationGraph` should become the canonical semantic graph of the program.
-`DependencyGraph` is not a sibling source of truth in that model. It is a
-derived projection or renderer over declaration-graph entities and relations,
-plus any late dependency-analysis facts that have not yet been absorbed into
-the shared substrate.
+This is the validation boundary.
 
-The split that should remain is:
+Examples:
 
-- declaration stage
-- dependency stage
-- memory/reactivity stage
+- declaration says `User` has member `name`
+- application says `user.firstName`
+- boundary validation says the member does not exist
 
-The split that should go away is:
+Or:
 
-- separate core storage models for declaration semantics and dependency facts
+- declaration says `User.name: String`
+- application says `User(name: 3)`
+- boundary validation says the application is type-incompatible
 
-### Core Principle
+So `ApplicationGraph` is not just “extra structure after parsing.” It is the
+resolved use-site interpretation of the program against declaration facts.
 
-The graph starts with simple structural nodes and edges. Later passes add
-meaning:
+## Current State Audit
 
-- declaration meaning
-- conformance meaning
-- macro realization meaning
-- expansion meaning
-- dependency/use meaning
-- memory/reactivity meaning
+### What Is Better Than Before
 
-This is procedural reading, not replacement.
+- old `DependencyGraph` naming is gone from the active source surface
+- the root graph vocabulary lives in `ProgramGraph.swift`
+- declaration-side graph logic lives in `DeclarationGraph.swift`
+- application-side graph logic lives in `ApplicationGraph.swift`
+- macro realization and rewrite-surface logic now lives on graph-backed context
+  and graph-backed macro views rather than in expander-owned static state
+- `CompiledProgram` is now clearly the pipeline/container layer rather than a
+  graph root
 
-### Canonical Graph Rule
+### What Is Still Transitional
 
-- `DeclarationGraph` is the true source of program graph facts.
-- dependency facts are declaration-graph relations, not a separate peer graph
-  model.
-- any remaining `DependencyGraph` type should be treated as a compatibility
-  projection or renderer over canonical graph kinds.
-- transient analysis artifacts may still exist during dependency analysis, but
-  they should not redefine the canonical graph vocabulary.
+- `DeclarationGraph` still carries more responsibility than a pure view because
+  it also builds the current root graph facts
+- `ApplicationGraph` still owns some application-local analysis artifacts such
+  as local flow/indexing state
+- `MemoryGraph` and `ReactivityGraph` are architectural targets, not active
+  code yet
+- some docs and comments elsewhere in the repo may still reflect the older
+  declaration-vs-dependency phrasing
 
 ## Stage Graph Model
 
@@ -163,7 +220,7 @@ Core edges:
 - `has_facet`
 - `references_type`
 
-This stage should be enough to answer:
+This stage should answer:
 
 - what exists?
 - what is nested under what?
@@ -192,13 +249,6 @@ Add:
 - protocol-carried macro relations
 - capability relations such as `SupportsRewrite`
 
-New edges or normalized relations:
-
-- `satisfies_requirement`
-- `inherits_macro`
-- `supports_capability`
-- `facet_of`
-
 This stage should answer:
 
 - which declaration satisfies this protocol requirement?
@@ -221,28 +271,26 @@ Derived views:
 
 - `LiteralBridgeView`
 - `InitMacroTargetView`
-- `AttachedMacroView`
+- `MacroRealizationView`
 - `RewriteSurfaceView`
 - `MemberResolutionView`
 - `OperatorSignatureView`
-- `MacroExpansionSignatureView`
+- `MacroExpansionContext`
 
 This stage should answer:
 
 - what literal bridges exist?
 - what init macro targets are realized?
-- what parameter, function, init, or construct macros apply to this callable or declaration?
+- what parameter, function, init, or construct macros apply to this declaration?
 - what rewrite-capable member paths exist from a target surface?
 - what member and callable signatures are available?
-
-This is where current ad hoc collector logic should move.
 
 ### Stage 4: Expansion
 
 Input:
 
 - parsed files
-- realization-stage graph views
+- declaration/realization graph views
 
 Purpose:
 
@@ -251,10 +299,10 @@ Purpose:
 Expansion should consume:
 
 - macro declarations
-- applicable attachments
+- realized macro targets
 - target surfaces
 - rewrite-capable paths
-- realized declaration/application targets
+- explicit macro expansion context
 
 Expansion should own only:
 
@@ -266,11 +314,11 @@ Expansion should own only:
 Expansion should not own:
 
 - target surface discovery
-- attachment discovery
+- macro realization discovery
 - protocol carry discovery
 - rewrite capability discovery
 
-### Stage 5: Dependency
+### Stage 5: Application
 
 Input:
 
@@ -279,7 +327,7 @@ Input:
 
 Purpose:
 
-- record usage and dependency relationships in bodies
+- record usage and application relationships in bodies
 
 Add:
 
@@ -294,43 +342,65 @@ This stage should answer:
 - what does this call resolve to?
 - what declarations does this body depend on?
 - which local values alias or depend on outer declarations?
+- which application paths are valid against declaration facts?
 
-This is where the current `DependencyGraph` should land as a view or projection,
-not as a separate core model.
+This is the current role of `ApplicationGraph`.
 
 ### Stage 6: Memory
 
 Input:
 
-- expanded files
-- declaration/realization/dependency graph layers
+- declaration graph
+- application graph
 
 Purpose:
 
-- ownership, mutation, aliasing, and reactivity
+- ownership, mutation, aliasing, and storage identity
 
-Add:
+Likely facts:
 
 - `mutates`
 - `aliases`
 - `owns`
+- `stores`
+
+This should be treated as a downstream layer derived from declaration +
+application facts rather than invented as a separate root model.
+
+### Stage 7: Reactivity
+
+Input:
+
+- memory graph
+
+Purpose:
+
+- observation, invalidation, and propagation
+
+Likely facts:
+
 - `observes`
+- `invalidates`
+- `recomputes`
 
-This may remain a later specialized layer even if the underlying storage is
-shared.
+## Views, Not Parallel Root Models
 
-## Views, Not Separate Graph Types
+The compiler should expose domain views over one graph root, not rebuild
+parallel top-level graph truths.
 
-Instead of separate top-level graph systems, expose views over one substrate:
+The intended interpretation layers are:
 
-- `StructuralView`
-- `DeclarationView`
-- `MacroView`
-- `RewriteSurfaceView`
-- `DependencyView`
-- `MemoryView`
+- `ProgramGraph`
+- `DeclarationGraph`
+- `ApplicationGraph`
+- later `MemoryGraph`
+- later `ReactivityGraph`
 
-The CLI can render whichever projection is relevant.
+And the non-graph container is:
+
+- `CompiledProgram`
+
+That distinction should remain explicit.
 
 ## Alignment With NeatCore
 
@@ -350,7 +420,7 @@ Examples:
 The graph should treat these as real declaration-surface entities and
 relationships, not as hidden compiler conventions.
 
-This is important for:
+This matters for:
 
 - macro surface correctness
 - reduced semantic drift between compiler internals and `NeatCore`
@@ -361,129 +431,117 @@ This is important for:
 
 ### Current Pipeline Mapping
 
-The existing compiler pipeline already maps fairly well to the stage model:
+The existing compiler pipeline maps to the graph stages like this:
 
-- `discoverProjectDeclarationFiles` -> Stage 1 seed input
-- early `DeclarationGraph(files: ...)` -> Stages 1-2 partial
-- `MacroExpander.expand(files:)` -> Stage 4
-- final `DeclarationGraph(files: expandedFiles)` -> Stages 2-3 settled
-- `DependencyGraphBuilder().build(files: expandedFiles)` -> Stage 5
+- `discoverProjectDeclarationFiles` -> structural seed input
+- early `DeclarationGraph(files: ...)` -> structural + declaration partial
+- `MacroExpander.expand(files:)` -> expansion
+- final `DeclarationGraph(files: expandedFiles)` -> declaration + realization
+- `ApplicationGraphBuilder().build(...)` -> application
 
-The ordering is not the main problem. The storage model split is.
+The ordering is already mostly correct. The main job is to keep tightening the
+graph boundaries and stop inventing parallel semantic stores.
 
-### Current Types That Should Become Graph Views
+### Current Types That Should Keep Becoming Graph Views
 
-These are useful, but they should become graph-backed views instead of parallel
-semantic models:
+These are useful, but they should remain graph-backed views rather than
+semi-independent semantic models:
 
 - `DeclarationSyntaxResolver`
 - `DeclarationMemberResolver`
 - `DeclarationOperatorResolver`
 - `DeclarationMacroExpansionResolver`
-- `collectRealizedLiteralBridges`
-- `collectRealizedInitMacroTargets`
-- `collectAttachedParameterCallables`
-- `collectAttachedFunctionCallables`
+- macro realization views in `DeclarationGraph+MacroViews.swift`
+- rewrite-surface validation and decoding in
+  `DeclarationGraph+MacroViewModels.swift`
 
 ### Current File Roles
 
+- `ProgramGraph.swift`
+  owns root graph vocabulary and storage concepts
 - `DeclarationGraph.swift`
-  should move toward graph storage plus reusable semantic views
-- `DependencyGraph.swift`
-  should become a projection or rendering-oriented view of the shared graph
-- `MacroExpander.swift`
-  should consume explicit graph context rather than storing graph-derived static
-  state
-- `SemanticProgram.swift`
-  should orchestrate staged enrichment rather than bouncing between separate
-  models
+  owns declaration graph construction and declaration-side query views
+- `ApplicationGraph.swift`
+  owns application graph construction and application-side projection logic
+- `CompiledProgram.swift`
+  orchestrates pipeline artifacts and exposes graph accessors
+- `CompiledProgramValidator.swift`
+  validates the compiled program using declaration/application graph facts
 
 ## Migration Plan
 
-### Phase 1: Name The Architecture Correctly
+### Phase 1: Establish The Root Graph Stack
 
-- Keep `DeclarationGraph` as the semantic name for the main graph substrate.
-- Reframe `DependencyGraph` as a dependency projection over the same graph.
-- Update docs so they describe one staged semantic graph rather than two
-  competing graph models.
+Completed or largely completed:
 
-### Phase 2: Split Storage From Views
+- introduce `ProgramGraph` as the root graph type
+- split `DeclarationGraph` and `ApplicationGraph` into separate files/concepts
+- make `CompiledProgram` the explicit container artifact rather than another
+  graph root
 
-- Refactor the current `DeclarationGraph` into:
-  - base graph storage
-  - graph-backed derived views
-- Stop letting resolver structs act like semi-independent semantic stores.
+### Phase 2: Keep Declaration Graph As The Source For Declaration Facts
 
-### Phase 3: Promote Macros To First-Class Graph Facts
+Continue:
 
-- Model macro declarations and macro applications as first-class graph entities.
-- Represent target relations, attachment relations, carried-macro relations, and
-  realized macro-target relations explicitly.
-- Replace current ad hoc macro collectors with graph views.
+- keep moving declaration-side semantic queries behind `DeclarationGraph`
+- keep reducing declaration reconstruction elsewhere
+- keep making macro-related declaration/application surfaces graph-derived
 
-### Phase 4: Make Rewrite Surfaces Fully Graph-Derived
+### Phase 3: Keep Application Graph Downstream From Declaration Graph
 
-- Expose a graph-backed `RewriteSurfaceView`.
-- Derive paths such as `target.application.rewrite` from target-surface
-  declarations and capability conformance.
-- Remove remaining hardcoded or target-kind-specific rewrite-surface logic from
-  expansion.
+Continue:
 
-### Phase 5: Make MacroExpander A Pure Consumer
+- build application/use-site facts from:
+  - expanded files
+  - declaration graph facts
+  - application-local flow analysis
+- keep application-local transient analysis state out of declaration storage
+- keep stable declaration facts in declaration views
 
-- Build an explicit `MacroExpansionContext` from graph views.
-- Pass that context through expansion instead of using static mutable state.
-- Remove graph-discovery logic from the expander.
+### Phase 4: Prepare The Memory Graph Boundary
 
-### Phase 6: Collapse DependencyGraph Into A View
+Next major design step:
 
-- Rebuild the current dependency graph output from the shared graph substrate.
-- Keep CLI rendering and structural visualization, but make them projections
-  rather than separate graph construction systems.
-- Keep projection-local node identity, resolution indexing, and flow inference
-  state inside the dependency layer when those facts are created by dependency
-  analysis rather than declared by the program.
-- Move only stable declaration facts and reusable declaration queries behind
-  `DeclarationGraph` views; do not push dependency-local alias or inferred
-  instance typing state into declaration storage.
+- identify which declaration + application facts should feed `MemoryGraph`
+- define stable memory-domain relations without prematurely introducing another
+  parallel storage model
 
-### Phase 7: Reassess Memory Graph Layering
+### Phase 5: Prepare The Reactivity Graph Boundary
 
-- Decide whether the memory graph should remain a separate late-layer model or
-  become another view/enrichment phase over the same substrate.
-- Do not force this collapse too early; declaration and macro alignment is the
-  higher-priority architectural debt.
+Later:
+
+- derive reactivity from memory facts
+- avoid coupling reactivity directly to parser- or AST-shaped structures
 
 ## Immediate Next Slice
 
 If continuing immediately, implement in this order:
 
-1. document the unified staged graph architecture in compiler docs
-2. introduce a graph-backed macro view layer for:
-   - target-kind macro lookup
-   - realized init macro targets
-   - rewrite-capable target paths
-3. replace `MacroExpander` static state with explicit expansion context
-4. decide whether `DependencyGraph` storage should be merged into
-   `DeclarationGraph` internals or rebuilt as a projection over shared graph
-   entities
+1. keep declaration/application architecture docs aligned with the current code
+2. continue pulling declaration-side semantic queries behind `DeclarationGraph`
+3. decide the first concrete `MemoryGraph` inputs from:
+   - declaration facts
+   - application facts
+4. design memory-domain relations before adding storage
 
 ## Decision
 
 Keep the stage separation.
 
-Collapse the storage split.
+Keep the graph stack explicit.
 
-The compiler should have:
+Use:
 
-- one staged semantic graph substrate
-- multiple enrichment passes
-- multiple projections/views
+- `ProgramGraph` as the root graph substrate
+- `DeclarationGraph` as the declaration-domain graph
+- `ApplicationGraph` as the application-domain graph
+- `CompiledProgram` as the pipeline/container artifact
 
-It should not keep:
+Do not reintroduce:
 
-- one declaration-semantic model
-- another dependency graph model
-- plus separate resolver mini-models
+- a second peer root graph model
+- a dependency-named graph concept as a separate semantic authority
+- graph-independent resolver mini-models where graph-backed views will do
 
-That duplication is the real source of drift and unnecessary compiler code.
+That duplication is what causes drift, unnecessary compiler code, and weaker
+alignment with `NeatCore`.
