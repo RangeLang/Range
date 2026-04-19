@@ -603,7 +603,28 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
     ) throws {
         switch expression {
         case .call(let name, let arguments):
-            if let candidates = callLabelCandidates(
+            if let (baseName, memberName) = splitMemberName(name),
+                baseName == "self",
+                let currentConstructName = context.currentConstructName
+            {
+                let candidates = callLabelCandidates(
+                    for: name,
+                    environment: environment,
+                    context: context
+                )
+
+                guard let candidates else {
+                    throw SemanticValidationError(
+                        "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) is invalid because \(currentConstructName).\(memberName) is not a declared callable surface."
+                    )
+                }
+
+                guard candidates.contains(where: { callArguments(arguments, match: $0.parameters) }) else {
+                    throw SemanticValidationError(
+                        "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) does not match any available parameter labels. Expected one of: \(renderExpectedCallShapes(for: candidates))."
+                    )
+                }
+            } else if let candidates = callLabelCandidates(
                 for: name,
                 environment: environment,
                 context: context
