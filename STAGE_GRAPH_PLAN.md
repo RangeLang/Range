@@ -424,6 +424,12 @@ semantic models:
 - Rebuild the current dependency graph output from the shared graph substrate.
 - Keep CLI rendering and structural visualization, but make them projections
   rather than separate graph construction systems.
+- Keep projection-local node identity, resolution indexing, and flow inference
+  state inside the dependency layer when those facts are created by dependency
+  analysis rather than declared by the program.
+- Move only stable declaration facts and reusable declaration queries behind
+  `DeclarationGraph` views; do not push dependency-local alias or inferred
+  instance typing state into declaration storage.
 
 ### Phase 7: Reassess Memory Graph Layering
 
