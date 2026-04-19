@@ -29,12 +29,39 @@ public enum DependencyGraphNodeKind: String {
     case member
     case typeReference
     case macroApplication
+
+    public var semanticKind: SemanticGraphEntityKind {
+        switch self {
+        case .file: return .file
+        case .construct: return .construct
+        case .enumeration: return .enumeration
+        case .protocolDefinition: return .protocolDefinition
+        case .macro: return .macro
+        case .typeExtension: return .typeExtension
+        case .mainBlock: return .mainBlock
+        case .state: return .state
+        case .environment: return .environment
+        case .binding: return .binding
+        case .derived: return .derived
+        case .value: return .value
+        case .initializer: return .initializer
+        case .function: return .function
+        case .parameter: return .parameter
+        case .member: return .member
+        case .typeReference: return .typeReference
+        case .macroApplication: return .macroApplication
+        }
+    }
 }
 
 public struct DependencyGraphNode: Hashable {
     public let id: String
     public let kind: DependencyGraphNodeKind
     public let label: String
+
+    public var semanticKind: SemanticGraphEntityKind {
+        kind.semanticKind
+    }
 }
 
 public enum DependencyGraphEdgeKind: String {
@@ -50,12 +77,33 @@ public enum DependencyGraphEdgeKind: String {
     case mutates
     case aliases
     case calls
+
+    public var semanticKind: SemanticGraphRelationKind {
+        switch self {
+        case .contains: return .contains
+        case .conformsTo: return .conformsTo
+        case .extends: return .extends
+        case .referencesType: return .referencesType
+        case .referencesIdentity: return .referencesIdentity
+        case .appliesMacro: return .appliesMacro
+        case .targetsMacro: return .targetsMacro
+        case .resolvesTo: return .resolvesTo
+        case .dependsOn: return .dependsOn
+        case .mutates: return .mutates
+        case .aliases: return .aliases
+        case .calls: return .calls
+        }
+    }
 }
 
 public struct DependencyGraphEdge: Hashable {
     public let sourceID: String
     public let targetID: String
     public let kind: DependencyGraphEdgeKind
+
+    public var semanticKind: SemanticGraphRelationKind {
+        kind.semanticKind
+    }
 }
 
 public struct DependencyGraph {
@@ -1580,8 +1628,7 @@ private struct GraphCollector {
             return
         }
         guard
-            let declaration = dependencySourceView.construct(named: constructName),
-            let callable = declaration.callables.first(where: { $0.name == methodName }),
+            let callable = dependencySourceView.callable(named: methodName, onConstruct: constructName),
             let callableNodeID = resolutionIndex.constructCallableProjectionNodeIDs[constructName]?[methodName]
         else {
             return
@@ -1593,7 +1640,9 @@ private struct GraphCollector {
         guard !visitedCalls.contains(callKey) else { return }
 
         var callableScope = scopeForConstructInstance(
-            instanceNodeID: baseNodeID, declaration: declaration)
+            instanceNodeID: baseNodeID,
+            constructName: constructName
+        )
         for (index, parameter) in callable.parameters.enumerated() {
             let parameterID = "\(ownerID)/call:\(methodName)/parameter:\(parameter.name):\(index)"
             addNode(id: parameterID, kind: .parameter, label: parameter.name)
@@ -1625,13 +1674,16 @@ private struct GraphCollector {
         arguments: [CallArgument],
         scope: MemoryScope
     ) {
-        guard let declaration = dependencySourceView.construct(named: constructName) else { return }
-        let memberKinds = self.memberKinds(for: declaration)
+        let memberKinds = dependencySourceView.memberKinds(forConstruct: constructName)
 
         for argument in arguments {
             guard let label = argument.label, let kind = memberKinds[label] else { continue }
             let memberID = ensureMemberNode(baseID: ownerID, name: label, kind: kind)
-            captureConstructTypeForMember(named: label, in: declaration, nodeID: memberID)
+            captureConstructTypeForMember(
+                named: label,
+                onConstruct: constructName,
+                nodeID: memberID
+            )
             if case .bindingReference(let name) = argument.value,
                 let sourceID = resolveSimpleName(name, scope: scope)
             {
@@ -1642,50 +1694,34 @@ private struct GraphCollector {
         }
     }
 
-    private func memberKinds(for declaration: ConstructDeclaration) -> [String:
-        DependencyGraphNodeKind]
-    {
-        var result: [String: DependencyGraphNodeKind] = [:]
-        for state in declaration.states { result[state.name] = .state }
-        for environment in declaration.environments { result[environment.name] = .environment }
-        for binding in declaration.bindings { result[binding.name] = .binding }
-        for derived in declaration.deriveds { result[derived.name] = .derived }
-        for value in declaration.values { result[value.name] = .value }
-        return result
-    }
-
     private mutating func scopeForConstructInstance(
         instanceNodeID: String,
-        declaration: ConstructDeclaration
+        constructName: String
     ) -> MemoryScope {
         var scope = MemoryScope()
         scope.symbols["self"] = instanceNodeID
-        for state in declaration.states {
-            scope.symbols[state.name] = ensureMemberNode(
-                baseID: instanceNodeID, name: state.name, kind: .state)
+        let memberKinds = dependencySourceView.memberKinds(forConstruct: constructName)
+        let constructTypedMembers = dependencySourceView.constructTypedMemberNames(
+            forConstruct: constructName
+        )
+
+        for (memberName, kind) in memberKinds {
+            guard kind == .state else { continue }
+            scope.symbols[memberName] = ensureMemberNode(
+                baseID: instanceNodeID, name: memberName, kind: kind)
         }
-        for environment in declaration.environments {
-            scope.symbols[environment.name] = ensureMemberNode(
-                baseID: instanceNodeID, name: environment.name, kind: .environment)
+        for (memberName, kind) in memberKinds {
+            guard kind == .environment else { continue }
+            scope.symbols[memberName] = ensureMemberNode(
+                baseID: instanceNodeID, name: memberName, kind: kind)
         }
-        for binding in declaration.bindings {
-            let nodeID = ensureMemberNode(
-                baseID: instanceNodeID, name: binding.name, kind: .binding)
-            if dependencySourceView.hasConstruct(named: binding.typeName) {
-                flowState.inferredConstructTypeByNodeID[nodeID] = binding.typeName
+        for (memberName, kind) in memberKinds {
+            guard kind == .binding || kind == .derived || kind == .value else { continue }
+            let nodeID = ensureMemberNode(baseID: instanceNodeID, name: memberName, kind: kind)
+            if let typeName = constructTypedMembers[memberName] {
+                flowState.inferredConstructTypeByNodeID[nodeID] = typeName
             }
-            scope.symbols[binding.name] = nodeID
-        }
-        for derived in declaration.deriveds {
-            scope.symbols[derived.name] = ensureMemberNode(
-                baseID: instanceNodeID, name: derived.name, kind: .derived)
-        }
-        for value in declaration.values {
-            let nodeID = ensureMemberNode(baseID: instanceNodeID, name: value.name, kind: .value)
-            if dependencySourceView.hasConstruct(named: value.typeName) {
-                flowState.inferredConstructTypeByNodeID[nodeID] = value.typeName
-            }
-            scope.symbols[value.name] = nodeID
+            scope.symbols[memberName] = nodeID
         }
         return scope
     }
@@ -1699,18 +1735,13 @@ private struct GraphCollector {
 
     private mutating func captureConstructTypeForMember(
         named memberName: String,
-        in declaration: ConstructDeclaration,
+        onConstruct constructName: String,
         nodeID: String
     ) {
-        if let binding = declaration.bindings.first(where: { $0.name == memberName }),
-            dependencySourceView.hasConstruct(named: binding.typeName)
-        {
-            flowState.inferredConstructTypeByNodeID[nodeID] = binding.typeName
-        }
-        if let value = declaration.values.first(where: { $0.name == memberName }),
-            dependencySourceView.hasConstruct(named: value.typeName)
-        {
-            flowState.inferredConstructTypeByNodeID[nodeID] = value.typeName
+        if let typeName = dependencySourceView.constructTypedMemberNames(
+            forConstruct: constructName
+        )[memberName] {
+            flowState.inferredConstructTypeByNodeID[nodeID] = typeName
         }
     }
 

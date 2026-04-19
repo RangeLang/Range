@@ -73,6 +73,12 @@ graph clarity, and self-hosting alignment.
 
 Use one semantic graph substrate with staged enrichment passes.
 
+`DeclarationGraph` should become the canonical semantic graph of the program.
+`DependencyGraph` is not a sibling source of truth in that model. It is a
+derived projection or renderer over declaration-graph entities and relations,
+plus any late dependency-analysis facts that have not yet been absorbed into
+the shared substrate.
+
 The split that should remain is:
 
 - declaration stage
@@ -96,6 +102,16 @@ meaning:
 - memory/reactivity meaning
 
 This is procedural reading, not replacement.
+
+### Canonical Graph Rule
+
+- `DeclarationGraph` is the true source of program graph facts.
+- dependency facts are declaration-graph relations, not a separate peer graph
+  model.
+- any remaining `DependencyGraph` type should be treated as a compatibility
+  projection or renderer over canonical graph kinds.
+- transient analysis artifacts may still exist during dependency analysis, but
+  they should not redefine the canonical graph vocabulary.
 
 ## Stage Graph Model
 

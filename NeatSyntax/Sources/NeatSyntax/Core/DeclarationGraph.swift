@@ -1,5 +1,43 @@
 import Foundation
 
+public enum SemanticGraphEntityKind: String, Sendable {
+    case file
+    case construct
+    case enumeration
+    case protocolDefinition
+    case macro
+    case typeExtension
+    case mainBlock
+    case state
+    case environment
+    case binding
+    case derived
+    case value
+    case initializer
+    case function
+    case parameter
+    case member
+    case typeReference
+    case macroApplication
+    case localSymbol
+    case unresolved
+}
+
+public enum SemanticGraphRelationKind: String, Sendable {
+    case contains
+    case conformsTo
+    case extends
+    case referencesType
+    case referencesIdentity
+    case appliesMacro
+    case targetsMacro
+    case resolvesTo
+    case dependsOn
+    case mutates
+    case aliases
+    case calls
+}
+
 public struct RealizedInitTarget: Hashable, Sendable {
     public let constructName: String
     public let parameterLabels: [String?]
@@ -400,6 +438,46 @@ public struct DependencySourceView {
 
     public func isCoreConstruct(named name: String) -> Bool {
         constructsByName[name]?.isCore == true
+    }
+
+    public func callable(
+        named callableName: String,
+        onConstruct named: String
+    ) -> CallableDeclaration? {
+        constructsByName[named]?.callables.first(where: { $0.name == callableName })
+    }
+
+    public func memberKinds(
+        forConstruct named: String
+    ) -> [String: DependencyGraphNodeKind] {
+        guard let declaration = constructsByName[named] else {
+            return [:]
+        }
+
+        var result: [String: DependencyGraphNodeKind] = [:]
+        for state in declaration.states { result[state.name] = .state }
+        for environment in declaration.environments { result[environment.name] = .environment }
+        for binding in declaration.bindings { result[binding.name] = .binding }
+        for derived in declaration.deriveds { result[derived.name] = .derived }
+        for value in declaration.values { result[value.name] = .value }
+        return result
+    }
+
+    public func constructTypedMemberNames(
+        forConstruct named: String
+    ) -> [String: String] {
+        guard let declaration = constructsByName[named] else {
+            return [:]
+        }
+
+        var result: [String: String] = [:]
+        for binding in declaration.bindings where hasConstruct(named: binding.typeName) {
+            result[binding.name] = binding.typeName
+        }
+        for value in declaration.values where hasConstruct(named: value.typeName) {
+            result[value.name] = value.typeName
+        }
+        return result
     }
 }
 
