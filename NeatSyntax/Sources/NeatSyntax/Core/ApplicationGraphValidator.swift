@@ -28,6 +28,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         )
         try validateBindingReferences(
             in: program.expandedFiles,
+            declarationGraph: program.declarationGraph,
             registryView: graphViews.registryView
         )
         try validateEnvironmentStateResolution(in: program.expandedFiles)
@@ -88,6 +89,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
     private struct BindingReferenceContext {
         var mutableNames: Set<String>
         var selfAvailable: Bool
+        var currentConstructName: String?
     }
 
     private func validateControlFlow(in parsedFiles: [ParsedSourceFile]) throws {
@@ -870,6 +872,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateBindingReferences(
         in parsedFiles: [ParsedSourceFile],
+        declarationGraph: DeclarationGraph,
         registryView: DeclarationRegistryView
     ) throws {
         for parsedFile in parsedFiles {
@@ -877,7 +880,11 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
             switch parsedFile.sourceFile {
             case .construct(let declaration):
-                try validateBindingReferences(in: declaration, fileName: fileName)
+                try validateBindingReferences(
+                    in: declaration,
+                    declarationGraph: declarationGraph,
+                    fileName: fileName
+                )
             case .module(let module):
                 let topLevelMutable = Set(
                     registryView.topLevelStates(inFilePath: parsedFile.path).map(\.name)
@@ -885,9 +892,11 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 if let mainBlock = module.mainBlock {
                     try validateBindingReferences(
                         in: mainBlock.body,
+                        declarationGraph: declarationGraph,
                         context: BindingReferenceContext(
                             mutableNames: topLevelMutable,
-                            selfAvailable: false
+                            selfAvailable: false,
+                            currentConstructName: nil
                         ),
                         fileName: fileName
                     )
@@ -896,21 +905,32 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                     guard let body = callable.body else { continue }
                     try validateBindingReferences(
                         in: body,
+                        declarationGraph: declarationGraph,
                         context: bindingReferenceContext(
                             mutableNames: topLevelMutable,
                             selfAvailable: false,
+                            currentConstructName: nil,
                             parameters: callable.parameters
                         ),
                         fileName: fileName
                     )
                 }
                 for declaration in module.constructs {
-                    try validateBindingReferences(in: declaration, fileName: fileName)
+                    try validateBindingReferences(
+                        in: declaration,
+                        declarationGraph: declarationGraph,
+                        fileName: fileName
+                    )
                 }
             case .mainBlock(let mainBlock):
                 try validateBindingReferences(
                     in: mainBlock.body,
-                    context: BindingReferenceContext(mutableNames: [], selfAvailable: false),
+                    declarationGraph: declarationGraph,
+                    context: BindingReferenceContext(
+                        mutableNames: [],
+                        selfAvailable: false,
+                        currentConstructName: nil
+                    ),
                     fileName: fileName
                 )
             case .enumeration, .protocolDefinition, .macro, .extensions:
@@ -921,6 +941,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateBindingReferences(
         in declaration: ConstructDeclaration,
+        declarationGraph: DeclarationGraph,
         fileName: String
     ) throws {
         let memberMutableNames =
@@ -932,9 +953,11 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             if let body = derived.body {
                 try validateBindingReferences(
                     in: body,
+                    declarationGraph: declarationGraph,
                     context: BindingReferenceContext(
                         mutableNames: memberMutableNames,
-                        selfAvailable: true
+                        selfAvailable: true,
+                        currentConstructName: declaration.name
                     ),
                     fileName: fileName
                 )
@@ -945,9 +968,11 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             if let body = initializer.body {
                 try validateBindingReferences(
                     in: body,
+                    declarationGraph: declarationGraph,
                     context: bindingReferenceContext(
                         mutableNames: memberMutableNames,
                         selfAvailable: true,
+                        currentConstructName: declaration.name,
                         parameters: initializer.parameters
                     ),
                     fileName: fileName
@@ -959,9 +984,11 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             if let body = callable.body {
                 try validateBindingReferences(
                     in: body,
+                    declarationGraph: declarationGraph,
                     context: bindingReferenceContext(
                         mutableNames: memberMutableNames,
                         selfAvailable: true,
+                        currentConstructName: declaration.name,
                         parameters: callable.parameters
                     ),
                     fileName: fileName
@@ -970,24 +997,31 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         }
 
         for nested in declaration.constructs {
-            try validateBindingReferences(in: nested, fileName: fileName)
+            try validateBindingReferences(
+                in: nested,
+                declarationGraph: declarationGraph,
+                fileName: fileName
+            )
         }
     }
 
     private func bindingReferenceContext(
         mutableNames: Set<String>,
         selfAvailable: Bool,
+        currentConstructName: String?,
         parameters: [NeatFunctionParameter]
     ) -> BindingReferenceContext {
         let parameterMutableNames = Set(parameters.filter(\.isBinding).map(\.localName))
         return BindingReferenceContext(
             mutableNames: mutableNames.union(parameterMutableNames),
-            selfAvailable: selfAvailable
+            selfAvailable: selfAvailable,
+            currentConstructName: currentConstructName
         )
     }
 
     private func validateBindingReferences(
         in statements: [Statement],
+        declarationGraph: DeclarationGraph,
         context: BindingReferenceContext,
         fileName: String
     ) throws {
@@ -996,16 +1030,23 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         for statement in statements {
             switch statement {
             case .macroInvocation(_, _, let body):
-                try validateBindingReferences(in: body, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: body,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             case .background(let background):
                 try validateBindingReferences(
                     in: background.body,
+                    declarationGraph: declarationGraph,
                     context: context,
                     fileName: fileName
                 )
             case .localBinding(let declaration):
                 try validateBindingReferences(
                     in: declaration.expression,
+                    declarationGraph: declarationGraph,
                     context: context,
                     fileName: fileName
                 )
@@ -1015,41 +1056,76 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             case .localCallable(let declaration):
                 try validateBindingReferences(
                     in: declaration.body,
+                    declarationGraph: declarationGraph,
                     context: bindingReferenceContext(
                         mutableNames: context.mutableNames,
                         selfAvailable: context.selfAvailable,
+                        currentConstructName: context.currentConstructName,
                         parameters: declaration.parameters
                     ),
                     fileName: fileName
                 )
             case .derived(_, _, let body):
-                try validateBindingReferences(in: body, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: body,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             case .environmentProvision(let provision):
                 try validateBindingReferences(
                     in: provision.expression,
+                    declarationGraph: declarationGraph,
                     context: context,
                     fileName: fileName
                 )
             case .assignment(_, let expression), .compoundAssignment(_, _, let expression),
                 .expression(let expression):
-                try validateBindingReferences(in: expression, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: expression,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             case .forEach(_, let sequence, let body):
-                try validateBindingReferences(in: sequence, context: context, fileName: fileName)
-                try validateBindingReferences(in: body, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: sequence,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
+                try validateBindingReferences(
+                    in: body,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             case .whileLoop(let condition, let body):
-                try validateBindingReferences(in: condition, context: context, fileName: fileName)
-                try validateBindingReferences(in: body, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: condition,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
+                try validateBindingReferences(
+                    in: body,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             case .conditional(let branches):
                 for branch in branches {
                     if let condition = branch.condition {
                         try validateBindingReferences(
                             in: condition,
+                            declarationGraph: declarationGraph,
                             context: context,
                             fileName: fileName
                         )
                     }
                     try validateBindingReferences(
                         in: branch.body,
+                        declarationGraph: declarationGraph,
                         context: context,
                         fileName: fileName
                     )
@@ -1058,20 +1134,28 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 if let expression {
                     try validateBindingReferences(
                         in: expression,
+                        declarationGraph: declarationGraph,
                         context: context,
                         fileName: fileName
                     )
                 }
             case .switchStatement(let expression, let cases, let defaultBody):
-                try validateBindingReferences(in: expression, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: expression,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
                 for switchCase in cases {
                     try validateBindingReferences(
                         in: switchCase.pattern,
+                        declarationGraph: declarationGraph,
                         context: context,
                         fileName: fileName
                     )
                     try validateBindingReferences(
                         in: switchCase.body,
+                        declarationGraph: declarationGraph,
                         context: bindingReferenceContext(
                             for: switchCase.pattern,
                             base: context
@@ -1082,6 +1166,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 if let defaultBody {
                     try validateBindingReferences(
                         in: defaultBody,
+                        declarationGraph: declarationGraph,
                         context: context,
                         fileName: fileName
                     )
@@ -1094,16 +1179,23 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateBindingReferences(
         in pattern: SwitchCasePattern,
+        declarationGraph: DeclarationGraph,
         context: BindingReferenceContext,
         fileName: String
     ) throws {
         if case .expression(let expression) = pattern {
-            try validateBindingReferences(in: expression, context: context, fileName: fileName)
+            try validateBindingReferences(
+                in: expression,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
         }
     }
 
     private func validateBindingReferences(
         in expression: Expression,
+        declarationGraph: DeclarationGraph,
         context: BindingReferenceContext,
         fileName: String
     ) throws {
@@ -1116,6 +1208,25 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                         "Binding reference '$\(path)' in \(fileName) is invalid because self is not available in this scope."
                     )
                 }
+                if path != "self" {
+                    guard let currentConstructName = context.currentConstructName else {
+                        throw SemanticValidationError(
+                            "Binding reference '$\(path)' in \(fileName) is invalid because self has no declaration context."
+                        )
+                    }
+                    let memberSuffix = String(path.dropFirst("self.".count))
+                    let declaredPath = "\(currentConstructName).\(memberSuffix)"
+                    guard
+                        declarationGraph.declaresMemberPath(
+                            declaredPath,
+                            onConstruct: currentConstructName
+                        )
+                    else {
+                        throw SemanticValidationError(
+                            "Binding reference '$\(path)' in \(fileName) is invalid because \(declaredPath) is not a declared member path."
+                        )
+                    }
+                }
                 return
             }
             guard context.mutableNames.contains(root) else {
@@ -1125,34 +1236,94 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             }
         case .macroInvocation(_, let arguments), .call(_, let arguments):
             for argument in arguments {
-                try validateBindingReferences(in: argument.value, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: argument.value,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             }
         case .array(let elements):
             for element in elements {
-                try validateBindingReferences(in: element, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: element,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             }
         case .dictionary(let elements):
             for element in elements {
-                try validateBindingReferences(in: element.key, context: context, fileName: fileName)
-                try validateBindingReferences(in: element.value, context: context, fileName: fileName)
+                try validateBindingReferences(
+                    in: element.key,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
+                try validateBindingReferences(
+                    in: element.value,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             }
         case .ternary(let condition, let trueExpression, let falseExpression):
-            try validateBindingReferences(in: condition, context: context, fileName: fileName)
-            try validateBindingReferences(in: trueExpression, context: context, fileName: fileName)
-            try validateBindingReferences(in: falseExpression, context: context, fileName: fileName)
+            try validateBindingReferences(
+                in: condition,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
+            try validateBindingReferences(
+                in: trueExpression,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
+            try validateBindingReferences(
+                in: falseExpression,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
         case .unary(_, let nested):
-            try validateBindingReferences(in: nested, context: context, fileName: fileName)
+            try validateBindingReferences(
+                in: nested,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
         case .binary(let lhs, _, let rhs):
-            try validateBindingReferences(in: lhs, context: context, fileName: fileName)
-            try validateBindingReferences(in: rhs, context: context, fileName: fileName)
+            try validateBindingReferences(
+                in: lhs,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
+            try validateBindingReferences(
+                in: rhs,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
         case .interpolatedString(let string):
             for segment in string.segments {
                 if case .expression(let nested) = segment {
-                    try validateBindingReferences(in: nested, context: context, fileName: fileName)
+                    try validateBindingReferences(
+                        in: nested,
+                        declarationGraph: declarationGraph,
+                        context: context,
+                        fileName: fileName
+                    )
                 }
             }
         case .block(let body):
-            try validateBindingReferences(in: body, context: context, fileName: fileName)
+            try validateBindingReferences(
+                in: body,
+                declarationGraph: declarationGraph,
+                context: context,
+                fileName: fileName
+            )
         case .integer, .double, .string, .boolean, .nilLiteral, .identifier:
             break
         }
@@ -1170,7 +1341,8 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
         return BindingReferenceContext(
             mutableNames: base.mutableNames.union([binding.name]),
-            selfAvailable: base.selfAvailable
+            selfAvailable: base.selfAvailable,
+            currentConstructName: base.currentConstructName
         )
     }
 
