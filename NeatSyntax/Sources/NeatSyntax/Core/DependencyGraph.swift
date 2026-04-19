@@ -1009,6 +1009,7 @@ private struct GraphCollector {
 
     init(declarationGraph: DeclarationGraph) {
         self.dependencySourceView = declarationGraph.dependencySourceView
+        seed(from: declarationGraph.semanticGraph)
     }
 
     mutating func build() -> DependencyGraph {
@@ -1343,6 +1344,88 @@ private struct GraphCollector {
         from sourceID: String, to targetID: String, kind: DependencyGraphEdgeKind
     ) {
         edges.insert(DependencyGraphEdge(sourceID: sourceID, targetID: targetID, kind: kind))
+    }
+
+    private mutating func seed(from semanticGraph: SemanticGraph) {
+        for entity in semanticGraph.entities {
+            guard let dependencyKind = dependencyNodeKind(for: entity.kind) else {
+                continue
+            }
+            addNode(id: entity.id, kind: dependencyKind, label: entity.label)
+            registerDeclarationProjectionIfNeeded(entityID: entity.id, kind: dependencyKind, label: entity.label)
+        }
+
+        for relation in semanticGraph.relations {
+            guard let dependencyKind = dependencyEdgeKind(for: relation.kind) else {
+                continue
+            }
+            addEdge(from: relation.sourceID, to: relation.targetID, kind: dependencyKind)
+        }
+    }
+
+    private func dependencyNodeKind(for kind: SemanticGraphEntityKind) -> DependencyGraphNodeKind? {
+        switch kind {
+        case .file: return .file
+        case .construct: return .construct
+        case .enumeration: return .enumeration
+        case .protocolDefinition: return .protocolDefinition
+        case .macro: return .macro
+        case .typeExtension: return .typeExtension
+        case .mainBlock: return .mainBlock
+        case .state: return .state
+        case .environment: return .environment
+        case .binding: return .binding
+        case .derived: return .derived
+        case .value: return .value
+        case .initializer: return .initializer
+        case .function: return .function
+        case .parameter: return .parameter
+        case .member: return .member
+        case .typeReference: return .typeReference
+        case .macroApplication: return .macroApplication
+        case .localSymbol, .unresolved: return nil
+        }
+    }
+
+    private func dependencyEdgeKind(for kind: SemanticGraphRelationKind) -> DependencyGraphEdgeKind? {
+        switch kind {
+        case .contains: return .contains
+        case .conformsTo: return .conformsTo
+        case .extends: return .extends
+        case .referencesType: return .referencesType
+        case .referencesIdentity: return .referencesIdentity
+        case .appliesMacro: return .appliesMacro
+        case .targetsMacro: return .targetsMacro
+        case .resolvesTo: return .resolvesTo
+        case .dependsOn: return .dependsOn
+        case .mutates: return .mutates
+        case .aliases: return .aliases
+        case .calls: return .calls
+        }
+    }
+
+    private mutating func registerDeclarationProjectionIfNeeded(
+        entityID: String,
+        kind: DependencyGraphNodeKind,
+        label: String
+    ) {
+        switch kind {
+        case .construct, .enumeration, .protocolDefinition, .macro:
+            let name = declarationName(for: entityID, fallbackLabel: label)
+            resolutionIndex.declarationProjectionNodeIDsByName[name, default: []].insert(entityID)
+        default:
+            break
+        }
+    }
+
+    private func declarationName(for entityID: String, fallbackLabel: String) -> String {
+        if let component = entityID.split(separator: "/").last {
+            let raw = String(component)
+            if let colonIndex = raw.firstIndex(of: ":") {
+                return String(raw[raw.index(after: colonIndex)...])
+            }
+        }
+        return fallbackLabel
     }
 
     private mutating func registerDeclaration(name: String, nodeID: String) {

@@ -38,6 +38,53 @@ public enum SemanticGraphRelationKind: String, Sendable {
     case calls
 }
 
+public struct SemanticGraphEntity: Hashable, Sendable {
+    public let id: String
+    public let kind: SemanticGraphEntityKind
+    public let label: String
+
+    public init(id: String, kind: SemanticGraphEntityKind, label: String) {
+        self.id = id
+        self.kind = kind
+        self.label = label
+    }
+}
+
+public struct SemanticGraphRelation: Hashable, Sendable {
+    public let sourceID: String
+    public let targetID: String
+    public let kind: SemanticGraphRelationKind
+
+    public init(sourceID: String, targetID: String, kind: SemanticGraphRelationKind) {
+        self.sourceID = sourceID
+        self.targetID = targetID
+        self.kind = kind
+    }
+}
+
+public struct SemanticGraph: Sendable {
+    public let entities: [SemanticGraphEntity]
+    public let relations: [SemanticGraphRelation]
+
+    public init(entities: [SemanticGraphEntity], relations: [SemanticGraphRelation]) {
+        self.entities = entities.sorted {
+            if $0.kind.rawValue != $1.kind.rawValue {
+                return $0.kind.rawValue < $1.kind.rawValue
+            }
+            return $0.id < $1.id
+        }
+        self.relations = relations.sorted {
+            if $0.sourceID != $1.sourceID {
+                return $0.sourceID < $1.sourceID
+            }
+            if $0.kind.rawValue != $1.kind.rawValue {
+                return $0.kind.rawValue < $1.kind.rawValue
+            }
+            return $0.targetID < $1.targetID
+        }
+    }
+}
+
 public struct RealizedInitTarget: Hashable, Sendable {
     public let constructName: String
     public let parameterLabels: [String?]
@@ -113,6 +160,7 @@ public struct DeclarationGraph {
     public let callablesByName: [String: [CallableDeclaration]]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
     public let realizedInitMacroTargets: [RealizedInitMacroTarget]
+    public let semanticGraph: SemanticGraph
 
     public init(files: [ParsedSourceFile]) {
         let protocols = Self.collectProtocols(from: files)
@@ -124,6 +172,7 @@ public struct DeclarationGraph {
         self.callablesByName = callables
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
+        self.semanticGraph = Self.collectSemanticGraph(from: files)
     }
 
     public var views: DeclarationGraphViews {
@@ -399,6 +448,283 @@ public struct DeclarationGraph {
                     && $0.slotName == $1.slotName
                     && $0.isBinding == $1.isBinding
             })
+    }
+
+    static func collectSemanticGraph(from files: [ParsedSourceFile]) -> SemanticGraph {
+        var collector = SemanticGraphCollector()
+        for parsedFile in files.sorted(by: { $0.path < $1.path }) {
+            collector.add(parsedFile)
+        }
+        return collector.build()
+    }
+}
+
+private struct SemanticGraphCollector {
+    private var entitiesByID: [String: SemanticGraphEntity] = [:]
+    private var relations: Set<SemanticGraphRelation> = []
+
+    mutating func build() -> SemanticGraph {
+        SemanticGraph(
+            entities: Array(entitiesByID.values),
+            relations: Array(relations)
+        )
+    }
+
+    mutating func add(_ parsedFile: ParsedSourceFile) {
+        let fileID = "file:\(parsedFile.path)"
+        let fileLabel = URL(fileURLWithPath: parsedFile.path).lastPathComponent
+        addEntity(id: fileID, kind: .file, label: fileLabel)
+
+        switch parsedFile.sourceFile {
+        case .construct(let declaration):
+            addConstruct(declaration, parentID: fileID)
+        case .enumeration(let declaration):
+            addEnumeration(declaration, parentID: fileID)
+        case .protocolDefinition(let declaration):
+            addProtocol(declaration, parentID: fileID)
+        case .macro(let declaration):
+            addMacroDeclaration(declaration, parentID: fileID)
+        case .extensions(let declarations):
+            for declaration in declarations {
+                addExtension(declaration, parentID: fileID)
+            }
+        case .module(let module):
+            if module.mainBlock != nil {
+                let mainID = "\(fileID)/main"
+                addEntity(id: mainID, kind: .mainBlock, label: "@main")
+                addRelation(from: fileID, to: mainID, kind: .contains)
+            }
+            for state in module.states {
+                addState(state, parentID: fileID)
+            }
+            for callable in module.callables {
+                addCallable(callable, parentID: fileID)
+            }
+            for declaration in module.constructs {
+                addConstruct(declaration, parentID: fileID)
+            }
+            for declaration in module.enumerations {
+                addEnumeration(declaration, parentID: fileID)
+            }
+            for declaration in module.protocols {
+                addProtocol(declaration, parentID: fileID)
+            }
+            for declaration in module.macros {
+                addMacroDeclaration(declaration, parentID: fileID)
+            }
+            for declaration in module.extensions {
+                addExtension(declaration, parentID: fileID)
+            }
+        case .mainBlock:
+            let mainID = "\(fileID)/main"
+            addEntity(id: mainID, kind: .mainBlock, label: "@main")
+            addRelation(from: fileID, to: mainID, kind: .contains)
+        }
+    }
+
+    private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
+        let constructID = "\(parentID)/construct:\(declaration.name)"
+        let label = declaration.isCore ? "@core \(declaration.name)" : declaration.name
+        addEntity(id: constructID, kind: .construct, label: label)
+        addRelation(from: parentID, to: constructID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: constructID)
+        addTypeReferences(declaration.conformances, from: constructID, kind: .conformsTo)
+
+        for state in declaration.states {
+            addState(state, parentID: constructID)
+        }
+        for environment in declaration.environments {
+            addEnvironment(environment, parentID: constructID)
+        }
+        for binding in declaration.bindings {
+            addBinding(binding, parentID: constructID)
+        }
+        for derived in declaration.deriveds {
+            addDerived(derived, parentID: constructID)
+        }
+        for value in declaration.values {
+            addValue(value, parentID: constructID)
+        }
+        for initializer in declaration.initializers {
+            addInitializer(initializer, parentID: constructID)
+        }
+        for callable in declaration.callables {
+            addCallable(callable, parentID: constructID)
+        }
+        for nested in declaration.constructs {
+            addConstruct(nested, parentID: constructID)
+        }
+    }
+
+    private mutating func addEnumeration(_ declaration: EnumDeclaration, parentID: String) {
+        let enumID = "\(parentID)/enum:\(declaration.name)"
+        addEntity(id: enumID, kind: .enumeration, label: declaration.name)
+        addRelation(from: parentID, to: enumID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: enumID)
+        addTypeReferences(declaration.conformances, from: enumID, kind: .conformsTo)
+    }
+
+    private mutating func addProtocol(_ declaration: ProtocolDeclaration, parentID: String) {
+        let protocolID = "\(parentID)/protocol:\(declaration.name)"
+        let label = declaration.isCore ? "@core \(declaration.name)" : declaration.name
+        addEntity(id: protocolID, kind: .protocolDefinition, label: label)
+        addRelation(from: parentID, to: protocolID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: protocolID)
+        addTypeReferences(declaration.conformances, from: protocolID, kind: .conformsTo)
+    }
+
+    private mutating func addMacroDeclaration(_ declaration: MacroDeclaration, parentID: String) {
+        let macroID = "\(parentID)/macro:\(declaration.name)"
+        addEntity(id: macroID, kind: .macro, label: declaration.name)
+        addRelation(from: parentID, to: macroID, kind: .contains)
+        addTypeReference(declaration.target.typeReference, from: macroID, kind: .targetsMacro)
+    }
+
+    private mutating func addExtension(_ declaration: ExtensionDeclaration, parentID: String) {
+        let extensionID = "\(parentID)/extension:\(declaration.targetType.displayName)"
+        addEntity(id: extensionID, kind: .typeExtension, label: declaration.targetType.displayName)
+        addRelation(from: parentID, to: extensionID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: extensionID)
+        addTypeReference(declaration.targetType, from: extensionID, kind: .extends)
+    }
+
+    private mutating func addState(_ declaration: StateDeclaration, parentID: String) {
+        let stateID = "\(parentID)/state:\(declaration.name)"
+        addEntity(id: stateID, kind: .state, label: declaration.name)
+        addRelation(from: parentID, to: stateID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: stateID)
+        addStorageTypeReference(declaration.type, from: stateID)
+    }
+
+    private mutating func addEnvironment(_ declaration: EnvironmentDeclaration, parentID: String) {
+        let environmentID = "\(parentID)/environment:\(declaration.name)"
+        addEntity(id: environmentID, kind: .environment, label: declaration.name)
+        addRelation(from: parentID, to: environmentID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: environmentID)
+        addStorageTypeReference(.named(declaration.typeName), from: environmentID)
+    }
+
+    private mutating func addBinding(_ declaration: BindingDeclaration, parentID: String) {
+        let bindingID = "\(parentID)/binding:\(declaration.name)"
+        addEntity(id: bindingID, kind: .binding, label: declaration.name)
+        addRelation(from: parentID, to: bindingID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: bindingID)
+        addStorageTypeReference(.named(declaration.typeName), from: bindingID)
+    }
+
+    private mutating func addDerived(_ declaration: DerivedDeclaration, parentID: String) {
+        let derivedID = "\(parentID)/derived:\(declaration.name)"
+        addEntity(id: derivedID, kind: .derived, label: declaration.name)
+        addRelation(from: parentID, to: derivedID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: derivedID)
+        addStorageTypeReference(.named(declaration.typeName), from: derivedID)
+        if let builderName = declaration.builderName {
+            addTypeReference(.named(builderName), from: derivedID, kind: .referencesType)
+        }
+    }
+
+    private mutating func addValue(_ declaration: ValueDeclaration, parentID: String) {
+        let valueID = "\(parentID)/value:\(declaration.name)"
+        addEntity(id: valueID, kind: .value, label: declaration.name)
+        addRelation(from: parentID, to: valueID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: valueID)
+        addStorageTypeReference(.named(declaration.typeName), from: valueID)
+    }
+
+    private mutating func addInitializer(_ declaration: InitializerDeclaration, parentID: String) {
+        let initializerID = "\(parentID)/init:\(renderParameterList(declaration.parameters))"
+        addEntity(id: initializerID, kind: .initializer, label: "init")
+        addRelation(from: parentID, to: initializerID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: initializerID)
+        for parameter in declaration.parameters {
+            addParameter(parameter, parentID: initializerID)
+        }
+    }
+
+    private mutating func addCallable(_ declaration: CallableDeclaration, parentID: String) {
+        let callableID =
+            "\(parentID)/function:\(declaration.name)(\(renderParameterList(declaration.parameters)))"
+        addEntity(id: callableID, kind: .function, label: declaration.name)
+        addRelation(from: parentID, to: callableID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: callableID)
+        if let targetType = declaration.targetType {
+            addTypeReference(targetType, from: callableID, kind: .referencesType)
+        }
+        if let returnType = declaration.returnType {
+            addTypeReference(returnType, from: callableID, kind: .referencesType)
+        }
+        for parameter in declaration.parameters {
+            addParameter(parameter, parentID: callableID)
+        }
+    }
+
+    private mutating func addParameter(_ parameter: NeatFunctionParameter, parentID: String) {
+        let label = parameter.externalLabel ?? "_"
+        let parameterID = "\(parentID)/parameter:\(label):\(parameter.localName)"
+        addEntity(id: parameterID, kind: .parameter, label: parameter.localName)
+        addRelation(from: parentID, to: parameterID, kind: .contains)
+        addMacroApplications(parameter.macros, parentID: parameterID)
+        if let typeReference = parameter.typeReference {
+            addStorageTypeReference(typeReference, from: parameterID)
+        }
+    }
+
+    private mutating func addStorageTypeReference(_ reference: TypeReference, from sourceID: String) {
+        addTypeReference(reference, from: sourceID, kind: .referencesType)
+    }
+
+    private mutating func addMacroApplications(_ macros: [MacroApplication], parentID: String) {
+        for macro in macros {
+            let macroID = "\(parentID)/macro-application:#\(macro.name)"
+            addEntity(id: macroID, kind: .macroApplication, label: "#\(macro.name)")
+            addRelation(from: parentID, to: macroID, kind: .appliesMacro)
+        }
+    }
+
+    private mutating func addTypeReferences(
+        _ references: [TypeReference],
+        from sourceID: String,
+        kind: SemanticGraphRelationKind
+    ) {
+        for reference in references {
+            addTypeReference(reference, from: sourceID, kind: kind)
+        }
+    }
+
+    private mutating func addTypeReference(
+        _ reference: TypeReference,
+        from sourceID: String,
+        kind: SemanticGraphRelationKind
+    ) {
+        let typeID = "type:\(reference.displayName)"
+        addEntity(id: typeID, kind: .typeReference, label: reference.displayName)
+        addRelation(from: sourceID, to: typeID, kind: kind)
+    }
+
+    private mutating func addEntity(
+        id: String,
+        kind: SemanticGraphEntityKind,
+        label: String
+    ) {
+        entitiesByID[id] = SemanticGraphEntity(id: id, kind: kind, label: label)
+    }
+
+    private mutating func addRelation(
+        from sourceID: String,
+        to targetID: String,
+        kind: SemanticGraphRelationKind
+    ) {
+        relations.insert(SemanticGraphRelation(sourceID: sourceID, targetID: targetID, kind: kind))
+    }
+
+    private func renderParameterList(_ parameters: [NeatFunctionParameter]) -> String {
+        parameters.map { parameter in
+            let typeName =
+                parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+                ?? "_"
+            let label = parameter.externalLabel ?? "_"
+            return "\(label):\(typeName)"
+        }.joined(separator: ",")
     }
 }
 
