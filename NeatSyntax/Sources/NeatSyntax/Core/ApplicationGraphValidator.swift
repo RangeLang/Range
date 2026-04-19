@@ -8,20 +8,28 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
     public func validate(_ program: CompiledProgram) throws {
         let graphViews = program.declarationViews
         try validateControlFlow(in: program.expandedFiles)
-        try validateCallArgumentLabels(in: program.expandedFiles)
+        try validateCallArgumentLabels(
+            in: program.expandedFiles,
+            registryView: graphViews.registryView
+        )
         try validateCallableReturnSemantics(
             in: program.expandedFiles,
+            registryView: graphViews.registryView,
             resolver: program.literalBridgeResolver,
             memberResolver: graphViews.memberResolver,
             operatorResolver: graphViews.operatorResolver
         )
         try validateLiteralBridgeCompatibility(
             in: program.parsedFiles,
+            registryView: graphViews.registryView,
             resolver: program.literalBridgeResolver,
             memberResolver: graphViews.memberResolver,
             operatorResolver: graphViews.operatorResolver
         )
-        try validateBindingReferences(in: program.expandedFiles)
+        try validateBindingReferences(
+            in: program.expandedFiles,
+            registryView: graphViews.registryView
+        )
         try validateEnvironmentStateResolution(in: program.expandedFiles)
         try validateValueBindings(in: program.expandedFiles)
     }
@@ -290,8 +298,14 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         }
     }
 
-    private func validateCallArgumentLabels(in parsedFiles: [ParsedSourceFile]) throws {
-        let environment = callLabelValidationEnvironment(from: parsedFiles)
+    private func validateCallArgumentLabels(
+        in parsedFiles: [ParsedSourceFile],
+        registryView: DeclarationRegistryView
+    ) throws {
+        let environment = callLabelValidationEnvironment(
+            from: parsedFiles,
+            registryView: registryView
+        )
 
         for parsedFile in parsedFiles {
             let fileName = lastPathComponent(of: parsedFile.path)
@@ -702,31 +716,23 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         }
     }
 
-    private func callLabelValidationEnvironment(from parsedFiles: [ParsedSourceFile])
+    private func callLabelValidationEnvironment(
+        from parsedFiles: [ParsedSourceFile],
+        registryView: DeclarationRegistryView
+    )
         -> CallLabelValidationEnvironment
     {
         var topLevelCallablesByName: [String: [CallLabelCandidate]] = [:]
-        var constructsByName: [String: ConstructDeclaration] = [:]
-
-        func record(construct: ConstructDeclaration) {
-            constructsByName[construct.name] = construct
-            for nested in construct.constructs {
-                record(construct: nested)
-            }
-        }
 
         for parsedFile in parsedFiles {
             switch parsedFile.sourceFile {
-            case .construct(let declaration):
-                record(construct: declaration)
+            case .construct:
+                break
             case .module(let module):
                 for callable in module.callables {
                     topLevelCallablesByName[callable.name, default: []].append(
                         CallLabelCandidate(name: callable.name, parameters: callable.parameters)
                     )
-                }
-                for declaration in module.constructs {
-                    record(construct: declaration)
                 }
             case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
                 break
@@ -735,7 +741,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
         return CallLabelValidationEnvironment(
             topLevelCallablesByName: topLevelCallablesByName,
-            constructsByName: constructsByName
+            constructsByName: registryView.allConstructsByName
         )
     }
 
@@ -871,7 +877,10 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
         return (base, member)
     }
 
-    private func validateBindingReferences(in parsedFiles: [ParsedSourceFile]) throws {
+    private func validateBindingReferences(
+        in parsedFiles: [ParsedSourceFile],
+        registryView: DeclarationRegistryView
+    ) throws {
         for parsedFile in parsedFiles {
             let fileName = lastPathComponent(of: parsedFile.path)
 
@@ -879,7 +888,9 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
             case .construct(let declaration):
                 try validateBindingReferences(in: declaration, fileName: fileName)
             case .module(let module):
-                let topLevelMutable = Set(module.states.map(\.name))
+                let topLevelMutable = Set(
+                    registryView.topLevelStates(inFilePath: parsedFile.path).map(\.name)
+                )
                 if let mainBlock = module.mainBlock {
                     try validateBindingReferences(
                         in: mainBlock.body,
@@ -1390,6 +1401,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateLiteralBridgeCompatibility(
         in parsedFiles: [ParsedSourceFile],
+        registryView: DeclarationRegistryView,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -1408,7 +1420,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 )
             case .module(let module):
                 try validateLiteralBridgeCompatibility(
-                    in: module.states,
+                    in: registryView.topLevelStates(inFilePath: parsedFile.path),
                     accessibleTypes: [:],
                     resolver: resolver,
                     memberResolver: memberResolver,
@@ -1417,7 +1429,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 )
 
                 let topLevelStateTypes = Dictionary(
-                    uniqueKeysWithValues: module.states.map {
+                    uniqueKeysWithValues: registryView.topLevelStates(inFilePath: parsedFile.path).map {
                         ($0.name, BootstrapLiteralType.typed($0.type))
                     }
                 )
@@ -1682,6 +1694,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
 
     private func validateCallableReturnSemantics(
         in parsedFiles: [ParsedSourceFile],
+        registryView: DeclarationRegistryView,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver
@@ -1700,7 +1713,7 @@ public struct ApplicationGraphValidator: CompiledProgramValidationPass {
                 )
             case .module(let module):
                 let topLevelAccessibleTypes = Dictionary(
-                    uniqueKeysWithValues: module.states.map {
+                    uniqueKeysWithValues: registryView.topLevelStates(inFilePath: parsedFile.path).map {
                         ($0.name, BootstrapLiteralType.typed($0.type))
                     }
                 )

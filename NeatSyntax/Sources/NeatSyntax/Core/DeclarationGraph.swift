@@ -1015,6 +1015,10 @@ public struct DeclarationRegistryView {
         self.callablesByName = callablesByName
     }
 
+    public var allConstructsByName: [String: ConstructDeclaration] {
+        constructsByName
+    }
+
     public func `protocol`(named name: String) -> ProtocolDeclaration? {
         protocolsByName[name]
     }
