@@ -1,0 +1,5 @@
+@core
+protocol Property: Syntax {
+    value name: String
+    value type: TypeReference
+}

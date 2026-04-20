@@ -24,13 +24,38 @@ extension Parser {
         let name = try consumeTypeName()
         let genericParameters = try parseProtocolGenericParameterClauseIfPresent()
         let conformances = try parseConformanceListIfPresent()
+        var states: [StateDeclaration] = []
+        var bindings: [BindingDeclaration] = []
+        var deriveds: [DerivedDeclaration] = []
+        var values: [ValueDeclaration] = []
         var initializers: [InitializerDeclaration] = []
+        var callables: [CallableDeclaration] = []
 
         if peek() == .leftBrace {
             try consume(.leftBrace)
             while peek() != .rightBrace {
+                if isValueDeclarationStart() {
+                    values.append(try parseValueDeclaration())
+                    continue
+                }
+                if isBindingDeclarationStart() {
+                    bindings.append(try parseBindingDeclaration())
+                    continue
+                }
+                if isDerivedDeclarationStart() {
+                    deriveds.append(try parseDerivedDeclaration())
+                    continue
+                }
+                if isStateDeclarationStart() {
+                    states.append(try parseState(allowDeclaredStorage: true))
+                    continue
+                }
                 if isInitializerDeclarationStart() {
-                    initializers.append(try parseInitializerDeclaration())
+                    initializers.append(try parseInitializerDeclaration(signatureOnly: true))
+                    continue
+                }
+                if isCallableStart() {
+                    callables.append(try parseCallableDeclaration(signatureOnly: true))
                     continue
                 }
                 try skipUnknownProtocolRequirement()
@@ -48,7 +73,12 @@ extension Parser {
             name: name,
             genericParameters: genericParameters,
             conformances: conformances,
-            initializers: initializers
+            states: states,
+            bindings: bindings,
+            deriveds: deriveds,
+            values: values,
+            initializers: initializers,
+            callables: callables
         )
     }
 

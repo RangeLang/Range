@@ -62,7 +62,9 @@ extension Parser {
                 "Callable declarations must declare an explicit parameter clause. Use derived \(name): Type for produced values."
             )
         }
-        let parameters = try parseFunctionParameters()
+        let parameters = try parseFunctionParameters(
+            allowOmittedLocalName: signatureOnly
+        )
         let returnType: TypeReference?
         if peek() == .arrow {
             try consume(.arrow)
@@ -204,7 +206,10 @@ extension Parser {
         )
     }
 
-    mutating func parseFunctionParameters(allowSyntaxCapture: Bool = false) throws
+    mutating func parseFunctionParameters(
+        allowSyntaxCapture: Bool = false,
+        allowOmittedLocalName: Bool = false
+    ) throws
         -> [NeatFunctionParameter]
     {
         try consume(.leftParen)
@@ -215,7 +220,7 @@ extension Parser {
                 let macros = try parseMacroApplicationsIfPresent()
                 let (localName, externalLabel) = try parseLabeledDeclarationName(
                     expecting: "parameter",
-                    allowOmittedLocalName: false
+                    allowOmittedLocalName: allowOmittedLocalName
                 )
 
                 var typeReference: TypeReference?
@@ -271,13 +276,15 @@ extension Parser {
         return parameters
     }
 
-    mutating func parseInitializerDeclaration() throws -> InitializerDeclaration {
+    mutating func parseInitializerDeclaration(signatureOnly: Bool = false) throws -> InitializerDeclaration {
         let macros = try parseMacroApplicationsIfPresent()
         guard case .identifier(let name) = peek(), name == "init" else {
             throw ParseError("Expected initializer declaration.")
         }
         advance()
-        let parameters = try parseFunctionParameters()
+        let parameters = try parseFunctionParameters(
+            allowOmittedLocalName: signatureOnly
+        )
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         return InitializerDeclaration(macros: macros, parameters: parameters, body: body)
     }

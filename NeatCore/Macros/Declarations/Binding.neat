@@ -1,0 +1,14 @@
+@core
+construct Binding: Property {
+    value name: String
+    value type: TypeReference
+    value declaration: Declaration
+
+    @core
+    construct Declaration {
+        value name: String
+        value type: TypeReference
+        value getterBody: Block?
+        value setterBody: Block?
+    }
+}
