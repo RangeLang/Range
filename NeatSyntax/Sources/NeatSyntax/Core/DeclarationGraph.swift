@@ -2,6 +2,7 @@ import Foundation
 
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
+    public let namespacesByName: [String: NamespaceDeclaration]
     public let constructsByName: [String: ConstructDeclaration]
     public let enumsByName: [String: EnumDeclaration]
     public let macrosByName: [String: MacroDeclaration]
@@ -22,10 +23,11 @@ public struct DeclarationGraph {
 
     public init(files: [ParsedSourceFile]) {
         let protocols = Self.collectProtocols(from: files)
+        let namespaces = Self.collectNamespaces(from: files)
+        let extensions = Self.collectExtensions(from: files)
         let constructs = Self.collectConstructs(from: files, protocols: protocols)
         let enumerations = Self.collectEnums(from: files)
         let macros = Self.collectMacros(from: files)
-        let extensions = Self.collectExtensions(from: files)
         let topLevelStates = Self.collectTopLevelStates(from: files)
         let statesByConstructName = Self.collectStatesByConstructName(from: constructs)
         let environmentsByConstructName = Self.collectEnvironmentsByConstructName(from: constructs)
@@ -40,6 +42,7 @@ public struct DeclarationGraph {
         )
 
         self.protocolsByName = protocols
+        self.namespacesByName = namespaces
         self.constructsByName = constructs
         self.enumsByName = enumerations
         self.macrosByName = macros
@@ -144,8 +147,16 @@ public struct DeclarationGraph {
         constructsByName[name]
     }
 
+    public func namespace(named name: String) -> NamespaceDeclaration? {
+        namespacesByName[name]
+    }
+
     public func hasConstruct(named name: String) -> Bool {
         constructsByName[name] != nil
+    }
+
+    public func hasNamespace(named name: String) -> Bool {
+        namespacesByName[name] != nil
     }
 
     public func isCoreConstruct(named name: String) -> Bool {
@@ -361,6 +372,8 @@ public struct DeclarationGraph {
         protocols: [String: ProtocolDeclaration]
     ) -> [String: ConstructDeclaration] {
         var registry: [String: ConstructDeclaration] = [:]
+        let namespaceRegistry = collectNamespaces(from: files)
+        let extensions = collectExtensions(from: files)
         for parsedFile in files {
             for declaration in constructs(in: parsedFile.sourceFile) {
                 collectConstruct(
@@ -376,6 +389,30 @@ public struct DeclarationGraph {
                     qualifiedPrefix: namespace.name,
                     into: &registry,
                     protocols: protocols
+                )
+            }
+        }
+        for (targetName, declarations) in extensions where namespaceRegistry[targetName] != nil {
+            for declaration in declarations {
+                collectNamespaceExtensionConstructs(
+                    from: declaration,
+                    qualifiedPrefix: targetName,
+                    into: &registry,
+                    protocols: protocols
+                )
+            }
+        }
+        return registry
+    }
+
+    static func collectNamespaces(from files: [ParsedSourceFile]) -> [String: NamespaceDeclaration] {
+        var registry: [String: NamespaceDeclaration] = [:]
+        for parsedFile in files {
+            for declaration in namespaces(in: parsedFile.sourceFile) {
+                collectNamespace(
+                    declaration,
+                    qualifiedName: declaration.name,
+                    into: &registry
                 )
             }
         }
@@ -484,6 +521,8 @@ public struct DeclarationGraph {
         from files: [ParsedSourceFile]
     ) -> [String: [NeatFunctionParameter]] {
         var registry: [String: [NeatFunctionParameter]] = [:]
+        let namespaceRegistry = collectNamespaces(from: files)
+        let extensions = collectExtensions(from: files)
 
         for parsedFile in files {
             switch parsedFile.sourceFile {
@@ -523,6 +562,15 @@ public struct DeclarationGraph {
                 )
             case .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
                 continue
+            }
+        }
+        for (targetName, declarations) in extensions where namespaceRegistry[targetName] != nil {
+            for declaration in declarations {
+                collectNamespaceExtensionCallableParameters(
+                    from: declaration,
+                    registry: &registry,
+                    qualifiedPrefix: targetName
+                )
             }
         }
 
@@ -614,6 +662,8 @@ public struct DeclarationGraph {
     static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]]
     {
         var registry: [String: [CallableDeclaration]] = [:]
+        let namespaceRegistry = collectNamespaces(from: files)
+        let extensions = collectExtensions(from: files)
         for parsedFile in files {
             for declaration in callables(in: parsedFile.sourceFile) {
                 registry[declaration.name, default: []].append(declaration)
@@ -622,6 +672,15 @@ public struct DeclarationGraph {
                 collectNamespaceCallables(
                     in: namespace,
                     qualifiedPrefix: namespace.name,
+                    into: &registry
+                )
+            }
+        }
+        for (targetName, declarations) in extensions where namespaceRegistry[targetName] != nil {
+            for declaration in declarations {
+                collectNamespaceExtensionCallables(
+                    from: declaration,
+                    qualifiedPrefix: targetName,
                     into: &registry
                 )
             }
@@ -653,6 +712,60 @@ public struct DeclarationGraph {
         }
     }
 
+    private static func collectNamespace(
+        _ declaration: NamespaceDeclaration,
+        qualifiedName: String,
+        into registry: inout [String: NamespaceDeclaration]
+    ) {
+        let qualifiedChildren = declaration.namespaces.map { child in
+            NamespaceDeclaration(
+                name: "\(qualifiedName).\(child.name)",
+                callables: child.callables,
+                constructs: child.constructs,
+                namespaces: child.namespaces
+            )
+        }
+
+        registry[qualifiedName] = NamespaceDeclaration(
+            name: qualifiedName,
+            callables: declaration.callables,
+            constructs: declaration.constructs,
+            namespaces: qualifiedChildren
+        )
+
+        for child in declaration.namespaces {
+            collectNamespace(
+                child,
+                qualifiedName: "\(qualifiedName).\(child.name)",
+                into: &registry
+            )
+        }
+    }
+
+    private static func collectNamespaceExtensionConstructs(
+        from declaration: ExtensionDeclaration,
+        qualifiedPrefix: String,
+        into registry: inout [String: ConstructDeclaration],
+        protocols: [String: ProtocolDeclaration]
+    ) {
+        for construct in declaration.constructs {
+            collectConstruct(
+                construct,
+                qualifiedName: "\(qualifiedPrefix).\(construct.name)",
+                into: &registry,
+                protocols: protocols
+            )
+        }
+        for namespace in declaration.namespaces {
+            collectNamespaceConstructs(
+                in: namespace,
+                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
+                into: &registry,
+                protocols: protocols
+            )
+        }
+    }
+
     private static func collectNamespaceCallables(
         in namespace: NamespaceDeclaration,
         qualifiedPrefix: String,
@@ -678,6 +791,36 @@ public struct DeclarationGraph {
             collectNamespaceCallables(
                 in: nested,
                 qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)",
+                into: &registry
+            )
+        }
+    }
+
+    private static func collectNamespaceExtensionCallables(
+        from declaration: ExtensionDeclaration,
+        qualifiedPrefix: String,
+        into registry: inout [String: [CallableDeclaration]]
+    ) {
+        for callable in declaration.callables {
+            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
+            registry[qualifiedName, default: []].append(
+                CallableDeclaration(
+                    macros: callable.macros,
+                    attribute: callable.attribute,
+                    targetType: callable.targetType,
+                    name: qualifiedName,
+                    genericParameters: callable.genericParameters,
+                    hasExplicitParameterClause: callable.hasExplicitParameterClause,
+                    parameters: callable.parameters,
+                    returnType: callable.returnType,
+                    body: callable.body
+                )
+            )
+        }
+        for namespace in declaration.namespaces {
+            collectNamespaceCallables(
+                in: namespace,
+                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
                 into: &registry
             )
         }
@@ -745,6 +888,36 @@ public struct DeclarationGraph {
                     carrierTypeName: literalMacro.genericArguments[0].displayName
                 )
             }
+        }
+    }
+
+    private static func collectNamespaceExtensionCallableParameters(
+        from declaration: ExtensionDeclaration,
+        registry: inout [String: [NeatFunctionParameter]],
+        qualifiedPrefix: String
+    ) {
+        for callable in declaration.callables {
+            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
+            let qualifiedCallable = CallableDeclaration(
+                macros: callable.macros,
+                attribute: callable.attribute,
+                targetType: callable.targetType,
+                name: qualifiedName,
+                genericParameters: callable.genericParameters,
+                hasExplicitParameterClause: callable.hasExplicitParameterClause,
+                parameters: callable.parameters,
+                returnType: callable.returnType,
+                body: callable.body
+            )
+            registry[callableIdentity(ownerName: nil, declaration: qualifiedCallable)] =
+                callable.parameters
+        }
+        for namespace in declaration.namespaces {
+            collectNamespaceCallableParameters(
+                in: namespace,
+                registry: &registry,
+                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)"
+            )
         }
     }
 

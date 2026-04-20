@@ -60,7 +60,16 @@ struct GraphCollector {
                 parentID: fileID,
                 qualifiedPrefix: declaration.name
             )
-        case .enumeration, .protocolDefinition, .macro, .extensions:
+        case .enumeration, .protocolDefinition, .macro:
+            return
+        case .extensions(let declarations):
+            for declaration in declarations where declarationGraph.hasNamespace(named: declaration.targetType.displayName) {
+                analyzeNamespaceExtension(
+                    declaration,
+                    parentID: fileID,
+                    qualifiedPrefix: declaration.targetType.displayName
+                )
+            }
             return
         case .module(let module):
             let topLevelStates = declarationGraph.topLevelStates(inFilePath: parsedFile.path)
@@ -75,6 +84,13 @@ struct GraphCollector {
                     declaration,
                     parentID: fileID,
                     qualifiedPrefix: declaration.name
+                )
+            }
+            for declaration in module.extensions where declarationGraph.hasNamespace(named: declaration.targetType.displayName) {
+                analyzeNamespaceExtension(
+                    declaration,
+                    parentID: fileID,
+                    qualifiedPrefix: declaration.targetType.displayName
                 )
             }
             let moduleScope = MemoryScope(
@@ -124,6 +140,36 @@ struct GraphCollector {
                 nested,
                 parentID: namespaceID,
                 qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)"
+            )
+        }
+    }
+
+    private mutating func analyzeNamespaceExtension(
+        _ declaration: ExtensionDeclaration,
+        parentID: String,
+        qualifiedPrefix: String
+    ) {
+        let namespaceID = "\(parentID)/extension:\(declaration.targetType.displayName)"
+        let scope = MemoryScope(symbols: [:])
+
+        for callable in declaration.callables {
+            analyzeCallableDeclaration(
+                qualified(callable, withPrefix: qualifiedPrefix),
+                parentID: namespaceID,
+                scope: scope
+            )
+        }
+        for construct in declaration.constructs {
+            analyzeConstructDeclaration(
+                qualified(construct, withPrefix: qualifiedPrefix),
+                parentID: namespaceID
+            )
+        }
+        for namespace in declaration.namespaces {
+            analyzeNamespaceDeclaration(
+                namespace,
+                parentID: namespaceID,
+                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)"
             )
         }
     }

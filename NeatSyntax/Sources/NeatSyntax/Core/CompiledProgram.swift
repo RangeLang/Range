@@ -242,12 +242,27 @@ public struct CompilerPipeline {
                     into: &returnTypes
                 )
             }
+            for declaration in module.extensions {
+                collectCallableReturnTypes(
+                    in: declaration,
+                    qualifiedPrefix: declaration.targetType.displayName,
+                    into: &returnTypes
+                )
+            }
         case .namespace(let namespace):
             collectCallableReturnTypes(
                 in: namespace,
                 qualifiedPrefix: namespace.name,
                 into: &returnTypes
             )
+        case .extensions(let declarations):
+            for declaration in declarations {
+                collectCallableReturnTypes(
+                    in: declaration,
+                    qualifiedPrefix: declaration.targetType.displayName,
+                    into: &returnTypes
+                )
+            }
         default:
             break
         }
@@ -272,6 +287,30 @@ public struct CompilerPipeline {
             collectCallableReturnTypes(
                 in: nested,
                 qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)",
+                into: &returnTypes
+            )
+        }
+    }
+
+    private func collectCallableReturnTypes(
+        in declaration: ExtensionDeclaration,
+        qualifiedPrefix: String,
+        into returnTypes: inout [String: TypeReference]
+    ) {
+        for callable in declaration.callables {
+            guard let returnType = callable.returnType else {
+                continue
+            }
+            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
+            returnTypes[qualifiedName] = returnType
+            if let targetType = callable.targetType {
+                returnTypes["\(targetType.displayName).\(qualifiedName)"] = returnType
+            }
+        }
+        for namespace in declaration.namespaces {
+            collectCallableReturnTypes(
+                in: namespace,
+                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
                 into: &returnTypes
             )
         }

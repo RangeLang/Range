@@ -224,6 +224,33 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.callablesByName["Math.clamp"] != nil)
     }
 
+    @Test("Namespace extensions reopen namespace members")
+    func namespaceExtensionsReopenNamespaceMembers() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/NamespaceExtension.neat",
+                source: """
+                extension Math {
+                    function twice(value: Int) -> Int {
+                        return value + value
+                    }
+
+                    construct Box {
+                        value number: Int
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+
+        #expect(program.declarationGraph.callablesByName["Math.twice"] != nil)
+        #expect(program.declarationGraph.constructsByName["Math.Box"] != nil)
+    }
+
 }
 
 private enum FixtureRole {
