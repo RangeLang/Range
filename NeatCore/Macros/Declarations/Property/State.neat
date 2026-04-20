@@ -1,6 +1,10 @@
 @core
-construct State: Property {
+construct State<T>: Property {
     value name: String
     value type: TypeReference
-    value initializer: Expression?
+    value value: Expression?
+
+    function initializer(transform: (T) -> T)
+    function getter(transform: (T) -> T)
+    function setter(transform: (T) -> T)
 }
