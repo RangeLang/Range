@@ -1,0 +1,782 @@
+import Foundation
+
+public struct DeclarationMacroExpansionArgument: Sendable {
+    public let label: String?
+    public let type: BootstrapLiteralType?
+
+    public init(label: String?, type: BootstrapLiteralType?) {
+        self.label = label
+        self.type = type
+    }
+}
+
+public struct DeclarationMacroExpansionResolver: Sendable {
+    public static let empty = DeclarationMacroExpansionResolver(macrosByName: [:])
+
+    private struct MacroExpansionParameter: Sendable {
+        var localName: String
+        var externalLabel: String?
+        var typeReference: TypeReference?
+        var isBinding: Bool
+        var capturesSyntax: Bool
+    }
+
+    private struct MacroExpansionSignature: Sendable {
+        var genericParameterNames: Set<String>
+        var parameters: [MacroExpansionParameter]
+        var returnType: TypeReference
+    }
+
+    private let signaturesByName: [String: [MacroExpansionSignature]]
+
+    public init(macrosByName: [String: MacroDeclaration]) {
+        self.signaturesByName = macrosByName.mapValues { macro in
+            guard let expansionType = macro.expansionType else {
+                return []
+            }
+            return [
+                MacroExpansionSignature(
+                    genericParameterNames: Set(macro.genericParameters),
+                    parameters: macro.parameters.map {
+                        MacroExpansionParameter(
+                            localName: $0.localName,
+                            externalLabel: $0.externalLabel,
+                            typeReference: $0.typeReference,
+                            isBinding: $0.isBinding,
+                            capturesSyntax: $0.capturesSyntax
+                        )
+                    },
+                    returnType: expansionType
+                )
+            ]
+        }
+    }
+
+    public func expansionReturnType(
+        name: String,
+        arguments: [DeclarationMacroExpansionArgument],
+        literalBridgeResolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        let matches: [TypeReference] = signaturesByName[name, default: []].compactMap { signature in
+            guard signature.parameters.count == arguments.count else {
+                return nil
+            }
+
+            var bindings: [String: TypeReference] = [:]
+            for (parameter, argument) in zip(signature.parameters, arguments) {
+                guard argumentLabel(argument.label, matches: parameter) else {
+                    return nil
+                }
+                if parameter.capturesSyntax {
+                    continue
+                }
+                guard let expectedType = parameter.typeReference else {
+                    continue
+                }
+                guard let actual = argument.type,
+                    let actualType = materializedTypeReference(
+                        for: actual,
+                        resolver: literalBridgeResolver
+                    )
+                else {
+                    return nil
+                }
+                guard
+                    typeMatches(
+                        actual: actualType,
+                        expected: expectedType,
+                        genericParameterNames: signature.genericParameterNames,
+                        bindings: &bindings
+                    )
+                else {
+                    return nil
+                }
+            }
+
+            return Self.substitute(signature.returnType, using: bindings)
+        }
+
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
+    }
+
+    private func argumentLabel(_ actualLabel: String?, matches parameter: MacroExpansionParameter)
+        -> Bool
+    {
+        guard let actualLabel else {
+            return true
+        }
+        let expectedLabel = parameter.externalLabel ?? parameter.localName
+        return actualLabel == expectedLabel
+    }
+
+    private func materializedTypeReference(
+        for type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        switch type {
+        case .typed(let typeReference):
+            return typeReference
+        case .nilLiteral:
+            return .named("NilLiteral")
+        default:
+            return resolver.defaultDestinationType(for: type.displayName)
+        }
+    }
+
+    private func typeMatches(
+        actual: TypeReference,
+        expected: TypeReference,
+        genericParameterNames: Set<String>,
+        bindings: inout [String: TypeReference]
+    ) -> Bool {
+        if case .named(let name) = expected, genericParameterNames.contains(name) {
+            if let existing = bindings[name] {
+                return existing == actual
+            }
+            bindings[name] = actual
+            return true
+        }
+
+        if case .optional(let actualWrapped) = actual,
+            case .generic(.named("Optional"), let expectedArguments) = expected,
+            expectedArguments.count == 1
+        {
+            return typeMatches(
+                actual: actualWrapped,
+                expected: expectedArguments[0],
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+
+        if case .generic(.named("Optional"), let actualArguments) = actual,
+            actualArguments.count == 1,
+            case .optional(let expectedWrapped) = expected
+        {
+            return typeMatches(
+                actual: actualArguments[0],
+                expected: expectedWrapped,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+
+        switch (actual, expected) {
+        case (.named(let actualName), .named(let expectedName)):
+            return actualName == expectedName
+        case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
+            return actualName == expectedName
+                && typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+        case (
+            .generic(let actualBase, let actualArguments),
+            .generic(let expectedBase, let expectedArguments)
+        ):
+            guard actualArguments.count == expectedArguments.count,
+                typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            else {
+                return false
+            }
+            return zip(actualArguments, expectedArguments).allSatisfy {
+                actualArgument, expectedArgument in
+                typeMatches(
+                    actual: actualArgument,
+                    expected: expectedArgument,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            }
+        case (.array(let actualElement), .array(let expectedElement)),
+            (.optional(let actualElement), .optional(let expectedElement)),
+            (.variadic(let actualElement), .variadic(let expectedElement)):
+            return typeMatches(
+                actual: actualElement,
+                expected: expectedElement,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case (
+            .function(let actualParameters, let actualReturn),
+            .function(let expectedParameters, let expectedReturn)
+        ):
+            guard actualParameters.count == expectedParameters.count else {
+                return false
+            }
+            return zip(actualParameters, expectedParameters).allSatisfy {
+                actualParameter, expectedParameter in
+                typeMatches(
+                    actual: actualParameter,
+                    expected: expectedParameter,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            }
+                && typeMatches(
+                    actual: actualReturn,
+                    expected: expectedReturn,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+        default:
+            return false
+        }
+    }
+
+    private static func substitute(
+        _ type: TypeReference,
+        using substitutions: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return substitutions[name] ?? type
+        case .member(let base, let name):
+            return .member(base: substitute(base, using: substitutions), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: substitute(base, using: substitutions),
+                arguments: arguments.map { substitute($0, using: substitutions) }
+            )
+        case .array(let element):
+            return .array(substitute(element, using: substitutions))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { substitute($0, using: substitutions) },
+                returnType: substitute(returnType, using: substitutions)
+            )
+        case .optional(let wrapped):
+            return .optional(substitute(wrapped, using: substitutions))
+        case .variadic(let element):
+            return .variadic(substitute(element, using: substitutions))
+        }
+    }
+}
+
+public struct DeclarationOperatorResolver: Sendable {
+    public static let empty = DeclarationOperatorResolver(callablesByName: [:])
+
+    private struct OperatorSignature: Sendable {
+        var genericParameterNames: Set<String>
+        var lhsType: TypeReference
+        var rhsType: TypeReference
+        var returnType: TypeReference
+    }
+
+    private let signaturesByName: [String: [OperatorSignature]]
+
+    public init(callablesByName: [String: [CallableDeclaration]]) {
+        self.signaturesByName = callablesByName.mapValues { callables in
+            callables.compactMap { callable in
+                guard callable.parameters.count == 2,
+                    let lhsParameter = callable.parameters[0].typeReference,
+                    let rhsParameter = callable.parameters[1].typeReference
+                else {
+                    return nil
+                }
+
+                return OperatorSignature(
+                    genericParameterNames: Set(
+                        callable.genericParameters.map(Self.genericParameterName)),
+                    lhsType: lhsParameter,
+                    rhsType: rhsParameter,
+                    returnType: callable.returnType ?? .named("Void")
+                )
+            }
+        }
+    }
+
+    public func binaryOperatorReturnType(
+        symbol: String,
+        lhs: BootstrapLiteralType,
+        rhs: BootstrapLiteralType,
+        literalBridgeResolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        guard let lhsType = materializedTypeReference(for: lhs, resolver: literalBridgeResolver),
+            let rhsType = materializedTypeReference(for: rhs, resolver: literalBridgeResolver)
+        else {
+            return nil
+        }
+
+        let matches: [TypeReference] = signaturesByName[symbol, default: []].compactMap {
+            signature in
+            var bindings: [String: TypeReference] = [:]
+            guard
+                typeMatches(
+                    actual: lhsType,
+                    expected: signature.lhsType,
+                    genericParameterNames: signature.genericParameterNames,
+                    bindings: &bindings
+                ),
+                typeMatches(
+                    actual: rhsType,
+                    expected: signature.rhsType,
+                    genericParameterNames: signature.genericParameterNames,
+                    bindings: &bindings
+                )
+            else {
+                return nil
+            }
+            return Self.substitute(signature.returnType, using: bindings)
+        }
+
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
+    }
+
+    private func materializedTypeReference(
+        for type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        switch type {
+        case .typed(let typeReference):
+            return typeReference
+        case .nilLiteral:
+            return .named("NilLiteral")
+        default:
+            return resolver.defaultDestinationType(for: type.displayName)
+        }
+    }
+
+    private func typeMatches(
+        actual: TypeReference,
+        expected: TypeReference,
+        genericParameterNames: Set<String>,
+        bindings: inout [String: TypeReference]
+    ) -> Bool {
+        if case .named(let name) = expected, genericParameterNames.contains(name) {
+            if let existing = bindings[name] {
+                return existing == actual
+            }
+            bindings[name] = actual
+            return true
+        }
+
+        if case .optional(let actualWrapped) = actual,
+            case .generic(.named("Optional"), let expectedArguments) = expected,
+            expectedArguments.count == 1
+        {
+            return typeMatches(
+                actual: actualWrapped,
+                expected: expectedArguments[0],
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+
+        if case .generic(.named("Optional"), let actualArguments) = actual,
+            actualArguments.count == 1,
+            case .optional(let expectedWrapped) = expected
+        {
+            return typeMatches(
+                actual: actualArguments[0],
+                expected: expectedWrapped,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+
+        switch (actual, expected) {
+        case (.named(let actualName), .named(let expectedName)):
+            return actualName == expectedName
+        case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
+            return actualName == expectedName
+                && typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+        case (
+            .generic(let actualBase, let actualArguments),
+            .generic(let expectedBase, let expectedArguments)
+        ):
+            guard actualArguments.count == expectedArguments.count,
+                typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            else {
+                return false
+            }
+            return zip(actualArguments, expectedArguments).allSatisfy {
+                actualArgument, expectedArgument in
+                typeMatches(
+                    actual: actualArgument,
+                    expected: expectedArgument,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            }
+        case (.array(let actualElement), .array(let expectedElement)),
+            (.optional(let actualElement), .optional(let expectedElement)),
+            (.variadic(let actualElement), .variadic(let expectedElement)):
+            return typeMatches(
+                actual: actualElement,
+                expected: expectedElement,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case (
+            .function(let actualParameters, let actualReturn),
+            .function(let expectedParameters, let expectedReturn)
+        ):
+            guard actualParameters.count == expectedParameters.count else {
+                return false
+            }
+            return zip(actualParameters, expectedParameters).allSatisfy {
+                actualParameter, expectedParameter in
+                typeMatches(
+                    actual: actualParameter,
+                    expected: expectedParameter,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            }
+                && typeMatches(
+                    actual: actualReturn,
+                    expected: expectedReturn,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+        default:
+            return false
+        }
+    }
+
+    private static func genericParameterName(_ parameter: GenericParameter) -> String {
+        switch parameter {
+        case .type(let name, _, _), .value(let name, _, _):
+            return name
+        }
+    }
+
+    private static func substitute(
+        _ type: TypeReference,
+        using substitutions: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return substitutions[name] ?? type
+        case .member(let base, let name):
+            return .member(base: substitute(base, using: substitutions), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: substitute(base, using: substitutions),
+                arguments: arguments.map { substitute($0, using: substitutions) }
+            )
+        case .array(let element):
+            return .array(substitute(element, using: substitutions))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { substitute($0, using: substitutions) },
+                returnType: substitute(returnType, using: substitutions)
+            )
+        case .optional(let wrapped):
+            return .optional(substitute(wrapped, using: substitutions))
+        case .variadic(let element):
+            return .variadic(substitute(element, using: substitutions))
+        }
+    }
+}
+
+public struct DeclarationMemberResolver: Sendable {
+    public static let empty = DeclarationMemberResolver(constructsByName: [:])
+
+    private struct ConstructMembers: Sendable {
+        var genericParameterNames: [String]
+        var genericDefaultArguments: [TypeReference?]
+        var propertyTypes: [String: TypeReference]
+        var callableReturnTypes: [String: TypeReference]
+    }
+
+    private let membersByConstructName: [String: ConstructMembers]
+
+    public init(constructsByName: [String: ConstructDeclaration]) {
+        self.membersByConstructName = constructsByName.mapValues { construct in
+            let nestedTypeMap = Self.nestedTypeMap(for: construct)
+            var propertyTypes: [String: TypeReference] = [:]
+            for state in construct.states {
+                propertyTypes[state.name] = Self.qualifyNestedLocalTypes(
+                    state.type,
+                    using: nestedTypeMap
+                )
+            }
+            for environment in construct.environments {
+                propertyTypes[environment.name] = Self.qualifyNestedLocalTypes(
+                    environment.type,
+                    using: nestedTypeMap
+                )
+            }
+            for binding in construct.bindings {
+                propertyTypes[binding.name] = Self.qualifyNestedLocalTypes(
+                    Self.simpleTypeReference(named: binding.typeName),
+                    using: nestedTypeMap
+                )
+            }
+            for derived in construct.deriveds {
+                propertyTypes[derived.name] = Self.qualifyNestedLocalTypes(
+                    Self.simpleTypeReference(named: derived.typeName),
+                    using: nestedTypeMap
+                )
+            }
+            for value in construct.values {
+                propertyTypes[value.name] = Self.qualifyNestedLocalTypes(
+                    Self.simpleTypeReference(named: value.typeName),
+                    using: nestedTypeMap
+                )
+            }
+
+            var callableReturnTypes: [String: TypeReference] = [:]
+            for callable in construct.callables {
+                callableReturnTypes[callable.name] = Self.qualifyNestedLocalTypes(
+                    callable.returnType ?? .named("Void"),
+                    using: nestedTypeMap
+                )
+            }
+
+            return ConstructMembers(
+                genericParameterNames: construct.genericParameters.map(Self.genericParameterName),
+                genericDefaultArguments: construct.genericParameters.map {
+                    switch $0 {
+                    case .type(_, _, let defaultArgument):
+                        return defaultArgument
+                    case .value:
+                        return nil
+                    }
+                },
+                propertyTypes: propertyTypes,
+                callableReturnTypes: callableReturnTypes
+            )
+        }
+    }
+
+    private static func nestedTypeMap(for construct: ConstructDeclaration) -> [String:
+        TypeReference]
+    {
+        Dictionary(
+            uniqueKeysWithValues: construct.constructs.map { nested in
+                let localName =
+                    nested.name.split(separator: ".").last.map(String.init) ?? nested.name
+                return (localName, .member(base: .named(construct.name), name: localName))
+            }
+        )
+    }
+
+    private static func qualifyNestedLocalTypes(
+        _ type: TypeReference,
+        using nestedTypeMap: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return nestedTypeMap[name] ?? type
+        case .member(let base, let name):
+            return .member(base: qualifyNestedLocalTypes(base, using: nestedTypeMap), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: qualifyNestedLocalTypes(base, using: nestedTypeMap),
+                arguments: arguments.map { qualifyNestedLocalTypes($0, using: nestedTypeMap) }
+            )
+        case .array(let element):
+            return .array(qualifyNestedLocalTypes(element, using: nestedTypeMap))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { qualifyNestedLocalTypes($0, using: nestedTypeMap) },
+                returnType: qualifyNestedLocalTypes(returnType, using: nestedTypeMap)
+            )
+        case .optional(let wrapped):
+            return .optional(qualifyNestedLocalTypes(wrapped, using: nestedTypeMap))
+        case .variadic(let element):
+            return .variadic(qualifyNestedLocalTypes(element, using: nestedTypeMap))
+        }
+    }
+
+    public func memberType(baseType: TypeReference, memberName: String) -> TypeReference? {
+        guard let context = constructContext(for: baseType),
+            let members = membersByConstructName[context.name],
+            let type = members.propertyTypes[memberName]
+        else {
+            return nil
+        }
+        return Self.substitute(
+            type, using: genericSubstitution(for: members, arguments: context.arguments))
+    }
+
+    public func memberCallableReturnType(
+        baseType: TypeReference,
+        memberName: String
+    ) -> TypeReference? {
+        guard let context = constructContext(for: baseType),
+            let members = membersByConstructName[context.name],
+            let type = members.callableReturnTypes[memberName]
+        else {
+            return nil
+        }
+        return Self.substitute(
+            type, using: genericSubstitution(for: members, arguments: context.arguments))
+    }
+
+    public func constructType(forConstructorCallName name: String) -> TypeReference? {
+        resolveConstructType(forConstructorCallName: name)
+    }
+
+    private func resolveConstructType(forConstructorCallName name: String) -> TypeReference? {
+        guard let constructType = Self.parseConstructTypeReference(from: name),
+            let context = constructContext(for: constructType),
+            let members = membersByConstructName[context.name]
+        else {
+            return nil
+        }
+
+        guard
+            members.genericParameterNames.isEmpty
+                || resolvedGenericArguments(
+                    for: members,
+                    providedArguments: context.arguments
+                ) != nil
+        else {
+            return nil
+        }
+
+        guard let resolvedArguments = resolvedGenericArguments(
+            for: members,
+            providedArguments: context.arguments
+        ) else {
+            return constructType
+        }
+
+        guard !resolvedArguments.isEmpty else {
+            return constructType
+        }
+
+        return .generic(base: .named(context.name), arguments: resolvedArguments)
+    }
+
+    private func genericSubstitution(
+        for members: ConstructMembers,
+        arguments: [TypeReference]
+    ) -> [String: TypeReference] {
+        guard let resolvedArguments = resolvedGenericArguments(
+            for: members,
+            providedArguments: arguments
+        ) else {
+            return [:]
+        }
+
+        return Dictionary(uniqueKeysWithValues: zip(members.genericParameterNames, resolvedArguments))
+    }
+
+    private func resolvedGenericArguments(
+        for members: ConstructMembers,
+        providedArguments: [TypeReference]
+    ) -> [TypeReference]? {
+        guard providedArguments.count <= members.genericParameterNames.count else {
+            return nil
+        }
+
+        var resolvedArguments = providedArguments
+        if providedArguments.count == members.genericParameterNames.count {
+            return resolvedArguments
+        }
+
+        for defaultArgument in members.genericDefaultArguments.dropFirst(providedArguments.count) {
+            guard let defaultArgument else {
+                return nil
+            }
+            resolvedArguments.append(defaultArgument)
+        }
+
+        return resolvedArguments
+    }
+
+    private func constructContext(for type: TypeReference) -> (
+        name: String, arguments: [TypeReference]
+    )? {
+        switch type {
+        case .named(let name):
+            return (name, [])
+        case .member:
+            return (type.displayName, [])
+        case .generic(let base, let arguments):
+            guard let context = constructContext(for: base) else {
+                return nil
+            }
+            return (context.name, arguments)
+        case .array(let element):
+            return ("Array", [element])
+        case .optional(let wrapped):
+            return ("Optional", [wrapped])
+        case .function, .variadic:
+            return nil
+        }
+    }
+
+    private static func simpleTypeReference(named name: String) -> TypeReference {
+        var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasSuffix("?") {
+            trimmed.removeLast()
+            return .optional(simpleTypeReference(named: trimmed))
+        }
+        return .named(trimmed)
+    }
+
+    private static func parseConstructTypeReference(from raw: String) -> TypeReference? {
+        do {
+            var parser = try Parser(source: raw)
+            let type = try parser.parseTypeReferenceNode()
+            try parser.consume(.eof)
+            return type
+        } catch {
+            return nil
+        }
+    }
+
+    private static func genericParameterName(_ parameter: GenericParameter) -> String {
+        switch parameter {
+        case .type(let name, _, _), .value(let name, _, _):
+            return name
+        }
+    }
+
+    private static func substitute(
+        _ type: TypeReference,
+        using substitutions: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return substitutions[name] ?? type
+        case .member(let base, let name):
+            return .member(base: substitute(base, using: substitutions), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: substitute(base, using: substitutions),
+                arguments: arguments.map { substitute($0, using: substitutions) }
+            )
+        case .array(let element):
+            return .array(substitute(element, using: substitutions))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { substitute($0, using: substitutions) },
+                returnType: substitute(returnType, using: substitutions)
+            )
+        case .optional(let wrapped):
+            return .optional(substitute(wrapped, using: substitutions))
+        case .variadic(let element):
+            return .variadic(substitute(element, using: substitutions))
+        }
+    }
+}
