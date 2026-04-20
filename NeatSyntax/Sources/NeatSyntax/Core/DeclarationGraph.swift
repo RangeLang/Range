@@ -163,7 +163,7 @@ public struct DeclarationGraph {
     public let callablesByName: [String: [CallableDeclaration]]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
     public let realizedInitMacroTargets: [RealizedInitMacroTarget]
-    public let semanticGraph: SemanticGraph
+    public let programGraph: ProgramGraph
 
     public init(files: [ParsedSourceFile]) {
         let protocols = Self.collectProtocols(from: files)
@@ -201,7 +201,7 @@ public struct DeclarationGraph {
         self.callablesByName = callables
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
-        self.semanticGraph = Self.collectSemanticGraph(from: files)
+        self.programGraph = Self.collectProgramGraph(from: files)
     }
 
     public var views: DeclarationGraphViews {
@@ -251,10 +251,6 @@ public struct DeclarationGraph {
 
     public var registryView: DeclarationRegistryView {
         views.registryView
-    }
-
-    public var programGraph: ProgramGraph {
-        ProgramGraph(semanticGraph: semanticGraph)
     }
 
     public func topLevelStates(inFilePath path: String) -> [StateDeclaration] {
@@ -974,7 +970,7 @@ public struct DeclarationGraph {
             })
     }
 
-    static func collectSemanticGraph(from files: [ParsedSourceFile]) -> SemanticGraph {
+    static func collectProgramGraph(from files: [ParsedSourceFile]) -> ProgramGraph {
         var collector = SemanticGraphCollector()
         for parsedFile in files.sorted(by: { $0.path < $1.path }) {
             collector.add(parsedFile)
@@ -987,8 +983,8 @@ private struct SemanticGraphCollector {
     private var entitiesByID: [String: SemanticGraphEntity] = [:]
     private var relations: Set<SemanticGraphRelation> = []
 
-    mutating func build() -> SemanticGraph {
-        SemanticGraph(
+    mutating func build() -> ProgramGraph {
+        ProgramGraph(
             entities: Array(entitiesByID.values),
             relations: Array(relations)
         )

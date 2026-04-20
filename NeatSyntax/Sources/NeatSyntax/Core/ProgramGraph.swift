@@ -62,7 +62,7 @@ public struct SemanticGraphRelation: Hashable, Sendable {
     }
 }
 
-public struct SemanticGraph: Sendable {
+public struct ProgramGraph: Sendable {
     public let entities: [SemanticGraphEntity]
     public let relations: [SemanticGraphRelation]
 
@@ -82,13 +82,5 @@ public struct SemanticGraph: Sendable {
             }
             return $0.targetID < $1.targetID
         }
-    }
-}
-
-public struct ProgramGraph: Sendable {
-    public let semanticGraph: SemanticGraph
-
-    public init(semanticGraph: SemanticGraph) {
-        self.semanticGraph = semanticGraph
     }
 }

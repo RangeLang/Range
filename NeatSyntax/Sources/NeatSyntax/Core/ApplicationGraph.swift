@@ -1040,7 +1040,7 @@ private struct ApplicationGraphResolutionPass: ApplicationGraphBuildPass {
 
 private struct GraphCollector {
     private let declarationGraph: DeclarationGraph
-    private let baseSemanticGraph: SemanticGraph
+    private let baseProgramGraph: ProgramGraph
     private let baseEntityIDs: Set<String>
     private let baseEdges: Set<ApplicationGraphEdge>
     private var nodesByID: [String: ApplicationGraphNode] = [:]
@@ -1051,10 +1051,10 @@ private struct GraphCollector {
 
     init(declarationGraph: DeclarationGraph) {
         self.declarationGraph = declarationGraph
-        self.baseSemanticGraph = declarationGraph.semanticGraph
-        self.baseEntityIDs = Set(declarationGraph.semanticGraph.entities.map(\.id))
+        self.baseProgramGraph = declarationGraph.programGraph
+        self.baseEntityIDs = Set(declarationGraph.programGraph.entities.map(\.id))
         self.baseEdges = Set(
-            declarationGraph.semanticGraph.relations.compactMap { relation in
+            declarationGraph.programGraph.relations.compactMap { relation in
                 guard let applicationKind = Self.applicationEdgeKind(for: relation.kind) else {
                     return nil
                 }
@@ -1069,7 +1069,7 @@ private struct GraphCollector {
     }
 
     mutating func seedDeclarationProjection() {
-        indexBaseSemanticGraph()
+        indexBaseProgramGraph()
     }
 
     mutating func resolveApplicationEdges() {
@@ -1077,7 +1077,7 @@ private struct GraphCollector {
     }
 
     func materialize() -> ApplicationGraph {
-        let baseNodes = baseSemanticGraph.entities.compactMap { entity in
+        let baseNodes = baseProgramGraph.entities.compactMap { entity in
             applicationNode(for: entity)
         }
         return ApplicationGraph(
@@ -1254,8 +1254,8 @@ private struct GraphCollector {
         addEdge(from: sourceID, to: typeID, kind: edgeKind)
     }
 
-    private mutating func indexBaseSemanticGraph() {
-        for entity in baseSemanticGraph.entities {
+    private mutating func indexBaseProgramGraph() {
+        for entity in baseProgramGraph.entities {
             guard let applicationKind = Self.applicationNodeKind(for: entity.kind) else {
                 continue
             }
@@ -1351,7 +1351,7 @@ private struct GraphCollector {
 
     private mutating func addResolutionEdges() {
         let typeNodes =
-            baseSemanticGraph.entities.compactMap { applicationNode(for: $0) }.filter {
+            baseProgramGraph.entities.compactMap { applicationNode(for: $0) }.filter {
                 $0.kind == .typeReference
             }
             + nodesByID.values.filter { $0.kind == .typeReference }
