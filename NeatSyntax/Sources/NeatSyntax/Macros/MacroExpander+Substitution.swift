@@ -326,14 +326,14 @@ extension MacroExpander {
             context.resolvedRewriteCall(
                 from: expression,
                 targetBinding: targetBinding,
-                targetKind: targetKind
+                targetType: macro.target.typeReference
             ) != nil
         }
         return operationExpressions.compactMap {
             context.resolvedRewriteCall(
                 from: $0,
                 targetBinding: targetBinding,
-                targetKind: targetKind
+                targetType: macro.target.typeReference
             )
         }
     }

@@ -300,6 +300,11 @@ struct RewriteSurfaceView {
     }
 }
 
+struct RewriteSiteDescriptor {
+    let normalizedPath: String
+    let site: ResolvedRewriteSite
+}
+
 struct MacroExpansionContext {
     let macroRealizationView: MacroRealizationView
     let rewriteSurfaceView: RewriteSurfaceView
@@ -404,88 +409,105 @@ struct MacroExpansionContext {
     func resolvedRewriteCall(
         from expression: Expression,
         targetBinding: String,
-        targetKind: MacroTargetKind
+        targetType: TypeReference
     ) -> ResolvedRewriteCall? {
         guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
             return nil
         }
 
-        let explicitSites = explicitRewriteSites(
+        guard
+            let normalizedPath = normalizedRewritePath(name, targetBinding: targetBinding),
+            let descriptor = rewriteSurfaceView.rewriteSiteDescriptors(
+                targetBinding: targetBinding,
+                targetType: targetType
+            ).first(where: { $0.normalizedPath == normalizedPath })
+        else {
+            return nil
+        }
+
+        return ResolvedRewriteCall(site: descriptor.site, payload: arguments[0].value)
+    }
+}
+
+extension RewriteSurfaceView {
+    func rewriteSiteDescriptors(
+        targetBinding: String,
+        targetType: TypeReference
+    ) -> [RewriteSiteDescriptor] {
+        let targetKind = macroTargetKind(for: targetType)
+        return allowedPaths(
             targetBinding: targetBinding,
-            targetKind: targetKind
+            targetType: targetType
         )
+        .sorted()
+        .compactMap { normalizedPath in
+            guard
+                let site = supportedRewriteSite(
+                    normalizedPath: normalizedPath,
+                    targetBinding: targetBinding,
+                    targetKind: targetKind
+                )
+            else {
+                return nil
+            }
 
-        if let site = explicitSites.first(where: { $0.0 == name })?.1 {
-            return ResolvedRewriteCall(site: site, payload: arguments[0].value)
+            return RewriteSiteDescriptor(normalizedPath: normalizedPath, site: site)
         }
-
-        if targetKind == .parameter,
-            indexedReference(
-                name,
-                prefix: "\(targetBinding).application.arguments[",
-                suffix: "].rewrite"
-            ) != nil
-        {
-            return ResolvedRewriteCall(
-                site: .parameterApplicationArgument,
-                payload: arguments[0].value
-            )
-        }
-
-        if targetKind == .initializer,
-            indexedReference(
-                name,
-                prefix: "\(targetBinding).application.arguments[",
-                suffix: "].rewrite"
-            ) != nil
-        {
-            return ResolvedRewriteCall(
-                site: .initApplication,
-                payload: arguments[0].value
-            )
-        }
-
-        if targetKind == .function,
-            indexedReference(
-                name,
-                prefix: "\(targetBinding).application.arguments[",
-                suffix: "].expression.rewrite"
-            ) != nil
-        {
-            return ResolvedRewriteCall(
-                site: .functionArgumentExpression,
-                payload: arguments[0].value
-            )
-        }
-
-        return nil
     }
 
-    private func explicitRewriteSites(
+    private func supportedRewriteSite(
+        normalizedPath: String,
         targetBinding: String,
         targetKind: MacroTargetKind
-    ) -> [(String, ResolvedRewriteSite)] {
+    ) -> ResolvedRewriteSite? {
+        let directPath = "\(targetBinding).rewrite"
+        if normalizedPath == directPath {
+            switch targetKind {
+            case .expression, .block:
+                return .targetDirect
+            default:
+                return nil
+            }
+        }
+
+        let prefix = "\(targetBinding)."
+        guard normalizedPath.hasPrefix(prefix) else {
+            return nil
+        }
+        let relativePath = String(normalizedPath.dropFirst(prefix.count))
+
         switch targetKind {
-        case .expression, .block:
-            return [
-                ("\(targetBinding).rewrite", .targetDirect)
-            ]
         case .initializer:
-            return [
-                ("\(targetBinding).application.rewrite", .initApplication)
-            ]
+            switch relativePath {
+            case "application.rewrite":
+                return .initApplication
+            case "application.arguments[].expression.rewrite":
+                return .initApplication
+            default:
+                return nil
+            }
         case .function:
-            return [
-                ("\(targetBinding).application.rewrite", .functionApplication)
-            ]
+            switch relativePath {
+            case "application.rewrite":
+                return .functionApplication
+            case "application.arguments[].expression.rewrite":
+                return .functionArgumentExpression
+            default:
+                return nil
+            }
         case .parameter:
-            return [
-                ("\(targetBinding).declaration.type.rewrite", .parameterDeclarationType),
-                ("\(targetBinding).application.expression.rewrite", .parameterApplicationArgument),
-            ]
-        case .construct, .other:
-            return []
+            switch relativePath {
+            case "declaration.type.rewrite":
+                return .parameterDeclarationType
+            case "application.expression.rewrite":
+                return .parameterApplicationArgument
+            case "application.arguments[].expression.rewrite":
+                return .parameterApplicationArguments
+            default:
+                return nil
+            }
+        case .expression, .block, .construct, .other:
+            return nil
         }
     }
-
 }

@@ -135,6 +135,52 @@ struct CompilerFixtureTests {
         #expect(graph.syntaxResolver.declaration(named: "Init.Application", conformsTo: "SupportsRewrite"))
     }
 
+    @Test("Rewrite site decoding uses declaration-backed descriptors")
+    func rewriteSiteDecodingUsesDeclarationBackedDescriptors() throws {
+        let program = try CompilerPipeline().build(inputs: neatCoreInputs())
+        let context = program.declarationGraph.macroExpansionContext(macrosByName: [:])
+
+        let direct = context.resolvedRewriteCall(
+            from: .call(
+                name: "target.rewrite",
+                arguments: [CallArgument(label: nil, value: .string("value"))]
+            ),
+            targetBinding: "target",
+            targetType: .named("Expression")
+        )
+        #expect(direct?.site == .targetDirect)
+
+        let parameter = context.resolvedRewriteCall(
+            from: .call(
+                name: "target.application.expression.rewrite",
+                arguments: [CallArgument(label: nil, value: .string("value"))]
+            ),
+            targetBinding: "target",
+            targetType: .named("Parameter")
+        )
+        #expect(parameter?.site == .parameterApplicationArgument)
+
+        let functionArgument = context.resolvedRewriteCall(
+            from: .call(
+                name: "target.application.arguments[0].expression.rewrite",
+                arguments: [CallArgument(label: nil, value: .string("value"))]
+            ),
+            targetBinding: "target",
+            targetType: .named("Function")
+        )
+        #expect(functionArgument?.site == .functionArgumentExpression)
+
+        let initializer = context.resolvedRewriteCall(
+            from: .call(
+                name: "target.application.rewrite",
+                arguments: [CallArgument(label: nil, value: .string("value"))]
+            ),
+            targetBinding: "target",
+            targetType: .named("Init")
+        )
+        #expect(initializer?.site == .initApplication)
+    }
+
 }
 
 private enum FixtureRole {
