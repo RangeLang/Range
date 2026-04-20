@@ -68,6 +68,13 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 continue
             }
 
+            if skipsExplicitRequirementValidation(
+                for: construct,
+                protocol: protocolDeclaration
+            ) {
+                continue
+            }
+
             let requirements = collectedRequirements(
                 of: protocolDeclaration,
                 declarationGraph: declarationGraph,
@@ -105,6 +112,17 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 protocolName: protocolName
             )
         }
+    }
+
+    private func skipsExplicitRequirementValidation(
+        for construct: ConstructDeclaration,
+        protocol protocolDeclaration: ProtocolDeclaration
+    ) -> Bool {
+        guard construct.isCore else {
+            return false
+        }
+
+        return synthesizedCoreProtocols.contains(protocolDeclaration.name)
     }
 
     private func collectedRequirements(
@@ -393,3 +411,10 @@ private struct ProtocolRequirements {
         callables.append(contentsOf: other.callables)
     }
 }
+
+private let synthesizedCoreProtocols: Set<String> = [
+    "Equatable",
+    "Comparable",
+    "Hashable",
+    "SupportsExtension",
+]

@@ -117,7 +117,7 @@ struct NeatLanguageServer {
             return
         }
 
-        try updateDocument(uri: uri, text: text, diagnosticsMode: .none)
+        try updateDocument(uri: uri, text: text, diagnosticsMode: .validated)
     }
 
     private mutating func applyDocumentChange(from message: [String: Any]) throws {
@@ -131,7 +131,7 @@ struct NeatLanguageServer {
             return
         }
 
-        try updateDocument(uri: uri, text: latest, diagnosticsMode: .none)
+        try updateDocument(uri: uri, text: latest, diagnosticsMode: .validated)
     }
 
     private mutating func refreshSavedDocument(from message: [String: Any]) throws {
