@@ -2,12 +2,5 @@
 construct State: Property {
     value name: String
     value type: TypeReference
-    value declaration: Declaration
-
-    @core
-    construct Declaration {
-        value name: String
-        value type: TypeReference
-        value initializer: Expression?
-    }
+    value initializer: Expression?
 }
