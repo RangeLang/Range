@@ -214,6 +214,16 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.constructsByName["System.Math.Box"] != nil)
     }
 
+    @Test("Core Math namespace is available")
+    func coreMathNamespaceIsAvailable() throws {
+        let program = try CompilerPipeline().buildValidated(inputs: neatCoreInputs())
+
+        #expect(program.declarationGraph.callablesByName["Math.abs"] != nil)
+        #expect(program.declarationGraph.callablesByName["Math.min"] != nil)
+        #expect(program.declarationGraph.callablesByName["Math.max"] != nil)
+        #expect(program.declarationGraph.callablesByName["Math.clamp"] != nil)
+    }
+
 }
 
 private enum FixtureRole {
