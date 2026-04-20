@@ -22,6 +22,15 @@ extension ApplicationGraphValidator {
                     operatorResolver: operatorResolver,
                     fileName: fileName
                 )
+            case .namespace(let declaration):
+                try validateLiteralBridgeCompatibility(
+                    in: declaration,
+                    declarationGraph: declarationGraph,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
             case .module(let module):
                 try validateLiteralBridgeCompatibility(
                     in: registryView.topLevelStates(inFilePath: parsedFile.path),
@@ -59,9 +68,59 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
+                for declaration in module.namespaces {
+                    try validateLiteralBridgeCompatibility(
+                        in: declaration,
+                        declarationGraph: declarationGraph,
+                        resolver: resolver,
+                        memberResolver: memberResolver,
+                        operatorResolver: operatorResolver,
+                        fileName: fileName
+                    )
+                }
             case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
                 break
             }
+        }
+    }
+
+    func validateLiteralBridgeCompatibility(
+        in declaration: NamespaceDeclaration,
+        declarationGraph: DeclarationGraph,
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver,
+        fileName: String
+    ) throws {
+        for callable in declaration.callables {
+            try validateLiteralBridgeCompatibility(
+                in: callable,
+                accessibleTypes: [:],
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                fileName: fileName
+            )
+        }
+        for construct in declaration.constructs {
+            try validateLiteralBridgeCompatibility(
+                in: construct,
+                declarationGraph: declarationGraph,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                fileName: fileName
+            )
+        }
+        for namespace in declaration.namespaces {
+            try validateLiteralBridgeCompatibility(
+                in: namespace,
+                declarationGraph: declarationGraph,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                fileName: fileName
+            )
         }
     }
 

@@ -217,21 +217,76 @@ public struct CompilerPipeline {
         var returnTypes: [String: TypeReference] = [:]
 
         for parsedFile in files {
-            guard case .module(let module) = parsedFile.sourceFile else {
-                continue
-            }
-
-            for callable in module.callables {
-                guard let returnType = callable.returnType else {
-                    continue
-                }
-                returnTypes[callable.name] = returnType
-                if let targetType = callable.targetType {
-                    returnTypes["\(targetType.displayName).\(callable.name)"] = returnType
-                }
-            }
+            collectCallableReturnTypes(
+                from: parsedFile.sourceFile,
+                into: &returnTypes
+            )
         }
 
         return returnTypes
+    }
+
+    private func collectCallableReturnTypes(
+        from sourceFile: SourceFileNode,
+        into returnTypes: inout [String: TypeReference]
+    ) {
+        switch sourceFile {
+        case .module(let module):
+            for callable in module.callables {
+                collectCallableReturnType(callable, into: &returnTypes)
+            }
+            for namespace in module.namespaces {
+                collectCallableReturnTypes(
+                    in: namespace,
+                    qualifiedPrefix: namespace.name,
+                    into: &returnTypes
+                )
+            }
+        case .namespace(let namespace):
+            collectCallableReturnTypes(
+                in: namespace,
+                qualifiedPrefix: namespace.name,
+                into: &returnTypes
+            )
+        default:
+            break
+        }
+    }
+
+    private func collectCallableReturnTypes(
+        in namespace: NamespaceDeclaration,
+        qualifiedPrefix: String,
+        into returnTypes: inout [String: TypeReference]
+    ) {
+        for callable in namespace.callables {
+            guard let returnType = callable.returnType else {
+                continue
+            }
+            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
+            returnTypes[qualifiedName] = returnType
+            if let targetType = callable.targetType {
+                returnTypes["\(targetType.displayName).\(qualifiedName)"] = returnType
+            }
+        }
+        for nested in namespace.namespaces {
+            collectCallableReturnTypes(
+                in: nested,
+                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)",
+                into: &returnTypes
+            )
+        }
+    }
+
+    private func collectCallableReturnType(
+        _ callable: CallableDeclaration,
+        into returnTypes: inout [String: TypeReference]
+    ) {
+        guard let returnType = callable.returnType else {
+            return
+        }
+        returnTypes[callable.name] = returnType
+        if let targetType = callable.targetType {
+            returnTypes["\(targetType.displayName).\(callable.name)"] = returnType
+        }
     }
 }

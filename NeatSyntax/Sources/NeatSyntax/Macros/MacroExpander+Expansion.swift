@@ -65,6 +65,7 @@ extension MacroExpander {
                             context: context
                         )
                     },
+                    namespaces: module.namespaces,
                     enumerations: module.enumerations,
                     protocols: module.protocols,
                     macros: module.macros,
@@ -83,7 +84,7 @@ extension MacroExpander {
                     literalBridges: literalBridges,
                     context: context
                 ))
-        case .macro, .enumeration, .protocolDefinition, .extensions:
+        case .namespace, .macro, .enumeration, .protocolDefinition, .extensions:
             return sourceFile
         }
     }

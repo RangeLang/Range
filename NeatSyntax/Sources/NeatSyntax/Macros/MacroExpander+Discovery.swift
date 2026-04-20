@@ -46,7 +46,7 @@ extension MacroExpander {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .enumeration, .protocolDefinition, .mainBlock, .extensions:
+        case .construct, .namespace, .enumeration, .protocolDefinition, .mainBlock, .extensions:
             return []
         }
     }

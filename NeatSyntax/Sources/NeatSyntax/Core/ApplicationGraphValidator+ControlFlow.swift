@@ -8,6 +8,8 @@ extension ApplicationGraphValidator {
             switch parsedFile.sourceFile {
             case .construct(let declaration):
                 try validateControlFlow(in: declaration, fileName: fileName)
+            case .namespace(let declaration):
+                try validateControlFlow(in: declaration, fileName: fileName)
             case .module(let module):
                 if let mainBlock = module.mainBlock {
                     try validateControlFlow(
@@ -32,6 +34,9 @@ extension ApplicationGraphValidator {
                 for declaration in module.constructs {
                     try validateControlFlow(in: declaration, fileName: fileName)
                 }
+                for declaration in module.namespaces {
+                    try validateControlFlow(in: declaration, fileName: fileName)
+                }
             case .mainBlock(let mainBlock):
                 try validateControlFlow(
                     in: mainBlock.body,
@@ -41,6 +46,27 @@ extension ApplicationGraphValidator {
             case .enumeration, .protocolDefinition, .macro, .extensions:
                 break
             }
+        }
+    }
+
+    func validateControlFlow(
+        in declaration: NamespaceDeclaration,
+        fileName: String
+    ) throws {
+        for callable in declaration.callables {
+            guard let body = callable.body else { continue }
+            try validateControlFlow(
+                in: body,
+                context: .root,
+                fileName: fileName
+            )
+        }
+
+        for nestedDeclaration in declaration.constructs {
+            try validateControlFlow(in: nestedDeclaration, fileName: fileName)
+        }
+        for nestedNamespace in declaration.namespaces {
+            try validateControlFlow(in: nestedNamespace, fileName: fileName)
         }
     }
 

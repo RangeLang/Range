@@ -370,6 +370,14 @@ public struct DeclarationGraph {
                     protocols: protocols
                 )
             }
+            for namespace in namespaces(in: parsedFile.sourceFile) {
+                collectNamespaceConstructs(
+                    in: namespace,
+                    qualifiedPrefix: namespace.name,
+                    into: &registry,
+                    protocols: protocols
+                )
+            }
         }
         return registry
     }
@@ -494,11 +502,24 @@ public struct DeclarationGraph {
                         ownerName: construct.name
                     )
                 }
+                for namespace in module.namespaces {
+                    collectNamespaceCallableParameters(
+                        in: namespace,
+                        registry: &registry,
+                        qualifiedPrefix: namespace.name
+                    )
+                }
             case .construct(let construct):
                 collectCallableParameters(
                     in: construct,
                     registry: &registry,
                     ownerName: construct.name
+                )
+            case .namespace(let namespace):
+                collectNamespaceCallableParameters(
+                    in: namespace,
+                    registry: &registry,
+                    qualifiedPrefix: namespace.name
                 )
             case .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
                 continue
@@ -597,8 +618,106 @@ public struct DeclarationGraph {
             for declaration in callables(in: parsedFile.sourceFile) {
                 registry[declaration.name, default: []].append(declaration)
             }
+            for namespace in namespaces(in: parsedFile.sourceFile) {
+                collectNamespaceCallables(
+                    in: namespace,
+                    qualifiedPrefix: namespace.name,
+                    into: &registry
+                )
+            }
         }
         return registry
+    }
+
+    private static func collectNamespaceConstructs(
+        in namespace: NamespaceDeclaration,
+        qualifiedPrefix: String,
+        into registry: inout [String: ConstructDeclaration],
+        protocols: [String: ProtocolDeclaration]
+    ) {
+        for declaration in namespace.constructs {
+            collectConstruct(
+                declaration,
+                qualifiedName: "\(qualifiedPrefix).\(declaration.name)",
+                into: &registry,
+                protocols: protocols
+            )
+        }
+        for nested in namespace.namespaces {
+            collectNamespaceConstructs(
+                in: nested,
+                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)",
+                into: &registry,
+                protocols: protocols
+            )
+        }
+    }
+
+    private static func collectNamespaceCallables(
+        in namespace: NamespaceDeclaration,
+        qualifiedPrefix: String,
+        into registry: inout [String: [CallableDeclaration]]
+    ) {
+        for callable in namespace.callables {
+            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
+            registry[qualifiedName, default: []].append(
+                CallableDeclaration(
+                    macros: callable.macros,
+                    attribute: callable.attribute,
+                    targetType: callable.targetType,
+                    name: qualifiedName,
+                    genericParameters: callable.genericParameters,
+                    hasExplicitParameterClause: callable.hasExplicitParameterClause,
+                    parameters: callable.parameters,
+                    returnType: callable.returnType,
+                    body: callable.body
+                )
+            )
+        }
+        for nested in namespace.namespaces {
+            collectNamespaceCallables(
+                in: nested,
+                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)",
+                into: &registry
+            )
+        }
+    }
+
+    private static func collectNamespaceCallableParameters(
+        in namespace: NamespaceDeclaration,
+        registry: inout [String: [NeatFunctionParameter]],
+        qualifiedPrefix: String
+    ) {
+        for callable in namespace.callables {
+            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
+            let qualifiedCallable = CallableDeclaration(
+                macros: callable.macros,
+                attribute: callable.attribute,
+                targetType: callable.targetType,
+                name: qualifiedName,
+                genericParameters: callable.genericParameters,
+                hasExplicitParameterClause: callable.hasExplicitParameterClause,
+                parameters: callable.parameters,
+                returnType: callable.returnType,
+                body: callable.body
+            )
+            registry[callableIdentity(ownerName: nil, declaration: qualifiedCallable)] =
+                callable.parameters
+        }
+        for construct in namespace.constructs {
+            collectCallableParameters(
+                in: construct,
+                registry: &registry,
+                ownerName: "\(qualifiedPrefix).\(construct.name)"
+            )
+        }
+        for nested in namespace.namespaces {
+            collectNamespaceCallableParameters(
+                in: nested,
+                registry: &registry,
+                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)"
+            )
+        }
     }
 
     static func collectRealizedLiteralBridges(
@@ -656,7 +775,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.protocols
-        case .construct, .enumeration, .mainBlock, .macro, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -667,7 +786,18 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.constructs
-        case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+            return []
+        }
+    }
+
+    static func namespaces(in sourceFile: SourceFileNode) -> [NamespaceDeclaration] {
+        switch sourceFile {
+        case .namespace(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.namespaces
+        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -676,7 +806,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
             return []
         }
     }
@@ -687,7 +817,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.enumerations
-        case .construct, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .namespace, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -698,7 +828,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .enumeration, .mainBlock, .protocolDefinition, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -709,7 +839,7 @@ public struct DeclarationGraph {
             return declarations
         case .module(let module):
             return module.extensions
-        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition:
             return []
         }
     }
@@ -718,6 +848,8 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.callables
+        case .namespace(let declaration):
+            return declaration.callables
         case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
@@ -853,6 +985,8 @@ private struct SemanticGraphCollector {
         switch parsedFile.sourceFile {
         case .construct(let declaration):
             addConstruct(declaration, parentID: fileID)
+        case .namespace(let declaration):
+            addNamespace(declaration, parentID: fileID)
         case .enumeration(let declaration):
             addEnumeration(declaration, parentID: fileID)
         case .protocolDefinition(let declaration):
@@ -878,6 +1012,9 @@ private struct SemanticGraphCollector {
             for declaration in module.constructs {
                 addConstruct(declaration, parentID: fileID)
             }
+            for declaration in module.namespaces {
+                addNamespace(declaration, parentID: fileID)
+            }
             for declaration in module.enumerations {
                 addEnumeration(declaration, parentID: fileID)
             }
@@ -894,6 +1031,22 @@ private struct SemanticGraphCollector {
             let mainID = "\(fileID)/main"
             addEntity(id: mainID, kind: .mainBlock, label: "@main")
             addRelation(from: fileID, to: mainID, kind: .contains)
+        }
+    }
+
+    private mutating func addNamespace(_ declaration: NamespaceDeclaration, parentID: String) {
+        let namespaceID = "\(parentID)/namespace:\(declaration.name)"
+        addEntity(id: namespaceID, kind: .namespace, label: declaration.name)
+        addRelation(from: parentID, to: namespaceID, kind: .contains)
+
+        for callable in declaration.callables {
+            addCallable(callable, parentID: namespaceID)
+        }
+        for construct in declaration.constructs {
+            addConstruct(construct, parentID: namespaceID)
+        }
+        for namespace in declaration.namespaces {
+            addNamespace(namespace, parentID: namespaceID)
         }
     }
 
@@ -1101,4 +1254,5 @@ private struct SemanticGraphCollector {
             return "\(label):\(typeName)"
         }.joined(separator: ",")
     }
+
 }

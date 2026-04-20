@@ -8,6 +8,7 @@ enum NeatSyntax {
     }
 
     enum Keyword: String {
+        case namespace = "namespace"
         case value = "value"
         case state = "state"
         case environment = "environment"

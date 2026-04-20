@@ -54,6 +54,12 @@ struct GraphCollector {
         switch parsedFile.sourceFile {
         case .construct(let declaration):
             analyzeConstructDeclaration(declaration, parentID: fileID)
+        case .namespace(let declaration):
+            analyzeNamespaceDeclaration(
+                declaration,
+                parentID: fileID,
+                qualifiedPrefix: declaration.name
+            )
         case .enumeration, .protocolDefinition, .macro, .extensions:
             return
         case .module(let module):
@@ -63,6 +69,13 @@ struct GraphCollector {
             }
             for declaration in module.constructs {
                 analyzeConstructDeclaration(declaration, parentID: fileID)
+            }
+            for declaration in module.namespaces {
+                analyzeNamespaceDeclaration(
+                    declaration,
+                    parentID: fileID,
+                    qualifiedPrefix: declaration.name
+                )
             }
             let moduleScope = MemoryScope(
                 symbols: Dictionary(uniqueKeysWithValues: topLevelStates.map { state in
@@ -82,6 +95,36 @@ struct GraphCollector {
             }
         case .mainBlock(let mainBlock):
             analyzeMainBlock(mainBlock, parentID: fileID, topLevelStates: [])
+        }
+    }
+
+    private mutating func analyzeNamespaceDeclaration(
+        _ declaration: NamespaceDeclaration,
+        parentID: String,
+        qualifiedPrefix: String
+    ) {
+        let namespaceID = "\(parentID)/namespace:\(declaration.name)"
+        let scope = MemoryScope(symbols: [:])
+
+        for callable in declaration.callables {
+            analyzeCallableDeclaration(
+                qualified(callable, withPrefix: qualifiedPrefix),
+                parentID: namespaceID,
+                scope: scope
+            )
+        }
+        for construct in declaration.constructs {
+            analyzeConstructDeclaration(
+                qualified(construct, withPrefix: qualifiedPrefix),
+                parentID: namespaceID
+            )
+        }
+        for nested in declaration.namespaces {
+            analyzeNamespaceDeclaration(
+                nested,
+                parentID: namespaceID,
+                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)"
+            )
         }
     }
 
@@ -186,6 +229,45 @@ struct GraphCollector {
         }
     }
 
+    private func qualified(
+        _ callable: CallableDeclaration,
+        withPrefix prefix: String
+    ) -> CallableDeclaration {
+        CallableDeclaration(
+            macros: callable.macros,
+            attribute: callable.attribute,
+            targetType: callable.targetType,
+            name: "\(prefix).\(callable.name)",
+            genericParameters: callable.genericParameters,
+            hasExplicitParameterClause: callable.hasExplicitParameterClause,
+            parameters: callable.parameters,
+            returnType: callable.returnType,
+            body: callable.body
+        )
+    }
+
+    private func qualified(
+        _ construct: ConstructDeclaration,
+        withPrefix prefix: String
+    ) -> ConstructDeclaration {
+        ConstructDeclaration(
+            macros: construct.macros,
+            kind: construct.kind,
+            attribute: construct.attribute,
+            name: "\(prefix).\(construct.name)",
+            genericParameters: construct.genericParameters,
+            conformances: construct.conformances,
+            states: construct.states,
+            environments: construct.environments,
+            bindings: construct.bindings,
+            deriveds: construct.deriveds,
+            values: construct.values,
+            initializers: construct.initializers,
+            callables: construct.callables,
+            constructs: construct.constructs.map { qualified($0, withPrefix: "\(prefix).\(construct.name)") }
+        )
+    }
+
     private mutating func addNode(id: String, kind: ApplicationGraphNodeKind, label: String) {
         guard !baseEntityIDs.contains(id) else { return }
         nodesByID[id] = ApplicationGraphNode(id: id, kind: kind, label: label)
@@ -239,6 +321,7 @@ struct GraphCollector {
     private static func applicationNodeKind(for kind: SemanticGraphEntityKind) -> ApplicationGraphNodeKind? {
         switch kind {
         case .file: return .file
+        case .namespace: return .namespace
         case .construct: return .construct
         case .enumeration: return .enumeration
         case .protocolDefinition: return .protocolDefinition

@@ -181,6 +181,39 @@ struct CompilerFixtureTests {
         #expect(initializer?.site == .initApplication)
     }
 
+    @Test("Namespaces qualify nested callables and constructs")
+    func namespacesQualifyNestedCallablesAndConstructs() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Namespaces.neat",
+                source: """
+                namespace System {
+                    namespace Math {
+                        function zero() -> Int {
+                            return 0
+                        }
+
+                        construct Box {
+                            value number: Int
+                        }
+                    }
+                }
+
+                @main {
+                    value result = System.Math.zero()
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+
+        #expect(program.declarationGraph.callablesByName["System.Math.zero"] != nil)
+        #expect(program.declarationGraph.constructsByName["System.Math.Box"] != nil)
+    }
+
 }
 
 private enum FixtureRole {

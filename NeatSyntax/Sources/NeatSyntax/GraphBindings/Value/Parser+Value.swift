@@ -33,13 +33,22 @@ extension Parser {
         guard peek(offset: offset) == .keyword(NeatSyntax.Keyword.value.rawValue) else {
             return false
         }
-        guard case .identifier = peek(offset: offset + 1) else { return false }
+        guard tokenCanStartDeclarationName(peek(offset: offset + 1)) else { return false }
         if peek(offset: offset + 2) == .colon {
             return true
         }
         return {
-            guard case .identifier = peek(offset: offset + 2) else { return false }
+            guard tokenCanStartDeclarationName(peek(offset: offset + 2)) else { return false }
             return peek(offset: offset + 3) == .colon
         }()
+    }
+
+    private func tokenCanStartDeclarationName(_ token: Token) -> Bool {
+        switch token {
+        case .identifier, .keyword:
+            return true
+        default:
+            return false
+        }
     }
 }
