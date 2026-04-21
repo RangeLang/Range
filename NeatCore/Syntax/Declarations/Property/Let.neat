@@ -1,6 +1,9 @@
 @core
-construct Let: Property {
-    let name: String
-    let type: TypeReference
-    let expression: Expression?
+construct Let<T>: Property {
+  let name: String
+  let type: TypeReference
+  let value: Expression?
+
+  function initializer(transform: (T) -> T)
+  function getter(transform: (T) -> T)
 }
