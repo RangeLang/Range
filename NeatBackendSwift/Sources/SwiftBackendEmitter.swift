@@ -187,6 +187,13 @@ struct SwiftBackendEmitter {
                     fputs("\\(String(describing: value))\\n", stderr)
                 }
             }
+
+            enum __NeatDeferredControlFlow: Error {
+                case returnValue(Any)
+                case returnVoid
+                case breakLoop
+                case continueLoop
+            }
             """
 
         guard includeFoundationImport else {
@@ -226,7 +233,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitMain(_ mainBlock: MainBlockNode) throws -> String {
-        let body = try emitStatements(mainBlock.body, indent: 2)
+        let body = try emitStatements(mainBlock.body, indent: 2, enclosingReturnType: .named("Void"))
 
         return """
             @main
@@ -246,7 +253,11 @@ struct SwiftBackendEmitter {
 
         let parameters = try callable.parameters.map(emitParameter).joined(separator: ", ")
         let returnClause = try emitReturnClause(callable.returnType)
-        let functionBody = try emitStatements(body, indent: 1)
+        let functionBody = try emitStatements(
+            body,
+            indent: 1,
+            enclosingReturnType: callable.returnType ?? .named("Void")
+        )
 
         return """
             func \(callable.name)(\(parameters))\(returnClause) {
@@ -430,7 +441,11 @@ struct SwiftBackendEmitter {
                 "var \(derived.name): \(derived.typeName) { \(try emitExpression(expression)) }"
         }
 
-        let bodyText = try emitStatements(body, indent: 2)
+        let bodyText = try emitStatements(
+            body,
+            indent: 2,
+            enclosingReturnType: .named(derived.typeName)
+        )
         return """
             var \(derived.name): \(derived.typeName) {
             \(bodyText)
@@ -444,7 +459,7 @@ struct SwiftBackendEmitter {
             return "init(\(parameters)) {}"
         }
 
-        let functionBody = try emitStatements(body, indent: 2)
+        let functionBody = try emitStatements(body, indent: 2, enclosingReturnType: .named("Void"))
         return """
             init(\(parameters)) {
             \(functionBody)
@@ -460,7 +475,11 @@ struct SwiftBackendEmitter {
 
         let parameters = try callable.parameters.map(emitParameter).joined(separator: ", ")
         let returnClause = try emitReturnClause(callable.returnType)
-        let functionBody = try emitStatements(body, indent: 2)
+        let functionBody = try emitStatements(
+            body,
+            indent: 2,
+            enclosingReturnType: callable.returnType ?? .named("Void")
+        )
         let mutatingPrefix = methodNeedsMutation(callable) ? "mutating " : ""
 
         return """
@@ -523,32 +542,43 @@ struct SwiftBackendEmitter {
             .joined(separator: "\n")
     }
 
-    private func emitStatements(_ statements: [NeatStatement], indent: Int) throws -> String {
+    private func emitStatements(
+        _ statements: [NeatStatement],
+        indent: Int,
+        enclosingReturnType: TypeReference? = nil
+    ) throws -> String {
         try statements
-            .map { try emitStatement($0, indent: indent) }
+            .map { try emitStatement($0, indent: indent, enclosingReturnType: enclosingReturnType) }
             .joined(separator: "\n")
     }
 
-    private func emitStatement(_ statement: NeatStatement, indent: Int) throws -> String {
+    private func emitStatement(
+        _ statement: NeatStatement,
+        indent: Int,
+        enclosingReturnType: TypeReference? = nil
+    ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
 
         switch statement {
         case .macroInvocation:
             throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
         case .background(let background):
-            let bodyText = try emitStatements(background.body, indent: indent + 1)
+            let bodyText = try emitStatements(
+                background.body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
             return """
                 \(prefix)Task.detached {
                 \(bodyText)
                 \(prefix)}
                 """
         case .deferBlock(let deferred):
-            let bodyText = try emitStatements(deferred.body, indent: indent + 1)
-            return """
-                \(prefix)defer {
-                \(bodyText)
-                \(prefix)}
-                """
+            return try emitDeferredBlock(
+                deferred.body,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType
+            )
         case .localCallable(let declaration):
             return try emitLocalCallableDeclaration(declaration, indent: indent)
         case .localBinding(let declaration):
@@ -558,7 +588,11 @@ struct SwiftBackendEmitter {
             return
                 "\(prefix)\(keyword) \(declaration.name)\(typeAnnotation) = \(try emitLocalBindingExpression(declaration))"
         case .derived(let name, let typeName, let body):
-            let bodyText = try emitStatements(body, indent: indent + 2)
+            let bodyText = try emitStatements(
+                body,
+                indent: indent + 2,
+                enclosingReturnType: .named(typeName)
+            )
             return """
                 \(prefix)let \(name): \(typeName) = {
                 \(bodyText)
@@ -578,14 +612,26 @@ struct SwiftBackendEmitter {
             }
             return "\(prefix)return"
         case .conditional(let branches):
-            return try emitConditional(branches, indent: indent)
+            return try emitConditional(
+                branches,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType
+            )
         case .forEach(let name, let sequence, let body):
             let header = "\(prefix)for \(name) in \(try emitExpression(sequence)) {"
-            let bodyText = try emitStatements(body, indent: indent + 1)
+            let bodyText = try emitStatements(
+                body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
             return "\(header)\n\(bodyText)\n\(prefix)}"
         case .whileLoop(let condition, let body):
             let header = "\(prefix)while \(try emitExpression(condition)) {"
-            let bodyText = try emitStatements(body, indent: indent + 1)
+            let bodyText = try emitStatements(
+                body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
             return "\(header)\n\(bodyText)\n\(prefix)}"
         case .break:
             return "\(prefix)break"
@@ -596,7 +642,8 @@ struct SwiftBackendEmitter {
                 subject: expression,
                 cases: cases,
                 defaultBody: defaultBody,
-                indent: indent
+                indent: indent,
+                enclosingReturnType: enclosingReturnType
             )
         case .environmentProvision:
             throw SwiftBackendError(
@@ -604,14 +651,22 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func emitConditional(_ branches: [StatementConditionalBranch], indent: Int) throws
+    private func emitConditional(
+        _ branches: [StatementConditionalBranch],
+        indent: Int,
+        enclosingReturnType: TypeReference? = nil
+    ) throws
         -> String
     {
         let prefix = String(repeating: "    ", count: indent)
         var rendered: [String] = []
 
         for (index, branch) in branches.enumerated() {
-            let bodyText = try emitStatements(branch.body, indent: indent + 1)
+            let bodyText = try emitStatements(
+                branch.body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
             if let condition = branch.condition {
                 let keyword = index == 0 ? "if" : "else if"
                 rendered.append(
@@ -629,19 +684,32 @@ struct SwiftBackendEmitter {
         subject: NeatExpression,
         cases: [SwitchCase],
         defaultBody: [NeatStatement]?,
-        indent: Int
+        indent: Int,
+        enclosingReturnType: TypeReference? = nil
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
         var lines: [String] = ["\(prefix)switch \(try emitExpression(subject)) {"]
 
         for switchCase in cases {
             lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
-            lines.append(try emitStatements(switchCase.body, indent: indent + 1))
+            lines.append(
+                try emitStatements(
+                    switchCase.body,
+                    indent: indent + 1,
+                    enclosingReturnType: enclosingReturnType
+                )
+            )
         }
 
         if let defaultBody {
             lines.append("\(prefix)default:")
-            lines.append(try emitStatements(defaultBody, indent: indent + 1))
+            lines.append(
+                try emitStatements(
+                    defaultBody,
+                    indent: indent + 1,
+                    enclosingReturnType: enclosingReturnType
+                )
+            )
         }
 
         lines.append("\(prefix)}")
@@ -853,8 +921,264 @@ struct SwiftBackendEmitter {
             return "{ \(try emitExpression(expression)) }"
         }
 
-        let bodyText = try emitStatements(body, indent: 1)
+        let bodyText = try emitStatements(body, indent: 1, enclosingReturnType: nil)
         return "{\n\(bodyText)\n}"
+    }
+
+    private func emitDeferredBlock(
+        _ statements: [NeatStatement],
+        indent: Int,
+        enclosingReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        let bodyPrefix = String(repeating: "    ", count: indent + 1)
+        var lines: [String] = [
+            "\(prefix)do {",
+            "\(bodyPrefix)var __neatDeferredControlFlow: __NeatDeferredControlFlow?",
+        ]
+
+        for statement in statements {
+            lines.append(
+                try emitDeferredProtectedStatement(
+                    statement,
+                    indent: indent + 1,
+                    enclosingReturnType: enclosingReturnType
+                )
+            )
+        }
+
+        lines.append(
+            try emitDeferredFlowResume(
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
+        )
+        lines.append("\(prefix)}")
+        return lines.joined(separator: "\n")
+    }
+
+    private func emitDeferredProtectedStatement(
+        _ statement: NeatStatement,
+        indent: Int,
+        enclosingReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        let bodyText = try emitDeferredInnerStatement(
+            statement,
+            indent: indent + 2,
+            enclosingReturnType: enclosingReturnType
+        )
+
+        return """
+            \(prefix)do {
+            \(prefix)    try ({ () throws in
+            \(bodyText)
+            \(prefix)    })()
+            \(prefix)} catch let flow as __NeatDeferredControlFlow {
+            \(prefix)    if __neatDeferredControlFlow == nil {
+            \(prefix)        __neatDeferredControlFlow = flow
+            \(prefix)    }
+            \(prefix)}
+            """
+    }
+
+    private func emitDeferredInnerStatement(
+        _ statement: NeatStatement,
+        indent: Int,
+        enclosingReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+
+        switch statement {
+        case .macroInvocation:
+            throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
+        case .background(let background):
+            let bodyText = try emitStatements(
+                background.body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
+            return """
+                \(prefix)Task.detached {
+                \(bodyText)
+                \(prefix)}
+                """
+        case .deferBlock(let deferred):
+            return try emitDeferredBlock(
+                deferred.body,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType
+            )
+        case .localCallable(let declaration):
+            return try emitLocalCallableDeclaration(declaration, indent: indent)
+        case .localBinding(let declaration):
+            let keyword = declaration.kind == .constant ? "let" : "var"
+            let typeAnnotation =
+                declaration.hasExplicitTypeAnnotation ? ": \(emitTypeName(declaration.type))" : ""
+            return
+                "\(prefix)\(keyword) \(declaration.name)\(typeAnnotation) = \(try emitLocalBindingExpression(declaration))"
+        case .derived(let name, let typeName, let body):
+            let bodyText = try emitStatements(
+                body,
+                indent: indent + 2,
+                enclosingReturnType: .named(typeName)
+            )
+            return """
+                \(prefix)let \(name): \(typeName) = {
+                \(bodyText)
+                \(prefix)}()
+                """
+        case .assignment(let target, let expression):
+            return
+                "\(prefix)\(try emitAssignmentTarget(target)) = \(try emitExpression(expression))"
+        case .compoundAssignment(let target, .plusEquals, let expression):
+            return
+                "\(prefix)\(try emitAssignmentTarget(target)) += \(try emitExpression(expression))"
+        case .expression(let expression):
+            return "\(prefix)\(try emitExpression(expression))"
+        case .return(let expression):
+            if let expression {
+                return "\(prefix)throw __NeatDeferredControlFlow.returnValue(\(try emitExpression(expression)))"
+            }
+            return "\(prefix)throw __NeatDeferredControlFlow.returnVoid"
+        case .conditional(let branches):
+            return try emitDeferredConditional(
+                branches,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType
+            )
+        case .forEach(let name, let sequence, let body):
+            let header = "\(prefix)for \(name) in \(try emitExpression(sequence)) {"
+            let bodyText = try emitDeferredInnerStatements(
+                body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
+            return "\(header)\n\(bodyText)\n\(prefix)}"
+        case .whileLoop(let condition, let body):
+            let header = "\(prefix)while \(try emitExpression(condition)) {"
+            let bodyText = try emitDeferredInnerStatements(
+                body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
+            return "\(header)\n\(bodyText)\n\(prefix)}"
+        case .break:
+            return "\(prefix)throw __NeatDeferredControlFlow.breakLoop"
+        case .continue:
+            return "\(prefix)throw __NeatDeferredControlFlow.continueLoop"
+        case .switchStatement(let expression, let cases, let defaultBody):
+            return try emitDeferredSwitch(
+                subject: expression,
+                cases: cases,
+                defaultBody: defaultBody,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType
+            )
+        case .environmentProvision:
+            throw SwiftBackendError(
+                "Swift backend does not support environment provision statements yet.")
+        }
+    }
+
+    private func emitDeferredInnerStatements(
+        _ statements: [NeatStatement],
+        indent: Int,
+        enclosingReturnType: TypeReference?
+    ) throws -> String {
+        try statements
+            .map { try emitDeferredInnerStatement($0, indent: indent, enclosingReturnType: enclosingReturnType) }
+            .joined(separator: "\n")
+    }
+
+    private func emitDeferredConditional(
+        _ branches: [StatementConditionalBranch],
+        indent: Int,
+        enclosingReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        var rendered: [String] = []
+
+        for (index, branch) in branches.enumerated() {
+            let bodyText = try emitDeferredInnerStatements(
+                branch.body,
+                indent: indent + 1,
+                enclosingReturnType: enclosingReturnType
+            )
+            if let condition = branch.condition {
+                let keyword = index == 0 ? "if" : "else if"
+                rendered.append(
+                    "\(prefix)\(keyword) \(try emitExpression(condition)) {\n\(bodyText)\n\(prefix)}"
+                )
+            } else {
+                rendered.append("\(prefix)else {\n\(bodyText)\n\(prefix)}")
+            }
+        }
+
+        return rendered.joined(separator: " ")
+    }
+
+    private func emitDeferredSwitch(
+        subject: NeatExpression,
+        cases: [SwitchCase],
+        defaultBody: [NeatStatement]?,
+        indent: Int,
+        enclosingReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject)) {"]
+
+        for switchCase in cases {
+            lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
+            lines.append(
+                try emitDeferredInnerStatements(
+                    switchCase.body,
+                    indent: indent + 1,
+                    enclosingReturnType: enclosingReturnType
+                )
+            )
+        }
+
+        if let defaultBody {
+            lines.append("\(prefix)default:")
+            lines.append(
+                try emitDeferredInnerStatements(
+                    defaultBody,
+                    indent: indent + 1,
+                    enclosingReturnType: enclosingReturnType
+                )
+            )
+        }
+
+        lines.append("\(prefix)}")
+        return lines.joined(separator: "\n")
+    }
+
+    private func emitDeferredFlowResume(
+        indent: Int,
+        enclosingReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        var lines: [String] = [
+            "\(prefix)if let __neatDeferredControlFlow {",
+            "\(prefix)    switch __neatDeferredControlFlow {",
+        ]
+
+        if let enclosingReturnType, emitTypeName(enclosingReturnType) != "Void" {
+            lines.append(
+                "\(prefix)    case .returnValue(let value): return value as! \(emitTypeName(enclosingReturnType))"
+            )
+            lines.append("\(prefix)    case .returnVoid: return")
+        } else {
+            lines.append("\(prefix)    case .returnValue: return")
+            lines.append("\(prefix)    case .returnVoid: return")
+        }
+
+        lines.append("\(prefix)    case .breakLoop: break")
+        lines.append("\(prefix)    case .continueLoop: continue")
+        lines.append("\(prefix)    }")
+        lines.append("\(prefix)}")
+        return lines.joined(separator: "\n")
     }
 
     private func emitInterpolatedString(_ string: InterpolatedString) throws -> String {
