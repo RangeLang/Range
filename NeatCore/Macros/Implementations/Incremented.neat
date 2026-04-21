@@ -1,5 +1,0 @@
-macro incremented(amount by: Int): State<Int> { target, diagnostics in
-    target.getter { value in
-        value + amount
-    }
-}

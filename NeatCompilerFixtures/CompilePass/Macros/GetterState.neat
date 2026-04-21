@@ -1,3 +1,9 @@
+macro incremented(amount by: Int): State<Int> { target, diagnostics in
+    target.getter { value in
+        value + amount
+    }
+}
+
 construct Reader {
     #incremented(by: 1)
     state age: Int = 10
