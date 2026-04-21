@@ -1,5 +1,5 @@
 @core
-construct Value: Property {
+construct Let: Property {
     let name: String
     let type: TypeReference
     let expression: Expression?
