@@ -56,28 +56,31 @@ extension Parser {
         expecting kind: String,
         allowOmittedLocalName: Bool = true
     ) throws -> (localName: String, externalLabel: String?) {
-        let localName: String
+        let firstName: String
         switch peek() {
         case .identifier(let value):
-            localName = value
+            firstName = value
             advance()
         case .keyword(let value):
-            localName = value
+            firstName = value
             advance()
         default:
             throw ParseError("Expected \(kind) name.")
-        }
-        if !allowOmittedLocalName, localName == "_" {
-            throw ParseError("\(kind.capitalized) local name cannot be '_'.")
         }
 
         switch peek() {
         case .identifier(let secondName) where peek(offset: 1) == .colon:
             advance()
-            return (localName, secondName == "_" ? nil : secondName)
+            guard secondName != "_" else {
+                throw ParseError("\(kind.capitalized) internal name cannot be '_'.")
+            }
+            return (secondName, firstName == "_" ? nil : firstName)
         case .keyword(let secondName) where peek(offset: 1) == .colon:
             advance()
-            return (localName, secondName == "_" ? nil : secondName)
+            guard secondName != "_" else {
+                throw ParseError("\(kind.capitalized) internal name cannot be '_'.")
+            }
+            return (secondName, firstName == "_" ? nil : firstName)
         default:
             break
         }
@@ -86,7 +89,12 @@ extension Parser {
             throw ParseError("Expected ':' after \(kind) name.")
         }
 
-        return (localName, localName)
+        if firstName == "_" {
+            throw ParseError("\(kind.capitalized) internal name cannot be '_'.")
+        }
+
+        _ = allowOmittedLocalName
+        return (firstName, firstName)
     }
 
     mutating func parseAttributeIfPresent(before keyword: NeatSyntax.Keyword)

@@ -1,4 +1,4 @@
-macro fallbackOne(value _: Optional<Int>): Expression { target, diagnostics in
+macro fallbackOne(_ value: Optional<Int>): Expression { target, diagnostics in
     target.replace(with: value ?? 1)
 }
 

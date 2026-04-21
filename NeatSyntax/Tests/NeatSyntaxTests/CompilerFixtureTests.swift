@@ -34,7 +34,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ProjectMacros.neat",
                 source: """
-                macro captureText(value _: capture Expression): Expression -> String { target, diagnostics in
+                macro captureText(_ value: capture Expression): Expression -> String { target, diagnostics in
                     target.replace(with: "captured: \\(value)")
                 }
                 """,
@@ -72,7 +72,7 @@ struct CompilerFixtureTests {
                     return "Hello"
                 }
 
-                macro captureText(value _: capture Expression): Expression -> String { target, diagnostics in
+                macro captureText(_ value: capture Expression): Expression -> String { target, diagnostics in
                     target.replace(with: "captured: \\(value)")
                 }
                 """,
@@ -521,7 +521,7 @@ struct CompilerFixtureTests {
             return value
         }
 
-        macro clamped<T: Comparable, let count: Int = 3>(value _: T): State<T> { target, diagnostics in
+        macro clamped<T: Comparable, let count: Int = 3>(_ value: T): State<T> { target, diagnostics in
             target.replace(with: value)
         }
         """

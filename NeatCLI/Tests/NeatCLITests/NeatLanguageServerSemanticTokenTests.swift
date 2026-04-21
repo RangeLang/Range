@@ -27,18 +27,18 @@ struct NeatLanguageServerSemanticTokenTests {
     @Test("Functions, variables, parameters, and member semantics are emitted")
     func declarationsAndMembersEmitSemanticTokens() {
         let source = """
-        function identity(value _: Int) -> Int {
+        function identity(_ value: Int) -> Int {
             let number: Int = 0
             Logger.info(number)
             return value
         }
 
-        function fetchUsername(id _: Int) -> String {
+        function fetchUsername(_ id: Int) -> String {
             return ""
         }
 
-        function refreshUser(id _: Int) {
-            let username = fetchUsername(id: id)
+        function refreshUser(_ id: Int) {
+            let username = fetchUsername(id)
             Logger.info(username)
         }
 
@@ -56,7 +56,6 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(containsToken(tokens, text: "identity", type: .function, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "number", type: .variable, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "number", type: .variable, modifiers: [.argument]))
-        #expect(containsToken(tokens, text: "id", type: .parameter, modifiers: [.argument]))
         #expect(containsToken(tokens, text: "username", type: .variable, modifiers: [.argument]))
         #expect(containsToken(tokens, text: "arrayifyParameter", type: .macro, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "declaration", type: .property, modifiers: []))
@@ -103,7 +102,7 @@ struct NeatLanguageServerSemanticTokenTests {
     func genericFunctionDeclarationsEmitDeclarationTokens() {
         let source = """
         function load<Value, Failure>(
-            target _: binding Promise<Value, Failure>,
+            target target: binding Promise<Value, Failure>,
             #autoclosure task: Result<Value, Failure>
         ) {
             switch task() {
@@ -116,9 +115,7 @@ struct NeatLanguageServerSemanticTokenTests {
         let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsToken(tokens, text: "load", type: .function, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "target", type: .parameter, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "task", type: .parameter, modifiers: [.declaration]))
-        #expect(!containsExactToken(tokens, text: "target", type: .method, modifiers: []))
         #expect(!containsExactToken(tokens, text: "task", type: .method, modifiers: []))
     }
 

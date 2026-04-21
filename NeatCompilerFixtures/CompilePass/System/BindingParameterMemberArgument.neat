@@ -1,4 +1,4 @@
-function write(target _: binding Int, let _: Int) {
+function write(_ target: binding Int, _ let: Int) {
     target = value
 }
 

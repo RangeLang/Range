@@ -10,7 +10,7 @@ construct Channel<Element> {
         self.storage = ChannelStorage(capacity: capacity)
     }
 
-    function send(element _: Element) {
+    function send(_ element: Element) {
         storage.send(element: element)
     }
 

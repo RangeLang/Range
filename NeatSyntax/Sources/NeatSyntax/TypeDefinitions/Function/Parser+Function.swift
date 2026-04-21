@@ -683,9 +683,9 @@ extension Parser {
             if externalLabel == parameter.localName {
                 return "\(parameter.localName): \(typeName)"
             }
-            return "\(parameter.localName) \(externalLabel): \(typeName)"
+            return "\(externalLabel) \(parameter.localName): \(typeName)"
         }
-        return "\(parameter.localName) _: \(typeName)"
+        return "_ \(parameter.localName): \(typeName)"
     }
 
     func signatureParameterVariants(_ parameters: [NeatFunctionParameter])

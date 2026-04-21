@@ -1,4 +1,4 @@
-macro shifted(amount by: Int): Let<Int> { target, diagnostics in
+macro shifted(by amount: Int): Let<Int> { target, diagnostics in
     target.initializer { value in
         value + amount
     }

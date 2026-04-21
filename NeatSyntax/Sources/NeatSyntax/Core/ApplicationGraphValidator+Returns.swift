@@ -458,6 +458,6 @@ extension ApplicationGraphValidator {
             }
             return "\(externalLabel) \(parameter.localName): \(typeName)"
         }
-        return "\(parameter.localName): \(typeName)"
+        return "_ \(parameter.localName): \(typeName)"
     }
 }

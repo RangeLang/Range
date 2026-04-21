@@ -10,7 +10,7 @@ construct SingleInitRewriteFixture {
     let number: Int
 
     #forwardOnlyArgument
-    init(number _: Int) {
+    init(_ number: Int) {
         self.number = number
     }
 }

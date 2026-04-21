@@ -1,9 +1,9 @@
 @core
 construct Logger {
-    function log(message _: String)
-    function debug(message _: String)
-    function info(message _: String)
-    function success(message _: String)
-    function warning(message _: String)
-    function error(message _: String)
+    function log(_ message: String)
+    function debug(_ message: String)
+    function info(_ message: String)
+    function success(_ message: String)
+    function warning(_ message: String)
+    function error(_ message: String)
 }
