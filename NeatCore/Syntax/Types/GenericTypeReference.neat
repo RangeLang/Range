@@ -3,5 +3,5 @@ construct GenericTypeReference: NominalTypeReference {
     let base: NominalTypeReference
     let arguments: [TypeReference]
 
-    function rewrite(type _: TypeReference)
+    function replace(with replacement: TypeReference) -> TypeReference
 }

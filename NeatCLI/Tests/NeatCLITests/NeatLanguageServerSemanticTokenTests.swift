@@ -43,7 +43,7 @@ struct NeatLanguageServerSemanticTokenTests {
         }
 
         macro arrayifyParameter(): Parameter { target, diagnostics in
-            target.declaration.type.rewrite(
+            target.declaration.type.replace(with:
                 ArrayTypeReference(
                     element: target.declaration.type
                 )
@@ -60,7 +60,7 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(containsToken(tokens, text: "username", type: .variable, modifiers: [.argument]))
         #expect(containsToken(tokens, text: "arrayifyParameter", type: .macro, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "declaration", type: .property, modifiers: []))
-        #expect(containsToken(tokens, text: "rewrite", type: .method, modifiers: []))
+        #expect(containsToken(tokens, text: "replace", type: .method, modifiers: []))
     }
 
     @Test("Constructor argument labels are method-style tokens, not parameter declarations")
@@ -85,7 +85,7 @@ struct NeatLanguageServerSemanticTokenTests {
     func typeReferenceArgumentLabelsEmitTypeApplicationTokens() {
         let source = """
         macro arrayifyParameter(): Parameter { target, diagnostics in
-            target.declaration.type.rewrite(
+            target.declaration.type.replace(with:
                 ArrayTypeReference(
                     element: target.declaration.type
                 )

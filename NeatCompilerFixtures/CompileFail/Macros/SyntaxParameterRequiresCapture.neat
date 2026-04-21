@@ -1,5 +1,5 @@
 macro badStringify(value _: Expression): Expression { target, diagnostics in
-    target.rewrite("\(value)")
+    target.replace(with: "\(value)")
 }
 
 @main {

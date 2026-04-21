@@ -1,5 +1,5 @@
 macro secondArgument(): Function { target, diagnostics in
-    target.application.arguments[1].expression.rewrite(
+    target.application.arguments[1].expression.replace(with:
         target.application.arguments[1].expression
     )
 }

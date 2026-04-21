@@ -10,10 +10,10 @@ construct Init: Syntax {
     }
 
     @core
-    construct Application: SyntaxRewritable<Expression> {
+    construct Application: SyntaxReplaceable<Expression> {
         let type: TypeReference
         let arguments: [Parameter.Application]
 
-        function rewrite(expression _: Expression)
+        function replace(with replacement: Expression) -> Expression
     }
 }

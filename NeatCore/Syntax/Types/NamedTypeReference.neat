@@ -2,5 +2,5 @@
 construct NamedTypeReference: NominalTypeReference {
     let name: String
 
-    function rewrite(type _: TypeReference)
+    function replace(with replacement: TypeReference) -> TypeReference
 }

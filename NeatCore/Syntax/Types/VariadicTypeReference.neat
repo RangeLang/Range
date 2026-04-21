@@ -2,5 +2,5 @@
 construct VariadicTypeReference: TypeReference {
     let element: TypeReference
 
-    function rewrite(type _: TypeReference)
+    function replace(with replacement: TypeReference) -> TypeReference
 }

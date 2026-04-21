@@ -1,5 +1,5 @@
 macro nestedArgumentRewrite(): Parameter { target, diagnostics in
-    target.application.expression.rewrite(
+    target.application.expression.replace(with:
         target.application.expression
     )
 }

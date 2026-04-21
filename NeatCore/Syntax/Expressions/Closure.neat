@@ -3,5 +3,5 @@ construct Closure: Expression {
     let type: TypeReference?
     let body: Block
 
-    function rewrite(expression _: Expression)
+    function replace(with replacement: Expression) -> Expression
 }

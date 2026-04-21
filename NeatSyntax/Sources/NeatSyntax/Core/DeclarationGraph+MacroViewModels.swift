@@ -134,7 +134,7 @@ struct RewriteSurfaceView {
         var paths: Set<String> = []
 
         func supportsRewrite(_ typeName: String) -> Bool {
-            syntaxResolver.declaration(named: typeName, conformsTo: "SyntaxRewritable")
+            syntaxResolver.declaration(named: typeName, conformsTo: "SyntaxReplaceable")
         }
 
         func resolvedValueType(
@@ -164,7 +164,7 @@ struct RewriteSurfaceView {
             }
 
             if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
-                || syntaxResolver.declaration(named: text, conformsTo: "SyntaxRewritable")
+                || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
             {
                 return (text, isArray)
             }
@@ -178,7 +178,7 @@ struct RewriteSurfaceView {
             activeTypes: Set<String>
         ) {
             if supportsRewrite(typeName) {
-                paths.insert("\(path).rewrite")
+                paths.insert("\(path).replace")
             }
 
             guard !activeTypes.contains(typeName) else {
@@ -229,13 +229,13 @@ struct RewriteSurfaceView {
             return false
         }
 
-        let directPath = "\(targetBinding).rewrite"
+        let directPath = "\(targetBinding).replace"
         if normalizedPath == directPath {
-            return syntaxResolver.declaration(named: targetName, conformsTo: "SyntaxRewritable")
+            return syntaxResolver.declaration(named: targetName, conformsTo: "SyntaxReplaceable")
         }
 
         let prefix = "\(targetBinding)."
-        let suffix = ".rewrite"
+        let suffix = ".replace"
         guard normalizedPath.hasPrefix(prefix), normalizedPath.hasSuffix(suffix) else {
             return false
         }
@@ -273,7 +273,7 @@ struct RewriteSurfaceView {
             currentTypeName = resolvedType.typeName
         }
 
-        return syntaxResolver.declaration(named: currentTypeName, conformsTo: "SyntaxRewritable")
+        return syntaxResolver.declaration(named: currentTypeName, conformsTo: "SyntaxReplaceable")
     }
 
     private func resolvedDeclaredValueType(
@@ -303,7 +303,7 @@ struct RewriteSurfaceView {
         }
 
         if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
-            || syntaxResolver.declaration(named: text, conformsTo: "SyntaxRewritable")
+            || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
         {
             return (text, isArray)
         }
@@ -360,7 +360,7 @@ struct MacroExpansionContext {
             guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
                 continue
             }
-            guard name.hasPrefix(targetPrefix), name.hasSuffix(".rewrite") else {
+            guard name.hasPrefix(targetPrefix), name.hasSuffix(".replace") else {
                 continue
             }
 
@@ -381,12 +381,12 @@ struct MacroExpansionContext {
         guard invalidPaths.isEmpty else {
             let allowedDescription: String
             if allowedPaths.isEmpty {
-                allowedDescription = "no rewrite paths"
+                allowedDescription = "no replace paths"
             } else {
                 allowedDescription = allowedPaths.sorted().joined(separator: ", ")
             }
             throw ParseError(
-                "Macro #\(macro.name) targeting \(macro.target.typeReference.displayName) uses unsupported rewrite site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
+                "Macro #\(macro.name) targeting \(macro.target.typeReference.displayName) uses unsupported replace site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
             )
         }
     }
@@ -395,13 +395,13 @@ struct MacroExpansionContext {
         _ name: String,
         targetBinding: String
     ) -> String? {
-        let directPath = "\(targetBinding).rewrite"
+        let directPath = "\(targetBinding).replace"
         if name == directPath {
             return directPath
         }
 
         let prefix = "\(targetBinding)."
-        let suffix = ".rewrite"
+        let suffix = ".replace"
         guard name.hasPrefix(prefix), name.hasSuffix(suffix) else {
             return nil
         }
@@ -436,7 +436,7 @@ struct MacroExpansionContext {
             index = raw.index(after: index)
         }
 
-        return "\(targetBinding).\(normalized).rewrite"
+        return "\(targetBinding).\(normalized).replace"
     }
 
     func resolvedRewriteCall(
@@ -444,7 +444,11 @@ struct MacroExpansionContext {
         targetBinding: String,
         targetType: TypeReference
     ) -> ResolvedRewriteCall? {
-        guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
+        guard
+            case .call(let name, let arguments) = expression,
+            arguments.count == 1,
+            arguments[0].label == "with"
+        else {
             return nil
         }
 
@@ -646,7 +650,7 @@ extension RewriteSurfaceView {
         targetBinding: String,
         targetKind: MacroTargetKind
     ) -> ResolvedRewriteSite? {
-        let directPath = "\(targetBinding).rewrite"
+        let directPath = "\(targetBinding).replace"
         if normalizedPath == directPath {
             switch targetKind {
             case .expression:
@@ -665,29 +669,29 @@ extension RewriteSurfaceView {
         switch targetKind {
         case .initializer:
             switch relativePath {
-            case "application.rewrite":
+            case "application.replace":
                 return .initApplication
-            case "application.arguments[].expression.rewrite":
+            case "application.arguments[].expression.replace":
                 return .initApplication
             default:
                 return nil
             }
         case .function:
             switch relativePath {
-            case "application.rewrite":
+            case "application.replace":
                 return .functionApplication
-            case "application.arguments[].expression.rewrite":
+            case "application.arguments[].expression.replace":
                 return .functionArgumentExpression
             default:
                 return nil
             }
         case .parameter:
             switch relativePath {
-            case "declaration.type.rewrite":
+            case "declaration.type.replace":
                 return .parameterDeclarationType
-            case "application.expression.rewrite":
+            case "application.expression.replace":
                 return .parameterApplicationArgument
-            case "application.arguments[].expression.rewrite":
+            case "application.arguments[].expression.replace":
                 return .parameterApplicationArguments
             default:
                 return nil

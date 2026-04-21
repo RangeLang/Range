@@ -35,7 +35,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/ProjectMacros.neat",
                 source: """
                 macro captureText(value _: capture Expression): Expression -> String { target, diagnostics in
-                    target.rewrite("captured: \\(value)")
+                    target.replace(with: "captured: \\(value)")
                 }
                 """,
                 role: .project
@@ -73,7 +73,7 @@ struct CompilerFixtureTests {
                 }
 
                 macro captureText(value _: capture Expression): Expression -> String { target, diagnostics in
-                    target.rewrite("captured: \\(value)")
+                    target.replace(with: "captured: \\(value)")
                 }
                 """,
                 role: .project
@@ -132,7 +132,7 @@ struct CompilerFixtureTests {
 
         #expect(graph.constructsByName["Init"] != nil)
         #expect(graph.constructsByName["Init.Application"] != nil)
-        #expect(graph.syntaxResolver.declaration(named: "Init.Application", conformsTo: "SyntaxRewritable"))
+        #expect(graph.syntaxResolver.declaration(named: "Init.Application", conformsTo: "SyntaxReplaceable"))
     }
 
     @Test("Rewrite site decoding uses declaration-backed descriptors")
@@ -142,8 +142,8 @@ struct CompilerFixtureTests {
 
         let direct = context.resolvedRewriteCall(
             from: .call(
-                name: "target.rewrite",
-                arguments: [CallArgument(label: nil, value: .string("value"))]
+                name: "target.replace",
+                arguments: [CallArgument(label: "with", value: .string("value"))]
             ),
             targetBinding: "target",
             targetType: .named("Expression")
@@ -152,8 +152,8 @@ struct CompilerFixtureTests {
 
         let parameter = context.resolvedRewriteCall(
             from: .call(
-                name: "target.application.expression.rewrite",
-                arguments: [CallArgument(label: nil, value: .string("value"))]
+                name: "target.application.expression.replace",
+                arguments: [CallArgument(label: "with", value: .string("value"))]
             ),
             targetBinding: "target",
             targetType: .named("Parameter")
@@ -162,8 +162,8 @@ struct CompilerFixtureTests {
 
         let functionArgument = context.resolvedRewriteCall(
             from: .call(
-                name: "target.application.arguments[0].expression.rewrite",
-                arguments: [CallArgument(label: nil, value: .string("value"))]
+                name: "target.application.arguments[0].expression.replace",
+                arguments: [CallArgument(label: "with", value: .string("value"))]
             ),
             targetBinding: "target",
             targetType: .named("Function")
@@ -172,8 +172,8 @@ struct CompilerFixtureTests {
 
         let initializer = context.resolvedRewriteCall(
             from: .call(
-                name: "target.application.rewrite",
-                arguments: [CallArgument(label: nil, value: .string("value"))]
+                name: "target.application.replace",
+                arguments: [CallArgument(label: "with", value: .string("value"))]
             ),
             targetBinding: "target",
             targetType: .named("Init")
@@ -522,7 +522,7 @@ struct CompilerFixtureTests {
         }
 
         macro clamped<T: Comparable, let count: Int = 3>(value _: T): State<T> { target, diagnostics in
-            target.rewrite(value)
+            target.replace(with: value)
         }
         """
 

@@ -711,7 +711,7 @@ extension MacroExpander {
         {
             guard case .block(let body) = rewrite.payload else {
                 throw ParseError(
-                    "Macro #\(macro.name) target.rewrite(...) must receive a block expression for Block-targeted macros."
+                    "Macro #\(macro.name) target.replace(with: ...) must receive a block expression."
                 )
             }
             rewriteCalls.append(body)
@@ -719,7 +719,7 @@ extension MacroExpander {
 
         guard let rewriteBody = rewriteCalls.first else {
             throw ParseError(
-                "Macro #\(macro.name) must call \(macro.bindings.target).rewrite(...) with a block expression."
+                "Macro #\(macro.name) must call \(macro.bindings.target).replace(with: ...) with a block expression."
             )
         }
 
@@ -744,7 +744,7 @@ extension MacroExpander {
 
         guard let rewriteExpression = rewriteExpressions.first else {
             throw ParseError(
-                "Macro #\(macro.name) must call \(macro.bindings.target).rewrite(...) with an expression."
+                "Macro #\(macro.name) must call \(macro.bindings.target).replace(with: ...) with an expression."
             )
         }
 

@@ -2,5 +2,5 @@
 construct OptionalTypeReference: TypeReference {
     let wrapped: TypeReference
 
-    function rewrite(type _: TypeReference)
+    function replace(with replacement: TypeReference) -> TypeReference
 }

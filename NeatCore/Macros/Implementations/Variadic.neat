@@ -1,5 +1,5 @@
 macro variadic(): Parameter { target, diagnostics in
-    target.declaration.type.rewrite(
+    target.declaration.type.replace(with:
         ArrayTypeReference(
             element: target.declaration.type
         )

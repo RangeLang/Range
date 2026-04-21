@@ -1,5 +1,5 @@
 macro fallbackOne(value _: Optional<Int>): Expression { target, diagnostics in
-    target.rewrite(value ?? 1)
+    target.replace(with: value ?? 1)
 }
 
 @main {

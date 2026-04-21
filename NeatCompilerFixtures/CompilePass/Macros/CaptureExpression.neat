@@ -1,5 +1,5 @@
 macro captureText(value _: capture Expression): Expression -> String { target, diagnostics in
-    target.rewrite("captured: \(value)")
+    target.replace(with: "captured: \(value)")
 }
 
 @main {

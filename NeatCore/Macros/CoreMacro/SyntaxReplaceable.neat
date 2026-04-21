@@ -1,0 +1,3 @@
+protocol SyntaxReplaceable<T> {
+    function replace(with replacement: T) -> T
+}
