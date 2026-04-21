@@ -1,0 +1,18 @@
+macro incremented(amount by: Int): Derived<Int> { target, diagnostics in
+    target.getter { value in
+        value + amount
+    }
+}
+
+construct Reader {
+    state age: Int = 10
+
+    #incremented(by: 1)
+    derived next: Int {
+        age
+    }
+
+    function current() -> Int {
+        return next
+    }
+}

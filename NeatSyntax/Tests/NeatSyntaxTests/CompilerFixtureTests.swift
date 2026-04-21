@@ -365,6 +365,145 @@ struct CompilerFixtureTests {
         #expect(totalValueName == "value")
     }
 
+    @Test("Let property macro rewrites initializer and reads")
+    func letPropertyMacroRewritesInitializerAndReads() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/LetProperty.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let construct: ConstructDeclaration
+        switch expandedFile.sourceFile {
+        case .construct(let declaration):
+            construct = declaration
+        case .module(let module):
+            construct = try #require(module.constructs.first(where: { $0.name == "Holder" }))
+        default:
+            Issue.record("Expected expanded project file to contain the Holder construct.")
+            return
+        }
+
+        let value = try #require(construct.values.first(where: { $0.name == "count" }))
+        guard case .binary(let initializerLHS, .addition, let initializerRHS)? = value.value,
+            case .integer(let initializerBase) = initializerLHS,
+            case .integer(let initializerAmount) = initializerRHS
+        else {
+            Issue.record("Expected let initializer to be rewritten through the initializer hook.")
+            return
+        }
+
+        #expect(initializerBase == 10)
+        #expect(initializerAmount == 2)
+
+        let current = try #require(construct.callables.first(where: { $0.name == "current" }))
+        let currentReturn = try #require(current.body?.first)
+        guard case .return(let expression?) = currentReturn,
+            case .binary(let lhs, .addition, let rhs) = expression,
+            case .identifier(let name) = lhs,
+            case .integer(let amount) = rhs
+        else {
+            Issue.record("Expected let getter to rewrite reads.")
+            return
+        }
+
+        #expect(name == "count")
+        #expect(amount == 2)
+    }
+
+    @Test("Binding property macro rewrites reads and assignments")
+    func bindingPropertyMacroRewritesReadsAndAssignments() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/BindingProperty.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let construct: ConstructDeclaration
+        switch expandedFile.sourceFile {
+        case .construct(let declaration):
+            construct = declaration
+        case .module(let module):
+            construct = try #require(module.constructs.first(where: { $0.name == "Box" }))
+        default:
+            Issue.record("Expected expanded project file to contain the Box construct.")
+            return
+        }
+
+        let current = try #require(construct.callables.first(where: { $0.name == "current" }))
+        let currentReturn = try #require(current.body?.first)
+        guard case .return(let expression?) = currentReturn,
+            case .binary(let lhs, .addition, let rhs) = expression,
+            case .identifier(let name) = lhs,
+            case .integer(let amount) = rhs
+        else {
+            Issue.record("Expected binding getter to rewrite reads.")
+            return
+        }
+
+        #expect(name == "score")
+        #expect(amount == 1)
+
+        let update = try #require(construct.callables.first(where: { $0.name == "update" }))
+        let directAssignment = try #require(update.body?.first)
+        guard case .assignment(_, let directExpression) = directAssignment,
+            case .binary(let directLHS, .addition, let directRHS) = directExpression,
+            case .identifier(let directName) = directLHS,
+            case .integer(let directAmount) = directRHS
+        else {
+            Issue.record("Expected binding setter to rewrite direct assignments.")
+            return
+        }
+
+        #expect(directName == "value")
+        #expect(directAmount == 1)
+
+        let compoundAssignment = try #require(update.body?[1])
+        guard case .assignment(_, let compoundExpression) = compoundAssignment,
+            case .binary(_, .addition, let outerRHS) = compoundExpression,
+            case .integer(let compoundAmount) = outerRHS
+        else {
+            Issue.record("Expected binding setter to rewrite compound assignments.")
+            return
+        }
+
+        #expect(compoundAmount == 1)
+    }
+
+    @Test("Derived property macro rewrites reads")
+    func derivedPropertyMacroRewritesReads() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedProperty.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let construct: ConstructDeclaration
+        switch expandedFile.sourceFile {
+        case .construct(let declaration):
+            construct = declaration
+        case .module(let module):
+            construct = try #require(module.constructs.first(where: { $0.name == "Reader" }))
+        default:
+            Issue.record("Expected expanded project file to contain the Reader construct.")
+            return
+        }
+
+        let current = try #require(construct.callables.first(where: { $0.name == "current" }))
+        let currentReturn = try #require(current.body?.first)
+        guard case .return(let expression?) = currentReturn,
+            case .binary(let lhs, .addition, let rhs) = expression,
+            case .identifier(let name) = lhs,
+            case .integer(let amount) = rhs
+        else {
+            Issue.record("Expected derived getter to rewrite reads.")
+            return
+        }
+
+        #expect(name == "next")
+        #expect(amount == 1)
+    }
+
     @Test("Generic parameter clauses are shared across declarations")
     func genericParameterClausesAreSharedAcrossDeclarations() throws {
         let source = """

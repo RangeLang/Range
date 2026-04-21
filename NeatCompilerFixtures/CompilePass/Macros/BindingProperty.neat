@@ -1,0 +1,33 @@
+macro offset(amount by: Int): Binding<Int> { target, diagnostics in
+    target.getter { value in
+        value + amount
+    }
+
+    target.setter { value in
+        value + amount
+    }
+}
+
+construct Box {
+    state age: Int = 10
+
+    #offset(by: 1)
+    binding score: Int {
+        get {
+            return age
+        }
+
+        set {
+            age = newValue
+        }
+    }
+
+    function current() -> Int {
+        return score
+    }
+
+    function update(value: Int) {
+        score = value
+        score += value
+    }
+}

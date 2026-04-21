@@ -619,17 +619,17 @@ extension MacroExpander {
         return (parameters, body)
     }
 
-    static func stateTransformRegistrations(for macro: MacroDeclaration) throws -> [StateTransformRegistration] {
+    static func propertyTransformRegistrations(for macro: MacroDeclaration) throws -> [PropertyTransformRegistration] {
         let targetBinding = macro.bindings.target
         let operationExpressions = macroOperationExpressions(in: macro.body)
-        var registrations: [StateTransformRegistration] = []
+        var registrations: [PropertyTransformRegistration] = []
 
         for expression in operationExpressions {
             guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
                 continue
             }
 
-            let hook: StateTransformHook?
+            let hook: PropertyTransformHook?
             switch name {
             case "\(targetBinding).initializer":
                 hook = .initializer
@@ -664,7 +664,7 @@ extension MacroExpander {
             )
 
             registrations.append(
-                StateTransformRegistration(
+                PropertyTransformRegistration(
                     hook: hook,
                     parameterName: closure.parameters[0],
                     body: bodyExpression

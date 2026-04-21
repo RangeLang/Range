@@ -1,0 +1,10 @@
+macro invalidSetter(): Let<Int> { target, diagnostics in
+    target.setter { value in
+        value
+    }
+}
+
+construct Holder {
+    #invalidSetter()
+    let count: Int = 10
+}

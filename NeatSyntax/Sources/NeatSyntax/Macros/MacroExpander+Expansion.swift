@@ -22,8 +22,11 @@ extension MacroExpander {
                     ))
             )
         case .module(let module):
-            let moduleStateEffects = try stateMacroEffects(
-                for: module.states,
+            let moduleStateEffects = try propertyMacroEffects(
+                states: module.states,
+                values: [],
+                bindings: [],
+                deriveds: [],
                 macros: macros,
                 context: context
             )
@@ -110,8 +113,11 @@ extension MacroExpander {
             context: context
         )
 
-        let constructStateEffects = try stateMacroEffects(
-            for: construct.states,
+        let constructStateEffects = try propertyMacroEffects(
+            states: construct.states,
+            values: construct.values,
+            bindings: construct.bindings,
+            deriveds: construct.deriveds,
             macros: macros,
             context: context
         )
@@ -135,11 +141,22 @@ extension MacroExpander {
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context
+                    context: context,
+                    stateEffects: constructStateEffects
                 )
             },
             environments: construct.environments,
-            bindings: construct.bindings,
+            bindings: try construct.bindings.map {
+                try expand(
+                    binding: $0,
+                    macros: macros,
+                    protocols: protocols,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: constructStateEffects
+                )
+            },
             deriveds: try construct.deriveds.map {
                 try expand(
                     derived: $0,
@@ -151,7 +168,16 @@ extension MacroExpander {
                     stateEffects: constructStateEffects
                 )
             },
-            values: construct.values,
+            values: try construct.values.map {
+                try expand(
+                    value: $0,
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: constructStateEffects
+                )
+            },
             initializers: try carriedInitializers.map {
                 try expand(
                     initializer: $0,
@@ -194,7 +220,7 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: StateMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> CallableDeclaration {
         CallableDeclaration(
             macros: callable.macros,
@@ -227,7 +253,7 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: StateMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> InitializerDeclaration {
         InitializerDeclaration(
             macros: initializer.macros,
@@ -254,7 +280,7 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: StateMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> DerivedDeclaration {
         DerivedDeclaration(
             macros: derived.macros,
@@ -281,17 +307,25 @@ extension MacroExpander {
         macros: [String: MacroDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> StateDeclaration {
         let storage: StateStorage
 
         switch state.storage {
         case .stored(let expression):
-            let rewrittenExpression = try applyStateInitializerTransforms(
-                to: expression,
-                state: state,
+            let effects = try propertyMacroEffects(
+                name: state.name,
+                propertyTypeName: "State",
+                propertyKind: .state,
+                propertyValueType: state.type,
+                applications: state.macros,
                 macros: macros,
                 context: context
+            )
+            let rewrittenExpression = applyPropertyTransforms(
+                effects.initializerTransforms,
+                to: expression,
             )
             storage = .stored(
                 try expand(
@@ -300,7 +334,8 @@ extension MacroExpander {
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context
+                    context: context,
+                    stateEffects: stateEffects
                 )
             )
         case .declared:
@@ -316,42 +351,189 @@ extension MacroExpander {
         )
     }
 
-    static func stateMacroEffects(
-        for states: [StateDeclaration],
+    static func expand(
+        value declaration: ValueDeclaration,
         macros: [String: MacroDeclaration],
-        context: MacroExpansionContext
-    ) throws -> [String: StateMacroEffects] {
-        Dictionary(
-            uniqueKeysWithValues: try states.map { state in
-                (
-                    state.name,
-                    try stateMacroEffects(for: state, macros: macros, context: context)
+        parameterMacroSignatures: [ParameterMacroSignature],
+        literalBridges: [RealizedLiteralBridge],
+        context: MacroExpansionContext,
+        stateEffects: [String: PropertyMacroEffects] = [:]
+    ) throws -> ValueDeclaration {
+        let type = try parsePropertyTypeReference(from: declaration.typeName)
+        let effects = try propertyMacroEffects(
+            name: declaration.name,
+            propertyTypeName: "Let",
+            propertyKind: .immutable,
+            propertyValueType: type,
+            applications: declaration.macros,
+            macros: macros,
+            context: context
+        )
+
+        return ValueDeclaration(
+            macros: declaration.macros,
+            localName: declaration.localName,
+            externalLabel: declaration.externalLabel,
+            typeName: declaration.typeName,
+            value: try declaration.value.map {
+                try expand(
+                    expression: applyPropertyTransforms(effects.initializerTransforms, to: $0),
+                    expectedType: type,
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
                 )
             }
         )
     }
 
-    static func stateMacroEffects(
-        for state: StateDeclaration,
+    static func expand(
+        binding declaration: BindingDeclaration,
+        macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
+        parameterMacroSignatures: [ParameterMacroSignature],
+        literalBridges: [RealizedLiteralBridge],
+        context: MacroExpansionContext,
+        stateEffects: [String: PropertyMacroEffects] = [:]
+    ) throws -> BindingDeclaration {
+        let storage: BindingStorage
+        switch declaration.storage {
+        case .plain:
+            storage = .plain
+        case .derived(let getterBody, let setterBody):
+            storage = .derived(
+                get: try expand(
+                    statements: getterBody,
+                    expectedReturnType: nil,
+                    macros: macros,
+                    protocols: protocols,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                ),
+                set: try expand(
+                    statements: setterBody,
+                    expectedReturnType: nil,
+                    macros: macros,
+                    protocols: protocols,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                )
+            )
+        }
+
+        return BindingDeclaration(
+            macros: declaration.macros,
+            localName: declaration.localName,
+            externalLabel: declaration.externalLabel,
+            typeName: declaration.typeName,
+            storage: storage
+        )
+    }
+
+    static func propertyMacroEffects(
+        states: [StateDeclaration],
+        values: [ValueDeclaration],
+        bindings: [BindingDeclaration],
+        deriveds: [DerivedDeclaration],
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
-    ) throws -> StateMacroEffects {
+    ) throws -> [String: PropertyMacroEffects] {
+        Dictionary(
+            uniqueKeysWithValues:
+                try states.map {
+                    (
+                        $0.name,
+                        try propertyMacroEffects(
+                            name: $0.name,
+                            propertyTypeName: "State",
+                            propertyKind: .state,
+                            propertyValueType: $0.type,
+                            applications: $0.macros,
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                }
+                + values.map {
+                    (
+                        $0.name,
+                        try propertyMacroEffects(
+                            name: $0.name,
+                            propertyTypeName: "Let",
+                            propertyKind: .immutable,
+                            propertyValueType: try parsePropertyTypeReference(from: $0.typeName),
+                            applications: $0.macros,
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                }
+                + bindings.map {
+                    (
+                        $0.name,
+                        try propertyMacroEffects(
+                            name: $0.name,
+                            propertyTypeName: "Binding",
+                            propertyKind: .binding,
+                            propertyValueType: try parsePropertyTypeReference(from: $0.typeName),
+                            applications: $0.macros,
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                }
+                + deriveds.map {
+                    (
+                        $0.name,
+                        try propertyMacroEffects(
+                            name: $0.name,
+                            propertyTypeName: "Derived",
+                            propertyKind: .derived,
+                            propertyValueType: try parsePropertyTypeReference(from: $0.typeName),
+                            applications: $0.macros,
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                }
+        )
+    }
+
+    static func propertyMacroEffects(
+        name: String,
+        propertyTypeName: String,
+        propertyKind: PropertyDeclarationKind,
+        propertyValueType: TypeReference,
+        applications: [MacroApplication],
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) throws -> PropertyMacroEffects {
         var initializerTransforms: [Expression] = []
         var getterTransforms: [Expression] = []
         var setterTransforms: [Expression] = []
 
-        for application in state.macros {
+        for application in applications {
             guard let macro = macros[application.name] else {
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetKind(for: macro) == .state else {
+            guard allowedMacroTargetKinds(for: propertyKind).contains(macroTargetKind(for: macro)) else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on a state but targets \(macro.target.typeReference.displayName)."
+                    "Macro #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target.typeReference.displayName)."
                 )
             }
-            guard context.stateMacroTargetMatches(macro, stateType: state.type) else {
+            guard context.propertyMacroTargetMatches(
+                macro,
+                propertyTypeName: propertyTypeName,
+                propertyValueType: propertyValueType
+            ) else {
                 throw ParseError(
-                    "Macro #\(application.name) targeting \(macro.target.typeReference.displayName) does not match state \(state.name): \(state.type.displayName)."
+                    "Macro #\(application.name) targeting \(macro.target.typeReference.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                 )
             }
 
@@ -360,7 +542,13 @@ extension MacroExpander {
                 argumentClause: application.argumentClause
             )
 
-            for registration in try stateTransformRegistrations(for: macro) {
+            for registration in try propertyTransformRegistrations(for: macro) {
+                guard supportedHooks(for: propertyKind).contains(registration.hook) else {
+                    throw ParseError(
+                        "Macro #\(application.name) uses unsupported \(propertyHookName(registration.hook)) hook on \(propertyKindDescription(propertyKind)) \(name)."
+                    )
+                }
+
                 let substituted = substituteMacroBindings(
                     in: registration.body,
                     bindings: argumentBindings
@@ -371,92 +559,141 @@ extension MacroExpander {
                     initializerTransforms.append(
                         substituteMacroBindings(
                             in: substituted,
-                            bindings: [registration.parameterName: .identifier("__state_input__")]
+                            bindings: [registration.parameterName: .identifier("__property_input__")]
                         )
                     )
                 case .getter:
                     getterTransforms.append(
                         substituteMacroBindings(
                             in: substituted,
-                            bindings: [registration.parameterName: .identifier("__state_input__")]
+                            bindings: [registration.parameterName: .identifier("__property_input__")]
                         )
                     )
                 case .setter:
                     setterTransforms.append(
                         substituteMacroBindings(
                             in: substituted,
-                            bindings: [registration.parameterName: .identifier("__state_input__")]
+                            bindings: [registration.parameterName: .identifier("__property_input__")]
                         )
                     )
                 }
             }
         }
 
-        return StateMacroEffects(
-            type: state.type,
+        return PropertyMacroEffects(
+            kind: propertyKind,
+            type: propertyValueType,
             initializerTransforms: initializerTransforms,
             getterTransforms: getterTransforms,
             setterTransforms: setterTransforms
         )
     }
 
-    static func applyStateInitializerTransforms(
-        to expression: Expression,
-        state: StateDeclaration,
-        macros: [String: MacroDeclaration],
-        context: MacroExpansionContext
-    ) throws -> Expression {
-        let effects = try stateMacroEffects(for: state, macros: macros, context: context)
-        return applyStateTransforms(
-            effects.initializerTransforms,
-            to: expression
-        )
-    }
-
-    static func applyStateTransforms(
+    static func applyPropertyTransforms(
         _ transforms: [Expression],
         to expression: Expression
     ) -> Expression {
         transforms.reduce(expression) { current, transform in
             substituteMacroBindings(
                 in: transform,
-                bindings: ["__state_input__": current]
+                bindings: ["__property_input__": current]
             )
         }
     }
 
     static func expectedType(
         for target: AssignmentTarget,
-        stateEffects: [String: StateMacroEffects]
+        stateEffects: [String: PropertyMacroEffects]
     ) -> TypeReference? {
         switch target {
-        case .state(let name):
+        case .state(let name), .binding(let name):
             return stateEffects[name]?.type
         case .member(let base, _):
             return expectedType(for: base, stateEffects: stateEffects)
-        case .binding, .environment, .local:
+        case .environment, .local:
             return nil
         }
     }
 
-    static func rewrittenStateAssignmentExpression(
+    static func parsePropertyTypeReference(from raw: String) throws -> TypeReference {
+        var parser = try Parser(source: raw)
+        let type = try parser.parseTypeReferenceNode()
+        try parser.consume(.eof)
+        return type
+    }
+
+    static func allowedMacroTargetKinds(
+        for propertyKind: PropertyDeclarationKind
+    ) -> Set<MacroTargetKind> {
+        switch propertyKind {
+        case .state:
+            return [.state, .property]
+        case .immutable:
+            return [.immutable, .property]
+        case .binding:
+            return [.binding, .property]
+        case .derived:
+            return [.derived, .property]
+        }
+    }
+
+    static func supportedHooks(
+        for propertyKind: PropertyDeclarationKind
+    ) -> Set<PropertyTransformHook> {
+        switch propertyKind {
+        case .state:
+            return [.initializer, .getter, .setter]
+        case .immutable:
+            return [.initializer, .getter]
+        case .binding:
+            return [.getter, .setter]
+        case .derived:
+            return [.getter]
+        }
+    }
+
+    static func propertyKindDescription(_ propertyKind: PropertyDeclarationKind) -> String {
+        switch propertyKind {
+        case .state:
+            return "state"
+        case .immutable:
+            return "let"
+        case .binding:
+            return "binding"
+        case .derived:
+            return "derived"
+        }
+    }
+
+    static func propertyHookName(_ hook: PropertyTransformHook) -> String {
+        switch hook {
+        case .initializer:
+            return "initializer"
+        case .getter:
+            return "getter"
+        case .setter:
+            return "setter"
+        }
+    }
+
+    static func rewrittenPropertyAssignmentExpression(
         target: AssignmentTarget,
         expression: Expression,
-        stateEffects: [String: StateMacroEffects]
+        stateEffects: [String: PropertyMacroEffects]
     ) -> Expression {
-        guard case .state(let name) = target,
+        guard let name = propertyName(for: target),
             let effects = stateEffects[name],
             !effects.setterTransforms.isEmpty
         else {
             return expression
         }
 
-        return applyStateTransforms(effects.setterTransforms, to: expression)
+        return applyPropertyTransforms(effects.setterTransforms, to: expression)
     }
 
-    static func rewrittenStateReadExpression(
+    static func rewrittenPropertyReadExpression(
         _ expression: Expression,
-        stateEffects: [String: StateMacroEffects]
+        stateEffects: [String: PropertyMacroEffects]
     ) -> Expression {
         guard case .identifier(let name) = expression,
             let effects = stateEffects[name],
@@ -465,16 +702,16 @@ extension MacroExpander {
             return expression
         }
 
-        return applyStateTransforms(effects.getterTransforms, to: expression)
+        return applyPropertyTransforms(effects.getterTransforms, to: expression)
     }
 
     static func rewrittenCompoundStateAssignment(
         target: AssignmentTarget,
         operatorSymbol: CompoundOperator,
         expression: Expression,
-        stateEffects: [String: StateMacroEffects]
+        stateEffects: [String: PropertyMacroEffects]
     ) -> Statement? {
-        guard case .state(let name) = target,
+        guard let name = propertyName(for: target),
             let effects = stateEffects[name],
             !effects.setterTransforms.isEmpty
         else {
@@ -493,8 +730,17 @@ extension MacroExpander {
 
         return .assignment(
             target: target,
-            expression: applyStateTransforms(effects.setterTransforms, to: combinedExpression)
+            expression: applyPropertyTransforms(effects.setterTransforms, to: combinedExpression)
         )
+    }
+
+    static func propertyName(for target: AssignmentTarget) -> String? {
+        switch target {
+        case .state(let name), .binding(let name):
+            return name
+        case .environment, .local, .member:
+            return nil
+        }
     }
 
     static func expand(
@@ -505,7 +751,7 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: StateMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> [Statement] {
         var expanded: [Statement] = []
         for statement in statements {
@@ -532,7 +778,7 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: StateMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> [Statement] {
         switch statement {
         case .macroInvocation(let name, let argumentClause, let body):
@@ -725,7 +971,7 @@ extension MacroExpander {
                 )
             ]
         case .assignment(let target, let expression):
-            let rewrittenExpression = rewrittenStateAssignmentExpression(
+            let rewrittenExpression = rewrittenPropertyAssignmentExpression(
                 target: target,
                 expression: expression,
                 stateEffects: stateEffects
@@ -862,7 +1108,7 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: StateMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> SwitchCasePattern {
         switch pattern {
         case .expression(let expression):
@@ -928,7 +1174,7 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: StateMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> Expression {
         switch expression {
         case .call(let name, let arguments):
@@ -1204,7 +1450,7 @@ extension MacroExpander {
                 context: context
             )
         case .identifier:
-            return rewrittenStateReadExpression(expression, stateEffects: stateEffects)
+            return rewrittenPropertyReadExpression(expression, stateEffects: stateEffects)
         case .bindingReference:
             return expression
         }

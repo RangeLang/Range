@@ -12,12 +12,16 @@ struct FunctionMacroSignature {
     let functionMacros: [MacroDeclaration]
 }
 
-enum MacroTargetKind: Equatable {
+enum MacroTargetKind: Hashable {
     case expression
     case block
     case parameter
     case initializer
     case state
+    case immutable
+    case binding
+    case derived
+    case property
     case function
     case construct
     case other(String)
@@ -51,6 +55,14 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
         return .initializer
     case "State":
         return .state
+    case "Let":
+        return .immutable
+    case "Binding":
+        return .binding
+    case "Derived":
+        return .derived
+    case "Property":
+        return .property
     case "Function":
         return .function
     case "Construct":
@@ -312,13 +324,14 @@ struct MacroExpansionContext {
     let macroRealizationView: MacroRealizationView
     let rewriteSurfaceView: RewriteSurfaceView
 
-    func stateMacroTargetMatches(
+    func propertyMacroTargetMatches(
         _ macro: MacroDeclaration,
-        stateType: TypeReference
+        propertyTypeName: String,
+        propertyValueType: TypeReference
     ) -> Bool {
         let actualTargetType = TypeReference.generic(
-            base: .named("State"),
-            arguments: [stateType]
+            base: .named(propertyTypeName),
+            arguments: [propertyValueType]
         )
 
         let matcher = MacroTargetTypeMatcher(
@@ -526,6 +539,7 @@ private struct MacroTargetTypeMatcher {
         switch (actual, expected) {
         case (.named(let actualName), .named(let expectedName)):
             return actualName == expectedName
+                || syntaxResolver.declaration(named: actualName, conformsTo: expectedName)
         case (.generic(let actualBase, _), .named):
             return typeMatches(
                 actual: actualBase,
@@ -681,7 +695,7 @@ extension RewriteSurfaceView {
             default:
                 return nil
             }
-        case .expression, .block, .state, .construct, .other:
+        case .expression, .block, .state, .immutable, .binding, .derived, .property, .construct, .other:
             return nil
         }
     }

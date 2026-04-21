@@ -1,0 +1,18 @@
+macro shifted(amount by: Int): Let<Int> { target, diagnostics in
+    target.initializer { value in
+        value + amount
+    }
+
+    target.getter { value in
+        value + amount
+    }
+}
+
+construct Holder {
+    #shifted(by: 2)
+    let count: Int = 10
+
+    function current() -> Int {
+        return count
+    }
+}

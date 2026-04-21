@@ -1,0 +1,20 @@
+macro invalidInitializer(): Binding<Int> { target, diagnostics in
+    target.initializer { value in
+        value
+    }
+}
+
+construct Holder {
+    state age: Int = 10
+
+    #invalidInitializer()
+    binding score: Int {
+        get {
+            return age
+        }
+
+        set {
+            age = newValue
+        }
+    }
+}
