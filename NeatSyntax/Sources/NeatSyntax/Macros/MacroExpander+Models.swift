@@ -35,5 +35,6 @@ struct StateTransformRegistration {
 struct StateMacroEffects {
     let type: TypeReference
     let initializerTransforms: [Expression]
+    let getterTransforms: [Expression]
     let setterTransforms: [Expression]
 }

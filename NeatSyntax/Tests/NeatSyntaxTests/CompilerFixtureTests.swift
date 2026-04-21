@@ -314,6 +314,57 @@ struct CompilerFixtureTests {
         #expect(compoundAssignmentName == "Math.clamp")
     }
 
+    @Test("State getter macro rewrites reads in expressions")
+    func stateGetterMacroRewritesReadsInExpressions() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/GetterState.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let construct: ConstructDeclaration
+        switch expandedFile.sourceFile {
+        case .construct(let declaration):
+            construct = declaration
+        case .module(let module):
+            construct = try #require(module.constructs.first(where: { $0.name == "Reader" }))
+        default:
+            Issue.record("Expected expanded project file to contain the Reader construct.")
+            return
+        }
+
+        let current = try #require(construct.callables.first(where: { $0.name == "current" }))
+        let currentReturn = try #require(current.body?.first)
+        guard case .return(let currentExpression?) = currentReturn,
+            case .binary(let currentLHS, .addition, let currentRHS) = currentExpression,
+            case .identifier(let currentName) = currentLHS,
+            case .integer(let currentAmount) = currentRHS
+        else {
+            Issue.record("Expected current() to return the getter-rewritten age expression.")
+            return
+        }
+
+        #expect(currentName == "age")
+        #expect(currentAmount == 1)
+
+        let total = try #require(construct.callables.first(where: { $0.name == "total" }))
+        let totalReturn = try #require(total.body?.first)
+        guard case .return(let totalExpression?) = totalReturn,
+            case .binary(let totalLHS, .addition, let totalRHS) = totalExpression,
+            case .binary(let nestedLHS, .addition, let nestedRHS) = totalLHS,
+            case .identifier(let nestedName) = nestedLHS,
+            case .integer(let nestedAmount) = nestedRHS,
+            case .identifier(let totalValueName) = totalRHS
+        else {
+            Issue.record("Expected total() to rewrite the age read inside the larger expression.")
+            return
+        }
+
+        #expect(nestedName == "age")
+        #expect(nestedAmount == 1)
+        #expect(totalValueName == "value")
+    }
+
     @Test("Generic parameter clauses are shared across declarations")
     func genericParameterClausesAreSharedAcrossDeclarations() throws {
         let source = """

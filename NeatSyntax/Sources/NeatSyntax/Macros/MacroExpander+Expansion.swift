@@ -332,6 +332,7 @@ extension MacroExpander {
         macros: [String: MacroDeclaration]
     ) throws -> StateMacroEffects {
         var initializerTransforms: [Expression] = []
+        var getterTransforms: [Expression] = []
         var setterTransforms: [Expression] = []
 
         for application in state.macros {
@@ -363,6 +364,13 @@ extension MacroExpander {
                             bindings: [registration.parameterName: .identifier("__state_input__")]
                         )
                     )
+                case .getter:
+                    getterTransforms.append(
+                        substituteMacroBindings(
+                            in: substituted,
+                            bindings: [registration.parameterName: .identifier("__state_input__")]
+                        )
+                    )
                 case .setter:
                     setterTransforms.append(
                         substituteMacroBindings(
@@ -370,8 +378,6 @@ extension MacroExpander {
                             bindings: [registration.parameterName: .identifier("__state_input__")]
                         )
                     )
-                case .getter:
-                    continue
                 }
             }
         }
@@ -379,6 +385,7 @@ extension MacroExpander {
         return StateMacroEffects(
             type: state.type,
             initializerTransforms: initializerTransforms,
+            getterTransforms: getterTransforms,
             setterTransforms: setterTransforms
         )
     }
@@ -434,6 +441,20 @@ extension MacroExpander {
         }
 
         return applyStateTransforms(effects.setterTransforms, to: expression)
+    }
+
+    static func rewrittenStateReadExpression(
+        _ expression: Expression,
+        stateEffects: [String: StateMacroEffects]
+    ) -> Expression {
+        guard case .identifier(let name) = expression,
+            let effects = stateEffects[name],
+            !effects.getterTransforms.isEmpty
+        else {
+            return expression
+        }
+
+        return applyStateTransforms(effects.getterTransforms, to: expression)
     }
 
     static func rewrittenCompoundStateAssignment(
@@ -606,7 +627,8 @@ extension MacroExpander {
                         macros: macros,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
-                        context: context
+                        context: context,
+                        stateEffects: stateEffects
                     ),
                     body: try expand(
                         statements: body,
@@ -628,7 +650,8 @@ extension MacroExpander {
                         macros: macros,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
-                        context: context
+                        context: context,
+                        stateEffects: stateEffects
                     ),
                     body: try expand(
                         statements: body,
@@ -652,7 +675,8 @@ extension MacroExpander {
                                     macros: macros,
                                     parameterMacroSignatures: parameterMacroSignatures,
                                     literalBridges: literalBridges,
-                                    context: context)
+                                    context: context,
+                                    stateEffects: stateEffects)
                             },
                             body: try expand(
                                 statements: branch.body,
@@ -683,7 +707,8 @@ extension MacroExpander {
                             macros: macros,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
-                            context: context
+                            context: context,
+                            stateEffects: stateEffects
                         )
                     )
                 )
@@ -703,7 +728,8 @@ extension MacroExpander {
                         macros: macros,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
-                        context: context
+                        context: context,
+                        stateEffects: stateEffects
                     )
                 )
             ]
@@ -736,7 +762,8 @@ extension MacroExpander {
                         macros: macros,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
-                        context: context
+                        context: context,
+                        stateEffects: stateEffects
                     )
                 )
             ]
@@ -761,7 +788,8 @@ extension MacroExpander {
                             macros: macros,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
-                            context: context)
+                            context: context,
+                            stateEffects: stateEffects)
                     })
             ]
         case .switchStatement(let expression, let cases, let defaultBody):
@@ -773,7 +801,8 @@ extension MacroExpander {
                         macros: macros,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
-                        context: context
+                        context: context,
+                        stateEffects: stateEffects
                     ),
                     cases: try cases.map { switchCase in
                         SwitchCase(
@@ -782,7 +811,8 @@ extension MacroExpander {
                                 macros: macros,
                                 parameterMacroSignatures: parameterMacroSignatures,
                                 literalBridges: literalBridges,
-                                context: context
+                                context: context,
+                                stateEffects: stateEffects
                             ),
                             body: try expand(
                                 statements: switchCase.body,
@@ -820,7 +850,8 @@ extension MacroExpander {
         macros: [String: MacroDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        stateEffects: [String: StateMacroEffects] = [:]
     ) throws -> SwitchCasePattern {
         switch pattern {
         case .expression(let expression):
@@ -831,7 +862,8 @@ extension MacroExpander {
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context
+                    context: context,
+                    stateEffects: stateEffects
                 )
             )
         case .enumCase:
@@ -884,7 +916,8 @@ extension MacroExpander {
         macros: [String: MacroDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        stateEffects: [String: StateMacroEffects] = [:]
     ) throws -> Expression {
         switch expression {
         case .call(let name, let arguments):
@@ -897,7 +930,8 @@ extension MacroExpander {
                         macros: macros,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
-                        context: context
+                        context: context,
+                        stateEffects: stateEffects
                     )
                 )
             }
@@ -982,7 +1016,8 @@ extension MacroExpander {
                             macros: macros,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
-                            context: context
+                            context: context,
+                            stateEffects: stateEffects
                         )
                     )
                 }
@@ -1002,7 +1037,8 @@ extension MacroExpander {
                 macros: macros,
                 parameterMacroSignatures: parameterMacroSignatures,
                 literalBridges: literalBridges,
-                context: context
+                context: context,
+                stateEffects: stateEffects
             )
         case .array(let elements):
             return .array(
@@ -1013,7 +1049,8 @@ extension MacroExpander {
                         macros: macros,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
-                        context: context
+                        context: context,
+                        stateEffects: stateEffects
                     )
                 }
             )
@@ -1027,7 +1064,8 @@ extension MacroExpander {
                             macros: macros,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
-                            context: context
+                            context: context,
+                            stateEffects: stateEffects
                         ),
                         value: try expand(
                             expression: element.value,
@@ -1035,7 +1073,8 @@ extension MacroExpander {
                             macros: macros,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
-                            context: context
+                            context: context,
+                            stateEffects: stateEffects
                         )
                     )
                 }
@@ -1048,14 +1087,16 @@ extension MacroExpander {
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context),
+                    context: context,
+                    stateEffects: stateEffects),
                 trueExpression: try expand(
                     expression: trueExpression,
                     expectedType: expectedType,
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context
+                    context: context,
+                    stateEffects: stateEffects
                 ),
                 falseExpression: try expand(
                     expression: falseExpression,
@@ -1063,7 +1104,8 @@ extension MacroExpander {
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context
+                    context: context,
+                    stateEffects: stateEffects
                 )
             )
         case .unary(let operatorSymbol, let nested):
@@ -1075,7 +1117,8 @@ extension MacroExpander {
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context)
+                    context: context,
+                    stateEffects: stateEffects)
             )
         case .binary(let lhs, let operatorSymbol, let rhs):
             return .binary(
@@ -1085,7 +1128,8 @@ extension MacroExpander {
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context),
+                    context: context,
+                    stateEffects: stateEffects),
                 operatorSymbol: operatorSymbol,
                 rhs: try expand(
                     expression: rhs,
@@ -1093,7 +1137,8 @@ extension MacroExpander {
                     macros: macros,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
-                    context: context)
+                    context: context,
+                    stateEffects: stateEffects)
             )
         case .interpolatedString(let string):
             let expanded: Expression = .interpolatedString(
@@ -1110,7 +1155,8 @@ extension MacroExpander {
                                     macros: macros,
                                     parameterMacroSignatures: parameterMacroSignatures,
                                     literalBridges: literalBridges,
-                                    context: context
+                                    context: context,
+                                    stateEffects: stateEffects
                                 ))
                         }
                     }
@@ -1133,7 +1179,8 @@ extension MacroExpander {
                         protocols: [:],
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
-                        context: context
+                        context: context,
+                        stateEffects: stateEffects
                     )
                 }
             )
@@ -1145,7 +1192,9 @@ extension MacroExpander {
                 literalBridges: literalBridges,
                 context: context
             )
-        case .identifier, .bindingReference:
+        case .identifier:
+            return rewrittenStateReadExpression(expression, stateEffects: stateEffects)
+        case .bindingReference:
             return expression
         }
     }
