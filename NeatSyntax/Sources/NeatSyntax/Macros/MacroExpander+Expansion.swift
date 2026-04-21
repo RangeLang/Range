@@ -436,6 +436,35 @@ extension MacroExpander {
         return applyStateTransforms(effects.setterTransforms, to: expression)
     }
 
+    static func rewrittenCompoundStateAssignment(
+        target: AssignmentTarget,
+        operatorSymbol: CompoundOperator,
+        expression: Expression,
+        stateEffects: [String: StateMacroEffects]
+    ) -> Statement? {
+        guard case .state(let name) = target,
+            let effects = stateEffects[name],
+            !effects.setterTransforms.isEmpty
+        else {
+            return nil
+        }
+
+        let combinedExpression: Expression
+        switch operatorSymbol {
+        case .plusEquals:
+            combinedExpression = .binary(
+                lhs: .identifier(name),
+                operatorSymbol: .addition,
+                rhs: expression
+            )
+        }
+
+        return .assignment(
+            target: target,
+            expression: applyStateTransforms(effects.setterTransforms, to: combinedExpression)
+        )
+    }
+
     static func expand(
         statements: [Statement],
         expectedReturnType: TypeReference? = nil,
@@ -679,6 +708,24 @@ extension MacroExpander {
                 )
             ]
         case .compoundAssignment(let target, let operatorSymbol, let expression):
+            if let rewrittenAssignment = rewrittenCompoundStateAssignment(
+                target: target,
+                operatorSymbol: operatorSymbol,
+                expression: expression,
+                stateEffects: stateEffects
+            ) {
+                return try expand(
+                    statement: rewrittenAssignment,
+                    expectedReturnType: expectedReturnType,
+                    macros: macros,
+                    protocols: protocols,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                )
+            }
+
             return [
                 .compoundAssignment(
                     target: target,

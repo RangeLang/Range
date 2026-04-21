@@ -298,6 +298,20 @@ struct CompilerFixtureTests {
         }
 
         #expect(assignmentName == "Math.clamp")
+
+        let compoundAssignment = try #require(update.body?[1])
+
+        guard case .assignment(_, let compoundAssignmentExpression) = compoundAssignment else {
+            Issue.record("Expected compound assignment to lower into a rewritten assignment.")
+            return
+        }
+
+        guard case .call(let compoundAssignmentName, _) = compoundAssignmentExpression else {
+            Issue.record("Expected lowered compound assignment to become a call.")
+            return
+        }
+
+        #expect(compoundAssignmentName == "Math.clamp")
     }
 
     @Test("Generic parameter clauses are shared across declarations")

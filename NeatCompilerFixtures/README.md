@@ -7,6 +7,33 @@ This folder holds `.neat` source files used by compiler regression tests.
 
 These are compiler fixtures, not the future Neat-native testing library.
 
+## Adding Fixtures
+
+Create new compiler fixtures in this folder, not inline inside Swift test files.
+
+- Put validating examples in `CompilePass/<Category>/Name.neat`.
+- Put expected-failure examples in `CompileFail/<Category>/Name.neat`.
+- Reuse an existing category when possible. Add a new category only when it
+  reflects a real compiler surface that is starting to accumulate coverage.
+- Name fixtures after the behavior being protected, not after the test method.
+  Good examples: `ClampedState.neat`, `InitMacroRewrite.neat`,
+  `UnknownAttribute.neat`.
+- Keep each fixture focused. Prefer one behavior per file unless the behaviors
+  are inseparable.
+- If a Swift test needs to inspect expanded AST or graph details for one
+  specific fixture, load the fixture file by path from `NeatCompilerFixtures`
+  rather than embedding the `.neat` source directly in the test.
+
+Current top-level layout:
+
+- `CompilePass/Macros`: macro expansion and validation fixtures
+- `CompilePass/System`: core language/system behavior that should validate
+- `CompilePass/Concurrency`: concurrency semantics that should validate
+- `CompileFail/...`: negative fixtures grouped by the same surface areas
+
+The default rule is simple: if it is compiler input worth keeping around, it
+belongs in `NeatCompilerFixtures`.
+
 ## Roadmap
 
 The current fixture surface is intentionally small. Add categories only when
