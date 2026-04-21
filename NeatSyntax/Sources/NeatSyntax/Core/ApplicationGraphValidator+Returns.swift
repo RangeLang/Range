@@ -379,8 +379,10 @@ extension ApplicationGraphValidator {
                 if let defaultBody {
                     expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
                 }
-            case .background, .deferBlock:
+            case .background:
                 continue
+            case .deferBlock(let deferred):
+                expressions.append(contentsOf: collectReturnExpressions(in: deferred.body))
             case .localCallable:
                 continue
             case .localBinding, .derived, .environmentProvision, .assignment, .compoundAssignment,
@@ -429,8 +431,10 @@ extension ApplicationGraphValidator {
             guard let defaultBody else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
             return blockAlwaysReturnsValue(defaultBody)
-        case .background, .deferBlock, .localCallable:
+        case .background, .localCallable:
             return false
+        case .deferBlock(let deferred):
+            return blockAlwaysReturnsValue(deferred.body)
         default:
             return false
         }

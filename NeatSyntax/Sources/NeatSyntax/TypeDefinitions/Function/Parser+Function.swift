@@ -528,8 +528,10 @@ extension Parser {
                     expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
                 }
 
-            case .background, .deferBlock:
+            case .background:
                 continue
+            case .deferBlock(let deferred):
+                expressions.append(contentsOf: collectReturnExpressions(in: deferred.body))
 
             default:
                 break
@@ -565,8 +567,10 @@ extension Parser {
             guard let defaultBody else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
             return blockAlwaysReturnsValue(defaultBody)
-        case .background, .deferBlock:
+        case .background:
             return false
+        case .deferBlock(let deferred):
+            return blockAlwaysReturnsValue(deferred.body)
         default:
             return false
         }

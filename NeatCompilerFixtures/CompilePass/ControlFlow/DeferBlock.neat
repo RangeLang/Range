@@ -1,7 +1,6 @@
-function work() {
+function work() -> Int {
     @defer {
         log(message: "done")
+        return 1
     }
-
-    return
 }

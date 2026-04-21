@@ -159,6 +159,25 @@ private struct MainProgramInterpreter {
         return .none
     }
 
+    private mutating func executeDeferredStatements(_ statements: [Statement]) throws -> ControlFlow {
+        var pendingFlow: ControlFlow = .none
+
+        for statement in statements {
+            let flow = try executeStatement(statement)
+
+            switch flow {
+            case .none:
+                continue
+            case .returned, .broke, .continued:
+                if case .none = pendingFlow {
+                    pendingFlow = flow
+                }
+            }
+        }
+
+        return pendingFlow
+    }
+
     private mutating func executeStatement(_ statement: Statement) throws -> ControlFlow {
         switch statement {
         case .macroInvocation:
@@ -167,7 +186,7 @@ private struct MainProgramInterpreter {
             throw ValidationError(
                 "@background blocks are not supported in the main program interpreter yet.")
         case .deferBlock(let deferred):
-            return try executeStatements(deferred.body)
+            return try executeDeferredStatements(deferred.body)
         case .localCallable:
             throw ValidationError(
                 "Local callable declarations are not supported in the main program interpreter yet.")
