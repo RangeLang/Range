@@ -1,0 +1,10 @@
+macro passthrough(): State { target, diagnostics in
+    target.initializer { value in
+        value
+    }
+}
+
+construct Sample {
+    #passthrough()
+    state name: String = "George"
+}

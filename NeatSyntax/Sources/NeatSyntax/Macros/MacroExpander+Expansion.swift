@@ -24,7 +24,8 @@ extension MacroExpander {
         case .module(let module):
             let moduleStateEffects = try stateMacroEffects(
                 for: module.states,
-                macros: macros
+                macros: macros,
+                context: context
             )
             return .module(
                 ModuleFileNode(
@@ -111,7 +112,8 @@ extension MacroExpander {
 
         let constructStateEffects = try stateMacroEffects(
             for: construct.states,
-            macros: macros
+            macros: macros,
+            context: context
         )
 
         let carriedInitializers = DeclarationGraph.carriedProtocolInitializerMacros(
@@ -288,7 +290,8 @@ extension MacroExpander {
             let rewrittenExpression = try applyStateInitializerTransforms(
                 to: expression,
                 state: state,
-                macros: macros
+                macros: macros,
+                context: context
             )
             storage = .stored(
                 try expand(
@@ -315,13 +318,14 @@ extension MacroExpander {
 
     static func stateMacroEffects(
         for states: [StateDeclaration],
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
     ) throws -> [String: StateMacroEffects] {
         Dictionary(
             uniqueKeysWithValues: try states.map { state in
                 (
                     state.name,
-                    try stateMacroEffects(for: state, macros: macros)
+                    try stateMacroEffects(for: state, macros: macros, context: context)
                 )
             }
         )
@@ -329,7 +333,8 @@ extension MacroExpander {
 
     static func stateMacroEffects(
         for state: StateDeclaration,
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
     ) throws -> StateMacroEffects {
         var initializerTransforms: [Expression] = []
         var getterTransforms: [Expression] = []
@@ -342,6 +347,11 @@ extension MacroExpander {
             guard macroTargetKind(for: macro) == .state else {
                 throw ParseError(
                     "Macro #\(application.name) is used on a state but targets \(macro.target.typeReference.displayName)."
+                )
+            }
+            guard context.stateMacroTargetMatches(macro, stateType: state.type) else {
+                throw ParseError(
+                    "Macro #\(application.name) targeting \(macro.target.typeReference.displayName) does not match state \(state.name): \(state.type.displayName)."
                 )
             }
 
@@ -393,9 +403,10 @@ extension MacroExpander {
     static func applyStateInitializerTransforms(
         to expression: Expression,
         state: StateDeclaration,
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
     ) throws -> Expression {
-        let effects = try stateMacroEffects(for: state, macros: macros)
+        let effects = try stateMacroEffects(for: state, macros: macros, context: context)
         return applyStateTransforms(
             effects.initializerTransforms,
             to: expression

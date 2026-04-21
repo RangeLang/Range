@@ -312,6 +312,26 @@ struct MacroExpansionContext {
     let macroRealizationView: MacroRealizationView
     let rewriteSurfaceView: RewriteSurfaceView
 
+    func stateMacroTargetMatches(
+        _ macro: MacroDeclaration,
+        stateType: TypeReference
+    ) -> Bool {
+        let actualTargetType = TypeReference.generic(
+            base: .named("State"),
+            arguments: [stateType]
+        )
+
+        let matcher = MacroTargetTypeMatcher(
+            syntaxResolver: rewriteSurfaceView.syntaxResolver,
+            genericParameters: macro.genericParameters
+        )
+
+        return matcher.matches(
+            actual: actualTargetType,
+            expected: macro.target.typeReference
+        )
+    }
+
     func validateRewriteSites(
         for macro: MacroDeclaration,
         targetKind: MacroTargetKind,
@@ -429,6 +449,158 @@ struct MacroExpansionContext {
         }
 
         return ResolvedRewriteCall(site: descriptor.site, payload: arguments[0].value)
+    }
+}
+
+private struct MacroTargetTypeMatcher {
+    let syntaxResolver: DeclarationSyntaxResolver
+    let genericParameters: [GenericParameter]
+
+    func matches(
+        actual: TypeReference,
+        expected: TypeReference
+    ) -> Bool {
+        var bindings: [String: TypeReference] = [:]
+        guard typeMatches(actual: actual, expected: expected, bindings: &bindings) else {
+            return false
+        }
+
+        for parameter in genericParameters {
+            guard case .type(let name, let constraint, _) = parameter,
+                let constraint,
+                let binding = bindings[name]
+            else {
+                continue
+            }
+
+            guard let constraintName = syntaxResolver.nominalName(of: constraint) else {
+                return false
+            }
+
+            guard syntaxResolver.typeConforms(binding, to: constraintName) else {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private func typeMatches(
+        actual: TypeReference,
+        expected: TypeReference,
+        bindings: inout [String: TypeReference]
+    ) -> Bool {
+        if case .named(let name) = expected,
+            typeGenericParameterNames.contains(name)
+        {
+            if let existing = bindings[name] {
+                return existing == actual
+            }
+
+            bindings[name] = actual
+            return true
+        }
+
+        if case .optional(let actualWrapped) = actual,
+            case .generic(.named("Optional"), let expectedArguments) = expected,
+            expectedArguments.count == 1
+        {
+            return typeMatches(
+                actual: actualWrapped,
+                expected: expectedArguments[0],
+                bindings: &bindings
+            )
+        }
+
+        if case .generic(.named("Optional"), let actualArguments) = actual,
+            actualArguments.count == 1,
+            case .optional(let expectedWrapped) = expected
+        {
+            return typeMatches(
+                actual: actualArguments[0],
+                expected: expectedWrapped,
+                bindings: &bindings
+            )
+        }
+
+        switch (actual, expected) {
+        case (.named(let actualName), .named(let expectedName)):
+            return actualName == expectedName
+        case (.generic(let actualBase, _), .named):
+            return typeMatches(
+                actual: actualBase,
+                expected: expected,
+                bindings: &bindings
+            )
+        case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
+            return actualName == expectedName
+                && typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    bindings: &bindings
+                )
+        case (
+            .generic(let actualBase, let actualArguments),
+            .generic(let expectedBase, let expectedArguments)
+        ):
+            guard actualArguments.count == expectedArguments.count,
+                typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    bindings: &bindings
+                )
+            else {
+                return false
+            }
+
+            return zip(actualArguments, expectedArguments).allSatisfy { actualArgument, expectedArgument in
+                typeMatches(
+                    actual: actualArgument,
+                    expected: expectedArgument,
+                    bindings: &bindings
+                )
+            }
+        case (.array(let actualElement), .array(let expectedElement)),
+            (.optional(let actualElement), .optional(let expectedElement)),
+            (.variadic(let actualElement), .variadic(let expectedElement)):
+            return typeMatches(
+                actual: actualElement,
+                expected: expectedElement,
+                bindings: &bindings
+            )
+        case (
+            .function(let actualParameters, let actualReturn),
+            .function(let expectedParameters, let expectedReturn)
+        ):
+            guard actualParameters.count == expectedParameters.count else {
+                return false
+            }
+
+            return zip(actualParameters, expectedParameters).allSatisfy { actualParameter, expectedParameter in
+                typeMatches(
+                    actual: actualParameter,
+                    expected: expectedParameter,
+                    bindings: &bindings
+                )
+            } && typeMatches(
+                actual: actualReturn,
+                expected: expectedReturn,
+                bindings: &bindings
+            )
+        default:
+            return false
+        }
+    }
+
+    private var typeGenericParameterNames: Set<String> {
+        Set(
+            genericParameters.compactMap { parameter in
+                guard case .type(let name, _, _) = parameter else {
+                    return nil
+                }
+                return name
+            }
+        )
     }
 }
 

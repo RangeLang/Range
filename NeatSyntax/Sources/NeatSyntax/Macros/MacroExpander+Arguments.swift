@@ -42,17 +42,19 @@ extension MacroExpander {
         argumentClause: String?
     ) throws -> [String: Expression] {
         let parameters = macro.parameters
-        guard !parameters.isEmpty || argumentClause == nil else {
+        let normalizedArgumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !parameters.isEmpty || normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
             throw ParseError("Macro #\(macro.name) requires arguments.")
         }
         guard !parameters.isEmpty else {
             return [:]
         }
-        guard let argumentClause else {
+        guard let normalizedArgumentClause, !normalizedArgumentClause.isEmpty else {
             throw ParseError("Macro #\(macro.name) requires arguments.")
         }
 
-        var parser = try Parser(source: "macro(\(argumentClause))")
+        var parser = try Parser(source: "macro(\(normalizedArgumentClause))")
         _ = try parser.consumeCallableName()
         let arguments = try parser.parseInvocationArgumentsIfPresent()
         try parser.consume(Token.eof)
