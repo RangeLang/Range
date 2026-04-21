@@ -5,6 +5,9 @@
 Center the compiler on a graph-first architecture with one root graph substrate
 and progressively derived domain views.
 
+This document should stay focused on the long-range graph stack and stage model.
+It is not the place for already-completed validator migration checklists.
+
 The current intended stack is:
 
 - `ProgramGraph`
@@ -40,6 +43,9 @@ Core files:
 - [ApplicationGraph.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ApplicationGraph.swift)
 - [CompiledProgram.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgram.swift)
 - [CompiledProgramValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgramValidator.swift)
+- [ProgramGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ProgramGraphValidator.swift)
+- [DeclarationGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraphValidator.swift)
+- [ApplicationGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ApplicationGraphValidator.swift)
 
 Macro graph view files:
 
@@ -88,6 +94,19 @@ This split is important:
 
 - `ProgramGraph` is the semantic graph root
 - `CompiledProgram` is the compiler pipeline result object
+
+### Validation Status
+
+The validator split is already implemented in code:
+
+- `ProgramGraphValidator`
+- `DeclarationGraphValidator`
+- `ApplicationGraphValidator`
+- `CompiledProgramValidator` as orchestration over ordered passes
+
+So validation migration is no longer the main open topic here.
+The live question is how future graph domains such as `MemoryGraph` and
+`ReactivityGraph` should fit into the same staged architecture.
 
 ### Current Pipeline
 

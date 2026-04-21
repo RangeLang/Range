@@ -9,7 +9,7 @@ The compiler should recognize literals and `@core` declarations, while `NeatCore
 ## Phase 1: Name The Boundary Correctly
 
 - Treat remaining Swift-side type knowledge as bootstrap machinery, not as true builtins.
-- Rename narrow compiler concepts away from `BuiltinType` terminology.
+- Keep narrow compiler concepts named as bootstrap machinery rather than as true builtins.
 - Keep the bootstrap set intentionally small and explicit.
 
 ## Phase 2: Move From Scalar Types To Literal Categories
@@ -30,6 +30,21 @@ The compiler should recognize literals and `@core` declarations, while `NeatCore
 - Move more language meaning into Neat declarations and protocols.
 - Remove bootstrap mirrors when source-driven semantic resolution can replace them.
 
+## Current Status
+
+This plan is still directionally correct, but one important rename step is already done:
+
+- the compiler now uses `BootstrapLiteralType`, not `BuiltinType`
+
+That means the remaining work is no longer naming cleanup. It is semantic cleanup.
+
 ## Immediate Next Step
 
-Rename the remaining narrow Swift-side bootstrap type model away from `BuiltinType` so the code reflects its real role.
+Keep shrinking the places where `BootstrapLiteralType` directly carries language meaning.
+
+The next useful slice is:
+
+- push more literal compatibility and destination choice through declaration-graph
+  facts and `@core` literal bridge protocols
+- keep Swift-side bootstrap logic only where parsing, lowering, or runtime hooks
+  still truly require it
