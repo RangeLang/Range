@@ -32,7 +32,7 @@ struct MainProgramRunner {
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )
-        case .construct, .enumeration, .protocolDefinition, .macro:
+        case .construct, .namespace, .enumeration, .protocolDefinition, .macro:
             throw ValidationError(
                 "Main entry file '\(entryFile.lastPathComponent)' must use @main { ... }."
             )
@@ -776,7 +776,7 @@ private struct MainProgramInterpreter {
                 throw ValidationError("Unknown mutable symbol '\(name)'.")
             }
             guard slot.kind == .mutable else {
-                throw ValidationError("Cannot assign to immutable value '\(name)'.")
+                throw ValidationError("Cannot assign to immutable binding '\(name)'.")
             }
             slot.value = value
 

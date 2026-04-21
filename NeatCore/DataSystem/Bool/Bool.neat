@@ -1,6 +1,6 @@
 @core
 construct Bool: ExpressibleByBoolLiteral, Equatable, Hashable {
-    value storage: BoolStorage
+    let storage: BoolStorage
 
     init(literal: BoolLiteral) {
         self.storage = literal.storage()

@@ -1,4 +1,4 @@
 @main {
-    value maybe: Int? = nil
-    value resolved = #unwrap(value: maybe, fallback: 1)
+    let maybe: Int? = nil
+    let resolved = #unwrap(value: maybe, fallback: 1)
 }

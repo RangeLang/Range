@@ -119,7 +119,7 @@ extension ApplicationGraphValidator {
                 bindingConstructNames.contains(constructName)
             {
                 throw SemanticValidationError(
-                    "value \(value.name): \(constructName) in construct \(declaration.name) (\(fileName)) is not allowed because \(constructName) declares binding members. Use state or a snapshot construct."
+                    "let \(value.name): \(constructName) in construct \(declaration.name) (\(fileName)) is not allowed because \(constructName) declares binding members. Use state or a snapshot construct."
                 )
             }
         }
@@ -175,7 +175,7 @@ extension ApplicationGraphValidator {
                 let constructName = explicitType ?? inferredType
                 if let constructName, bindingConstructNames.contains(constructName) {
                     throw SemanticValidationError(
-                        "value \(declaration.name): \(constructName) in \(fileName) is not allowed because \(constructName) declares binding members. Use state or a snapshot construct."
+                        "let \(declaration.name): \(constructName) in \(fileName) is not allowed because \(constructName) declares binding members. Use state or a snapshot construct."
                     )
                 }
             case .derived(_, _, let body):

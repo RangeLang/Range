@@ -13,7 +13,7 @@
 }
 
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 

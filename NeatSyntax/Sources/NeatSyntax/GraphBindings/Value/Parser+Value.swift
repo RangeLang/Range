@@ -3,8 +3,8 @@ import Foundation
 extension Parser {
     mutating func parseValueDeclaration() throws -> ValueDeclaration {
         let macros = try parseMacroApplicationsIfPresent()
-        try consumeKeyword(.value)
-        let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "value")
+        try consumeKeyword(.let)
+        let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "let")
         try consume(.colon)
         let typeName = try consumeTypeReference()
         let value: Expression?
@@ -30,7 +30,7 @@ extension Parser {
 
     func isValueDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        guard peek(offset: offset) == .keyword(NeatSyntax.Keyword.value.rawValue) else {
+        guard peek(offset: offset) == .keyword(NeatSyntax.Keyword.let.rawValue) else {
             return false
         }
         guard tokenCanStartDeclarationName(peek(offset: offset + 1)) else { return false }

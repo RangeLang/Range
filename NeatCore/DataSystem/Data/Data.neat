@@ -1,6 +1,6 @@
 @core
 construct Data: Equatable, Hashable {
-    value storage: DataStorage
+    let storage: DataStorage
 
     init(storage: DataStorage)
 }

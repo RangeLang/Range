@@ -1,6 +1,6 @@
 @core
 construct String: ExpressibleByStringLiteral, Equatable, Hashable, Comparable {
-    value storage: StringStorage
+    let storage: StringStorage
 
     init(literal: StringLiteral) {
         self.storage = literal.storage()

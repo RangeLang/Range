@@ -1,5 +1,5 @@
 @core
 construct GenericTypeReference: NominalTypeReference {
-    value base: NominalTypeReference
-    value arguments: [TypeReference]
+    let base: NominalTypeReference
+    let arguments: [TypeReference]
 }

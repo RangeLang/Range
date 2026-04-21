@@ -36,7 +36,7 @@ extension Parser {
             return try parseSwitchStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(NeatSyntax.Keyword.value.rawValue) = peek() {
+        if case .keyword(NeatSyntax.Keyword.let.rawValue) = peek() {
             advance()
             return try parseLocalDeclaration(kind: .constant, localBindings: &localBindings)
         }
@@ -243,7 +243,7 @@ extension Parser {
             explicitType: explicitType,
             expression: expression,
             accessibleTypes: accessibleLocalTypes(localBindings),
-            bindingKindDescription: kind == .constant ? "value" : "state",
+            bindingKindDescription: kind == .constant ? "let" : "state",
             allowPromiseResolution: kind == .constant
         )
         let declaration = LocalBindingDeclaration(
@@ -305,7 +305,7 @@ extension Parser {
     ) throws -> AssignmentTarget {
         if let localBinding = localBindings[name] {
             if case .constant = localBinding.kind {
-                throw ParseError("Cannot assign to immutable value '\(name)'.")
+                throw ParseError("Cannot assign to immutable binding '\(name)'.")
             }
             return .local(name)
         }
@@ -330,7 +330,7 @@ extension Parser {
             throw ParseError("Cannot assign to derived state '\(name)'.")
         }
 
-        throw ParseError("Unknown mutable symbol '\(name)'. Declare it with value or state.")
+        throw ParseError("Unknown mutable symbol '\(name)'. Declare it with let or state.")
     }
 
     mutating func parseSwitchStatement(
@@ -452,14 +452,14 @@ extension Parser {
                 try consume(.leftParen)
                 let bindingKind: LocalBindingKind
                 switch peek() {
-                case .keyword(NeatSyntax.Keyword.value.rawValue):
+                case .keyword(NeatSyntax.Keyword.let.rawValue):
                     bindingKind = .constant
                     advance()
                 case .keyword(NeatSyntax.Keyword.state.rawValue):
                     bindingKind = .mutable
                     advance()
                 default:
-                    throw ParseError("Expected value or state in switch case binding.")
+                    throw ParseError("Expected let or state in switch case binding.")
                 }
 
                 let bindingName = try consumeIdentifier()
@@ -558,7 +558,7 @@ extension Parser {
         if peek() == .keyword(NeatSyntax.Keyword.continueStatement.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.value.rawValue)
+        if peek() == .keyword(NeatSyntax.Keyword.let.rawValue)
             || peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
             || peek() == .keyword(NeatSyntax.Keyword.derived.rawValue)
         {

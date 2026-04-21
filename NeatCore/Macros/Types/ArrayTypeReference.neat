@@ -1,4 +1,4 @@
 @core
 construct ArrayTypeReference: TypeReference {
-    value element: TypeReference
+    let element: TypeReference
 }

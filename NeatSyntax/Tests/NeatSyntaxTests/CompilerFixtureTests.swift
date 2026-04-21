@@ -46,7 +46,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/ProjectMain.neat",
                 source: """
                 @main {
-                    value text = #captureText(1 + 2)
+                    let text = #captureText(1 + 2)
                 }
                 """,
                 role: .project
@@ -64,8 +64,8 @@ struct CompilerFixtureTests {
                 path: "/tmp/ForwardDeclarations.neat",
                 source: """
                 @main {
-                    value messageText = message()
-                    value captured = #captureText(1 + 2)
+                    let messageText = message()
+                    let captured = #captureText(1 + 2)
                 }
 
                 function message() -> String {
@@ -195,13 +195,13 @@ struct CompilerFixtureTests {
                         }
 
                         construct Box {
-                            value number: Int
+                            let number: Int
                         }
                     }
                 }
 
                 @main {
-                    value result = System.Math.zero()
+                    let result = System.Math.zero()
                 }
                 """,
                 role: .project
@@ -237,7 +237,7 @@ struct CompilerFixtureTests {
                     }
 
                     construct Box {
-                        value number: Int
+                        let number: Int
                     }
                 }
                 """,

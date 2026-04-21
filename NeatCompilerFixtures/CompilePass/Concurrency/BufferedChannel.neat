@@ -8,12 +8,12 @@ function enqueueBufferedValues(queue: Channel<Int>) {
 }
 
 @main {
-    value queue = Channel<Int>(capacity: 2)
+    let queue = Channel<Int>(capacity: 2)
 
     enqueueBufferedValues(queue: queue)
 
-    value first = queue.receive()
-    value second = queue.receive()
+    let first = queue.receive()
+    let second = queue.receive()
 
     Logger.info(first)
     Logger.info(second)

@@ -4,8 +4,8 @@ enum LoadError {
 }
 
 construct User {
-    value id: Int
-    value name: String
+    let id: Int
+    let name: String
 }
 
 function fetchUser(id: Int) -> Result<User, LoadError> {
@@ -24,17 +24,17 @@ function load<Value, Failure>(
 
     @background {
         switch task() {
-        case .success(value item):
+        case .success(let item):
             target = .success(result: item)
 
-        case .failure(value reason):
+        case .failure(let reason):
             target = .failure(cause: reason)
         }
     }
 }
 
 construct UserView {
-    value id: Int
+    let id: Int
     state user: Promise<User, LoadError> = .loading
 
     init(id: Int) {
@@ -48,5 +48,5 @@ construct UserView {
 }
 
 @main {
-    value view = UserView(id: 1)
+    let view = UserView(id: 1)
 }

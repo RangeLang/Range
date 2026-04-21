@@ -1,5 +1,5 @@
 construct Greeter: Greetable {
-    value name: String
+    let name: String
 
     function greeting() -> String {
         "Hello, \(name)"

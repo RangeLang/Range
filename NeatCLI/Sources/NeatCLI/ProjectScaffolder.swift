@@ -235,7 +235,7 @@ struct ProjectScaffolder {
             {
               Logger.info("Neat program playground")
 
-              value values = [1, 2, 3]
+              let values = [1, 2, 3]
               state total = 0
 
               for value in values {

@@ -24,14 +24,14 @@ Plain foundational and compiler-structural values such as `Int` and `Closure` be
 
 ```neat
 construct Person {
-    value name: String
+    let name: String
 }
 ```
 
 - Instantiable
 
 ```neat
-value user = Person(name: "George")
+let user = Person(name: "George")
 ```
 
 - Does not inherit from other constructs
@@ -46,7 +46,7 @@ protocol Named {
 }
 
 construct Person: Named {
-    value name: String
+    let name: String
 
     function displayName() -> String {
         return name
@@ -58,12 +58,12 @@ construct Person: Named {
 
 ```neat
 construct Author {
-    value name: String
+    let name: String
 }
 
 construct Book {
-    value title: String
-    value author: Author
+    let title: String
+    let author: Author
 }
 ```
 

@@ -1,6 +1,6 @@
 @core
 construct If: Statement {
-    value condition: Expression
-    value thenBody: Block
-    value elseBody: Block?
+    let condition: Expression
+    let thenBody: Block
+    let elseBody: Block?
 }

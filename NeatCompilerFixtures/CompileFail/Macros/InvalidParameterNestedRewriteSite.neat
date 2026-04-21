@@ -9,5 +9,5 @@ function broken(#badNestedParameterRewrite value: Int) -> Int {
 }
 
 @main {
-    value output: Int = broken(1)
+    let output: Int = broken(1)
 }

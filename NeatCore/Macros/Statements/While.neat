@@ -1,5 +1,5 @@
 @core
 construct While: Statement {
-    value condition: Expression
-    value body: Block
+    let condition: Expression
+    let body: Block
 }

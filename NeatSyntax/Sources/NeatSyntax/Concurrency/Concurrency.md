@@ -111,14 +111,14 @@ This is just a normal function.
 If you want to run it concurrently, you do that at the use site:
 
 ```neat
-value names = Channel<String>()
+let names = Channel<String>()
 
 @background {
-    value name = fetchUserName(id: 1)
+    let name = fetchUserName(id: 1)
     names.send(name)
 }
 
-value received = names.receive()
+let received = names.receive()
 ```
 
 The concurrency is visible where it happens:
@@ -163,14 +163,14 @@ Example:
 
 ```neat
 function loadUser(id: Int) {
-    value output = Channel<String>()
+    let output = Channel<String>()
 
     @background {
-        value name = fetchUserName(id: id)
+        let name = fetchUserName(id: id)
         output.send(name)
     }
 
-    value name = output.receive()
+    let name = output.receive()
     Logger.info(name)
 }
 ```
@@ -195,7 +195,7 @@ Most importantly:
 This is preferred over designs where something like:
 
 ```neat
-value result = worker()
+let result = worker()
 ```
 
 looks like an ordinary binding but secretly waits for background work to finish.
@@ -270,7 +270,7 @@ The concurrency model should avoid centering around:
 
 - named background worker declarations
 - Promise-returning callable forms
-- special binding semantics where `value` joins async work
+- special binding semantics where `let` joins async work
 - hidden synchronization points
 - backend-shaped async concepts leaking into source semantics
 
@@ -340,13 +340,13 @@ function refreshCache() {
 
 ```neat
 function loadName(id: Int) {
-    value output = Channel<String>()
+    let output = Channel<String>()
 
     @background {
         output.send(fetchUserName(id: id))
     }
 
-    value name = output.receive()
+    let name = output.receive()
     Logger.info(name)
 }
 ```
@@ -355,7 +355,7 @@ function loadName(id: Int) {
 
 ```neat
 function processJobs() {
-    value jobs = Channel<Int>(capacity: 8)
+    let jobs = Channel<Int>(capacity: 8)
 
     @background {
         jobs.send(1)
@@ -363,8 +363,8 @@ function processJobs() {
         jobs.close()
     }
 
-    value first = jobs.receive()
-    value second = jobs.receive()
+    let first = jobs.receive()
+    let second = jobs.receive()
 
     Logger.info(first)
     Logger.info(second)

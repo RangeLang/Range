@@ -1,6 +1,6 @@
 @core
 construct Extension: Syntax {
-    value target: TypeReference
-    value protocols: [TypeReference]
-    value functions: [Function.Declaration]
+    let target: TypeReference
+    let protocols: [TypeReference]
+    let functions: [Function.Declaration]
 }

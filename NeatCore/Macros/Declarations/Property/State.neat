@@ -1,8 +1,8 @@
 @core
 construct State<T>: Property {
-    value name: String
-    value type: TypeReference
-    value value: Expression?
+    let name: String
+    let type: TypeReference
+    let value: Expression?
 
     function initializer(transform: (T) -> T)
     function getter(transform: (T) -> T)

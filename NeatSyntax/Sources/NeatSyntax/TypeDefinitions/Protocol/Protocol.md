@@ -19,7 +19,7 @@ A protocol is a non-instantiable contract.
 
 ```neat
 protocol Named {
-    value name: String
+    let name: String
 }
 ```
 
@@ -27,11 +27,11 @@ protocol Named {
 
 ```neat
 protocol Named {
-    value name: String
+    let name: String
 }
 
 construct User: Named {
-    value name: String
+    let name: String
 }
 ```
 
@@ -39,11 +39,11 @@ construct User: Named {
 
 ```neat
 protocol Named {
-    value name: String
+    let name: String
 }
 
 protocol Person: Named {
-    value age: Int
+    let age: Int
 }
 ```
 
@@ -67,17 +67,17 @@ construct UserList: Paginated {
 }
 ```
 
-`state page: Int` must be satisfied by `state`, not by `value`, `binding`, or `derived`.
+`state page: Int` must be satisfied by `state`, not by `let`, `binding`, or `derived`.
 
 - Constructs own the storage that satisfies protocol requirements
 
 ```neat
 protocol Identifiable {
-    value id: UUID
+    let id: UUID
 }
 
 construct User: Identifiable {
-    value id: UUID
+    let id: UUID
 }
 ```
 

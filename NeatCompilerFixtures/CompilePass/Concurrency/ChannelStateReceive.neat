@@ -3,7 +3,7 @@ enum LoadError {
 }
 
 @main {
-    value output = Channel<String>()
+    let output = Channel<String>()
 
     @background {
         output.send("george")

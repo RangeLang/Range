@@ -235,8 +235,8 @@ extension Parser {
     }
 
     mutating func parseConstructGenericParameter() throws -> GenericParameter {
-        if peek() == .keyword(NeatSyntax.Keyword.value.rawValue) {
-            try consumeKeyword(.value)
+        if peek() == .keyword(NeatSyntax.Keyword.let.rawValue) {
+            try consumeKeyword(.let)
             let name = try consumeIdentifier()
             try consume(.colon)
             let typeReference = try parseTypeReferenceNode()

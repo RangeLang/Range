@@ -4,9 +4,9 @@ macro extendConstructSurface(): Construct { target, diagnostics in
 
 #extendConstructSurface
 construct ExtendableFixture {
-    value number: Int
+    let number: Int
 }
 
 @main {
-    value result: ExtendableFixture = ExtendableFixture(number: 1)
+    let result: ExtendableFixture = ExtendableFixture(number: 1)
 }

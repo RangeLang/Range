@@ -1,17 +1,17 @@
 @core
 construct Enum: Syntax {
-    value self: NominalTypeReference
-    value cases: [Case]
+    let self: NominalTypeReference
+    let cases: [Case]
 
     @core
     construct Case {
-        value name: String
-        value associatedValues: [AssociatedValue]
+        let name: String
+        let associatedValues: [AssociatedValue]
     }
 
     @core
     construct AssociatedValue {
-        value label: String?
-        value type: TypeReference
+        let label: String?
+        let type: TypeReference
     }
 }

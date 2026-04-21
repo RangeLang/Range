@@ -1,5 +1,5 @@
 @main {
-    value queue = Channel<Int>(capacity: 2)
+    let queue = Channel<Int>(capacity: 2)
 
     @background {
         queue.send(1)

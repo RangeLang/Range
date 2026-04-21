@@ -1,6 +1,6 @@
 @core
-construct Float<value width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equatable, Hashable, Comparable {
-    value storage: FloatStorage
+construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equatable, Hashable, Comparable {
+    let storage: FloatStorage
 
     init(literal: FloatLiteral) {
         self.storage = literal.storage()

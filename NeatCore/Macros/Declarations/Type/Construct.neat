@@ -1,18 +1,18 @@
 @core
 construct Construct: Syntax, SupportsExtension {
-    value declaration: Declaration
-    value application: Application
+    let declaration: Declaration
+    let application: Application
 
     @core
     construct Declaration {
-        value self: NominalTypeReference
-        value inits: [Init.Declaration]
-        value functions: [Function.Declaration]
-        value constructs: [Construct.Declaration]
+        let self: NominalTypeReference
+        let inits: [Init.Declaration]
+        let functions: [Function.Declaration]
+        let constructs: [Construct.Declaration]
     }
 
     @core
     construct Application {
-      value init: Init.Application
+      let init: Init.Application
     }
 }

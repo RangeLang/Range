@@ -1,5 +1,5 @@
 @core
 construct FunctionTypeReference: TypeReference {
-    value parameters: [TypeReference]
-    value returnType: TypeReference
+    let parameters: [TypeReference]
+    let returnType: TypeReference
 }

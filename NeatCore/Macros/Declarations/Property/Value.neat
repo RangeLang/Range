@@ -1,6 +1,6 @@
 @core
 construct Value: Property {
-    value name: String
-    value type: TypeReference
-    value expression: Expression?
+    let name: String
+    let type: TypeReference
+    let expression: Expression?
 }

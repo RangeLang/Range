@@ -7,5 +7,5 @@ function accept(task _: () -> Int) -> Int {
 }
 
 @main {
-    value result = accept(compute)
+    let result = accept(compute)
 }

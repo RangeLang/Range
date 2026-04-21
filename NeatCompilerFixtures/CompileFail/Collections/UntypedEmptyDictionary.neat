@@ -1,3 +1,3 @@
 @main {
-    value counts = [:]
+    let counts = [:]
 }

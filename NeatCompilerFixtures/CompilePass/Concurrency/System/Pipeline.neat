@@ -21,9 +21,9 @@ function stageTwo(parsed: Channel<Int>, output: Channel<Int>) {
 }
 
 @main {
-    value input = Channel<Int>(capacity: 2)
-    value parsed = Channel<Int>(capacity: 2)
-    value output = Channel<Int>(capacity: 2)
+    let input = Channel<Int>(capacity: 2)
+    let parsed = Channel<Int>(capacity: 2)
+    let output = Channel<Int>(capacity: 2)
 
     stageOne(input: input, parsed: parsed)
     stageTwo(parsed: parsed, output: output)

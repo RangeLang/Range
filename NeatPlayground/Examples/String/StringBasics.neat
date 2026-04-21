@@ -1,7 +1,7 @@
 @main {
-    value text = "Hello"
-    value count = text.count
-    value empty = text.isEmpty
-    value ordered = text < "Zed"
-    value greeting = text + " World"
+    let text = "Hello"
+    let count = text.count
+    let empty = text.isEmpty
+    let ordered = text < "Zed"
+    let greeting = text + " World"
 }

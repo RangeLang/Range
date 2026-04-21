@@ -2,7 +2,7 @@ macro literal<T>(): Init { target, diagnostics in
 }
 
 construct FixtureInt {
-    value storage: IntStorage
+    let storage: IntStorage
 
     #literal<IntLiteral>
     init(literal: IntLiteral) {
@@ -11,5 +11,5 @@ construct FixtureInt {
 }
 
 @main {
-    value number: FixtureInt = 1
+    let number: FixtureInt = 1
 }

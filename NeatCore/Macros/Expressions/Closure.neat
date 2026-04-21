@@ -1,5 +1,5 @@
 @core
 construct Closure: Expression {
-    value type: TypeReference?
-    value body: Block
+    let type: TypeReference?
+    let body: Block
 }

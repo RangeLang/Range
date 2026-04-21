@@ -4,8 +4,8 @@ function computeValue() -> Int {
 
 @main {
     @background {
-        value result = computeValue()
+        let result = computeValue()
     }
 
-    value finished = true
+    let finished = true
 }

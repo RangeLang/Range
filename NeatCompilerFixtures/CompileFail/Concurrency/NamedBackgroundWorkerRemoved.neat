@@ -3,5 +3,5 @@
 }
 
 @main {
-    value name = fetchUsername(id: 1)
+    let name = fetchUsername(id: 1)
 }

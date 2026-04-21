@@ -1,6 +1,6 @@
 @core
-construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressibleByIntLiteral, Equatable, Hashable, Comparable {
-    value storage: IntStorage
+construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral, Equatable, Hashable, Comparable {
+    let storage: IntStorage
 
     init(literal: IntLiteral) {
         self.storage = literal.storage()

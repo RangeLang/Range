@@ -174,7 +174,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 })
             else {
                 throw SemanticValidationError(
-                    "Construct \(construct.name) does not satisfy protocol \(protocolName): missing value \(requirement.name): \(requirement.typeName)."
+                    "Construct \(construct.name) does not satisfy protocol \(protocolName): missing let \(requirement.name): \(requirement.typeName)."
                 )
             }
         }

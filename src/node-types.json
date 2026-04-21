@@ -1815,7 +1815,7 @@
     "named": true
   },
   {
-    "type": "value",
+    "type": "let",
     "named": false
   },
   {

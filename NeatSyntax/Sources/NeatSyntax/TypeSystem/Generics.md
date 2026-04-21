@@ -39,33 +39,33 @@ The second form is not needed. That constraint should be written inline.
 - Value generics declare compile-time values rather than types
 
 ```neat
-construct Int<value bits: RawInt>
+construct Int<let bits: RawInt>
 ```
 
 - Type and value generics can be mixed
 
 ```neat
-construct Array<value capacity: RawInt, Element>
+construct Array<let capacity: RawInt, Element>
 ```
 
 - Generic parameters can have default arguments
 
 ```neat
-construct Int<value bits: RawInt, value signedness: Signedness = .signed>
+construct Int<let bits: RawInt, let signedness: Signedness = .signed>
 ```
 
 - Generic arguments can be partially supplied when defaults exist
 
 ```neat
-value x: Int<8>
-value y: Int<8, .unsigned>
+let x: Int<8>
+let y: Int<8, .unsigned>
 ```
 
 - Variadic generics are supported
 
 ```neat
 construct Group<each Child: View> {
-    value children: (repeat each Child)
+    let children: (repeat each Child)
 }
 ```
 

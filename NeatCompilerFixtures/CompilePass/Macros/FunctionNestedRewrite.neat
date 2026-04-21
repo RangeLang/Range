@@ -12,5 +12,5 @@ function passthrough(value value: Int) -> Int {
 }
 
 @main {
-    value output: Int = passthrough(value: 10)
+    let output: Int = passthrough(value: 10)
 }

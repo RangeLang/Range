@@ -3,6 +3,6 @@ construct User {
 }
 
 @main {
-    value user = User()
+    let user = User()
     Logger.info("constructed user")
 }

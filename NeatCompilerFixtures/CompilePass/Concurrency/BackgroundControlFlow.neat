@@ -17,5 +17,5 @@
         return
     }
 
-    value finished = true
+    let finished = true
 }

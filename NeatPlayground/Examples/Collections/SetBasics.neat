@@ -2,8 +2,8 @@
     state unique: Set<Int> = [1, 2]
     unique.insert(element: 3)
 
-    value hasOne = unique.contains(element: 1)
-    value count = unique.count
-    value empty = unique.isEmpty
-    value removed = unique.remove(element: 2)
+    let hasOne = unique.contains(element: 1)
+    let count = unique.count
+    let empty = unique.isEmpty
+    let removed = unique.remove(element: 2)
 }

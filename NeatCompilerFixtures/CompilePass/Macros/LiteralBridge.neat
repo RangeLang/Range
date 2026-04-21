@@ -1,5 +1,5 @@
 construct FixtureInt: ExpressibleByIntLiteral {
-    value storage: IntStorage
+    let storage: IntStorage
 
     init(literal: IntLiteral) {
         self.storage = literal.storage()
@@ -7,5 +7,5 @@ construct FixtureInt: ExpressibleByIntLiteral {
 }
 
 @main {
-    value number: FixtureInt = 1
+    let number: FixtureInt = 1
 }

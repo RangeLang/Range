@@ -1,20 +1,20 @@
 @core
 construct Parameter: Syntax {
-    value declaration: Declaration
-    value application: Application
+    let declaration: Declaration
+    let application: Application
 
     @core
     construct Declaration {
-        value externalName: String?
-        value localName: String
-        value type: TypeReference
-        value defaultValue: Expression?
+        let externalName: String?
+        let localName: String
+        let type: TypeReference
+        let defaultValue: Expression?
     }
 
     @core
     construct Application {
-        value label: String?
-        value type: TypeReference
-        value expression: Expression
+        let label: String?
+        let type: TypeReference
+        let expression: Expression
     }
 }

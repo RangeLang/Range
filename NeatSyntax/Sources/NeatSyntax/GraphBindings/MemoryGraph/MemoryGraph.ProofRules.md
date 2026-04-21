@@ -10,7 +10,7 @@ The rules here are the contract for memory safety in Neat's storage model. If an
 
 ## Mental Model
 
-- `value`, `state`, `binding`, `derived`, and `environment` are ownership declarations, not style hints.
+- `let`, `state`, `binding`, `derived`, and `environment` are ownership declarations, not style hints.
 - The memory graph is the canonical semantic model used for validation.
 - Reactivity is layered on top later; these rules are memory-first.
 
@@ -23,17 +23,17 @@ state count: Int = 0
 count += 1
 ```
 
-- `value` is immutable after initialization.
+- `let` is immutable after initialization.
 
 ```neat
-value name: String = "George"
+let name: String = "George"
 name = "Ava" // invalid
 ```
 
-- Mutation through a `value` root is always invalid, including member-path mutation.
+- Mutation through a `let` root is always invalid, including member-path mutation.
 
 ```neat
-value person: Person = Person(name: "George", age: 26)
+let person: Person = Person(name: "George", age: 26)
 person.age = 27 // invalid
 ```
 
@@ -51,16 +51,16 @@ state person: Person = Person(name: "George", age: 26)
 state user: User = User(person: $person)
 ```
 
-- `value` cannot store a construct type that declares `binding` members.
+- `let` cannot store a construct type that declares `binding` members.
 
 ```neat
-value user: User = User(person: $person) // invalid if User contains binding members
+let user: User = User(person: $person) // invalid if User contains binding members
 ```
 
-- Assigning a construct from `value` into `state` performs an owned copy, not aliasing.
+- Assigning a construct from `let` into `state` performs an owned copy, not aliasing.
 
 ```neat
-value person: Person = Person(name: "George", age: 26)
+let person: Person = Person(name: "George", age: 26)
 state statefulPerson: Person = person
 ```
 
@@ -70,7 +70,7 @@ state statefulPerson: Person = person
 
 ```neat
 construct Book {
-    value author: Author
+    let author: Author
 }
 ```
 
@@ -78,7 +78,7 @@ construct Book {
 
 ```neat
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 ```
@@ -107,14 +107,14 @@ function incrementAge() {
 
 ## Rejection Rules
 
-- Reject assignment to immutable storage (`value`, non-mutable `environment`, constants).
+- Reject assignment to immutable storage (`let`, non-mutable `environment`, constants).
 - Reject unresolved mutable targets.
 - Reject uninitialized required construct members at construction sites.
 - Reject invalid binding sources (non-addressable, temporary, or incompatible storage).
 - Reject alias paths that violate ownership constraints.
 - Reject mutation effects that escape allowed storage paths.
-- Reject `value` declarations whose type declares `binding` members.
-- Reject mutation attempts through `value` roots, including member-path writes.
+- Reject `let` declarations whose type declares `binding` members.
+- Reject mutation attempts through `let` roots, including member-path writes.
 
 ## Examples
 
@@ -122,7 +122,7 @@ Valid:
 
 ```neat
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 
@@ -136,7 +136,7 @@ Invalid:
 
 ```neat
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 
@@ -149,7 +149,7 @@ Valid:
 
 ```neat
 @main {
-    value person: Person = Person(name: "George", age: 26)
+    let person: Person = Person(name: "George", age: 26)
     state statefulPerson: Person = person
     statefulPerson.age = 27
 }
@@ -159,7 +159,7 @@ Invalid:
 
 ```neat
 @main {
-    value person: Person = Person(name: "George", age: 26)
+    let person: Person = Person(name: "George", age: 26)
     person.age = 27
 }
 ```
@@ -169,7 +169,7 @@ Invalid:
 ```neat
 @main {
     state person: Person = Person(name: "George", age: 26)
-    value user: User = User(person: $person) // User has binding members
+    let user: User = User(person: $person) // User has binding members
 }
 ```
 
@@ -191,7 +191,7 @@ Valid:
 
 ```neat
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 

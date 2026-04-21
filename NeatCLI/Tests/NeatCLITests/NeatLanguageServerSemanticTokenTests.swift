@@ -8,11 +8,11 @@ struct NeatLanguageServerSemanticTokenTests {
     func typeDeclarationsAndUsagesSplit() {
         let source = """
         construct Something {
-            value number: Int
+            let number: Int
         }
 
         @main {
-            value item = Something()
+            let item = Something()
         }
         """
 
@@ -28,7 +28,7 @@ struct NeatLanguageServerSemanticTokenTests {
     func declarationsAndMembersEmitSemanticTokens() {
         let source = """
         function identity(value _: Int) -> Int {
-            value number: Int = 0
+            let number: Int = 0
             Logger.info(number)
             return value
         }
@@ -38,7 +38,7 @@ struct NeatLanguageServerSemanticTokenTests {
         }
 
         function refreshUser(id _: Int) {
-            value username = fetchUsername(id: id)
+            let username = fetchUsername(id: id)
             Logger.info(username)
         }
 
@@ -67,11 +67,11 @@ struct NeatLanguageServerSemanticTokenTests {
     func constructorArgumentLabelsEmitMethodTokens() {
         let source = """
         construct FixtureConstruct {
-            value number: Int
+            let number: Int
         }
 
         @main {
-            value result: FixtureConstruct = FixtureConstruct(number: 1)
+            let result: FixtureConstruct = FixtureConstruct(number: 1)
         }
         """
 
@@ -107,7 +107,7 @@ struct NeatLanguageServerSemanticTokenTests {
             #autoclosure task: Result<Value, Failure>
         ) {
             switch task() {
-            case .success(value item):
+            case .success(let item):
                 target = .success(result: item)
             }
         }
@@ -130,7 +130,7 @@ struct NeatLanguageServerSemanticTokenTests {
         }
 
         @main {
-            value text = #stringify(1 + 2)
+            let text = #stringify(1 + 2)
         }
         """
 
@@ -157,7 +157,7 @@ struct NeatLanguageServerSemanticTokenTests {
     func memberCallReceiversDoNotEmitVariableReadTokens() {
         let source = """
         @main {
-            value output = Channel<String>()
+            let output = Channel<String>()
             output.send("george")
             state received = output.receive()
         }

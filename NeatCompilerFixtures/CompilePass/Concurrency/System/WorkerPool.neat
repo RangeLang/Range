@@ -4,19 +4,19 @@ function process(value: Int) -> Int {
 
 function worker(jobs: Channel<Int>, results: Channel<Int>) {
     @background {
-        value first: Int = jobs.receive()
-        value firstResult: Int = process(value: first)
+        let first: Int = jobs.receive()
+        let firstResult: Int = process(value: first)
         results.send(firstResult)
 
-        value second: Int = jobs.receive()
-        value secondResult: Int = process(value: second)
+        let second: Int = jobs.receive()
+        let secondResult: Int = process(value: second)
         results.send(secondResult)
     }
 }
 
 @main {
-    value jobs = Channel<Int>(capacity: 4)
-    value results = Channel<Int>(capacity: 4)
+    let jobs = Channel<Int>(capacity: 4)
+    let results = Channel<Int>(capacity: 4)
 
     worker(jobs: jobs, results: results)
     worker(jobs: jobs, results: results)
@@ -26,10 +26,10 @@ function worker(jobs: Channel<Int>, results: Channel<Int>) {
     jobs.send(3)
     jobs.send(4)
 
-    value a: Int = results.receive()
-    value b: Int = results.receive()
-    value c: Int = results.receive()
-    value d: Int = results.receive()
+    let a: Int = results.receive()
+    let b: Int = results.receive()
+    let c: Int = results.receive()
+    let d: Int = results.receive()
 
     Logger.info(a)
     Logger.info(b)

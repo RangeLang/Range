@@ -1,5 +1,5 @@
 construct FixtureDirectInt {
-    value storage: IntStorage
+    let storage: IntStorage
 
     #literal<IntLiteral>
     init(literal: IntLiteral) {
@@ -8,5 +8,5 @@ construct FixtureDirectInt {
 }
 
 @main {
-    value number: FixtureDirectInt = 1
+    let number: FixtureDirectInt = 1
 }

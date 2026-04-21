@@ -1,4 +1,4 @@
 @core
 construct Return: Statement {
-    value expression: Expression?
+    let expression: Expression?
 }

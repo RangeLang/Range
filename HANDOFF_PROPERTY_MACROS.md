@@ -179,13 +179,13 @@ This is the best concrete shape discussed for `State` so far:
 ```neat
 @core
 construct State: Property {
-    value name: String
-    value type: TypeReference
-    value value: Expression?
+    let name: String
+    let type: TypeReference
+    let value: Expression?
 
-    value initializer: ((Expression) -> T)?
-    value getter: ((T) -> T)?
-    value setter: ((Expression) -> T)?
+    let initializer: ((Expression) -> T)?
+    let getter: ((T) -> T)?
+    let setter: ((Expression) -> T)?
 }
 ```
 

@@ -668,7 +668,7 @@
                 },
                 {
                   "type": "STRING",
-                  "value": "value"
+                  "value": "let"
                 }
               ]
             },

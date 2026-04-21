@@ -1,4 +1,4 @@
 @core
 construct Block: Syntax, SupportsRewrite<Block> {
-    value statements: [Statement]
+    let statements: [Statement]
 }

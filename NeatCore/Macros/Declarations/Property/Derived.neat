@@ -1,7 +1,7 @@
 @core
 construct Derived: Property {
-    value name: String
-    value type: TypeReference
-    value builderName: String?
-    value body: Block?
+    let name: String
+    let type: TypeReference
+    let builderName: String?
+    let body: Block?
 }

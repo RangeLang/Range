@@ -41,8 +41,8 @@
 
 ```neat
 @core
-construct Int<value bits: IntLiteral, value signedness: Signedness = .signed>: ExpressibleByIntLiteral {
-    value storage: IntStorage
+construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral {
+    let storage: IntStorage
 }
 ```
 
@@ -54,7 +54,7 @@ construct IntLiteral { }
 ```neat
 @core
 construct Closure {
-    value body: Block
+    let body: Block
 }
 ```
 

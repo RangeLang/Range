@@ -1,6 +1,6 @@
 @core
 construct For: Statement {
-    value pattern: Expression
-    value sequence: Expression
-    value body: Block
+    let pattern: Expression
+    let sequence: Expression
+    let body: Block
 }

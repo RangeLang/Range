@@ -7,7 +7,7 @@ function logIncoming(messages: Channel<String>) {
 }
 
 @main {
-    value messages = Channel<String>(capacity: 3)
+    let messages = Channel<String>(capacity: 3)
 
     logIncoming(messages: messages)
 

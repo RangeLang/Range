@@ -1,5 +1,5 @@
 @core
 construct MemberTypeReference: NominalTypeReference {
-    value base: NominalTypeReference
-    value name: String
+    let base: NominalTypeReference
+    let name: String
 }

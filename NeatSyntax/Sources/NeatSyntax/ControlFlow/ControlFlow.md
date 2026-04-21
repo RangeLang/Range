@@ -38,7 +38,7 @@ switch direction {
 }
 ```
 
-- Supports value binding in `switch`
+- Supports let binding in `switch`
 
 ```neat
 switch result {

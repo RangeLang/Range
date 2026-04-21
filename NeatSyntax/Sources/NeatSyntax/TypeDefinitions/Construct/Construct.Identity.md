@@ -20,7 +20,7 @@ Construct-to-construct members preserve construct identity in the graph, which k
 
 ```neat
 construct User {
-    value name: String
+    let name: String
 }
 ```
 
@@ -28,33 +28,33 @@ construct User {
 
 ```neat
 construct User {
-    value name: String
+    let name: String
 }
 
-value userID: User.ID
+let userID: User.ID
 ```
 
 - The identity used by the graph is distinct from ordinary user-defined fields
 
 ```neat
 construct User {
-    value id: UUID
-    value name: String
+    let id: UUID
+    let name: String
 }
 
-value userID: User.ID
+let userID: User.ID
 ```
 
 - References to other constructs are identity references
 
 ```neat
 construct Author {
-    value name: String
+    let name: String
 }
 
 construct Book {
-    value title: String
-    value author: Author
+    let title: String
+    let author: Author
 }
 ```
 
@@ -64,12 +64,12 @@ construct Book {
 
 ```neat
 construct Author {
-    value name: String
+    let name: String
 }
 
 construct Book {
-    value title: String
-    value author: Author
+    let title: String
+    let author: Author
 }
 ```
 
@@ -79,8 +79,8 @@ construct Book {
 
 ```neat
 construct FileNode {
-    value name: String
-    value parent: FileNode
+    let name: String
+    let parent: FileNode
 }
 ```
 
@@ -90,7 +90,7 @@ Recursive construct references are legal because construct members preserve cons
 
 ```neat
 construct User {
-    value manager: User
+    let manager: User
 }
 ```
 
@@ -99,7 +99,7 @@ Cycles are safe because construct references are identity references, not contai
 ## Notes
 
 - `User.ID` is the compiler-provided identity type for `User`.
-- Ordinary fields such as `value id: UUID` are user-facing data and do not replace the intrinsic construct identity.
+- Ordinary fields such as `let id: UUID` are user-facing data and do not replace the intrinsic construct identity.
 - `construct` identity is part of the language model even though user code does not choose a separate reference type.
 - Foundational plain-value types such as `Int` belong to `@core construct`, not this identity model.
 - Compiler structural constructs such as `Closure` and `Block` may also belong to `@core construct` when they are non-identity-bearing values.

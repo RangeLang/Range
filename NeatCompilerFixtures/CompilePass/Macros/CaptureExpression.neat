@@ -3,5 +3,5 @@ macro captureText(value _: capture Expression): Expression -> String { target, d
 }
 
 @main {
-    value text = #captureText(1 + 2)
+    let text = #captureText(1 + 2)
 }

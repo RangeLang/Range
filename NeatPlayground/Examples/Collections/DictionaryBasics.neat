@@ -2,9 +2,9 @@
     state counts = ["a": 1]
     counts.updateValue(value: 2, key: "b")
 
-    value hasA = counts.contains(key: "a")
-    value count = counts.count
-    value empty = counts.isEmpty
-    value valueA = counts.value(key: "a")
-    value removed = counts.removeValue(key: "b")
+    let hasA = counts.contains(key: "a")
+    let count = counts.count
+    let empty = counts.isEmpty
+    let valueA = counts.value(key: "a")
+    let removed = counts.removeValue(key: "b")
 }

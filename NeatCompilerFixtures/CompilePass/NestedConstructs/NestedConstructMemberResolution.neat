@@ -1,8 +1,8 @@
 construct Parent {
-    value child: Child
+    let child: Child
 
     construct Child {
-        value text: String
+        let text: String
     }
 
     function childText() -> String {

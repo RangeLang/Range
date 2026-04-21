@@ -1,4 +1,4 @@
-function write(target _: binding Int, value _: Int) {
+function write(target _: binding Int, let _: Int) {
     target = value
 }
 
@@ -11,5 +11,5 @@ construct Counter {
 }
 
 @main {
-    value counter = Counter()
+    let counter = Counter()
 }

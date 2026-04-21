@@ -11,5 +11,5 @@ function collect(#arrayifyParameter values: Int) -> [Int] {
 }
 
 @main {
-    value output: [Int] = collect(1, 2, 3)
+    let output: [Int] = collect(1, 2, 3)
 }

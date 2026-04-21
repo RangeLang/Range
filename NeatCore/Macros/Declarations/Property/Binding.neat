@@ -1,7 +1,7 @@
 @core
 construct Binding: Property {
-    value name: String
-    value type: TypeReference
-    value getterBody: Block?
-    value setterBody: Block?
+    let name: String
+    let type: TypeReference
+    let getterBody: Block?
+    let setterBody: Block?
 }

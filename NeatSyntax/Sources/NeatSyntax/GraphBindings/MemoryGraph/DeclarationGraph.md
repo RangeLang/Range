@@ -171,8 +171,8 @@ protocol Equatable {
 }
 
 construct Point: Equatable {
-    value x: Int
-    value y: Int
+    let x: Int
+    let y: Int
 }
 ```
 

@@ -51,7 +51,7 @@ function +(lhs: Int, rhs: Int) -> Int
 
 ```neat
 construct User {
-    value name: String
+    let name: String
 
     function displayName() -> String {
         return name
@@ -81,7 +81,7 @@ extension Named {
 
 ```neat
 construct User {
-    value name: String
+    let name: String
 
     function displayName() -> String {
         return name
@@ -151,11 +151,11 @@ construct NameEditor {
 }
 ```
 
-- Cannot assign to `value`
+- Cannot assign to `let`
 
 ```neat
 construct User {
-    value name: String
+    let name: String
 
     function rename(to newName: String) {
         name = newName
@@ -163,4 +163,4 @@ construct User {
 }
 ```
 
-Assigning to `value` is a compile error.
+Assigning to `let` is a compile error.

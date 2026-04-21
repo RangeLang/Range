@@ -38,20 +38,20 @@ This means the memory graph consumes already-settled declaration semantics. It s
 - The storage declaration keywords define ownership semantics.
 
 ```neat
-value title: String
+let title: String
 state person: Person
 derived personString: String
 binding selectedPerson: Person
 environment session: Session
 ```
 
-- `value` is immutable owned data declared here.
+- `let` is immutable owned data declared here.
 
 ```neat
-value title: String = "Neat"
+let title: String = "Neat"
 ```
 
-The compiler does not need to track mutation for `value`.
+The compiler does not need to track mutation for `let`.
 
 - `state` is mutable owned storage with a single source of truth.
 
@@ -86,11 +86,11 @@ construct Editor {
 
 ```neat
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 
-value person: Person = Person(name: "George", age: 26)
+let person: Person = Person(name: "George", age: 26)
 state editablePerson: Person = person
 ```
 
@@ -99,7 +99,7 @@ The memory graph treats `editablePerson` as a new owned value, not as an alias t
 - Copy-on-write is an implementation optimization, not a semantic aliasing rule.
 
 ```neat
-value values: [Int] = [1, 2, 3]
+let values: [Int] = [1, 2, 3]
 state editableValues: [Int] = values
 
 editableValues.append(4)
@@ -137,13 +137,13 @@ The difference between owned mutable storage and borrowed access is part of the 
 
 ```neat
 construct Author {
-    value name: String
-    value books: [Book]
+    let name: String
+    let books: [Book]
 }
 
 construct Book {
-    value title: String
-    value author: Author
+    let title: String
+    let author: Author
 }
 ```
 
@@ -162,7 +162,7 @@ construct IntStorage {
 
 @core
 construct Int {
-    value storage: IntStorage
+    let storage: IntStorage
 }
 ```
 
@@ -190,7 +190,7 @@ This keeps wrapper semantics and representation semantics separate:
 
 ```neat
 construct User {
-    value name: String
+    let name: String
 }
 ```
 
@@ -200,7 +200,7 @@ The graph can refer to `User` instances by intrinsic identity without requiring 
 
 ```neat
 construct User {
-    value manager: User
+    let manager: User
 }
 ```
 
@@ -224,15 +224,15 @@ state user: User = User(person: $person)
 
 If `User.person` is a binding, the graph records that `user.person` aliases existing storage owned by `person`.
 
-- Mutation through a `value` root is invalid even when the construct contains internal `state`.
+- Mutation through a `let` root is invalid even when the construct contains internal `state`.
 
 ```neat
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 
-value person: Person = Person(name: "George", age: 26)
+let person: Person = Person(name: "George", age: 26)
 ```
 
 `person.age = 27` is rejected because `person` is immutable at the root path.
@@ -299,7 +299,7 @@ When packages interact, the compiler merges the relevant graph information at bu
 }
 
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 

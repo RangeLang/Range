@@ -7,13 +7,13 @@ function fetchUserName(id: Int) -> String {
 }
 
 @main {
-    value output = Channel<String>()
+    let output = Channel<String>()
 
     @background {
-        value name: String = fetchUserName(id: 1)
+        let name: String = fetchUserName(id: 1)
         output.send(name)
     }
 
-    value received: String = output.receive()
+    let received: String = output.receive()
     Logger.info(received)
 }

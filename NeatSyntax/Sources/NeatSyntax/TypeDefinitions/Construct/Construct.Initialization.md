@@ -10,30 +10,30 @@ Constructs support automatic memberwise initialization by default.
 
 ```neat
 construct User {
-    value name: String
-    value age: Int
+    let name: String
+    let age: Int
 }
 
-value user = User(name: "Ava", age: 20)
+let user = User(name: "Ava", age: 20)
 ```
 
 - Default values reduce the required initializer surface
 
 ```neat
 construct User {
-    value name: String
-    value age: Int = 20
+    let name: String
+    let age: Int = 20
 }
 
-value user = User(name: "Ava")
+let user = User(name: "Ava")
 ```
 
 - A construct may declare custom initializers
 
 ```neat
 construct User {
-    value name: String
-    value age: Int
+    let name: String
+    let age: Int
 
     init(name: String) {
         self.name = name
@@ -46,8 +46,8 @@ construct User {
 
 ```neat
 construct User {
-    value name: String
-    value age: Int
+    let name: String
+    let age: Int
 
     init(name: String) {
         self.name = name
@@ -61,11 +61,11 @@ construct User {
 }
 ```
 
-- Every `value` and `state` must be initialized unless it has a default value
+- Every `let` and `state` must be initialized unless it has a default value
 
 ```neat
 construct User {
-    value name: String
+    let name: String
     state visits: Int = 0
 }
 ```

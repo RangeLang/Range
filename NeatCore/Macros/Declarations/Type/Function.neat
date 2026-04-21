@@ -1,19 +1,19 @@
 @core
 construct Function: Syntax {
-    value declaration: Declaration
-    value application: Application
+    let declaration: Declaration
+    let application: Application
 
     @core
     construct Declaration {
-        value name: String
-        value parameters: [Parameter.Declaration]
-        value returnType: TypeReference?
-        value body: Block
+        let name: String
+        let parameters: [Parameter.Declaration]
+        let returnType: TypeReference?
+        let body: Block
     }
 
     @core
     construct Application {
-        value name: String
-        value arguments: [Parameter.Application]
+        let name: String
+        let arguments: [Parameter.Application]
     }
 }

@@ -37,7 +37,7 @@ construct Counter {
     state count: Int
 }
 
-value counter = Counter(count: 0)
+let counter = Counter(count: 0)
 ```
 
 Inside construct member storage, `state` may be declared without a default and must then be initialized by construction.

@@ -4,5 +4,5 @@ function fallback() -> Int {
 
 @main {
     state current: Int? = nil
-    value resolved = current ?? fallback()
+    let resolved = current ?? fallback()
 }

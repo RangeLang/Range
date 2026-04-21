@@ -2,9 +2,9 @@ macro inspectConstruct(): Construct { target, diagnostics in }
 
 #inspectConstruct
 construct FixtureConstruct {
-    value number: Int
+    let number: Int
 }
 
 @main {
-    value result: FixtureConstruct = FixtureConstruct(number: 1)
+    let result: FixtureConstruct = FixtureConstruct(number: 1)
 }

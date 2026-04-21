@@ -23,6 +23,8 @@ enum PackageManifestLoader {
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .module:
             throw ValidationError("Package.neat must declare construct Name: Package.")
+        case .namespace:
+            throw ValidationError("Package.neat must declare construct Name: Package.")
         case .construct(let declaration):
             guard declaration.attribute == nil else {
                 throw ValidationError("Package.neat cannot use declaration attributes.")

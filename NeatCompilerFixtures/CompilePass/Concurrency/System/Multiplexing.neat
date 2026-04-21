@@ -1,7 +1,7 @@
 @main {
-    value sourceA = Channel<String>(capacity: 1)
-    value sourceB = Channel<String>(capacity: 1)
-    value merged = Channel<String>(capacity: 2)
+    let sourceA = Channel<String>(capacity: 1)
+    let sourceB = Channel<String>(capacity: 1)
+    let merged = Channel<String>(capacity: 2)
 
     @background {
         merged.send(sourceA.receive())

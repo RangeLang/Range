@@ -63,17 +63,17 @@ Current preferred `Init` shape:
 ```neat
 @core
 construct Init: Syntax {
-    value declaration: Declaration
-    value application: Application
+    let declaration: Declaration
+    let application: Application
 
     construct Declaration {
-        value parameters: [Parameter.Declaration]
-        value body: Block
+        let parameters: [Parameter.Declaration]
+        let body: Block
     }
 
     construct Application: SupportsRewrite<Expression> {
-        value type: TypeReference
-        value arguments: [Parameter.Application]
+        let type: TypeReference
+        let arguments: [Parameter.Application]
     }
 }
 ```
@@ -92,20 +92,20 @@ Current aligned `Parameter` shape:
 ```neat
 @core
 construct Parameter: Syntax {
-    value declaration: Declaration
-    value application: Application
+    let declaration: Declaration
+    let application: Application
 
     construct Declaration {
-        value externalName: String?
-        value localName: String
-        value type: TypeReference
-        value defaultValue: Expression?
+        let externalName: String?
+        let localName: String
+        let type: TypeReference
+        let defaultValue: Expression?
     }
 
     construct Application {
-        value label: String?
-        value type: TypeReference
-        value expression: Expression
+        let label: String?
+        let type: TypeReference
+        let expression: Expression
     }
 }
 ```
@@ -115,19 +115,19 @@ Current preferred `Function` shape:
 ```neat
 @core
 construct Function: Syntax {
-    value declaration: Declaration
-    value application: Application
+    let declaration: Declaration
+    let application: Application
 
     construct Declaration {
-        value name: String
-        value parameters: [Parameter.Declaration]
-        value returnType: TypeReference?
-        value body: Block
+        let name: String
+        let parameters: [Parameter.Declaration]
+        let returnType: TypeReference?
+        let body: Block
     }
 
     construct Application {
-        value name: String
-        value arguments: [Parameter.Application]
+        let name: String
+        let arguments: [Parameter.Application]
     }
 }
 ```
@@ -225,15 +225,15 @@ macro clamped(min: Int, max: Int): Property { target, diagnostics in
 
 ```neat
 macro literal<T>(): Init { target, diagnostics in
-    value declaration = target.declaration
-    value application = target.application
+    let declaration = target.declaration
+    let application = target.application
 }
 ```
 
 ```neat
 macro traced(): Function { target, diagnostics in
-    value declaration = target.declaration
-    value application = target.application
+    let declaration = target.declaration
+    let application = target.application
 }
 ```
 

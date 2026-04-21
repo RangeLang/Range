@@ -3,7 +3,7 @@ function refreshCache() {
 
     @background {
         Logger.info("background refresh started")
-        value finished = true
+        let finished = true
         Logger.info("background refresh finished")
     }
 

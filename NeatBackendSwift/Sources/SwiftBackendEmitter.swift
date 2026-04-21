@@ -643,7 +643,7 @@ struct SwiftBackendEmitter {
             return try emitExpression(expression)
         case .enumCase(let name, let binding):
             if let binding {
-                let bindingKeyword = binding.kind == .constant ? "value" : "state"
+                let bindingKeyword = binding.kind == .constant ? "let" : "state"
                 return ".\(name)(\(bindingKeyword) \(binding.name))"
             }
             return ".\(name)"

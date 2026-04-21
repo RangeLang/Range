@@ -101,7 +101,7 @@
 			summary: 'A block is just a body container for ordered statements.',
 			lines: [
 				[{ text: '{', partId: 'block-brace' }],
-				[{ text: '    ' }, { text: 'value count = 0', partId: 'statement-one' }],
+				[{ text: '    ' }, { text: 'let count = 0', partId: 'statement-one' }],
 				[{ text: '    ' }, { text: 'log(count)', partId: 'statement-two' }],
 				[{ text: '}', partId: 'block-brace' }]
 			],
@@ -113,7 +113,7 @@
 				},
 				{
 					id: 'statement-one',
-					label: 'value count = 0',
+					label: 'let count = 0',
 					description: 'A declaration can be a statement inside a block.'
 				},
 				{

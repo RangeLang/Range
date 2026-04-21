@@ -68,7 +68,7 @@ Here `Person.name` is bound to the surrounding `state name`. The construct does 
 
 ```neat
 construct Person {
-    value name: String
+    let name: String
     state age: Int
 }
 

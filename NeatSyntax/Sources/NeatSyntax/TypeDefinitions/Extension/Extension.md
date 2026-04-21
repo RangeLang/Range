@@ -19,7 +19,7 @@ An extension adds declarations to an existing type definition.
 
 ```neat
 construct User {
-    value name: String
+    let name: String
 }
 
 extension User {
