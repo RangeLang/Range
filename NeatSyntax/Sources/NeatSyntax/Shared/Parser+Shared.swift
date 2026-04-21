@@ -122,7 +122,11 @@ extension Parser {
         var conformances: [TypeReference] = []
 
         while true {
-            conformances.append(try parseTypeReferenceNode())
+            conformances.append(
+                try parseNominalTypeReferenceNode(
+                    expectedDescription: "Conformance"
+                )
+            )
             guard peek() == .comma else { break }
             advance()
         }

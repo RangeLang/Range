@@ -34,6 +34,19 @@ public indirect enum TypeReference: Equatable, Sendable {
             return "\(element.displayName)..."
         }
     }
+
+    public var isNominalReference: Bool {
+        switch self {
+        case .named:
+            return true
+        case .member(let base, _):
+            return base.isNominalReference
+        case .generic(let base, _):
+            return base.isNominalReference
+        case .array, .function, .optional, .variadic:
+            return false
+        }
+    }
 }
 
 public enum BootstrapLiteralType: Equatable, Sendable {

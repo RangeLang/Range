@@ -136,6 +136,18 @@ extension Parser {
         try parseTypeReferenceNode().displayName
     }
 
+    mutating func parseNominalTypeReferenceNode(
+        expectedDescription: String = "Type"
+    ) throws -> TypeReference {
+        let typeReference = try parseTypeReferenceNode()
+        guard typeReference.isNominalReference else {
+            throw ParseError(
+                "\(expectedDescription) must be a nominal type reference, got \(typeReference.displayName)."
+            )
+        }
+        return typeReference
+    }
+
     mutating func parseTypeReferenceNode() throws -> TypeReference {
         var result = try parseTypeReferenceBaseNode()
         while peek() == .question {

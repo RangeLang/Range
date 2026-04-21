@@ -251,6 +251,38 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.constructsByName["Math.Box"] != nil)
     }
 
+    @Test("Construct conformances require nominal type references")
+    func constructConformancesRequireNominalTypeReferences() throws {
+        let source = """
+        construct Box: [Int] { }
+        """
+
+        do {
+            var parser = try Parser(source: source)
+            _ = try parser.parseSourceFile()
+            Issue.record("Expected non-nominal construct conformance to fail parsing.")
+        } catch {
+            let description = String(describing: error)
+            #expect(description.contains("Conformance must be a nominal type reference"))
+        }
+    }
+
+    @Test("Extension targets require nominal type references")
+    func extensionTargetsRequireNominalTypeReferences() throws {
+        let source = """
+        extension [Int] { }
+        """
+
+        do {
+            var parser = try Parser(source: source)
+            _ = try parser.parseSourceFile()
+            Issue.record("Expected non-nominal extension target to fail parsing.")
+        } catch {
+            let description = String(describing: error)
+            #expect(description.contains("Extension target must be a nominal type reference"))
+        }
+    }
+
     @Test("Clamped state macro rewrites initializer and assignments")
     func clampedStateMacroRewritesInitializerAndAssignments() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ClampedState.neat")

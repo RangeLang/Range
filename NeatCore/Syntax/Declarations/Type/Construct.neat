@@ -6,7 +6,7 @@ construct Construct: Syntax {
     @core
     construct Declaration {
         let self: NominalTypeReference
-        let conformances: [TypeReference]
+        let conformances: [NominalTypeReference]
         let inits: [Init.Declaration]
         let lets: [Let]
         let states: [State]

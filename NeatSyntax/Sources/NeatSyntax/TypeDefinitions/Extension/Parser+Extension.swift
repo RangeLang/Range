@@ -4,7 +4,9 @@ extension Parser {
     mutating func parseExtensionDeclaration() throws -> ExtensionDeclaration {
         let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.typeExtension)
-        let targetType = try parseTypeReferenceNode()
+        let targetType = try parseNominalTypeReferenceNode(
+            expectedDescription: "Extension target"
+        )
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
