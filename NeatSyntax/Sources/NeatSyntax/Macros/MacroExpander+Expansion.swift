@@ -782,45 +782,9 @@ extension MacroExpander {
     ) throws -> [Statement] {
         switch statement {
         case .macroInvocation(let name, let argumentClause, let body):
-            guard let macro = macros[name] else {
-                throw ParseError("Unknown block-targeted macro #\(name).")
-            }
-            guard macroTargetKind(for: macro) == .block
-            else {
-                throw ParseError("Macro #\(name) does not target Block.")
-            }
-            let expandedTarget = try expand(
-                statements: body,
-                macros: macros,
-                protocols: protocols,
-                parameterMacroSignatures: parameterMacroSignatures,
-                literalBridges: literalBridges,
-                context: context,
-                stateEffects: stateEffects
-            )
-            let argumentBindings = try parseMacroArgumentBindings(
-                for: macro,
-                argumentClause: argumentClause
-            )
-            let rewriteBody = try rewriteBody(for: macro, context: context)
-            let bindingSubstituted = substituteMacroBindings(
-                in: rewriteBody,
-                bindings: argumentBindings
-            )
-            let targetSubstituted = substituteMacroTargetCalls(
-                in: bindingSubstituted,
-                targetBinding: macro.bindings.target,
-                targetBlock: expandedTarget
-            )
-            return try expand(
-                statements: targetSubstituted,
-                macros: macros,
-                protocols: protocols,
-                parameterMacroSignatures: parameterMacroSignatures,
-                literalBridges: literalBridges,
-                context: context,
-                stateEffects: stateEffects
-            )
+            _ = argumentClause
+            _ = body
+            throw ParseError("Block macros like #\(name) { ... } are no longer supported.")
         case .background(let background):
             return [
                 .background(

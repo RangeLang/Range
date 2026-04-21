@@ -5,7 +5,7 @@ extension Parser {
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         if isMacroApplicationStart() {
-            return try parseMacroInvocationStatement(localBindings: &localBindings)
+            throw ParseError("Block macros are not supported.")
         }
 
         if isLocalBackgroundCallableStart() {
@@ -91,18 +91,6 @@ extension Parser {
         default:
             throw ParseError("Expected assignment operator in action block.")
         }
-    }
-
-    mutating func parseMacroInvocationStatement(
-        localBindings: inout [String: LocalBindingSymbol]
-    ) throws -> Statement {
-        guard case .hashDirective(let name) = peek() else {
-            throw ParseError("Expected block-targeted macro application.")
-        }
-        advance()
-        let argumentClause = try parseMacroArgumentClauseIfPresent()
-        let body = try parseStatementBlock(baseLocalBindings: localBindings)
-        return .macroInvocation(name: name, argumentClause: argumentClause, body: body)
     }
 
     func isBackgroundStatementStart() -> Bool {

@@ -14,7 +14,6 @@ struct FunctionMacroSignature {
 
 enum MacroTargetKind: Hashable {
     case expression
-    case block
     case parameter
     case initializer
     case state
@@ -47,8 +46,6 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
     switch name {
     case "Expression":
         return .expression
-    case "Block":
-        return .block
     case "Parameter":
         return .parameter
     case "Init":
@@ -652,7 +649,7 @@ extension RewriteSurfaceView {
         let directPath = "\(targetBinding).rewrite"
         if normalizedPath == directPath {
             switch targetKind {
-            case .expression, .block:
+            case .expression:
                 return .targetDirect
             default:
                 return nil
@@ -695,7 +692,7 @@ extension RewriteSurfaceView {
             default:
                 return nil
             }
-        case .expression, .block, .state, .immutable, .binding, .derived, .property, .construct, .other:
+        case .expression, .state, .immutable, .binding, .derived, .property, .construct, .other:
             return nil
         }
     }

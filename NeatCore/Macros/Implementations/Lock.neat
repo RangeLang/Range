@@ -1,7 +1,0 @@
-macro lock(): Block { target, diagnostics in
-    target.rewrite({
-        acquire()
-        target()
-        release()
-    })
-}
