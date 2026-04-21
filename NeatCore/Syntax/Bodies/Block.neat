@@ -1,4 +1,6 @@
 @core
 construct Block: Syntax, SupportsRewrite<Block> {
     let statements: [Statement]
+
+    function rewrite(block _: Block)
 }

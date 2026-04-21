@@ -13,5 +13,7 @@ construct Init: Syntax {
     construct Application: SupportsRewrite<Expression> {
         let type: TypeReference
         let arguments: [Parameter.Application]
+
+        function rewrite(expression _: Expression)
     }
 }

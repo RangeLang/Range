@@ -1,6 +1,0 @@
-macro trace(message: String): Block { target, diagnostics in
-    target.rewrite({
-        log(message)
-        target()
-    })
-}

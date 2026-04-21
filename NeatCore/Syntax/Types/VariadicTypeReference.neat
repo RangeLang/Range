@@ -1,4 +1,6 @@
 @core
 construct VariadicTypeReference: TypeReference {
     let element: TypeReference
+
+    function rewrite(type _: TypeReference)
 }

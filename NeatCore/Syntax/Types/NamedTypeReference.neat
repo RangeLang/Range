@@ -1,4 +1,6 @@
 @core
 construct NamedTypeReference: NominalTypeReference {
     let name: String
+
+    function rewrite(type _: TypeReference)
 }

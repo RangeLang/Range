@@ -1,3 +1,0 @@
-macro unwrap<T>(value _: Optional<T>, fallback _: T): Expression -> T { target, diagnostics in
-    target.rewrite(value ?? fallback)
-}

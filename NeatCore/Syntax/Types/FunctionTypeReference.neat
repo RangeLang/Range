@@ -2,4 +2,6 @@
 construct FunctionTypeReference: TypeReference {
     let parameters: [TypeReference]
     let returnType: TypeReference
+
+    function rewrite(type _: TypeReference)
 }

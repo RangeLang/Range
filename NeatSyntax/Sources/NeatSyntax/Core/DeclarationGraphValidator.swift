@@ -62,7 +62,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         declarationGraph: DeclarationGraph
     ) throws {
         for conformance in construct.conformances {
-            guard case .named(let protocolName) = conformance,
+            guard let protocolName = protocolName(for: conformance),
                 let protocolDeclaration = declarationGraph.protocolsByName[protocolName]
             else {
                 continue
@@ -75,11 +75,15 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 continue
             }
 
+            let substitution = genericSubstitution(
+                for: protocolDeclaration,
+                conformance: conformance
+            )
             let requirements = collectedRequirements(
                 of: protocolDeclaration,
                 declarationGraph: declarationGraph,
                 visitedProtocols: []
-            )
+            ).substituted(using: substitution)
 
             try validateValueRequirements(
                 requirements.values,
@@ -145,17 +149,21 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         )
 
         for conformance in declaration.conformances {
-            guard case .named(let protocolName) = conformance,
+            guard let protocolName = protocolName(for: conformance),
                 let inherited = declarationGraph.protocolsByName[protocolName]
             else {
                 continue
             }
 
+            let substitution = genericSubstitution(
+                for: inherited,
+                conformance: conformance
+            )
             let inheritedRequirements = collectedRequirements(
                 of: inherited,
                 declarationGraph: declarationGraph,
                 visitedProtocols: nextVisited
-            )
+            ).substituted(using: substitution)
             requirements.merge(inheritedRequirements)
         }
 
@@ -277,7 +285,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     ) -> Bool {
         candidate.parameters.count == requirement.parameters.count
             && zip(candidate.parameters, requirement.parameters).allSatisfy { candidate, requirement in
-                candidate.externalLabel == requirement.externalLabel
+                labelsMatch(candidate.externalLabel, requirement.externalLabel)
                     && candidate.typeReference?.displayName == requirement.typeReference?.displayName
             }
     }
@@ -290,9 +298,22 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             && candidate.parameters.count == requirement.parameters.count
             && candidate.returnType?.displayName == requirement.returnType?.displayName
             && zip(candidate.parameters, requirement.parameters).allSatisfy { candidate, requirement in
-                candidate.externalLabel == requirement.externalLabel
+                labelsMatch(candidate.externalLabel, requirement.externalLabel)
                     && candidate.typeReference?.displayName == requirement.typeReference?.displayName
             }
+    }
+
+    private func labelsMatch(_ lhs: String?, _ rhs: String?) -> Bool {
+        normalizeLabel(lhs) == normalizeLabel(rhs)
+    }
+
+    private func normalizeLabel(_ label: String?) -> String? {
+        switch label {
+        case nil, "_":
+            return nil
+        case .some(let value):
+            return value
+        }
     }
 
     private func renderInitializerSignature(_ declaration: InitializerDeclaration) -> String {
@@ -311,6 +332,41 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         let label = parameter.externalLabel ?? "_"
         let typeName = parameter.typeReference?.displayName ?? "_"
         return "\(label): \(typeName)"
+    }
+
+    private func protocolName(for conformance: TypeReference) -> String? {
+        switch conformance {
+        case .named(let name):
+            return name
+        case .generic(let base, _):
+            return protocolName(for: base)
+        case .member, .array, .function, .optional, .variadic:
+            return nil
+        }
+    }
+
+    private func genericSubstitution(
+        for protocolDeclaration: ProtocolDeclaration,
+        conformance: TypeReference
+    ) -> [String: TypeReference] {
+        let parameterNames = protocolDeclaration.genericParameters.compactMap { parameter -> String? in
+            guard case .type(let name, _, _) = parameter else {
+                return nil
+            }
+            return name
+        }
+
+        guard !parameterNames.isEmpty else {
+            return [:]
+        }
+
+        guard case .generic(_, let arguments) = conformance,
+            arguments.count == parameterNames.count
+        else {
+            return [:]
+        }
+
+        return Dictionary(uniqueKeysWithValues: zip(parameterNames, arguments))
     }
 
     private func validateCoreAttributeUsage(in parsedFiles: [ParsedSourceFile]) throws {
@@ -413,6 +469,138 @@ private struct ProtocolRequirements {
         values.append(contentsOf: other.values)
         initializers.append(contentsOf: other.initializers)
         callables.append(contentsOf: other.callables)
+    }
+
+    func substituted(using bindings: [String: TypeReference]) -> ProtocolRequirements {
+        guard !bindings.isEmpty else {
+            return self
+        }
+
+        return ProtocolRequirements(
+            states: states.map { $0.substituted(using: bindings) },
+            bindings: self.bindings.map { $0.substituted(using: bindings) },
+            deriveds: deriveds.map { $0.substituted(using: bindings) },
+            values: values.map { $0.substituted(using: bindings) },
+            initializers: initializers.map { $0.substituted(using: bindings) },
+            callables: callables.map { $0.substituted(using: bindings) }
+        )
+    }
+}
+
+private extension ValueDeclaration {
+    func substituted(using bindings: [String: TypeReference]) -> ValueDeclaration {
+        ValueDeclaration(
+            macros: macros,
+            localName: localName,
+            externalLabel: externalLabel,
+            typeName: substituteTypeName(typeName, using: bindings),
+            value: value
+        )
+    }
+}
+
+private extension BindingDeclaration {
+    func substituted(using bindings: [String: TypeReference]) -> BindingDeclaration {
+        BindingDeclaration(
+            macros: macros,
+            localName: localName,
+            externalLabel: externalLabel,
+            typeName: substituteTypeName(typeName, using: bindings),
+            storage: storage
+        )
+    }
+}
+
+private extension DerivedDeclaration {
+    func substituted(using bindings: [String: TypeReference]) -> DerivedDeclaration {
+        DerivedDeclaration(
+            macros: macros,
+            builderName: builderName,
+            name: name,
+            typeName: substituteTypeName(typeName, using: bindings),
+            body: body
+        )
+    }
+}
+
+private extension StateDeclaration {
+    func substituted(using bindings: [String: TypeReference]) -> StateDeclaration {
+        StateDeclaration(
+            macros: macros,
+            name: name,
+            hasExplicitTypeAnnotation: hasExplicitTypeAnnotation,
+            type: substitute(type, using: bindings),
+            storage: storage
+        )
+    }
+}
+
+private extension InitializerDeclaration {
+    func substituted(using bindings: [String: TypeReference]) -> InitializerDeclaration {
+        InitializerDeclaration(
+            macros: macros,
+            parameters: parameters.map { $0.substituted(using: bindings) },
+            body: body
+        )
+    }
+}
+
+private extension CallableDeclaration {
+    func substituted(using bindings: [String: TypeReference]) -> CallableDeclaration {
+        CallableDeclaration(
+            macros: macros,
+            attribute: attribute,
+            targetType: targetType.map { substitute($0, using: bindings) },
+            name: name,
+            genericParameters: genericParameters,
+            hasExplicitParameterClause: hasExplicitParameterClause,
+            parameters: parameters.map { $0.substituted(using: bindings) },
+            returnType: returnType.map { substitute($0, using: bindings) },
+            body: body
+        )
+    }
+}
+
+private extension NeatFunctionParameter {
+    func substituted(using bindings: [String: TypeReference]) -> NeatFunctionParameter {
+        NeatFunctionParameter(
+            macros: macros,
+            localName: localName,
+            externalLabel: externalLabel,
+            typeReference: typeReference.map { substitute($0, using: bindings) },
+            slotName: slotName,
+            isBinding: isBinding,
+            capturesSyntax: capturesSyntax
+        )
+    }
+}
+
+private func substituteTypeName(_ typeName: String, using bindings: [String: TypeReference]) -> String {
+    bindings[typeName]?.displayName ?? typeName
+}
+
+private func substitute(_ type: TypeReference, using bindings: [String: TypeReference]) -> TypeReference {
+    switch type {
+    case .named(let name):
+        return bindings[name] ?? type
+    case .member(let base, let name):
+        return .member(base: substitute(base, using: bindings), name: name)
+    case .generic(let base, let arguments):
+        return .generic(
+            base: substitute(base, using: bindings),
+            arguments: arguments.map { substitute($0, using: bindings) }
+        )
+    case .array(let element):
+        return .array(substitute(element, using: bindings))
+    case .function(let parameters, let returnType):
+        return .function(
+            parameters: parameters.map { substitute($0, using: bindings) },
+            returnType: substitute(returnType, using: bindings)
+        )
+    case .optional(let wrapped):
+        return .optional(substitute(wrapped, using: bindings))
+    case .variadic(let element):
+        return .variadic(substitute(element, using: bindings))
     }
 }
 

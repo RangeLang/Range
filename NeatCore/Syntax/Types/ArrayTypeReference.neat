@@ -1,4 +1,6 @@
 @core
 construct ArrayTypeReference: TypeReference {
     let element: TypeReference
+
+    function rewrite(type _: TypeReference)
 }
