@@ -253,7 +253,7 @@ public struct Parser {
                 continue
             }
 
-            if peek() == .keyword(NeatSyntax.Keyword.state.rawValue) {
+            if isStateDeclarationStart() {
                 let state = try parseState()
                 topLevelStates.append(state)
                 currentStateTypes[state.name] = state.type

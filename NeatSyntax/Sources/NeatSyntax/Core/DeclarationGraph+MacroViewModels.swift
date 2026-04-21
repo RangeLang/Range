@@ -17,6 +17,7 @@ enum MacroTargetKind: Equatable {
     case block
     case parameter
     case initializer
+    case state
     case function
     case construct
     case other(String)
@@ -48,6 +49,8 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
         return .parameter
     case "Init":
         return .initializer
+    case "State":
+        return .state
     case "Function":
         return .function
     case "Construct":
@@ -506,7 +509,7 @@ extension RewriteSurfaceView {
             default:
                 return nil
             }
-        case .expression, .block, .construct, .other:
+        case .expression, .block, .state, .construct, .other:
             return nil
         }
     }

@@ -251,12 +251,150 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.constructsByName["Math.Box"] != nil)
     }
 
+    @Test("Clamped state macro rewrites initializer and assignments")
+    func clampedStateMacroRewritesInitializerAndAssignments() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/Clamped.neat",
+                source: """
+                construct Person {
+                    #clamped(min: 0, max: 120)
+                    state age: Int = 150
+
+                    function update(value: Int) {
+                        age = value
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == "/tmp/Clamped.neat" })
+        )
+
+        let construct: ConstructDeclaration
+        switch expandedFile.sourceFile {
+        case .construct(let declaration):
+            construct = declaration
+        case .module(let module):
+            construct = try #require(module.constructs.first(where: { $0.name == "Person" }))
+        default:
+            Issue.record("Expected expanded project file to contain the Person construct.")
+            return
+        }
+
+        let state = try #require(construct.states.first(where: { $0.name == "age" }))
+
+        guard case .stored(let initializerExpression) = state.storage else {
+            Issue.record("Expected clamped state to keep stored initializer.")
+            return
+        }
+
+        guard case .call(let initializerName, _) = initializerExpression else {
+            Issue.record("Expected clamped initializer to become a call.")
+            return
+        }
+
+        #expect(initializerName == "Math.clamp")
+
+        let update = try #require(construct.callables.first(where: { $0.name == "update" }))
+        let assignment = try #require(update.body?.first)
+
+        guard case .assignment(_, let assignmentExpression) = assignment else {
+            Issue.record("Expected update body to contain a rewritten assignment.")
+            return
+        }
+
+        guard case .call(let assignmentName, _) = assignmentExpression else {
+            Issue.record("Expected clamped assignment to become a call.")
+            return
+        }
+
+        #expect(assignmentName == "Math.clamp")
+    }
+
+    @Test("Generic parameter clauses are shared across declarations")
+    func genericParameterClausesAreSharedAcrossDeclarations() throws {
+        let source = """
+        construct Box<T: Comparable, let count: Int = 3> { }
+
+        enum Maybe<T: Comparable, let count: Int = 3> {
+            case value(T)
+        }
+
+        protocol Cache<T: Comparable, let capacity: Int = 1> {
+            function get(value: T) -> T
+        }
+
+        function identity<T: Comparable, let count: Int = 3>(value: T) -> T {
+            return value
+        }
+
+        macro clamped<T: Comparable, let count: Int = 3>(value _: T): State<T> { target, diagnostics in
+            target.rewrite(value)
+        }
+        """
+
+        var parser = try Parser(source: source)
+        let file = try parser.parseSourceFile()
+
+        guard case .module(let module) = file else {
+            Issue.record("Expected a module source file.")
+            return
+        }
+
+        #expect(module.constructs.count == 1)
+        #expect(module.enumerations.count == 1)
+        #expect(module.protocols.count == 1)
+        #expect(module.callables.count == 1)
+        #expect(module.macros.count == 1)
+
+        expectSharedGenericShape(module.constructs[0].genericParameters)
+        expectSharedGenericShape(module.enumerations[0].genericParameters)
+        expectSharedGenericShape(module.protocols[0].genericParameters)
+        expectSharedGenericShape(module.callables[0].genericParameters)
+        expectSharedGenericShape(module.macros[0].genericParameters)
+    }
+
 }
 
 private enum FixtureRole {
     case pass
     case fail
 }
+
+private func expectSharedGenericShape(_ parameters: [GenericParameter]) {
+    #expect(parameters.count == 2)
+
+    guard case .type(let typeName, let constraint?, let defaultArgument) = parameters[0] else {
+        Issue.record("Expected first generic parameter to be a constrained type parameter.")
+        return
+    }
+
+    #expect(typeName == "T")
+    #expect(constraint.displayName == "Comparable")
+    #expect(defaultArgument == nil)
+
+    guard case .value(let valueName, let typeReference, let defaultValue?) = parameters[1] else {
+        Issue.record("Expected second generic parameter to be a value parameter with a default.")
+        return
+    }
+
+    #expect(valueName == "count" || valueName == "capacity")
+    #expect(typeReference.displayName == "Int")
+
+    guard case .integer(let value) = defaultValue else {
+        Issue.record("Expected generic value default to parse as an integer literal.")
+        return
+    }
+
+    #expect(value == 3 || value == 1)
+}
+
 
 private func compile(fixture: URL, expectedRole: FixtureRole) throws -> CompiledProgram {
     var inputs = try neatCoreInputs()

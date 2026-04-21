@@ -1,6 +1,57 @@
 import Foundation
 
 extension Parser {
+    mutating func parseGenericParameterClauseIfPresent() throws -> [GenericParameter] {
+        guard peek() == .less else {
+            return []
+        }
+
+        try consume(.less)
+        var parameters: [GenericParameter] = [try parseGenericParameter()]
+        while peek() == .comma {
+            advance()
+            parameters.append(try parseGenericParameter())
+        }
+        try consume(.greater)
+        return parameters
+    }
+
+    mutating func parseGenericParameter() throws -> GenericParameter {
+        if peek() == .keyword(NeatSyntax.Keyword.let.rawValue) {
+            try consumeKeyword(.let)
+            let name = try consumeIdentifier()
+            try consume(.colon)
+            let typeReference = try parseTypeReferenceNode()
+            let defaultValue: Expression?
+            if peek() == .equal {
+                try consume(.equal)
+                defaultValue = try parseExpression(terminatingAt: [.comma, .greater])
+            } else {
+                defaultValue = nil
+            }
+            return .value(name: name, typeReference: typeReference, defaultValue: defaultValue)
+        }
+
+        let name = try consumeIdentifier()
+        let constraint: TypeReference?
+        if peek() == .colon {
+            try consume(.colon)
+            constraint = try parseTypeReferenceNode()
+        } else {
+            constraint = nil
+        }
+
+        let defaultArgument: TypeReference?
+        if peek() == .equal {
+            try consume(.equal)
+            defaultArgument = try parseTypeReferenceNode()
+        } else {
+            defaultArgument = nil
+        }
+
+        return .type(name: name, constraint: constraint, defaultArgument: defaultArgument)
+    }
+
     mutating func parseLabeledDeclarationName(
         expecting kind: String,
         allowOmittedLocalName: Bool = true

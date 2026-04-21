@@ -2,7 +2,7 @@ import Foundation
 
 public struct MacroDeclaration {
     public let name: String
-    public let genericParameters: [String]
+    public let genericParameters: [GenericParameter]
     public let parameters: [NeatFunctionParameter]
     public let target: MacroTarget
     public let expansionType: TypeReference?

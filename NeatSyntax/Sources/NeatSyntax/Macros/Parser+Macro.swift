@@ -89,19 +89,4 @@ extension Parser {
         try consume(.rightBrace)
         return (bindings, statements)
     }
-
-    mutating func parseGenericParameterClauseIfPresent() throws -> [String] {
-        guard peek() == .less else {
-            return []
-        }
-
-        try consume(.less)
-        var parameters: [String] = [try consumeIdentifier()]
-        while peek() == .comma {
-            advance()
-            parameters.append(try consumeIdentifier())
-        }
-        try consume(.greater)
-        return parameters
-    }
 }

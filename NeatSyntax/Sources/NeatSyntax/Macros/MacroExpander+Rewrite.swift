@@ -431,7 +431,7 @@ extension MacroExpander {
     ) throws {
         for application in applications {
             guard let macro = macros[application.name] else {
-                continue
+                throw ParseError("Unknown attached macro @\(application.name).")
             }
             guard macroTargetKind(for: macro) == .construct else {
                 throw ParseError(
@@ -584,6 +584,118 @@ extension MacroExpander {
         }
 
         return nil
+    }
+
+    static func closureComponents(from expression: Expression) -> (parameters: [String], body: [Statement])? {
+        guard case .call(let name, let arguments) = expression, name == "Closure" else {
+            return nil
+        }
+
+        let parameterArgument = arguments.first(where: { $0.label == "parameters" })
+            ?? (arguments.count >= 1 ? arguments[0] : nil)
+        let bodyArgument = arguments.first(where: { $0.label == "body" })
+            ?? (arguments.count >= 2 ? arguments[1] : nil)
+
+        guard
+            let parameterArgument,
+            let bodyArgument,
+            case .array(let parameterExpressions) = parameterArgument.value,
+            case .block(let body) = bodyArgument.value
+        else {
+            return nil
+        }
+
+        let parameters = parameterExpressions.compactMap { expression -> String? in
+            guard case .identifier(let name) = expression else {
+                return nil
+            }
+            return name
+        }
+
+        guard parameters.count == parameterExpressions.count else {
+            return nil
+        }
+
+        return (parameters, body)
+    }
+
+    static func stateTransformRegistrations(for macro: MacroDeclaration) throws -> [StateTransformRegistration] {
+        let targetBinding = macro.bindings.target
+        let operationExpressions = macroOperationExpressions(in: macro.body)
+        var registrations: [StateTransformRegistration] = []
+
+        for expression in operationExpressions {
+            guard case .call(let name, let arguments) = expression, arguments.count == 1 else {
+                continue
+            }
+
+            let hook: StateTransformHook?
+            switch name {
+            case "\(targetBinding).initializer":
+                hook = .initializer
+            case "\(targetBinding).getter":
+                hook = .getter
+            case "\(targetBinding).setter":
+                hook = .setter
+            default:
+                hook = nil
+            }
+
+            guard let hook else {
+                continue
+            }
+
+            guard let closure = closureComponents(from: arguments[0].value) else {
+                throw ParseError(
+                    "Macro #\(macro.name) \(name)(...) must receive a closure."
+                )
+            }
+
+            guard closure.parameters.count == 1 else {
+                throw ParseError(
+                    "Macro #\(macro.name) \(name)(...) must receive a single-parameter closure."
+                )
+            }
+
+            let bodyExpression = try closureResultExpression(
+                from: closure.body,
+                macroName: macro.name,
+                hookName: name
+            )
+
+            registrations.append(
+                StateTransformRegistration(
+                    hook: hook,
+                    parameterName: closure.parameters[0],
+                    body: bodyExpression
+                )
+            )
+        }
+
+        return registrations
+    }
+
+    static func closureResultExpression(
+        from statements: [Statement],
+        macroName: String,
+        hookName: String
+    ) throws -> Expression {
+        guard statements.count == 1 else {
+            throw ParseError(
+                "Macro #\(macroName) \(hookName)(...) closure must contain exactly one expression."
+            )
+        }
+
+        switch statements[0] {
+        case .expression(let expression):
+            return expression
+        case .return(let expression?):
+            return expression
+        default:
+            throw ParseError(
+                "Macro #\(macroName) \(hookName)(...) closure must evaluate to an expression."
+            )
+        }
     }
 
     static func rewriteBody(

@@ -19,3 +19,21 @@ struct ParameterApplicationRewritePlan {
     let payload: Expression
     let isVariadic: Bool
 }
+
+enum StateTransformHook {
+    case initializer
+    case getter
+    case setter
+}
+
+struct StateTransformRegistration {
+    let hook: StateTransformHook
+    let parameterName: String
+    let body: Expression
+}
+
+struct StateMacroEffects {
+    let type: TypeReference
+    let initializerTransforms: [Expression]
+    let setterTransforms: [Expression]
+}

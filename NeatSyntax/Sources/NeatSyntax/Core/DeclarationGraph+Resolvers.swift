@@ -36,7 +36,7 @@ public struct DeclarationMacroExpansionResolver: Sendable {
             }
             return [
                 MacroExpansionSignature(
-                    genericParameterNames: Set(macro.genericParameters),
+                    genericParameterNames: Set(macro.genericParameters.map(Self.genericParameterName)),
                     parameters: macro.parameters.map {
                         MacroExpansionParameter(
                             localName: $0.localName,
@@ -123,6 +123,13 @@ public struct DeclarationMacroExpansionResolver: Sendable {
             return .named("NilLiteral")
         default:
             return resolver.defaultDestinationType(for: type.displayName)
+        }
+    }
+
+    private static func genericParameterName(_ parameter: GenericParameter) -> String {
+        switch parameter {
+        case .type(let name, _, _), .value(let name, _, _):
+            return name
         }
     }
 

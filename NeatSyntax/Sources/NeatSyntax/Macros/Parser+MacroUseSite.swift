@@ -10,42 +10,49 @@ extension Parser {
 
     func macroApplicationLookaheadLength() -> Int {
         var offset = 0
-        while case .hashDirective = peek(offset: offset) {
-            offset += 1
-            if peek(offset: offset) == .less {
-                var depth = 1
+        while true {
+            if case .hashDirective = peek(offset: offset) {
                 offset += 1
-                while depth > 0 {
-                    switch peek(offset: offset) {
-                    case .less:
-                        depth += 1
-                    case .greater:
-                        depth -= 1
-                    case .eof:
-                        return offset
-                    default:
-                        break
-                    }
+                if peek(offset: offset) == .less {
+                    var depth = 1
                     offset += 1
-                }
-            }
-            if peek(offset: offset) == .leftParen {
-                var depth = 1
-                offset += 1
-                while depth > 0 {
-                    switch peek(offset: offset) {
-                    case .leftParen:
-                        depth += 1
-                    case .rightParen:
-                        depth -= 1
-                    case .eof:
-                        return offset
-                    default:
-                        break
+                    while depth > 0 {
+                        switch peek(offset: offset) {
+                        case .less:
+                            depth += 1
+                        case .greater:
+                            depth -= 1
+                        case .eof:
+                            return offset
+                        default:
+                            break
+                        }
+                        offset += 1
                     }
-                    offset += 1
                 }
+
+                if peek(offset: offset) == .leftParen {
+                    var depth = 1
+                    offset += 1
+                    while depth > 0 {
+                        switch peek(offset: offset) {
+                        case .leftParen:
+                            depth += 1
+                        case .rightParen:
+                            depth -= 1
+                        case .eof:
+                            return offset
+                        default:
+                            break
+                        }
+                        offset += 1
+                    }
+                }
+
+                continue
             }
+
+            break
         }
         return offset
     }
@@ -53,17 +60,22 @@ extension Parser {
     mutating func parseMacroApplicationsIfPresent() throws -> [MacroApplication] {
         var macros: [MacroApplication] = []
 
-        while case .hashDirective(let name) = peek() {
-            advance()
-            let genericArguments = try parseMacroGenericArgumentsIfPresent()
-            let argumentClause = try parseMacroArgumentClauseIfPresent()
-            macros.append(
-                MacroApplication(
-                    name: name,
-                    genericArguments: genericArguments,
-                    argumentClause: argumentClause
+        while true {
+            if case .hashDirective(let name) = peek() {
+                advance()
+                let genericArguments = try parseMacroGenericArgumentsIfPresent()
+                let argumentClause = try parseMacroArgumentClauseIfPresent()
+                macros.append(
+                    MacroApplication(
+                        name: name,
+                        genericArguments: genericArguments,
+                        argumentClause: argumentClause
+                    )
                 )
-            )
+                continue
+            }
+
+            break
         }
 
         return macros

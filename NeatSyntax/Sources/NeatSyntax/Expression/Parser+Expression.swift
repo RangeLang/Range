@@ -136,10 +136,7 @@ extension Parser {
             var fullName = name
             try appendPostfixAccesses(to: &fullName)
             fullName += try parseGenericArgumentClauseIfPresent()
-            if peek() == .leftParen {
-                return .call(name: fullName, arguments: try parseInvocationArgumentsIfPresent())
-            }
-            return .identifier(fullName)
+            return try parseCalledOrReferencedExpression(named: fullName)
         case .dollar:
             try consume(.dollar)
             let name = try consumeIdentifier()
@@ -151,10 +148,7 @@ extension Parser {
             let name = try consumeCallableName()
             var fullName = ".\(name)"
             fullName += try parseGenericArgumentClauseIfPresent()
-            if peek() == .leftParen {
-                return .call(name: fullName, arguments: try parseInvocationArgumentsIfPresent())
-            }
-            return .identifier(fullName)
+            return try parseCalledOrReferencedExpression(named: fullName)
         case .leftBracket:
             return try parseCollectionLiteral()
         case .leftParen:
@@ -167,6 +161,100 @@ extension Parser {
         default:
             throw ParseError("Expected expression.")
         }
+    }
+
+    mutating func parseCalledOrReferencedExpression(named fullName: String) throws -> Expression {
+        var arguments: [CallArgument] = []
+        let hadArgumentClause = peek() == .leftParen
+
+        if hadArgumentClause {
+            arguments = try parseInvocationArgumentsIfPresent()
+        }
+
+        if peek() == .leftBrace, isClosureExpressionStart() {
+            arguments.append(CallArgument(label: nil, value: try parseClosureExpression()))
+        }
+
+        guard hadArgumentClause || !arguments.isEmpty else {
+            return .identifier(fullName)
+        }
+
+        return .call(name: fullName, arguments: arguments)
+    }
+
+    func isClosureExpressionStart() -> Bool {
+        guard peek() == .leftBrace else {
+            return false
+        }
+
+        var offset = 1
+        while true {
+            switch peek(offset: offset) {
+            case .identifier, .keyword:
+                offset += 1
+                switch peek(offset: offset) {
+                case .comma:
+                    offset += 1
+                    continue
+                case .keyword(NeatSyntax.Keyword.inKeyword.rawValue):
+                    return true
+                default:
+                    return false
+                }
+            default:
+                return false
+            }
+        }
+    }
+
+    mutating func parseClosureExpression() throws -> Expression {
+        try consume(.leftBrace)
+
+        var parameterNames: [String] = []
+        while true {
+            switch peek() {
+            case .identifier(let name), .keyword(let name):
+                parameterNames.append(name)
+                advance()
+            default:
+                throw ParseError("Expected closure parameter name.")
+            }
+
+            if peek() == .comma {
+                advance()
+                continue
+            }
+
+            break
+        }
+
+        try consumeKeyword(.inKeyword)
+
+        var localBindings = Dictionary(
+            uniqueKeysWithValues: parameterNames.map {
+                ($0, LocalBindingSymbol(kind: .constant, type: .named("Unknown")))
+            }
+        )
+        var statements: [Statement] = []
+        while peek() != .rightBrace {
+            statements.append(try parseStatement(localBindings: &localBindings))
+        }
+
+        try consume(.rightBrace)
+
+        return .call(
+            name: "Closure",
+            arguments: [
+                CallArgument(
+                    label: "parameters",
+                    value: .array(parameterNames.map(Expression.identifier))
+                ),
+                CallArgument(
+                    label: "body",
+                    value: .block(statements)
+                ),
+            ]
+        )
     }
 
     mutating func appendPostfixAccesses(to fullName: inout String) throws {

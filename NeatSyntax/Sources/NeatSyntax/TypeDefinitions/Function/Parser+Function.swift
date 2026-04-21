@@ -55,7 +55,7 @@ extension Parser {
         advance()
 
         let name = try consumeCallableName()
-        let genericParameters = try parseConstructGenericParameterClauseIfPresent()
+        let genericParameters = try parseGenericParameterClauseIfPresent()
         let hasExplicitParameterClause = peek() == .leftParen
         guard hasExplicitParameterClause else {
             throw ParseError(

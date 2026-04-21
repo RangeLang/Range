@@ -22,7 +22,7 @@ extension Parser {
 
         try consumeKeyword(.protocolDefinition)
         let name = try consumeTypeName()
-        let genericParameters = try parseProtocolGenericParameterClauseIfPresent()
+        let genericParameters = try parseGenericParameterClauseIfPresent()
         let conformances = try parseConformanceListIfPresent()
         var states: [StateDeclaration] = []
         var bindings: [BindingDeclaration] = []
@@ -93,41 +93,5 @@ extension Parser {
         while peek() != .rightBrace, peek() != .eof {
             advance()
         }
-    }
-
-    mutating func parseProtocolGenericParameterClauseIfPresent() throws -> [GenericParameter] {
-        guard peek() == .less else {
-            return []
-        }
-
-        try consume(.less)
-        var parameters: [GenericParameter] = [try parseProtocolGenericParameter()]
-        while peek() == .comma {
-            advance()
-            parameters.append(try parseProtocolGenericParameter())
-        }
-        try consume(.greater)
-        return parameters
-    }
-
-    mutating func parseProtocolGenericParameter() throws -> GenericParameter {
-        let name = try consumeIdentifier()
-        let constraint: TypeReference?
-        if peek() == .colon {
-            try consume(.colon)
-            constraint = try parseTypeReferenceNode()
-        } else {
-            constraint = nil
-        }
-
-        let defaultArgument: TypeReference?
-        if peek() == .equal {
-            try consume(.equal)
-            defaultArgument = try parseTypeReferenceNode()
-        } else {
-            defaultArgument = nil
-        }
-
-        return .type(name: name, constraint: constraint, defaultArgument: defaultArgument)
     }
 }

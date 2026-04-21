@@ -48,7 +48,7 @@ extension Parser {
             currentEnvironmentTypes = outerEnvironmentTypes
             currentCallableReturnTypes = outerCallableReturnTypes
             currentSelfAvailable = true
-            while peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
+            while isStateDeclarationStart()
                 || isEnvironmentDeclarationStart()
                 || isBindingDeclarationStart()
                 || isDerivedDeclarationStart()
@@ -207,7 +207,7 @@ extension Parser {
         -> (name: String, genericParameters: [GenericParameter], conformances: [TypeReference])
     {
         let name = try consumeTypeName()
-        let genericParameters = try parseConstructGenericParameterClauseIfPresent()
+        let genericParameters = try parseGenericParameterClauseIfPresent()
 
         if peek() == .colon || peek() == .leftBrace {
             let conformances = try parseConformanceListIfPresent()
@@ -219,54 +219,4 @@ extension Parser {
         )
     }
 
-    mutating func parseConstructGenericParameterClauseIfPresent() throws -> [GenericParameter] {
-        guard peek() == .less else {
-            return []
-        }
-
-        try consume(.less)
-        var parameters: [GenericParameter] = [try parseConstructGenericParameter()]
-        while peek() == .comma {
-            advance()
-            parameters.append(try parseConstructGenericParameter())
-        }
-        try consume(.greater)
-        return parameters
-    }
-
-    mutating func parseConstructGenericParameter() throws -> GenericParameter {
-        if peek() == .keyword(NeatSyntax.Keyword.let.rawValue) {
-            try consumeKeyword(.let)
-            let name = try consumeIdentifier()
-            try consume(.colon)
-            let typeReference = try parseTypeReferenceNode()
-            let defaultValue: Expression?
-            if peek() == .equal {
-                try consume(.equal)
-                defaultValue = try parseExpression(terminatingAt: [.comma, .greater])
-            } else {
-                defaultValue = nil
-            }
-            return .value(name: name, typeReference: typeReference, defaultValue: defaultValue)
-        }
-
-        let name = try consumeIdentifier()
-        let constraint: TypeReference?
-        if peek() == .colon {
-            try consume(.colon)
-            constraint = try parseTypeReferenceNode()
-        } else {
-            constraint = nil
-        }
-
-        let defaultArgument: TypeReference?
-        if peek() == .equal {
-            try consume(.equal)
-            defaultArgument = try parseTypeReferenceNode()
-        } else {
-            defaultArgument = nil
-        }
-
-        return .type(name: name, constraint: constraint, defaultArgument: defaultArgument)
-    }
 }

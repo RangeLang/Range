@@ -1,0 +1,9 @@
+macro clamped<T: Comparable>(min: T, max: T): State<T> { target, diagnostics in
+    target.initializer { value in
+        Math.clamp(value: value, min: min, max: max)
+    }
+
+    target.setter { value in
+        Math.clamp(value: value, min: min, max: max)
+    }
+}
