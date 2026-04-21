@@ -1,7 +1,10 @@
 @core
-construct Binding: Property {
+construct Binding<T>: Property {
     let name: String
     let type: TypeReference
     let getterBody: Block?
     let setterBody: Block?
+
+    function getter(transform: (T) -> T)
+    function setter(transform: (T) -> T)
 }

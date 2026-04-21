@@ -1,7 +1,8 @@
 @core
-construct Derived: Property {
+construct Derived<T>: Property {
     let name: String
     let type: TypeReference
-    let builderName: String?
     let body: Block?
+
+    function getter(transform: (T) -> T)
 }
