@@ -196,6 +196,12 @@ extension ApplicationGraphValidator {
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )
+            case .deferBlock(let deferred):
+                try validateValueDeclarations(
+                    in: deferred.body,
+                    bindingConstructNames: bindingConstructNames,
+                    fileName: fileName
+                )
             case .forEach(_, _, let body):
                 try validateValueDeclarations(
                     in: body,

@@ -134,6 +134,12 @@ extension ApplicationGraphValidator {
                     context: context.enteringBackground(),
                     fileName: fileName
                 )
+            case .deferBlock(let deferred):
+                try validateControlFlow(
+                    in: deferred.body,
+                    context: context,
+                    fileName: fileName
+                )
             case .localCallable(let declaration):
                 try validateControlFlow(
                     in: declaration.body,

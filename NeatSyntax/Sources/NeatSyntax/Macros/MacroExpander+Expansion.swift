@@ -836,6 +836,21 @@ extension MacroExpander {
                     ))
                 )
             ]
+        case .deferBlock(let deferred):
+            return [
+                .deferBlock(
+                    DeferredBlock(body: try expand(
+                        statements: deferred.body,
+                        expectedReturnType: expectedReturnType,
+                        macros: macros,
+                        protocols: protocols,
+                        parameterMacroSignatures: parameterMacroSignatures,
+                        literalBridges: literalBridges,
+                        context: context,
+                        stateEffects: stateEffects
+                    ))
+                )
+            ]
         case .localCallable(let declaration):
             return [
                 .localCallable(

@@ -166,6 +166,8 @@ private struct MainProgramInterpreter {
         case .background:
             throw ValidationError(
                 "@background blocks are not supported in the main program interpreter yet.")
+        case .deferBlock(let deferred):
+            return try executeStatements(deferred.body)
         case .localCallable:
             throw ValidationError(
                 "Local callable declarations are not supported in the main program interpreter yet.")

@@ -528,7 +528,7 @@ extension Parser {
                     expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
                 }
 
-            case .background:
+            case .background, .deferBlock:
                 continue
 
             default:
@@ -565,7 +565,7 @@ extension Parser {
             guard let defaultBody else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
             return blockAlwaysReturnsValue(defaultBody)
-        case .background:
+        case .background, .deferBlock:
             return false
         default:
             return false

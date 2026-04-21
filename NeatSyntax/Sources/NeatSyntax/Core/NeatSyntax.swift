@@ -4,6 +4,7 @@ enum NeatSyntax {
     enum Attribute: String, CaseIterable {
         case main = "main"
         case background = "background"
+        case `defer` = "defer"
         case core = "core"
     }
 

@@ -1,0 +1,7 @@
+function work() {
+    @defer {
+        log(message: "done")
+    }
+
+    return
+}

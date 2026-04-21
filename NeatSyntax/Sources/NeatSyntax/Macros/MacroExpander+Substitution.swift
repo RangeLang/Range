@@ -34,6 +34,10 @@ extension MacroExpander {
             return .background(
                 Background(body: substituteMacroBindings(in: background.body, bindings: bindings))
             )
+        case .deferBlock(let deferred):
+            return .deferBlock(
+                DeferredBlock(body: substituteMacroBindings(in: deferred.body, bindings: bindings))
+            )
         case .localCallable(let declaration):
             return .localCallable(
                 LocalCallableDeclaration(
@@ -375,6 +379,16 @@ extension MacroExpander {
                 .background(
                     Background(body: substituteMacroTargetCalls(
                         in: background.body,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    ))
+                )
+            ]
+        case .deferBlock(let deferred):
+            return [
+                .deferBlock(
+                    DeferredBlock(body: substituteMacroTargetCalls(
+                        in: deferred.body,
                         targetBinding: targetBinding,
                         targetBlock: targetBlock
                     ))

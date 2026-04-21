@@ -536,6 +536,8 @@ extension MacroExpander {
                 expressions.append(contentsOf: macroOperationExpressions(in: body))
             case .background(let background):
                 expressions.append(contentsOf: macroOperationExpressions(in: background.body))
+            case .deferBlock(let deferred):
+                expressions.append(contentsOf: macroOperationExpressions(in: deferred.body))
             case .localCallable(let declaration):
                 expressions.append(contentsOf: macroOperationExpressions(in: declaration.body))
             case .switchStatement(_, let cases, let defaultBody):

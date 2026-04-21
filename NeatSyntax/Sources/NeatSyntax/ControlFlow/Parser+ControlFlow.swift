@@ -16,6 +16,10 @@ extension Parser {
             return try parseBackgroundStatement(localBindings: &localBindings)
         }
 
+        if isDeferStatementStart() {
+            return try parseDeferStatement(localBindings: &localBindings)
+        }
+
         if isEnvironmentProvisionStart() {
             return .environmentProvision(try parseEnvironmentProvision())
         }
@@ -108,6 +112,13 @@ extension Parser {
         return peek(offset: 1) == .leftBrace
     }
 
+    func isDeferStatementStart() -> Bool {
+        guard case .atAttribute(let name, _) = peek(), name == "defer" else {
+            return false
+        }
+        return peek(offset: 1) == .leftBrace
+    }
+
     func isLocalBackgroundCallableStart() -> Bool {
         guard case .atAttribute(let name, _) = peek(), name == "background" else {
             return false
@@ -175,6 +186,17 @@ extension Parser {
         advance()
         let body = try parseStatementBlock(baseLocalBindings: localBindings)
         return .background(Background(body: body))
+    }
+
+    mutating func parseDeferStatement(
+        localBindings: inout [String: LocalBindingSymbol]
+    ) throws -> Statement {
+        guard case .atAttribute(let name, _) = peek(), name == "defer" else {
+            throw ParseError("Expected @defer block.")
+        }
+        advance()
+        let body = try parseStatementBlock(baseLocalBindings: localBindings)
+        return .deferBlock(DeferredBlock(body: body))
     }
 
     func isStandaloneCallExpressionStart() -> Bool {

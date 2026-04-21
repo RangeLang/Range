@@ -216,6 +216,13 @@ extension ApplicationGraphValidator {
                     context: context,
                     fileName: fileName
                 )
+            case .deferBlock(let deferred):
+                try validateCallArgumentLabels(
+                    in: deferred.body,
+                    environment: environment,
+                    context: context,
+                    fileName: fileName
+                )
             case .localBinding(let declaration):
                 try validateCallArgumentLabels(
                     in: declaration.expression,

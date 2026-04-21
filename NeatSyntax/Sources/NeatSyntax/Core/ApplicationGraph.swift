@@ -485,6 +485,9 @@ struct GraphCollector {
             case .background(let background):
                 analyzeStatements(
                     background.body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
+            case .deferBlock(let deferred):
+                analyzeStatements(
+                    deferred.body, ownerID: statementID, scope: scope, visitedCalls: visitedCalls)
             case .localCallable(let declaration):
                 let callableID = "\(statementID)/localCallable:\(declaration.name)"
                 addNode(id: callableID, kind: .function, label: declaration.name)

@@ -259,6 +259,13 @@ extension ApplicationGraphValidator {
                     context: context,
                     fileName: fileName
                 )
+            case .deferBlock(let deferred):
+                try validateBindingReferences(
+                    in: deferred.body,
+                    declarationGraph: declarationGraph,
+                    context: context,
+                    fileName: fileName
+                )
             case .localBinding(let declaration):
                 try validateBindingReferences(
                     in: declaration.expression,

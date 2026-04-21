@@ -1,0 +1,4 @@
+@core
+construct Defer: Statement {
+    let body: Block
+}

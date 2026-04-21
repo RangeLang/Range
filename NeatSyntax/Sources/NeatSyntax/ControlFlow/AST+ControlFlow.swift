@@ -3,6 +3,7 @@ import Foundation
 public indirect enum Statement {
     case macroInvocation(name: String, argumentClause: String?, body: [Statement])
     case background(Background)
+    case deferBlock(DeferredBlock)
     case localBinding(LocalBindingDeclaration)
     case localCallable(LocalCallableDeclaration)
     case derived(name: String, typeName: String, body: [Statement])
@@ -28,6 +29,14 @@ public indirect enum Statement {
 }
 
 public struct Background {
+    public let body: [Statement]
+
+    public init(body: [Statement]) {
+        self.body = body
+    }
+}
+
+public struct DeferredBlock {
     public let body: [Statement]
 
     public init(body: [Statement]) {

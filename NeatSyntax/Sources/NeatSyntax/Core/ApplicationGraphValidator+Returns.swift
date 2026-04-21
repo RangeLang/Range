@@ -304,6 +304,15 @@ extension ApplicationGraphValidator {
                     operatorResolver: operatorResolver,
                     fileName: fileName
                 )
+            case .deferBlock(let deferred):
+                try validateCallableReturnSemanticsInLocalCallables(
+                    in: deferred.body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
             case .conditional(let branches):
                 for branch in branches {
                     try validateCallableReturnSemanticsInLocalCallables(
@@ -370,7 +379,7 @@ extension ApplicationGraphValidator {
                 if let defaultBody {
                     expressions.append(contentsOf: collectReturnExpressions(in: defaultBody))
                 }
-            case .background:
+            case .background, .deferBlock:
                 continue
             case .localCallable:
                 continue
@@ -420,7 +429,7 @@ extension ApplicationGraphValidator {
             guard let defaultBody else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
             return blockAlwaysReturnsValue(defaultBody)
-        case .background, .localCallable:
+        case .background, .deferBlock, .localCallable:
             return false
         default:
             return false

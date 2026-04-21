@@ -491,6 +491,10 @@ struct SwiftBackendEmitter {
                 if statementsContainMutation(background.body) {
                     return true
                 }
+            case .deferBlock(let deferred):
+                if statementsContainMutation(deferred.body) {
+                    return true
+                }
             case .conditional(let branches):
                 if branches.contains(where: { statementsContainMutation($0.body) }) {
                     return true
@@ -535,6 +539,13 @@ struct SwiftBackendEmitter {
             let bodyText = try emitStatements(background.body, indent: indent + 1)
             return """
                 \(prefix)Task.detached {
+                \(bodyText)
+                \(prefix)}
+                """
+        case .deferBlock(let deferred):
+            let bodyText = try emitStatements(deferred.body, indent: indent + 1)
+            return """
+                \(prefix)defer {
                 \(bodyText)
                 \(prefix)}
                 """

@@ -315,6 +315,15 @@ extension ApplicationGraphValidator {
                     operatorResolver: operatorResolver,
                     fileName: fileName
                 )
+            case .deferBlock(let deferred):
+                try validateLiteralBridgeCompatibilityInLocalCallables(
+                    in: deferred.body,
+                    accessibleTypes: accessibleTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver,
+                    fileName: fileName
+                )
             case .conditional(let branches):
                 for branch in branches {
                     try validateLiteralBridgeCompatibilityInLocalCallables(
