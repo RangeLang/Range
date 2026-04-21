@@ -253,27 +253,10 @@ struct CompilerFixtureTests {
 
     @Test("Clamped state macro rewrites initializer and assignments")
     func clampedStateMacroRewritesInitializerAndAssignments() throws {
-        var inputs = try neatCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: "/tmp/Clamped.neat",
-                source: """
-                construct Person {
-                    #clamped(min: 0, max: 120)
-                    state age: Int = 150
-
-                    function update(value: Int) {
-                        age = value
-                    }
-                }
-                """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().build(inputs: inputs)
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ClampedState.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
-            program.projectExpandedFiles.first(where: { $0.path == "/tmp/Clamped.neat" })
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
         )
 
         let construct: ConstructDeclaration
@@ -413,6 +396,13 @@ private func fixtureFiles(in suite: String) throws -> [URL] {
         .appendingPathComponent("NeatCompilerFixtures", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
     return try neatFiles(in: root, excludingExploration: false)
+}
+
+private func fixtureFile(in suite: String, path: String) throws -> URL {
+    try repositoryRoot()
+        .appendingPathComponent("NeatCompilerFixtures", isDirectory: true)
+        .appendingPathComponent(suite, isDirectory: true)
+        .appendingPathComponent(path)
 }
 
 private func neatCoreInputs() throws -> [SourceInput] {
