@@ -1,6 +1,7 @@
 @core
 construct Extension: Syntax {
-    let target: TypeReference
-    let protocols: [TypeReference]
+    let target: NominalTypeReference
+    let conformances: [TypeReference]
     let functions: [Function.Declaration]
+    let constructs: [Construct.Declaration]
 }

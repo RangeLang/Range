@@ -1,18 +1,24 @@
 @core
-construct Construct: Syntax, SupportsExtension {
+construct Construct: Syntax {
     let declaration: Declaration
     let application: Application
 
     @core
     construct Declaration {
         let self: NominalTypeReference
+        let conformances: [TypeReference]
         let inits: [Init.Declaration]
+        let lets: [Let]
+        let states: [State]
+        let bindings: [Binding]
+        let deriveds: [Derived]
         let functions: [Function.Declaration]
         let constructs: [Construct.Declaration]
+        let extensions: [Extension]
     }
 
     @core
     construct Application {
-      let init: Init.Application
+        let init: Init.Application
     }
 }
