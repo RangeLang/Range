@@ -3,11 +3,16 @@
 Current macro surface is split into:
 
 - `CoreMacro`
+- `Implementations`
+
+Compiler-owned syntax surfaces now live in `NeatCore/Syntax`:
+
+- `Syntax`
 - `Bodies`
 - `Statements`
 - `Expressions`
 - `Types`
-- `Implementations`
+- `Declarations`
 
 `Implementations/README.md` is the index of active bootstrap macro coverage and
 the current implementation status of each macro target kind.

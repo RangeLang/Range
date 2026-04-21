@@ -33,7 +33,7 @@ enum NeatCoreLoader {
             let isDirectory =
                 (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             if isDirectory, fileURL.lastPathComponent == "Exploration",
-                fileURL.path.contains("/NeatCore/Macros/")
+                fileURL.path.contains("/NeatCore/")
             {
                 enumerator.skipDescendants()
                 continue

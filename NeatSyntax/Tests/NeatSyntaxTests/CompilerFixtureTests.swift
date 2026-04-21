@@ -502,7 +502,7 @@ private func neatFiles(in root: URL, excludingExploration: Bool) throws -> [URL]
         if excludingExploration,
             isDirectory,
             url.lastPathComponent == "Exploration",
-            url.path.contains("/NeatCore/Macros/")
+            url.path.contains("/NeatCore/")
         {
             enumerator.skipDescendants()
             continue
