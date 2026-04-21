@@ -1,2 +1,2 @@
 @core
-protocol TypeReference: Syntax, SupportsRewrite<TypeReference> {}
+protocol TypeReference: Syntax, SyntaxRewritable<TypeReference> {}

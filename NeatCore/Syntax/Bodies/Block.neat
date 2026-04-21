@@ -1,5 +1,5 @@
 @core
-construct Block: Syntax, SupportsRewrite<Block> {
+construct Block: Syntax, SyntaxRewritable<Block> {
     let statements: [Statement]
 
     function rewrite(block _: Block)

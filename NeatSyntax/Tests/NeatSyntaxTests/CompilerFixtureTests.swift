@@ -132,7 +132,7 @@ struct CompilerFixtureTests {
 
         #expect(graph.constructsByName["Init"] != nil)
         #expect(graph.constructsByName["Init.Application"] != nil)
-        #expect(graph.syntaxResolver.declaration(named: "Init.Application", conformsTo: "SupportsRewrite"))
+        #expect(graph.syntaxResolver.declaration(named: "Init.Application", conformsTo: "SyntaxRewritable"))
     }
 
     @Test("Rewrite site decoding uses declaration-backed descriptors")

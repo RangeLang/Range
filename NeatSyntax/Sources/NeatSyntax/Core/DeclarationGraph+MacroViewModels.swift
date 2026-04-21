@@ -137,7 +137,7 @@ struct RewriteSurfaceView {
         var paths: Set<String> = []
 
         func supportsRewrite(_ typeName: String) -> Bool {
-            syntaxResolver.declaration(named: typeName, conformsTo: "SupportsRewrite")
+            syntaxResolver.declaration(named: typeName, conformsTo: "SyntaxRewritable")
         }
 
         func resolvedValueType(
@@ -167,7 +167,7 @@ struct RewriteSurfaceView {
             }
 
             if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
-                || syntaxResolver.declaration(named: text, conformsTo: "SupportsRewrite")
+                || syntaxResolver.declaration(named: text, conformsTo: "SyntaxRewritable")
             {
                 return (text, isArray)
             }
@@ -234,7 +234,7 @@ struct RewriteSurfaceView {
 
         let directPath = "\(targetBinding).rewrite"
         if normalizedPath == directPath {
-            return syntaxResolver.declaration(named: targetName, conformsTo: "SupportsRewrite")
+            return syntaxResolver.declaration(named: targetName, conformsTo: "SyntaxRewritable")
         }
 
         let prefix = "\(targetBinding)."
@@ -276,7 +276,7 @@ struct RewriteSurfaceView {
             currentTypeName = resolvedType.typeName
         }
 
-        return syntaxResolver.declaration(named: currentTypeName, conformsTo: "SupportsRewrite")
+        return syntaxResolver.declaration(named: currentTypeName, conformsTo: "SyntaxRewritable")
     }
 
     private func resolvedDeclaredValueType(
@@ -306,7 +306,7 @@ struct RewriteSurfaceView {
         }
 
         if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
-            || syntaxResolver.declaration(named: text, conformsTo: "SupportsRewrite")
+            || syntaxResolver.declaration(named: text, conformsTo: "SyntaxRewritable")
         {
             return (text, isArray)
         }

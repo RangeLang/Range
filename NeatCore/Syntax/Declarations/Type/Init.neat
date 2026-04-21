@@ -10,7 +10,7 @@ construct Init: Syntax {
     }
 
     @core
-    construct Application: SupportsRewrite<Expression> {
+    construct Application: SyntaxRewritable<Expression> {
         let type: TypeReference
         let arguments: [Parameter.Application]
 

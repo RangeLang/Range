@@ -1,0 +1,3 @@
+protocol SyntaxRewritable<T> {
+    function rewrite(_: T)
+}

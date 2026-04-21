@@ -1,3 +1,0 @@
-protocol SupportsRewrite<T> {
-    function rewrite(_: T)
-}
