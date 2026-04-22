@@ -122,6 +122,8 @@ extension ApplicationGraphValidator {
     ) throws {
         for statement in statements {
             switch statement {
+            case .expand:
+                continue
             case .macroInvocation(_, _, let body):
                 try validateControlFlow(
                     in: body,

@@ -128,6 +128,8 @@ extension Parser {
 
     func renderMacroToken(_ token: Token) -> String {
         switch token {
+        case .hash:
+            return "#"
         case .identifier(let value):
             return value
         case .hashDirective(let value):

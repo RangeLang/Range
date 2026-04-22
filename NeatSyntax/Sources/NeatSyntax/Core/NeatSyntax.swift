@@ -6,6 +6,7 @@ enum NeatSyntax {
         case background = "background"
         case `defer` = "defer"
         case core = "core"
+        case expand = "expand"
     }
 
     enum Keyword: String {

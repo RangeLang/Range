@@ -82,11 +82,134 @@ extension Parser {
             diagnosticsBinding: .init(kind: .constant, type: .named("MacroDiagnostics")),
         ]
         var statements: [Statement] = []
+        currentMacroBodyDepth += 1
+        defer { currentMacroBodyDepth -= 1 }
         while peek() != .rightBrace {
             statements.append(try parseStatement(localBindings: &localBindings))
         }
 
         try consume(.rightBrace)
         return (bindings, statements)
+    }
+
+    mutating func parseExpandStatement() throws -> Statement {
+        guard case .atAttribute(let name, _) = peek(), name == "expand" else {
+            throw ParseError("Expected @expand block.")
+        }
+        advance()
+        try consume(.leftBrace)
+
+        var declarations: [EmittedDeclaration] = []
+        while peek() != .rightBrace {
+            declarations.append(try parseEmittedDeclaration())
+        }
+
+        try consume(.rightBrace)
+        return .expand(declarations)
+    }
+
+    mutating func parseEmittedDeclaration() throws -> EmittedDeclaration {
+        if isEmittedExtensionDeclarationStart() {
+            return .extensionDeclaration(try parseEmittedExtensionDeclaration())
+        }
+
+        throw ParseError("Only extension emission is supported inside @expand in this bootstrap pass.")
+    }
+
+    func isEmittedExtensionDeclarationStart() -> Bool {
+        var offset = 0
+        while true {
+            switch peek(offset: offset) {
+            case .hashDirective:
+                offset += 1
+                if peek(offset: offset) == .less {
+                    var depth = 1
+                    offset += 1
+                    while depth > 0 {
+                        switch peek(offset: offset) {
+                        case .less:
+                            depth += 1
+                        case .greater:
+                            depth -= 1
+                        case .eof:
+                            return false
+                        default:
+                            break
+                        }
+                        offset += 1
+                    }
+                }
+
+                if peek(offset: offset) == .leftParen {
+                    var depth = 1
+                    offset += 1
+                    while depth > 0 {
+                        switch peek(offset: offset) {
+                        case .leftParen:
+                            depth += 1
+                        case .rightParen:
+                            depth -= 1
+                        case .eof:
+                            return false
+                        default:
+                            break
+                        }
+                        offset += 1
+                    }
+                }
+            default:
+                return peek(offset: offset) == .keyword(NeatSyntax.Keyword.typeExtension.rawValue)
+            }
+        }
+    }
+
+    mutating func parseEmittedExtensionDeclaration() throws -> EmittedExtensionDeclaration {
+        let macros = try parseMacroApplicationsIfPresent()
+        try consumeKeyword(.typeExtension)
+
+        let target: EmittedNominalTypeReference
+        if peek() == .hash {
+            try consume(.hash)
+            try consume(.leftParen)
+            target = .splice(try parseExpression(terminatingAt: [.rightParen]))
+            try consume(.rightParen)
+        } else {
+            target = .type(
+                try parseNominalTypeReferenceNode(expectedDescription: "Extension target")
+            )
+        }
+        let conformances = try parseConformanceListIfPresent()
+
+        var callables: [CallableDeclaration] = []
+        var constructs: [ConstructDeclaration] = []
+        var namespaces: [NamespaceDeclaration] = []
+        if peek() == .leftBrace {
+            try consume(.leftBrace)
+            while isCallableStart()
+                || isConstructDeclarationStart()
+                || isBuilderDeclarationStart()
+                || isNamespaceDeclarationStart()
+            {
+                if isCallableStart() {
+                    callables.append(try parseCallableDeclaration())
+                    continue
+                }
+                if isConstructDeclarationStart() || isBuilderDeclarationStart() {
+                    constructs.append(try parseConstructDeclaration(requiresEOF: false))
+                    continue
+                }
+                namespaces.append(try parseNamespaceDeclaration(requiresEOF: false))
+            }
+            try consume(.rightBrace)
+        }
+
+        return EmittedExtensionDeclaration(
+            macros: macros,
+            target: target,
+            conformances: conformances,
+            callables: callables,
+            constructs: constructs,
+            namespaces: namespaces
+        )
     }
 }

@@ -10,6 +10,24 @@ public struct MacroDeclaration {
     public let body: [Statement]
 }
 
+public enum EmittedDeclaration {
+    case extensionDeclaration(EmittedExtensionDeclaration)
+}
+
+public struct EmittedExtensionDeclaration {
+    public let macros: [MacroApplication]
+    public let target: EmittedNominalTypeReference
+    public let conformances: [TypeReference]
+    public let callables: [CallableDeclaration]
+    public let constructs: [ConstructDeclaration]
+    public let namespaces: [NamespaceDeclaration]
+}
+
+public enum EmittedNominalTypeReference {
+    case type(TypeReference)
+    case splice(Expression)
+}
+
 public struct MacroApplication {
     public let name: String
     public let genericArguments: [TypeReference]

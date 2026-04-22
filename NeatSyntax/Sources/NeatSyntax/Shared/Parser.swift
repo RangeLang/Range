@@ -184,6 +184,7 @@ public struct Parser {
     var discoveredCallableReturnTypes: [String: TypeReference]
     var macroDeclarationsByName: [String: MacroDeclaration]
     var macroExpansionTypes: [String: TypeReference] = [:]
+    var currentMacroBodyDepth: Int = 0
 
     public init(
         source: String,

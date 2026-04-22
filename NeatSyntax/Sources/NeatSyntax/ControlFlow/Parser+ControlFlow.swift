@@ -4,6 +4,13 @@ extension Parser {
     mutating func parseStatement(
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
+        if isExpandStatementStart() {
+            guard currentMacroBodyDepth > 0 else {
+                throw ParseError("@expand is only valid inside macro bodies.")
+            }
+            return try parseExpandStatement()
+        }
+
         if isMacroApplicationStart() {
             throw ParseError("Block macros are not supported.")
         }
@@ -91,6 +98,13 @@ extension Parser {
         default:
             throw ParseError("Expected assignment operator in action block.")
         }
+    }
+
+    func isExpandStatementStart() -> Bool {
+        guard case .atAttribute(let name, _) = peek(), name == "expand" else {
+            return false
+        }
+        return peek(offset: 1) == .leftBrace
     }
 
     func isBackgroundStatementStart() -> Bool {

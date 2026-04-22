@@ -55,13 +55,21 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 declarationGraph: declarationGraph
             )
         }
+        for extensions in declarationGraph.extensionsByTargetName.values {
+            for declaration in extensions {
+                try validateProtocolConformances(
+                    of: declaration,
+                    declarationGraph: declarationGraph
+                )
+            }
+        }
     }
 
     private func validateProtocolConformances(
         of construct: ConstructDeclaration,
         declarationGraph: DeclarationGraph
     ) throws {
-        for conformance in construct.conformances {
+        for conformance in declarationGraph.conformances(onConstruct: construct.name) {
             guard let protocolName = protocolName(for: conformance),
                 let protocolDeclaration = declarationGraph.protocolsByName[protocolName]
             else {
@@ -113,7 +121,67 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             try validateCallableRequirements(
                 requirements.callables,
                 on: construct,
+                protocolName: protocolName,
+                declarationGraph: declarationGraph
+            )
+        }
+    }
+
+    private func validateProtocolConformances(
+        of declaration: ExtensionDeclaration,
+        declarationGraph: DeclarationGraph
+    ) throws {
+        guard let construct = declarationGraph.construct(named: declaration.targetType.displayName) else {
+            return
+        }
+
+        for conformance in declaration.conformances {
+            guard let protocolName = protocolName(for: conformance),
+                let protocolDeclaration = declarationGraph.protocolsByName[protocolName]
+            else {
+                continue
+            }
+
+            let substitution = genericSubstitution(
+                for: protocolDeclaration,
+                conformance: conformance
+            )
+            let requirements = collectedRequirements(
+                of: protocolDeclaration,
+                declarationGraph: declarationGraph,
+                visitedProtocols: []
+            ).substituted(using: substitution)
+
+            try validateValueRequirements(
+                requirements.values,
+                on: construct,
                 protocolName: protocolName
+            )
+            try validateStateRequirements(
+                requirements.states,
+                on: construct,
+                protocolName: protocolName
+            )
+            try validateBindingRequirements(
+                requirements.bindings,
+                on: construct,
+                protocolName: protocolName
+            )
+            try validateDerivedRequirements(
+                requirements.deriveds,
+                on: construct,
+                protocolName: protocolName
+            )
+            try validateInitializerRequirements(
+                requirements.initializers,
+                on: construct,
+                protocolName: protocolName
+            )
+            try validateCallableRequirements(
+                requirements.callables,
+                on: construct,
+                protocolName: protocolName,
+                declarationGraph: declarationGraph
             )
         }
     }
@@ -264,11 +332,13 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     private func validateCallableRequirements(
         _ requirements: [CallableDeclaration],
         on construct: ConstructDeclaration,
-        protocolName: String
+        protocolName: String,
+        declarationGraph: DeclarationGraph
     ) throws {
+        let availableCallables = declarationGraph.callables(onConstruct: construct.name)
         for requirement in requirements {
             guard
-                construct.callables.contains(where: {
+                availableCallables.contains(where: {
                     callableMatchesRequirement($0, requirement: requirement)
                 })
             else {

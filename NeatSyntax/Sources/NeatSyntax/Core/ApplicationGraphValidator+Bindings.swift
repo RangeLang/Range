@@ -245,6 +245,8 @@ extension ApplicationGraphValidator {
 
         for statement in statements {
             switch statement {
+            case .expand:
+                continue
             case .macroInvocation(_, _, let body):
                 try validateBindingReferences(
                     in: body,

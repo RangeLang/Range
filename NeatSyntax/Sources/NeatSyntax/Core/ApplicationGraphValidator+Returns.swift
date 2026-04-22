@@ -264,6 +264,8 @@ extension ApplicationGraphValidator {
     ) throws {
         for statement in statements {
             switch statement {
+            case .expand:
+                continue
             case .localCallable(let declaration):
                 try validateCallableReturnSemantics(
                     CallableDeclaration(
@@ -360,6 +362,8 @@ extension ApplicationGraphValidator {
 
         for statement in statements {
             switch statement {
+            case .expand:
+                continue
             case .macroInvocation(_, _, let body):
                 expressions.append(contentsOf: collectReturnExpressions(in: body))
             case .return(let expression):

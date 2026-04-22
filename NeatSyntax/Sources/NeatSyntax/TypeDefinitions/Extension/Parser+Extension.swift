@@ -7,6 +7,7 @@ extension Parser {
         let targetType = try parseNominalTypeReferenceNode(
             expectedDescription: "Extension target"
         )
+        let conformances = try parseConformanceListIfPresent()
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
@@ -32,6 +33,7 @@ extension Parser {
         return ExtensionDeclaration(
             macros: macros,
             targetType: targetType,
+            conformances: conformances,
             callables: callables,
             constructs: constructs,
             namespaces: namespaces

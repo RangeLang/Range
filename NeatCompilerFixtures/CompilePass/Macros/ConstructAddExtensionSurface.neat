@@ -1,5 +1,15 @@
+protocol Greetable {
+    function greet() -> String
+}
+
 macro extendConstructSurface(): Construct { target, diagnostics in
-    target.addExtension(target)
+    @expand {
+        extension #(target.declaration.self): Greetable {
+            function greet() -> String {
+                return "Hello"
+            }
+        }
+    }
 }
 
 #extendConstructSurface
@@ -9,4 +19,6 @@ construct ExtendableFixture {
 
 @main {
     let result: ExtendableFixture = ExtendableFixture(number: 1)
+
+    result.greet()
 }

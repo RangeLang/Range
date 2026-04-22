@@ -2,6 +2,7 @@ import Foundation
 
 public indirect enum Statement {
     case macroInvocation(name: String, argumentClause: String?, body: [Statement])
+    case expand([EmittedDeclaration])
     case background(Background)
     case deferBlock(DeferredBlock)
     case localBinding(LocalBindingDeclaration)

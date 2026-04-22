@@ -1,6 +1,7 @@
 import Foundation
 
 enum Token: Equatable {
+    case hash
     case identifier(String)
     case hashDirective(String)
     case stringLiteral(String)

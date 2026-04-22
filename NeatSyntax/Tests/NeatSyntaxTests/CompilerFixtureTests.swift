@@ -502,6 +502,29 @@ struct CompilerFixtureTests {
         #expect(compoundAmount == 1)
     }
 
+    @Test("Construct macro expand emits extension declarations")
+    func constructMacroExpandEmitsExtensionDeclarations() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ConstructAddExtensionSurface.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let module: ModuleFileNode
+        switch expandedFile.sourceFile {
+        case .module(let expandedModule):
+            module = expandedModule
+        default:
+            Issue.record("Expected expanded construct macro fixture to become a module.")
+            return
+        }
+
+        let extensionDeclaration = try #require(module.extensions.first)
+        #expect(extensionDeclaration.targetType.displayName == "ExtendableFixture")
+        #expect(extensionDeclaration.conformances.map(\.displayName) == ["Greetable"])
+        #expect(extensionDeclaration.callables.contains(where: { $0.name == "greet" }))
+    }
+
     @Test("Derived property macro rewrites reads")
     func derivedPropertyMacroRewritesReads() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedProperty.neat")

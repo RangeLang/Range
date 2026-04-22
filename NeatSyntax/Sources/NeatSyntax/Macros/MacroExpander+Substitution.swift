@@ -11,6 +11,34 @@ extension MacroExpander {
         bindings: [String: Expression]
     ) -> Statement {
         switch statement {
+        case .expand(let declarations):
+            return .expand(
+                declarations.map { declaration in
+                    switch declaration {
+                    case .extensionDeclaration(let declaration):
+                        let target: EmittedNominalTypeReference
+                        switch declaration.target {
+                        case .type:
+                            target = declaration.target
+                        case .splice(let expression):
+                            target = .splice(
+                                substituteMacroBindings(in: expression, bindings: bindings)
+                            )
+                        }
+
+                        return .extensionDeclaration(
+                            EmittedExtensionDeclaration(
+                                macros: declaration.macros,
+                                target: target,
+                                conformances: declaration.conformances,
+                                callables: declaration.callables,
+                                constructs: declaration.constructs,
+                                namespaces: declaration.namespaces
+                            )
+                        )
+                    }
+                }
+            )
         case .localBinding(let declaration):
             return .localBinding(
                 LocalBindingDeclaration(

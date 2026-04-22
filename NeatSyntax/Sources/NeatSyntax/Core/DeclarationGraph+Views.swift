@@ -218,13 +218,16 @@ public struct DeclarationRegistryView {
 public struct DeclarationSyntaxResolver {
     private let protocolsByName: [String: ProtocolDeclaration]
     private let constructsByName: [String: ConstructDeclaration]
+    private let extensionsByTargetName: [String: [ExtensionDeclaration]]
 
     public init(
         protocolsByName: [String: ProtocolDeclaration],
-        constructsByName: [String: ConstructDeclaration]
+        constructsByName: [String: ConstructDeclaration],
+        extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
         self.protocolsByName = protocolsByName
         self.constructsByName = constructsByName
+        self.extensionsByTargetName = extensionsByTargetName
     }
 
     public func typeConformsToSyntax(_ typeReference: TypeReference?) -> Bool {
@@ -278,7 +281,8 @@ public struct DeclarationSyntaxResolver {
         }
 
         if let constructDeclaration = constructsByName[name] {
-            return constructDeclaration.conformances.contains {
+            let extensionConformances = extensionsByTargetName[name, default: []].flatMap(\.conformances)
+            return (constructDeclaration.conformances + extensionConformances).contains {
                 conformance in
                 guard let conformanceName = nominalName(of: conformance) else {
                     return false

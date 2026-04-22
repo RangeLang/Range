@@ -30,6 +30,19 @@ extension MacroExpander {
                 macros: macros,
                 context: context
             )
+            let expandedConstructs = try module.constructs.map {
+                try expand(
+                    construct: $0,
+                    macros: macros,
+                    protocols: protocols,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context
+                )
+            }
+            let emittedExtensionDeclarations = try module.constructs.flatMap {
+                try emittedExtensions(from: $0, macros: macros)
+            }
             return .module(
                 ModuleFileNode(
                     mainBlock: try module.mainBlock.map {
@@ -65,35 +78,44 @@ extension MacroExpander {
                             stateEffects: moduleStateEffects
                         )
                     },
-                    constructs: try module.constructs.map {
-                        try expand(
-                            construct: $0,
-                            macros: macros,
-                            protocols: protocols,
-                            parameterMacroSignatures: parameterMacroSignatures,
-                            literalBridges: literalBridges,
-                            context: context
-                        )
-                    },
+                    constructs: expandedConstructs,
                     namespaces: module.namespaces,
                     enumerations: module.enumerations,
                     protocols: module.protocols,
                     macros: module.macros,
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
-                    extensions: module.extensions
+                    extensions: module.extensions + emittedExtensionDeclarations
                 )
             )
         case .construct(let declaration):
-            return .construct(
-                try expand(
-                    construct: declaration,
-                    macros: macros,
-                    protocols: protocols,
-                    parameterMacroSignatures: parameterMacroSignatures,
-                    literalBridges: literalBridges,
-                    context: context
-                ))
+            let expandedConstruct = try expand(
+                construct: declaration,
+                macros: macros,
+                protocols: protocols,
+                parameterMacroSignatures: parameterMacroSignatures,
+                literalBridges: literalBridges,
+                context: context
+            )
+            let emittedExtensions = try emittedExtensions(from: declaration, macros: macros)
+            guard !emittedExtensions.isEmpty else {
+                return .construct(expandedConstruct)
+            }
+            return .module(
+                ModuleFileNode(
+                    mainBlock: nil,
+                    states: [],
+                    callables: [],
+                    constructs: [expandedConstruct],
+                    namespaces: [],
+                    enumerations: [],
+                    protocols: [],
+                    macros: [],
+                    precedenceGroups: [],
+                    operators: [],
+                    extensions: emittedExtensions
+                )
+            )
         case .namespace, .macro, .enumeration, .protocolDefinition, .extensions:
             return sourceFile
         }
@@ -781,6 +803,8 @@ extension MacroExpander {
         stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> [Statement] {
         switch statement {
+        case .expand:
+            return []
         case .macroInvocation(let name, let argumentClause, let body):
             _ = argumentClause
             _ = body
@@ -1433,5 +1457,130 @@ extension MacroExpander {
         case .bindingReference:
             return expression
         }
+    }
+
+    static func emittedExtensions(
+        from construct: ConstructDeclaration,
+        macros: [String: MacroDeclaration]
+    ) throws -> [ExtensionDeclaration] {
+        var emitted: [ExtensionDeclaration] = []
+
+        for application in construct.macros {
+            guard let macro = macros[application.name], macroTargetKind(for: macro) == .construct else {
+                continue
+            }
+            emitted.append(contentsOf: try emittedExtensions(from: macro, construct: construct))
+        }
+
+        for nested in construct.constructs {
+            emitted.append(contentsOf: try emittedExtensions(from: nested, macros: macros))
+        }
+
+        return emitted
+    }
+
+    static func emittedExtensions(
+        from macro: MacroDeclaration,
+        construct: ConstructDeclaration
+    ) throws -> [ExtensionDeclaration] {
+        try emittedDeclarations(in: macro.body).compactMap { declaration in
+            switch declaration {
+            case .extensionDeclaration(let extensionDeclaration):
+                return try lowerEmittedExtensionDeclaration(
+                    extensionDeclaration,
+                    macro: macro,
+                    construct: construct
+                )
+            }
+        }
+    }
+
+    static func emittedDeclarations(in statements: [Statement]) -> [EmittedDeclaration] {
+        var declarations: [EmittedDeclaration] = []
+
+        for statement in statements {
+            switch statement {
+            case .expand(let emitted):
+                declarations.append(contentsOf: emitted)
+            case .conditional(let branches):
+                for branch in branches {
+                    declarations.append(contentsOf: emittedDeclarations(in: branch.body))
+                }
+            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
+                declarations.append(contentsOf: emittedDeclarations(in: body))
+            case .background(let background):
+                declarations.append(contentsOf: emittedDeclarations(in: background.body))
+            case .deferBlock(let deferred):
+                declarations.append(contentsOf: emittedDeclarations(in: deferred.body))
+            case .localCallable(let declaration):
+                declarations.append(contentsOf: emittedDeclarations(in: declaration.body))
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    declarations.append(contentsOf: emittedDeclarations(in: switchCase.body))
+                }
+                if let defaultBody {
+                    declarations.append(contentsOf: emittedDeclarations(in: defaultBody))
+                }
+            case .macroInvocation, .localBinding, .assignment, .compoundAssignment, .expression,
+                .return, .environmentProvision, .break, .continue:
+                continue
+            }
+        }
+
+        return declarations
+    }
+
+    static func lowerEmittedExtensionDeclaration(
+        _ declaration: EmittedExtensionDeclaration,
+        macro: MacroDeclaration,
+        construct: ConstructDeclaration
+    ) throws -> ExtensionDeclaration {
+        let targetType: TypeReference
+        switch declaration.target {
+        case .type(let type):
+            targetType = type
+        case .splice(let expression):
+            guard let interpolated = interpolateNominalTypeReference(
+                expression,
+                macro: macro,
+                construct: construct
+            )
+            else {
+                throw ParseError(
+                    "Macro #\(macro.name) could not interpolate extension target from \(renderExpressionForStringify(expression))."
+                )
+            }
+            targetType = interpolated
+        }
+
+        guard targetType.isNominalReference else {
+            throw ParseError(
+                "Macro #\(macro.name) emitted extension target must be a nominal type reference, got \(targetType.displayName)."
+            )
+        }
+
+        return ExtensionDeclaration(
+            macros: declaration.macros,
+            targetType: targetType,
+            conformances: declaration.conformances,
+            callables: declaration.callables,
+            constructs: declaration.constructs,
+            namespaces: declaration.namespaces
+        )
+    }
+
+    static func interpolateNominalTypeReference(
+        _ expression: Expression,
+        macro: MacroDeclaration,
+        construct: ConstructDeclaration
+    ) -> TypeReference? {
+        interpretTypeReferenceRewriteExpression(
+            expression,
+            bindings: [
+                macro.bindings.target: .named(construct.name),
+                "\(macro.bindings.target).declaration.self": .named(construct.name),
+                "\(macro.bindings.target).declaration.type": .named(construct.name),
+            ]
+        )
     }
 }

@@ -94,6 +94,8 @@ extension Parser {
     func collectBuilderHooks(from statements: [Statement], into hooks: inout Set<String>) {
         for statement in statements {
             switch statement {
+            case .expand:
+                continue
             case .macroInvocation(_, _, let body):
                 collectBuilderHooks(from: body, into: &hooks)
             case .expression:

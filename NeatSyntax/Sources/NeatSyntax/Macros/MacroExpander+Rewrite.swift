@@ -438,7 +438,9 @@ extension MacroExpander {
                     "Macro #\(application.name) is used on a construct but targets \(macro.target.typeReference.displayName)."
                 )
             }
-            _ = try resolvedRewriteCalls(for: macro, context: context)
+            if !macroOperationExpressions(in: macro.body).isEmpty {
+                _ = try resolvedRewriteCalls(for: macro, context: context)
+            }
         }
     }
 
@@ -526,6 +528,8 @@ extension MacroExpander {
 
         for statement in statements {
             switch statement {
+            case .expand:
+                continue
             case .expression(let expression):
                 expressions.append(expression)
             case .conditional(let branches):

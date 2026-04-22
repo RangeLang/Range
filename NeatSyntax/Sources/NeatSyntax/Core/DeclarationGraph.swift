@@ -65,7 +65,10 @@ public struct DeclarationGraph {
     public var views: DeclarationGraphViews {
         DeclarationGraphViews(
             literalBridgeResolver: LiteralBridgeResolver(realizedLiteralBridges: realizedLiteralBridges),
-            memberResolver: DeclarationMemberResolver(constructsByName: constructsByName),
+            memberResolver: DeclarationMemberResolver(
+                constructsByName: constructsByName,
+                extensionsByTargetName: extensionsByTargetName
+            ),
             operatorResolver: DeclarationOperatorResolver(callablesByName: callablesByName),
             registryView: DeclarationRegistryView(
                 protocolsByName: protocolsByName,
@@ -86,7 +89,8 @@ public struct DeclarationGraph {
             ),
             syntaxResolver: DeclarationSyntaxResolver(
                 protocolsByName: protocolsByName,
-                constructsByName: constructsByName
+                constructsByName: constructsByName,
+                extensionsByTargetName: extensionsByTargetName
             )
         )
     }
@@ -140,7 +144,15 @@ public struct DeclarationGraph {
     }
 
     public func callables(onConstruct named: String) -> [CallableDeclaration] {
-        constructsByName[named]?.callables ?? []
+        let baseCallables = constructsByName[named]?.callables ?? []
+        let extensionCallables = extensionsByTargetName[named, default: []].flatMap(\.callables)
+        return baseCallables + extensionCallables
+    }
+
+    public func conformances(onConstruct named: String) -> [TypeReference] {
+        let baseConformances = constructsByName[named]?.conformances ?? []
+        let extensionConformances = extensionsByTargetName[named, default: []].flatMap(\.conformances)
+        return baseConformances + extensionConformances
     }
 
     public func construct(named name: String) -> ConstructDeclaration? {
@@ -1287,6 +1299,7 @@ private struct SemanticGraphCollector {
         addRelation(from: parentID, to: extensionID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: extensionID)
         addTypeReference(declaration.targetType, from: extensionID, kind: .extends)
+        addTypeReferences(declaration.conformances, from: extensionID, kind: .conformsTo)
     }
 
     private mutating func addState(_ declaration: StateDeclaration, parentID: String) {

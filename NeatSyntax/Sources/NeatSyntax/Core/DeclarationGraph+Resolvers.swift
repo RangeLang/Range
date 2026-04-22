@@ -502,7 +502,7 @@ public struct DeclarationOperatorResolver: Sendable {
 }
 
 public struct DeclarationMemberResolver: Sendable {
-    public static let empty = DeclarationMemberResolver(constructsByName: [:])
+    public static let empty = DeclarationMemberResolver(constructsByName: [:], extensionsByTargetName: [:])
 
     private struct ConstructMembers: Sendable {
         var genericParameterNames: [String]
@@ -513,7 +513,10 @@ public struct DeclarationMemberResolver: Sendable {
 
     private let membersByConstructName: [String: ConstructMembers]
 
-    public init(constructsByName: [String: ConstructDeclaration]) {
+    public init(
+        constructsByName: [String: ConstructDeclaration],
+        extensionsByTargetName: [String: [ExtensionDeclaration]]
+    ) {
         self.membersByConstructName = constructsByName.mapValues { construct in
             let nestedTypeMap = Self.nestedTypeMap(for: construct)
             var propertyTypes: [String: TypeReference] = [:]
@@ -554,6 +557,14 @@ public struct DeclarationMemberResolver: Sendable {
                     callable.returnType ?? .named("Void"),
                     using: nestedTypeMap
                 )
+            }
+            for extensionDeclaration in extensionsByTargetName[construct.name, default: []] {
+                for callable in extensionDeclaration.callables {
+                    callableReturnTypes[callable.name] = Self.qualifyNestedLocalTypes(
+                        callable.returnType ?? .named("Void"),
+                        using: nestedTypeMap
+                    )
+                }
             }
 
             return ConstructMembers(

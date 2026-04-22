@@ -275,6 +275,8 @@ extension ApplicationGraphValidator {
     ) throws {
         for statement in statements {
             switch statement {
+            case .expand:
+                continue
             case .localCallable(let declaration):
                 try validateLiteralBridgeCompatibility(
                     in: CallableDeclaration(

@@ -424,7 +424,7 @@ extension Parser {
                 .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .andAnd, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
-            case .stringLiteral, .integer, .double, .hashDirective, .atAttribute, .dollar,
+            case .stringLiteral, .integer, .double, .hash, .hashDirective, .atAttribute, .dollar,
                 .percent, .bang:
                 return false
             case .identifier, .keyword, .leftBracket, .leftParen, .asterisk, .dot, .ellipsis,

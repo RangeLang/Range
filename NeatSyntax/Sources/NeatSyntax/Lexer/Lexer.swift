@@ -132,8 +132,13 @@ struct Lexer {
             case "\"":
                 tokens.append(.stringLiteral(try readString()))
             case "#":
-                let identifier = try readHashIdentifier()
-                tokens.append(.hashDirective(identifier))
+                if peek(offset: 1) == "(" {
+                    advance()
+                    tokens.append(.hash)
+                } else {
+                    let identifier = try readHashIdentifier()
+                    tokens.append(.hashDirective(identifier))
+                }
             case "@":
                 let identifier = try readSigilIdentifier()
                 guard NeatSyntax.attributeIdentifiers.contains(identifier) else {

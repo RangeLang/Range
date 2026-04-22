@@ -58,6 +58,8 @@ public struct CompilationArtifactsEmitter {
 
     private func render(_ token: Token) -> String {
         switch token {
+        case .hash:
+            return "hash"
         case .identifier(let value):
             return "identifier(\(value))"
         case .hashDirective(let value):
