@@ -1,3 +1,0 @@
-protocol SupportsExtension {
-    function addExtension(_ extension: Extension)
-}

@@ -1,6 +1,5 @@
 @core
-construct Extension: Syntax {
-    let target: NominalTypeReference
+construct Extension<Target: NominalTypeReference>: Syntax {
     let conformances: [NominalTypeReference]
     let functions: [Function.Declaration]
     let constructs: [Construct.Declaration]

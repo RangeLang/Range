@@ -4,8 +4,8 @@ construct Construct: Syntax {
     let application: Application
 
     @core
-    construct Declaration {
-        let self: NominalTypeReference
+    construct Declaration<SelfType: NominalTypeReference> {
+        let self: SelfType
         let conformances: [NominalTypeReference]
         let inits: [Init.Declaration]
         let lets: [Let]
@@ -14,7 +14,7 @@ construct Construct: Syntax {
         let deriveds: [Derived]
         let functions: [Function.Declaration]
         let constructs: [Construct.Declaration]
-        let extensions: [Extension]
+        let extensions: [Extension<SelfType>]
     }
 
     @core
