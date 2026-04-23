@@ -523,6 +523,7 @@ struct CompilerFixtureTests {
         #expect(extensionDeclaration.targetType.displayName == "ExtendableFixture")
         #expect(extensionDeclaration.conformances.map(\.displayName) == ["Greetable"])
         #expect(extensionDeclaration.callables.contains(where: { $0.name == "greet" }))
+        #expect(module.constructs.contains(where: { $0.name == "SiblingConstruct" }))
     }
 
     @Test("Derived property macro rewrites reads")

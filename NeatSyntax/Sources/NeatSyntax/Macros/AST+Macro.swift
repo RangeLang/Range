@@ -12,6 +12,12 @@ public struct MacroDeclaration {
 
 public enum EmittedDeclaration {
     case extensionDeclaration(EmittedExtensionDeclaration)
+    case constructDeclaration(ConstructDeclaration)
+    case callableDeclaration(CallableDeclaration)
+    case namespaceDeclaration(NamespaceDeclaration)
+    case enumDeclaration(EnumDeclaration)
+    case protocolDeclaration(ProtocolDeclaration)
+    case stateDeclaration(StateDeclaration)
 }
 
 public struct EmittedExtensionDeclaration {

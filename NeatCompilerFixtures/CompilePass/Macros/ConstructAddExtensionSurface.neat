@@ -8,6 +8,18 @@ macro extendConstructSurface(): Construct { target, diagnostics in
             function greet() -> String {
                 return "Hello"
             }
+
+            construct ChildConstruct {
+                function doThing() -> String {
+                    return "Thing"
+                }
+            }
+        }
+
+        construct SiblingConstruct {
+            function doThing() -> String {
+                return "Thing"
+            }
         }
     }
 }

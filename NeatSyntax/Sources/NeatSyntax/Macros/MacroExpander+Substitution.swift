@@ -36,6 +36,9 @@ extension MacroExpander {
                                 namespaces: declaration.namespaces
                             )
                         )
+                    case .constructDeclaration, .callableDeclaration, .namespaceDeclaration,
+                        .enumDeclaration, .protocolDeclaration, .stateDeclaration:
+                        return declaration
                     }
                 }
             )

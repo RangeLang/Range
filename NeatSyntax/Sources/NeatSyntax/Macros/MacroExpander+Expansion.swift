@@ -1,4 +1,24 @@
 extension MacroExpander {
+    struct EmittedDeclarationBundle {
+        var states: [StateDeclaration] = []
+        var callables: [CallableDeclaration] = []
+        var constructs: [ConstructDeclaration] = []
+        var namespaces: [NamespaceDeclaration] = []
+        var enumerations: [EnumDeclaration] = []
+        var protocols: [ProtocolDeclaration] = []
+        var extensions: [ExtensionDeclaration] = []
+
+        mutating func merge(_ other: EmittedDeclarationBundle) {
+            states.append(contentsOf: other.states)
+            callables.append(contentsOf: other.callables)
+            constructs.append(contentsOf: other.constructs)
+            namespaces.append(contentsOf: other.namespaces)
+            enumerations.append(contentsOf: other.enumerations)
+            protocols.append(contentsOf: other.protocols)
+            extensions.append(contentsOf: other.extensions)
+        }
+    }
+
     static func expand(
         sourceFile: SourceFileNode,
         macros: [String: MacroDeclaration],
@@ -40,8 +60,8 @@ extension MacroExpander {
                     context: context
                 )
             }
-            let emittedExtensionDeclarations = try module.constructs.flatMap {
-                try emittedExtensions(from: $0, macros: macros)
+            let emittedDeclarationBundles = try module.constructs.map {
+                try emittedDeclarations(from: $0, macros: macros)
             }
             return .module(
                 ModuleFileNode(
@@ -66,7 +86,7 @@ extension MacroExpander {
                             literalBridges: literalBridges,
                             context: context
                         )
-                    },
+                    } + emittedDeclarationBundles.flatMap(\.states),
                     callables: try module.callables.map {
                         try expand(
                             callable: $0,
@@ -77,15 +97,15 @@ extension MacroExpander {
                             context: context,
                             stateEffects: moduleStateEffects
                         )
-                    },
-                    constructs: expandedConstructs,
-                    namespaces: module.namespaces,
-                    enumerations: module.enumerations,
-                    protocols: module.protocols,
+                    } + emittedDeclarationBundles.flatMap(\.callables),
+                    constructs: expandedConstructs + emittedDeclarationBundles.flatMap(\.constructs),
+                    namespaces: module.namespaces + emittedDeclarationBundles.flatMap(\.namespaces),
+                    enumerations: module.enumerations + emittedDeclarationBundles.flatMap(\.enumerations),
+                    protocols: module.protocols + emittedDeclarationBundles.flatMap(\.protocols),
                     macros: module.macros,
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
-                    extensions: module.extensions + emittedExtensionDeclarations
+                    extensions: module.extensions + emittedDeclarationBundles.flatMap(\.extensions)
                 )
             )
         case .construct(let declaration):
@@ -97,23 +117,31 @@ extension MacroExpander {
                 literalBridges: literalBridges,
                 context: context
             )
-            let emittedExtensions = try emittedExtensions(from: declaration, macros: macros)
-            guard !emittedExtensions.isEmpty else {
+            let emittedBundle = try emittedDeclarations(from: declaration, macros: macros)
+            guard
+                !emittedBundle.states.isEmpty
+                    || !emittedBundle.callables.isEmpty
+                    || !emittedBundle.constructs.isEmpty
+                    || !emittedBundle.namespaces.isEmpty
+                    || !emittedBundle.enumerations.isEmpty
+                    || !emittedBundle.protocols.isEmpty
+                    || !emittedBundle.extensions.isEmpty
+            else {
                 return .construct(expandedConstruct)
             }
             return .module(
                 ModuleFileNode(
                     mainBlock: nil,
-                    states: [],
-                    callables: [],
-                    constructs: [expandedConstruct],
-                    namespaces: [],
-                    enumerations: [],
-                    protocols: [],
+                    states: emittedBundle.states,
+                    callables: emittedBundle.callables,
+                    constructs: [expandedConstruct] + emittedBundle.constructs,
+                    namespaces: emittedBundle.namespaces,
+                    enumerations: emittedBundle.enumerations,
+                    protocols: emittedBundle.protocols,
                     macros: [],
                     precedenceGroups: [],
                     operators: [],
-                    extensions: emittedExtensions
+                    extensions: emittedBundle.extensions
                 )
             )
         case .namespace, .macro, .enumeration, .protocolDefinition, .extensions:
@@ -1459,40 +1487,69 @@ extension MacroExpander {
         }
     }
 
-    static func emittedExtensions(
+    static func emittedDeclarations(
         from construct: ConstructDeclaration,
         macros: [String: MacroDeclaration]
-    ) throws -> [ExtensionDeclaration] {
-        var emitted: [ExtensionDeclaration] = []
+    ) throws -> EmittedDeclarationBundle {
+        var emitted = EmittedDeclarationBundle()
 
         for application in construct.macros {
             guard let macro = macros[application.name], macroTargetKind(for: macro) == .construct else {
                 continue
             }
-            emitted.append(contentsOf: try emittedExtensions(from: macro, construct: construct))
+            emitted.merge(try emittedDeclarations(from: macro, construct: construct))
         }
 
         for nested in construct.constructs {
-            emitted.append(contentsOf: try emittedExtensions(from: nested, macros: macros))
+            let nestedEmitted = try emittedDeclarations(from: nested, macros: macros)
+            guard
+                nestedEmitted.states.isEmpty
+                    && nestedEmitted.namespaces.isEmpty
+                    && nestedEmitted.enumerations.isEmpty
+                    && nestedEmitted.protocols.isEmpty
+                    && nestedEmitted.extensions.isEmpty
+            else {
+                throw ParseError(
+                    "Nested construct macros can currently emit peer callables and constructs only in this bootstrap pass."
+                )
+            }
+            emitted.callables.append(contentsOf: nestedEmitted.callables)
+            emitted.constructs.append(contentsOf: nestedEmitted.constructs)
         }
 
         return emitted
     }
 
-    static func emittedExtensions(
+    static func emittedDeclarations(
         from macro: MacroDeclaration,
         construct: ConstructDeclaration
-    ) throws -> [ExtensionDeclaration] {
-        try emittedDeclarations(in: macro.body).compactMap { declaration in
+    ) throws -> EmittedDeclarationBundle {
+        var emitted = EmittedDeclarationBundle()
+
+        for declaration in emittedDeclarations(in: macro.body) {
             switch declaration {
             case .extensionDeclaration(let extensionDeclaration):
-                return try lowerEmittedExtensionDeclaration(
+                emitted.extensions.append(try lowerEmittedExtensionDeclaration(
                     extensionDeclaration,
                     macro: macro,
                     construct: construct
-                )
+                ))
+            case .constructDeclaration(let declaration):
+                emitted.constructs.append(declaration)
+            case .callableDeclaration(let declaration):
+                emitted.callables.append(declaration)
+            case .namespaceDeclaration(let declaration):
+                emitted.namespaces.append(declaration)
+            case .enumDeclaration(let declaration):
+                emitted.enumerations.append(declaration)
+            case .protocolDeclaration(let declaration):
+                emitted.protocols.append(declaration)
+            case .stateDeclaration(let declaration):
+                emitted.states.append(declaration)
             }
         }
+
+        return emitted
     }
 
     static func emittedDeclarations(in statements: [Statement]) -> [EmittedDeclaration] {

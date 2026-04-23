@@ -112,8 +112,26 @@ extension Parser {
         if isEmittedExtensionDeclarationStart() {
             return .extensionDeclaration(try parseEmittedExtensionDeclaration())
         }
+        if isStateDeclarationStart() {
+            return .stateDeclaration(try parseState())
+        }
+        if isCallableStart() {
+            return .callableDeclaration(try parseCallableDeclaration())
+        }
+        if isNamespaceDeclarationStart() {
+            return .namespaceDeclaration(try parseNamespaceDeclaration(requiresEOF: false))
+        }
+        if isEnumDeclarationStart() {
+            return .enumDeclaration(try parseEnumDeclaration(requiresEOF: false))
+        }
+        if isProtocolDeclarationStart() {
+            return .protocolDeclaration(try parseProtocolDeclaration(requiresEOF: false))
+        }
+        if isConstructDeclarationStart() || isBuilderDeclarationStart() {
+            return .constructDeclaration(try parseConstructDeclaration(requiresEOF: false))
+        }
 
-        throw ParseError("Only extension emission is supported inside @expand in this bootstrap pass.")
+        throw ParseError("Expected emitted declaration inside @expand.")
     }
 
     func isEmittedExtensionDeclarationStart() -> Bool {
