@@ -11,36 +11,20 @@ extension MacroExpander {
         bindings: [String: Expression]
     ) -> Statement {
         switch statement {
-        case .expand(let declarations):
+        case .expand(let emitted):
             return .expand(
-                declarations.map { declaration in
-                    switch declaration {
-                    case .extensionDeclaration(let declaration):
-                        let target: EmittedNominalTypeReference
-                        switch declaration.target {
-                        case .type:
-                            target = declaration.target
+                EmittedCodeBlock(
+                    parts: emitted.parts.map { part in
+                        switch part {
+                        case .text:
+                            return part
                         case .splice(let expression):
-                            target = .splice(
+                            return .splice(
                                 substituteMacroBindings(in: expression, bindings: bindings)
                             )
                         }
-
-                        return .extensionDeclaration(
-                            EmittedExtensionDeclaration(
-                                macros: declaration.macros,
-                                target: target,
-                                conformances: declaration.conformances,
-                                callables: declaration.callables,
-                                constructs: declaration.constructs,
-                                namespaces: declaration.namespaces
-                            )
-                        )
-                    case .constructDeclaration, .callableDeclaration, .namespaceDeclaration,
-                        .enumDeclaration, .protocolDeclaration, .stateDeclaration:
-                        return declaration
                     }
-                }
+                )
             )
         case .localBinding(let declaration):
             return .localBinding(

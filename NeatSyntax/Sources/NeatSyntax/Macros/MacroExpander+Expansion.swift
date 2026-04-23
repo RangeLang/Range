@@ -1526,57 +1526,44 @@ extension MacroExpander {
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
 
-        for declaration in emittedDeclarations(in: macro.body) {
-            switch declaration {
-            case .extensionDeclaration(let extensionDeclaration):
-                emitted.extensions.append(try lowerEmittedExtensionDeclaration(
-                    extensionDeclaration,
+        for block in emittedCodeBlocks(in: macro.body) {
+            emitted.merge(
+                try emittedDeclarationBundle(
+                    from: block,
                     macro: macro,
                     construct: construct
-                ))
-            case .constructDeclaration(let declaration):
-                emitted.constructs.append(declaration)
-            case .callableDeclaration(let declaration):
-                emitted.callables.append(declaration)
-            case .namespaceDeclaration(let declaration):
-                emitted.namespaces.append(declaration)
-            case .enumDeclaration(let declaration):
-                emitted.enumerations.append(declaration)
-            case .protocolDeclaration(let declaration):
-                emitted.protocols.append(declaration)
-            case .stateDeclaration(let declaration):
-                emitted.states.append(declaration)
-            }
+                )
+            )
         }
 
         return emitted
     }
 
-    static func emittedDeclarations(in statements: [Statement]) -> [EmittedDeclaration] {
-        var declarations: [EmittedDeclaration] = []
+    static func emittedCodeBlocks(in statements: [Statement]) -> [EmittedCodeBlock] {
+        var blocks: [EmittedCodeBlock] = []
 
         for statement in statements {
             switch statement {
             case .expand(let emitted):
-                declarations.append(contentsOf: emitted)
+                blocks.append(emitted)
             case .conditional(let branches):
                 for branch in branches {
-                    declarations.append(contentsOf: emittedDeclarations(in: branch.body))
+                    blocks.append(contentsOf: emittedCodeBlocks(in: branch.body))
                 }
             case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
-                declarations.append(contentsOf: emittedDeclarations(in: body))
+                blocks.append(contentsOf: emittedCodeBlocks(in: body))
             case .background(let background):
-                declarations.append(contentsOf: emittedDeclarations(in: background.body))
+                blocks.append(contentsOf: emittedCodeBlocks(in: background.body))
             case .deferBlock(let deferred):
-                declarations.append(contentsOf: emittedDeclarations(in: deferred.body))
+                blocks.append(contentsOf: emittedCodeBlocks(in: deferred.body))
             case .localCallable(let declaration):
-                declarations.append(contentsOf: emittedDeclarations(in: declaration.body))
+                blocks.append(contentsOf: emittedCodeBlocks(in: declaration.body))
             case .switchStatement(_, let cases, let defaultBody):
                 for switchCase in cases {
-                    declarations.append(contentsOf: emittedDeclarations(in: switchCase.body))
+                    blocks.append(contentsOf: emittedCodeBlocks(in: switchCase.body))
                 }
                 if let defaultBody {
-                    declarations.append(contentsOf: emittedDeclarations(in: defaultBody))
+                    blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
                 }
             case .macroInvocation, .localBinding, .assignment, .compoundAssignment, .expression,
                 .return, .environmentProvision, .break, .continue:
@@ -1584,60 +1571,73 @@ extension MacroExpander {
             }
         }
 
-        return declarations
+        return blocks
     }
 
-    static func lowerEmittedExtensionDeclaration(
-        _ declaration: EmittedExtensionDeclaration,
+    static func emittedDeclarationBundle(
+        from block: EmittedCodeBlock,
         macro: MacroDeclaration,
         construct: ConstructDeclaration
-    ) throws -> ExtensionDeclaration {
-        let targetType: TypeReference
-        switch declaration.target {
-        case .type(let type):
-            targetType = type
-        case .splice(let expression):
-            guard let interpolated = interpolateNominalTypeReference(
-                expression,
-                macro: macro,
-                construct: construct
-            )
-            else {
-                throw ParseError(
-                    "Macro #\(macro.name) could not interpolate extension target from \(renderExpressionForStringify(expression))."
-                )
+    ) throws -> EmittedDeclarationBundle {
+        let rendered = renderEmittedCodeBlock(
+            block,
+            macro: macro,
+            construct: construct
+        )
+
+        var parser = try Parser(source: rendered)
+        let sourceFile = try parser.parseSourceFile()
+        return try declarationBundle(from: sourceFile)
+    }
+
+    static func renderEmittedCodeBlock(
+        _ block: EmittedCodeBlock,
+        macro: MacroDeclaration,
+        construct: ConstructDeclaration
+    ) -> String {
+        let bindings: [String: Expression] = [
+            macro.bindings.target: .identifier(construct.name),
+            "\(macro.bindings.target).declaration.self": .identifier(construct.name),
+            "\(macro.bindings.target).declaration.type": .identifier(construct.name),
+        ]
+
+        return block.parts.map { part in
+            switch part {
+            case .text(let text):
+                return text
+            case .splice(let expression):
+                let substituted = substituteMacroBindings(in: expression, bindings: bindings)
+                return renderExpressionForStringify(substituted)
             }
-            targetType = interpolated
-        }
-
-        guard targetType.isNominalReference else {
-            throw ParseError(
-                "Macro #\(macro.name) emitted extension target must be a nominal type reference, got \(targetType.displayName)."
-            )
-        }
-
-        return ExtensionDeclaration(
-            macros: declaration.macros,
-            targetType: targetType,
-            conformances: declaration.conformances,
-            callables: declaration.callables,
-            constructs: declaration.constructs,
-            namespaces: declaration.namespaces
-        )
+        }.joined(separator: " ")
     }
 
-    static func interpolateNominalTypeReference(
-        _ expression: Expression,
-        macro: MacroDeclaration,
-        construct: ConstructDeclaration
-    ) -> TypeReference? {
-        interpretTypeReferenceRewriteExpression(
-            expression,
-            bindings: [
-                macro.bindings.target: .named(construct.name),
-                "\(macro.bindings.target).declaration.self": .named(construct.name),
-                "\(macro.bindings.target).declaration.type": .named(construct.name),
-            ]
-        )
+    static func declarationBundle(from sourceFile: SourceFileNode) throws -> EmittedDeclarationBundle {
+        switch sourceFile {
+        case .construct(let declaration):
+            return EmittedDeclarationBundle(constructs: [declaration])
+        case .namespace(let declaration):
+            return EmittedDeclarationBundle(namespaces: [declaration])
+        case .enumeration(let declaration):
+            return EmittedDeclarationBundle(enumerations: [declaration])
+        case .protocolDefinition(let declaration):
+            return EmittedDeclarationBundle(protocols: [declaration])
+        case .extensions(let declarations):
+            return EmittedDeclarationBundle(extensions: declarations)
+        case .module(let module):
+            return EmittedDeclarationBundle(
+                states: module.states,
+                callables: module.callables,
+                constructs: module.constructs,
+                namespaces: module.namespaces,
+                enumerations: module.enumerations,
+                protocols: module.protocols,
+                extensions: module.extensions
+            )
+        case .mainBlock:
+            throw ParseError("Macros cannot emit @main blocks.")
+        case .macro:
+            throw ParseError("Macros cannot emit macro declarations.")
+        }
     }
 }

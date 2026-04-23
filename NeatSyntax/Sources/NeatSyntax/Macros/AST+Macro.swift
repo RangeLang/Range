@@ -10,27 +10,16 @@ public struct MacroDeclaration {
     public let body: [Statement]
 }
 
-public enum EmittedDeclaration {
-    case extensionDeclaration(EmittedExtensionDeclaration)
-    case constructDeclaration(ConstructDeclaration)
-    case callableDeclaration(CallableDeclaration)
-    case namespaceDeclaration(NamespaceDeclaration)
-    case enumDeclaration(EnumDeclaration)
-    case protocolDeclaration(ProtocolDeclaration)
-    case stateDeclaration(StateDeclaration)
+public struct EmittedCodeBlock {
+    public let parts: [EmittedCodePart]
+
+    public init(parts: [EmittedCodePart]) {
+        self.parts = parts
+    }
 }
 
-public struct EmittedExtensionDeclaration {
-    public let macros: [MacroApplication]
-    public let target: EmittedNominalTypeReference
-    public let conformances: [TypeReference]
-    public let callables: [CallableDeclaration]
-    public let constructs: [ConstructDeclaration]
-    public let namespaces: [NamespaceDeclaration]
-}
-
-public enum EmittedNominalTypeReference {
-    case type(TypeReference)
+public enum EmittedCodePart {
+    case text(String)
     case splice(Expression)
 }
 

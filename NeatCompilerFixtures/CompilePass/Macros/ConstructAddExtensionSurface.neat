@@ -9,6 +9,10 @@ macro extendConstructSurface(): Construct { target, diagnostics in
                 return "Hello"
             }
 
+            function clone() -> #(target.declaration.self) {
+                return self
+            }
+
             construct ChildConstruct {
                 function doThing() -> String {
                     return "Thing"
