@@ -1,11 +1,11 @@
 @core
 construct Enum: Syntax {
     let declaration: Declaration
-    let cases: [Case]
 
     @core
-    construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType> {
-        let self: SelfType
+    construct Declaration: SyntaxExpandable<NominalTypeReference> {
+        let self: NominalTypeReference
+        let cases: [Case]
     }
 
     @core

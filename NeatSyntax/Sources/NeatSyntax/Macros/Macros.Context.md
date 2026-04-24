@@ -154,27 +154,24 @@ macro lock(): Block { target, diagnostics in
 
 ```neat
 macro codable(): Construct { target, diagnostics in
-    target.name
-    target.self
-    target.inits
-    target.functions
+    target.declaration.self
+    target.declaration.inits
+    target.declaration.functions
 }
 ```
 
 ```neat
 macro iterable(): Enum { target, diagnostics in
-    target.name
-    target.self
-    target.cases
+    target.declaration.self
+    target.declaration.cases
 }
 ```
 
 ```neat
 macro equatable(): Protocol { target, diagnostics in
-    target.name
-    target.self
-    target.inits
-    target.functions
+    target.declaration.self
+    target.declaration.inits
+    target.declaration.functions
 }
 ```
 
