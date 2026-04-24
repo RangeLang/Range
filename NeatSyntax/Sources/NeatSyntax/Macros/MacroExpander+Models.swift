@@ -52,9 +52,22 @@ struct MacroTargetSurface {
     let targetType: TypeReference
     let targetDeclarationName: String
     let localBindings: [String: Expression]
+    let targetValue: MacroValue
     let context: MacroExpansionContext
 
+    private var evaluator: MacroValueEvaluator {
+        MacroValueEvaluator(
+            targetBinding: targetBinding,
+            targetValue: targetValue,
+            localBindings: localBindings
+        )
+    }
+
     func emittedSyntaxKinds(of expression: Expression) -> Set<EmittedSyntaxKind> {
+        if let value = evaluator.evaluate(expression) {
+            return emittedSyntaxKinds(of: value)
+        }
+
         switch expression {
         case .identifier(let path):
             if let bound = localBindings[path] {
@@ -88,6 +101,12 @@ struct MacroTargetSurface {
     }
 
     func render(_ expression: Expression) -> Expression {
+        if let value = evaluator.evaluate(expression),
+            let expression = value.expression
+        {
+            return expression
+        }
+
         switch expression {
         case .identifier(let path):
             if let bound = localBindings[path] {
@@ -100,6 +119,10 @@ struct MacroTargetSurface {
     }
 
     func renderSyntax(_ expression: Expression) -> String? {
+        if let value = evaluator.evaluate(expression) {
+            return renderSyntax(value)
+        }
+
         switch expression {
         case .identifier(let path):
             if let bound = localBindings[path] {
@@ -121,6 +144,24 @@ struct MacroTargetSurface {
             }
         default:
             return nil
+        }
+    }
+
+    private func emittedSyntaxKinds(of value: MacroValue) -> Set<EmittedSyntaxKind> {
+        switch value {
+        case .string:
+            return [.callableName, .declaration]
+        case .array:
+            return [.expression]
+        case .object(let typeName, _):
+            switch typeName {
+            case "Enum":
+                return [.declaration]
+            case "NamedTypeReference", "MemberTypeReference":
+                return [.nominalTypeReference, .typeReference]
+            default:
+                return [.expression]
+            }
         }
     }
 
@@ -166,6 +207,73 @@ struct MacroTargetSurface {
         }
         let body = cases.isEmpty ? "" : " \(cases.joined(separator: " ")) "
         return "enum \(enumName) {\(body)}"
+    }
+
+    private func renderSyntax(_ value: MacroValue) -> String? {
+        switch value {
+        case .object(let typeName, let fields) where typeName == "Enum":
+            guard let declaration = fields["declaration"] else {
+                return nil
+            }
+            return renderEnum(declaration)
+        case .object(let typeName, _) where typeName == "NamedTypeReference" || typeName == "MemberTypeReference":
+            return renderNominalTypeReference(value)
+        case .string(let value):
+            return value
+        default:
+            return nil
+        }
+    }
+
+    private func renderEnum(_ value: MacroValue) -> String? {
+        guard case .object(let typeName, let fields) = value,
+            typeName == "Enum.Declaration",
+            let selfValue = fields["self"],
+            let enumName = renderNominalTypeReference(selfValue),
+            let casesValue = fields["cases"],
+            let cases = renderEnumCases(casesValue)
+        else {
+            return nil
+        }
+
+        let body = cases.isEmpty ? "" : " \(cases.joined(separator: " ")) "
+        return "enum \(enumName) {\(body)}"
+    }
+
+    private func renderEnumCases(_ value: MacroValue) -> [String]? {
+        guard case .array(let elements) = value else {
+            return nil
+        }
+        return elements.map(renderEnumCase)
+    }
+
+    private func renderEnumCase(_ value: MacroValue) -> String {
+        guard case .object(let typeName, let fields) = value,
+            typeName == "Enum.Case",
+            let nameValue = fields["name"],
+            let caseName = renderString(nameValue)
+        else {
+            guard let expression = value.expression else {
+                return ""
+            }
+            return renderExpressionForSyntax(expression)
+        }
+
+        return "case \(caseName)"
+    }
+
+    private func renderNominalTypeReference(_ value: MacroValue) -> String? {
+        switch value {
+        case .object(let typeName, let fields) where typeName == "NamedTypeReference":
+            guard let nameValue = fields["name"] else {
+                return nil
+            }
+            return renderString(nameValue)
+        case .string(let value):
+            return value
+        default:
+            return nil
+        }
     }
 
     private func renderEnumCases(_ expression: Expression) -> [String]? {
@@ -221,6 +329,13 @@ struct MacroTargetSurface {
         default:
             return nil
         }
+    }
+
+    private func renderString(_ value: MacroValue) -> String? {
+        guard case .string(let value) = value else {
+            return nil
+        }
+        return value
     }
 
     private func argument(_ label: String, in arguments: [CallArgument]) -> Expression? {

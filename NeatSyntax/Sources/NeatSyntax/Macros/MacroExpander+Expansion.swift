@@ -1607,7 +1607,7 @@ extension MacroExpander {
             emitted.merge(
                 try emittedDeclarations(
                     from: macro,
-                    targetDeclarationName: enumeration.name,
+                    targetValue: MacroTargetValueBuilder().targetValue(for: enumeration),
                     context: context
                 )
             )
@@ -1633,7 +1633,7 @@ extension MacroExpander {
             emitted.merge(
                 try emittedDeclarations(
                     from: macro,
-                    targetDeclarationName: protocolDeclaration.name,
+                    targetValue: MacroTargetValueBuilder().targetValue(for: protocolDeclaration),
                     context: context
                 )
             )
@@ -1649,14 +1649,14 @@ extension MacroExpander {
     ) throws -> EmittedDeclarationBundle {
         try emittedDeclarations(
             from: macro,
-            targetDeclarationName: construct.name,
+            targetValue: MacroTargetValueBuilder().targetValue(for: construct),
             context: context
         )
     }
 
     static func emittedDeclarations(
         from macro: MacroDeclaration,
-        targetDeclarationName: String,
+        targetValue: MacroValue,
         context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
@@ -1669,7 +1669,7 @@ extension MacroExpander {
                 try emittedDeclarationBundle(
                     from: block,
                     macro: macro,
-                    targetDeclarationName: targetDeclarationName,
+                    targetValue: targetValue,
                     localBindings: localBindings,
                     context: context
                 )
@@ -1720,14 +1720,14 @@ extension MacroExpander {
     static func emittedDeclarationBundle(
         from block: EmittedCodeBlock,
         macro: MacroDeclaration,
-        targetDeclarationName: String,
+        targetValue: MacroValue,
         localBindings: [String: Expression],
         context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         let rendered = try renderEmittedCodeBlock(
             block,
             macro: macro,
-            targetDeclarationName: targetDeclarationName,
+            targetValue: targetValue,
             localBindings: localBindings,
             context: context
         )
@@ -1740,15 +1740,17 @@ extension MacroExpander {
     static func renderEmittedCodeBlock(
         _ block: EmittedCodeBlock,
         macro: MacroDeclaration,
-        targetDeclarationName: String,
+        targetValue: MacroValue,
         localBindings: [String: Expression],
         context: MacroExpansionContext
     ) throws -> String {
+        let targetDeclarationName = MacroTargetValueBuilder().declarationName(for: targetValue)
         let targetSurface = MacroTargetSurface(
             targetBinding: macro.bindings.target,
             targetType: macro.target.typeReference,
             targetDeclarationName: targetDeclarationName,
             localBindings: localBindings,
+            targetValue: targetValue,
             context: context
         )
 
