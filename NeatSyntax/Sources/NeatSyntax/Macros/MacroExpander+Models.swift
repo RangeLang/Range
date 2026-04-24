@@ -50,7 +50,7 @@ struct PropertyMacroEffects {
 struct MacroTargetSurface {
     let targetBinding: String
     let targetType: TypeReference
-    let construct: ConstructDeclaration
+    let targetDeclarationName: String
     let context: MacroExpansionContext
 
     func emittedSyntaxKinds(of expression: Expression) -> Set<EmittedSyntaxKind> {
@@ -103,7 +103,7 @@ struct MacroTargetSurface {
 
         switch path {
         case "\(targetBinding).declaration.self":
-            return .identifier(construct.name)
+            return .identifier(targetDeclarationName)
         default:
             return nil
         }

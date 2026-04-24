@@ -23,6 +23,8 @@ enum MacroTargetKind: Hashable {
     case property
     case function
     case construct
+    case enumeration
+    case protocolDefinition
     case other(String)
 }
 
@@ -64,6 +66,10 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
         return .function
     case "Construct":
         return .construct
+    case "Enum":
+        return .enumeration
+    case "Protocol":
+        return .protocolDefinition
     default:
         return .other(name)
     }
@@ -881,7 +887,8 @@ extension RewriteSurfaceView {
             default:
                 return nil
             }
-        case .expression, .state, .immutable, .binding, .derived, .property, .construct, .other:
+        case .expression, .state, .immutable, .binding, .derived, .property, .construct,
+            .enumeration, .protocolDefinition, .other:
             return nil
         }
     }

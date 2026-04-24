@@ -1,0 +1,14 @@
+macro enumDeclarationExpand(): Enum { target, diagnostics in
+    target.declaration.expand {
+        extension #(target.declaration.self) {
+            function generatedEnumName() -> String {
+                return "enum"
+            }
+        }
+    }
+}
+
+#enumDeclarationExpand
+enum EnumDeclarationExpandFixture {
+    case one
+}

@@ -1,0 +1,13 @@
+macro protocolDeclarationExpand(): Protocol { target, diagnostics in
+    target.declaration.expand {
+        extension #(target.declaration.self) {
+            function generatedProtocolName() -> String {
+                return "protocol"
+            }
+        }
+    }
+}
+
+#protocolDeclarationExpand
+protocol ProtocolDeclarationExpandFixture {
+}

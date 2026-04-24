@@ -1,7 +1,11 @@
 @core
 construct Protocol: Syntax {
-    let name: String
-    let self: NominalTypeReference
+    let declaration: Declaration
     let inits: [Init.Declaration]
     let functions: [Function.Declaration]
+
+    @core
+    construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType> {
+        let self: SelfType
+    }
 }

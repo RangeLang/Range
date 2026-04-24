@@ -8,6 +8,16 @@ extension MacroExpander {
         var protocols: [ProtocolDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
 
+        var isEmpty: Bool {
+            states.isEmpty
+                && callables.isEmpty
+                && constructs.isEmpty
+                && namespaces.isEmpty
+                && enumerations.isEmpty
+                && protocols.isEmpty
+                && extensions.isEmpty
+        }
+
         mutating func merge(_ other: EmittedDeclarationBundle) {
             states.append(contentsOf: other.states)
             callables.append(contentsOf: other.callables)
@@ -63,6 +73,12 @@ extension MacroExpander {
             let emittedDeclarationBundles = try module.constructs.map {
                 try emittedDeclarations(from: $0, macros: macros, context: context)
             }
+                + module.enumerations.map {
+                    try emittedDeclarations(from: $0, macros: macros, context: context)
+                }
+                + module.protocols.map {
+                    try emittedDeclarations(from: $0, macros: macros, context: context)
+                }
             return .module(
                 ModuleFileNode(
                     mainBlock: try module.mainBlock.map {
@@ -148,7 +164,55 @@ extension MacroExpander {
                     extensions: emittedBundle.extensions
                 )
             )
-        case .namespace, .macro, .enumeration, .protocolDefinition, .extensions:
+        case .enumeration(let declaration):
+            let emittedBundle = try emittedDeclarations(
+                from: declaration,
+                macros: macros,
+                context: context
+            )
+            guard !emittedBundle.isEmpty else {
+                return sourceFile
+            }
+            return .module(
+                ModuleFileNode(
+                    mainBlock: nil,
+                    states: emittedBundle.states,
+                    callables: emittedBundle.callables,
+                    constructs: emittedBundle.constructs,
+                    namespaces: emittedBundle.namespaces,
+                    enumerations: [declaration] + emittedBundle.enumerations,
+                    protocols: emittedBundle.protocols,
+                    macros: [],
+                    precedenceGroups: [],
+                    operators: [],
+                    extensions: emittedBundle.extensions
+                )
+            )
+        case .protocolDefinition(let declaration):
+            let emittedBundle = try emittedDeclarations(
+                from: declaration,
+                macros: macros,
+                context: context
+            )
+            guard !emittedBundle.isEmpty else {
+                return sourceFile
+            }
+            return .module(
+                ModuleFileNode(
+                    mainBlock: nil,
+                    states: emittedBundle.states,
+                    callables: emittedBundle.callables,
+                    constructs: emittedBundle.constructs,
+                    namespaces: emittedBundle.namespaces,
+                    enumerations: emittedBundle.enumerations,
+                    protocols: [declaration] + emittedBundle.protocols,
+                    macros: [],
+                    precedenceGroups: [],
+                    operators: [],
+                    extensions: emittedBundle.extensions
+                )
+            )
+        case .namespace, .macro, .extensions:
             return sourceFile
         }
     }
@@ -1530,8 +1594,69 @@ extension MacroExpander {
     }
 
     static func emittedDeclarations(
+        from enumeration: EnumDeclaration,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) throws -> EmittedDeclarationBundle {
+        var emitted = EmittedDeclarationBundle()
+
+        for application in enumeration.macros {
+            guard let macro = macros[application.name], macroTargetKind(for: macro) == .enumeration else {
+                continue
+            }
+            emitted.merge(
+                try emittedDeclarations(
+                    from: macro,
+                    targetDeclarationName: enumeration.name,
+                    context: context
+                )
+            )
+        }
+
+        return emitted
+    }
+
+    static func emittedDeclarations(
+        from protocolDeclaration: ProtocolDeclaration,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) throws -> EmittedDeclarationBundle {
+        var emitted = EmittedDeclarationBundle()
+
+        for application in protocolDeclaration.macros {
+            guard
+                let macro = macros[application.name],
+                macroTargetKind(for: macro) == .protocolDefinition
+            else {
+                continue
+            }
+            emitted.merge(
+                try emittedDeclarations(
+                    from: macro,
+                    targetDeclarationName: protocolDeclaration.name,
+                    context: context
+                )
+            )
+        }
+
+        return emitted
+    }
+
+    static func emittedDeclarations(
         from macro: MacroDeclaration,
         construct: ConstructDeclaration,
+        context: MacroExpansionContext
+    ) throws -> EmittedDeclarationBundle {
+        try emittedDeclarations(
+            from: macro,
+            targetDeclarationName: construct.name,
+            context: context
+        )
+    }
+
+    static func emittedDeclarations(
+        from macro: MacroDeclaration,
+        targetDeclarationName: String,
         context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
@@ -1544,7 +1669,7 @@ extension MacroExpander {
                 try emittedDeclarationBundle(
                     from: block,
                     macro: macro,
-                    construct: construct,
+                    targetDeclarationName: targetDeclarationName,
                     context: context
                 )
             )
@@ -1591,13 +1716,13 @@ extension MacroExpander {
     static func emittedDeclarationBundle(
         from block: EmittedCodeBlock,
         macro: MacroDeclaration,
-        construct: ConstructDeclaration,
+        targetDeclarationName: String,
         context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         let rendered = try renderEmittedCodeBlock(
             block,
             macro: macro,
-            construct: construct,
+            targetDeclarationName: targetDeclarationName,
             context: context
         )
 
@@ -1609,13 +1734,13 @@ extension MacroExpander {
     static func renderEmittedCodeBlock(
         _ block: EmittedCodeBlock,
         macro: MacroDeclaration,
-        construct: ConstructDeclaration,
+        targetDeclarationName: String,
         context: MacroExpansionContext
     ) throws -> String {
         let targetSurface = MacroTargetSurface(
             targetBinding: macro.bindings.target,
             targetType: macro.target.typeReference,
-            construct: construct,
+            targetDeclarationName: targetDeclarationName,
             context: context
         )
 
