@@ -61,7 +61,7 @@ extension MacroExpander {
                 )
             }
             let emittedDeclarationBundles = try module.constructs.map {
-                try emittedDeclarations(from: $0, macros: macros)
+                try emittedDeclarations(from: $0, macros: macros, context: context)
             }
             return .module(
                 ModuleFileNode(
@@ -117,7 +117,11 @@ extension MacroExpander {
                 literalBridges: literalBridges,
                 context: context
             )
-            let emittedBundle = try emittedDeclarations(from: declaration, macros: macros)
+            let emittedBundle = try emittedDeclarations(
+                from: declaration,
+                macros: macros,
+                context: context
+            )
             guard
                 !emittedBundle.states.isEmpty
                     || !emittedBundle.callables.isEmpty
@@ -1489,7 +1493,8 @@ extension MacroExpander {
 
     static func emittedDeclarations(
         from construct: ConstructDeclaration,
-        macros: [String: MacroDeclaration]
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
 
@@ -1497,11 +1502,15 @@ extension MacroExpander {
             guard let macro = macros[application.name], macroTargetKind(for: macro) == .construct else {
                 continue
             }
-            emitted.merge(try emittedDeclarations(from: macro, construct: construct))
+            emitted.merge(try emittedDeclarations(from: macro, construct: construct, context: context))
         }
 
         for nested in construct.constructs {
-            let nestedEmitted = try emittedDeclarations(from: nested, macros: macros)
+            let nestedEmitted = try emittedDeclarations(
+                from: nested,
+                macros: macros,
+                context: context
+            )
             guard
                 nestedEmitted.states.isEmpty
                     && nestedEmitted.namespaces.isEmpty
@@ -1522,7 +1531,8 @@ extension MacroExpander {
 
     static func emittedDeclarations(
         from macro: MacroDeclaration,
-        construct: ConstructDeclaration
+        construct: ConstructDeclaration,
+        context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
 
@@ -1531,7 +1541,8 @@ extension MacroExpander {
                 try emittedDeclarationBundle(
                     from: block,
                     macro: macro,
-                    construct: construct
+                    construct: construct,
+                    context: context
                 )
             )
         }
@@ -1577,12 +1588,14 @@ extension MacroExpander {
     static func emittedDeclarationBundle(
         from block: EmittedCodeBlock,
         macro: MacroDeclaration,
-        construct: ConstructDeclaration
+        construct: ConstructDeclaration,
+        context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         let rendered = try renderEmittedCodeBlock(
             block,
             macro: macro,
-            construct: construct
+            construct: construct,
+            context: context
         )
 
         var parser = try Parser(source: rendered)
@@ -1593,7 +1606,8 @@ extension MacroExpander {
     static func renderEmittedCodeBlock(
         _ block: EmittedCodeBlock,
         macro: MacroDeclaration,
-        construct: ConstructDeclaration
+        construct: ConstructDeclaration,
+        context: MacroExpansionContext
     ) throws -> String {
         let bindings: [String: Expression] = [
             macro.bindings.target: .identifier(construct.name),
@@ -1608,7 +1622,9 @@ extension MacroExpander {
             case .splice(let expression, let expected):
                 let actual = emittedSyntaxKinds(
                     of: expression,
-                    targetBinding: macro.bindings.target
+                    targetBinding: macro.bindings.target,
+                    targetType: macro.target.typeReference,
+                    context: context
                 )
                 guard emittedSyntaxKind(actual, isCompatibleWith: expected) else {
                     throw ParseError(
@@ -1616,7 +1632,9 @@ extension MacroExpander {
                     )
                 }
                 let substituted = substituteMacroBindings(in: expression, bindings: bindings)
-                if expected == .callableName, case .string(let name) = substituted {
+                if (expected == .callableName || expected == .declaration),
+                    case .string(let name) = substituted
+                {
                     return name
                 }
                 return renderExpressionForStringify(substituted)
@@ -1626,17 +1644,25 @@ extension MacroExpander {
 
     static func emittedSyntaxKinds(
         of expression: Expression,
-        targetBinding: String
+        targetBinding: String,
+        targetType: TypeReference,
+        context: MacroExpansionContext
     ) -> Set<EmittedSyntaxKind> {
         switch expression {
-        case .identifier("\(targetBinding).declaration.self"):
-            return [.nominalTypeReference, .typeReference]
-        case .identifier("\(targetBinding).declaration.type"):
-            return [.typeReference]
-        case .identifier:
-            return [.callableName, .nominalTypeReference, .typeReference]
+        case .identifier(let path):
+            if let targetPathKinds = context.rewriteSurfaceView.emittedSyntaxKinds(
+                forTargetPath: path,
+                targetBinding: targetBinding,
+                targetType: targetType
+            ) {
+                return targetPathKinds
+            }
+            if path == targetBinding || path.hasPrefix("\(targetBinding).") {
+                return [.expression]
+            }
+            return [.callableName, .declaration, .nominalTypeReference, .typeReference]
         case .string:
-            return [.callableName]
+            return [.callableName, .declaration]
         default:
             return [.expression]
         }

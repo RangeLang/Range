@@ -1,0 +1,10 @@
+macro invalidDeclarationNameSplice(): Construct { target, diagnostics in
+    @expand {
+        construct #(target.declaration.type) {
+        }
+    }
+}
+
+#invalidDeclarationNameSplice
+construct InvalidDeclarationNameFixture {
+}

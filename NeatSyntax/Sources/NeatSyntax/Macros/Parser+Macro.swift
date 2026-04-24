@@ -175,17 +175,36 @@ extension Parser {
         }
 
         switch previous {
+        case .keyword(NeatSyntax.Keyword.construct.rawValue),
+            .keyword(NeatSyntax.Keyword.enumeration.rawValue),
+            .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue),
+            .keyword(NeatSyntax.Keyword.namespace.rawValue),
+            .keyword(NeatSyntax.Keyword.caseBranch.rawValue):
+            return .declaration
         case .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
             return .nominalTypeReference
         case .keyword(NeatSyntax.Keyword.function.rawValue):
             return .callableName
+        case .keyword(NeatSyntax.Keyword.binding.rawValue):
+            return .typeReference
         case .arrow:
+            return .typeReference
+        case .less where nextToken == .greater || nextToken == .comma:
             return .typeReference
         case .colon where nextToken == .leftBrace || nextToken == .comma:
             return .nominalTypeReference
+        case .colon:
+            return .typeReference
         case .comma where nextToken == .leftBrace || nextToken == .comma:
             return .nominalTypeReference
+        case .comma where nextToken == .rightParen || nextToken == .greater:
+            return .typeReference
+        case .leftParen where nextToken == .rightParen || nextToken == .comma:
+            return .typeReference
         default:
+            if nextToken == .keyword(NeatSyntax.Keyword.function.rawValue) {
+                return .nominalTypeReference
+            }
             return .expression
         }
     }

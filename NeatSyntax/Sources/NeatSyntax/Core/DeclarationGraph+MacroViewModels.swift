@@ -123,6 +123,24 @@ struct RewriteSurfaceView {
     let syntaxResolver: DeclarationSyntaxResolver
     let constructsByName: [String: ConstructDeclaration]
 
+    func emittedSyntaxKinds(
+        forTargetPath path: String,
+        targetBinding: String,
+        targetType: TypeReference
+    ) -> Set<EmittedSyntaxKind>? {
+        guard path == targetBinding || path.hasPrefix("\(targetBinding).") else {
+            return nil
+        }
+        guard let semanticType = semanticType(
+            ofTargetPath: path,
+            targetBinding: targetBinding,
+            targetType: targetType
+        ) else {
+            return nil
+        }
+        return emittedSyntaxKinds(forSemanticType: semanticType)
+    }
+
     func allowedPaths(
         targetBinding: String,
         targetType: TypeReference
@@ -309,6 +327,134 @@ struct RewriteSurfaceView {
         }
 
         return nil
+    }
+
+    private func semanticType(
+        ofTargetPath path: String,
+        targetBinding: String,
+        targetType: TypeReference
+    ) -> TypeReference? {
+        guard let targetName = syntaxResolver.nominalName(of: targetType) else {
+            return nil
+        }
+        guard path != targetBinding else {
+            return targetType
+        }
+
+        let prefix = "\(targetBinding)."
+        guard path.hasPrefix(prefix) else {
+            return nil
+        }
+
+        let start = path.index(path.startIndex, offsetBy: prefix.count)
+        let memberPath = path[start...]
+        var currentTypeName = targetName
+        var currentType: TypeReference = targetType
+
+        for segment in memberPath.split(separator: ".").map(String.init) {
+            guard let currentConstruct = constructsByName[currentTypeName] else {
+                return nil
+            }
+            guard let value = currentConstruct.values.first(where: { $0.name == segment }) else {
+                return nil
+            }
+            guard let valueType = parseCoreTypeReference(value.typeName) else {
+                return nil
+            }
+
+            currentType = resolveGenericType(valueType, in: currentConstruct)
+
+            if let nextTypeName = resolvedNominalTypeName(
+                for: currentType,
+                ownerTypeName: currentTypeName
+            ) {
+                currentTypeName = nextTypeName
+            }
+        }
+
+        return currentType
+    }
+
+    private func parseCoreTypeReference(_ typeName: String) -> TypeReference? {
+        var parser: Parser
+        do {
+            parser = try Parser(source: typeName)
+            return try parser.parseTypeReferenceNode()
+        } catch {
+            return nil
+        }
+    }
+
+    private func resolveGenericType(
+        _ typeReference: TypeReference,
+        in construct: ConstructDeclaration
+    ) -> TypeReference {
+        guard case .named(let name) = typeReference else {
+            return typeReference
+        }
+
+        for parameter in construct.genericParameters {
+            guard case .type(let parameterName, let constraint, _) = parameter,
+                parameterName == name
+            else {
+                continue
+            }
+            return constraint ?? typeReference
+        }
+
+        return typeReference
+    }
+
+    private func resolvedNominalTypeName(
+        for typeReference: TypeReference,
+        ownerTypeName: String
+    ) -> String? {
+        guard let nominalName = syntaxResolver.nominalName(of: typeReference) else {
+            return nil
+        }
+
+        let qualifiedNestedName = "\(ownerTypeName).\(nominalName)"
+        if constructsByName[qualifiedNestedName] != nil {
+            return qualifiedNestedName
+        }
+
+        if constructsByName[nominalName] != nil {
+            return nominalName
+        }
+
+        return nil
+    }
+
+    private func emittedSyntaxKinds(forSemanticType typeReference: TypeReference) -> Set<
+        EmittedSyntaxKind
+    > {
+        guard let semanticName = syntaxResolver.nominalName(of: typeReference) else {
+            return [.expression]
+        }
+
+        if semanticName == "String" {
+            return [.callableName, .declaration]
+        }
+
+        if semanticName == "NominalTypeReference"
+            || syntaxResolver.declaration(named: semanticName, conformsTo: "NominalTypeReference")
+        {
+            return [.nominalTypeReference, .typeReference]
+        }
+
+        if semanticName == "TypeReference"
+            || syntaxResolver.declaration(named: semanticName, conformsTo: "TypeReference")
+        {
+            return [.typeReference]
+        }
+
+        if semanticName == "Expression"
+            || syntaxResolver.declaration(named: semanticName, conformsTo: "Expression")
+        {
+            return [.expression]
+        }
+
+        return [.expression]
     }
 }
 

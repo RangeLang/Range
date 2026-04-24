@@ -1,5 +1,5 @@
 @core
-construct OptionalTypeReference: TypeReference {
+construct OptionalTypeReference: StructuralTypeReference {
     let wrapped: TypeReference
 
     function replace(with replacement: TypeReference) -> TypeReference

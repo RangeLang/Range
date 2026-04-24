@@ -1,5 +1,5 @@
 @core
-construct VariadicTypeReference: TypeReference {
+construct VariadicTypeReference: StructuralTypeReference {
     let element: TypeReference
 
     function replace(with replacement: TypeReference) -> TypeReference
