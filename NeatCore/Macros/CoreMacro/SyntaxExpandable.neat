@@ -1,1 +1,3 @@
-protocol SyntaxExpandable<Target: NominalTypeReference> {}
+protocol SyntaxExpandable<Target: NominalTypeReference> {
+    function expand(_ expansion: () -> [Syntax])
+}

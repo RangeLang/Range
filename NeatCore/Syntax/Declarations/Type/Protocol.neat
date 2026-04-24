@@ -7,5 +7,7 @@ construct Protocol: Syntax {
         let self: NominalTypeReference
         let inits: [Init.Declaration]
         let functions: [Function.Declaration]
+
+        function expand(_ expansion: () -> [Syntax])
     }
 }
