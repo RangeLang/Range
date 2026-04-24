@@ -1,0 +1,23 @@
+macro codingKeysSyntaxValue(): Construct { target, diagnostics in
+    let codingKeys: Enum = Enum(
+        declaration: Enum.Declaration(
+            self: NamedTypeReference(name: "CodingKeys"),
+            cases: [
+                Enum.Case(name: "id", associatedValues: []),
+                Enum.Case(name: "name", associatedValues: [])
+            ]
+        )
+    )
+
+    target.declaration.expand {
+        extension #(target.declaration.self) {
+            #(codingKeys)
+        }
+    }
+}
+
+#codingKeysSyntaxValue
+construct SyntaxValueCodingKeysFixture {
+    let id: Int
+    let name: String
+}

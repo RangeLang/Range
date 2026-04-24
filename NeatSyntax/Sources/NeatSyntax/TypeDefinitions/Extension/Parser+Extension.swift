@@ -11,12 +11,16 @@ extension Parser {
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
+        var enumerations: [EnumDeclaration] = []
+        var protocols: [ProtocolDeclaration] = []
         if peek() == .leftBrace {
             try consume(.leftBrace)
             while isCallableStart()
                 || isConstructDeclarationStart()
                 || isBuilderDeclarationStart()
                 || isNamespaceDeclarationStart()
+                || isEnumDeclarationStart()
+                || isProtocolDeclarationStart()
             {
                 if isCallableStart() {
                     callables.append(try parseCallableDeclaration())
@@ -26,7 +30,15 @@ extension Parser {
                     constructs.append(try parseConstructDeclaration(requiresEOF: false))
                     continue
                 }
-                namespaces.append(try parseNamespaceDeclaration(requiresEOF: false))
+                if isNamespaceDeclarationStart() {
+                    namespaces.append(try parseNamespaceDeclaration(requiresEOF: false))
+                    continue
+                }
+                if isEnumDeclarationStart() {
+                    enumerations.append(try parseEnumDeclaration(requiresEOF: false))
+                    continue
+                }
+                protocols.append(try parseProtocolDeclaration(requiresEOF: false))
             }
             try consume(.rightBrace)
         }
@@ -36,7 +48,9 @@ extension Parser {
             conformances: conformances,
             callables: callables,
             constructs: constructs,
-            namespaces: namespaces
+            namespaces: namespaces,
+            enumerations: enumerations,
+            protocols: protocols
         )
     }
 }

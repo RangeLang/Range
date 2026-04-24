@@ -182,6 +182,8 @@ private struct MainProgramInterpreter {
         switch statement {
         case .macroInvocation:
             throw ValidationError("Macro invocations must be expanded before interpretation.")
+        case .expand:
+            throw ValidationError("Macro expansion statements must be expanded before interpretation.")
         case .background:
             throw ValidationError(
                 "@background blocks are not supported in the main program interpreter yet.")

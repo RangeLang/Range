@@ -92,6 +92,8 @@ struct SwiftLoweredProgramAdapter {
                 argumentClause: argumentClause,
                 body: lower(statements: body)
             )
+        case .expand:
+            return statement
         case .background(let background):
             return .background(Background(body: lower(statements: background.body)))
         case .deferBlock(let deferred):

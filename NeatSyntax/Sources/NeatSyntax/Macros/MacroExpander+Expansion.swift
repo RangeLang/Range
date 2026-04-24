@@ -1661,7 +1661,7 @@ extension MacroExpander {
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
 
-        for (targetPath, block) in emittedCodeBlocks(in: macro.body) {
+        for (targetPath, block, localBindings) in emittedCodeBlocks(in: macro.body) {
             if let targetPath {
                 try context.validateExpansionPath(targetPath, for: macro)
             }
@@ -1670,6 +1670,7 @@ extension MacroExpander {
                     from: block,
                     macro: macro,
                     targetDeclarationName: targetDeclarationName,
+                    localBindings: localBindings,
                     context: context
                 )
             )
@@ -1678,13 +1679,16 @@ extension MacroExpander {
         return emitted
     }
 
-    static func emittedCodeBlocks(in statements: [Statement]) -> [(targetPath: String?, block: EmittedCodeBlock)] {
-        var blocks: [(targetPath: String?, block: EmittedCodeBlock)] = []
+    static func emittedCodeBlocks(in statements: [Statement]) -> [(targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression])] {
+        var blocks: [(targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression])] = []
+        var localBindings: [String: Expression] = [:]
 
         for statement in statements {
             switch statement {
+            case .localBinding(let declaration):
+                localBindings[declaration.name] = declaration.expression
             case .expand(let targetPath, let emitted):
-                blocks.append((targetPath, emitted))
+                blocks.append((targetPath, emitted, localBindings))
             case .conditional(let branches):
                 for branch in branches {
                     blocks.append(contentsOf: emittedCodeBlocks(in: branch.body))
@@ -1704,7 +1708,7 @@ extension MacroExpander {
                 if let defaultBody {
                     blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
                 }
-            case .macroInvocation, .localBinding, .assignment, .compoundAssignment, .expression,
+            case .macroInvocation, .assignment, .compoundAssignment, .expression,
                 .return, .environmentProvision, .break, .continue:
                 continue
             }
@@ -1717,12 +1721,14 @@ extension MacroExpander {
         from block: EmittedCodeBlock,
         macro: MacroDeclaration,
         targetDeclarationName: String,
+        localBindings: [String: Expression],
         context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         let rendered = try renderEmittedCodeBlock(
             block,
             macro: macro,
             targetDeclarationName: targetDeclarationName,
+            localBindings: localBindings,
             context: context
         )
 
@@ -1735,12 +1741,14 @@ extension MacroExpander {
         _ block: EmittedCodeBlock,
         macro: MacroDeclaration,
         targetDeclarationName: String,
+        localBindings: [String: Expression],
         context: MacroExpansionContext
     ) throws -> String {
         let targetSurface = MacroTargetSurface(
             targetBinding: macro.bindings.target,
             targetType: macro.target.typeReference,
             targetDeclarationName: targetDeclarationName,
+            localBindings: localBindings,
             context: context
         )
 
@@ -1760,6 +1768,9 @@ extension MacroExpander {
                     case .string(let name) = substituted
                 {
                     return name
+                }
+                if let renderedSyntax = targetSurface.renderSyntax(expression) {
+                    return renderedSyntax
                 }
                 return renderExpressionForStringify(substituted)
             }

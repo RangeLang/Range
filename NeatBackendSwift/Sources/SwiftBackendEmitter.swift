@@ -499,6 +499,8 @@ struct SwiftBackendEmitter {
             switch statement {
             case .assignment, .compoundAssignment:
                 return true
+            case .expand:
+                continue
             case .macroInvocation(_, _, let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body),
@@ -562,6 +564,8 @@ struct SwiftBackendEmitter {
         switch statement {
         case .macroInvocation:
             throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
+        case .expand:
+            throw SwiftBackendError("Macro expansion statements must be expanded before Swift emission.")
         case .background(let background):
             let bodyText = try emitStatements(
                 background.body,
@@ -768,6 +772,9 @@ struct SwiftBackendEmitter {
         case .identifier(let name):
             return name
         case .call(let name, let arguments):
+            if let closure = try emitCoreClosureCall(name: name, arguments: arguments) {
+                return closure
+            }
             if let lowered = try emitKnownCollectionCall(
                 name: name,
                 arguments: arguments
@@ -822,6 +829,46 @@ struct SwiftBackendEmitter {
         return rawName
     }
 
+    private func emitCoreClosureCall(
+        name: String,
+        arguments: [CallArgument]
+    ) throws -> String? {
+        guard name == "Closure",
+            let parameters = arguments.first(where: { $0.label == "parameters" })?.value,
+            let body = arguments.first(where: { $0.label == "body" })?.value
+        else {
+            return nil
+        }
+
+        guard case .array(let parameterExpressions) = parameters else {
+            return nil
+        }
+
+        let parameterNames = parameterExpressions.compactMap { expression -> String? in
+            guard case .identifier(let name) = expression else {
+                return nil
+            }
+            return name
+        }
+
+        guard parameterNames.count == parameterExpressions.count,
+            case .block(let statements) = body
+        else {
+            return nil
+        }
+
+        if statements.count == 1, case .expression(let expression) = statements[0] {
+            return "{ \(parameterNames.joined(separator: ", ")) in \(try emitExpression(expression)) }"
+        }
+
+        let bodyText = try emitStatements(statements, indent: 1, enclosingReturnType: nil)
+        return """
+            { \(parameterNames.joined(separator: ", ")) in
+            \(bodyText)
+            }
+            """
+    }
+
     private func emitCallArgument(
         _ argument: CallArgument
     ) throws -> String {
@@ -852,6 +899,13 @@ struct SwiftBackendEmitter {
 
         func argument(_ label: String) -> NeatSyntax.Expression? {
             arguments.first(where: { $0.label == label })?.value
+        }
+
+        func unlabeledArgument() -> NeatSyntax.Expression? {
+            guard arguments.count == 1, arguments[0].label == nil else {
+                return nil
+            }
+            return arguments[0].value
         }
 
         switch member {
@@ -895,6 +949,9 @@ struct SwiftBackendEmitter {
         case "filter":
             guard let include = argument("include") else { return nil }
             return "\(base).filter(\(try emitExpression(include)))"
+        case "map", "compactMap", "flatMap", "forEach":
+            guard let transform = unlabeledArgument() else { return nil }
+            return "\(base).\(member)(\(try emitExpression(transform)))"
         case "value":
             guard let key = argument("key") else { return nil }
             return "\(base)[\(try emitExpression(key))]"
@@ -992,6 +1049,8 @@ struct SwiftBackendEmitter {
         switch statement {
         case .macroInvocation:
             throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
+        case .expand:
+            throw SwiftBackendError("Macro expansion statements must be expanded before Swift emission.")
         case .background(let background):
             let bodyText = try emitStatements(
                 background.body,

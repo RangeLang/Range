@@ -14,4 +14,8 @@ construct ArrayStorage<Element> {
     function removeLast() -> Element?
     function clear()
     function filter(include: (Element) -> Bool) -> ArrayStorage<Element>
+    function map<Output>(_ transform: (Element) -> Output) -> ArrayStorage<Output>
+    function compactMap<Output>(_ transform: (Element) -> Output?) -> ArrayStorage<Output>
+    function flatMap<Output>(_ transform: (Element) -> Array<Output>) -> ArrayStorage<Output>
+    function forEach(_ body: (Element) -> Void)
 }

@@ -59,4 +59,20 @@ construct Array<Element>: ExpressibleByArrayLiteral {
     function filter(include: (Element) -> Bool) -> Array<Element> {
         return Array(storage: storage.filter(include: include))
     }
+
+    function map<Output>(_ transform: (Element) -> Output) -> Array<Output> {
+        return Array<Output>(storage: storage.map(transform))
+    }
+
+    function compactMap<Output>(_ transform: (Element) -> Output?) -> Array<Output> {
+        return Array<Output>(storage: storage.compactMap(transform))
+    }
+
+    function flatMap<Output>(_ transform: (Element) -> Array<Output>) -> Array<Output> {
+        return Array<Output>(storage: storage.flatMap(transform))
+    }
+
+    function forEach(_ body: (Element) -> Void) {
+        storage.forEach(body)
+    }
 }
