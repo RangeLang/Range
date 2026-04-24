@@ -1,0 +1,13 @@
+macro invalidReturnTypeSplice(): Construct { target, diagnostics in
+    @expand {
+        extension #(target.declaration.self) {
+            function invalidReturnType() -> #(1 + 2) {
+                return 1
+            }
+        }
+    }
+}
+
+#invalidReturnTypeSplice
+construct InvalidReturnTypeFixture {
+}

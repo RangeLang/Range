@@ -1606,51 +1606,56 @@ extension MacroExpander {
             case .text(let text):
                 return text
             case .splice(let expression, let expected):
-                let actual = emittedSyntaxKind(
+                let actual = emittedSyntaxKinds(
                     of: expression,
                     targetBinding: macro.bindings.target
                 )
                 guard emittedSyntaxKind(actual, isCompatibleWith: expected) else {
                     throw ParseError(
-                        "Interpolation in \(emittedSyntaxPositionDescription(expected)) position must produce \(expected.diagnosticDescription), got \(actual.diagnosticDescription)."
+                        "Interpolation in \(emittedSyntaxPositionDescription(expected)) position must produce \(expected.diagnosticDescription), got \(emittedSyntaxDescription(actual))."
                     )
                 }
                 let substituted = substituteMacroBindings(in: expression, bindings: bindings)
+                if expected == .callableName, case .string(let name) = substituted {
+                    return name
+                }
                 return renderExpressionForStringify(substituted)
             }
         }.joined(separator: " ")
     }
 
-    static func emittedSyntaxKind(
+    static func emittedSyntaxKinds(
         of expression: Expression,
         targetBinding: String
-    ) -> EmittedSyntaxKind {
+    ) -> Set<EmittedSyntaxKind> {
         switch expression {
         case .identifier("\(targetBinding).declaration.self"):
-            return .nominalTypeReference
+            return [.nominalTypeReference, .typeReference]
         case .identifier("\(targetBinding).declaration.type"):
-            return .typeReference
-        case .identifier, .string:
-            return .callableName
+            return [.typeReference]
+        case .identifier:
+            return [.callableName, .nominalTypeReference, .typeReference]
+        case .string:
+            return [.callableName]
         default:
-            return .expression
+            return [.expression]
         }
     }
 
     static func emittedSyntaxKind(
-        _ actual: EmittedSyntaxKind,
+        _ actual: Set<EmittedSyntaxKind>,
         isCompatibleWith expected: EmittedSyntaxKind
     ) -> Bool {
         if expected == .expression {
             return true
         }
-        if actual == expected {
-            return true
-        }
-        if expected == .typeReference && actual == .nominalTypeReference {
-            return true
-        }
-        return false
+        return actual.contains(expected)
+    }
+
+    static func emittedSyntaxDescription(_ kinds: Set<EmittedSyntaxKind>) -> String {
+        kinds.sorted { $0.rawValue < $1.rawValue }
+            .map(\.diagnosticDescription)
+            .joined(separator: " or ")
     }
 
     static func emittedSyntaxPositionDescription(_ kind: EmittedSyntaxKind) -> String {

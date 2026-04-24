@@ -1,0 +1,10 @@
+macro invalidExtensionTargetSplice(): Construct { target, diagnostics in
+    @expand {
+        extension #(target.declaration.type) {
+        }
+    }
+}
+
+#invalidExtensionTargetSplice
+construct InvalidExtensionTargetFixture {
+}

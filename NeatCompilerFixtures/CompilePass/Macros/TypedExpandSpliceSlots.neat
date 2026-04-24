@@ -1,0 +1,21 @@
+protocol TypedExpandSpliceProtocol {
+}
+
+macro typedExpandSpliceSlots(): Construct { target, diagnostics in
+    @expand {
+        extension #(target.declaration.self): #(TypedExpandSpliceProtocol) {
+            function #("generatedName")() -> #(target.declaration.type) {
+                return self
+            }
+        }
+    }
+}
+
+#typedExpandSpliceSlots
+construct TypedExpandSpliceFixture {
+}
+
+@main {
+    let value = TypedExpandSpliceFixture()
+    value.generatedName()
+}
