@@ -46,3 +46,66 @@ struct PropertyMacroEffects {
     let getterTransforms: [Expression]
     let setterTransforms: [Expression]
 }
+
+struct MacroTargetSurface {
+    let targetBinding: String
+    let targetType: TypeReference
+    let construct: ConstructDeclaration
+    let context: MacroExpansionContext
+
+    func emittedSyntaxKinds(of expression: Expression) -> Set<EmittedSyntaxKind> {
+        switch expression {
+        case .identifier(let path):
+            if let targetPathKinds = context.rewriteSurfaceView.emittedSyntaxKinds(
+                forTargetPath: path,
+                targetBinding: targetBinding,
+                targetType: targetType
+            ) {
+                return targetPathKinds
+            }
+            if isTargetPath(path) {
+                return [.expression]
+            }
+            return [.callableName, .declaration, .nominalTypeReference, .typeReference]
+        case .string:
+            return [.callableName, .declaration]
+        default:
+            return [.expression]
+        }
+    }
+
+    func render(_ expression: Expression) -> Expression {
+        switch expression {
+        case .identifier(let path):
+            return renderedTargetPath(path) ?? expression
+        default:
+            return expression
+        }
+    }
+
+    private func isTargetPath(_ path: String) -> Bool {
+        path == targetBinding || path.hasPrefix("\(targetBinding).")
+    }
+
+    private func renderedTargetPath(_ path: String) -> Expression? {
+        guard isTargetPath(path) else {
+            return nil
+        }
+        guard
+            context.rewriteSurfaceView.emittedSyntaxKinds(
+                forTargetPath: path,
+                targetBinding: targetBinding,
+                targetType: targetType
+            ) != nil
+        else {
+            return nil
+        }
+
+        switch path {
+        case "\(targetBinding).declaration.self":
+            return .identifier(construct.name)
+        default:
+            return nil
+        }
+    }
+}

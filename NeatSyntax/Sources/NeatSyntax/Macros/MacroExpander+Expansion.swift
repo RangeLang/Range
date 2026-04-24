@@ -1609,28 +1609,25 @@ extension MacroExpander {
         construct: ConstructDeclaration,
         context: MacroExpansionContext
     ) throws -> String {
-        let bindings: [String: Expression] = [
-            macro.bindings.target: .identifier(construct.name),
-            "\(macro.bindings.target).declaration.self": .identifier(construct.name),
-        ]
+        let targetSurface = MacroTargetSurface(
+            targetBinding: macro.bindings.target,
+            targetType: macro.target.typeReference,
+            construct: construct,
+            context: context
+        )
 
         return try block.parts.map { part in
             switch part {
             case .text(let text):
                 return text
             case .splice(let expression, let expected):
-                let actual = emittedSyntaxKinds(
-                    of: expression,
-                    targetBinding: macro.bindings.target,
-                    targetType: macro.target.typeReference,
-                    context: context
-                )
+                let actual = targetSurface.emittedSyntaxKinds(of: expression)
                 guard emittedSyntaxKind(actual, isCompatibleWith: expected) else {
                     throw ParseError(
                         "Interpolation in \(emittedSyntaxPositionDescription(expected)) position must produce \(expected.diagnosticDescription), got \(emittedSyntaxDescription(actual))."
                     )
                 }
-                let substituted = substituteMacroBindings(in: expression, bindings: bindings)
+                let substituted = targetSurface.render(expression)
                 if (expected == .callableName || expected == .declaration),
                     case .string(let name) = substituted
                 {
@@ -1639,32 +1636,6 @@ extension MacroExpander {
                 return renderExpressionForStringify(substituted)
             }
         }.joined(separator: " ")
-    }
-
-    static func emittedSyntaxKinds(
-        of expression: Expression,
-        targetBinding: String,
-        targetType: TypeReference,
-        context: MacroExpansionContext
-    ) -> Set<EmittedSyntaxKind> {
-        switch expression {
-        case .identifier(let path):
-            if let targetPathKinds = context.rewriteSurfaceView.emittedSyntaxKinds(
-                forTargetPath: path,
-                targetBinding: targetBinding,
-                targetType: targetType
-            ) {
-                return targetPathKinds
-            }
-            if path == targetBinding || path.hasPrefix("\(targetBinding).") {
-                return [.expression]
-            }
-            return [.callableName, .declaration, .nominalTypeReference, .typeReference]
-        case .string:
-            return [.callableName, .declaration]
-        default:
-            return [.expression]
-        }
     }
 
     static func emittedSyntaxKind(
