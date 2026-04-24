@@ -1,5 +1,5 @@
 macro invalidCallableNameSplice(): Construct { target, diagnostics in
-    @expand {
+    target.declaration.expand {
         extension #(target.declaration.self) {
             function #(target.declaration.self)() -> String {
                 return "Invalid"

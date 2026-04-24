@@ -1,5 +1,5 @@
 macro invalidParameterTypeSplice(): Construct { target, diagnostics in
-    @expand {
+    target.declaration.expand {
         extension #(target.declaration.self) {
             function invalidParameterType(value: #("NotAType")) -> String {
                 return "Invalid"

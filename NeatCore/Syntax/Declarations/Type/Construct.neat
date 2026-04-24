@@ -4,7 +4,7 @@ construct Construct: Syntax {
     let application: Application
 
     @core
-    construct Declaration<SelfType: NominalTypeReference> {
+    construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType> {
         let self: SelfType
         let conformances: [NominalTypeReference]
         let inits: [Init.Declaration]

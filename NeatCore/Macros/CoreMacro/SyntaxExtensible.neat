@@ -1,3 +1,0 @@
-protocol SyntaxExtensible<Target: NominalTypeReference> {
-    let extensions: [Extension<Target>]
-}

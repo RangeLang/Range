@@ -3,7 +3,7 @@ protocol Greetable {
 }
 
 macro extendConstructSurface(): Construct { target, diagnostics in
-    @expand {
+    target.declaration.expand {
         extension #(target.declaration.self): Greetable {
             function greet() -> String {
                 return "Hello"

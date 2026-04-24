@@ -1,0 +1,1 @@
+protocol SyntaxExpandable<Target: NominalTypeReference> {}

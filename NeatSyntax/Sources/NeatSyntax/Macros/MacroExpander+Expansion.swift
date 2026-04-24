@@ -1536,7 +1536,10 @@ extension MacroExpander {
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
 
-        for block in emittedCodeBlocks(in: macro.body) {
+        for (targetPath, block) in emittedCodeBlocks(in: macro.body) {
+            if let targetPath {
+                try context.validateExpansionPath(targetPath, for: macro)
+            }
             emitted.merge(
                 try emittedDeclarationBundle(
                     from: block,
@@ -1550,13 +1553,13 @@ extension MacroExpander {
         return emitted
     }
 
-    static func emittedCodeBlocks(in statements: [Statement]) -> [EmittedCodeBlock] {
-        var blocks: [EmittedCodeBlock] = []
+    static func emittedCodeBlocks(in statements: [Statement]) -> [(targetPath: String?, block: EmittedCodeBlock)] {
+        var blocks: [(targetPath: String?, block: EmittedCodeBlock)] = []
 
         for statement in statements {
             switch statement {
-            case .expand(let emitted):
-                blocks.append(emitted)
+            case .expand(let targetPath, let emitted):
+                blocks.append((targetPath, emitted))
             case .conditional(let branches):
                 for branch in branches {
                     blocks.append(contentsOf: emittedCodeBlocks(in: branch.body))

@@ -1,5 +1,5 @@
 macro invalidReturnTypeSplice(): Construct { target, diagnostics in
-    @expand {
+    target.declaration.expand {
         extension #(target.declaration.self) {
             function invalidReturnType() -> #(1 + 2) {
                 return 1

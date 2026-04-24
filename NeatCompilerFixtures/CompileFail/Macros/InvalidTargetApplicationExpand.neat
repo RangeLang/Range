@@ -1,0 +1,10 @@
+macro invalidTargetApplicationExpand(): Construct { target, diagnostics in
+    target.application.expand {
+        construct InvalidTargetApplicationExpansion {
+        }
+    }
+}
+
+#invalidTargetApplicationExpand
+construct InvalidTargetApplicationExpandFixture {
+}

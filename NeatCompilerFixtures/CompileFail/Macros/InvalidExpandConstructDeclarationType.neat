@@ -1,5 +1,5 @@
 macro invalidConstructDeclarationType(): Construct { target, diagnostics in
-    @expand {
+    target.declaration.expand {
         extension #(target.declaration.type) {
         }
     }

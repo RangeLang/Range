@@ -11,8 +11,10 @@ extension MacroExpander {
         bindings: [String: Expression]
     ) -> Statement {
         switch statement {
-        case .expand(let emitted):
+        case .expand(let targetPath, let emitted):
             return .expand(
+                targetPath: targetPath,
+                block:
                 EmittedCodeBlock(
                     parts: emitted.parts.map { part in
                         switch part {

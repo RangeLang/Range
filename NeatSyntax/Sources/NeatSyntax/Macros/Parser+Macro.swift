@@ -92,14 +92,30 @@ extension Parser {
         return (bindings, statements)
     }
 
-    mutating func parseExpandStatement() throws -> Statement {
-        guard case .atAttribute(let name, _) = peek(), name == "expand" else {
-            throw ParseError("Expected @expand block.")
+    mutating func parseTargetExpandStatement(targetPath: String) throws -> Statement {
+        let components = targetPath.split(separator: ".").map(String.init)
+        for (index, component) in components.enumerated() {
+            if index > 0 {
+                try consume(.dot)
+            }
+            try consumeIdentifierOrKeyword(component)
         }
-        advance()
+        try consume(.dot)
+        try consumeIdentifierOrKeyword("expand")
         try consume(.leftBrace)
         let emitted = try parseEmittedCodeBlock()
-        return .expand(emitted)
+        return .expand(targetPath: targetPath, block: emitted)
+    }
+
+    private mutating func consumeIdentifierOrKeyword(_ expected: String) throws {
+        switch peek() {
+        case .identifier(let value) where value == expected:
+            advance()
+        case .keyword(let value) where value == expected:
+            advance()
+        default:
+            throw ParseError("Expected \(expected).")
+        }
     }
 
     mutating func parseEmittedCodeBlock() throws -> EmittedCodeBlock {
@@ -118,7 +134,7 @@ extension Parser {
             let token = peek()
             switch token {
             case .eof:
-                throw ParseError("Unterminated @expand block.")
+                throw ParseError("Unterminated expand block.")
             case .rightBrace:
                 if braceDepth == 1 {
                     flushText()

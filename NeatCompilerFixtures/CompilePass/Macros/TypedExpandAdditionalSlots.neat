@@ -2,7 +2,7 @@ protocol AdditionalTypedExpandProtocol {
 }
 
 macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
-    @expand {
+    target.declaration.expand {
         protocol #("GeneratedTypedExpandProtocol"): #(AdditionalTypedExpandProtocol) {
         }
 

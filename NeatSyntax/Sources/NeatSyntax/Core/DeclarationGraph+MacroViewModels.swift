@@ -183,6 +183,7 @@ struct RewriteSurfaceView {
 
             if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
                 || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
+                || syntaxResolver.declaration(named: text, conformsTo: "SyntaxExpandable")
             {
                 return (text, isArray)
             }
@@ -294,6 +295,25 @@ struct RewriteSurfaceView {
         return syntaxResolver.declaration(named: currentTypeName, conformsTo: "SyntaxReplaceable")
     }
 
+    func declaredExpansionPathExists(
+        _ path: String,
+        targetBinding: String,
+        targetType: TypeReference
+    ) -> Bool {
+        guard
+            let semanticType = semanticType(
+                ofTargetPath: path,
+                targetBinding: targetBinding,
+                targetType: targetType
+            ),
+            let semanticName = syntaxResolver.nominalName(of: semanticType)
+        else {
+            return false
+        }
+
+        return syntaxResolver.declaration(named: semanticName, conformsTo: "SyntaxExpandable")
+    }
+
     private func resolvedDeclaredValueType(
         named rawTypeName: String,
         ownerTypeName: String
@@ -322,6 +342,7 @@ struct RewriteSurfaceView {
 
         if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
             || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
+            || syntaxResolver.declaration(named: text, conformsTo: "SyntaxExpandable")
         {
             return (text, isArray)
         }
@@ -369,6 +390,9 @@ struct RewriteSurfaceView {
                 ownerTypeName: currentTypeName
             ) {
                 currentTypeName = nextTypeName
+                if case .named = currentType {
+                    currentType = .named(nextTypeName)
+                }
             }
         }
 
@@ -533,6 +557,21 @@ struct MacroExpansionContext {
             }
             throw ParseError(
                 "Macro #\(macro.name) targeting \(macro.target.typeReference.displayName) uses unsupported replace site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
+            )
+        }
+    }
+
+    func validateExpansionPath(
+        _ path: String,
+        for macro: MacroDeclaration
+    ) throws {
+        guard rewriteSurfaceView.declaredExpansionPathExists(
+            path,
+            targetBinding: macro.bindings.target,
+            targetType: macro.target.typeReference
+        ) else {
+            throw ParseError(
+                "Macro #\(macro.name) targeting \(macro.target.typeReference.displayName) uses unsupported expand site '\(path).expand'."
             )
         }
     }

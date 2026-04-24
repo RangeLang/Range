@@ -4,11 +4,11 @@ extension Parser {
     mutating func parseStatement(
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
-        if isExpandStatementStart() {
+        if let targetPath = targetExpandStatementPath() {
             guard currentMacroBodyDepth > 0 else {
-                throw ParseError("@expand is only valid inside macro bodies.")
+                throw ParseError("expand is only valid inside macro bodies.")
             }
-            return try parseExpandStatement()
+            return try parseTargetExpandStatement(targetPath: targetPath)
         }
 
         if isMacroApplicationStart() {
@@ -100,11 +100,38 @@ extension Parser {
         }
     }
 
-    func isExpandStatementStart() -> Bool {
-        guard case .atAttribute(let name, _) = peek(), name == "expand" else {
-            return false
+    func targetExpandStatementPath() -> String? {
+        guard let first = tokenIdentifierOrKeyword(peek()) else {
+            return nil
         }
-        return peek(offset: 1) == .leftBrace
+
+        var components = [first]
+        var offset = 1
+        while peek(offset: offset) == .dot {
+            guard let component = tokenIdentifierOrKeyword(peek(offset: offset + 1)) else {
+                return nil
+            }
+            components.append(component)
+            offset += 2
+        }
+
+        guard components.count > 1,
+            components.last == "expand",
+            peek(offset: offset) == .leftBrace
+        else {
+            return nil
+        }
+
+        return components.dropLast().joined(separator: ".")
+    }
+
+    private func tokenIdentifierOrKeyword(_ token: Token) -> String? {
+        switch token {
+        case .identifier(let value), .keyword(let value):
+            return value
+        default:
+            return nil
+        }
     }
 
     func isBackgroundStatementStart() -> Bool {
