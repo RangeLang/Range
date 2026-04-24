@@ -1,0 +1,10 @@
+macro invalidConstructDeclarationType(): Construct { target, diagnostics in
+    @expand {
+        extension #(target.declaration.type) {
+        }
+    }
+}
+
+#invalidConstructDeclarationType
+construct InvalidConstructDeclarationTypeFixture {
+}

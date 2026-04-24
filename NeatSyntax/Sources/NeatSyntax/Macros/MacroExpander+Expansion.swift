@@ -1612,7 +1612,6 @@ extension MacroExpander {
         let bindings: [String: Expression] = [
             macro.bindings.target: .identifier(construct.name),
             "\(macro.bindings.target).declaration.self": .identifier(construct.name),
-            "\(macro.bindings.target).declaration.type": .identifier(construct.name),
         ]
 
         return try block.parts.map { part in
