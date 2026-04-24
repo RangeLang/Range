@@ -105,6 +105,7 @@ extension Parser {
     mutating func parseEmittedCodeBlock() throws -> EmittedCodeBlock {
         var parts: [EmittedCodePart] = []
         var currentTextTokens: [String] = []
+        var emittedTokens: [Token] = []
         var braceDepth = 1
 
         func flushText() {
@@ -126,22 +127,66 @@ extension Parser {
                     break
                 }
                 braceDepth -= 1
-                currentTextTokens.append(renderMacroToken(advance()))
+                let consumed = advance()
+                emittedTokens.append(consumed)
+                currentTextTokens.append(renderMacroToken(consumed))
             case .leftBrace:
                 braceDepth += 1
-                currentTextTokens.append(renderMacroToken(advance()))
+                let consumed = advance()
+                emittedTokens.append(consumed)
+                currentTextTokens.append(renderMacroToken(consumed))
             case .hash where peek(offset: 1) == .leftParen:
                 flushText()
                 try consume(.hash)
                 try consume(.leftParen)
                 let expression = try parseExpression(terminatingAt: [.rightParen])
                 try consume(.rightParen)
-                parts.append(.splice(expression))
+                parts.append(
+                    .splice(
+                        expression: expression,
+                        expected: emittedSpliceExpectedKind(
+                            before: emittedTokens,
+                            after: peek()
+                        )
+                    )
+                )
             default:
-                currentTextTokens.append(renderMacroToken(advance()))
+                let consumed = advance()
+                emittedTokens.append(consumed)
+                currentTextTokens.append(renderMacroToken(consumed))
             }
         }
 
         return EmittedCodeBlock(parts: parts)
+    }
+
+    func emittedSpliceExpectedKind(before tokens: [Token], after nextToken: Token) -> EmittedSyntaxKind {
+        let significantTokens = tokens.filter {
+            switch $0 {
+            case .eof:
+                return false
+            default:
+                return true
+            }
+        }
+
+        guard let previous = significantTokens.last else {
+            return .expression
+        }
+
+        switch previous {
+        case .keyword(NeatSyntax.Keyword.typeExtension.rawValue):
+            return .nominalTypeReference
+        case .keyword(NeatSyntax.Keyword.function.rawValue):
+            return .callableName
+        case .arrow:
+            return .typeReference
+        case .colon where nextToken == .leftBrace || nextToken == .comma:
+            return .nominalTypeReference
+        case .comma where nextToken == .leftBrace || nextToken == .comma:
+            return .nominalTypeReference
+        default:
+            return .expression
+        }
     }
 }

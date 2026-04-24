@@ -1579,7 +1579,7 @@ extension MacroExpander {
         macro: MacroDeclaration,
         construct: ConstructDeclaration
     ) throws -> EmittedDeclarationBundle {
-        let rendered = renderEmittedCodeBlock(
+        let rendered = try renderEmittedCodeBlock(
             block,
             macro: macro,
             construct: construct
@@ -1594,22 +1594,78 @@ extension MacroExpander {
         _ block: EmittedCodeBlock,
         macro: MacroDeclaration,
         construct: ConstructDeclaration
-    ) -> String {
+    ) throws -> String {
         let bindings: [String: Expression] = [
             macro.bindings.target: .identifier(construct.name),
             "\(macro.bindings.target).declaration.self": .identifier(construct.name),
             "\(macro.bindings.target).declaration.type": .identifier(construct.name),
         ]
 
-        return block.parts.map { part in
+        return try block.parts.map { part in
             switch part {
             case .text(let text):
                 return text
-            case .splice(let expression):
+            case .splice(let expression, let expected):
+                let actual = emittedSyntaxKind(
+                    of: expression,
+                    targetBinding: macro.bindings.target
+                )
+                guard emittedSyntaxKind(actual, isCompatibleWith: expected) else {
+                    throw ParseError(
+                        "Interpolation in \(emittedSyntaxPositionDescription(expected)) position must produce \(expected.diagnosticDescription), got \(actual.diagnosticDescription)."
+                    )
+                }
                 let substituted = substituteMacroBindings(in: expression, bindings: bindings)
                 return renderExpressionForStringify(substituted)
             }
         }.joined(separator: " ")
+    }
+
+    static func emittedSyntaxKind(
+        of expression: Expression,
+        targetBinding: String
+    ) -> EmittedSyntaxKind {
+        switch expression {
+        case .identifier("\(targetBinding).declaration.self"):
+            return .nominalTypeReference
+        case .identifier("\(targetBinding).declaration.type"):
+            return .typeReference
+        case .identifier, .string:
+            return .callableName
+        default:
+            return .expression
+        }
+    }
+
+    static func emittedSyntaxKind(
+        _ actual: EmittedSyntaxKind,
+        isCompatibleWith expected: EmittedSyntaxKind
+    ) -> Bool {
+        if expected == .expression {
+            return true
+        }
+        if actual == expected {
+            return true
+        }
+        if expected == .typeReference && actual == .nominalTypeReference {
+            return true
+        }
+        return false
+    }
+
+    static func emittedSyntaxPositionDescription(_ kind: EmittedSyntaxKind) -> String {
+        switch kind {
+        case .declaration:
+            return "declaration"
+        case .expression:
+            return "expression"
+        case .typeReference:
+            return "type reference"
+        case .nominalTypeReference:
+            return "nominal type reference"
+        case .callableName:
+            return "function name"
+        }
     }
 
     static func declarationBundle(from sourceFile: SourceFileNode) throws -> EmittedDeclarationBundle {

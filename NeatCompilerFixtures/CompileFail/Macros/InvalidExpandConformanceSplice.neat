@@ -1,0 +1,13 @@
+protocol ExpandSpliceProtocol {
+}
+
+macro invalidConformanceSplice(): Construct { target, diagnostics in
+    @expand {
+        extension #(target.declaration.self): #(target.declaration.type) {
+        }
+    }
+}
+
+#invalidConformanceSplice
+construct InvalidConformanceFixture {
+}

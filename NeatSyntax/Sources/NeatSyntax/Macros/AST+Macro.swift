@@ -18,9 +18,32 @@ public struct EmittedCodeBlock {
     }
 }
 
+public enum EmittedSyntaxKind: String {
+    case declaration
+    case expression
+    case typeReference
+    case nominalTypeReference
+    case callableName
+
+    var diagnosticDescription: String {
+        switch self {
+        case .declaration:
+            return "a declaration"
+        case .expression:
+            return "an expression"
+        case .typeReference:
+            return "a type reference"
+        case .nominalTypeReference:
+            return "a nominal type reference"
+        case .callableName:
+            return "a callable name"
+        }
+    }
+}
+
 public enum EmittedCodePart {
     case text(String)
-    case splice(Expression)
+    case splice(expression: Expression, expected: EmittedSyntaxKind)
 }
 
 public struct MacroApplication {

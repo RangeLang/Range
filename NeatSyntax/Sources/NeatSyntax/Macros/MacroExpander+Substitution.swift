@@ -18,9 +18,10 @@ extension MacroExpander {
                         switch part {
                         case .text:
                             return part
-                        case .splice(let expression):
+                        case .splice(let expression, let expected):
                             return .splice(
-                                substituteMacroBindings(in: expression, bindings: bindings)
+                                expression: substituteMacroBindings(in: expression, bindings: bindings),
+                                expected: expected
                             )
                         }
                     }
