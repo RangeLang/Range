@@ -67,6 +67,7 @@ public struct DeclarationGraph {
             literalBridgeResolver: LiteralBridgeResolver(realizedLiteralBridges: realizedLiteralBridges),
             memberResolver: DeclarationMemberResolver(
                 constructsByName: constructsByName,
+                protocolsByName: protocolsByName,
                 extensionsByTargetName: extensionsByTargetName
             ),
             operatorResolver: DeclarationOperatorResolver(callablesByName: callablesByName),

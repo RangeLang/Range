@@ -502,7 +502,11 @@ public struct DeclarationOperatorResolver: Sendable {
 }
 
 public struct DeclarationMemberResolver: Sendable {
-    public static let empty = DeclarationMemberResolver(constructsByName: [:], extensionsByTargetName: [:])
+    public static let empty = DeclarationMemberResolver(
+        constructsByName: [:],
+        protocolsByName: [:],
+        extensionsByTargetName: [:]
+    )
 
     private struct ConstructMembers: Sendable {
         var genericParameterNames: [String]
@@ -512,11 +516,16 @@ public struct DeclarationMemberResolver: Sendable {
     }
 
     private let membersByConstructName: [String: ConstructMembers]
+    private let callableReturnTypesByProtocolName: [String: [String: TypeReference]]
 
     public init(
         constructsByName: [String: ConstructDeclaration],
+        protocolsByName: [String: ProtocolDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
+        self.callableReturnTypesByProtocolName = protocolsByName.mapValues { declaration in
+            Self.protocolCallableReturnTypes(for: declaration)
+        }
         self.membersByConstructName = constructsByName.mapValues { construct in
             let nestedTypeMap = Self.nestedTypeMap(for: construct)
             var propertyTypes: [String: TypeReference] = [:]
@@ -595,6 +604,16 @@ public struct DeclarationMemberResolver: Sendable {
         )
     }
 
+    private static func protocolCallableReturnTypes(
+        for declaration: ProtocolDeclaration
+    ) -> [String: TypeReference] {
+        var returnTypes: [String: TypeReference] = [:]
+        for callable in declaration.callables where returnTypes[callable.name] == nil {
+            returnTypes[callable.name] = callable.returnType ?? .named("Void")
+        }
+        return returnTypes
+    }
+
     private static func qualifyNestedLocalTypes(
         _ type: TypeReference,
         using nestedTypeMap: [String: TypeReference]
@@ -638,6 +657,13 @@ public struct DeclarationMemberResolver: Sendable {
         baseType: TypeReference,
         memberName: String
     ) -> TypeReference? {
+        if let protocolType = protocolCallableReturnType(
+            baseType: baseType,
+            memberName: memberName
+        ) {
+            return protocolType
+        }
+
         guard let context = constructContext(for: baseType),
             let members = membersByConstructName[context.name],
             let type = members.callableReturnTypes[memberName]
@@ -646,6 +672,18 @@ public struct DeclarationMemberResolver: Sendable {
         }
         return Self.substitute(
             type, using: genericSubstitution(for: members, arguments: context.arguments))
+    }
+
+    private func protocolCallableReturnType(
+        baseType: TypeReference,
+        memberName: String
+    ) -> TypeReference? {
+        guard let context = constructContext(for: baseType),
+            let type = callableReturnTypesByProtocolName[context.name]?[memberName]
+        else {
+            return nil
+        }
+        return type
     }
 
     public func constructType(forConstructorCallName name: String) -> TypeReference? {

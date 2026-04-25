@@ -425,6 +425,9 @@ public struct Parser {
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
+        var enumerations: [EnumDeclaration] = []
+        var protocols: [ProtocolDeclaration] = []
+        var extensions: [ExtensionDeclaration] = []
         var macros: [MacroDeclaration] = []
         var precedenceGroups: [PrecedenceGroupDeclaration] = []
         var operators: [OperatorDeclaration] = []
@@ -472,7 +475,7 @@ public struct Parser {
             }
 
             if peek() == .keyword(NeatSyntax.Keyword.typeExtension.rawValue) {
-                _ = try parseExtensionDeclaration()
+                extensions.append(try parseExtensionDeclarationForDeclarationDiscovery())
                 continue
             }
 
@@ -482,12 +485,12 @@ public struct Parser {
             }
 
             if isProtocolDeclarationStart() {
-                _ = try parseProtocolDeclaration(requiresEOF: false)
+                protocols.append(try parseProtocolDeclaration(requiresEOF: false))
                 continue
             }
 
             if isEnumDeclarationStart() {
-                _ = try parseEnumDeclaration(requiresEOF: false)
+                enumerations.append(try parseEnumDeclaration(requiresEOF: false))
                 continue
             }
 
@@ -503,12 +506,12 @@ public struct Parser {
                 callables: topLevelCallables,
                 constructs: constructs,
                 namespaces: namespaces,
-                enumerations: [],
-                protocols: [],
+                enumerations: enumerations,
+                protocols: protocols,
                 macros: macros,
                 precedenceGroups: precedenceGroups,
                 operators: operators,
-                extensions: []
+                extensions: extensions
             )
         )
     }

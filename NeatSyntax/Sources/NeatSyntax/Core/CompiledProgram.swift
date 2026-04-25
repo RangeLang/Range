@@ -87,11 +87,20 @@ public struct CompilerPipeline {
         let coreInputs = orderedInputs.filter { $0.role == .core }
         let projectInputs = orderedInputs.filter { $0.role == .project }
 
+        let discoveredCoreDeclarationFiles = try discoverProjectDeclarationFiles(
+            inputs: coreInputs
+        )
+        let discoveredCoreGraph = DeclarationGraph(files: discoveredCoreDeclarationFiles)
+        let discoveredCoreViews = discoveredCoreGraph.views
+        let discoveredCoreCallableReturnTypes = collectCallableReturnTypes(
+            from: discoveredCoreDeclarationFiles
+        )
         let parsedCoreFiles = try parse(
             inputs: coreInputs,
-            literalBridgeResolver: .empty,
-            declarationMemberResolver: .empty,
-            declarationOperatorResolver: .empty
+            literalBridgeResolver: discoveredCoreViews.literalBridgeResolver,
+            declarationMemberResolver: discoveredCoreViews.memberResolver,
+            declarationOperatorResolver: discoveredCoreViews.operatorResolver,
+            discoveredCallableReturnTypes: discoveredCoreCallableReturnTypes
         )
 
         let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
