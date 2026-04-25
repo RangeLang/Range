@@ -288,6 +288,7 @@ struct GraphCollector {
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
             parameters: callable.parameters,
             returnType: callable.returnType,
+            isThrowing: callable.isThrowing,
             body: callable.body
         )
     }
@@ -578,6 +579,13 @@ struct GraphCollector {
                     analyzeExpression(
                         expression, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
                 }
+            case .throw(let expression):
+                analyzeExpression(
+                    expression, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
+            case .doCatch(let body, _, let catchBody):
+                analyzeStatements(body, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
+                analyzeStatements(
+                    catchBody, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
 
             case .switchStatement(let expression, let cases, let defaultBody):
                 analyzeExpression(
@@ -699,6 +707,8 @@ struct GraphCollector {
         case .binary(let lhs, _, let rhs):
             analyzeExpression(lhs, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
             analyzeExpression(rhs, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
+        case .tryExpression(let expression):
+            analyzeExpression(expression, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
         case .block:
             return
         case .integer, .double, .string, .boolean, .nilLiteral:

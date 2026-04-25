@@ -12,6 +12,17 @@ public enum ExpressionTypeSemantics {
         macroExpansionResolver: DeclarationMacroExpansionResolver = .empty
     ) throws -> BootstrapLiteralType {
         switch expression {
+        case .tryExpression(let expression):
+            return try inferType(
+                of: expression,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver,
+                macroExpansionResolver: macroExpansionResolver
+            )
         case .integer:
             return .intLiteral
         case .double:
@@ -462,6 +473,8 @@ public enum ExpressionTypeSemantics {
 
     public static func isLiteralExpression(_ expression: Expression) -> Bool {
         switch expression {
+        case .tryExpression(let expression):
+            return isLiteralExpression(expression)
         case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral, .array,
             .dictionary:
             return true

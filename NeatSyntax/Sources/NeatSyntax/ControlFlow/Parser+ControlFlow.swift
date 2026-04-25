@@ -39,6 +39,10 @@ extension Parser {
             return try parseWhileStatement(localBindings: &localBindings)
         }
 
+        if case .keyword(NeatSyntax.Keyword.doStatement.rawValue) = peek() {
+            return try parseDoCatchStatement(localBindings: &localBindings)
+        }
+
         if case .keyword(NeatSyntax.Keyword.forLoop.rawValue) = peek() {
             return try parseForStatement(localBindings: &localBindings)
         }
@@ -66,6 +70,11 @@ extension Parser {
                 return .return(nil)
             }
             return .return(try parseExpression())
+        }
+
+        if case .keyword(NeatSyntax.Keyword.throwStatement.rawValue) = peek() {
+            advance()
+            return .throw(try parseExpression())
         }
 
         if case .keyword(NeatSyntax.Keyword.breakStatement.rawValue) = peek() {
@@ -464,6 +473,32 @@ extension Parser {
         return .whileLoop(condition: condition, body: body)
     }
 
+    mutating func parseDoCatchStatement(
+        localBindings: inout [String: LocalBindingSymbol]
+    ) throws -> Statement {
+        try consumeKeyword(.doStatement)
+        let body = try parseStatementBlock(baseLocalBindings: localBindings)
+        try consumeKeyword(.catchStatement)
+
+        var catchBindings = localBindings
+        let errorName: String?
+        switch peek() {
+        case .identifier(let name) where peek(offset: 1) == .leftBrace:
+            advance()
+            errorName = name
+            catchBindings[name] = LocalBindingSymbol(kind: .constant, type: .named("Error"))
+        case .keyword(let name) where peek(offset: 1) == .leftBrace:
+            advance()
+            errorName = name
+            catchBindings[name] = LocalBindingSymbol(kind: .constant, type: .named("Error"))
+        default:
+            errorName = nil
+        }
+
+        let catchBody = try parseStatementBlock(baseLocalBindings: catchBindings)
+        return .doCatch(body: body, errorName: errorName, catchBody: catchBody)
+    }
+
     mutating func parseForStatement(
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
@@ -594,6 +629,9 @@ extension Parser {
         if peek() == .keyword(NeatSyntax.Keyword.whileLoop.rawValue) {
             return true
         }
+        if peek() == .keyword(NeatSyntax.Keyword.doStatement.rawValue) {
+            return true
+        }
         if peek() == .keyword(NeatSyntax.Keyword.forLoop.rawValue) {
             return true
         }
@@ -601,6 +639,9 @@ extension Parser {
             return true
         }
         if peek() == .keyword(NeatSyntax.Keyword.returnStatement.rawValue) {
+            return true
+        }
+        if peek() == .keyword(NeatSyntax.Keyword.throwStatement.rawValue) {
             return true
         }
         if peek() == .keyword(NeatSyntax.Keyword.breakStatement.rawValue) {

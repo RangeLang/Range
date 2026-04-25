@@ -354,6 +354,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         requirement: InitializerDeclaration
     ) -> Bool {
         candidate.parameters.count == requirement.parameters.count
+            && candidate.isThrowing == requirement.isThrowing
             && zip(candidate.parameters, requirement.parameters).allSatisfy { candidate, requirement in
                 labelsMatch(candidate.externalLabel, requirement.externalLabel)
                     && candidate.typeReference?.displayName == requirement.typeReference?.displayName
@@ -367,6 +368,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         candidate.name == requirement.name
             && candidate.parameters.count == requirement.parameters.count
             && candidate.returnType?.displayName == requirement.returnType?.displayName
+            && candidate.isThrowing == requirement.isThrowing
             && zip(candidate.parameters, requirement.parameters).allSatisfy { candidate, requirement in
                 labelsMatch(candidate.externalLabel, requirement.externalLabel)
                     && candidate.typeReference?.displayName == requirement.typeReference?.displayName

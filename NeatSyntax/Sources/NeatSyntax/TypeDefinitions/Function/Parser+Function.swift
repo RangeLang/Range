@@ -65,6 +65,7 @@ extension Parser {
         let parameters = try parseFunctionParameters(
             allowOmittedLocalName: signatureOnly
         )
+        let isThrowing = parseThrowsIfPresent()
         let returnType: TypeReference?
         if peek() == .arrow {
             try consume(.arrow)
@@ -99,6 +100,7 @@ extension Parser {
             hasExplicitParameterClause: hasExplicitParameterClause,
             parameters: parameters,
             returnType: returnType,
+            isThrowing: isThrowing,
             body: body
         )
     }
@@ -168,6 +170,7 @@ extension Parser {
         }
 
         let parameters = try parseFunctionParameters()
+        let isThrowing = parseThrowsIfPresent()
         let returnType: TypeReference?
         if peek() == .arrow {
             try consume(.arrow)
@@ -202,6 +205,7 @@ extension Parser {
             hasExplicitParameterClause: true,
             parameters: parameters,
             returnType: returnType,
+            isThrowing: isThrowing,
             body: body
         )
     }
@@ -285,8 +289,22 @@ extension Parser {
         let parameters = try parseFunctionParameters(
             allowOmittedLocalName: signatureOnly
         )
+        let isThrowing = parseThrowsIfPresent()
         let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
-        return InitializerDeclaration(macros: macros, parameters: parameters, body: body)
+        return InitializerDeclaration(
+            macros: macros,
+            parameters: parameters,
+            isThrowing: isThrowing,
+            body: body
+        )
+    }
+
+    mutating func parseThrowsIfPresent() -> Bool {
+        guard peek() == .keyword(NeatSyntax.Keyword.throwsEffect.rawValue) else {
+            return false
+        }
+        advance()
+        return true
     }
 
     func isInitializerDeclarationStart() -> Bool {
@@ -556,6 +574,8 @@ extension Parser {
             return blockAlwaysReturnsValue(body)
         case .return(let expression):
             return expression != nil
+        case .throw:
+            return true
 
         case .conditional(let branches):
             guard branches.contains(where: { $0.condition == nil }) else {

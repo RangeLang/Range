@@ -59,6 +59,7 @@ public struct CallableDeclaration {
     public let hasExplicitParameterClause: Bool
     public let parameters: [NeatFunctionParameter]
     public let returnType: TypeReference?
+    public let isThrowing: Bool
     public let body: [Statement]?
 
     public init(
@@ -70,6 +71,7 @@ public struct CallableDeclaration {
         hasExplicitParameterClause: Bool,
         parameters: [NeatFunctionParameter],
         returnType: TypeReference?,
+        isThrowing: Bool = false,
         body: [Statement]?
     ) {
         self.macros = macros
@@ -80,6 +82,7 @@ public struct CallableDeclaration {
         self.hasExplicitParameterClause = hasExplicitParameterClause
         self.parameters = parameters
         self.returnType = returnType
+        self.isThrowing = isThrowing
         self.body = body
     }
 
@@ -91,15 +94,18 @@ public struct CallableDeclaration {
 public struct InitializerDeclaration {
     public let macros: [MacroApplication]
     public let parameters: [NeatFunctionParameter]
+    public let isThrowing: Bool
     public let body: [Statement]?
 
     public init(
         macros: [MacroApplication],
         parameters: [NeatFunctionParameter],
+        isThrowing: Bool = false,
         body: [Statement]?
     ) {
         self.macros = macros
         self.parameters = parameters
+        self.isThrowing = isThrowing
         self.body = body
     }
 }

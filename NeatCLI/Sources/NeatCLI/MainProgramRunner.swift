@@ -127,6 +127,10 @@ private struct MainProgramInterpreter {
         case continued
     }
 
+    private struct ThrownRuntimeValue: Error {
+        let value: RuntimeValue
+    }
+
     private var scopes: [[String: VariableSlot]] = [[:]]
     private let fileName: String
 
@@ -270,6 +274,27 @@ private struct MainProgramInterpreter {
             }
             return .none
 
+        case .doCatch(let body, let errorName, let catchBody):
+            pushScope()
+            do {
+                let flow = try executeStatements(body)
+                popScope()
+                return flow
+            } catch let thrown as ThrownRuntimeValue {
+                popScope()
+                var bindings: [String: VariableSlot] = [:]
+                if let errorName {
+                    bindings[errorName] = VariableSlot(kind: .constant, value: thrown.value)
+                }
+                pushScope(bindings: bindings)
+                let flow = try executeStatements(catchBody)
+                popScope()
+                return flow
+            } catch {
+                popScope()
+                throw error
+            }
+
         case .conditional(let branches):
             for branch in branches {
                 let matches: Bool
@@ -296,6 +321,9 @@ private struct MainProgramInterpreter {
                 value = nil
             }
             return .returned(value)
+
+        case .throw(let expression):
+            throw ThrownRuntimeValue(value: try evaluate(expression))
 
         case .break:
             return .broke
@@ -526,6 +554,9 @@ private struct MainProgramInterpreter {
                 let negated = try expectBool(try evaluate(nested), context: "Negation operand")
                 return .bool(!negated)
             }
+
+        case .tryExpression(let nested):
+            return try evaluate(nested)
 
         case .binary(let lhs, let operatorSymbol, let rhs):
             switch operatorSymbol {

@@ -95,6 +95,10 @@ extension Parser {
     }
 
     mutating func parseUnaryExpression() throws -> Expression {
+        if peek() == .keyword(NeatSyntax.Keyword.tryExpression.rawValue) {
+            advance()
+            return .tryExpression(try parseUnaryExpression())
+        }
         if let unary = currentPrefixOperator() {
             advance()
             return .unary(operatorSymbol: unary, expression: try parseUnaryExpression())

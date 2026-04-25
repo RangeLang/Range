@@ -1,0 +1,16 @@
+function throwingMessage() throws -> String {
+    throw "failed"
+}
+
+function handledThrowingMessage() -> String {
+    do {
+        let message = try throwingMessage()
+        return message
+    } catch error {
+        return "fallback"
+    }
+}
+
+function propagatedThrowingMessage() throws -> String {
+    return try throwingMessage()
+}

@@ -1,0 +1,3 @@
+function throwOutsideThrowingContext() -> String {
+    throw "value"
+}

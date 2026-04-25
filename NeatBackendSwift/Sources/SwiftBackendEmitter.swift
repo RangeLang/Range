@@ -258,9 +258,10 @@ struct SwiftBackendEmitter {
             indent: 1,
             enclosingReturnType: callable.returnType ?? .named("Void")
         )
+        let throwsClause = callable.isThrowing ? " throws" : ""
 
         return """
-            func \(callable.name)(\(parameters))\(returnClause) {
+            func \(callable.name)(\(parameters))\(throwsClause)\(returnClause) {
             \(functionBody)
             }
             """
@@ -279,6 +280,7 @@ struct SwiftBackendEmitter {
             hasExplicitParameterClause: declaration.hasExplicitParameterClause,
             parameters: declaration.parameters,
             returnType: declaration.returnType,
+            isThrowing: declaration.isThrowing,
             body: declaration.body
         )
 
@@ -455,13 +457,14 @@ struct SwiftBackendEmitter {
 
     private func emitInitializer(_ initializer: InitializerDeclaration) throws -> String {
         let parameters = try initializer.parameters.map(emitParameter).joined(separator: ", ")
+        let throwsClause = initializer.isThrowing ? " throws" : ""
         guard let body = initializer.body else {
-            return "init(\(parameters)) {}"
+            return "init(\(parameters))\(throwsClause) {}"
         }
 
         let functionBody = try emitStatements(body, indent: 2, enclosingReturnType: .named("Void"))
         return """
-            init(\(parameters)) {
+            init(\(parameters))\(throwsClause) {
             \(functionBody)
             }
             """
@@ -481,9 +484,10 @@ struct SwiftBackendEmitter {
             enclosingReturnType: callable.returnType ?? .named("Void")
         )
         let mutatingPrefix = methodNeedsMutation(callable) ? "mutating " : ""
+        let throwsClause = callable.isThrowing ? " throws" : ""
 
         return """
-            \(mutatingPrefix)func \(callable.name)(\(parameters))\(returnClause) {
+            \(mutatingPrefix)func \(callable.name)(\(parameters))\(throwsClause)\(returnClause) {
             \(functionBody)
             }
             """
@@ -527,7 +531,11 @@ struct SwiftBackendEmitter {
                 if let defaultBody, statementsContainMutation(defaultBody) {
                     return true
                 }
-            case .localBinding, .localCallable, .environmentProvision, .expression, .return, .break, .continue:
+            case .doCatch(let body, _, let catchBody):
+                if statementsContainMutation(body) || statementsContainMutation(catchBody) {
+                    return true
+                }
+            case .localBinding, .localCallable, .environmentProvision, .expression, .return, .throw, .break, .continue:
                 continue
             }
         }
@@ -637,6 +645,16 @@ struct SwiftBackendEmitter {
                 enclosingReturnType: enclosingReturnType
             )
             return "\(header)\n\(bodyText)\n\(prefix)}"
+        case .doCatch(let body, let errorName, let catchBody):
+            return try emitDoCatch(
+                body: body,
+                errorName: errorName,
+                catchBody: catchBody,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType
+            )
+        case .throw(let expression):
+            return "\(prefix)throw \(try emitExpression(expression))"
         case .break:
             return "\(prefix)break"
         case .continue:
@@ -682,6 +700,28 @@ struct SwiftBackendEmitter {
         }
 
         return rendered.joined(separator: " ")
+    }
+
+    private func emitDoCatch(
+        body: [NeatStatement],
+        errorName: String?,
+        catchBody: [NeatStatement],
+        indent: Int,
+        enclosingReturnType: TypeReference? = nil
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        let bodyText = try emitStatements(
+            body,
+            indent: indent + 1,
+            enclosingReturnType: enclosingReturnType
+        )
+        let catchBodyText = try emitStatements(
+            catchBody,
+            indent: indent + 1,
+            enclosingReturnType: enclosingReturnType
+        )
+        let catchHeader = errorName.map { "catch let \($0)" } ?? "catch"
+        return "\(prefix)do {\n\(bodyText)\n\(prefix)} \(catchHeader) {\n\(catchBodyText)\n\(prefix)}"
     }
 
     private func emitSwitch(
@@ -797,6 +837,8 @@ struct SwiftBackendEmitter {
                 "\(try emitExpression(condition)) ? \(try emitExpression(trueExpression)) : \(try emitExpression(falseExpression))"
         case .unary(let operatorSymbol, let nested):
             return "\(operatorSymbol.rawValue)\(try emitExpression(nested))"
+        case .tryExpression(let nested):
+            return "try \(try emitExpression(nested))"
         case .binary(let lhs, let operatorSymbol, let rhs):
             return
                 "\(try emitExpression(lhs)) \(operatorSymbol.rawValue) \(try emitExpression(rhs))"
@@ -1122,6 +1164,16 @@ struct SwiftBackendEmitter {
                 enclosingReturnType: enclosingReturnType
             )
             return "\(header)\n\(bodyText)\n\(prefix)}"
+        case .doCatch(let body, let errorName, let catchBody):
+            return try emitDeferredDoCatch(
+                body: body,
+                errorName: errorName,
+                catchBody: catchBody,
+                indent: indent,
+                enclosingReturnType: enclosingReturnType
+            )
+        case .throw(let expression):
+            return "\(prefix)throw \(try emitExpression(expression))"
         case .break:
             return "\(prefix)throw __NeatDeferredControlFlow.breakLoop"
         case .continue:
@@ -1175,6 +1227,28 @@ struct SwiftBackendEmitter {
         }
 
         return rendered.joined(separator: " ")
+    }
+
+    private func emitDeferredDoCatch(
+        body: [NeatStatement],
+        errorName: String?,
+        catchBody: [NeatStatement],
+        indent: Int,
+        enclosingReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        let bodyText = try emitDeferredInnerStatements(
+            body,
+            indent: indent + 1,
+            enclosingReturnType: enclosingReturnType
+        )
+        let catchBodyText = try emitDeferredInnerStatements(
+            catchBody,
+            indent: indent + 1,
+            enclosingReturnType: enclosingReturnType
+        )
+        let catchHeader = errorName.map { "catch let \($0)" } ?? "catch"
+        return "\(prefix)do {\n\(bodyText)\n\(prefix)} \(catchHeader) {\n\(catchBodyText)\n\(prefix)}"
     }
 
     private func emitDeferredSwitch(

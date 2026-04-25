@@ -18,8 +18,10 @@ public indirect enum Statement {
     case expression(Expression)
     case forEach(name: String, sequence: Expression, body: [Statement])
     case whileLoop(condition: Expression, body: [Statement])
+    case doCatch(body: [Statement], errorName: String?, catchBody: [Statement])
     case conditional([StatementConditionalBranch])
     case `return`(Expression?)
+    case `throw`(Expression)
     case `break`
     case `continue`
     case switchStatement(
@@ -53,6 +55,7 @@ public struct LocalCallableDeclaration {
     public let hasExplicitParameterClause: Bool
     public let parameters: [NeatFunctionParameter]
     public let returnType: TypeReference?
+    public let isThrowing: Bool
     public let body: [Statement]
 
     public init(
@@ -63,6 +66,7 @@ public struct LocalCallableDeclaration {
         hasExplicitParameterClause: Bool,
         parameters: [NeatFunctionParameter],
         returnType: TypeReference?,
+        isThrowing: Bool = false,
         body: [Statement]
     ) {
         self.macros = macros
@@ -72,6 +76,7 @@ public struct LocalCallableDeclaration {
         self.hasExplicitParameterClause = hasExplicitParameterClause
         self.parameters = parameters
         self.returnType = returnType
+        self.isThrowing = isThrowing
         self.body = body
     }
 

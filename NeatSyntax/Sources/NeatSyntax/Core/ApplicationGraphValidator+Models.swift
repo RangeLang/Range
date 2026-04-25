@@ -41,6 +41,7 @@ extension ApplicationGraphValidator {
         let currentConstructName: String?
         var localCallablesByName: [String: [CallLabelCandidate]]
         var accessibleConstructTypesByName: [String: String]
+        var canPropagateThrownErrors: Bool = false
     }
 
     struct CallLabelValidationEnvironment {
@@ -51,6 +52,17 @@ extension ApplicationGraphValidator {
     struct CallLabelCandidate {
         let name: String
         let parameters: [NeatFunctionParameter]
+        let isThrowing: Bool
+
+        init(
+            name: String,
+            parameters: [NeatFunctionParameter],
+            isThrowing: Bool = false
+        ) {
+            self.name = name
+            self.parameters = parameters
+            self.isThrowing = isThrowing
+        }
     }
 
     struct BindingReferenceContext {

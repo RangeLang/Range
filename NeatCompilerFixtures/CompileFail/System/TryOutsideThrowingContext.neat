@@ -1,0 +1,7 @@
+function throwingValue() throws -> String {
+    throw "value"
+}
+
+function tryOutsideThrowingContext() -> String {
+    return try throwingValue()
+}

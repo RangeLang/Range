@@ -323,7 +323,8 @@ public struct DeclarationGraph {
                     $0.typeReference?.displayName ?? $0.slotName
                 },
                 parameters: callable.parameters,
-                returnTypeName: callable.returnType?.displayName
+                returnTypeName: callable.returnType?.displayName,
+                isThrowing: callable.isThrowing
             )
         }
     }
@@ -348,7 +349,8 @@ public struct DeclarationGraph {
                         $0.typeReference?.displayName ?? $0.slotName
                     },
                     parameters: callable.parameters,
-                    returnTypeName: callable.returnType?.displayName
+                    returnTypeName: callable.returnType?.displayName,
+                    isThrowing: callable.isThrowing
                 )
             }
         }
@@ -364,7 +366,8 @@ public struct DeclarationGraph {
                 parameterTypeNames: initializer.parameters.map {
                     $0.typeReference?.displayName ?? $0.slotName
                 },
-                parameters: initializer.parameters
+                parameters: initializer.parameters,
+                isThrowing: initializer.isThrowing
             )
         }
     }
@@ -795,6 +798,7 @@ public struct DeclarationGraph {
                     hasExplicitParameterClause: callable.hasExplicitParameterClause,
                     parameters: callable.parameters,
                     returnType: callable.returnType,
+                    isThrowing: callable.isThrowing,
                     body: callable.body
                 )
             )
@@ -825,6 +829,7 @@ public struct DeclarationGraph {
                     hasExplicitParameterClause: callable.hasExplicitParameterClause,
                     parameters: callable.parameters,
                     returnType: callable.returnType,
+                    isThrowing: callable.isThrowing,
                     body: callable.body
                 )
             )
@@ -854,6 +859,7 @@ public struct DeclarationGraph {
                 hasExplicitParameterClause: callable.hasExplicitParameterClause,
                 parameters: callable.parameters,
                 returnType: callable.returnType,
+                isThrowing: callable.isThrowing,
                 body: callable.body
             )
             registry[callableIdentity(ownerName: nil, declaration: qualifiedCallable)] =
@@ -919,6 +925,7 @@ public struct DeclarationGraph {
                 hasExplicitParameterClause: callable.hasExplicitParameterClause,
                 parameters: callable.parameters,
                 returnType: callable.returnType,
+                isThrowing: callable.isThrowing,
                 body: callable.body
             )
             registry[callableIdentity(ownerName: nil, declaration: qualifiedCallable)] =
@@ -1122,6 +1129,7 @@ public struct DeclarationGraph {
             return InitializerDeclaration(
                 macros: mergedMacros,
                 parameters: initializer.parameters,
+                isThrowing: initializer.isThrowing,
                 body: initializer.body
             )
         }

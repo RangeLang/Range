@@ -66,6 +66,7 @@ extension MacroExpander {
                     hasExplicitParameterClause: declaration.hasExplicitParameterClause,
                     parameters: declaration.parameters,
                     returnType: declaration.returnType,
+                    isThrowing: declaration.isThrowing,
                     body: substituteMacroBindings(in: declaration.body, bindings: bindings)
                 )
             )
@@ -106,6 +107,14 @@ extension MacroExpander {
             )
         case .return(let expression):
             return .return(expression.map { substituteMacroBindings(in: $0, bindings: bindings) })
+        case .throw(let expression):
+            return .throw(substituteMacroBindings(in: expression, bindings: bindings))
+        case .doCatch(let body, let errorName, let catchBody):
+            return .doCatch(
+                body: substituteMacroBindings(in: body, bindings: bindings),
+                errorName: errorName,
+                catchBody: substituteMacroBindings(in: catchBody, bindings: bindings)
+            )
         case .switchStatement(let expression, let cases, let defaultBody):
             return .switchStatement(
                 expression: substituteMacroBindings(in: expression, bindings: bindings),
@@ -185,6 +194,8 @@ extension MacroExpander {
                 operatorSymbol: operatorSymbol,
                 rhs: substituteMacroBindings(in: rhs, bindings: bindings)
             )
+        case .tryExpression(let expression):
+            return .tryExpression(substituteMacroBindings(in: expression, bindings: bindings))
         case .interpolatedString(let string):
             return .interpolatedString(
                 InterpolatedString(
@@ -423,6 +434,7 @@ extension MacroExpander {
                         hasExplicitParameterClause: declaration.hasExplicitParameterClause,
                         parameters: declaration.parameters,
                         returnType: declaration.returnType,
+                        isThrowing: declaration.isThrowing,
                         body: substituteMacroTargetCalls(
                             in: declaration.body,
                             targetBinding: targetBinding,

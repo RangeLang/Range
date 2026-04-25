@@ -62,6 +62,7 @@ struct SwiftLoweredProgramAdapter {
         InitializerDeclaration(
             macros: initializer.macros,
             parameters: initializer.parameters,
+            isThrowing: initializer.isThrowing,
             body: initializer.body.map(lower(statements:))
         )
     }
@@ -76,6 +77,7 @@ struct SwiftLoweredProgramAdapter {
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
             parameters: callable.parameters,
             returnType: callable.returnType,
+            isThrowing: callable.isThrowing,
             body: callable.body.map(lower(statements:))
         )
     }
@@ -118,6 +120,7 @@ struct SwiftLoweredProgramAdapter {
                     hasExplicitParameterClause: declaration.hasExplicitParameterClause,
                     parameters: declaration.parameters,
                     returnType: declaration.returnType,
+                    isThrowing: declaration.isThrowing,
                     body: lower(statements: declaration.body)
                 )
             )
@@ -144,6 +147,12 @@ struct SwiftLoweredProgramAdapter {
         case .whileLoop(let condition, let body):
             return .whileLoop(
                 condition: lower(expression: condition), body: lower(statements: body))
+        case .doCatch(let body, let errorName, let catchBody):
+            return .doCatch(
+                body: lower(statements: body),
+                errorName: errorName,
+                catchBody: lower(statements: catchBody)
+            )
         case .conditional(let branches):
             return .conditional(
                 branches.map { branch in
@@ -155,6 +164,8 @@ struct SwiftLoweredProgramAdapter {
             )
         case .return(let expression):
             return .return(expression.map(lower(expression:)))
+        case .throw(let expression):
+            return .throw(lower(expression: expression))
         case .break, .continue:
             return statement
         case .switchStatement(let expression, let cases, let defaultBody):
@@ -217,6 +228,8 @@ struct SwiftLoweredProgramAdapter {
             )
         case .unary(let operatorSymbol, let nested):
             lowered = .unary(operatorSymbol: operatorSymbol, expression: lower(expression: nested))
+        case .tryExpression(let nested):
+            lowered = .tryExpression(lower(expression: nested))
         case .binary(let lhs, let operatorSymbol, let rhs):
             lowered = .binary(
                 lhs: lower(expression: lhs),
