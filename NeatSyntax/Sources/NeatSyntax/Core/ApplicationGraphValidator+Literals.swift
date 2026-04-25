@@ -288,7 +288,6 @@ extension ApplicationGraphValidator {
                         hasExplicitParameterClause: declaration.hasExplicitParameterClause,
                         parameters: declaration.parameters,
                         returnType: declaration.returnType,
-                        isThrowing: declaration.isThrowing,
                         body: declaration.body
                     ),
                     accessibleTypes: accessibleTypes,
@@ -303,23 +302,6 @@ extension ApplicationGraphValidator {
                 .whileLoop(_, let body):
                 try validateLiteralBridgeCompatibilityInLocalCallables(
                     in: body,
-                    accessibleTypes: accessibleTypes,
-                    resolver: resolver,
-                    memberResolver: memberResolver,
-                    operatorResolver: operatorResolver,
-                    fileName: fileName
-                )
-            case .doCatch(let body, _, let catchBody):
-                try validateLiteralBridgeCompatibilityInLocalCallables(
-                    in: body,
-                    accessibleTypes: accessibleTypes,
-                    resolver: resolver,
-                    memberResolver: memberResolver,
-                    operatorResolver: operatorResolver,
-                    fileName: fileName
-                )
-                try validateLiteralBridgeCompatibilityInLocalCallables(
-                    in: catchBody,
                     accessibleTypes: accessibleTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
@@ -380,7 +362,6 @@ extension ApplicationGraphValidator {
                     )
                 }
             case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
-                .throw,
                 .expression, .return, .break, .continue:
                 continue
             }

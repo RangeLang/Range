@@ -17,7 +17,6 @@ public indirect enum Expression {
     case ternary(condition: Expression, trueExpression: Expression, falseExpression: Expression)
     case unary(operatorSymbol: UnaryOperator, expression: Expression)
     case binary(lhs: Expression, operatorSymbol: BinaryOperator, rhs: Expression)
-    case tryExpression(Expression)
 }
 
 public struct CallArgument {

@@ -349,7 +349,6 @@ extension MacroExpander {
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
             parameters: try expand(parameters: callable.parameters, macros: macros, context: context),
             returnType: callable.returnType,
-            isThrowing: callable.isThrowing,
             body: try callable.body.map {
                 try expand(
                     statements: $0,
@@ -377,7 +376,6 @@ extension MacroExpander {
         InitializerDeclaration(
             macros: initializer.macros,
             parameters: try expand(parameters: initializer.parameters, macros: macros, context: context),
-            isThrowing: initializer.isThrowing,
             body: try initializer.body.map {
                 try expand(
                     statements: $0,
@@ -948,7 +946,6 @@ extension MacroExpander {
                         hasExplicitParameterClause: declaration.hasExplicitParameterClause,
                         parameters: declaration.parameters,
                         returnType: declaration.returnType,
-                        isThrowing: declaration.isThrowing,
                         body: try expand(
                             statements: declaration.body,
                             expectedReturnType: declaration.returnType,
@@ -1279,18 +1276,6 @@ extension MacroExpander {
         stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> Expression {
         switch expression {
-        case .tryExpression(let expression):
-            return .tryExpression(
-                try expand(
-                    expression: expression,
-                    expectedType: expectedType,
-                    macros: macros,
-                    parameterMacroSignatures: parameterMacroSignatures,
-                    literalBridges: literalBridges,
-                    context: context,
-                    stateEffects: stateEffects
-                )
-            )
         case .call(let name, let arguments):
             let rewrittenArguments = try arguments.map { argument in
                 CallArgument(
@@ -1710,9 +1695,6 @@ extension MacroExpander {
                 }
             case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
                 blocks.append(contentsOf: emittedCodeBlocks(in: body))
-            case .doCatch(let body, _, let catchBody):
-                blocks.append(contentsOf: emittedCodeBlocks(in: body))
-                blocks.append(contentsOf: emittedCodeBlocks(in: catchBody))
             case .background(let background):
                 blocks.append(contentsOf: emittedCodeBlocks(in: background.body))
             case .deferBlock(let deferred):
@@ -1727,7 +1709,7 @@ extension MacroExpander {
                     blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
                 }
             case .macroInvocation, .assignment, .compoundAssignment, .expression,
-                .return, .throw, .environmentProvision, .break, .continue:
+                .return, .environmentProvision, .break, .continue:
                 continue
             }
         }

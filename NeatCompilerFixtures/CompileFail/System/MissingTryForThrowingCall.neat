@@ -1,7 +1,0 @@
-function throwingValue() throws -> String {
-    throw "value"
-}
-
-function missingTryForThrowingCall() throws -> String {
-    return throwingValue()
-}

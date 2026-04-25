@@ -51,8 +51,7 @@ extension ApplicationGraphValidator {
                             accessibleConstructTypesByName: parameterConstructTypes(
                                 callable.parameters,
                                 declarationGraph: declarationGraph
-                            ),
-                            canPropagateThrownErrors: callable.isThrowing
+                            )
                         ),
                         fileName: fileName
                     )
@@ -105,8 +104,7 @@ extension ApplicationGraphValidator {
                     accessibleConstructTypesByName: parameterConstructTypes(
                         callable.parameters,
                         declarationGraph: environment.declarationGraph
-                    ),
-                    canPropagateThrownErrors: callable.isThrowing
+                    )
                 ),
                 fileName: fileName
             )
@@ -158,12 +156,7 @@ extension ApplicationGraphValidator {
                 try validateCallArgumentLabels(
                     in: body,
                     environment: environment,
-                    context: CallLabelValidationContext(
-                        currentConstructName: constructContext.currentConstructName,
-                        localCallablesByName: constructContext.localCallablesByName,
-                        accessibleConstructTypesByName: constructContext.accessibleConstructTypesByName,
-                        canPropagateThrownErrors: initializer.isThrowing
-                    ),
+                    context: constructContext,
                     fileName: fileName
                 )
             }
@@ -183,8 +176,7 @@ extension ApplicationGraphValidator {
                                     callable.parameters,
                                     declarationGraph: environment.declarationGraph
                                 )
-                            ) { current, _ in current },
-                        canPropagateThrownErrors: callable.isThrowing
+                            ) { current, _ in current }
                     ),
                     fileName: fileName
                 )
@@ -250,8 +242,7 @@ extension ApplicationGraphValidator {
                 context.localCallablesByName[declaration.name, default: []].append(
                     CallLabelCandidate(
                         name: declaration.name,
-                        parameters: declaration.parameters,
-                        isThrowing: declaration.isThrowing
+                        parameters: declaration.parameters
                     )
                 )
                 try validateCallArgumentLabels(
@@ -260,8 +251,7 @@ extension ApplicationGraphValidator {
                     context: CallLabelValidationContext(
                         currentConstructName: context.currentConstructName,
                         localCallablesByName: context.localCallablesByName,
-                        accessibleConstructTypesByName: context.accessibleConstructTypesByName,
-                        canPropagateThrownErrors: declaration.isThrowing
+                        accessibleConstructTypesByName: context.accessibleConstructTypesByName
                     ),
                     fileName: fileName
                 )
@@ -281,18 +271,6 @@ extension ApplicationGraphValidator {
                 )
             case .assignment(_, let expression), .compoundAssignment(_, _, let expression),
                 .expression(let expression):
-                try validateCallArgumentLabels(
-                    in: expression,
-                    environment: environment,
-                    context: context,
-                    fileName: fileName
-                )
-            case .throw(let expression):
-                guard context.canPropagateThrownErrors else {
-                    throw SemanticValidationError(
-                        "throw in \(fileName) is only valid inside a throwing function, throwing initializer, or do block."
-                    )
-                }
                 try validateCallArgumentLabels(
                     in: expression,
                     environment: environment,
@@ -321,21 +299,6 @@ extension ApplicationGraphValidator {
                 )
                 try validateCallArgumentLabels(
                     in: body,
-                    environment: environment,
-                    context: context,
-                    fileName: fileName
-                )
-            case .doCatch(let body, _, let catchBody):
-                var catchingContext = context
-                catchingContext.canPropagateThrownErrors = true
-                try validateCallArgumentLabels(
-                    in: body,
-                    environment: environment,
-                    context: catchingContext,
-                    fileName: fileName
-                )
-                try validateCallArgumentLabels(
-                    in: catchBody,
                     environment: environment,
                     context: context,
                     fileName: fileName
@@ -421,12 +384,10 @@ extension ApplicationGraphValidator {
         in expression: Expression,
         environment: CallLabelValidationEnvironment,
         context: CallLabelValidationContext,
-        fileName: String,
-        isUnderTry: Bool = false
+        fileName: String
     ) throws {
         switch expression {
         case .call(let name, let arguments):
-            var matchingCandidates: [CallLabelCandidate] = []
             if let (baseName, memberName) = splitMemberName(name),
                 let constructName =
                     baseName == "self"
@@ -450,9 +411,6 @@ extension ApplicationGraphValidator {
                         "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) does not match any available parameter labels. Expected one of: \(renderExpectedCallShapes(for: candidates))."
                     )
                 }
-                matchingCandidates = candidates.filter {
-                    callArguments(arguments, match: $0.parameters)
-                }
             } else if let candidates = callLabelCandidates(
                 for: name,
                 environment: environment,
@@ -463,15 +421,6 @@ extension ApplicationGraphValidator {
                         "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) does not match any available parameter labels. Expected one of: \(renderExpectedCallShapes(for: candidates))."
                     )
                 }
-                matchingCandidates = candidates.filter {
-                    callArguments(arguments, match: $0.parameters)
-                }
-            }
-
-            if matchingCandidates.contains(where: \.isThrowing), !isUnderTry {
-                throw SemanticValidationError(
-                    "Call \(name)(\(renderCallArguments(arguments))) in \(fileName) can throw and must be marked with try."
-                )
             }
 
             for argument in arguments {
@@ -482,19 +431,6 @@ extension ApplicationGraphValidator {
                     fileName: fileName
                 )
             }
-        case .tryExpression(let nested):
-            guard context.canPropagateThrownErrors else {
-                throw SemanticValidationError(
-                    "try in \(fileName) is only valid inside a throwing function, throwing initializer, or do block."
-                )
-            }
-            try validateCallArgumentLabels(
-                in: nested,
-                environment: environment,
-                context: context,
-                fileName: fileName,
-                isUnderTry: true
-            )
         case .macroInvocation(_, let arguments):
             for argument in arguments {
                 try validateCallArgumentLabels(
@@ -617,11 +553,7 @@ extension ApplicationGraphValidator {
 
         for surface in declarationGraph.topLevelCallableSurfaces() {
             topLevelCallablesByName[surface.name, default: []].append(
-                CallLabelCandidate(
-                    name: surface.name,
-                    parameters: surface.parameters,
-                    isThrowing: surface.isThrowing
-                )
+                CallLabelCandidate(name: surface.name, parameters: surface.parameters)
             )
         }
 
@@ -640,25 +572,13 @@ extension ApplicationGraphValidator {
             if baseName == "self", let currentConstructName = context.currentConstructName {
                 let candidates = environment.declarationGraph.callableSurfaces(onConstruct: currentConstructName)
                     .filter { $0.name == memberName }
-                    .map {
-                        CallLabelCandidate(
-                            name: $0.name,
-                            parameters: $0.parameters,
-                            isThrowing: $0.isThrowing
-                        )
-                    }
+                    .map { CallLabelCandidate(name: $0.name, parameters: $0.parameters) }
                 return candidates.isEmpty ? nil : candidates
             }
             if let constructName = context.accessibleConstructTypesByName[baseName] {
                 let candidates = environment.declarationGraph.callableSurfaces(onConstruct: constructName)
                     .filter { $0.name == memberName }
-                    .map {
-                        CallLabelCandidate(
-                            name: $0.name,
-                            parameters: $0.parameters,
-                            isThrowing: $0.isThrowing
-                        )
-                    }
+                    .map { CallLabelCandidate(name: $0.name, parameters: $0.parameters) }
                 return candidates.isEmpty ? nil : candidates
             }
             return nil
@@ -674,11 +594,7 @@ extension ApplicationGraphValidator {
 
         if environment.declarationGraph.hasConstruct(named: name) {
             let candidates = environment.declarationGraph.initializerSurfaces(onConstruct: name).map {
-                CallLabelCandidate(
-                    name: name,
-                    parameters: $0.parameters,
-                    isThrowing: $0.isThrowing
-                )
+                CallLabelCandidate(name: name, parameters: $0.parameters)
             }
             return candidates.isEmpty ? nil : candidates
         }
@@ -764,11 +680,7 @@ extension ApplicationGraphValidator {
     func localCallableMap(_ callables: [CallableDeclaration]) -> [String: [CallLabelCandidate]] {
         Dictionary(
             grouping: callables.map {
-                CallLabelCandidate(
-                    name: $0.name,
-                    parameters: $0.parameters,
-                    isThrowing: $0.isThrowing
-                )
+                CallLabelCandidate(name: $0.name, parameters: $0.parameters)
             },
             by: \.name
         )

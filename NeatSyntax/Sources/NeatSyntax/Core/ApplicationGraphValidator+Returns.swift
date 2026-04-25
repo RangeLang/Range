@@ -277,7 +277,6 @@ extension ApplicationGraphValidator {
                         hasExplicitParameterClause: declaration.hasExplicitParameterClause,
                         parameters: declaration.parameters,
                         returnType: declaration.returnType,
-                        isThrowing: declaration.isThrowing,
                         body: declaration.body
                     ),
                     accessibleTypes: accessibleTypes,
@@ -292,23 +291,6 @@ extension ApplicationGraphValidator {
                 .whileLoop(_, let body):
                 try validateCallableReturnSemanticsInLocalCallables(
                     in: body,
-                    accessibleTypes: accessibleTypes,
-                    resolver: resolver,
-                    memberResolver: memberResolver,
-                    operatorResolver: operatorResolver,
-                    fileName: fileName
-                )
-            case .doCatch(let body, _, let catchBody):
-                try validateCallableReturnSemanticsInLocalCallables(
-                    in: body,
-                    accessibleTypes: accessibleTypes,
-                    resolver: resolver,
-                    memberResolver: memberResolver,
-                    operatorResolver: operatorResolver,
-                    fileName: fileName
-                )
-                try validateCallableReturnSemanticsInLocalCallables(
-                    in: catchBody,
                     accessibleTypes: accessibleTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
@@ -369,7 +351,6 @@ extension ApplicationGraphValidator {
                     )
                 }
             case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
-                .throw,
                 .expression, .return, .break, .continue:
                 continue
             }
@@ -391,9 +372,6 @@ extension ApplicationGraphValidator {
                 expressions.append(contentsOf: collectReturnExpressions(in: body))
             case .whileLoop(_, let body):
                 expressions.append(contentsOf: collectReturnExpressions(in: body))
-            case .doCatch(let body, _, let catchBody):
-                expressions.append(contentsOf: collectReturnExpressions(in: body))
-                expressions.append(contentsOf: collectReturnExpressions(in: catchBody))
             case .conditional(let branches):
                 for branch in branches {
                     expressions.append(contentsOf: collectReturnExpressions(in: branch.body))
@@ -412,7 +390,6 @@ extension ApplicationGraphValidator {
             case .localCallable:
                 continue
             case .localBinding, .derived, .environmentProvision, .assignment, .compoundAssignment,
-                .throw,
                 .expression, .break, .continue:
                 continue
             }
@@ -458,10 +435,6 @@ extension ApplicationGraphValidator {
             guard let defaultBody else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
             return blockAlwaysReturnsValue(defaultBody)
-        case .doCatch(let body, _, let catchBody):
-            return blockAlwaysReturnsValue(body) && blockAlwaysReturnsValue(catchBody)
-        case .throw:
-            return true
         case .background, .localCallable:
             return false
         case .deferBlock(let deferred):

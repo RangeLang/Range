@@ -114,7 +114,7 @@ extension Parser {
                 continue
             case .environmentProvision:
                 continue
-            case .return, .throw, .break, .continue:
+            case .return, .break, .continue:
                 continue
             case .forEach(_, _, let body):
                 hooks.insert("buildArray")
@@ -122,9 +122,6 @@ extension Parser {
             case .whileLoop(_, let body):
                 hooks.insert("buildArray")
                 collectBuilderHooks(from: body, into: &hooks)
-            case .doCatch(let body, _, let catchBody):
-                collectBuilderHooks(from: body, into: &hooks)
-                collectBuilderHooks(from: catchBody, into: &hooks)
             case .conditional(let branches):
                 if branches.contains(where: { $0.condition == nil }) {
                     hooks.insert("buildEither")

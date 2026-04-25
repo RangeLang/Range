@@ -348,8 +348,6 @@ extension MacroExpander {
             return .boolLiteral
         case .nilLiteral:
             return .nilLiteral
-        case .tryExpression(let expression):
-            return bootstrapLiteralType(for: expression)
         case .block, .macroInvocation, .identifier, .call, .bindingReference, .array,
             .dictionary, .ternary, .unary, .binary:
             return nil
@@ -540,9 +538,6 @@ extension MacroExpander {
                 }
             case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
                 expressions.append(contentsOf: macroOperationExpressions(in: body))
-            case .doCatch(let body, _, let catchBody):
-                expressions.append(contentsOf: macroOperationExpressions(in: body))
-                expressions.append(contentsOf: macroOperationExpressions(in: catchBody))
             case .background(let background):
                 expressions.append(contentsOf: macroOperationExpressions(in: background.body))
             case .deferBlock(let deferred):
@@ -556,7 +551,7 @@ extension MacroExpander {
                 if let defaultBody {
                     expressions.append(contentsOf: macroOperationExpressions(in: defaultBody))
                 }
-            case .localBinding, .assignment, .compoundAssignment, .return, .throw, .macroInvocation,
+            case .localBinding, .assignment, .compoundAssignment, .return, .macroInvocation,
                 .environmentProvision, .break, .continue:
                 continue
             }

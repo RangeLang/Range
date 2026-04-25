@@ -364,26 +364,6 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-            case .throw(let expression):
-                try validateBindingReferences(
-                    in: expression,
-                    declarationGraph: declarationGraph,
-                    context: context,
-                    fileName: fileName
-                )
-            case .doCatch(let body, _, let catchBody):
-                try validateBindingReferences(
-                    in: body,
-                    declarationGraph: declarationGraph,
-                    context: context,
-                    fileName: fileName
-                )
-                try validateBindingReferences(
-                    in: catchBody,
-                    declarationGraph: declarationGraph,
-                    context: context,
-                    fileName: fileName
-                )
             case .switchStatement(let expression, let cases, let defaultBody):
                 try validateBindingReferences(
                     in: expression,
@@ -547,13 +527,6 @@ extension ApplicationGraphValidator {
             )
             try validateBindingReferences(
                 in: rhs,
-                declarationGraph: declarationGraph,
-                context: context,
-                fileName: fileName
-            )
-        case .tryExpression(let expression):
-            try validateBindingReferences(
-                in: expression,
                 declarationGraph: declarationGraph,
                 context: context,
                 fileName: fileName

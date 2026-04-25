@@ -48,8 +48,6 @@ extension MacroExpander {
         case .binary(let lhs, let operatorSymbol, let rhs):
             return
                 "\(renderExpressionForStringify(lhs)) \(operatorSymbol.rawValue) \(renderExpressionForStringify(rhs))"
-        case .tryExpression(let expression):
-            return "try \(renderExpressionForStringify(expression))"
         }
     }
 

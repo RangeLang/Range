@@ -216,17 +216,6 @@ extension ApplicationGraphValidator {
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )
-            case .doCatch(let body, _, let catchBody):
-                try validateValueDeclarations(
-                    in: body,
-                    bindingConstructNames: bindingConstructNames,
-                    fileName: fileName
-                )
-                try validateValueDeclarations(
-                    in: catchBody,
-                    bindingConstructNames: bindingConstructNames,
-                    fileName: fileName
-                )
             case .conditional(let branches):
                 for branch in branches {
                     try validateValueDeclarations(
@@ -251,7 +240,6 @@ extension ApplicationGraphValidator {
                     )
                 }
             case .environmentProvision, .assignment, .compoundAssignment, .expression, .return,
-                .throw,
                 .break, .continue:
                 continue
             }

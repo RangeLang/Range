@@ -166,17 +166,6 @@ extension ApplicationGraphValidator {
                     context: context.enteringLoop(),
                     fileName: fileName
                 )
-            case .doCatch(let body, _, let catchBody):
-                try validateControlFlow(
-                    in: body,
-                    context: context,
-                    fileName: fileName
-                )
-                try validateControlFlow(
-                    in: catchBody,
-                    context: context,
-                    fileName: fileName
-                )
             case .conditional(let branches):
                 for branch in branches {
                     try validateControlFlow(
@@ -222,7 +211,6 @@ extension ApplicationGraphValidator {
                     )
                 }
             case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
-                .throw,
                 .expression:
                 continue
             }

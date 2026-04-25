@@ -99,7 +99,6 @@ public struct DeclaredCallableSurface {
     public let parameterTypeNames: [String?]
     public let parameters: [NeatFunctionParameter]
     public let returnTypeName: String?
-    public let isThrowing: Bool
 
     public init(
         ownerConstructName: String?,
@@ -107,8 +106,7 @@ public struct DeclaredCallableSurface {
         labels: [String?],
         parameterTypeNames: [String?],
         parameters: [NeatFunctionParameter],
-        returnTypeName: String?,
-        isThrowing: Bool = false
+        returnTypeName: String?
     ) {
         self.ownerConstructName = ownerConstructName
         self.name = name
@@ -116,7 +114,6 @@ public struct DeclaredCallableSurface {
         self.parameterTypeNames = parameterTypeNames
         self.parameters = parameters
         self.returnTypeName = returnTypeName
-        self.isThrowing = isThrowing
     }
 
     public var identity: String {
@@ -130,20 +127,17 @@ public struct DeclaredInitializerSurface {
     public let labels: [String?]
     public let parameterTypeNames: [String?]
     public let parameters: [NeatFunctionParameter]
-    public let isThrowing: Bool
 
     public init(
         ownerConstructName: String,
         labels: [String?],
         parameterTypeNames: [String?],
-        parameters: [NeatFunctionParameter],
-        isThrowing: Bool = false
+        parameters: [NeatFunctionParameter]
     ) {
         self.ownerConstructName = ownerConstructName
         self.labels = labels
         self.parameterTypeNames = parameterTypeNames
         self.parameters = parameters
-        self.isThrowing = isThrowing
     }
 
     public var identity: String {
