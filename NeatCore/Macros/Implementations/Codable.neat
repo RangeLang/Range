@@ -1,11 +1,9 @@
 macro codable(): Construct { target, diagnostics in
-    let codingKeys: Enum = Enum(
-        declaration: Enum.Declaration(
-            self: NamedTypeReference(name: "CodingKeys"),
-            cases: target.declaration.lets.map { property in
-                Enum.Case(name: property.name, associatedValues: [])
-            }
-        )
+    let codingKeys: Enum.Declaration = Enum.Declaration(
+        self: NamedTypeReference(name: "CodingKeys"),
+        cases: target.declaration.lets.map { property in
+            Enum.Case(name: property.name, associatedValues: [])
+        }
     )
 
     target.declaration.expand {

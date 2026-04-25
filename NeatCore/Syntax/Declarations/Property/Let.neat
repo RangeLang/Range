@@ -1,5 +1,5 @@
 @core
-construct Let<T>: Property {
+construct Let<T>: Property, SyntaxEmittable {
   let name: String
   let type: TypeReference
   let value: Expression?

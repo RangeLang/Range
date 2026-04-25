@@ -3,7 +3,7 @@ construct Enum: Syntax {
     let declaration: Declaration
 
     @core
-    construct Declaration: SyntaxExpandable<NominalTypeReference> {
+    construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
         let self: NominalTypeReference
         let cases: [Case]
 
@@ -11,7 +11,7 @@ construct Enum: Syntax {
     }
 
     @core
-    construct Case {
+    construct Case: SyntaxEmittable {
         let name: String
         let associatedValues: [AssociatedValue]
     }

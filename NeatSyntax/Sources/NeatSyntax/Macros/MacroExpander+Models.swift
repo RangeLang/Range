@@ -94,14 +94,10 @@ struct MacroTargetSurface {
         case .string:
             return [.callableName, .declaration]
         case .call(let name, _):
-            switch name {
-            case "Enum":
-                return [.declaration]
-            case "NamedTypeReference", "MemberTypeReference":
-                return [.nominalTypeReference, .typeReference]
-            default:
-                return [.expression]
+            if let kinds = emittedSyntaxKinds(forConstructedTypeNamed: name) {
+                return kinds
             }
+            return [.expression]
         default:
             return [.expression]
         }
@@ -139,15 +135,17 @@ struct MacroTargetSurface {
         case .array:
             return [.expression]
         case .object(let typeName, _):
-            switch typeName {
-            case "Enum":
-                return [.declaration]
-            case "NamedTypeReference", "MemberTypeReference":
-                return [.nominalTypeReference, .typeReference]
-            default:
-                return [.expression]
+            if let kinds = emittedSyntaxKinds(forConstructedTypeNamed: typeName) {
+                return kinds
             }
+            return [.expression]
         }
+    }
+
+    private func emittedSyntaxKinds(forConstructedTypeNamed typeName: String) -> Set<EmittedSyntaxKind>? {
+        context.rewriteSurfaceView.emittedSyntaxKinds(
+            forSemanticType: TypeReference.named(typeName)
+        )
     }
 
     private func isTargetPath(_ path: String) -> Bool {

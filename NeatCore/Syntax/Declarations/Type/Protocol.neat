@@ -3,7 +3,7 @@ construct Protocol: Syntax {
     let declaration: Declaration
 
     @core
-    construct Declaration: SyntaxExpandable<NominalTypeReference> {
+    construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
         let self: NominalTypeReference
         let inits: [Init.Declaration]
         let functions: [Function.Declaration]

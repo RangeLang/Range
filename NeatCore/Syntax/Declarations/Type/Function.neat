@@ -4,7 +4,7 @@ construct Function: Syntax {
     let application: Application
 
     @core
-    construct Declaration {
+    construct Declaration: SyntaxEmittable {
         let name: String
         let parameters: [Parameter.Declaration]
         let returnType: TypeReference?
@@ -12,7 +12,7 @@ construct Function: Syntax {
     }
 
     @core
-    construct Application {
+    construct Application: SyntaxEmittable {
         let name: String
         let arguments: [Parameter.Application]
     }

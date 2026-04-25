@@ -11,6 +11,8 @@ struct MacroSyntaxRenderer {
                 return nil
             }
             return renderEnum(declaration)
+        case .object(let typeName, _) where typeName == "Enum.Declaration":
+            return renderEnum(value)
         case .object(let typeName, _) where typeName == "NamedTypeReference" || typeName == "MemberTypeReference":
             return renderNominalTypeReference(value)
         case .string(let value):
@@ -37,6 +39,8 @@ struct MacroSyntaxRenderer {
                     return nil
                 }
                 return renderEnum(declaration)
+            case "Enum.Declaration":
+                return renderEnum(expression)
             default:
                 return nil
             }
@@ -191,4 +195,3 @@ struct MacroSyntaxRenderer {
         }
     }
 }
-

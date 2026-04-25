@@ -1,27 +1,21 @@
 macro codingKeysFromLets(): Construct { target, diagnostics in
-    let codingKeys: Enum = Enum(
-        declaration: Enum.Declaration(
-            self: NamedTypeReference(name: "CodingKeys"),
-            cases: target.declaration.lets.map { property in
-                Enum.Case(name: property.name, associatedValues: [])
-            }
-        )
+    let codingKeys: Enum.Declaration = Enum.Declaration(
+        self: NamedTypeReference(name: "CodingKeys"),
+        cases: target.declaration.lets.map { property in
+            Enum.Case(name: property.name, associatedValues: [])
+        }
     )
-    let compactCodingKeys: Enum = Enum(
-        declaration: Enum.Declaration(
-            self: NamedTypeReference(name: "CompactCodingKeys"),
-            cases: target.declaration.lets.compactMap { property in
-                Enum.Case(name: property.name, associatedValues: [])
-            }
-        )
+    let compactCodingKeys: Enum.Declaration = Enum.Declaration(
+        self: NamedTypeReference(name: "CompactCodingKeys"),
+        cases: target.declaration.lets.compactMap { property in
+            Enum.Case(name: property.name, associatedValues: [])
+        }
     )
-    let flatCodingKeys: Enum = Enum(
-        declaration: Enum.Declaration(
-            self: NamedTypeReference(name: "FlatCodingKeys"),
-            cases: target.declaration.lets.flatMap { property in
-                [Enum.Case(name: property.name, associatedValues: [])]
-            }
-        )
+    let flatCodingKeys: Enum.Declaration = Enum.Declaration(
+        self: NamedTypeReference(name: "FlatCodingKeys"),
+        cases: target.declaration.lets.flatMap { property in
+            [Enum.Case(name: property.name, associatedValues: [])]
+        }
     )
 
     target.declaration.expand {

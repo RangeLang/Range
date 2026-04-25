@@ -455,7 +455,7 @@ struct RewriteSurfaceView {
         return nil
     }
 
-    private func emittedSyntaxKinds(forSemanticType typeReference: TypeReference) -> Set<
+    func emittedSyntaxKinds(forSemanticType typeReference: TypeReference) -> Set<
         EmittedSyntaxKind
     > {
         guard let semanticName = syntaxResolver.nominalName(of: typeReference) else {
@@ -482,6 +482,10 @@ struct RewriteSurfaceView {
             || syntaxResolver.declaration(named: semanticName, conformsTo: "Expression")
         {
             return [.expression]
+        }
+
+        if syntaxResolver.declaration(named: semanticName, conformsTo: "SyntaxEmittable") {
+            return [.declaration]
         }
 
         return [.expression]

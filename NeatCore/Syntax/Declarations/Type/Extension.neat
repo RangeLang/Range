@@ -1,5 +1,5 @@
 @core
-construct Extension<Target: NominalTypeReference>: Syntax {
+construct Extension<Target: NominalTypeReference>: Syntax, SyntaxEmittable {
     let target: Target
     let conformances: [NominalTypeReference]
     let functions: [Function.Declaration]
