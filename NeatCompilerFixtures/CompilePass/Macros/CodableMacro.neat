@@ -1,0 +1,5 @@
+#codable
+construct CodableMacroFixture {
+    let id: Int
+    let displayName: String
+}

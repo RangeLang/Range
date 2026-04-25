@@ -1,7 +1,7 @@
 import Foundation
 
 struct MacroTargetValueBuilder {
-    func targetValue(for construct: ConstructDeclaration) -> MacroValue {
+    func targetValue(for construct: ConstructDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Construct",
             fields: [
@@ -24,7 +24,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    func targetValue(for enumeration: EnumDeclaration) -> MacroValue {
+    func targetValue(for enumeration: EnumDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Enum",
             fields: [
@@ -39,7 +39,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    func targetValue(for protocolDeclaration: ProtocolDeclaration) -> MacroValue {
+    func targetValue(for protocolDeclaration: ProtocolDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Protocol",
             fields: [
@@ -55,7 +55,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    func declarationName(for value: MacroValue) -> String {
+    func declarationName(for value: CompileTimeValue) -> String {
         guard let declaration = value.field("declaration"),
             let selfValue = declaration.field("self"),
             case .object(_, let fields) = selfValue,
@@ -66,7 +66,7 @@ struct MacroTargetValueBuilder {
         return name
     }
 
-    private func declarationValue(for declaration: ConstructDeclaration) -> MacroValue {
+    private func declarationValue(for declaration: ConstructDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Construct.Declaration",
             fields: [
@@ -84,7 +84,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: ValueDeclaration) -> MacroValue {
+    private func value(for declaration: ValueDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Let",
             fields: [
@@ -94,7 +94,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: StateDeclaration) -> MacroValue {
+    private func value(for declaration: StateDeclaration) -> CompileTimeValue {
         .object(
             typeName: "State",
             fields: [
@@ -104,7 +104,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: BindingDeclaration) -> MacroValue {
+    private func value(for declaration: BindingDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Binding",
             fields: [
@@ -114,7 +114,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: DerivedDeclaration) -> MacroValue {
+    private func value(for declaration: DerivedDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Derived",
             fields: [
@@ -124,7 +124,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: InitializerDeclaration) -> MacroValue {
+    private func value(for declaration: InitializerDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Init.Declaration",
             fields: [
@@ -133,7 +133,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: CallableDeclaration) -> MacroValue {
+    private func value(for declaration: CallableDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Function.Declaration",
             fields: [
@@ -144,7 +144,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: NeatFunctionParameter) -> MacroValue {
+    private func value(for declaration: NeatFunctionParameter) -> CompileTimeValue {
         .object(
             typeName: "Parameter.Declaration",
             fields: [
@@ -154,7 +154,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: EnumCaseDeclaration) -> MacroValue {
+    private func value(for declaration: EnumCaseDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Enum.Case",
             fields: [
@@ -164,7 +164,7 @@ struct MacroTargetValueBuilder {
                         .object(
                             typeName: "Enum.AssociatedValue",
                             fields: [
-                                "name": associatedValue.label.map(MacroValue.string) ?? .string(""),
+                                "name": associatedValue.label.map(CompileTimeValue.string) ?? .string(""),
                                 "type": typeReferenceValue(associatedValue.typeReference),
                             ]
                         )
@@ -174,15 +174,15 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func nominalTypeReference(_ name: String) -> MacroValue {
+    private func nominalTypeReference(_ name: String) -> CompileTimeValue {
         .object(typeName: "NamedTypeReference", fields: ["name": .string(name)])
     }
 
-    private func typeReferenceValue(_ typeReference: TypeReference) -> MacroValue {
+    private func typeReferenceValue(_ typeReference: TypeReference) -> CompileTimeValue {
         typeReferenceValue(typeReference.displayName)
     }
 
-    private func typeReferenceValue(_ name: String) -> MacroValue {
+    private func typeReferenceValue(_ name: String) -> CompileTimeValue {
         nominalTypeReference(name)
     }
 }

@@ -1656,7 +1656,7 @@ extension MacroExpander {
 
     static func emittedDeclarations(
         from macro: MacroDeclaration,
-        targetValue: MacroValue,
+        targetValue: CompileTimeValue,
         context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
@@ -1720,7 +1720,7 @@ extension MacroExpander {
     static func emittedDeclarationBundle(
         from block: EmittedCodeBlock,
         macro: MacroDeclaration,
-        targetValue: MacroValue,
+        targetValue: CompileTimeValue,
         localBindings: [String: Expression],
         context: MacroExpansionContext
     ) throws -> EmittedDeclarationBundle {
@@ -1740,7 +1740,7 @@ extension MacroExpander {
     static func renderEmittedCodeBlock(
         _ block: EmittedCodeBlock,
         macro: MacroDeclaration,
-        targetValue: MacroValue,
+        targetValue: CompileTimeValue,
         localBindings: [String: Expression],
         context: MacroExpansionContext
     ) throws -> String {

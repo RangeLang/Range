@@ -1,18 +1,18 @@
 import Foundation
 
-struct MacroValueEvaluator {
+struct CompileTimeValueEvaluator {
     let targetBinding: String
-    let targetValue: MacroValue
+    let targetValue: CompileTimeValue
     let localBindings: [String: Expression]
 
-    func evaluate(_ expression: Expression) -> MacroValue? {
+    func evaluate(_ expression: Expression) -> CompileTimeValue? {
         evaluate(expression, locals: localBindings)
     }
 
     private func evaluate(
         _ expression: Expression,
         locals: [String: Expression]
-    ) -> MacroValue? {
+    ) -> CompileTimeValue? {
         switch expression {
         case .string(let value):
             return .string(value)
@@ -41,14 +41,14 @@ struct MacroValueEvaluator {
         }
     }
 
-    private func evaluatePath(_ path: String, locals: [String: Expression]) -> MacroValue? {
+    private func evaluatePath(_ path: String, locals: [String: Expression]) -> CompileTimeValue? {
         let components = path.split(separator: ".").map(String.init)
         guard !components.isEmpty else {
             return nil
         }
 
         let root = components[0]
-        let value: MacroValue?
+        let value: CompileTimeValue?
         if root == targetBinding {
             value = targetValue
         } else if let local = locals[root] {
@@ -75,12 +75,12 @@ struct MacroValueEvaluator {
         name: String,
         arguments: [CallArgument],
         locals: [String: Expression]
-    ) -> MacroValue? {
+    ) -> CompileTimeValue? {
         switch name {
         case "Enum", "Enum.Declaration", "Enum.Case", "NamedTypeReference", "MemberTypeReference",
             "Let", "State", "Binding", "Derived", "Init.Declaration", "Function.Declaration",
             "Construct.Declaration", "Extension":
-            var fields: [String: MacroValue] = [:]
+            var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
                 guard let label = argument.label,
                     let value = evaluate(argument.value, locals: locals)
@@ -99,7 +99,7 @@ struct MacroValueEvaluator {
         name: String,
         arguments: [CallArgument],
         locals: [String: Expression]
-    ) -> MacroValue? {
+    ) -> CompileTimeValue? {
         let supportedSuffixes = [".map", ".compactMap", ".flatMap"]
         guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
             arguments.count == 1,
@@ -111,7 +111,7 @@ struct MacroValueEvaluator {
             return nil
         }
 
-        let transformed = elements.compactMap { element -> MacroValue? in
+        let transformed = elements.compactMap { element -> CompileTimeValue? in
             evaluateSingleParameterClosure(
                 closureArguments,
                 element: element,
@@ -128,7 +128,7 @@ struct MacroValueEvaluator {
         case ".compactMap":
             return .array(transformed)
         case ".flatMap":
-            var flattened: [MacroValue] = []
+            var flattened: [CompileTimeValue] = []
             for value in transformed {
                 guard case .array(let nested) = value else {
                     return nil
@@ -143,9 +143,9 @@ struct MacroValueEvaluator {
 
     private func evaluateSingleParameterClosure(
         _ closureArguments: [CallArgument],
-        element: MacroValue,
+        element: CompileTimeValue,
         locals: [String: Expression]
-    ) -> MacroValue? {
+    ) -> CompileTimeValue? {
         guard let parameterExpression = argument("parameters", in: closureArguments),
             case .array(let parameterExpressions) = parameterExpression,
             parameterExpressions.count == 1,

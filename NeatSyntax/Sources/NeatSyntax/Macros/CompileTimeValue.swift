@@ -1,11 +1,11 @@
 import Foundation
 
-indirect enum MacroValue {
+indirect enum CompileTimeValue {
     case string(String)
-    case array([MacroValue])
-    case object(typeName: String, fields: [String: MacroValue])
+    case array([CompileTimeValue])
+    case object(typeName: String, fields: [String: CompileTimeValue])
 
-    func field(_ name: String) -> MacroValue? {
+    func field(_ name: String) -> CompileTimeValue? {
         guard case .object(_, let fields) = self else {
             return nil
         }

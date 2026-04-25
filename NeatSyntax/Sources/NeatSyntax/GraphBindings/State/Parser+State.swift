@@ -73,6 +73,10 @@ extension Parser {
         bindingKindDescription: String,
         allowPromiseResolution: Bool = false
     ) throws -> TypeReference {
+        if currentMacroBodyDepth > 0, let explicitType {
+            return explicitType
+        }
+
         if isEmptyArrayLiteral(expression) {
             guard let explicitType else {
                 throw ParseError(
