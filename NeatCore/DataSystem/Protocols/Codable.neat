@@ -1,2 +1,2 @@
-protocol Codable: Encodable {
+protocol Codable {
 }

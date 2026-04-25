@@ -9,10 +9,6 @@ macro codable(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Codable {
             #(codingKeys)
-
-            function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
-                return .success(result: Void())
-            }
         }
     }
 }

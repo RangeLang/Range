@@ -6,3 +6,10 @@ construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: Expre
         self.storage = literal.storage()
     }
 }
+
+extension Int: Encodable {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+        let container = encoder.singleValueContainer()
+        return container.encode(self)
+    }
+}

@@ -1,2 +1,8 @@
 protocol Encoder {
+    function container<Key: CodingKey>(
+        keyedBy keyType: NominalTypeReference
+    ) -> KeyedEncodingContainer<Key>
+
+    function unkeyedContainer() -> UnkeyedEncodingContainer
+    function singleValueContainer() -> SingleValueEncodingContainer
 }

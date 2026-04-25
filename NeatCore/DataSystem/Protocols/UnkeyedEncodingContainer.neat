@@ -1,0 +1,3 @@
+protocol UnkeyedEncodingContainer {
+    function encode<T: Encodable>(_ value: T) -> Result<Void, EncodingError>
+}

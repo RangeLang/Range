@@ -1,0 +1,3 @@
+protocol KeyedEncodingContainer<Key: CodingKey> {
+    function encode<T: Encodable>(_ value: T, forKey key: Key) -> Result<Void, EncodingError>
+}
