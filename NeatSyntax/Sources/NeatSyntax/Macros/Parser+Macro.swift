@@ -218,9 +218,6 @@ extension Parser {
         case .leftParen where nextToken == .rightParen || nextToken == .comma:
             return .typeReference
         default:
-            if nextToken == .keyword(NeatSyntax.Keyword.function.rawValue) {
-                return .nominalTypeReference
-            }
             return .expression
         }
     }
