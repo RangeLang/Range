@@ -285,7 +285,17 @@ extension Parser {
         let parameters = try parseFunctionParameters(
             allowOmittedLocalName: signatureOnly
         )
-        let body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        let body: [Statement]?
+        if signatureOnly {
+            if peek() == .leftBrace {
+                try consume(.leftBrace)
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+            }
+            body = nil
+        } else {
+            body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+        }
         return InitializerDeclaration(macros: macros, parameters: parameters, body: body)
     }
 

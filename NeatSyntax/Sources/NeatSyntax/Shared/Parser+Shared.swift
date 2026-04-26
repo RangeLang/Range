@@ -242,9 +242,36 @@ extension Parser {
         let attribute = parseAttributeIfPresent(before: .construct)
         let kind = try parseConstructKind(attribute: attribute)
         let header = try parseConstructHeader()
+        var initializers: [InitializerDeclaration] = []
+        var callables: [CallableDeclaration] = []
+        var constructs: [ConstructDeclaration] = []
         if peek() == .leftBrace {
             try consume(.leftBrace)
-            try skipUnknownBlockBody()
+            while peek() != .rightBrace {
+                if isInitializerDeclarationStart() {
+                    initializers.append(try parseInitializerDeclaration(signatureOnly: true))
+                    continue
+                }
+                if isCallableStart() {
+                    callables.append(try parseCallableDeclaration(signatureOnly: true))
+                    continue
+                }
+                if isConstructDeclarationStart() || isBuilderDeclarationStart() {
+                    constructs.append(try parseConstructDeclarationForDeclarationDiscovery())
+                    continue
+                }
+                if isStateDeclarationStart() {
+                    try skipStateDeclarationForDeclarationDiscovery()
+                    continue
+                }
+                if peek() == .leftBrace {
+                    try consume(.leftBrace)
+                    try skipUnknownBlockBody()
+                    try consume(.rightBrace)
+                    continue
+                }
+                advance()
+            }
             try consume(.rightBrace)
         }
 
@@ -260,9 +287,9 @@ extension Parser {
             bindings: [],
             deriveds: [],
             values: [],
-            initializers: [],
-            callables: [],
-            constructs: []
+            initializers: initializers,
+            callables: callables,
+            constructs: constructs
         )
     }
 
