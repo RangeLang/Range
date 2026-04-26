@@ -1,11 +1,59 @@
 construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     binding output: String
+    binding isArray: Bool
+    state wroteValue: Bool = false
 
-    init(output: binding String) {
+    init(output: binding String, isArray: binding Bool) {
         self.output = output
+        self.isArray = isArray
+        self.isArray = true
+    }
+
+    function encode(_ value: Bool) -> Result<Void, EncodingError> {
+        appendValue(value: "\(value)")
+        return .success(result: Void())
+    }
+
+    function encode(_ value: Data) -> Result<Void, EncodingError> {
+        return .failure(cause: .failed)
+    }
+
+    function encode(_ value: Float) -> Result<Void, EncodingError> {
+        appendValue(value: "\(value)")
+        return .success(result: Void())
+    }
+
+    function encode(_ value: Int) -> Result<Void, EncodingError> {
+        appendValue(value: "\(value)")
+        return .success(result: Void())
+    }
+
+    function encode(_ value: String) -> Result<Void, EncodingError> {
+        appendValue(value: "\"\(value)\"")
+        return .success(result: Void())
     }
 
     function encode<T: Encodable>(_ value: T) -> Result<Void, EncodingError> {
+        let encoder = JSONEncoder()
+
+        switch encoder.encode(value) {
+        case .success(let encoded):
+            appendValue(value: encoded)
+            return .success(result: Void())
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+
         return .failure(cause: .failed)
+    }
+
+    function appendValue(value: String) {
+        if wroteValue {
+            output = output + ","
+        } else {
+            wroteValue = true
+        }
+
+        output = output + value
     }
 }

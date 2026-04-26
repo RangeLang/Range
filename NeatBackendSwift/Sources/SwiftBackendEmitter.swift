@@ -35,6 +35,8 @@ struct SwiftBackendEmitter {
             "import Foundation",
             emitRuntimeSupport(includeFoundationImport: false),
             protocols,
+            program.protocols.contains(where: { $0.name == "Encodable" })
+                ? emitNativeEncodingConformances() : "",
             enumerations,
             declarations,
             extensions,
@@ -242,6 +244,10 @@ struct SwiftBackendEmitter {
             sections.append(protocols)
         }
 
+        if unit.protocols.contains(where: { $0.name == "Encodable" }) {
+            sections.append(emitNativeEncodingConformances())
+        }
+
         let enumerations = try unit.enumerations.map(emitEnum).joined(separator: "\n\n")
         if !enumerations.isEmpty {
             sections.append(enumerations)
@@ -271,6 +277,62 @@ struct SwiftBackendEmitter {
         }
 
         return sections.joined(separator: "\n\n") + "\n"
+    }
+
+    private func emitNativeEncodingConformances() -> String {
+        """
+        extension Bool: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.singleValueContainer()
+                return container.encode(self)
+            }
+        }
+
+        extension Data: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.singleValueContainer()
+                return container.encode(self)
+            }
+        }
+
+        extension Float: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.singleValueContainer()
+                return container.encode(self)
+            }
+        }
+
+        extension Int: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.singleValueContainer()
+                return container.encode(self)
+            }
+        }
+
+        extension String: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.singleValueContainer()
+                return container.encode(self)
+            }
+        }
+
+        extension Array: Neat_Encodable where Element: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.unkeyedContainer()
+
+                for element in self {
+                    switch container.encode(element) {
+                    case .success:
+                        continue
+                    case .failure(let error):
+                        return .failure(cause: error)
+                    }
+                }
+
+                return .success(result: Void())
+            }
+        }
+        """
     }
 
     private func emitMain(_ mainBlock: MainBlockNode) throws -> String {

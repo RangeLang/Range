@@ -1,15 +1,21 @@
 construct JSONEncoder: Encoder<String> {
     state output: String = ""
     state isObject: Bool = false
+    state isArray: Bool = false
 
     function encode<T: Encodable>(_ value: T) -> Result<String, EncodingError> {
         output = ""
         isObject = false
+        isArray = false
 
         switch value.encode(to: self) {
         case .success:
             if isObject {
                 return .success(result: "{" + output + "}")
+            }
+
+            if isArray {
+                return .success(result: "[" + output + "]")
             }
 
             return .success(result: output)
@@ -28,7 +34,7 @@ construct JSONEncoder: Encoder<String> {
     }
 
     function unkeyedContainer() -> UnkeyedEncodingContainer {
-        return JSONUnkeyedEncodingContainer(output: $self.output)
+        return JSONUnkeyedEncodingContainer(output: $self.output, isArray: $self.isArray)
     }
 
     function singleValueContainer() -> SingleValueEncodingContainer {

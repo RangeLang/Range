@@ -76,3 +76,21 @@ construct Array<Element>: ExpressibleByArrayLiteral {
         storage.forEach(body)
     }
 }
+
+extension Array: Encodable {
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+        state container = encoder.unkeyedContainer()
+        state index: Int = 0
+
+        while index < count {
+            switch container.encode(element(index: index)) {
+            case .success:
+                index += 1
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        }
+
+        return .success(result: Void())
+    }
+}
