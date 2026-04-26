@@ -1,6 +1,6 @@
 protocol Encoder {
     function container<Key: CodingKey>(
-        keyedBy keyType: NominalTypeReference
+        keyedBy keyType: Key.Type
     ) -> KeyedEncodingContainer<Key>
 
     function unkeyedContainer() -> UnkeyedEncodingContainer
