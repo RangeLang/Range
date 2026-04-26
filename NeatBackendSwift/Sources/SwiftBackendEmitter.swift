@@ -725,12 +725,17 @@ struct SwiftBackendEmitter {
         case .expression(let expression):
             return try emitExpression(expression)
         case .enumCase(let name, let binding):
+            let caseName = normalizedEnumCaseName(name)
             if let binding {
                 let bindingKeyword = binding.kind == .constant ? "let" : "state"
-                return ".\(name)(\(bindingKeyword) \(binding.name))"
+                return ".\(caseName)(\(bindingKeyword) \(binding.name))"
             }
-            return ".\(name)"
+            return ".\(caseName)"
         }
+    }
+
+    private func normalizedEnumCaseName(_ name: String) -> String {
+        name.hasPrefix(".") ? String(name.dropFirst()) : name
     }
 
     private func emitAssignmentTarget(_ target: AssignmentTarget) throws -> String {

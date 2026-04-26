@@ -30,4 +30,10 @@ function encodeUser() -> Result<String, EncodingError> {
 }
 
 @main {
+    switch encodeUser() {
+    case .success(let json):
+        Logger.info(json)
+    case .failure:
+        Logger.error("encoding failed")
+    }
 }
