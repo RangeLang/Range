@@ -8,8 +8,10 @@ struct SwiftLoweredProgramAdapter {
     func adapt(program: LoweredProgram) -> LoweredProgram {
         .init(
             callables: program.callables.map(lower(callable:)),
+            protocols: program.protocols,
             enumerations: program.enumerations,
             declarations: program.declarations.map(lower(construct:)),
+            extensions: program.extensions,
             mainBlock: lower(mainBlock: program.mainBlock),
             units: program.units.map(lower(sourceUnit:))
         )
@@ -18,8 +20,10 @@ struct SwiftLoweredProgramAdapter {
     private func lower(sourceUnit: LoweredSourceUnit) -> LoweredSourceUnit {
         .init(
             outputFileName: sourceUnit.outputFileName,
+            protocols: sourceUnit.protocols,
             enumerations: sourceUnit.enumerations,
             declarations: sourceUnit.declarations.map(lower(construct:)),
+            extensions: sourceUnit.extensions,
             callables: sourceUnit.callables.map(lower(callable:)),
             mainBlock: sourceUnit.mainBlock.map(lower(mainBlock:))
         )

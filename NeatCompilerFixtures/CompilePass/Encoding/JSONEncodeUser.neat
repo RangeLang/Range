@@ -13,7 +13,7 @@ construct UserCodingKey: CodingKey {
 
 extension User: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
-        let container = encoder.container(
+        state container = encoder.container(
             keyedBy: UserCodingKey.self
         )
         let idKey = UserCodingKey(value: "id")
@@ -24,7 +24,7 @@ extension User: Encodable {
 }
 
 function encodeUser() -> Result<String, EncodingError> {
-    let encoder = JSONEncoder()
+    state encoder = JSONEncoder()
     let user = User(id: 1, name: "George")
     return encoder.encode(user)
 }

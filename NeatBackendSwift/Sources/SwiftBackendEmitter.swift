@@ -5,6 +5,7 @@ struct SwiftBackendEmitter {
     private let swiftNativeTypeNames: Set<String> = [
         "Any",
         "Bool",
+        "Data",
         "Double",
         "Float",
         "Int",
@@ -23,16 +24,20 @@ struct SwiftBackendEmitter {
             .filter { $0.targetType == nil }
             .map(emitFunction)
             .joined(separator: "\n\n")
+        let protocols = try program.protocols.map(emitProtocol).joined(separator: "\n\n")
         let enumerations = try program.enumerations.map(emitEnum).joined(separator: "\n\n")
         let declarations = try program.declarations.map(emitConstruct).joined(separator: "\n\n")
+        let extensions = try program.extensions.map(emitExtension).joined(separator: "\n\n")
 
         let main = try emitMain(program.mainBlock)
 
         let sections = [
             "import Foundation",
             emitRuntimeSupport(includeFoundationImport: false),
+            protocols,
             enumerations,
             declarations,
+            extensions,
             functions,
             main,
         ].filter { !$0.isEmpty }
@@ -199,6 +204,21 @@ struct SwiftBackendEmitter {
                 }
             }
 
+            final class __NeatBinding<Value> {
+                private let getter: () -> Value
+                private let setter: (Value) -> Void
+
+                init(get: @escaping () -> Value, set: @escaping (Value) -> Void) {
+                    self.getter = get
+                    self.setter = set
+                }
+
+                var value: Value {
+                    get { getter() }
+                    set { setter(newValue) }
+                }
+            }
+
             enum __NeatDeferredControlFlow: Error {
                 case returnValue(Any)
                 case returnVoid
@@ -217,6 +237,11 @@ struct SwiftBackendEmitter {
     private func emitSourceUnit(_ unit: LoweredSourceUnit) throws -> String {
         var sections: [String] = ["import Foundation"]
 
+        let protocols = try unit.protocols.map(emitProtocol).joined(separator: "\n\n")
+        if !protocols.isEmpty {
+            sections.append(protocols)
+        }
+
         let enumerations = try unit.enumerations.map(emitEnum).joined(separator: "\n\n")
         if !enumerations.isEmpty {
             sections.append(enumerations)
@@ -225,6 +250,11 @@ struct SwiftBackendEmitter {
         let declarations = try unit.declarations.map(emitConstruct).joined(separator: "\n\n")
         if !declarations.isEmpty {
             sections.append(declarations)
+        }
+
+        let extensions = try unit.extensions.map(emitExtension).joined(separator: "\n\n")
+        if !extensions.isEmpty {
+            sections.append(extensions)
         }
 
         let functions = try unit.callables
@@ -262,6 +292,7 @@ struct SwiftBackendEmitter {
                 "Swift backend requires function \(callable.name) to have a body.")
         }
 
+        let genericClause = emitGenericClause(callable.genericParameters)
         let genericParameterNames = genericParameterNames(callable.genericParameters)
         let parameters = try callable.parameters.map {
             try emitParameter($0, genericParameterNames: genericParameterNames)
@@ -277,7 +308,7 @@ struct SwiftBackendEmitter {
         )
 
         return """
-            func \(callable.name)(\(parameters))\(returnClause) {
+            func \(callable.name)\(genericClause)(\(parameters))\(returnClause) {
             \(functionBody)
             }
             """
@@ -304,8 +335,58 @@ struct SwiftBackendEmitter {
 
 
 
+    private func emitProtocol(_ declaration: ProtocolDeclaration) throws -> String {
+        let genericClause = emitProtocolPrimaryAssociatedTypeClause(declaration.genericParameters)
+        let genericParameterNames = genericParameterNames(declaration.genericParameters)
+        let conformanceClause = emitConformanceClause(
+            declaration.conformances,
+            genericParameterNames: genericParameterNames
+        )
+        let associatedTypeRequirements = declaration.genericParameters.compactMap {
+            emitAssociatedTypeRequirement($0, genericParameterNames: genericParameterNames)
+        }.joined(separator: "\n")
+        let valueRequirements = declaration.values.map {
+            "var \($0.name): \(emitTypeName(.named($0.typeName), genericParameterNames: genericParameterNames)) { get }"
+        }.joined(separator: "\n")
+        let stateRequirements = declaration.states.map {
+            "var \($0.name): \(emitTypeName($0.type, genericParameterNames: genericParameterNames)) { get set }"
+        }.joined(separator: "\n")
+        let bindingRequirements = declaration.bindings.map {
+            "var \($0.name): \(emitTypeName(.named($0.typeName), genericParameterNames: genericParameterNames)) { get set }"
+        }.joined(separator: "\n")
+        let initializerRequirements = try declaration.initializers.map {
+            try emitInitializerRequirement($0, genericParameterNames: genericParameterNames)
+        }.joined(separator: "\n")
+        let callableRequirements = try declaration.callables.map {
+            try emitCallableRequirement(
+                $0,
+                enclosingProtocolName: declaration.name,
+                enclosingGenericParameterNames: genericParameterNames
+            )
+        }.joined(separator: "\n")
+
+        let memberSections = [
+            associatedTypeRequirements,
+            valueRequirements,
+            stateRequirements,
+            bindingRequirements,
+            initializerRequirements,
+            callableRequirements,
+        ].filter { !$0.isEmpty }
+
+        if memberSections.isEmpty {
+            return "protocol \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {}"
+        }
+
+        return """
+            protocol \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {
+            \(indentBlock(memberSections.joined(separator: "\n"), level: 1))
+            }
+            """
+    }
+
     private func emitEnum(_ declaration: EnumDeclaration) throws -> String {
-        let genericClause = emitConstructGenericClause(declaration.genericParameters)
+        let genericClause = emitGenericClause(declaration.genericParameters)
         let renderedCases = try declaration.cases.map(emitEnumCase).joined(separator: "\n")
 
         if renderedCases.isEmpty {
@@ -335,8 +416,15 @@ struct SwiftBackendEmitter {
     }
 
     private func emitConstruct(_ declaration: ConstructDeclaration) throws -> String {
-        let genericClause = emitConstructGenericClause(declaration.genericParameters)
+        let genericClause = emitGenericClause(declaration.genericParameters)
         let genericParameterNames = genericParameterNames(declaration.genericParameters)
+        let bindingNames = Set(declaration.bindings.map(\.name))
+        let isReferenceType = !declaration.states.isEmpty || !declaration.bindings.isEmpty
+        let typeKeyword = isReferenceType ? "final class" : "struct"
+        let conformanceClause = emitConformanceClause(
+            declaration.conformances,
+            genericParameterNames: genericParameterNames
+        )
         let storedValues = try declaration.values.map {
             try emitStoredValue($0, genericParameterNames: genericParameterNames)
         }.joined(separator: "\n")
@@ -350,12 +438,22 @@ struct SwiftBackendEmitter {
             try emitDerivedMember($0, genericParameterNames: genericParameterNames)
         }.joined(separator: "\n\n")
         let initializers = try declaration.initializers.map {
-            try emitInitializer($0, genericParameterNames: genericParameterNames)
+            try emitInitializer(
+                $0,
+                genericParameterNames: genericParameterNames,
+                bindingNames: bindingNames
+            )
         }.joined(
             separator: "\n\n")
         let methods = try declaration.callables
             .filter { $0.targetType == nil }
-            .map { try emitMethod($0, constructGenericParameterNames: genericParameterNames) }
+            .map {
+                try emitMethod(
+                    $0,
+                    constructGenericParameterNames: genericParameterNames,
+                    isReferenceType: isReferenceType
+                )
+            }
             .joined(separator: "\n\n")
 
         let memberSections = [
@@ -368,13 +466,41 @@ struct SwiftBackendEmitter {
         ].filter { !$0.isEmpty }
 
         if memberSections.isEmpty {
-            return "struct \(emitSwiftSymbolName(declaration.name))\(genericClause) {\n}"
+            return "\(typeKeyword) \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {\n}"
         }
 
         let body = memberSections.joined(separator: "\n\n")
         return """
-            struct \(emitSwiftSymbolName(declaration.name))\(genericClause) {
+            \(typeKeyword) \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {
             \(indentBlock(body, level: 1))
+            }
+            """
+    }
+
+    private func emitExtension(_ declaration: ExtensionDeclaration) throws -> String {
+        let conformanceClause = emitConformanceClause(declaration.conformances)
+        let nestedEnumerations = try declaration.enumerations.map(emitEnum).joined(separator: "\n\n")
+        let nestedConstructs = try declaration.constructs.map(emitConstruct).joined(separator: "\n\n")
+        let nestedProtocols = try declaration.protocols.map(emitProtocol).joined(separator: "\n\n")
+        let methods = try declaration.callables.map {
+            try emitMethod($0)
+        }.joined(separator: "\n\n")
+
+        let memberSections = [
+            nestedProtocols,
+            nestedEnumerations,
+            nestedConstructs,
+            methods,
+        ].filter { !$0.isEmpty }
+
+        let target = emitTypeName(declaration.targetType)
+        if memberSections.isEmpty {
+            return "extension \(target)\(conformanceClause) {}"
+        }
+
+        return """
+            extension \(target)\(conformanceClause) {
+            \(indentBlock(memberSections.joined(separator: "\n\n"), level: 1))
             }
             """
     }
@@ -388,13 +514,25 @@ struct SwiftBackendEmitter {
         }
 
         let local = parameter.localName
+        let renderedType = emitTypeName(typeReference, genericParameterNames: genericParameterNames)
+        if parameter.isBinding {
+            switch parameter.externalLabel {
+            case .none:
+                return "_ \(local): __NeatBinding<\(renderedType)>"
+            case .some(let external) where external == local:
+                return "\(local): __NeatBinding<\(renderedType)>"
+            case .some(let external):
+                return "\(external) \(local): __NeatBinding<\(renderedType)>"
+            }
+        }
+
         switch parameter.externalLabel {
         case .none:
-            return "_ \(local): \(emitTypeName(typeReference, genericParameterNames: genericParameterNames))"
+            return "_ \(local): \(renderedType)"
         case .some(let external) where external == local:
-            return "\(local): \(emitTypeName(typeReference, genericParameterNames: genericParameterNames))"
+            return "\(local): \(renderedType)"
         case .some(let external):
-            return "\(external) \(local): \(emitTypeName(typeReference, genericParameterNames: genericParameterNames))"
+            return "\(external) \(local): \(renderedType)"
         }
     }
 
@@ -442,12 +580,20 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func emitConstructGenericClause(_ parameters: [GenericParameter]) -> String {
+    private func emitGenericClause(
+        _ parameters: [GenericParameter],
+        inheritedGenericParameterNames: Set<String> = []
+    ) -> String {
         guard !parameters.isEmpty else { return "" }
+        let localGenericParameterNames = genericParameterNames(parameters)
+        let genericParameterNames = inheritedGenericParameterNames.union(localGenericParameterNames)
 
         let rendered = parameters.compactMap { parameter -> String? in
             switch parameter {
-            case .type(let name, _, _):
+            case .type(let name, let constraint, _):
+                if let constraint {
+                    return "\(name): \(emitTypeName(constraint, genericParameterNames: genericParameterNames))"
+                }
                 return name
             case .value:
                 return nil
@@ -456,6 +602,100 @@ struct SwiftBackendEmitter {
 
         guard !rendered.isEmpty else { return "" }
         return "<\(rendered.joined(separator: ", "))>"
+    }
+
+    private func emitConformanceClause(
+        _ conformances: [TypeReference],
+        genericParameterNames: Set<String> = []
+    ) -> String {
+        guard !conformances.isEmpty else { return "" }
+        let rendered = conformances.map {
+            emitConformanceTypeName($0, genericParameterNames: genericParameterNames)
+        }.joined(separator: ", ")
+        return ": \(rendered)"
+    }
+
+    private func emitConformanceTypeName(
+        _ typeReference: TypeReference,
+        genericParameterNames: Set<String> = []
+    ) -> String {
+        switch typeReference {
+        case .generic(let base, _):
+            return emitTypeName(base, genericParameterNames: genericParameterNames)
+        default:
+            return emitTypeName(typeReference, genericParameterNames: genericParameterNames)
+        }
+    }
+
+    private func emitProtocolPrimaryAssociatedTypeClause(_ parameters: [GenericParameter]) -> String {
+        let names = parameters.compactMap { parameter -> String? in
+            guard case .type(let name, _, _) = parameter else {
+                return nil
+            }
+            return name
+        }
+
+        guard !names.isEmpty else { return "" }
+        return "<\(names.joined(separator: ", "))>"
+    }
+
+    private func emitAssociatedTypeRequirement(
+        _ parameter: GenericParameter,
+        genericParameterNames: Set<String>
+    ) -> String? {
+        guard case .type(let name, let constraint, _) = parameter else {
+            return nil
+        }
+
+        if let constraint {
+            return "associatedtype \(name): \(emitTypeName(constraint, genericParameterNames: genericParameterNames))"
+        }
+
+        return "associatedtype \(name)"
+    }
+
+    private func emitInitializerRequirement(
+        _ initializer: InitializerDeclaration,
+        genericParameterNames: Set<String> = []
+    ) throws -> String {
+        let parameters = try initializer.parameters.map {
+            try emitParameter($0, genericParameterNames: genericParameterNames)
+        }.joined(separator: ", ")
+        return "init(\(parameters))"
+    }
+
+    private func emitCallableRequirement(
+        _ callable: CallableDeclaration,
+        enclosingProtocolName: String,
+        enclosingGenericParameterNames: Set<String> = []
+    ) throws -> String {
+        let genericClause = emitGenericClause(
+            callable.genericParameters,
+            inheritedGenericParameterNames: enclosingGenericParameterNames
+        )
+        let genericParameterNames = enclosingGenericParameterNames.union(
+            genericParameterNames(callable.genericParameters)
+        )
+        let parameters = try callable.parameters.map {
+            try emitParameter($0, genericParameterNames: genericParameterNames)
+        }.joined(separator: ", ")
+        let returnClause = try emitReturnClause(
+            callable.returnType,
+            genericParameterNames: genericParameterNames
+        )
+        let mutatingPrefix = protocolRequirementNeedsMutation(
+            callable,
+            enclosingProtocolName: enclosingProtocolName
+        ) ? "mutating " : ""
+        return "\(mutatingPrefix)func \(callable.name)\(genericClause)(\(parameters))\(returnClause)"
+    }
+
+    private func protocolRequirementNeedsMutation(
+        _ callable: CallableDeclaration,
+        enclosingProtocolName: String
+    ) -> Bool {
+        _ = callable
+        return enclosingProtocolName.contains("EncodingContainer")
     }
 
     private func genericParameterNames(_ parameters: [GenericParameter]) -> Set<String> {
@@ -500,7 +740,17 @@ struct SwiftBackendEmitter {
     ) throws -> String {
         switch binding.storage {
         case .plain:
-            return "var \(binding.name): \(emitTypeName(.named(binding.typeName), genericParameterNames: genericParameterNames))"
+            let typeName = emitTypeName(
+                .named(binding.typeName),
+                genericParameterNames: genericParameterNames
+            )
+            return """
+                private let __binding_\(binding.name): __NeatBinding<\(typeName)>
+                var \(binding.name): \(typeName) {
+                    get { __binding_\(binding.name).value }
+                    set { __binding_\(binding.name).value = newValue }
+                }
+                """
         case .derived:
             throw SwiftBackendError("Swift backend does not support derived binding storage yet.")
         }
@@ -538,7 +788,8 @@ struct SwiftBackendEmitter {
 
     private func emitInitializer(
         _ initializer: InitializerDeclaration,
-        genericParameterNames: Set<String> = []
+        genericParameterNames: Set<String> = [],
+        bindingNames: Set<String> = []
     ) throws -> String {
         let parameters = try initializer.parameters.map {
             try emitParameter($0, genericParameterNames: genericParameterNames)
@@ -547,7 +798,13 @@ struct SwiftBackendEmitter {
             return "init(\(parameters)) {}"
         }
 
-        let functionBody = try emitStatements(body, indent: 2, enclosingReturnType: .named("Void"))
+        let bindingParameterNames = Set(initializer.parameters.filter(\.isBinding).map(\.name))
+        let functionBody = try emitInitializerStatements(
+            body,
+            indent: 2,
+            bindingNames: bindingNames,
+            bindingParameterNames: bindingParameterNames
+        )
         return """
             init(\(parameters)) {
             \(functionBody)
@@ -557,13 +814,18 @@ struct SwiftBackendEmitter {
 
     private func emitMethod(
         _ callable: CallableDeclaration,
-        constructGenericParameterNames: Set<String> = []
+        constructGenericParameterNames: Set<String> = [],
+        isReferenceType: Bool = false
     ) throws -> String {
         guard let body = callable.body else {
             throw SwiftBackendError(
                 "Swift backend requires function \(callable.name) to have a body.")
         }
 
+        let genericClause = emitGenericClause(
+            callable.genericParameters,
+            inheritedGenericParameterNames: constructGenericParameterNames
+        )
         let genericParameterNames = constructGenericParameterNames.union(
             genericParameterNames(callable.genericParameters)
         )
@@ -579,10 +841,10 @@ struct SwiftBackendEmitter {
             indent: 2,
             enclosingReturnType: callable.returnType ?? .named("Void")
         )
-        let mutatingPrefix = methodNeedsMutation(callable) ? "mutating " : ""
+        let mutatingPrefix = !isReferenceType && methodNeedsMutation(callable) ? "mutating " : ""
 
         return """
-            \(mutatingPrefix)func \(callable.name)(\(parameters))\(returnClause) {
+            \(mutatingPrefix)func \(callable.name)\(genericClause)(\(parameters))\(returnClause) {
             \(functionBody)
             }
             """
@@ -590,7 +852,7 @@ struct SwiftBackendEmitter {
 
     private func methodNeedsMutation(_ callable: CallableDeclaration) -> Bool {
         guard let body = callable.body else { return false }
-        return statementsContainMutation(body)
+        return statementsContainMutation(body) || statementsCallKnownMutatingMember(body)
     }
 
     private func statementsContainMutation(_ statements: [NeatStatement]) -> Bool {
@@ -634,6 +896,99 @@ struct SwiftBackendEmitter {
         return false
     }
 
+    private func statementsCallKnownMutatingMember(_ statements: [NeatStatement]) -> Bool {
+        for statement in statements {
+            switch statement {
+            case .expression(let expression), .return(let expression?):
+                if expressionCallsKnownMutatingMember(expression) {
+                    return true
+                }
+            case .localBinding(let declaration):
+                if expressionCallsKnownMutatingMember(declaration.expression) {
+                    return true
+                }
+            case .assignment(_, let expression), .compoundAssignment(_, _, let expression):
+                if expressionCallsKnownMutatingMember(expression) {
+                    return true
+                }
+            case .conditional(let branches):
+                if branches.contains(where: { statementsCallKnownMutatingMember($0.body) }) {
+                    return true
+                }
+            case .switchStatement(let expression, let cases, let defaultBody):
+                if expressionCallsKnownMutatingMember(expression) {
+                    return true
+                }
+                if cases.contains(where: { statementsCallKnownMutatingMember($0.body) }) {
+                    return true
+                }
+                if let defaultBody, statementsCallKnownMutatingMember(defaultBody) {
+                    return true
+                }
+            case .forEach(_, let sequence, let body):
+                if expressionCallsKnownMutatingMember(sequence)
+                    || statementsCallKnownMutatingMember(body)
+                {
+                    return true
+                }
+            case .whileLoop(let condition, let body):
+                if expressionCallsKnownMutatingMember(condition)
+                    || statementsCallKnownMutatingMember(body)
+                {
+                    return true
+                }
+            case .background(let background):
+                if statementsCallKnownMutatingMember(background.body) {
+                    return true
+                }
+            case .deferBlock(let deferred):
+                if statementsCallKnownMutatingMember(deferred.body) {
+                    return true
+                }
+            case .derived(_, _, let body):
+                if statementsCallKnownMutatingMember(body) {
+                    return true
+                }
+            case .localCallable, .macroInvocation, .expand, .return(nil), .break, .continue,
+                .environmentProvision:
+                continue
+            }
+        }
+
+        return false
+    }
+
+    private func expressionCallsKnownMutatingMember(_ expression: NeatExpression) -> Bool {
+        switch expression {
+        case .call(let name, let arguments):
+            if name == "appendField" || name.hasSuffix(".appendField") {
+                return true
+            }
+            return arguments.contains { expressionCallsKnownMutatingMember($0.value) }
+        case .block(let statements):
+            return statementsCallKnownMutatingMember(statements)
+        case .array(let elements):
+            return elements.contains(where: expressionCallsKnownMutatingMember)
+        case .dictionary(let elements):
+            return elements.contains {
+                expressionCallsKnownMutatingMember($0.key)
+                    || expressionCallsKnownMutatingMember($0.value)
+            }
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return expressionCallsKnownMutatingMember(condition)
+                || expressionCallsKnownMutatingMember(trueExpression)
+                || expressionCallsKnownMutatingMember(falseExpression)
+        case .unary(_, let nested):
+            return expressionCallsKnownMutatingMember(nested)
+        case .binary(let lhs, _, let rhs):
+            return expressionCallsKnownMutatingMember(lhs)
+                || expressionCallsKnownMutatingMember(rhs)
+        case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral,
+            .macroInvocation, .identifier, .bindingReference:
+            return false
+        }
+    }
+
     private func indentBlock(_ text: String, level: Int) -> String {
         let prefix = String(repeating: "    ", count: level)
         return
@@ -651,6 +1006,57 @@ struct SwiftBackendEmitter {
         try statements
             .map { try emitStatement($0, indent: indent, enclosingReturnType: enclosingReturnType) }
             .joined(separator: "\n")
+    }
+
+    private func emitInitializerStatements(
+        _ statements: [NeatStatement],
+        indent: Int,
+        bindingNames: Set<String>,
+        bindingParameterNames: Set<String>
+    ) throws -> String {
+        try statements
+            .map {
+                try emitInitializerStatement(
+                    $0,
+                    indent: indent,
+                    bindingNames: bindingNames,
+                    bindingParameterNames: bindingParameterNames
+                )
+            }
+            .joined(separator: "\n")
+    }
+
+    private func emitInitializerStatement(
+        _ statement: NeatStatement,
+        indent: Int,
+        bindingNames: Set<String>,
+        bindingParameterNames: Set<String>
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+
+        if case .assignment(let target, let expression) = statement,
+            let bindingName = selfBindingAssignmentName(target),
+            bindingNames.contains(bindingName),
+            case .identifier(let parameterName) = expression,
+            bindingParameterNames.contains(parameterName)
+        {
+            return "\(prefix)self.__binding_\(bindingName) = \(parameterName)"
+        }
+
+        return try emitStatement(statement, indent: indent, enclosingReturnType: .named("Void"))
+    }
+
+    private func selfBindingAssignmentName(_ target: AssignmentTarget) -> String? {
+        guard case .member(let base, let name) = target else {
+            return nil
+        }
+
+        switch base {
+        case .local("self"), .state("self"), .binding("self"):
+            return name
+        default:
+            return nil
+        }
     }
 
     private func emitStatement(
@@ -861,7 +1267,7 @@ struct SwiftBackendEmitter {
         case .double(let value):
             return "\(value)"
         case .string(let value):
-            return "\"\(escapeString(value))\""
+            return "\"\(escapeString(decodeNeatStringEscapes(value)))\""
         case .interpolatedString(let value):
             return "\"\(try emitInterpolatedString(value))\""
         case .boolean(let value):
@@ -887,7 +1293,7 @@ struct SwiftBackendEmitter {
             }
             return try emitRawCall(name: name, arguments: arguments)
         case .bindingReference(let name):
-            return name
+            return "__NeatBinding(get: { \(name) }, set: { \(name) = $0 })"
         case .array(let elements):
             let rendered = try elements.map { try emitExpression($0) }.joined(separator: ", ")
             return "[\(rendered)]"
@@ -1380,7 +1786,7 @@ struct SwiftBackendEmitter {
         for segment in string.segments {
             switch segment {
             case .text(let text):
-                result += escapeString(text)
+                result += escapeString(decodeNeatStringEscapes(text))
             case .expression(let expression):
                 result += "\\(\(try emitExpression(expression)))"
             }
@@ -1394,6 +1800,48 @@ struct SwiftBackendEmitter {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\n", with: "\\n")
+    }
+
+    private func decodeNeatStringEscapes(_ value: String) -> String {
+        var result = ""
+        var index = value.startIndex
+
+        while index < value.endIndex {
+            let character = value[index]
+            guard character == "\\" else {
+                result.append(character)
+                index = value.index(after: index)
+                continue
+            }
+
+            let nextIndex = value.index(after: index)
+            guard nextIndex < value.endIndex else {
+                result.append(character)
+                index = nextIndex
+                continue
+            }
+
+            let escaped = value[nextIndex]
+            switch escaped {
+            case "\"":
+                result.append("\"")
+            case "\\":
+                result.append("\\")
+            case "n":
+                result.append("\n")
+            case "r":
+                result.append("\r")
+            case "t":
+                result.append("\t")
+            default:
+                result.append(character)
+                result.append(escaped)
+            }
+
+            index = value.index(after: nextIndex)
+        }
+
+        return result
     }
 
     private func emitRawCall(

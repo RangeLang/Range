@@ -28,22 +28,25 @@ struct SwiftBackendProgramBuilder {
             throw SwiftBackendError("Failed to expand \(fileURL.lastPathComponent).")
         }
 
-        let supportDeclarations = coreSupportDeclarations(in: compiledProgram)
-        let supportUnits = coreSupportUnits(for: supportDeclarations)
+        let supportUnits = coreSupportUnits(in: compiledProgram)
         let sourceFile = parsedFile.sourceFile
 
         switch sourceFile {
         case .mainBlock(let mainBlock):
             return .init(
                 callables: [],
+                protocols: supportUnits.flatMap(\.protocols),
                 enumerations: [],
-                declarations: supportDeclarations,
+                declarations: supportUnits.flatMap(\.declarations),
+                extensions: supportUnits.flatMap(\.extensions),
                 mainBlock: mainBlock,
                 units: [
                     .init(
                         outputFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
+                        protocols: [],
                         enumerations: [],
                         declarations: [],
+                        extensions: [],
                         callables: [],
                         mainBlock: mainBlock
                     )
@@ -63,14 +66,18 @@ struct SwiftBackendProgramBuilder {
 
             return .init(
                 callables: module.callables,
+                protocols: supportUnits.flatMap(\.protocols) + module.protocols,
                 enumerations: module.enumerations,
-                declarations: supportDeclarations + moduleDeclarations,
+                declarations: supportUnits.flatMap(\.declarations) + moduleDeclarations,
+                extensions: supportUnits.flatMap(\.extensions) + module.extensions,
                 mainBlock: mainBlock,
                 units: [
                     .init(
                         outputFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
+                        protocols: module.protocols,
                         enumerations: module.enumerations,
                         declarations: moduleDeclarations,
+                        extensions: module.extensions,
                         callables: module.callables,
                         mainBlock: mainBlock
                     )
@@ -88,13 +95,18 @@ struct SwiftBackendProgramBuilder {
     }
 
     private func build(compiledProgram: CompiledProgram) throws -> LoweredProgram {
-        let supportDeclarations = coreSupportDeclarations(in: compiledProgram)
-
         var callables: [CallableDeclaration] = []
+        var protocols: [ProtocolDeclaration] = []
         var enumerations: [EnumDeclaration] = []
-        var declarations: [ConstructDeclaration] = supportDeclarations
+        var declarations: [ConstructDeclaration] = []
+        var extensions: [ExtensionDeclaration] = []
         var mainBlock: MainBlockNode?
-        var units: [LoweredSourceUnit] = coreSupportUnits(for: supportDeclarations)
+        var units: [LoweredSourceUnit] = coreSupportUnits(in: compiledProgram)
+
+        protocols.append(contentsOf: units.flatMap(\.protocols))
+        enumerations.append(contentsOf: units.flatMap(\.enumerations))
+        declarations.append(contentsOf: units.flatMap(\.declarations))
+        extensions.append(contentsOf: units.flatMap(\.extensions))
 
         for parsedFile in compiledProgram.projectExpandedFiles {
             let fileURL = URL(fileURLWithPath: parsedFile.path)
@@ -110,9 +122,11 @@ struct SwiftBackendProgramBuilder {
                 units.append(
                     .init(
                         outputFileName: outputFileName,
+                        protocols: [],
                         enumerations: [],
                         declarations: declaration.kind == .declaration || declaration.kind == .entry
                             ? [declaration] : [],
+                        extensions: [],
                         callables: [],
                         mainBlock: nil
                     )
@@ -120,7 +134,9 @@ struct SwiftBackendProgramBuilder {
 
             case .module(let module):
                 callables.append(contentsOf: module.callables)
+                protocols.append(contentsOf: module.protocols)
                 enumerations.append(contentsOf: module.enumerations)
+                extensions.append(contentsOf: module.extensions)
 
                 let moduleDeclarations = module.constructs.filter {
                     $0.kind == .declaration || $0.kind == .entry
@@ -129,8 +145,10 @@ struct SwiftBackendProgramBuilder {
                 units.append(
                     .init(
                         outputFileName: outputFileName,
+                        protocols: module.protocols,
                         enumerations: module.enumerations,
                         declarations: moduleDeclarations,
+                        extensions: module.extensions,
                         callables: module.callables,
                         mainBlock: module.mainBlock
                     )
@@ -156,14 +174,58 @@ struct SwiftBackendProgramBuilder {
                 units.append(
                     .init(
                         outputFileName: outputFileName,
+                        protocols: [],
                         enumerations: [],
                         declarations: [],
+                        extensions: [],
                         callables: [],
                         mainBlock: block
                     )
                 )
 
-            case .namespace, .extensions, .enumeration, .protocolDefinition, .macro:
+            case .enumeration(let declaration):
+                enumerations.append(declaration)
+                units.append(
+                    .init(
+                        outputFileName: outputFileName,
+                        protocols: [],
+                        enumerations: [declaration],
+                        declarations: [],
+                        extensions: [],
+                        callables: [],
+                        mainBlock: nil
+                    )
+                )
+
+            case .protocolDefinition(let declaration):
+                protocols.append(declaration)
+                units.append(
+                    .init(
+                        outputFileName: outputFileName,
+                        protocols: [declaration],
+                        enumerations: [],
+                        declarations: [],
+                        extensions: [],
+                        callables: [],
+                        mainBlock: nil
+                    )
+                )
+
+            case .extensions(let declarations):
+                extensions.append(contentsOf: declarations)
+                units.append(
+                    .init(
+                        outputFileName: outputFileName,
+                        protocols: [],
+                        enumerations: declarations.flatMap(\.enumerations),
+                        declarations: declarations.flatMap(\.constructs),
+                        extensions: declarations,
+                        callables: [],
+                        mainBlock: nil
+                    )
+                )
+
+            case .namespace, .macro:
                 continue
             }
         }
@@ -174,8 +236,10 @@ struct SwiftBackendProgramBuilder {
 
         return .init(
             callables: callables,
+            protocols: protocols,
             enumerations: enumerations,
             declarations: declarations,
+            extensions: extensions,
             mainBlock: mainBlock,
             units: units
         )
@@ -198,19 +262,90 @@ struct SwiftBackendProgramBuilder {
         }
     }
 
-    private func coreSupportUnits(for declarations: [ConstructDeclaration]) -> [LoweredSourceUnit] {
-        guard !declarations.isEmpty else {
-            return []
+    private func coreSupportUnits(in compiledProgram: CompiledProgram) -> [LoweredSourceUnit] {
+        let encodingUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
+            guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
+                parsedFile.path.contains("/NeatCore/Encoding/")
+            else {
+                return nil
+            }
+
+            let fileURL = URL(fileURLWithPath: parsedFile.path)
+            let outputFileName = "NeatCore_\(fileURL.deletingPathExtension().lastPathComponent).swift"
+
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                return .init(
+                    outputFileName: outputFileName,
+                    protocols: [],
+                    enumerations: [],
+                    declarations: [declaration],
+                    extensions: [],
+                    callables: [],
+                    mainBlock: nil
+                )
+            case .enumeration(let declaration):
+                return .init(
+                    outputFileName: outputFileName,
+                    protocols: [],
+                    enumerations: [declaration],
+                    declarations: [],
+                    extensions: [],
+                    callables: [],
+                    mainBlock: nil
+                )
+            case .protocolDefinition(let declaration):
+                return .init(
+                    outputFileName: outputFileName,
+                    protocols: [declaration],
+                    enumerations: [],
+                    declarations: [],
+                    extensions: [],
+                    callables: [],
+                    mainBlock: nil
+                )
+            case .extensions(let declarations):
+                return .init(
+                    outputFileName: outputFileName,
+                    protocols: [],
+                    enumerations: declarations.flatMap(\.enumerations),
+                    declarations: declarations.flatMap(\.constructs),
+                    extensions: declarations,
+                    callables: [],
+                    mainBlock: nil
+                )
+            case .module(let module):
+                return .init(
+                    outputFileName: outputFileName,
+                    protocols: module.protocols,
+                    enumerations: module.enumerations,
+                    declarations: module.constructs.filter {
+                        $0.kind == .declaration || $0.kind == .entry
+                    },
+                    extensions: module.extensions,
+                    callables: module.callables,
+                    mainBlock: nil
+                )
+            case .mainBlock, .namespace, .macro:
+                return nil
+            }
+        }
+
+        let channelDeclarations = coreSupportDeclarations(in: compiledProgram)
+        guard !channelDeclarations.isEmpty else {
+            return encodingUnits
         }
 
         return [
             .init(
                 outputFileName: "NeatCoreSupport.swift",
+                protocols: [],
                 enumerations: [],
-                declarations: declarations,
+                declarations: channelDeclarations,
+                extensions: [],
                 callables: [],
                 mainBlock: nil
             )
-        ]
+        ] + encodingUnits
     }
 }
