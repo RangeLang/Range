@@ -757,7 +757,24 @@ public struct DeclarationMemberResolver: Sendable {
 
     private struct MemberCallableSignature: Sendable {
         var genericParameterNames: [String]
+        var parameters: [MemberCallableParameter]
         var returnType: TypeReference
+    }
+
+    private struct MemberCallableParameter: Sendable {
+        var localName: String
+        var externalLabel: String?
+        var typeReference: TypeReference?
+    }
+
+    public struct MemberCallArgument: Sendable {
+        public let label: String?
+        public let typeReference: TypeReference?
+
+        public init(label: String?, typeReference: TypeReference?) {
+            self.label = label
+            self.typeReference = typeReference
+        }
     }
 
     private let membersByConstructName: [String: ConstructMembers]
@@ -815,6 +832,10 @@ public struct DeclarationMemberResolver: Sendable {
             for callable in construct.callables {
                 callableSignatures[callable.name] = MemberCallableSignature(
                     genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
+                    parameters: Self.memberCallableParameters(
+                        callable.parameters,
+                        using: nestedTypeMap
+                    ),
                     returnType: Self.qualifyNestedLocalTypes(
                         callable.returnType ?? .named("Void"),
                         using: nestedTypeMap
@@ -825,6 +846,10 @@ public struct DeclarationMemberResolver: Sendable {
                 for callable in extensionDeclaration.callables {
                     callableSignatures[callable.name] = MemberCallableSignature(
                         genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
+                        parameters: Self.memberCallableParameters(
+                            callable.parameters,
+                            using: nestedTypeMap
+                        ),
                         returnType: Self.qualifyNestedLocalTypes(
                             callable.returnType ?? .named("Void"),
                             using: nestedTypeMap
@@ -868,10 +893,26 @@ public struct DeclarationMemberResolver: Sendable {
         for callable in declaration.callables where signatures[callable.name] == nil {
             signatures[callable.name] = MemberCallableSignature(
                 genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
+                parameters: Self.memberCallableParameters(callable.parameters, using: [:]),
                 returnType: callable.returnType ?? .named("Void")
             )
         }
         return signatures
+    }
+
+    private static func memberCallableParameters(
+        _ parameters: [NeatFunctionParameter],
+        using nestedTypeMap: [String: TypeReference]
+    ) -> [MemberCallableParameter] {
+        parameters.map { parameter in
+            MemberCallableParameter(
+                localName: parameter.localName,
+                externalLabel: parameter.externalLabel,
+                typeReference: parameter.typeReference.map {
+                    qualifyNestedLocalTypes($0, using: nestedTypeMap)
+                }
+            )
+        }
     }
 
     private static func genericParameterConstraints(
@@ -965,12 +1006,14 @@ public struct DeclarationMemberResolver: Sendable {
     public func memberCallableReturnType(
         baseType: TypeReference,
         memberName: String,
-        genericArguments: [TypeReference] = []
+        genericArguments: [TypeReference] = [],
+        arguments: [MemberCallArgument] = []
     ) -> TypeReference? {
         if let protocolType = protocolCallableReturnType(
             baseType: baseType,
             memberName: memberName,
-            genericArguments: genericArguments
+            genericArguments: genericArguments,
+            arguments: arguments
         ) {
             return protocolType
         }
@@ -982,16 +1025,21 @@ public struct DeclarationMemberResolver: Sendable {
             return nil
         }
         var substitution = genericSubstitution(for: members, arguments: context.arguments)
-        substitution.merge(callableGenericSubstitution(for: signature, arguments: genericArguments)) {
-            _, callable in callable
-        }
+        substitution.merge(
+            callableGenericSubstitution(
+                for: signature,
+                genericArguments: genericArguments,
+                callArguments: arguments
+            )
+        ) { _, callable in callable }
         return Self.substitute(signature.returnType, using: substitution)
     }
 
     private func protocolCallableReturnType(
         baseType: TypeReference,
         memberName: String,
-        genericArguments: [TypeReference]
+        genericArguments: [TypeReference],
+        arguments: [MemberCallArgument]
     ) -> TypeReference? {
         if case .named(let name) = baseType,
             let constrainedType = genericParameterConstraintsByName[name]
@@ -999,7 +1047,8 @@ public struct DeclarationMemberResolver: Sendable {
             return protocolCallableReturnType(
                 baseType: constrainedType,
                 memberName: memberName,
-                genericArguments: genericArguments
+                genericArguments: genericArguments,
+                arguments: arguments
             )
         }
 
@@ -1010,18 +1059,134 @@ public struct DeclarationMemberResolver: Sendable {
         }
         return Self.substitute(
             signature.returnType,
-            using: callableGenericSubstitution(for: signature, arguments: genericArguments)
+            using: callableGenericSubstitution(
+                for: signature,
+                genericArguments: genericArguments,
+                callArguments: arguments
+            )
         )
     }
 
     private func callableGenericSubstitution(
         for signature: MemberCallableSignature,
-        arguments: [TypeReference]
+        genericArguments: [TypeReference],
+        callArguments: [MemberCallArgument]
     ) -> [String: TypeReference] {
-        guard arguments.count == signature.genericParameterNames.count else {
-            return [:]
+        var bindings: [String: TypeReference] = [:]
+        if genericArguments.count == signature.genericParameterNames.count {
+            bindings.merge(
+                Dictionary(uniqueKeysWithValues: zip(signature.genericParameterNames, genericArguments))
+            ) { _, explicit in explicit }
         }
-        return Dictionary(uniqueKeysWithValues: zip(signature.genericParameterNames, arguments))
+
+        for (parameter, argument) in zip(signature.parameters, callArguments) {
+            guard argumentLabel(argument.label, matches: parameter),
+                let actualType = argument.typeReference,
+                let expectedType = parameter.typeReference
+            else {
+                continue
+            }
+            _ = typeMatches(
+                actual: actualType,
+                expected: expectedType,
+                genericParameterNames: Set(signature.genericParameterNames),
+                bindings: &bindings
+            )
+        }
+
+        return bindings
+    }
+
+    private func argumentLabel(_ actualLabel: String?, matches parameter: MemberCallableParameter)
+        -> Bool
+    {
+        guard let actualLabel else {
+            return true
+        }
+        let expectedLabel = parameter.externalLabel ?? parameter.localName
+        return actualLabel == expectedLabel
+    }
+
+    private func typeMatches(
+        actual: TypeReference,
+        expected: TypeReference,
+        genericParameterNames: Set<String>,
+        bindings: inout [String: TypeReference]
+    ) -> Bool {
+        if case .named(let name) = expected, genericParameterNames.contains(name) {
+            if let existing = bindings[name] {
+                return existing == actual
+            }
+            bindings[name] = actual
+            return true
+        }
+
+        switch (actual, expected) {
+        case (.named(let actualName), .named(let expectedName)):
+            return actualName == expectedName
+        case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
+            return actualName == expectedName
+                && typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+        case (
+            .generic(let actualBase, let actualArguments),
+            .generic(let expectedBase, let expectedArguments)
+        ):
+            guard actualArguments.count == expectedArguments.count,
+                typeMatches(
+                    actual: actualBase,
+                    expected: expectedBase,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            else {
+                return false
+            }
+            return zip(actualArguments, expectedArguments).allSatisfy {
+                typeMatches(
+                    actual: $0,
+                    expected: $1,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            }
+        case (.array(let actualElement), .array(let expectedElement)),
+            (.optional(let actualElement), .optional(let expectedElement)),
+            (.variadic(let actualElement), .variadic(let expectedElement)):
+            return typeMatches(
+                actual: actualElement,
+                expected: expectedElement,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case (
+            .function(let actualParameters, let actualReturn),
+            .function(let expectedParameters, let expectedReturn)
+        ):
+            guard actualParameters.count == expectedParameters.count else {
+                return false
+            }
+            return zip(actualParameters, expectedParameters).allSatisfy {
+                typeMatches(
+                    actual: $0,
+                    expected: $1,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            }
+                && typeMatches(
+                    actual: actualReturn,
+                    expected: expectedReturn,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+        default:
+            return false
+        }
     }
 
     public func constructType(forConstructorCallName name: String) -> TypeReference? {

@@ -46,6 +46,9 @@ public enum ExpressionTypeSemantics {
             if let type = accessibleTypes[name] {
                 return type
             }
+            if let metatype = inferMetatypeValue(named: name) {
+                return .typed(metatype)
+            }
             if let memberType = inferKnownMemberIdentifierType(
                 name: name,
                 accessibleTypes: accessibleTypes,
@@ -57,13 +60,17 @@ public enum ExpressionTypeSemantics {
                 throw ParseError("Unknown identifier '\(name)' in state initializer.")
             }
             return type
-        case .call(let name, _):
+        case .call(let name, let arguments):
             if let returnType = callableReturnTypes[name] {
                 return .typed(returnType)
             }
             if let memberType = inferKnownMemberCallType(
                 name: name,
+                arguments: arguments,
                 accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
                 memberResolver: memberResolver
             ) {
                 return .typed(memberType)
@@ -730,7 +737,11 @@ public enum ExpressionTypeSemantics {
 
     private static func inferKnownMemberCallType(
         name: String,
+        arguments: [CallArgument],
         accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
         guard let (baseName, memberName, genericArguments) = splitMemberName(name),
@@ -740,11 +751,42 @@ public enum ExpressionTypeSemantics {
             return nil
         }
 
+        let typedArguments = arguments.map { argument in
+            let inferred = try? inferType(
+                of: argument.value,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver
+            )
+            return DeclarationMemberResolver.MemberCallArgument(
+                label: argument.label,
+                typeReference: inferred.flatMap {
+                    defaultDestinationTypeReference(for: $0, resolver: resolver)
+                }
+            )
+        }
+
         return memberResolver.memberCallableReturnType(
             baseType: baseReference,
             memberName: memberName,
-            genericArguments: genericArguments
+            genericArguments: genericArguments,
+            arguments: typedArguments
         )
+    }
+
+    private static func inferMetatypeValue(named name: String) -> TypeReference? {
+        guard name.hasSuffix(".self") else {
+            return nil
+        }
+        let base = String(name.dropLast(".self".count))
+        guard !base.isEmpty,
+            let baseType = parseTypeReference(base)
+        else {
+            return nil
+        }
+        return .member(base: baseType, name: "Type")
     }
 
     private static func splitMemberName(_ name: String) -> (
