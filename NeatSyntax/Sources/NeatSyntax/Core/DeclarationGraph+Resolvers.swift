@@ -501,6 +501,246 @@ public struct DeclarationOperatorResolver: Sendable {
     }
 }
 
+public struct DeclarationTypeCompatibilityResolver: Sendable {
+    public static let empty = DeclarationTypeCompatibilityResolver(
+        protocolsByName: [:],
+        constructsByName: [:],
+        enumsByName: [:],
+        extensionsByTargetName: [:]
+    )
+
+    private struct TypeContext: Sendable {
+        var name: String
+        var arguments: [TypeReference]
+    }
+
+    private struct NominalConformance: Sendable {
+        var declarationGenericParameterNames: [String]
+        var conformance: TypeReference
+    }
+
+    private let protocolNames: Set<String>
+    private let conformancesByNominalName: [String: [NominalConformance]]
+
+    public init(
+        protocolsByName: [String: ProtocolDeclaration],
+        constructsByName: [String: ConstructDeclaration],
+        enumsByName: [String: EnumDeclaration],
+        extensionsByTargetName: [String: [ExtensionDeclaration]]
+    ) {
+        self.protocolNames = Set(protocolsByName.keys)
+
+        var conformances: [String: [NominalConformance]] = [:]
+        for construct in constructsByName.values {
+            let genericParameterNames = construct.genericParameters.map(Self.genericParameterName)
+            conformances[construct.name, default: []].append(
+                contentsOf: construct.conformances.map {
+                    NominalConformance(
+                        declarationGenericParameterNames: genericParameterNames,
+                        conformance: $0
+                    )
+                }
+            )
+        }
+        for enumeration in enumsByName.values {
+            conformances[enumeration.name, default: []].append(
+                contentsOf: enumeration.conformances.map {
+                    NominalConformance(
+                        declarationGenericParameterNames: [],
+                        conformance: $0
+                    )
+                }
+            )
+        }
+        for protocolDeclaration in protocolsByName.values {
+            let genericParameterNames = protocolDeclaration.genericParameters.map(
+                Self.genericParameterName
+            )
+            conformances[protocolDeclaration.name, default: []].append(
+                contentsOf: protocolDeclaration.conformances.map {
+                    NominalConformance(
+                        declarationGenericParameterNames: genericParameterNames,
+                        conformance: $0
+                    )
+                }
+            )
+        }
+        for (targetName, extensions) in extensionsByTargetName {
+            for extensionDeclaration in extensions {
+                let genericParameterNames = genericParameterNames(for: targetName)
+                conformances[targetName, default: []].append(
+                    contentsOf: extensionDeclaration.conformances.map {
+                        NominalConformance(
+                            declarationGenericParameterNames: genericParameterNames,
+                            conformance: $0
+                        )
+                    }
+                )
+            }
+        }
+
+        self.conformancesByNominalName = conformances
+
+        func genericParameterNames(for targetName: String) -> [String] {
+            if let construct = constructsByName[targetName] {
+                return construct.genericParameters.map(Self.genericParameterName)
+            }
+            if let protocolDeclaration = protocolsByName[targetName] {
+                return protocolDeclaration.genericParameters.map(Self.genericParameterName)
+            }
+            return []
+        }
+    }
+
+    public func isAssignable(actual: TypeReference, expected: TypeReference) -> Bool {
+        if actual == expected || Self.typesMatch(actual: actual, expected: expected) {
+            return true
+        }
+
+        guard isKnownProtocol(expected) else {
+            return false
+        }
+
+        return conforms(actual: actual, expectedProtocol: expected, visited: [])
+    }
+
+    private func conforms(
+        actual: TypeReference,
+        expectedProtocol: TypeReference,
+        visited: Set<String>
+    ) -> Bool {
+        guard let actualContext = typeContext(for: actual) else {
+            return false
+        }
+        let visitKey = "\(actual.displayName)->\(expectedProtocol.displayName)"
+        guard !visited.contains(visitKey) else {
+            return false
+        }
+        let nextVisited = visited.union([visitKey])
+
+        for conformance in conformancesByNominalName[actualContext.name, default: []] {
+            let substitution = Dictionary(
+                uniqueKeysWithValues: zip(
+                    conformance.declarationGenericParameterNames,
+                    actualContext.arguments
+                )
+            )
+            let resolvedConformance = Self.substitute(conformance.conformance, using: substitution)
+            if Self.typesMatch(actual: resolvedConformance, expected: expectedProtocol) {
+                return true
+            }
+            if conforms(
+                actual: resolvedConformance,
+                expectedProtocol: expectedProtocol,
+                visited: nextVisited
+            ) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    private func isKnownProtocol(_ type: TypeReference) -> Bool {
+        guard let context = typeContext(for: type) else {
+            return false
+        }
+        return protocolNames.contains(context.name)
+    }
+
+    private func typeContext(for type: TypeReference) -> TypeContext? {
+        switch type {
+        case .named(let name):
+            return TypeContext(name: name, arguments: [])
+        case .member:
+            return TypeContext(name: type.displayName, arguments: [])
+        case .generic(let base, let arguments):
+            guard let context = typeContext(for: base) else {
+                return nil
+            }
+            return TypeContext(name: context.name, arguments: arguments)
+        case .array(let element):
+            return TypeContext(name: "Array", arguments: [element])
+        case .optional(let wrapped):
+            return TypeContext(name: "Optional", arguments: [wrapped])
+        case .function, .variadic:
+            return nil
+        }
+    }
+
+    private static func typesMatch(actual: TypeReference, expected: TypeReference) -> Bool {
+        switch (actual, expected) {
+        case (.named(let actualName), .named(let expectedName)):
+            return actualName == expectedName
+        case (.member(let actualBase, let actualName), .member(let expectedBase, let expectedName)):
+            return actualName == expectedName && typesMatch(actual: actualBase, expected: expectedBase)
+        case (
+            .generic(let actualBase, let actualArguments),
+            .generic(let expectedBase, let expectedArguments)
+        ):
+            guard actualArguments.count == expectedArguments.count,
+                typesMatch(actual: actualBase, expected: expectedBase)
+            else {
+                return false
+            }
+            return zip(actualArguments, expectedArguments).allSatisfy {
+                typesMatch(actual: $0, expected: $1)
+            }
+        case (.array(let actualElement), .array(let expectedElement)),
+            (.optional(let actualElement), .optional(let expectedElement)),
+            (.variadic(let actualElement), .variadic(let expectedElement)):
+            return typesMatch(actual: actualElement, expected: expectedElement)
+        case (
+            .function(let actualParameters, let actualReturn),
+            .function(let expectedParameters, let expectedReturn)
+        ):
+            guard actualParameters.count == expectedParameters.count else {
+                return false
+            }
+            return zip(actualParameters, expectedParameters).allSatisfy {
+                typesMatch(actual: $0, expected: $1)
+            } && typesMatch(actual: actualReturn, expected: expectedReturn)
+        default:
+            return false
+        }
+    }
+
+    private static func substitute(
+        _ type: TypeReference,
+        using substitutions: [String: TypeReference]
+    ) -> TypeReference {
+        switch type {
+        case .named(let name):
+            return substitutions[name] ?? type
+        case .member(let base, let name):
+            return .member(base: substitute(base, using: substitutions), name: name)
+        case .generic(let base, let arguments):
+            return .generic(
+                base: substitute(base, using: substitutions),
+                arguments: arguments.map { substitute($0, using: substitutions) }
+            )
+        case .array(let element):
+            return .array(substitute(element, using: substitutions))
+        case .function(let parameters, let returnType):
+            return .function(
+                parameters: parameters.map { substitute($0, using: substitutions) },
+                returnType: substitute(returnType, using: substitutions)
+            )
+        case .optional(let wrapped):
+            return .optional(substitute(wrapped, using: substitutions))
+        case .variadic(let element):
+            return .variadic(substitute(element, using: substitutions))
+        }
+    }
+
+    private static func genericParameterName(_ parameter: GenericParameter) -> String {
+        switch parameter {
+        case .type(let name, _, _), .value(let name, _, _):
+            return name
+        }
+    }
+}
+
 public struct DeclarationMemberResolver: Sendable {
     public static let empty = DeclarationMemberResolver(
         constructsByName: [:],

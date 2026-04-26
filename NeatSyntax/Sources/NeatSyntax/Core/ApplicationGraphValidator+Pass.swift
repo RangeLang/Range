@@ -14,7 +14,8 @@ extension ApplicationGraphValidator: CompiledProgramValidationPass {
             registryView: graphViews.registryView,
             resolver: program.literalBridgeResolver,
             memberResolver: graphViews.memberResolver,
-            operatorResolver: graphViews.operatorResolver
+            operatorResolver: graphViews.operatorResolver,
+            typeCompatibilityResolver: graphViews.typeCompatibilityResolver
         )
         try validateLiteralBridgeCompatibility(
             in: program.parsedFiles,
@@ -22,7 +23,8 @@ extension ApplicationGraphValidator: CompiledProgramValidationPass {
             registryView: graphViews.registryView,
             resolver: program.literalBridgeResolver,
             memberResolver: graphViews.memberResolver,
-            operatorResolver: graphViews.operatorResolver
+            operatorResolver: graphViews.operatorResolver,
+            typeCompatibilityResolver: graphViews.typeCompatibilityResolver
         )
         try validateBindingReferences(
             in: program.expandedFiles,

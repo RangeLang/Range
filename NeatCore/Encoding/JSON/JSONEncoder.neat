@@ -1,0 +1,31 @@
+construct JSONEncoder: Encoder {
+    state output: String = ""
+
+    function encode<T: Encodable>(_ value: T) -> Result<String, EncodingError> {
+        output = ""
+
+        switch value.encode(to: self) {
+        case .success:
+            return .success(result: output)
+
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+
+        return .failure(cause: .failed)
+    }
+
+    function container<Key: CodingKey>(
+        keyedBy keyType: NominalTypeReference
+    ) -> KeyedEncodingContainer<Key> {
+        return JSONKeyedEncodingContainer<Key>(output: $self.output)
+    }
+
+    function unkeyedContainer() -> UnkeyedEncodingContainer {
+        return JSONUnkeyedEncodingContainer(output: $self.output)
+    }
+
+    function singleValueContainer() -> SingleValueEncodingContainer {
+        return JSONSingleValueEncodingContainer(output: $self.output)
+    }
+}

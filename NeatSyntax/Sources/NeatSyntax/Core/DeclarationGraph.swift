@@ -71,6 +71,12 @@ public struct DeclarationGraph {
                 extensionsByTargetName: extensionsByTargetName
             ),
             operatorResolver: DeclarationOperatorResolver(callablesByName: callablesByName),
+            typeCompatibilityResolver: DeclarationTypeCompatibilityResolver(
+                protocolsByName: protocolsByName,
+                constructsByName: constructsByName,
+                enumsByName: enumsByName,
+                extensionsByTargetName: extensionsByTargetName
+            ),
             registryView: DeclarationRegistryView(
                 protocolsByName: protocolsByName,
                 constructsByName: constructsByName,
@@ -106,6 +112,10 @@ public struct DeclarationGraph {
 
     public var operatorResolver: DeclarationOperatorResolver {
         views.operatorResolver
+    }
+
+    public var typeCompatibilityResolver: DeclarationTypeCompatibilityResolver {
+        views.typeCompatibilityResolver
     }
 
     public var syntaxResolver: DeclarationSyntaxResolver {

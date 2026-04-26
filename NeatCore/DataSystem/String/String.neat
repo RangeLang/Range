@@ -14,3 +14,10 @@ construct String: ExpressibleByStringLiteral, Equatable, Hashable, Comparable {
         storage.isEmpty
     }
 }
+
+extension String: Encodable {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+        let container = encoder.singleValueContainer()
+        return container.encode(self)
+    }
+}

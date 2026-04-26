@@ -1,0 +1,11 @@
+construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
+    binding output: String
+
+    init(output: binding String) {
+        self.output = output
+    }
+
+    function encode<T: Encodable>(_ value: T) -> Result<Void, EncodingError> {
+        return .failure(cause: .failed)
+    }
+}

@@ -243,12 +243,18 @@ public enum ExpressionTypeSemantics {
     public static func isCompatible(
         actual: BootstrapLiteralType,
         expected: TypeReference,
-        resolver: LiteralBridgeResolver
+        resolver: LiteralBridgeResolver,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver = .empty
     ) -> Bool {
         switch actual {
         case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral, .nilLiteral:
             if case .optional(let wrapped) = expected {
-                return isCompatible(actual: actual, expected: wrapped, resolver: resolver)
+                return isCompatible(
+                    actual: actual,
+                    expected: wrapped,
+                    resolver: resolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver
+                )
             }
             return resolver.isCompatible(
                 expected: expected,
@@ -257,6 +263,7 @@ public enum ExpressionTypeSemantics {
         case .typed(let actualType):
             return actualType == expected
                 || isCompatibleNamedType(expected: expected, actual: actualType)
+                || typeCompatibilityResolver.isAssignable(actual: actualType, expected: expected)
         }
     }
 
@@ -269,7 +276,8 @@ public enum ExpressionTypeSemantics {
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver = .empty,
         operatorResolver: DeclarationOperatorResolver = .empty,
-        macroExpansionResolver: DeclarationMacroExpansionResolver = .empty
+        macroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver = .empty
     ) throws -> Bool {
         switch expression {
         case .macroInvocation:
@@ -293,7 +301,12 @@ public enum ExpressionTypeSemantics {
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
                 )
-                return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+                return isCompatible(
+                    actual: inferred,
+                    expected: expected,
+                    resolver: resolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver
+                )
             }
 
             return try elements.allSatisfy { element in
@@ -305,7 +318,8 @@ public enum ExpressionTypeSemantics {
                     macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
-                    operatorResolver: operatorResolver
+                    operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver
                 )
             }
         case .dictionary(let elements):
@@ -320,7 +334,12 @@ public enum ExpressionTypeSemantics {
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
                 )
-                return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+                return isCompatible(
+                    actual: inferred,
+                    expected: expected,
+                    resolver: resolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver
+                )
             }
 
             return try elements.allSatisfy { element in
@@ -332,7 +351,8 @@ public enum ExpressionTypeSemantics {
                     macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
-                    operatorResolver: operatorResolver
+                    operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver
                 ) && isExpressionCompatible(
                     element.value,
                     expected: expectedValueType,
@@ -341,7 +361,8 @@ public enum ExpressionTypeSemantics {
                     macroExpansionTypes: macroExpansionTypes,
                     resolver: resolver,
                     memberResolver: memberResolver,
-                    operatorResolver: operatorResolver
+                    operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver
                 )
             }
         case .call(let name, _):
@@ -361,7 +382,12 @@ public enum ExpressionTypeSemantics {
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
             )
-            return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+            return isCompatible(
+                actual: inferred,
+                expected: expected,
+                resolver: resolver,
+                typeCompatibilityResolver: typeCompatibilityResolver
+            )
         case .identifier(let name):
             if isLeadingDotMemberShorthand(name), canUseLeadingDotMemberShorthand(for: expected) {
                 return true
@@ -375,7 +401,12 @@ public enum ExpressionTypeSemantics {
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
             )
-            return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+            return isCompatible(
+                actual: inferred,
+                expected: expected,
+                resolver: resolver,
+                typeCompatibilityResolver: typeCompatibilityResolver
+            )
         default:
             let inferred = try inferType(
                 of: expression,
@@ -386,7 +417,12 @@ public enum ExpressionTypeSemantics {
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
             )
-            return isCompatible(actual: inferred, expected: expected, resolver: resolver)
+            return isCompatible(
+                actual: inferred,
+                expected: expected,
+                resolver: resolver,
+                typeCompatibilityResolver: typeCompatibilityResolver
+            )
         }
     }
 

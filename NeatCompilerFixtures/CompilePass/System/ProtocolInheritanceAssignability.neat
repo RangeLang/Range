@@ -1,0 +1,15 @@
+protocol BaseProtocol {
+}
+
+protocol DerivedProtocol: BaseProtocol {
+}
+
+construct DerivedImplementation: DerivedProtocol {
+}
+
+function makeBase() -> BaseProtocol {
+    return DerivedImplementation()
+}
+
+@main {
+}

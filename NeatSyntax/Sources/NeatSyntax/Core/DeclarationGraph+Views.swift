@@ -4,6 +4,7 @@ public struct DeclarationGraphViews {
     public let literalBridgeResolver: LiteralBridgeResolver
     public let memberResolver: DeclarationMemberResolver
     public let operatorResolver: DeclarationOperatorResolver
+    public let typeCompatibilityResolver: DeclarationTypeCompatibilityResolver
     public let registryView: DeclarationRegistryView
     public let syntaxResolver: DeclarationSyntaxResolver
 
@@ -11,12 +12,14 @@ public struct DeclarationGraphViews {
         literalBridgeResolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
         registryView: DeclarationRegistryView,
         syntaxResolver: DeclarationSyntaxResolver
     ) {
         self.literalBridgeResolver = literalBridgeResolver
         self.memberResolver = memberResolver
         self.operatorResolver = operatorResolver
+        self.typeCompatibilityResolver = typeCompatibilityResolver
         self.registryView = registryView
         self.syntaxResolver = syntaxResolver
     }

@@ -6,3 +6,10 @@ construct Bool: ExpressibleByBoolLiteral, Equatable, Hashable {
         self.storage = literal.storage()
     }
 }
+
+extension Bool: Encodable {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+        let container = encoder.singleValueContainer()
+        return container.encode(self)
+    }
+}

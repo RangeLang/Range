@@ -7,7 +7,8 @@ extension ApplicationGraphValidator {
         registryView: DeclarationRegistryView,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
-        operatorResolver: DeclarationOperatorResolver
+        operatorResolver: DeclarationOperatorResolver,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver
     ) throws {
         for parsedFile in parsedFiles {
             let fileName = lastPathComponent(of: parsedFile.path)
@@ -20,6 +21,7 @@ extension ApplicationGraphValidator {
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver,
                     fileName: fileName
                 )
             case .namespace(let declaration):
@@ -29,6 +31,7 @@ extension ApplicationGraphValidator {
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver,
                     fileName: fileName
                 )
             case .module(let module):
@@ -38,6 +41,7 @@ extension ApplicationGraphValidator {
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver,
                     fileName: fileName
                 )
 
@@ -54,6 +58,7 @@ extension ApplicationGraphValidator {
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
+                        typeCompatibilityResolver: typeCompatibilityResolver,
                         fileName: fileName
                     )
                 }
@@ -65,6 +70,7 @@ extension ApplicationGraphValidator {
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
+                        typeCompatibilityResolver: typeCompatibilityResolver,
                         fileName: fileName
                     )
                 }
@@ -75,6 +81,7 @@ extension ApplicationGraphValidator {
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
+                        typeCompatibilityResolver: typeCompatibilityResolver,
                         fileName: fileName
                     )
                 }
@@ -90,6 +97,7 @@ extension ApplicationGraphValidator {
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
         fileName: String
     ) throws {
         for callable in declaration.callables {
@@ -99,6 +107,7 @@ extension ApplicationGraphValidator {
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver,
+                typeCompatibilityResolver: typeCompatibilityResolver,
                 fileName: fileName
             )
         }
@@ -109,6 +118,7 @@ extension ApplicationGraphValidator {
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver,
+                typeCompatibilityResolver: typeCompatibilityResolver,
                 fileName: fileName
             )
         }
@@ -119,6 +129,7 @@ extension ApplicationGraphValidator {
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver,
+                typeCompatibilityResolver: typeCompatibilityResolver,
                 fileName: fileName
             )
         }
@@ -130,6 +141,7 @@ extension ApplicationGraphValidator {
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
         fileName: String
     ) throws {
         let environmentTypes = Dictionary(
@@ -144,6 +156,7 @@ extension ApplicationGraphValidator {
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver,
+            typeCompatibilityResolver: typeCompatibilityResolver,
             fileName: fileName
         )
 
@@ -161,6 +174,7 @@ extension ApplicationGraphValidator {
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver,
+                typeCompatibilityResolver: typeCompatibilityResolver,
                 fileName: fileName
             )
         }
@@ -172,6 +186,7 @@ extension ApplicationGraphValidator {
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
         fileName: String
     ) throws {
         var accessibleTypes = initialAccessibleTypes
@@ -190,7 +205,8 @@ extension ApplicationGraphValidator {
                 !ExpressionTypeSemantics.isCompatible(
                     actual: inferred,
                     expected: state.type,
-                    resolver: resolver
+                    resolver: resolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver
                 )
             {
                 throw SemanticValidationError(
@@ -208,6 +224,7 @@ extension ApplicationGraphValidator {
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
         fileName: String
     ) throws {
         guard
@@ -224,6 +241,7 @@ extension ApplicationGraphValidator {
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver,
+            typeCompatibilityResolver: typeCompatibilityResolver,
             fileName: fileName
         )
 
@@ -255,7 +273,8 @@ extension ApplicationGraphValidator {
                 ExpressionTypeSemantics.isCompatible(
                     actual: inferred,
                     expected: explicitReturnType,
-                    resolver: resolver
+                    resolver: resolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver
                 )
             else {
                 throw SemanticValidationError(
@@ -271,6 +290,7 @@ extension ApplicationGraphValidator {
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
+        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
         fileName: String
     ) throws {
         for statement in statements {
@@ -294,6 +314,7 @@ extension ApplicationGraphValidator {
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver,
                     fileName: fileName
                 )
             case .macroInvocation(_, _, let body),
@@ -306,6 +327,7 @@ extension ApplicationGraphValidator {
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver,
                     fileName: fileName
                 )
             case .background(let background):
@@ -315,6 +337,7 @@ extension ApplicationGraphValidator {
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver,
                     fileName: fileName
                 )
             case .deferBlock(let deferred):
@@ -324,6 +347,7 @@ extension ApplicationGraphValidator {
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
+                    typeCompatibilityResolver: typeCompatibilityResolver,
                     fileName: fileName
                 )
             case .conditional(let branches):
@@ -334,6 +358,7 @@ extension ApplicationGraphValidator {
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
+                        typeCompatibilityResolver: typeCompatibilityResolver,
                         fileName: fileName
                     )
                 }
@@ -348,6 +373,7 @@ extension ApplicationGraphValidator {
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
+                        typeCompatibilityResolver: typeCompatibilityResolver,
                         fileName: fileName
                     )
                 }
@@ -358,6 +384,7 @@ extension ApplicationGraphValidator {
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
+                        typeCompatibilityResolver: typeCompatibilityResolver,
                         fileName: fileName
                     )
                 }

@@ -1,0 +1,40 @@
+construct JSONSingleValueEncodingContainer: SingleValueEncodingContainer {
+    binding output: String
+
+    init(output: binding String) {
+        self.output = output
+    }
+
+    function encodeNil() -> Result<Void, EncodingError> {
+        output = "null"
+        return .success(result: Void())
+    }
+
+    function encode(_ value: Bool) -> Result<Void, EncodingError> {
+        output = "\(value)"
+        return .success(result: Void())
+    }
+
+    function encode(_ value: Data) -> Result<Void, EncodingError> {
+        return .failure(cause: .failed)
+    }
+
+    function encode(_ value: Float) -> Result<Void, EncodingError> {
+        output = "\(value)"
+        return .success(result: Void())
+    }
+
+    function encode(_ value: Int) -> Result<Void, EncodingError> {
+        output = "\(value)"
+        return .success(result: Void())
+    }
+
+    function encode(_ value: String) -> Result<Void, EncodingError> {
+        output = "\"\(value)\""
+        return .success(result: Void())
+    }
+
+    function encode<T: Encodable>(_ value: T) -> Result<Void, EncodingError> {
+        return .failure(cause: .failed)
+    }
+}

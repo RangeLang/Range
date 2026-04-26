@@ -4,3 +4,10 @@ construct Data: Equatable, Hashable {
 
     init(storage: DataStorage)
 }
+
+extension Data: Encodable {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+        let container = encoder.singleValueContainer()
+        return container.encode(self)
+    }
+}

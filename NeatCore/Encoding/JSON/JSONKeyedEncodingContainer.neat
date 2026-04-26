@@ -1,0 +1,11 @@
+construct JSONKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer<Key> {
+    binding output: String
+
+    init(output: binding String) {
+        self.output = output
+    }
+
+    function encode<T: Encodable>(_ value: T, forKey key: Key) -> Result<Void, EncodingError> {
+        return .failure(cause: .failed)
+    }
+}

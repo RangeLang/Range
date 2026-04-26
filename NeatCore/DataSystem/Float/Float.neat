@@ -6,3 +6,10 @@ construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equat
         self.storage = literal.storage()
     }
 }
+
+extension Float: Encodable {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+        let container = encoder.singleValueContainer()
+        return container.encode(self)
+    }
+}
