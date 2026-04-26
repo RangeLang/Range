@@ -1,4 +1,4 @@
-construct JSONEncoder: Encoder {
+construct JSONEncoder: Encoder<String> {
     state output: String = ""
     state isObject: Bool = false
 

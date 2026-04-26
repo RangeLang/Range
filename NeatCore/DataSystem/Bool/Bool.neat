@@ -8,7 +8,7 @@ construct Bool: ExpressibleByBoolLiteral, Equatable, Hashable {
 }
 
 extension Bool: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
         let container = encoder.singleValueContainer()
         return container.encode(self)
     }

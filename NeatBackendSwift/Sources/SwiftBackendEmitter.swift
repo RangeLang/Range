@@ -425,6 +425,12 @@ struct SwiftBackendEmitter {
             declaration.conformances,
             genericParameterNames: genericParameterNames
         )
+        let conformanceAssociatedTypeAliases = declaration.conformances.compactMap {
+            emitConformanceAssociatedTypeAlias(
+                $0,
+                genericParameterNames: genericParameterNames
+            )
+        }.joined(separator: "\n")
         let storedValues = try declaration.values.map {
             try emitStoredValue($0, genericParameterNames: genericParameterNames)
         }.joined(separator: "\n")
@@ -457,6 +463,7 @@ struct SwiftBackendEmitter {
             .joined(separator: "\n\n")
 
         let memberSections = [
+            conformanceAssociatedTypeAliases,
             storedValues,
             storedStates,
             storedBindings,
@@ -625,6 +632,19 @@ struct SwiftBackendEmitter {
         default:
             return emitTypeName(typeReference, genericParameterNames: genericParameterNames)
         }
+    }
+
+    private func emitConformanceAssociatedTypeAlias(
+        _ typeReference: TypeReference,
+        genericParameterNames: Set<String>
+    ) -> String? {
+        guard case .generic(.named("Encoder"), let arguments) = typeReference,
+            arguments.count == 1
+        else {
+            return nil
+        }
+
+        return "typealias Output = \(emitTypeName(arguments[0], genericParameterNames: genericParameterNames))"
     }
 
     private func emitProtocolPrimaryAssociatedTypeClause(_ parameters: [GenericParameter]) -> String {

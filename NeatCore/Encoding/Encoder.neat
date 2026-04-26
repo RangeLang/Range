@@ -1,4 +1,4 @@
-protocol Encoder {
+protocol Encoder<Output> {
     function container<Key: CodingKey>(
         keyedBy keyType: Key.Type
     ) -> KeyedEncodingContainer<Key>

@@ -1,4 +1,4 @@
-function encodeNumber(_ encoder: Encoder) -> Result<Void, EncodingError> {
+function encodeNumber<Output>(_ encoder: Encoder<Output>) -> Result<Void, EncodingError> {
     let value = 42
     return value.encode(to: encoder)
 }

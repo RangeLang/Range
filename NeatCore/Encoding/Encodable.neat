@@ -1,3 +1,3 @@
 protocol Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError>
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError>
 }

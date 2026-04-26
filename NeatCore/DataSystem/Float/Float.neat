@@ -8,7 +8,7 @@ construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equat
 }
 
 extension Float: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
         let container = encoder.singleValueContainer()
         return container.encode(self)
     }

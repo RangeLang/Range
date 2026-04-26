@@ -12,7 +12,7 @@ construct UserCodingKey: CodingKey {
 }
 
 extension User: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
         state container = encoder.container(
             keyedBy: UserCodingKey.self
         )
