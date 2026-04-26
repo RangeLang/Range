@@ -718,7 +718,7 @@ public enum ExpressionTypeSemantics {
         accessibleTypes: [String: BootstrapLiteralType],
         memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
-        guard let (baseName, memberName) = splitMemberName(name),
+        guard let (baseName, memberName, _) = splitMemberName(name),
             let baseType = accessibleTypes[baseName],
             case .typed(let baseReference) = baseType
         else {
@@ -733,7 +733,7 @@ public enum ExpressionTypeSemantics {
         accessibleTypes: [String: BootstrapLiteralType],
         memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
-        guard let (baseName, memberName) = splitMemberName(name),
+        guard let (baseName, memberName, genericArguments) = splitMemberName(name),
             let baseType = accessibleTypes[baseName],
             case .typed(let baseReference) = baseType
         else {
@@ -742,22 +742,87 @@ public enum ExpressionTypeSemantics {
 
         return memberResolver.memberCallableReturnType(
             baseType: baseReference,
-            memberName: memberName
+            memberName: memberName,
+            genericArguments: genericArguments
         )
     }
 
-    private static func splitMemberName(_ name: String) -> (base: String, member: String)? {
+    private static func splitMemberName(_ name: String) -> (
+        base: String,
+        member: String,
+        genericArguments: [TypeReference]
+    )? {
         guard let dot = name.lastIndex(of: ".") else {
             return nil
         }
 
         let base = String(name[..<dot])
-        let member = String(name[name.index(after: dot)...])
+        let rawMember = String(name[name.index(after: dot)...])
+        let member = stripGenericArgumentClause(from: rawMember)
         guard !base.isEmpty, !member.isEmpty else {
             return nil
         }
 
-        return (base, member)
+        return (base, member, genericArguments(from: rawMember))
+    }
+
+    private static func stripGenericArgumentClause(from name: String) -> String {
+        guard let genericStart = name.firstIndex(of: "<") else {
+            return name
+        }
+        return String(name[..<genericStart])
+    }
+
+    private static func genericArguments(from name: String) -> [TypeReference] {
+        guard let genericStart = name.firstIndex(of: "<"),
+            name.hasSuffix(">")
+        else {
+            return []
+        }
+        let contentStart = name.index(after: genericStart)
+        let contentEnd = name.index(before: name.endIndex)
+        let content = String(name[contentStart..<contentEnd])
+        return splitTopLevelTypeList(content).compactMap(parseTypeReference)
+    }
+
+    private static func splitTopLevelTypeList(_ source: String) -> [String] {
+        var parts: [String] = []
+        var current = ""
+        var depth = 0
+        for character in source {
+            switch character {
+            case "<":
+                depth += 1
+                current.append(character)
+            case ">":
+                depth -= 1
+                current.append(character)
+            case "," where depth == 0:
+                let part = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !part.isEmpty {
+                    parts.append(part)
+                }
+                current = ""
+            default:
+                current.append(character)
+            }
+        }
+        let finalPart = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !finalPart.isEmpty {
+            parts.append(finalPart)
+        }
+        return parts
+    }
+
+    private static func parseTypeReference(_ source: String) -> TypeReference? {
+        do {
+            var parser = try Parser(source: source)
+            let type = try parser.parseTypeReferenceNode()
+            try parser.consume(.eof)
+            return type
+        } catch {
+            return nil
+        }
     }
 
     private static func inferGraphResolvedConstructCallType(

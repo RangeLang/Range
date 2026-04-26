@@ -1,11 +1,17 @@
 construct JSONEncoder: Encoder {
     state output: String = ""
+    state isObject: Bool = false
 
     function encode<T: Encodable>(_ value: T) -> Result<String, EncodingError> {
         output = ""
+        isObject = false
 
         switch value.encode(to: self) {
         case .success:
+            if isObject {
+                return .success(result: "{" + output + "}")
+            }
+
             return .success(result: output)
 
         case .failure(let error):
@@ -18,7 +24,7 @@ construct JSONEncoder: Encoder {
     function container<Key: CodingKey>(
         keyedBy keyType: NominalTypeReference
     ) -> KeyedEncodingContainer<Key> {
-        return JSONKeyedEncodingContainer<Key>(output: $self.output)
+        return JSONKeyedEncodingContainer<Key>(output: $self.output, isObject: $self.isObject)
     }
 
     function unkeyedContainer() -> UnkeyedEncodingContainer {

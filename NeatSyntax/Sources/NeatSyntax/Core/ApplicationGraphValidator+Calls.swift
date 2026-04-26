@@ -692,12 +692,20 @@ extension ApplicationGraphValidator {
         }
 
         let base = String(name[..<dot])
-        let member = String(name[name.index(after: dot)...])
+        let rawMember = String(name[name.index(after: dot)...])
+        let member = stripGenericArgumentClause(from: rawMember)
         guard !base.isEmpty, !member.isEmpty else {
             return nil
         }
 
         return (base, member)
+    }
+
+    func stripGenericArgumentClause(from name: String) -> String {
+        guard let genericStart = name.firstIndex(of: "<") else {
+            return name
+        }
+        return String(name[..<genericStart])
     }
 
     func constructTypeName(

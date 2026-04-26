@@ -752,19 +752,30 @@ public struct DeclarationMemberResolver: Sendable {
         var genericParameterNames: [String]
         var genericDefaultArguments: [TypeReference?]
         var propertyTypes: [String: TypeReference]
-        var callableReturnTypes: [String: TypeReference]
+        var callableSignatures: [String: MemberCallableSignature]
+    }
+
+    private struct MemberCallableSignature: Sendable {
+        var genericParameterNames: [String]
+        var returnType: TypeReference
     }
 
     private let membersByConstructName: [String: ConstructMembers]
-    private let callableReturnTypesByProtocolName: [String: [String: TypeReference]]
+    private let callableSignaturesByProtocolName: [String: [String: MemberCallableSignature]]
+    private let genericParameterConstraintsByName: [String: TypeReference]
 
     public init(
         constructsByName: [String: ConstructDeclaration],
         protocolsByName: [String: ProtocolDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
-        self.callableReturnTypesByProtocolName = protocolsByName.mapValues { declaration in
-            Self.protocolCallableReturnTypes(for: declaration)
+        self.genericParameterConstraintsByName = Self.genericParameterConstraints(
+            constructsByName: constructsByName,
+            protocolsByName: protocolsByName,
+            extensionsByTargetName: extensionsByTargetName
+        )
+        self.callableSignaturesByProtocolName = protocolsByName.mapValues { declaration in
+            Self.protocolCallableSignatures(for: declaration)
         }
         self.membersByConstructName = constructsByName.mapValues { construct in
             let nestedTypeMap = Self.nestedTypeMap(for: construct)
@@ -800,18 +811,24 @@ public struct DeclarationMemberResolver: Sendable {
                 )
             }
 
-            var callableReturnTypes: [String: TypeReference] = [:]
+            var callableSignatures: [String: MemberCallableSignature] = [:]
             for callable in construct.callables {
-                callableReturnTypes[callable.name] = Self.qualifyNestedLocalTypes(
-                    callable.returnType ?? .named("Void"),
-                    using: nestedTypeMap
+                callableSignatures[callable.name] = MemberCallableSignature(
+                    genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
+                    returnType: Self.qualifyNestedLocalTypes(
+                        callable.returnType ?? .named("Void"),
+                        using: nestedTypeMap
+                    )
                 )
             }
             for extensionDeclaration in extensionsByTargetName[construct.name, default: []] {
                 for callable in extensionDeclaration.callables {
-                    callableReturnTypes[callable.name] = Self.qualifyNestedLocalTypes(
-                        callable.returnType ?? .named("Void"),
-                        using: nestedTypeMap
+                    callableSignatures[callable.name] = MemberCallableSignature(
+                        genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
+                        returnType: Self.qualifyNestedLocalTypes(
+                            callable.returnType ?? .named("Void"),
+                            using: nestedTypeMap
+                        )
                     )
                 }
             }
@@ -827,7 +844,7 @@ public struct DeclarationMemberResolver: Sendable {
                     }
                 },
                 propertyTypes: propertyTypes,
-                callableReturnTypes: callableReturnTypes
+                callableSignatures: callableSignatures
             )
         }
     }
@@ -844,14 +861,66 @@ public struct DeclarationMemberResolver: Sendable {
         )
     }
 
-    private static func protocolCallableReturnTypes(
+    private static func protocolCallableSignatures(
         for declaration: ProtocolDeclaration
-    ) -> [String: TypeReference] {
-        var returnTypes: [String: TypeReference] = [:]
-        for callable in declaration.callables where returnTypes[callable.name] == nil {
-            returnTypes[callable.name] = callable.returnType ?? .named("Void")
+    ) -> [String: MemberCallableSignature] {
+        var signatures: [String: MemberCallableSignature] = [:]
+        for callable in declaration.callables where signatures[callable.name] == nil {
+            signatures[callable.name] = MemberCallableSignature(
+                genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
+                returnType: callable.returnType ?? .named("Void")
+            )
         }
-        return returnTypes
+        return signatures
+    }
+
+    private static func genericParameterConstraints(
+        constructsByName: [String: ConstructDeclaration],
+        protocolsByName: [String: ProtocolDeclaration],
+        extensionsByTargetName: [String: [ExtensionDeclaration]]
+    ) -> [String: TypeReference] {
+        var candidates: [String: [TypeReference]] = [:]
+
+        func record(_ parameters: [GenericParameter]) {
+            for parameter in parameters {
+                guard case .type(let name, let constraint?, _) = parameter else {
+                    continue
+                }
+                if candidates[name, default: []].contains(where: { $0.displayName == constraint.displayName }) {
+                    continue
+                }
+                candidates[name, default: []].append(constraint)
+            }
+        }
+
+        for construct in constructsByName.values {
+            record(construct.genericParameters)
+            for callable in construct.callables {
+                record(callable.genericParameters)
+            }
+        }
+        for declaration in protocolsByName.values {
+            record(declaration.genericParameters)
+            for callable in declaration.callables {
+                record(callable.genericParameters)
+            }
+        }
+        for extensions in extensionsByTargetName.values {
+            for extensionDeclaration in extensions {
+                for callable in extensionDeclaration.callables {
+                    record(callable.genericParameters)
+                }
+            }
+        }
+
+        return Dictionary(
+            uniqueKeysWithValues: candidates.compactMap { name, constraints in
+                guard constraints.count == 1 else {
+                    return nil
+                }
+                return (name, constraints[0])
+            }
+        )
     }
 
     private static func qualifyNestedLocalTypes(
@@ -895,35 +964,64 @@ public struct DeclarationMemberResolver: Sendable {
 
     public func memberCallableReturnType(
         baseType: TypeReference,
-        memberName: String
+        memberName: String,
+        genericArguments: [TypeReference] = []
     ) -> TypeReference? {
         if let protocolType = protocolCallableReturnType(
             baseType: baseType,
-            memberName: memberName
+            memberName: memberName,
+            genericArguments: genericArguments
         ) {
             return protocolType
         }
 
         guard let context = constructContext(for: baseType),
             let members = membersByConstructName[context.name],
-            let type = members.callableReturnTypes[memberName]
+            let signature = members.callableSignatures[memberName]
         else {
             return nil
         }
-        return Self.substitute(
-            type, using: genericSubstitution(for: members, arguments: context.arguments))
+        var substitution = genericSubstitution(for: members, arguments: context.arguments)
+        substitution.merge(callableGenericSubstitution(for: signature, arguments: genericArguments)) {
+            _, callable in callable
+        }
+        return Self.substitute(signature.returnType, using: substitution)
     }
 
     private func protocolCallableReturnType(
         baseType: TypeReference,
-        memberName: String
+        memberName: String,
+        genericArguments: [TypeReference]
     ) -> TypeReference? {
+        if case .named(let name) = baseType,
+            let constrainedType = genericParameterConstraintsByName[name]
+        {
+            return protocolCallableReturnType(
+                baseType: constrainedType,
+                memberName: memberName,
+                genericArguments: genericArguments
+            )
+        }
+
         guard let context = constructContext(for: baseType),
-            let type = callableReturnTypesByProtocolName[context.name]?[memberName]
+            let signature = callableSignaturesByProtocolName[context.name]?[memberName]
         else {
             return nil
         }
-        return type
+        return Self.substitute(
+            signature.returnType,
+            using: callableGenericSubstitution(for: signature, arguments: genericArguments)
+        )
+    }
+
+    private func callableGenericSubstitution(
+        for signature: MemberCallableSignature,
+        arguments: [TypeReference]
+    ) -> [String: TypeReference] {
+        guard arguments.count == signature.genericParameterNames.count else {
+            return [:]
+        }
+        return Dictionary(uniqueKeysWithValues: zip(signature.genericParameterNames, arguments))
     }
 
     public func constructType(forConstructorCallName name: String) -> TypeReference? {

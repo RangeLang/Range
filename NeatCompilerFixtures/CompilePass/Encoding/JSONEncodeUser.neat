@@ -1,0 +1,33 @@
+construct User {
+    let id: Int
+    let name: String
+}
+
+construct UserCodingKey: CodingKey {
+    let value: String
+
+    function stringValue() -> String {
+        return value
+    }
+}
+
+extension User: Encodable {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+        let container: KeyedEncodingContainer<UserCodingKey> = encoder.container<UserCodingKey>(
+            keyedBy: UserCodingKey.self
+        )
+        let idKey = UserCodingKey(value: "id")
+        state nameKey = UserCodingKey(value: "name")
+        container.encode(id, forKey: idKey)
+        return container.encode(name, forKey: nameKey)
+    }
+}
+
+function encodeUser() -> Result<String, EncodingError> {
+    let encoder = JSONEncoder()
+    let user = User(id: 1, name: "George")
+    return encoder.encode(user)
+}
+
+@main {
+}
