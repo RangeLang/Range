@@ -332,6 +332,18 @@ struct SwiftBackendEmitter {
                 return .success(result: Void())
             }
         }
+
+        extension Optional: Neat_Encodable where Wrapped: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                switch self {
+                case .some(let value):
+                    return value.encode(to: encoder)
+                case .none:
+                    var container = encoder.singleValueContainer()
+                    return container.encodeNil()
+                }
+            }
+        }
         """
     }
 
@@ -408,13 +420,13 @@ struct SwiftBackendEmitter {
             emitAssociatedTypeRequirement($0, genericParameterNames: genericParameterNames)
         }.joined(separator: "\n")
         let valueRequirements = declaration.values.map {
-            "var \($0.name): \(emitTypeName(.named($0.typeName), genericParameterNames: genericParameterNames)) { get }"
+            "var \($0.name): \(emitDeclaredTypeName($0.typeName, genericParameterNames: genericParameterNames)) { get }"
         }.joined(separator: "\n")
         let stateRequirements = declaration.states.map {
             "var \($0.name): \(emitTypeName($0.type, genericParameterNames: genericParameterNames)) { get set }"
         }.joined(separator: "\n")
         let bindingRequirements = declaration.bindings.map {
-            "var \($0.name): \(emitTypeName(.named($0.typeName), genericParameterNames: genericParameterNames)) { get set }"
+            "var \($0.name): \(emitDeclaredTypeName($0.typeName, genericParameterNames: genericParameterNames)) { get set }"
         }.joined(separator: "\n")
         let initializerRequirements = try declaration.initializers.map {
             try emitInitializerRequirement($0, genericParameterNames: genericParameterNames)
@@ -649,6 +661,28 @@ struct SwiftBackendEmitter {
         }
     }
 
+    private func emitDeclaredTypeName(
+        _ name: String,
+        genericParameterNames: Set<String> = []
+    ) -> String {
+        if name.hasPrefix("["),
+            name.hasSuffix("]"),
+            name.count > 2
+        {
+            let elementName = String(name.dropFirst().dropLast())
+            return "[\(emitDeclaredTypeName(elementName, genericParameterNames: genericParameterNames))]"
+        }
+
+        if name.hasSuffix("?"),
+            name.count > 1
+        {
+            let wrappedName = String(name.dropLast())
+            return "\(emitDeclaredTypeName(wrappedName, genericParameterNames: genericParameterNames))?"
+        }
+
+        return emitTypeName(.named(name), genericParameterNames: genericParameterNames)
+    }
+
     private func emitGenericClause(
         _ parameters: [GenericParameter],
         inheritedGenericParameterNames: Set<String> = []
@@ -798,9 +832,9 @@ struct SwiftBackendEmitter {
         genericParameterNames: Set<String> = []
     ) throws -> String {
         if let expression = value.value {
-            return "let \(value.name): \(emitTypeName(.named(value.typeName), genericParameterNames: genericParameterNames)) = \(try emitExpression(expression))"
+            return "let \(value.name): \(emitDeclaredTypeName(value.typeName, genericParameterNames: genericParameterNames)) = \(try emitExpression(expression))"
         }
-        return "let \(value.name): \(emitTypeName(.named(value.typeName), genericParameterNames: genericParameterNames))"
+        return "let \(value.name): \(emitDeclaredTypeName(value.typeName, genericParameterNames: genericParameterNames))"
     }
 
     private func emitStoredState(
@@ -822,8 +856,8 @@ struct SwiftBackendEmitter {
     ) throws -> String {
         switch binding.storage {
         case .plain:
-            let typeName = emitTypeName(
-                .named(binding.typeName),
+            let typeName = emitDeclaredTypeName(
+                binding.typeName,
                 genericParameterNames: genericParameterNames
             )
             return """
@@ -848,12 +882,12 @@ struct SwiftBackendEmitter {
         genericParameterNames: Set<String> = []
     ) throws -> String {
         guard let body = derived.body else {
-            return "var \(derived.name): \(emitTypeName(.named(derived.typeName), genericParameterNames: genericParameterNames))"
+            return "var \(derived.name): \(emitDeclaredTypeName(derived.typeName, genericParameterNames: genericParameterNames))"
         }
 
         if body.count == 1, case .expression(let expression) = body[0] {
             return
-                "var \(derived.name): \(emitTypeName(.named(derived.typeName), genericParameterNames: genericParameterNames)) { \(try emitExpression(expression)) }"
+                "var \(derived.name): \(emitDeclaredTypeName(derived.typeName, genericParameterNames: genericParameterNames)) { \(try emitExpression(expression)) }"
         }
 
         let bodyText = try emitStatements(
@@ -862,7 +896,7 @@ struct SwiftBackendEmitter {
             enclosingReturnType: .named(derived.typeName)
         )
         return """
-            var \(derived.name): \(emitTypeName(.named(derived.typeName), genericParameterNames: genericParameterNames)) {
+            var \(derived.name): \(emitDeclaredTypeName(derived.typeName, genericParameterNames: genericParameterNames)) {
             \(bodyText)
             }
             """

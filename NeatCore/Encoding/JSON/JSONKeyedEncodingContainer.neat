@@ -34,6 +34,16 @@ construct JSONKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer<Key
     }
 
     function encode<T: Encodable>(_ value: T, forKey key: Key) -> Result<Void, EncodingError> {
+        let encoder = JSONEncoder()
+
+        switch encoder.encode(value) {
+        case .success(let encoded):
+            appendField(key: key, value: encoded)
+            return .success(result: Void())
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+
         return .failure(cause: .failed)
     }
 

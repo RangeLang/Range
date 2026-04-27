@@ -1,0 +1,77 @@
+construct Address {
+    let city: String
+    let zip: Int
+}
+
+construct AddressCodingKey: CodingKey {
+    let value: String
+
+    function stringValue() -> String {
+        return value
+    }
+}
+
+extension Address: Encodable {
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+        state container = encoder.container(keyedBy: AddressCodingKey.self)
+
+        switch container.encode(city, forKey: AddressCodingKey(value: "city")) {
+        case .success:
+            return container.encode(zip, forKey: AddressCodingKey(value: "zip"))
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+
+        return .failure(cause: .failed)
+    }
+}
+
+construct User {
+    let name: String
+    let address: Address
+    let scores: [Int]
+}
+
+construct UserCodingKey: CodingKey {
+    let value: String
+
+    function stringValue() -> String {
+        return value
+    }
+}
+
+extension User: Encodable {
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+        state container = encoder.container(keyedBy: UserCodingKey.self)
+
+        switch container.encode(name, forKey: UserCodingKey(value: "name")) {
+        case .success:
+            switch container.encode(address, forKey: UserCodingKey(value: "address")) {
+            case .success:
+                return container.encode(scores, forKey: UserCodingKey(value: "scores"))
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+
+        return .failure(cause: .failed)
+    }
+}
+
+function encodeNested() -> Result<String, EncodingError> {
+    let encoder = JSONEncoder()
+    let address = Address(city: "Tbilisi", zip: 1000)
+    let user = User(name: "George", address: address, scores: [1, 2, 3])
+    return encoder.encode(user)
+}
+
+@main {
+    switch encodeNested() {
+    case .success(let json):
+        Logger.info(json)
+    case .failure:
+        Logger.error("encoding failed")
+    }
+}
