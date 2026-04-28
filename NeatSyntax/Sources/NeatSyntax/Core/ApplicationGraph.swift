@@ -63,11 +63,11 @@ struct GraphCollector {
         case .enumeration, .protocolDefinition, .macro:
             return
         case .extensions(let declarations):
-            for declaration in declarations where declarationGraph.hasNamespace(named: declaration.targetType.displayName) {
+            for declaration in declarations where declarationGraph.hasNamespace(named: declaration.targetName) {
                 analyzeNamespaceExtension(
                     declaration,
                     parentID: fileID,
-                    qualifiedPrefix: declaration.targetType.displayName
+                    qualifiedPrefix: declaration.targetName
                 )
             }
             return
@@ -86,11 +86,11 @@ struct GraphCollector {
                     qualifiedPrefix: declaration.name
                 )
             }
-            for declaration in module.extensions where declarationGraph.hasNamespace(named: declaration.targetType.displayName) {
+            for declaration in module.extensions where declarationGraph.hasNamespace(named: declaration.targetName) {
                 analyzeNamespaceExtension(
                     declaration,
                     parentID: fileID,
-                    qualifiedPrefix: declaration.targetType.displayName
+                    qualifiedPrefix: declaration.targetName
                 )
             }
             let moduleScope = MemoryScope(

@@ -40,7 +40,7 @@ construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
     }
 }
 
-extension Dictionary: Encodable {
+extension Dictionary<String, Value: Encodable>: Encodable {
     function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }

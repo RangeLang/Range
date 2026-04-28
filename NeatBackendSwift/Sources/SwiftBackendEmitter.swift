@@ -609,7 +609,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitExtension(_ declaration: ExtensionDeclaration) throws -> String {
-        let conformanceClause = emitConformanceClause(declaration.conformances)
+        let extensionHeader = emitExtensionHeader(declaration)
         let nestedEnumerations = try declaration.enumerations.map(emitEnum).joined(separator: "\n\n")
         let nestedConstructs = try declaration.constructs.map(emitConstruct).joined(separator: "\n\n")
         let nestedProtocols = try declaration.protocols.map(emitProtocol).joined(separator: "\n\n")
@@ -624,16 +624,80 @@ struct SwiftBackendEmitter {
             methods,
         ].filter { !$0.isEmpty }
 
-        let target = emitTypeName(declaration.targetType)
         if memberSections.isEmpty {
-            return "extension \(target)\(conformanceClause) {}"
+            return "\(extensionHeader) {}"
         }
 
         return """
-            extension \(target)\(conformanceClause) {
+            \(extensionHeader) {
             \(indentBlock(memberSections.joined(separator: "\n\n"), level: 1))
             }
             """
+    }
+
+    private func emitExtensionHeader(_ declaration: ExtensionDeclaration) -> String {
+        guard declaration.usesSpecializedTarget,
+            case .generic(let base, let arguments) = declaration.targetType
+        else {
+            return
+                "extension \(emitTypeName(declaration.targetType))\(emitConformanceClause(declaration.conformances))"
+        }
+
+        let target = emitTypeName(base)
+        let conformanceClause = emitConformanceClause(declaration.conformances)
+        let genericParameterNames = extensionGenericParameterNames(in: declaration)
+        var constraints: [String] = []
+        let baseGenericNames = extensionBaseGenericNames(for: base, argumentCount: arguments.count)
+
+        for (index, argument) in arguments.enumerated() {
+            guard index < baseGenericNames.count else {
+                continue
+            }
+
+            let baseGenericName = baseGenericNames[index]
+            if case .named(let name) = argument, genericParameterNames.contains(name) {
+                if name != baseGenericName {
+                    constraints.append("\(baseGenericName) == \(name)")
+                }
+                continue
+            }
+
+            constraints.append("\(baseGenericName) == \(emitTypeName(argument))")
+        }
+
+        for constraint in declaration.genericArgumentConstraints {
+            constraints.append(
+                "\(constraint.parameterName): \(emitTypeName(constraint.constraint))"
+            )
+        }
+
+        let whereClause = constraints.isEmpty ? "" : " where \(constraints.joined(separator: ", "))"
+        return "extension \(target)\(conformanceClause)\(whereClause)"
+    }
+
+    private func extensionGenericParameterNames(in declaration: ExtensionDeclaration) -> Set<String> {
+        Set(declaration.genericArgumentConstraints.map(\.parameterName))
+    }
+
+    private func extensionBaseGenericNames(
+        for base: TypeReference,
+        argumentCount: Int
+    ) -> [String] {
+        let targetName = base.displayName
+        switch targetName {
+        case "Array":
+            return ["Element"]
+        case "Dictionary":
+            return ["Key", "Value"]
+        case "Optional":
+            return ["Wrapped"]
+        case "Result":
+            return ["Success", "Failure"]
+        case "Set":
+            return ["Element"]
+        default:
+            return (0..<argumentCount).map { "T\($0)" }
+        }
     }
 
     private func emitParameter(

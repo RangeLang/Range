@@ -254,7 +254,7 @@ public struct CompilerPipeline {
             for declaration in module.extensions {
                 collectCallableReturnTypes(
                     in: declaration,
-                    qualifiedPrefix: declaration.targetType.displayName,
+                    qualifiedPrefix: declaration.targetName,
                     into: &returnTypes
                 )
             }
@@ -268,7 +268,7 @@ public struct CompilerPipeline {
             for declaration in declarations {
                 collectCallableReturnTypes(
                     in: declaration,
-                    qualifiedPrefix: declaration.targetType.displayName,
+                    qualifiedPrefix: declaration.targetName,
                     into: &returnTypes
                 )
             }

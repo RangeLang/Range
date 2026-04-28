@@ -36,7 +36,7 @@ construct Set<Element: Hashable>: ExpressibleBySetLiteral {
     }
 }
 
-extension Set: Encodable {
+extension Set<Element: Encodable>: Encodable {
     function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }

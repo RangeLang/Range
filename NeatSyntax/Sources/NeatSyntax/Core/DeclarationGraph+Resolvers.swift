@@ -516,6 +516,8 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
 
     private struct NominalConformance: Sendable {
         var declarationGenericParameterNames: [String]
+        var extensionTargetType: TypeReference?
+        var genericArgumentConstraints: [ExtensionGenericArgumentConstraint]
         var conformance: TypeReference
     }
 
@@ -537,6 +539,8 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
                 contentsOf: construct.conformances.map {
                     NominalConformance(
                         declarationGenericParameterNames: genericParameterNames,
+                        extensionTargetType: nil,
+                        genericArgumentConstraints: [],
                         conformance: $0
                     )
                 }
@@ -547,6 +551,8 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
                 contentsOf: enumeration.conformances.map {
                     NominalConformance(
                         declarationGenericParameterNames: [],
+                        extensionTargetType: nil,
+                        genericArgumentConstraints: [],
                         conformance: $0
                     )
                 }
@@ -560,6 +566,8 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
                 contentsOf: protocolDeclaration.conformances.map {
                     NominalConformance(
                         declarationGenericParameterNames: genericParameterNames,
+                        extensionTargetType: nil,
+                        genericArgumentConstraints: [],
                         conformance: $0
                     )
                 }
@@ -572,6 +580,10 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
                     contentsOf: extensionDeclaration.conformances.map {
                         NominalConformance(
                             declarationGenericParameterNames: genericParameterNames,
+                            extensionTargetType: extensionDeclaration.usesSpecializedTarget
+                                ? extensionDeclaration.targetType : nil,
+                            genericArgumentConstraints: extensionDeclaration
+                                .genericArgumentConstraints,
                             conformance: $0
                         )
                     }
@@ -619,12 +631,15 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
         let nextVisited = visited.union([visitKey])
 
         for conformance in conformancesByNominalName[actualContext.name, default: []] {
-            let substitution = Dictionary(
-                uniqueKeysWithValues: zip(
-                    conformance.declarationGenericParameterNames,
-                    actualContext.arguments
+            guard
+                let substitution = conformanceSubstitution(
+                    conformance,
+                    actualContext: actualContext,
+                    visited: nextVisited
                 )
-            )
+            else {
+                continue
+            }
             let resolvedConformance = Self.substitute(conformance.conformance, using: substitution)
             if Self.typesMatch(actual: resolvedConformance, expected: expectedProtocol) {
                 return true
@@ -639,6 +654,76 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
         }
 
         return false
+    }
+
+    private func conformanceSubstitution(
+        _ conformance: NominalConformance,
+        actualContext: TypeContext,
+        visited: Set<String>
+    ) -> [String: TypeReference]? {
+        if let extensionTargetType = conformance.extensionTargetType {
+            return extensionSubstitution(
+                targetType: extensionTargetType,
+                genericArgumentConstraints: conformance.genericArgumentConstraints,
+                actualContext: actualContext,
+                visited: visited
+            )
+        }
+
+        return Dictionary(
+            uniqueKeysWithValues: zip(
+                conformance.declarationGenericParameterNames,
+                actualContext.arguments
+            )
+        )
+    }
+
+    private func extensionSubstitution(
+        targetType: TypeReference,
+        genericArgumentConstraints: [ExtensionGenericArgumentConstraint],
+        actualContext: TypeContext,
+        visited: Set<String>
+    ) -> [String: TypeReference]? {
+        guard let targetContext = typeContext(for: targetType),
+            targetContext.name == actualContext.name,
+            targetContext.arguments.count == actualContext.arguments.count
+        else {
+            return nil
+        }
+
+        var bindings: [String: TypeReference] = [:]
+        let constraintNames = Set(genericArgumentConstraints.map(\.parameterName))
+
+        for (pattern, actual) in zip(targetContext.arguments, actualContext.arguments) {
+            if case .named(let name) = pattern,
+                constraintNames.contains(name)
+                    || !Self.typesMatch(actual: pattern, expected: actual)
+            {
+                if let existing = bindings[name],
+                    !Self.typesMatch(actual: existing, expected: actual)
+                {
+                    return nil
+                }
+                bindings[name] = actual
+                continue
+            }
+
+            guard Self.typesMatch(actual: actual, expected: pattern) else {
+                return nil
+            }
+        }
+
+        for genericConstraint in genericArgumentConstraints {
+            guard let actual = bindings[genericConstraint.parameterName] else {
+                return nil
+            }
+            let expected = Self.substitute(genericConstraint.constraint, using: bindings)
+            guard isAssignable(actual: actual, expected: expected) else {
+                return nil
+            }
+        }
+
+        return bindings
     }
 
     private func isKnownProtocol(_ type: TypeReference) -> Bool {

@@ -466,7 +466,7 @@ public struct DeclarationGraph {
         var registry: [String: [ExtensionDeclaration]] = [:]
         for parsedFile in files {
             for declaration in extensions(in: parsedFile.sourceFile) {
-                registry[declaration.targetType.displayName, default: []].append(declaration)
+                registry[declaration.targetName, default: []].append(declaration)
             }
         }
         return registry

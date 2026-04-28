@@ -131,7 +131,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         of declaration: ExtensionDeclaration,
         declarationGraph: DeclarationGraph
     ) throws {
-        guard let construct = declarationGraph.construct(named: declaration.targetType.displayName) else {
+        guard let construct = declarationGraph.construct(named: declaration.targetName) else {
             return
         }
 
