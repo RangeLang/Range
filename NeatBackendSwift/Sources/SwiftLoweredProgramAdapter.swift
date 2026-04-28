@@ -75,6 +75,7 @@ struct SwiftLoweredProgramAdapter {
             macros: callable.macros,
             attribute: callable.attribute,
             targetType: callable.targetType,
+            receiverType: callable.receiverType,
             name: callable.name,
             genericParameters: callable.genericParameters,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,

@@ -175,6 +175,7 @@ public struct Parser {
     var currentEnvironmentNames: Set<String> = []
     var currentMutableEnvironmentNames: Set<String> = []
     var currentSelfAvailable: Bool = false
+    var currentSelfType: TypeReference?
     var currentExpressionTerminators: [Token] = []
     var operatorEnvironment: OperatorEnvironment
     var literalBridgeResolver: LiteralBridgeResolver

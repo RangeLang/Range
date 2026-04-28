@@ -446,6 +446,7 @@ struct SwiftBackendEmitter {
             macros: declaration.macros,
             attribute: declaration.attribute,
             targetType: nil,
+            receiverType: nil,
             name: declaration.name,
             genericParameters: declaration.genericParameters,
             hasExplicitParameterClause: declaration.hasExplicitParameterClause,

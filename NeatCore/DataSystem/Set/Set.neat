@@ -38,6 +38,19 @@ construct Set<Element: Hashable>: ExpressibleBySetLiteral {
 
 extension Set<Element: Encodable>: Encodable {
     function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
-        return .failure(cause: .failed)
+        state container = encoder.unkeyedContainer()
+        let values: [Element] = elements()
+        state index = 0
+
+        while index < values.count {
+            switch container.encode(values.element(index: index)) {
+            case .success:
+                index += 1
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        }
+
+        return .success(result: Void())
     }
 }

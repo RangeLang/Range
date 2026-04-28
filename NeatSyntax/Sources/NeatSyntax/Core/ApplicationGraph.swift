@@ -259,6 +259,11 @@ struct GraphCollector {
         let callableID =
             "\(parentID)/function:\(declaration.name)(\(renderParameterList(declaration.parameters)))"
         var callableScope = scope
+        if let receiverType = declaration.receiverType {
+            let selfID = "\(callableID)/self"
+            callableScope.symbols["self"] = selfID
+            flowState.inferredConstructTypeByNodeID[selfID] = receiverType.displayName
+        }
         for parameter in declaration.parameters {
             let label = parameter.externalLabel ?? "_"
             let parameterID = "\(callableID)/parameter:\(label):\(parameter.localName)"
@@ -283,6 +288,7 @@ struct GraphCollector {
             macros: callable.macros,
             attribute: callable.attribute,
             targetType: callable.targetType,
+            receiverType: callable.receiverType,
             name: "\(prefix).\(callable.name)",
             genericParameters: callable.genericParameters,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,

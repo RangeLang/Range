@@ -58,7 +58,11 @@ extension Parser {
     }
 
     func accessibleContextTypes() -> [String: TypeReference] {
-        currentStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
+        var types = currentStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
+        if let currentSelfType {
+            types["self"] = currentSelfType
+        }
+        return types
     }
 
     func isCompatibleStateType(_ explicitType: TypeReference, inferredType: TypeReference) -> Bool {

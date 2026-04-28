@@ -44,10 +44,12 @@ extension Parser {
             let outerEnvironmentTypes = currentEnvironmentTypes
             let outerCallableReturnTypes = currentCallableReturnTypes
             let outerSelfAvailable = currentSelfAvailable
+            let outerSelfType = currentSelfType
             currentStateTypes = outerStateTypes
             currentEnvironmentTypes = outerEnvironmentTypes
             currentCallableReturnTypes = outerCallableReturnTypes
             currentSelfAvailable = true
+            currentSelfType = .named(name)
             while isStateDeclarationStart()
                 || isEnvironmentDeclarationStart()
                 || isBindingDeclarationStart()
@@ -108,6 +110,7 @@ extension Parser {
             currentEnvironmentTypes = outerEnvironmentTypes
             currentCallableReturnTypes = outerCallableReturnTypes
             currentSelfAvailable = outerSelfAvailable
+            currentSelfType = outerSelfType
             clearCurrentDeclarationSymbols()
 
             try consume(.rightBrace)

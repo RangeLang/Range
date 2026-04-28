@@ -621,6 +621,7 @@ private extension CallableDeclaration {
             macros: macros,
             attribute: attribute,
             targetType: targetType.map { substitute($0, using: bindings) },
+            receiverType: receiverType.map { substitute($0, using: bindings) },
             name: name,
             genericParameters: genericParameters,
             hasExplicitParameterClause: hasExplicitParameterClause,

@@ -42,6 +42,22 @@ construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
 
 extension Dictionary<String, Value: Encodable>: Encodable {
     function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
-        return .failure(cause: .failed)
+        state container = encoder.container(keyedBy: StringCodingKey.self)
+        let values: [DictionaryEntry<String, Value>] = entries()
+        state index = 0
+
+        while index < values.count {
+            let entry: DictionaryEntry<String, Value> = values.element(index: index)
+            let key = StringCodingKey(value: entry.key)
+
+            switch container.encode(entry.value, forKey: key) {
+            case .success:
+                index += 1
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        }
+
+        return .success(result: Void())
     }
 }

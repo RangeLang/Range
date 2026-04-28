@@ -75,6 +75,17 @@ public enum ExpressionTypeSemantics {
             ) {
                 return .typed(memberType)
             }
+            if let memberType = inferImplicitSelfMemberCallType(
+                name: name,
+                arguments: arguments,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver
+            ) {
+                return .typed(memberType)
+            }
             if let constructorType = inferGraphResolvedConstructCallType(
                 name: name,
                 memberResolver: memberResolver
@@ -773,6 +784,33 @@ public enum ExpressionTypeSemantics {
             memberName: memberName,
             genericArguments: genericArguments,
             arguments: typedArguments
+        )
+    }
+
+    private static func inferImplicitSelfMemberCallType(
+        name: String,
+        arguments: [CallArgument],
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
+    ) -> TypeReference? {
+        guard !name.contains("."),
+            let selfType = accessibleTypes["self"],
+            case .typed = selfType
+        else {
+            return nil
+        }
+
+        return inferKnownMemberCallType(
+            name: "self.\(name)",
+            arguments: arguments,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver
         )
     }
 

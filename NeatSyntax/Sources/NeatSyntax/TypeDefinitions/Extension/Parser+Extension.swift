@@ -13,6 +13,10 @@ extension Parser {
         var protocols: [ProtocolDeclaration] = []
         if peek() == .leftBrace {
             try consume(.leftBrace)
+            let outerSelfAvailable = currentSelfAvailable
+            let outerSelfType = currentSelfType
+            currentSelfAvailable = true
+            currentSelfType = target.type
             while isCallableStart()
                 || isConstructDeclarationStart()
                 || isBuilderDeclarationStart()
@@ -38,6 +42,8 @@ extension Parser {
                 }
                 protocols.append(try parseProtocolDeclaration(requiresEOF: false))
             }
+            currentSelfAvailable = outerSelfAvailable
+            currentSelfType = outerSelfType
             try consume(.rightBrace)
         }
         return ExtensionDeclaration(
