@@ -27,7 +27,17 @@ construct Set<Element: Hashable>: ExpressibleBySetLiteral {
         return storage.remove(element: element)
     }
 
+    function elements() -> [Element] {
+        return storage.elements()
+    }
+
     function clear() {
         storage.clear()
+    }
+}
+
+extension Set: Encodable {
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+        return .failure(cause: .failed)
     }
 }

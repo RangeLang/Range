@@ -7,5 +7,6 @@ construct SetStorage<Element: Hashable> {
     function contains(element: Element) -> Bool
     function insert(element: Element)
     function remove(element: Element) -> Element?
+    function elements() -> [Element]
     function clear()
 }

@@ -82,7 +82,7 @@ public enum ExpressionTypeSemantics {
                 return .typed(constructorType)
             }
             throw ParseError(
-                "Callable expressions are not supported in state initializer inference yet."
+                "Callable expression '\(name)' is not supported in state initializer inference yet."
             )
         case .bindingReference(let name):
             if let type = accessibleTypes[name] {

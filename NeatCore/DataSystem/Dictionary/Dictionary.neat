@@ -31,7 +31,17 @@ construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
         return storage.contains(key: key)
     }
 
+    function entries() -> [DictionaryEntry<Key, Value>] {
+        return storage.entries()
+    }
+
     function clear() {
         storage.clear()
+    }
+}
+
+extension Dictionary: Encodable {
+    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+        return .failure(cause: .failed)
     }
 }

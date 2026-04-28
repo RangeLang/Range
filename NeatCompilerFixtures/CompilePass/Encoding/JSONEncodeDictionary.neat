@@ -1,0 +1,14 @@
+function encodeDictionary() -> Result<String, EncodingError> {
+    let encoder: JSONEncoder = JSONEncoder()
+    let values: Dictionary<String, Int> = ["b": 2, "a": 1]
+    return encoder.encode(values)
+}
+
+@main {
+    switch encodeDictionary() {
+    case .success(let json):
+        Logger.info(json)
+    case .failure:
+        Logger.error("encoding failed")
+    }
+}

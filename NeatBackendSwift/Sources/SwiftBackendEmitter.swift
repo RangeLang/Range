@@ -4,12 +4,16 @@ import NeatSyntax
 struct SwiftBackendEmitter {
     private let swiftNativeTypeNames: Set<String> = [
         "Any",
+        "Array",
         "Bool",
         "Data",
+        "Dictionary",
         "Double",
         "Float",
         "Int",
         "Never",
+        "Optional",
+        "Set",
         "String",
         "Void",
     ]
@@ -316,6 +320,14 @@ struct SwiftBackendEmitter {
             }
         }
 
+        private struct __NeatStringCodingKey: Neat_CodingKey {
+            let value: String
+
+            func stringValue() -> String {
+                value
+            }
+        }
+
         extension Array: Neat_Encodable where Element: Neat_Encodable {
             func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.unkeyedContainer()
@@ -342,6 +354,44 @@ struct SwiftBackendEmitter {
                     var container = encoder.singleValueContainer()
                     return container.encodeNil()
                 }
+            }
+        }
+
+        extension Dictionary: Neat_Encodable where Key == String, Value: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.container(keyedBy: __NeatStringCodingKey.self)
+
+                for key in keys.sorted() {
+                    guard let value = self[key] else {
+                        continue
+                    }
+
+                    switch container.encode(value, forKey: __NeatStringCodingKey(value: key)) {
+                    case .success:
+                        continue
+                    case .failure(let error):
+                        return .failure(cause: error)
+                    }
+                }
+
+                return .success(result: Void())
+            }
+        }
+
+        extension Set: Neat_Encodable where Element: Neat_Encodable {
+            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.unkeyedContainer()
+
+                for element in self {
+                    switch container.encode(element) {
+                    case .success:
+                        continue
+                    case .failure(let error):
+                        return .failure(cause: error)
+                    }
+                }
+
+                return .success(result: Void())
             }
         }
         """

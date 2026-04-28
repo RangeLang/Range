@@ -8,5 +8,6 @@ construct DictionaryStorage<Key: Hashable, Value> {
     function updateValue(value: Value, key: Key)
     function removeValue(key: Key) -> Value?
     function contains(key: Key) -> Bool
+    function entries() -> [DictionaryEntry<Key, Value>]
     function clear()
 }

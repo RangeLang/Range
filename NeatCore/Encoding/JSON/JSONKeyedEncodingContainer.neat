@@ -34,7 +34,7 @@ construct JSONKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer<Key
     }
 
     function encode<T: Encodable>(_ value: T, forKey key: Key) -> Result<Void, EncodingError> {
-        let encoder = JSONEncoder()
+        let encoder: JSONEncoder = JSONEncoder()
 
         switch encoder.encode(value) {
         case .success(let encoded):

@@ -1,0 +1,14 @@
+function encodeSet() -> Result<String, EncodingError> {
+    let encoder: JSONEncoder = JSONEncoder()
+    let values: Set<Int> = [1]
+    return encoder.encode(values)
+}
+
+@main {
+    switch encodeSet() {
+    case .success(let json):
+        Logger.info(json)
+    case .failure:
+        Logger.error("encoding failed")
+    }
+}
