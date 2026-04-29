@@ -604,8 +604,9 @@ extension Parser {
             return branches.allSatisfy { blockAlwaysReturnsValue($0.body) }
 
         case .switchStatement(_, let cases, let defaultBody):
-            guard let defaultBody else { return false }
+            guard !cases.isEmpty else { return false }
             guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
+            guard let defaultBody else { return true }
             return blockAlwaysReturnsValue(defaultBody)
         case .background:
             return false

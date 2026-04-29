@@ -1,0 +1,41 @@
+enum DecodeProblem {
+    case failed
+}
+
+enum DecodeInput {
+    case empty
+    case blocked
+    case unknown
+    case george
+}
+
+construct ExtensionDecodedUser {
+    let name: String
+}
+
+extension ExtensionDecodedUser {
+    init(input: DecodeInput) -> Result<Self, DecodeProblem> {
+        switch input {
+        case .empty:
+            return .failure(cause: .failed)
+        case .blocked, .unknown:
+            return .failure(cause: .failed)
+        case .george:
+            self.name = "George"
+            return .success(result: self)
+        }
+    }
+}
+
+function decodeExtensionUser() -> Result<ExtensionDecodedUser, DecodeProblem> {
+    return ExtensionDecodedUser(input: .george)
+}
+
+@main {
+    switch decodeExtensionUser() {
+    case .success(let user):
+        Logger.info(user.name)
+    case .failure:
+        Logger.error("decoding failed")
+    }
+}

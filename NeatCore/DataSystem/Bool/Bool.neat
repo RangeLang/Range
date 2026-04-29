@@ -1,11 +1,13 @@
 @core
-construct Bool: ExpressibleByBoolLiteral, Equatable, Hashable, Decodable {
+construct Bool: ExpressibleByBoolLiteral, Equatable, Hashable {
     let storage: BoolStorage
 
     init(literal: BoolLiteral) {
         self.storage = literal.storage()
     }
+}
 
+extension Bool: Decodable {
     init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
         let container = decoder.singleValueContainer()
         switch container.decode(Bool.self) {

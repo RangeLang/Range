@@ -11,7 +11,7 @@ struct SwiftLoweredProgramAdapter {
             protocols: program.protocols,
             enumerations: program.enumerations,
             declarations: program.declarations.map(lower(construct:)),
-            extensions: program.extensions,
+            extensions: program.extensions.map(lower(extension:)),
             mainBlock: lower(mainBlock: program.mainBlock),
             units: program.units.map(lower(sourceUnit:))
         )
@@ -23,7 +23,7 @@ struct SwiftLoweredProgramAdapter {
             protocols: sourceUnit.protocols,
             enumerations: sourceUnit.enumerations,
             declarations: sourceUnit.declarations.map(lower(construct:)),
-            extensions: sourceUnit.extensions,
+            extensions: sourceUnit.extensions.map(lower(extension:)),
             callables: sourceUnit.callables.map(lower(callable:)),
             mainBlock: sourceUnit.mainBlock.map(lower(mainBlock:))
         )
@@ -49,6 +49,21 @@ struct SwiftLoweredProgramAdapter {
             initializers: construct.initializers.map(lower(initializer:)),
             callables: construct.callables.map(lower(callable:)),
             constructs: construct.constructs.map(lower(construct:))
+        )
+    }
+
+    private func lower(extension declaration: ExtensionDeclaration) -> ExtensionDeclaration {
+        ExtensionDeclaration(
+            macros: declaration.macros,
+            targetType: declaration.targetType,
+            genericArgumentConstraints: declaration.genericArgumentConstraints,
+            conformances: declaration.conformances,
+            initializers: declaration.initializers.map(lower(initializer:)),
+            callables: declaration.callables.map(lower(callable:)),
+            constructs: declaration.constructs.map(lower(construct:)),
+            namespaces: declaration.namespaces,
+            enumerations: declaration.enumerations,
+            protocols: declaration.protocols
         )
     }
 

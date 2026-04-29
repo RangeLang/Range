@@ -397,12 +397,20 @@ extension Parser {
         while peek() != .rightBrace {
             if case .keyword(NeatSyntax.Keyword.caseBranch.rawValue) = peek() {
                 try consumeKeyword(.caseBranch)
-                let pattern = try parseSwitchCasePattern()
+                let patterns = try parseSwitchCasePatterns()
+                if patterns.count > 1,
+                    patterns.contains(where: { pattern in
+                        if case .enumCase(_, .some) = pattern { return true }
+                        return false
+                    })
+                {
+                    throw ParseError("Switch cases with multiple patterns cannot bind values yet.")
+                }
                 let body = try parseSwitchBodyStatements(
                     baseLocalBindings: localBindings,
-                    pattern: pattern
+                    pattern: patterns[0]
                 )
-                cases.append(SwitchCase(pattern: pattern, body: body))
+                cases.append(contentsOf: patterns.map { SwitchCase(pattern: $0, body: body) })
                 continue
             }
 
@@ -525,6 +533,15 @@ extension Parser {
         }
 
         return .expression(try parseExpression())
+    }
+
+    mutating func parseSwitchCasePatterns() throws -> [SwitchCasePattern] {
+        var patterns = [try parseSwitchCasePattern()]
+        while peek() == .comma {
+            try consume(.comma)
+            patterns.append(try parseSwitchCasePattern())
+        }
+        return patterns
     }
 
     mutating func parseSwitchBodyStatements(

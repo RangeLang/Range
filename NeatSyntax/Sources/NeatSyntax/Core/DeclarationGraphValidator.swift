@@ -115,8 +115,9 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             )
             try validateInitializerRequirements(
                 requirements.initializers,
-                on: construct,
-                protocolName: protocolName
+                onConstructNamed: construct.name,
+                protocolName: protocolName,
+                declarationGraph: declarationGraph
             )
             try validateCallableRequirements(
                 requirements.callables,
@@ -174,8 +175,9 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             )
             try validateInitializerRequirements(
                 requirements.initializers,
-                on: construct,
-                protocolName: protocolName
+                onConstructNamed: construct.name,
+                protocolName: protocolName,
+                declarationGraph: declarationGraph
             )
             try validateCallableRequirements(
                 requirements.callables,
@@ -313,17 +315,19 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
     private func validateInitializerRequirements(
         _ requirements: [InitializerDeclaration],
-        on construct: ConstructDeclaration,
-        protocolName: String
+        onConstructNamed constructName: String,
+        protocolName: String,
+        declarationGraph: DeclarationGraph
     ) throws {
+        let availableInitializers = declarationGraph.initializers(onConstruct: constructName)
         for requirement in requirements {
             guard
-                construct.initializers.contains(where: {
+                availableInitializers.contains(where: {
                     initializerMatchesRequirement($0, requirement: requirement)
                 })
             else {
                 throw SemanticValidationError(
-                    "Construct \(construct.name) does not satisfy protocol \(protocolName): missing initializer \(renderInitializerSignature(requirement))."
+                    "Construct \(constructName) does not satisfy protocol \(protocolName): missing initializer \(renderInitializerSignature(requirement))."
                 )
             }
         }

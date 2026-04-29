@@ -6,6 +6,7 @@ extension Parser {
         try consumeKeyword(.typeExtension)
         let target = try parseExtensionTarget()
         let conformances = try parseConformanceListIfPresent()
+        var initializers: [InitializerDeclaration] = []
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
@@ -18,6 +19,7 @@ extension Parser {
             currentSelfAvailable = true
             currentSelfType = target.type
             while isCallableStart()
+                || isInitializerDeclarationStart()
                 || isConstructDeclarationStart()
                 || isBuilderDeclarationStart()
                 || isNamespaceDeclarationStart()
@@ -26,6 +28,10 @@ extension Parser {
             {
                 if isCallableStart() {
                     callables.append(try parseCallableDeclaration())
+                    continue
+                }
+                if isInitializerDeclarationStart() {
+                    initializers.append(try parseInitializerDeclaration())
                     continue
                 }
                 if isConstructDeclarationStart() || isBuilderDeclarationStart() {
@@ -46,11 +52,13 @@ extension Parser {
             currentSelfType = outerSelfType
             try consume(.rightBrace)
         }
+        try validateInitializerDeclarations(initializers, availableDeriveds: [])
         return ExtensionDeclaration(
             macros: macros,
             targetType: target.type,
             genericArgumentConstraints: target.genericArgumentConstraints,
             conformances: conformances,
+            initializers: initializers,
             callables: callables,
             constructs: constructs,
             namespaces: namespaces,
@@ -64,6 +72,7 @@ extension Parser {
         try consumeKeyword(.typeExtension)
         let target = try parseExtensionTarget()
         let conformances = try parseConformanceListIfPresent()
+        var initializers: [InitializerDeclaration] = []
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
@@ -74,6 +83,10 @@ extension Parser {
             while peek() != .rightBrace {
                 if isCallableStart() {
                     callables.append(try parseCallableDeclaration(signatureOnly: true))
+                    continue
+                }
+                if isInitializerDeclarationStart() {
+                    initializers.append(try parseInitializerDeclaration(signatureOnly: true))
                     continue
                 }
                 if isConstructDeclarationStart() || isBuilderDeclarationStart() {
@@ -101,6 +114,7 @@ extension Parser {
             targetType: target.type,
             genericArgumentConstraints: target.genericArgumentConstraints,
             conformances: conformances,
+            initializers: initializers,
             callables: callables,
             constructs: constructs,
             namespaces: namespaces,

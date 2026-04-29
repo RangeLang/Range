@@ -17,63 +17,35 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
             }
 
             return .failure(cause: .failed)
-        case .float:
-            return .failure(cause: .failed)
-        case .null:
+        case .float, .null:
             return .failure(cause: .failed)
         }
-
-        return .failure(cause: .failed)
     }
 
     function decode(_ type: Float.Type) -> Result<Float, DecodingError> {
         switch value {
         case .float(let decoded):
             return .success(result: decoded)
-        case .bool:
-            return .failure(cause: .failed)
-        case .int:
-            return .failure(cause: .failed)
-        case .null:
-            return .failure(cause: .failed)
-        case .string:
+        case .bool, .int, .null, .string:
             return .failure(cause: .failed)
         }
-
-        return .failure(cause: .failed)
     }
 
     function decode(_ type: Int.Type) -> Result<Int, DecodingError> {
         switch value {
         case .int(let decoded):
             return .success(result: decoded)
-        case .bool:
-            return .failure(cause: .failed)
-        case .float:
-            return .failure(cause: .failed)
-        case .null:
-            return .failure(cause: .failed)
-        case .string:
+        case .bool, .float, .null, .string:
             return .failure(cause: .failed)
         }
-
-        return .failure(cause: .failed)
     }
 
     function decode(_ type: String.Type) -> Result<String, DecodingError> {
         switch value {
         case .string(let decoded):
             return .success(result: decoded)
-        case .bool:
-            return .failure(cause: .failed)
-        case .float:
-            return .failure(cause: .failed)
-        case .int:
-            return .failure(cause: .failed)
-        case .null:
+        case .bool, .float, .int, .null:
             return .failure(cause: .failed)
         }
-
-        return .failure(cause: .failed)
     }
 }

@@ -34,11 +34,15 @@ public struct DeclarationGraph {
         let bindingsByConstructName = Self.collectBindingsByConstructName(from: constructs)
         let derivedsByConstructName = Self.collectDerivedsByConstructName(from: constructs)
         let valuesByConstructName = Self.collectValuesByConstructName(from: constructs)
-        let initializersByConstructName = Self.collectInitializersByConstructName(from: constructs)
+        let initializersByConstructName = Self.collectInitializersByConstructName(
+            from: constructs,
+            extensions: extensions
+        )
         let callables = Self.collectCallables(from: files)
         let parametersByCallableIdentity = Self.collectParametersByCallableIdentity(from: files)
         let parametersByInitializerIdentity = Self.collectParametersByInitializerIdentity(
-            from: constructs
+            from: constructs,
+            extensions: extensions
         )
 
         self.protocolsByName = protocols
@@ -532,13 +536,20 @@ public struct DeclarationGraph {
     }
 
     static func collectInitializersByConstructName(
-        from constructs: [String: ConstructDeclaration]
+        from constructs: [String: ConstructDeclaration],
+        extensions: [String: [ExtensionDeclaration]]
     ) -> [String: [InitializerDeclaration]] {
-        Dictionary(
-            uniqueKeysWithValues: constructs.map { name, declaration in
-                (name, declaration.initializers)
-            }.filter { !$0.1.isEmpty }
-        )
+        var registry: [String: [InitializerDeclaration]] = [:]
+        for (name, declaration) in constructs where !declaration.initializers.isEmpty {
+            registry[name, default: []].append(contentsOf: declaration.initializers)
+        }
+        for (name, declarations) in extensions {
+            let extensionInitializers = declarations.flatMap(\.initializers)
+            if !extensionInitializers.isEmpty {
+                registry[name, default: []].append(contentsOf: extensionInitializers)
+            }
+        }
+        return registry
     }
 
     static func collectParametersByCallableIdentity(
@@ -602,11 +613,20 @@ public struct DeclarationGraph {
     }
 
     static func collectParametersByInitializerIdentity(
-        from constructs: [String: ConstructDeclaration]
+        from constructs: [String: ConstructDeclaration],
+        extensions: [String: [ExtensionDeclaration]]
     ) -> [String: [NeatFunctionParameter]] {
         var registry: [String: [NeatFunctionParameter]] = [:]
         for (constructName, declaration) in constructs {
             for initializer in declaration.initializers {
+                registry[initializerIdentity(
+                    constructName: constructName,
+                    declaration: initializer
+                )] = initializer.parameters
+            }
+        }
+        for (constructName, declarations) in extensions {
+            for initializer in declarations.flatMap(\.initializers) {
                 registry[initializerIdentity(
                     constructName: constructName,
                     declaration: initializer

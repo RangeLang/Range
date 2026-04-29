@@ -10,11 +10,36 @@ public struct ExtensionDeclaration {
     public let targetType: TypeReference
     public let genericArgumentConstraints: [ExtensionGenericArgumentConstraint]
     public let conformances: [TypeReference]
+    public let initializers: [InitializerDeclaration]
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]
     public let namespaces: [NamespaceDeclaration]
     public let enumerations: [EnumDeclaration]
     public let protocols: [ProtocolDeclaration]
+
+    public init(
+        macros: [MacroApplication],
+        targetType: TypeReference,
+        genericArgumentConstraints: [ExtensionGenericArgumentConstraint],
+        conformances: [TypeReference],
+        initializers: [InitializerDeclaration] = [],
+        callables: [CallableDeclaration],
+        constructs: [ConstructDeclaration],
+        namespaces: [NamespaceDeclaration],
+        enumerations: [EnumDeclaration],
+        protocols: [ProtocolDeclaration]
+    ) {
+        self.macros = macros
+        self.targetType = targetType
+        self.genericArgumentConstraints = genericArgumentConstraints
+        self.conformances = conformances
+        self.initializers = initializers
+        self.callables = callables
+        self.constructs = constructs
+        self.namespaces = namespaces
+        self.enumerations = enumerations
+        self.protocols = protocols
+    }
 
     public var usesSpecializedTarget: Bool {
         if !genericArgumentConstraints.isEmpty {

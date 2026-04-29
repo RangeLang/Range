@@ -11,6 +11,10 @@ struct SwiftBackendEmitter {
             self.failableInitializersByConstructName = Self.collectFailableInitializers(
                 from: Self.allDeclarations(in: program)
             )
+            self.failableInitializersByConstructName.merge(
+                Self.collectFailableInitializers(from: Self.allExtensions(in: program)),
+                uniquingKeysWith: { lhs, rhs in lhs + rhs }
+            )
             if Self.programIncludesProtocol(named: "Decodable", in: program) {
                 self.failableInitializersByConstructName.merge(
                     Self.nativeScalarDecodableInitializers(),
@@ -23,6 +27,14 @@ struct SwiftBackendEmitter {
             var declarations = program.declarations
             for unit in program.units {
                 declarations.append(contentsOf: unit.declarations)
+            }
+            return declarations
+        }
+
+        private static func allExtensions(in program: LoweredProgram) -> [ExtensionDeclaration] {
+            var declarations = program.extensions
+            for unit in program.units {
+                declarations.append(contentsOf: unit.extensions)
             }
             return declarations
         }
@@ -76,6 +88,32 @@ struct SwiftBackendEmitter {
                     signatures[declaration.name, default: []].append(
                         FailableInitializerSignature(
                             constructName: declaration.name,
+                            labels: initializer.parameters.map(\.externalLabel),
+                            failureType: failureType
+                        )
+                    )
+                }
+            }
+
+            return signatures
+        }
+
+        private static func collectFailableInitializers(
+            from extensions: [ExtensionDeclaration]
+        ) -> [String: [FailableInitializerSignature]] {
+            var signatures: [String: [FailableInitializerSignature]] = [:]
+
+            for declaration in extensions {
+                for initializer in declaration.initializers {
+                    guard let returnType = initializer.returnType,
+                        let failureType = resultSelfFailureType(returnType)
+                    else {
+                        continue
+                    }
+
+                    signatures[declaration.targetName, default: []].append(
+                        FailableInitializerSignature(
+                            constructName: declaration.targetName,
                             labels: initializer.parameters.map(\.externalLabel),
                             failureType: failureType
                         )
@@ -798,6 +836,14 @@ struct SwiftBackendEmitter {
         let nestedEnumerations = try declaration.enumerations.map(emitEnum).joined(separator: "\n\n")
         let nestedConstructs = try declaration.constructs.map(emitConstruct).joined(separator: "\n\n")
         let nestedProtocols = try declaration.protocols.map(emitProtocol).joined(separator: "\n\n")
+        let genericParameterNames = extensionGenericParameterNames(in: declaration)
+        let initializers = try declaration.initializers.map {
+            try emitInitializer(
+                $0,
+                genericParameterNames: genericParameterNames,
+                bindingNames: []
+            )
+        }.joined(separator: "\n\n")
         let methods = try declaration.callables.map {
             try emitMethod($0)
         }.joined(separator: "\n\n")
@@ -806,6 +852,7 @@ struct SwiftBackendEmitter {
             nestedProtocols,
             nestedEnumerations,
             nestedConstructs,
+            initializers,
             methods,
         ].filter { !$0.isEmpty }
 
@@ -1588,6 +1635,9 @@ struct SwiftBackendEmitter {
                     initializerReturnType: initializerReturnType
                 )
             )
+        } else {
+            lines.append("\(prefix)default:")
+            lines.append("\(prefix)    fatalError(\"Non-exhaustive Neat switch reached at runtime.\")")
         }
 
         lines.append("\(prefix)}")
@@ -1796,6 +1846,9 @@ struct SwiftBackendEmitter {
                     enclosingReturnType: enclosingReturnType
                 )
             )
+        } else {
+            lines.append("\(prefix)default:")
+            lines.append("\(prefix)    fatalError(\"Non-exhaustive Neat switch reached at runtime.\")")
         }
 
         lines.append("\(prefix)}")

@@ -1,11 +1,13 @@
 @core
-construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equatable, Hashable, Comparable, Decodable {
+construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equatable, Hashable, Comparable {
     let storage: FloatStorage
 
     init(literal: FloatLiteral) {
         self.storage = literal.storage()
     }
+}
 
+extension Float: Decodable {
     init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
         let container = decoder.singleValueContainer()
         switch container.decode(Float.self) {

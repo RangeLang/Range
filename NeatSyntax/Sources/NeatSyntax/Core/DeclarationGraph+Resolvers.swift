@@ -920,7 +920,7 @@ public struct DeclarationMemberResolver: Sendable {
             }
 
             var callableSignatures: [String: MemberCallableSignature] = [:]
-            let initializerSignatures = construct.initializers.map { initializer in
+            var initializerSignatures = construct.initializers.map { initializer in
                 MemberInitializerSignature(
                     parameters: Self.memberCallableParameters(
                         initializer.parameters,
@@ -928,6 +928,21 @@ public struct DeclarationMemberResolver: Sendable {
                     ),
                     returnType: initializer.returnType.map {
                         Self.qualifyNestedLocalTypes($0, using: nestedTypeMap)
+                    }
+                )
+            }
+            for extensionDeclaration in extensionsByTargetName[construct.name, default: []] {
+                initializerSignatures.append(
+                    contentsOf: extensionDeclaration.initializers.map { initializer in
+                        MemberInitializerSignature(
+                            parameters: Self.memberCallableParameters(
+                                initializer.parameters,
+                                using: nestedTypeMap
+                            ),
+                            returnType: initializer.returnType.map {
+                                Self.qualifyNestedLocalTypes($0, using: nestedTypeMap)
+                            }
+                        )
                     }
                 )
             }
