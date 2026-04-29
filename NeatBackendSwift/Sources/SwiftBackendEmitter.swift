@@ -9,8 +9,55 @@ struct SwiftBackendEmitter {
 
         init(program: LoweredProgram) {
             self.failableInitializersByConstructName = Self.collectFailableInitializers(
-                from: program.declarations
+                from: Self.allDeclarations(in: program)
             )
+            if Self.programIncludesProtocol(named: "Decodable", in: program) {
+                self.failableInitializersByConstructName.merge(
+                    Self.nativeScalarDecodableInitializers(),
+                    uniquingKeysWith: { lhs, rhs in lhs + rhs }
+                )
+            }
+        }
+
+        private static func allDeclarations(in program: LoweredProgram) -> [ConstructDeclaration] {
+            var declarations = program.declarations
+            for unit in program.units {
+                declarations.append(contentsOf: unit.declarations)
+            }
+            return declarations
+        }
+
+        private static func programIncludesProtocol(
+            named name: String,
+            in program: LoweredProgram
+        ) -> Bool {
+            if program.protocols.contains(where: { $0.name == name }) {
+                return true
+            }
+
+            return program.units.contains { unit in
+                unit.protocols.contains(where: { $0.name == name })
+            }
+        }
+
+        private static func nativeScalarDecodableInitializers()
+            -> [String: [FailableInitializerSignature]]
+        {
+            let failureType = TypeReference.named("DecodingError")
+            let signature = { (constructName: String) in
+                FailableInitializerSignature(
+                    constructName: constructName,
+                    labels: ["from"],
+                    failureType: failureType
+                )
+            }
+
+            return [
+                "Bool": [signature("Bool")],
+                "Float": [signature("Float")],
+                "Int": [signature("Int")],
+                "String": [signature("String")],
+            ]
         }
 
         private static func collectFailableInitializers(
@@ -111,6 +158,8 @@ struct SwiftBackendEmitter {
             protocols,
             program.protocols.contains(where: { $0.name == "Encodable" })
                 ? emitNativeEncodingConformances() : "",
+            program.protocols.contains(where: { $0.name == "Decodable" })
+                ? emitNativeDecodingConformances() : "",
             enumerations,
             declarations,
             extensions,
@@ -331,6 +380,10 @@ struct SwiftBackendEmitter {
             sections.append(emitNativeEncodingConformances())
         }
 
+        if unit.protocols.contains(where: { $0.name == "Decodable" }) {
+            sections.append(emitNativeDecodingConformances())
+        }
+
         let enumerations = try unit.enumerations.map(emitEnum).joined(separator: "\n\n")
         if !enumerations.isEmpty {
             sections.append(enumerations)
@@ -471,6 +524,58 @@ struct SwiftBackendEmitter {
                 }
 
                 return .success(result: Void())
+            }
+        }
+        """
+    }
+
+    private func emitNativeDecodingConformances() -> String {
+        """
+        extension Bool: Neat_Decodable {
+            init(from decoder: Neat_Decoder<Neat_JSONValue>) throws {
+                let container = decoder.singleValueContainer()
+                switch container.decode(Bool.self) {
+                case .success(let value):
+                    self = value
+                case .failure(let error):
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
+                }
+            }
+        }
+
+        extension Float: Neat_Decodable {
+            init(from decoder: Neat_Decoder<Neat_JSONValue>) throws {
+                let container = decoder.singleValueContainer()
+                switch container.decode(Float.self) {
+                case .success(let value):
+                    self = value
+                case .failure(let error):
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
+                }
+            }
+        }
+
+        extension Int: Neat_Decodable {
+            init(from decoder: Neat_Decoder<Neat_JSONValue>) throws {
+                let container = decoder.singleValueContainer()
+                switch container.decode(Int.self) {
+                case .success(let value):
+                    self = value
+                case .failure(let error):
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
+                }
+            }
+        }
+
+        extension String: Neat_Decodable {
+            init(from decoder: Neat_Decoder<Neat_JSONValue>) throws {
+                let container = decoder.singleValueContainer()
+                switch container.decode(String.self) {
+                case .success(let value):
+                    self = value
+                case .failure(let error):
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
+                }
             }
         }
         """
@@ -928,13 +1033,16 @@ struct SwiftBackendEmitter {
         _ typeReference: TypeReference,
         genericParameterNames: Set<String>
     ) -> String? {
-        guard case .generic(.named("Encoder"), let arguments) = typeReference,
-            arguments.count == 1
-        else {
+        switch typeReference {
+        case .generic(.named("Encoder"), let arguments) where arguments.count == 1:
+            return
+                "typealias Output = \(emitTypeName(arguments[0], genericParameterNames: genericParameterNames))"
+        case .generic(.named("Decoder"), let arguments) where arguments.count == 1:
+            return
+                "typealias Input = \(emitTypeName(arguments[0], genericParameterNames: genericParameterNames))"
+        default:
             return nil
         }
-
-        return "typealias Output = \(emitTypeName(arguments[0], genericParameterNames: genericParameterNames))"
     }
 
     private func emitProtocolPrimaryAssociatedTypeClause(_ parameters: [GenericParameter]) -> String {

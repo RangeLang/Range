@@ -1,9 +1,20 @@
 @core
-construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral, Equatable, Hashable, Comparable {
+construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral, Equatable, Hashable, Comparable, Decodable {
     let storage: IntStorage
 
     init(literal: IntLiteral) {
         self.storage = literal.storage()
+    }
+
+    init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
+        let container = decoder.singleValueContainer()
+        switch container.decode(Int.self) {
+        case .success(let value):
+            self.storage = value.storage
+            return .success(result: self)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
     }
 }
 

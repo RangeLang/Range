@@ -1,0 +1,27 @@
+construct JSONDecoder: Decoder<JSONValue> {
+    let value: JSONValue
+
+    function decode(_ type: Bool.Type, from value: JSONValue) -> Result<Bool, DecodingError> {
+        let decoder = JSONDecoder(value: value)
+        return Bool(from: decoder)
+    }
+
+    function decode(_ type: Float.Type, from value: JSONValue) -> Result<Float, DecodingError> {
+        let decoder = JSONDecoder(value: value)
+        return Float(from: decoder)
+    }
+
+    function decode(_ type: Int.Type, from value: JSONValue) -> Result<Int, DecodingError> {
+        let decoder = JSONDecoder(value: value)
+        return Int(from: decoder)
+    }
+
+    function decode(_ type: String.Type, from value: JSONValue) -> Result<String, DecodingError> {
+        let decoder = JSONDecoder(value: value)
+        return String(from: decoder)
+    }
+
+    function singleValueContainer() -> SingleValueDecodingContainer {
+        return JSONSingleValueDecodingContainer(value: value)
+    }
+}

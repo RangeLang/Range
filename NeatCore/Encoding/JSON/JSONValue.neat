@@ -1,0 +1,7 @@
+enum JSONValue {
+    case null
+    case bool(value: Bool)
+    case float(value: Float)
+    case int(value: Int)
+    case string(value: String)
+}

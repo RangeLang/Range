@@ -1,5 +1,5 @@
 @core
-construct String: ExpressibleByStringLiteral, Equatable, Hashable, Comparable {
+construct String: ExpressibleByStringLiteral, Equatable, Hashable, Comparable, Decodable {
     let storage: StringStorage
 
     init(literal: StringLiteral) {
@@ -12,6 +12,17 @@ construct String: ExpressibleByStringLiteral, Equatable, Hashable, Comparable {
 
     derived isEmpty: Bool {
         storage.isEmpty
+    }
+
+    init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
+        let container = decoder.singleValueContainer()
+        switch container.decode(String.self) {
+        case .success(let value):
+            self.storage = value.storage
+            return .success(result: self)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
     }
 }
 

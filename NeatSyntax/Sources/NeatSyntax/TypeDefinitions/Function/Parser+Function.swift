@@ -305,7 +305,9 @@ extension Parser {
             }
             body = nil
         } else {
-            body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
+            body =
+                peek() == .leftBrace
+                ? try parseStatementBlock(baseLocalBindings: localBindings(for: parameters)) : nil
         }
         return InitializerDeclaration(
             macros: macros,

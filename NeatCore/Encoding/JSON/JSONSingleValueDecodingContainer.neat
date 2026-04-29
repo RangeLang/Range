@@ -1,0 +1,79 @@
+construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
+    let value: JSONValue
+
+    function decode(_ type: Bool.Type) -> Result<Bool, DecodingError> {
+        switch value {
+        case .bool(let decoded):
+            return .success(result: decoded)
+        case .int(let decoded):
+            return .success(result: decoded != 0)
+        case .string(let decoded):
+            if decoded == "true" {
+                return .success(result: true)
+            }
+
+            if decoded == "false" {
+                return .success(result: false)
+            }
+
+            return .failure(cause: .failed)
+        case .float:
+            return .failure(cause: .failed)
+        case .null:
+            return .failure(cause: .failed)
+        }
+
+        return .failure(cause: .failed)
+    }
+
+    function decode(_ type: Float.Type) -> Result<Float, DecodingError> {
+        switch value {
+        case .float(let decoded):
+            return .success(result: decoded)
+        case .bool:
+            return .failure(cause: .failed)
+        case .int:
+            return .failure(cause: .failed)
+        case .null:
+            return .failure(cause: .failed)
+        case .string:
+            return .failure(cause: .failed)
+        }
+
+        return .failure(cause: .failed)
+    }
+
+    function decode(_ type: Int.Type) -> Result<Int, DecodingError> {
+        switch value {
+        case .int(let decoded):
+            return .success(result: decoded)
+        case .bool:
+            return .failure(cause: .failed)
+        case .float:
+            return .failure(cause: .failed)
+        case .null:
+            return .failure(cause: .failed)
+        case .string:
+            return .failure(cause: .failed)
+        }
+
+        return .failure(cause: .failed)
+    }
+
+    function decode(_ type: String.Type) -> Result<String, DecodingError> {
+        switch value {
+        case .string(let decoded):
+            return .success(result: decoded)
+        case .bool:
+            return .failure(cause: .failed)
+        case .float:
+            return .failure(cause: .failed)
+        case .int:
+            return .failure(cause: .failed)
+        case .null:
+            return .failure(cause: .failed)
+        }
+
+        return .failure(cause: .failed)
+    }
+}

@@ -1,0 +1,3 @@
+protocol Decodable {
+    init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError>
+}
