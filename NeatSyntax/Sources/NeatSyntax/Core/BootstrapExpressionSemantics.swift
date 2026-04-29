@@ -86,6 +86,17 @@ public enum ExpressionTypeSemantics {
             ) {
                 return .typed(memberType)
             }
+            if let constructorReturnType = inferGraphResolvedConstructCallReturnType(
+                name: name,
+                arguments: arguments,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver
+            ) {
+                return .typed(constructorReturnType)
+            }
             if let constructorType = inferGraphResolvedConstructCallType(
                 name: name,
                 memberResolver: memberResolver
@@ -910,6 +921,38 @@ public enum ExpressionTypeSemantics {
         memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
         memberResolver.constructType(forConstructorCallName: name)
+    }
+
+    private static func inferGraphResolvedConstructCallReturnType(
+        name: String,
+        arguments: [CallArgument],
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver
+    ) -> TypeReference? {
+        let typedArguments = arguments.map { argument in
+            let inferred = try? inferType(
+                of: argument.value,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver
+            )
+            return DeclarationMemberResolver.MemberCallArgument(
+                label: argument.label,
+                typeReference: inferred.flatMap {
+                    defaultDestinationTypeReference(for: $0, resolver: resolver)
+                }
+            )
+        }
+
+        return memberResolver.constructorCallReturnType(
+            name: name,
+            arguments: typedArguments
+        )
     }
 
     private static func constructCallMatchesExpectedType(

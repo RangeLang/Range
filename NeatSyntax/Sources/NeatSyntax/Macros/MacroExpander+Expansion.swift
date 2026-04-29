@@ -377,6 +377,7 @@ extension MacroExpander {
         InitializerDeclaration(
             macros: initializer.macros,
             parameters: try expand(parameters: initializer.parameters, macros: macros, context: context),
+            returnType: initializer.returnType,
             body: try initializer.body.map {
                 try expand(
                     statements: $0,

@@ -127,17 +127,20 @@ public struct DeclaredInitializerSurface {
     public let labels: [String?]
     public let parameterTypeNames: [String?]
     public let parameters: [NeatFunctionParameter]
+    public let returnTypeName: String?
 
     public init(
         ownerConstructName: String,
         labels: [String?],
         parameterTypeNames: [String?],
-        parameters: [NeatFunctionParameter]
+        parameters: [NeatFunctionParameter],
+        returnTypeName: String?
     ) {
         self.ownerConstructName = ownerConstructName
         self.labels = labels
         self.parameterTypeNames = parameterTypeNames
         self.parameters = parameters
+        self.returnTypeName = returnTypeName
     }
 
     public var identity: String {

@@ -1,0 +1,4 @@
+construct BadInit {
+    init(value: String) -> Int {
+    }
+}

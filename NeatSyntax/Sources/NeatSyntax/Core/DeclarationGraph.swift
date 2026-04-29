@@ -375,7 +375,8 @@ public struct DeclarationGraph {
                 parameterTypeNames: initializer.parameters.map {
                     $0.typeReference?.displayName ?? $0.slotName
                 },
-                parameters: initializer.parameters
+                parameters: initializer.parameters,
+                returnTypeName: initializer.returnType?.displayName
             )
         }
     }
@@ -1137,6 +1138,7 @@ public struct DeclarationGraph {
             return InitializerDeclaration(
                 macros: mergedMacros,
                 parameters: initializer.parameters,
+                returnType: initializer.returnType,
                 body: initializer.body
             )
         }
@@ -1365,6 +1367,9 @@ private struct SemanticGraphCollector {
         addEntity(id: initializerID, kind: .initializer, label: "init")
         addRelation(from: parentID, to: initializerID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: initializerID)
+        if let returnType = declaration.returnType {
+            addTypeReference(returnType, from: initializerID, kind: .referencesType)
+        }
         for parameter in declaration.parameters {
             addParameter(parameter, parentID: initializerID)
         }

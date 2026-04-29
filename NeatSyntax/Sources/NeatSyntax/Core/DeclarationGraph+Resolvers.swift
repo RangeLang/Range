@@ -837,7 +837,13 @@ public struct DeclarationMemberResolver: Sendable {
         var genericParameterNames: [String]
         var genericDefaultArguments: [TypeReference?]
         var propertyTypes: [String: TypeReference]
+        var initializerSignatures: [MemberInitializerSignature]
         var callableSignatures: [String: MemberCallableSignature]
+    }
+
+    private struct MemberInitializerSignature: Sendable {
+        var parameters: [MemberCallableParameter]
+        var returnType: TypeReference?
     }
 
     private struct MemberCallableSignature: Sendable {
@@ -914,6 +920,17 @@ public struct DeclarationMemberResolver: Sendable {
             }
 
             var callableSignatures: [String: MemberCallableSignature] = [:]
+            let initializerSignatures = construct.initializers.map { initializer in
+                MemberInitializerSignature(
+                    parameters: Self.memberCallableParameters(
+                        initializer.parameters,
+                        using: nestedTypeMap
+                    ),
+                    returnType: initializer.returnType.map {
+                        Self.qualifyNestedLocalTypes($0, using: nestedTypeMap)
+                    }
+                )
+            }
             for callable in construct.callables {
                 callableSignatures[callable.name] = MemberCallableSignature(
                     genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
@@ -954,6 +971,7 @@ public struct DeclarationMemberResolver: Sendable {
                     }
                 },
                 propertyTypes: propertyTypes,
+                initializerSignatures: initializerSignatures,
                 callableSignatures: callableSignatures
             )
         }
@@ -1276,6 +1294,59 @@ public struct DeclarationMemberResolver: Sendable {
 
     public func constructType(forConstructorCallName name: String) -> TypeReference? {
         resolveConstructType(forConstructorCallName: name)
+    }
+
+    public func constructorCallReturnType(
+        name: String,
+        arguments: [MemberCallArgument]
+    ) -> TypeReference? {
+        guard let constructedType = resolveConstructType(forConstructorCallName: name),
+            let context = constructContext(for: constructedType),
+            let members = membersByConstructName[context.name]
+        else {
+            return nil
+        }
+
+        guard
+            let signature = members.initializerSignatures.first(where: {
+                initializerArguments(arguments, match: $0.parameters)
+            })
+        else {
+            return constructedType
+        }
+
+        guard let returnType = signature.returnType else {
+            return constructedType
+        }
+
+        var substitution = genericSubstitution(for: members, arguments: context.arguments)
+        substitution["Self"] = constructedType
+        let substitutedReturnType = Self.substitute(returnType, using: substitution)
+
+        guard case .generic(let base, let resultArguments) = substitutedReturnType,
+            case .named("Result") = base,
+            resultArguments.count == 2
+        else {
+            return constructedType
+        }
+
+        return .generic(
+            base: .named("Result"),
+            arguments: [constructedType, resultArguments[1]]
+        )
+    }
+
+    private func initializerArguments(
+        _ arguments: [MemberCallArgument],
+        match parameters: [MemberCallableParameter]
+    ) -> Bool {
+        guard arguments.count == parameters.count else {
+            return false
+        }
+
+        return zip(arguments, parameters).allSatisfy { argument, parameter in
+            argumentLabel(argument.label, matches: parameter)
+        }
     }
 
     private func resolveConstructType(forConstructorCallName name: String) -> TypeReference? {

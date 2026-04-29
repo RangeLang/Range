@@ -358,6 +358,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 labelsMatch(candidate.externalLabel, requirement.externalLabel)
                     && candidate.typeReference?.displayName == requirement.typeReference?.displayName
             }
+            && candidate.returnType?.displayName == requirement.returnType?.displayName
     }
 
     private func callableMatchesRequirement(
@@ -387,7 +388,11 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     }
 
     private func renderInitializerSignature(_ declaration: InitializerDeclaration) -> String {
-        "init(\(declaration.parameters.map(renderParameterRequirement).joined(separator: ", ")))"
+        let parameters = declaration.parameters.map(renderParameterRequirement).joined(separator: ", ")
+        if let returnType = declaration.returnType?.displayName {
+            return "init(\(parameters)) -> \(returnType)"
+        }
+        return "init(\(parameters))"
     }
 
     private func renderCallableSignature(_ declaration: CallableDeclaration) -> String {
@@ -610,6 +615,7 @@ private extension InitializerDeclaration {
         InitializerDeclaration(
             macros: macros,
             parameters: parameters.map { $0.substituted(using: bindings) },
+            returnType: returnType.map { substitute($0, using: bindings) },
             body: body
         )
     }

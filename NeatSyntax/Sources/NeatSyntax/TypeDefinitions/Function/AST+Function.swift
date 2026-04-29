@@ -94,15 +94,18 @@ public struct CallableDeclaration {
 public struct InitializerDeclaration {
     public let macros: [MacroApplication]
     public let parameters: [NeatFunctionParameter]
+    public let returnType: TypeReference?
     public let body: [Statement]?
 
     public init(
         macros: [MacroApplication],
         parameters: [NeatFunctionParameter],
+        returnType: TypeReference? = nil,
         body: [Statement]?
     ) {
         self.macros = macros
         self.parameters = parameters
+        self.returnType = returnType
         self.body = body
     }
 }

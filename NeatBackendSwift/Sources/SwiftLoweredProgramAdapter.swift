@@ -66,6 +66,7 @@ struct SwiftLoweredProgramAdapter {
         InitializerDeclaration(
             macros: initializer.macros,
             parameters: initializer.parameters,
+            returnType: initializer.returnType,
             body: initializer.body.map(lower(statements:))
         )
     }

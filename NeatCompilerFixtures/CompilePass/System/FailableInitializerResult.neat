@@ -1,0 +1,19 @@
+enum ParseError {
+    case failed
+}
+
+protocol StringDecodable {
+    init(value: String) -> Result<Self, ParseError>
+}
+
+construct User: StringDecodable {
+    let name: String
+
+    init(value: String) -> Result<Self, ParseError> {
+        self.name = value
+    }
+}
+
+function makeUser() -> Result<User, ParseError> {
+    return User(value: "George")
+}

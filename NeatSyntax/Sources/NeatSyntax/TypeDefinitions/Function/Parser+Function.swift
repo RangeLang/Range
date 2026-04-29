@@ -287,6 +287,15 @@ extension Parser {
         let parameters = try parseFunctionParameters(
             allowOmittedLocalName: signatureOnly
         )
+        let returnType: TypeReference?
+        if peek() == .arrow {
+            try consume(.arrow)
+            let parsedReturnType = try parseTypeReferenceNode()
+            try validateInitializerReturnType(parsedReturnType)
+            returnType = parsedReturnType
+        } else {
+            returnType = nil
+        }
         let body: [Statement]?
         if signatureOnly {
             if peek() == .leftBrace {
@@ -298,7 +307,24 @@ extension Parser {
         } else {
             body = peek() == .leftBrace ? try parseStatementBlock(baseLocalBindings: [:]) : nil
         }
-        return InitializerDeclaration(macros: macros, parameters: parameters, body: body)
+        return InitializerDeclaration(
+            macros: macros,
+            parameters: parameters,
+            returnType: returnType,
+            body: body
+        )
+    }
+
+    func validateInitializerReturnType(_ returnType: TypeReference) throws {
+        guard case .generic(let base, let arguments) = returnType,
+            case .named("Result") = base,
+            arguments.count == 2,
+            case .named("Self") = arguments[0]
+        else {
+            throw ParseError(
+                "Initializer return type must be Result<Self, Failure>."
+            )
+        }
     }
 
     func isInitializerDeclarationStart() -> Bool {
