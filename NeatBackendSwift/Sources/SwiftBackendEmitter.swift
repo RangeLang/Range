@@ -2,6 +2,62 @@ import Foundation
 import NeatSyntax
 
 struct SwiftBackendEmitter {
+    private struct SwiftEmissionContext {
+        var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
+
+        init() {}
+
+        init(program: LoweredProgram) {
+            self.failableInitializersByConstructName = Self.collectFailableInitializers(
+                from: program.declarations
+            )
+        }
+
+        private static func collectFailableInitializers(
+            from declarations: [ConstructDeclaration]
+        ) -> [String: [FailableInitializerSignature]] {
+            var signatures: [String: [FailableInitializerSignature]] = [:]
+
+            for declaration in declarations {
+                for initializer in declaration.initializers {
+                    guard let returnType = initializer.returnType,
+                        let failureType = resultSelfFailureType(returnType)
+                    else {
+                        continue
+                    }
+
+                    signatures[declaration.name, default: []].append(
+                        FailableInitializerSignature(
+                            constructName: declaration.name,
+                            labels: initializer.parameters.map(\.externalLabel),
+                            failureType: failureType
+                        )
+                    )
+                }
+            }
+
+            return signatures
+        }
+
+        private static func resultSelfFailureType(_ typeReference: TypeReference) -> TypeReference? {
+            guard case .generic(let base, let arguments) = typeReference,
+                case .named("Result") = base,
+                arguments.count == 2,
+                case .named("Self") = arguments[0]
+            else {
+                return nil
+            }
+
+            return arguments[1]
+        }
+    }
+
+    private struct FailableInitializerSignature {
+        var constructName: String
+        var labels: [String?]
+        var failureType: TypeReference
+    }
+
     private let swiftNativeTypeNames: Set<String> = [
         "Any",
         "Array",
@@ -20,8 +76,22 @@ struct SwiftBackendEmitter {
 
     private typealias NeatExpression = NeatSyntax.Expression
     private typealias NeatStatement = NeatSyntax.Statement
+    private let context: SwiftEmissionContext
+
+    init() {
+        self.context = SwiftEmissionContext()
+    }
+
+    private init(context: SwiftEmissionContext) {
+        self.context = context
+    }
 
     func emit(program: LoweredProgram) throws -> String {
+        try SwiftBackendEmitter(context: SwiftEmissionContext(program: program))
+            .emitProgramWithContext(program)
+    }
+
+    private func emitProgramWithContext(_ program: LoweredProgram) throws -> String {
         let allCallables = program.callables + program.declarations.flatMap(\.callables)
         let functions =
             try allCallables
@@ -52,6 +122,11 @@ struct SwiftBackendEmitter {
     }
 
     func emitWorkspace(program: LoweredProgram, at root: URL) throws {
+        try SwiftBackendEmitter(context: SwiftEmissionContext(program: program))
+            .emitWorkspaceWithContext(program: program, at: root)
+    }
+
+    private func emitWorkspaceWithContext(program: LoweredProgram, at root: URL) throws {
         let sourcesDirectory = root.appendingPathComponent("Sources", isDirectory: true)
         try FileManager.default.createDirectory(
             at: sourcesDirectory, withIntermediateDirectories: true)
@@ -223,6 +298,10 @@ struct SwiftBackendEmitter {
                     get { getter() }
                     set { setter(newValue) }
                 }
+            }
+
+            struct __NeatThrownFailure<Failure>: Error, @unchecked Sendable {
+                let failure: Failure
             }
 
             enum __NeatDeferredControlFlow: Error {
@@ -892,7 +971,8 @@ struct SwiftBackendEmitter {
         let parameters = try initializer.parameters.map {
             try emitParameter($0, genericParameterNames: genericParameterNames)
         }.joined(separator: ", ")
-        return "init(\(parameters))"
+        let throwsClause = isFailableInitializerReturnType(initializer.returnType) ? " throws" : ""
+        return "init(\(parameters))\(throwsClause)"
     }
 
     private func emitCallableRequirement(
@@ -1025,8 +1105,9 @@ struct SwiftBackendEmitter {
         let parameters = try initializer.parameters.map {
             try emitParameter($0, genericParameterNames: genericParameterNames)
         }.joined(separator: ", ")
+        let throwsClause = isFailableInitializerReturnType(initializer.returnType) ? " throws" : ""
         guard let body = initializer.body else {
-            return "init(\(parameters)) {}"
+            return "init(\(parameters))\(throwsClause) {}"
         }
 
         let bindingParameterNames = Set(initializer.parameters.filter(\.isBinding).map(\.name))
@@ -1034,10 +1115,11 @@ struct SwiftBackendEmitter {
             body,
             indent: 2,
             bindingNames: bindingNames,
-            bindingParameterNames: bindingParameterNames
+            bindingParameterNames: bindingParameterNames,
+            initializerReturnType: initializer.returnType
         )
         return """
-            init(\(parameters)) {
+            init(\(parameters))\(throwsClause) {
             \(functionBody)
             }
             """
@@ -1243,7 +1325,8 @@ struct SwiftBackendEmitter {
         _ statements: [NeatStatement],
         indent: Int,
         bindingNames: Set<String>,
-        bindingParameterNames: Set<String>
+        bindingParameterNames: Set<String>,
+        initializerReturnType: TypeReference?
     ) throws -> String {
         try statements
             .map {
@@ -1251,7 +1334,8 @@ struct SwiftBackendEmitter {
                     $0,
                     indent: indent,
                     bindingNames: bindingNames,
-                    bindingParameterNames: bindingParameterNames
+                    bindingParameterNames: bindingParameterNames,
+                    initializerReturnType: initializerReturnType
                 )
             }
             .joined(separator: "\n")
@@ -1261,7 +1345,8 @@ struct SwiftBackendEmitter {
         _ statement: NeatStatement,
         indent: Int,
         bindingNames: Set<String>,
-        bindingParameterNames: Set<String>
+        bindingParameterNames: Set<String>,
+        initializerReturnType: TypeReference?
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
 
@@ -1274,7 +1359,160 @@ struct SwiftBackendEmitter {
             return "\(prefix)self.__binding_\(bindingName) = \(parameterName)"
         }
 
+        if isFailableInitializerReturnType(initializerReturnType),
+            case .return(let expression) = statement
+        {
+            return try emitFailableInitializerReturn(
+                expression,
+                initializerReturnType: initializerReturnType,
+                indent: indent
+            )
+        }
+
+        switch statement {
+        case .conditional(let branches):
+            return try emitInitializerConditional(
+                branches,
+                indent: indent,
+                bindingNames: bindingNames,
+                bindingParameterNames: bindingParameterNames,
+                initializerReturnType: initializerReturnType
+            )
+        case .switchStatement(let expression, let cases, let defaultBody):
+            return try emitInitializerSwitch(
+                subject: expression,
+                cases: cases,
+                defaultBody: defaultBody,
+                indent: indent,
+                bindingNames: bindingNames,
+                bindingParameterNames: bindingParameterNames,
+                initializerReturnType: initializerReturnType
+            )
+        case .forEach(let name, let sequence, let body):
+            let bodyText = try emitInitializerStatements(
+                body,
+                indent: indent + 1,
+                bindingNames: bindingNames,
+                bindingParameterNames: bindingParameterNames,
+                initializerReturnType: initializerReturnType
+            )
+            return "\(prefix)for \(name) in \(try emitExpression(sequence)) {\n\(bodyText)\n\(prefix)}"
+        case .whileLoop(let condition, let body):
+            let bodyText = try emitInitializerStatements(
+                body,
+                indent: indent + 1,
+                bindingNames: bindingNames,
+                bindingParameterNames: bindingParameterNames,
+                initializerReturnType: initializerReturnType
+            )
+            return "\(prefix)while \(try emitExpression(condition)) {\n\(bodyText)\n\(prefix)}"
+        default:
+            break
+        }
+
         return try emitStatement(statement, indent: indent, enclosingReturnType: .named("Void"))
+    }
+
+    private func emitInitializerConditional(
+        _ branches: [StatementConditionalBranch],
+        indent: Int,
+        bindingNames: Set<String>,
+        bindingParameterNames: Set<String>,
+        initializerReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        var rendered: [String] = []
+
+        for (index, branch) in branches.enumerated() {
+            let bodyText = try emitInitializerStatements(
+                branch.body,
+                indent: indent + 1,
+                bindingNames: bindingNames,
+                bindingParameterNames: bindingParameterNames,
+                initializerReturnType: initializerReturnType
+            )
+            if let condition = branch.condition {
+                let keyword = index == 0 ? "if" : "else if"
+                rendered.append(
+                    "\(prefix)\(keyword) \(try emitExpression(condition)) {\n\(bodyText)\n\(prefix)}"
+                )
+            } else {
+                rendered.append("\(prefix)else {\n\(bodyText)\n\(prefix)}")
+            }
+        }
+
+        return rendered.joined(separator: " ")
+    }
+
+    private func emitInitializerSwitch(
+        subject: NeatExpression,
+        cases: [SwitchCase],
+        defaultBody: [NeatStatement]?,
+        indent: Int,
+        bindingNames: Set<String>,
+        bindingParameterNames: Set<String>,
+        initializerReturnType: TypeReference?
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject)) {"]
+
+        for switchCase in cases {
+            lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
+            lines.append(
+                try emitInitializerStatements(
+                    switchCase.body,
+                    indent: indent + 1,
+                    bindingNames: bindingNames,
+                    bindingParameterNames: bindingParameterNames,
+                    initializerReturnType: initializerReturnType
+                )
+            )
+        }
+
+        if let defaultBody {
+            lines.append("\(prefix)default:")
+            lines.append(
+                try emitInitializerStatements(
+                    defaultBody,
+                    indent: indent + 1,
+                    bindingNames: bindingNames,
+                    bindingParameterNames: bindingParameterNames,
+                    initializerReturnType: initializerReturnType
+                )
+            )
+        }
+
+        lines.append("\(prefix)}")
+        return lines.joined(separator: "\n")
+    }
+
+    private func emitFailableInitializerReturn(
+        _ expression: NeatExpression?,
+        initializerReturnType: TypeReference?,
+        indent: Int
+    ) throws -> String {
+        let prefix = String(repeating: "    ", count: indent)
+        guard let expression else {
+            return "\(prefix)return"
+        }
+
+        if let failureExpression = resultFailurePayloadExpression(expression) {
+            guard let failureType = resultSelfFailureType(initializerReturnType) else {
+                throw SwiftBackendError(
+                    "Swift backend requires Result<Self, Failure> for failable initializer lowering."
+                )
+            }
+
+            return "\(prefix)throw __NeatThrownFailure<\(emitTypeName(failureType))>(failure: \(try emitExpression(failureExpression)))"
+        }
+
+        if isResultSuccessExpression(expression) {
+            return "\(prefix)return"
+        }
+
+        throw SwiftBackendError(
+            "Swift backend can only lower failable initializer returns as .success(...) or .failure(...)."
+        )
     }
 
     private func selfBindingAssignmentName(_ target: AssignmentTarget) -> String? {
@@ -1521,6 +1759,16 @@ struct SwiftBackendEmitter {
                 arguments: arguments
             ) {
                 return lowered
+            }
+            if let failableInitializer = failableInitializerSignature(
+                forConstructorCallName: name,
+                arguments: arguments
+            ) {
+                return try emitFailableInitializerCall(
+                    failableInitializer,
+                    name: name,
+                    arguments: arguments
+                )
             }
             return try emitRawCall(name: name, arguments: arguments)
         case .bindingReference(let name):
@@ -2081,5 +2329,110 @@ struct SwiftBackendEmitter {
     ) throws -> String {
         let rendered = try emitCallArguments(arguments, for: name)
         return "\(emitSwiftReferenceName(name))(\(rendered))"
+    }
+
+    private func emitFailableInitializerCall(
+        _ signature: FailableInitializerSignature,
+        name: String,
+        arguments: [CallArgument]
+    ) throws -> String {
+        let constructedType = emitSwiftSymbolName(signature.constructName)
+        let failureType = emitTypeName(signature.failureType)
+        let call = try emitRawCall(name: name, arguments: arguments)
+
+        return """
+            ({ () -> Neat_Result<\(constructedType), \(failureType)> in
+                do {
+                    return .success(result: try \(call))
+                } catch let failure as __NeatThrownFailure<\(failureType)> {
+                    return .failure(cause: failure.failure)
+                } catch {
+                    fatalError("Unexpected Swift error thrown from Neat failable initializer: \\(error)")
+                }
+            })()
+            """
+    }
+
+    private func failableInitializerSignature(
+        forConstructorCallName name: String,
+        arguments: [CallArgument]
+    ) -> FailableInitializerSignature? {
+        let constructName = constructorConstructName(from: name)
+        guard let signatures = context.failableInitializersByConstructName[constructName] else {
+            return nil
+        }
+
+        return signatures.first { signature in
+            guard signature.labels.count == arguments.count else {
+                return false
+            }
+
+            return zip(signature.labels, arguments).allSatisfy { expectedLabel, argument in
+                expectedLabel == argument.label
+            }
+        }
+    }
+
+    private func constructorConstructName(from callName: String) -> String {
+        guard let genericStart = callName.firstIndex(of: "<") else {
+            return callName
+        }
+
+        return String(callName[..<genericStart])
+    }
+
+    private func isFailableInitializerReturnType(_ typeReference: TypeReference?) -> Bool {
+        resultSelfFailureType(typeReference) != nil
+    }
+
+    private func resultSelfFailureType(_ typeReference: TypeReference?) -> TypeReference? {
+        guard let typeReference else {
+            return nil
+        }
+
+        guard case .generic(let base, let arguments) = typeReference,
+            case .named("Result") = base,
+            arguments.count == 2,
+            case .named("Self") = arguments[0]
+        else {
+            return nil
+        }
+
+        return arguments[1]
+    }
+
+    private func resultFailurePayloadExpression(_ expression: NeatExpression) -> NeatExpression? {
+        guard case .call(let name, let arguments) = expression,
+            enumCaseTail(name) == "failure"
+        else {
+            return nil
+        }
+
+        if let cause = arguments.first(where: { $0.label == "cause" }) {
+            return cause.value
+        }
+
+        guard arguments.count == 1, arguments[0].label == nil else {
+            return nil
+        }
+
+        return arguments[0].value
+    }
+
+    private func isResultSuccessExpression(_ expression: NeatExpression) -> Bool {
+        guard case .call(let name, _) = expression else {
+            return false
+        }
+
+        return enumCaseTail(name) == "success"
+    }
+
+    private func enumCaseTail(_ name: String) -> String {
+        let normalized = normalizedEnumCaseName(name)
+        guard let dot = normalized.lastIndex(of: ".") else {
+            return normalized
+        }
+
+        return String(normalized[normalized.index(after: dot)...])
     }
 }
