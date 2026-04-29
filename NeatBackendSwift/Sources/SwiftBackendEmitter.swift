@@ -4,11 +4,14 @@ import NeatSyntax
 struct SwiftBackendEmitter {
     private struct SwiftEmissionContext {
         var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
+        var failableInitializersByProtocolName: [String: [FailableInitializerSignature]] = [:]
         var genericParameterNames: Set<String> = []
+        var genericParameterConstraintsByName: [String: [TypeReference]] = [:]
 
         init() {}
 
         init(program: LoweredProgram) {
+            let protocols = Self.allProtocols(in: program)
             self.failableInitializersByConstructName = Self.collectFailableInitializers(
                 from: Self.allDeclarations(in: program)
             )
@@ -22,7 +25,13 @@ struct SwiftBackendEmitter {
                     uniquingKeysWith: { lhs, rhs in lhs + rhs }
                 )
             }
+            self.failableInitializersByProtocolName = Self.collectFailableInitializers(
+                fromProtocols: protocols
+            )
             self.genericParameterNames = Self.collectGenericParameterNames(from: program)
+            self.genericParameterConstraintsByName = Self.collectGenericParameterConstraints(
+                from: program
+            )
         }
 
         private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<String> {
@@ -65,10 +74,63 @@ struct SwiftBackendEmitter {
             return names
         }
 
+        private static func collectGenericParameterConstraints(
+            from program: LoweredProgram
+        ) -> [String: [TypeReference]] {
+            var constraintsByName: [String: [TypeReference]] = [:]
+
+            func record(_ parameters: [GenericParameter]) {
+                for parameter in parameters {
+                    guard case .type(let name, let constraint?, _) = parameter else {
+                        continue
+                    }
+                    if constraintsByName[name, default: []].contains(constraint) {
+                        continue
+                    }
+                    constraintsByName[name, default: []].append(constraint)
+                }
+            }
+
+            func record(_ declaration: ConstructDeclaration) {
+                record(declaration.genericParameters)
+                for callable in declaration.callables {
+                    record(callable.genericParameters)
+                }
+                for nested in declaration.constructs {
+                    record(nested)
+                }
+            }
+
+            for declaration in allDeclarations(in: program) {
+                record(declaration)
+            }
+            for protocolDeclaration in allProtocols(in: program) {
+                record(protocolDeclaration.genericParameters)
+                for callable in protocolDeclaration.callables {
+                    record(callable.genericParameters)
+                }
+            }
+            for extensionDeclaration in allExtensions(in: program) {
+                for callable in extensionDeclaration.callables {
+                    record(callable.genericParameters)
+                }
+            }
+
+            return constraintsByName
+        }
+
         private static func allDeclarations(in program: LoweredProgram) -> [ConstructDeclaration] {
             var declarations = program.declarations
             for unit in program.units {
                 declarations.append(contentsOf: unit.declarations)
+            }
+            return declarations
+        }
+
+        private static func allProtocols(in program: LoweredProgram) -> [ProtocolDeclaration] {
+            var declarations = program.protocols
+            for unit in program.units {
+                declarations.append(contentsOf: unit.protocols)
             }
             return declarations
         }
@@ -85,13 +147,7 @@ struct SwiftBackendEmitter {
             named name: String,
             in program: LoweredProgram
         ) -> Bool {
-            if program.protocols.contains(where: { $0.name == name }) {
-                return true
-            }
-
-            return program.units.contains { unit in
-                unit.protocols.contains(where: { $0.name == name })
-            }
+            allProtocols(in: program).contains { $0.name == name }
         }
 
         private static func nativeScalarDecodableInitializers()
@@ -156,6 +212,32 @@ struct SwiftBackendEmitter {
                     signatures[declaration.targetName, default: []].append(
                         FailableInitializerSignature(
                             constructName: declaration.targetName,
+                            labels: initializer.parameters.map(\.externalLabel),
+                            failureType: failureType
+                        )
+                    )
+                }
+            }
+
+            return signatures
+        }
+
+        private static func collectFailableInitializers(
+            fromProtocols protocols: [ProtocolDeclaration]
+        ) -> [String: [FailableInitializerSignature]] {
+            var signatures: [String: [FailableInitializerSignature]] = [:]
+
+            for declaration in protocols {
+                for initializer in declaration.initializers {
+                    guard let returnType = initializer.returnType,
+                        let failureType = resultSelfFailureType(returnType)
+                    else {
+                        continue
+                    }
+
+                    signatures[declaration.name, default: []].append(
+                        FailableInitializerSignature(
+                            constructName: declaration.name,
                             labels: initializer.parameters.map(\.externalLabel),
                             failureType: failureType
                         )
@@ -2565,20 +2647,49 @@ struct SwiftBackendEmitter {
     ) -> FailableInitializerSignature? {
         let constructName = constructorConstructName(from: name)
         if context.genericParameterNames.contains(constructName),
-            arguments.count == 1,
-            arguments[0].label == "from"
+            let signature = genericFailableInitializerSignature(
+                forGenericParameter: constructName,
+                arguments: arguments
+            )
         {
             return FailableInitializerSignature(
                 constructName: constructName,
-                labels: ["from"],
-                failureType: .named("DecodingError")
+                labels: signature.labels,
+                failureType: signature.failureType
             )
         }
         guard let signatures = context.failableInitializersByConstructName[constructName] else {
             return nil
         }
 
-        return signatures.first { signature in
+        return matchingFailableInitializer(in: signatures, arguments: arguments)
+    }
+
+    private func genericFailableInitializerSignature(
+        forGenericParameter name: String,
+        arguments: [CallArgument]
+    ) -> FailableInitializerSignature? {
+        let matches = context.genericParameterConstraintsByName[name, default: []].compactMap {
+            constraint -> FailableInitializerSignature? in
+            guard let constraintName = nominalTypeName(constraint),
+                let signatures = context.failableInitializersByProtocolName[constraintName]
+            else {
+                return nil
+            }
+            return matchingFailableInitializer(in: signatures, arguments: arguments)
+        }
+
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
+    }
+
+    private func matchingFailableInitializer(
+        in signatures: [FailableInitializerSignature],
+        arguments: [CallArgument]
+    ) -> FailableInitializerSignature? {
+        signatures.first { signature in
             guard signature.labels.count == arguments.count else {
                 return false
             }
@@ -2586,6 +2697,19 @@ struct SwiftBackendEmitter {
             return zip(signature.labels, arguments).allSatisfy { expectedLabel, argument in
                 expectedLabel == argument.label
             }
+        }
+    }
+
+    private func nominalTypeName(_ typeReference: TypeReference) -> String? {
+        switch typeReference {
+        case .named(let name):
+            return name
+        case .member(_, let name):
+            return name
+        case .generic(let base, _):
+            return nominalTypeName(base)
+        case .array, .function, .optional, .variadic:
+            return nil
         }
     }
 
