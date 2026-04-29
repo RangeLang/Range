@@ -4,4 +4,11 @@ enum JSONValue {
     case float(value: Float)
     case int(value: Int)
     case string(value: String)
+    case array(values: [JSONValue])
+    case object(fields: [JSONField])
+}
+
+construct JSONField {
+    let key: String
+    let value: JSONValue
 }

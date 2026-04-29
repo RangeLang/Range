@@ -4,6 +4,7 @@ import NeatSyntax
 struct SwiftBackendEmitter {
     private struct SwiftEmissionContext {
         var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
+        var genericParameterNames: Set<String> = []
 
         init() {}
 
@@ -21,6 +22,47 @@ struct SwiftBackendEmitter {
                     uniquingKeysWith: { lhs, rhs in lhs + rhs }
                 )
             }
+            self.genericParameterNames = Self.collectGenericParameterNames(from: program)
+        }
+
+        private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<String> {
+            var names: Set<String> = []
+
+            func record(_ parameters: [GenericParameter]) {
+                for parameter in parameters {
+                    switch parameter {
+                    case .type(let name, _, _), .value(let name, _, _):
+                        names.insert(name)
+                    }
+                }
+            }
+
+            func record(_ declaration: ConstructDeclaration) {
+                record(declaration.genericParameters)
+                for callable in declaration.callables {
+                    record(callable.genericParameters)
+                }
+                for nested in declaration.constructs {
+                    record(nested)
+                }
+            }
+
+            for declaration in allDeclarations(in: program) {
+                record(declaration)
+            }
+            for protocolDeclaration in program.protocols + program.units.flatMap(\.protocols) {
+                record(protocolDeclaration.genericParameters)
+                for callable in protocolDeclaration.callables {
+                    record(callable.genericParameters)
+                }
+            }
+            for extensionDeclaration in allExtensions(in: program) {
+                for callable in extensionDeclaration.callables {
+                    record(callable.genericParameters)
+                }
+            }
+
+            return names
         }
 
         private static func allDeclarations(in program: LoweredProgram) -> [ConstructDeclaration] {
@@ -1995,6 +2037,9 @@ struct SwiftBackendEmitter {
         }
 
         guard let dotIndex = name.firstIndex(of: ".") else {
+            if context.genericParameterNames.contains(name) {
+                return name
+            }
             guard name.first?.isUppercase == true else {
                 return name
             }
@@ -2497,7 +2542,7 @@ struct SwiftBackendEmitter {
         name: String,
         arguments: [CallArgument]
     ) throws -> String {
-        let constructedType = emitSwiftSymbolName(signature.constructName)
+        let constructedType = emitSwiftReferenceName(signature.constructName)
         let failureType = emitTypeName(signature.failureType)
         let call = try emitRawCall(name: name, arguments: arguments)
 
@@ -2519,6 +2564,16 @@ struct SwiftBackendEmitter {
         arguments: [CallArgument]
     ) -> FailableInitializerSignature? {
         let constructName = constructorConstructName(from: name)
+        if context.genericParameterNames.contains(constructName),
+            arguments.count == 1,
+            arguments[0].label == "from"
+        {
+            return FailableInitializerSignature(
+                constructName: constructName,
+                labels: ["from"],
+                failureType: .named("DecodingError")
+            )
+        }
         guard let signatures = context.failableInitializersByConstructName[constructName] else {
             return nil
         }

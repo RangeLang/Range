@@ -21,7 +21,27 @@ construct JSONDecoder: Decoder<JSONValue> {
         return String(from: decoder)
     }
 
+    function container<Key: CodingKey>(
+        keyedBy keyType: Key.Type
+    ) -> KeyedDecodingContainer<Key> {
+        switch value {
+        case .object(let fields):
+            return JSONKeyedDecodingContainer<Key>(fields: fields)
+        case .array, .bool, .float, .int, .null, .string:
+            return JSONKeyedDecodingContainer<Key>(fields: [])
+        }
+    }
+
     function singleValueContainer() -> SingleValueDecodingContainer {
         return JSONSingleValueDecodingContainer(value: value)
+    }
+
+    function unkeyedContainer() -> UnkeyedDecodingContainer {
+        switch value {
+        case .array(let values):
+            return JSONUnkeyedDecodingContainer(values: values)
+        case .bool, .float, .int, .null, .object, .string:
+            return JSONUnkeyedDecodingContainer(values: [])
+        }
     }
 }

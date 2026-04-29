@@ -71,6 +71,7 @@ public struct DeclarationGraph {
             literalBridgeResolver: LiteralBridgeResolver(realizedLiteralBridges: realizedLiteralBridges),
             memberResolver: DeclarationMemberResolver(
                 constructsByName: constructsByName,
+                enumsByName: enumsByName,
                 protocolsByName: protocolsByName,
                 extensionsByTargetName: extensionsByTargetName
             ),

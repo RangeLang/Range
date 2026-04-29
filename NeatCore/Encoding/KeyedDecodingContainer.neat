@@ -1,0 +1,7 @@
+protocol KeyedDecodingContainer<Key: CodingKey> {
+    function decode(_ type: Bool.Type, forKey key: Key) -> Result<Bool, DecodingError>
+    function decode(_ type: Float.Type, forKey key: Key) -> Result<Float, DecodingError>
+    function decode(_ type: Int.Type, forKey key: Key) -> Result<Int, DecodingError>
+    function decode(_ type: String.Type, forKey key: Key) -> Result<String, DecodingError>
+    function decode<T: Decodable>(_ type: T.Type, forKey key: Key) -> Result<T, DecodingError>
+}

@@ -829,6 +829,7 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
 public struct DeclarationMemberResolver: Sendable {
     public static let empty = DeclarationMemberResolver(
         constructsByName: [:],
+        enumsByName: [:],
         protocolsByName: [:],
         extensionsByTargetName: [:]
     )
@@ -838,7 +839,7 @@ public struct DeclarationMemberResolver: Sendable {
         var genericDefaultArguments: [TypeReference?]
         var propertyTypes: [String: TypeReference]
         var initializerSignatures: [MemberInitializerSignature]
-        var callableSignatures: [String: MemberCallableSignature]
+        var callableSignatures: [String: [MemberCallableSignature]]
     }
 
     private struct MemberInitializerSignature: Sendable {
@@ -858,6 +859,11 @@ public struct DeclarationMemberResolver: Sendable {
         var typeReference: TypeReference?
     }
 
+    private struct EnumCaseSignature: Sendable {
+        var enumType: TypeReference
+        var parameters: [MemberCallableParameter]
+    }
+
     public struct MemberCallArgument: Sendable {
         public let label: String?
         public let typeReference: TypeReference?
@@ -869,11 +875,14 @@ public struct DeclarationMemberResolver: Sendable {
     }
 
     private let membersByConstructName: [String: ConstructMembers]
-    private let callableSignaturesByProtocolName: [String: [String: MemberCallableSignature]]
+    private let enumCaseSignaturesByQualifiedName: [String: EnumCaseSignature]
+    private let enumCaseSignaturesByEnumName: [String: [String: EnumCaseSignature]]
+    private let callableSignaturesByProtocolName: [String: [String: [MemberCallableSignature]]]
     private let genericParameterConstraintsByName: [String: TypeReference]
 
     public init(
         constructsByName: [String: ConstructDeclaration],
+        enumsByName: [String: EnumDeclaration],
         protocolsByName: [String: ProtocolDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
@@ -885,6 +894,38 @@ public struct DeclarationMemberResolver: Sendable {
         self.callableSignaturesByProtocolName = protocolsByName.mapValues { declaration in
             Self.protocolCallableSignatures(for: declaration)
         }
+        var enumCaseSignaturesByQualifiedName: [String: EnumCaseSignature] = [:]
+        var enumCaseSignaturesByEnumName: [String: [String: EnumCaseSignature]] = [:]
+        for (enumName, declaration) in enumsByName {
+            let enumType: TypeReference =
+                declaration.genericParameters.isEmpty
+                ? .named(enumName)
+                : .generic(
+                    base: .named(enumName),
+                    arguments: declaration.genericParameters.map { parameter in
+                        switch parameter {
+                        case .type(let name, _, _), .value(let name, _, _):
+                            return .named(name)
+                        }
+                    }
+                )
+            for enumCase in declaration.cases {
+                let signature = EnumCaseSignature(
+                    enumType: enumType,
+                    parameters: enumCase.associatedValues.map { associatedValue in
+                        MemberCallableParameter(
+                            localName: associatedValue.label ?? "_",
+                            externalLabel: associatedValue.label,
+                            typeReference: associatedValue.typeReference
+                        )
+                    }
+                )
+                enumCaseSignaturesByQualifiedName["\(enumName).\(enumCase.name)"] = signature
+                enumCaseSignaturesByEnumName[enumName, default: [:]][enumCase.name] = signature
+            }
+        }
+        self.enumCaseSignaturesByQualifiedName = enumCaseSignaturesByQualifiedName
+        self.enumCaseSignaturesByEnumName = enumCaseSignaturesByEnumName
         self.membersByConstructName = constructsByName.mapValues { construct in
             let nestedTypeMap = Self.nestedTypeMap(for: construct)
             var propertyTypes: [String: TypeReference] = [:]
@@ -919,7 +960,7 @@ public struct DeclarationMemberResolver: Sendable {
                 )
             }
 
-            var callableSignatures: [String: MemberCallableSignature] = [:]
+            var callableSignatures: [String: [MemberCallableSignature]] = [:]
             var initializerSignatures = construct.initializers.map { initializer in
                 MemberInitializerSignature(
                     parameters: Self.memberCallableParameters(
@@ -947,7 +988,7 @@ public struct DeclarationMemberResolver: Sendable {
                 )
             }
             for callable in construct.callables {
-                callableSignatures[callable.name] = MemberCallableSignature(
+                callableSignatures[callable.name, default: []].append(MemberCallableSignature(
                     genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
                     parameters: Self.memberCallableParameters(
                         callable.parameters,
@@ -957,11 +998,11 @@ public struct DeclarationMemberResolver: Sendable {
                         callable.returnType ?? .named("Void"),
                         using: nestedTypeMap
                     )
-                )
+                ))
             }
             for extensionDeclaration in extensionsByTargetName[construct.name, default: []] {
                 for callable in extensionDeclaration.callables {
-                    callableSignatures[callable.name] = MemberCallableSignature(
+                    callableSignatures[callable.name, default: []].append(MemberCallableSignature(
                         genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
                         parameters: Self.memberCallableParameters(
                             callable.parameters,
@@ -971,7 +1012,7 @@ public struct DeclarationMemberResolver: Sendable {
                             callable.returnType ?? .named("Void"),
                             using: nestedTypeMap
                         )
-                    )
+                    ))
                 }
             }
 
@@ -1006,14 +1047,14 @@ public struct DeclarationMemberResolver: Sendable {
 
     private static func protocolCallableSignatures(
         for declaration: ProtocolDeclaration
-    ) -> [String: MemberCallableSignature] {
-        var signatures: [String: MemberCallableSignature] = [:]
-        for callable in declaration.callables where signatures[callable.name] == nil {
-            signatures[callable.name] = MemberCallableSignature(
+    ) -> [String: [MemberCallableSignature]] {
+        var signatures: [String: [MemberCallableSignature]] = [:]
+        for callable in declaration.callables {
+            signatures[callable.name, default: []].append(MemberCallableSignature(
                 genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
                 parameters: Self.memberCallableParameters(callable.parameters, using: [:]),
                 returnType: callable.returnType ?? .named("Void")
-            )
+            ))
         }
         return signatures
     }
@@ -1138,7 +1179,16 @@ public struct DeclarationMemberResolver: Sendable {
 
         guard let context = constructContext(for: baseType),
             let members = membersByConstructName[context.name],
-            let signature = members.callableSignatures[memberName]
+            let signature = selectCallableSignature(
+                members.callableSignatures[memberName, default: []],
+                genericArguments: genericArguments,
+                arguments: arguments,
+                inheritedGenericParameterNames: Set(members.genericParameterNames),
+                inheritedGenericBindings: genericSubstitution(
+                    for: members,
+                    arguments: context.arguments
+                )
+            )
         else {
             return nil
         }
@@ -1171,7 +1221,11 @@ public struct DeclarationMemberResolver: Sendable {
         }
 
         guard let context = constructContext(for: baseType),
-            let signature = callableSignaturesByProtocolName[context.name]?[memberName]
+            let signature = selectCallableSignature(
+                callableSignaturesByProtocolName[context.name]?[memberName] ?? [],
+                genericArguments: genericArguments,
+                arguments: arguments
+            )
         else {
             return nil
         }
@@ -1213,6 +1267,71 @@ public struct DeclarationMemberResolver: Sendable {
         }
 
         return bindings
+    }
+
+    private func selectCallableSignature(
+        _ signatures: [MemberCallableSignature],
+        genericArguments: [TypeReference],
+        arguments: [MemberCallArgument],
+        inheritedGenericParameterNames: Set<String> = [],
+        inheritedGenericBindings: [String: TypeReference] = [:]
+    ) -> MemberCallableSignature? {
+        signatures.first {
+            callableSignature(
+                $0,
+                matchesGenericArguments: genericArguments,
+                arguments: arguments,
+                inheritedGenericParameterNames: inheritedGenericParameterNames,
+                inheritedGenericBindings: inheritedGenericBindings
+            )
+        }
+    }
+
+    private func callableSignature(
+        _ signature: MemberCallableSignature,
+        matchesGenericArguments genericArguments: [TypeReference],
+        arguments: [MemberCallArgument],
+        inheritedGenericParameterNames: Set<String> = [],
+        inheritedGenericBindings: [String: TypeReference] = [:]
+    ) -> Bool {
+        guard genericArguments.isEmpty || genericArguments.count == signature.genericParameterNames.count
+        else {
+            return false
+        }
+        guard arguments.count <= signature.parameters.count else {
+            return false
+        }
+
+        var bindings = inheritedGenericBindings
+        if genericArguments.count == signature.genericParameterNames.count {
+            bindings.merge(
+                Dictionary(uniqueKeysWithValues: zip(signature.genericParameterNames, genericArguments))
+            ) { _, explicit in explicit }
+        }
+
+        let genericParameterNames = inheritedGenericParameterNames.union(signature.genericParameterNames)
+        for (parameter, argument) in zip(signature.parameters, arguments) {
+            guard argumentLabel(argument.label, matches: parameter) else {
+                return false
+            }
+            guard let actualType = argument.typeReference,
+                let expectedType = parameter.typeReference
+            else {
+                continue
+            }
+            guard
+                typeMatches(
+                    actual: actualType,
+                    expected: expectedType,
+                    genericParameterNames: genericParameterNames,
+                    bindings: &bindings
+                )
+            else {
+                return false
+            }
+        }
+
+        return true
     }
 
     private func argumentLabel(_ actualLabel: String?, matches parameter: MemberCallableParameter)
@@ -1311,6 +1430,24 @@ public struct DeclarationMemberResolver: Sendable {
         resolveConstructType(forConstructorCallName: name)
     }
 
+    public func enumCaseReturnType(forCallName name: String) -> TypeReference? {
+        enumCaseSignature(forCallName: name)?.enumType
+    }
+
+    public func enumCaseCallMatches(
+        name: String,
+        expected: TypeReference,
+        arguments: [MemberCallArgument]
+    ) -> Bool {
+        guard let signature = enumCaseSignature(forCallName: name, expected: expected) else {
+            return false
+        }
+        guard initializerArguments(arguments, match: signature.parameters) else {
+            return false
+        }
+        return true
+    }
+
     public func constructorCallReturnType(
         name: String,
         arguments: [MemberCallArgument]
@@ -1361,6 +1498,41 @@ public struct DeclarationMemberResolver: Sendable {
 
         return zip(arguments, parameters).allSatisfy { argument, parameter in
             argumentLabel(argument.label, matches: parameter)
+        }
+    }
+
+    private func enumCaseSignature(
+        forCallName name: String,
+        expected: TypeReference? = nil
+    ) -> EnumCaseSignature? {
+        if name.hasPrefix(".") {
+            guard let expectedEnumName = expected.flatMap(enumName) else {
+                return nil
+            }
+            let caseName = String(name.dropFirst())
+            return enumCaseSignaturesByEnumName[expectedEnumName]?[caseName]
+        }
+
+        guard let dot = name.lastIndex(of: ".") else {
+            return nil
+        }
+        let enumName = String(name[..<dot])
+        let caseName = String(name[name.index(after: dot)...])
+        return enumCaseSignaturesByQualifiedName["\(enumName).\(caseName)"]
+    }
+
+    private func enumName(of type: TypeReference) -> String? {
+        switch type {
+        case .named(let name):
+            return name
+        case .member:
+            return type.displayName
+        case .generic(let base, _):
+            return enumName(of: base)
+        case .optional(let wrapped):
+            return enumName(of: wrapped)
+        case .array, .function, .variadic:
+            return nil
         }
     }
 

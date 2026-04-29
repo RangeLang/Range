@@ -17,7 +17,7 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
             }
 
             return .failure(cause: .failed)
-        case .float, .null:
+        case .array, .float, .null, .object:
             return .failure(cause: .failed)
         }
     }
@@ -26,7 +26,7 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
         switch value {
         case .float(let decoded):
             return .success(result: decoded)
-        case .bool, .int, .null, .string:
+        case .array, .bool, .int, .null, .object, .string:
             return .failure(cause: .failed)
         }
     }
@@ -35,7 +35,7 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
         switch value {
         case .int(let decoded):
             return .success(result: decoded)
-        case .bool, .float, .null, .string:
+        case .array, .bool, .float, .null, .object, .string:
             return .failure(cause: .failed)
         }
     }
@@ -44,7 +44,7 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
         switch value {
         case .string(let decoded):
             return .success(result: decoded)
-        case .bool, .float, .int, .null:
+        case .array, .bool, .float, .int, .null, .object:
             return .failure(cause: .failed)
         }
     }

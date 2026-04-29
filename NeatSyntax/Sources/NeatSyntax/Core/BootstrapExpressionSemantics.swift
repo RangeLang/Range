@@ -103,6 +103,9 @@ public enum ExpressionTypeSemantics {
             ) {
                 return .typed(constructorType)
             }
+            if let enumCaseType = memberResolver.enumCaseReturnType(forCallName: name) {
+                return .typed(enumCaseType)
+            }
             throw ParseError(
                 "Callable expression '\(name)' is not supported in state initializer inference yet."
             )
@@ -395,6 +398,19 @@ public enum ExpressionTypeSemantics {
                 )
             }
         case .call(let name, _):
+            if enumCaseCallMatchesExpectedType(
+                name: name,
+                expression: expression,
+                expected: expected,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            ) {
+                return true
+            }
             if constructCallMatchesExpectedType(
                 name: name,
                 expected: expected,
@@ -773,6 +789,13 @@ public enum ExpressionTypeSemantics {
             return nil
         }
 
+        if let collectionReturnType = inferKnownCollectionMemberCallType(
+            baseType: baseReference,
+            memberName: memberName
+        ) {
+            return collectionReturnType
+        }
+
         let typedArguments = arguments.map { argument in
             let inferred = try? inferType(
                 of: argument.value,
@@ -796,6 +819,49 @@ public enum ExpressionTypeSemantics {
             genericArguments: genericArguments,
             arguments: typedArguments
         )
+    }
+
+    private static func inferKnownCollectionMemberCallType(
+        baseType: TypeReference,
+        memberName: String
+    ) -> TypeReference? {
+        switch baseType {
+        case .array(let element):
+            switch memberName {
+            case "map", "compactMap", "flatMap", "filter":
+                return .array(element)
+            case "forEach", "append", "update", "insert", "clear":
+                return .named("Void")
+            case "element", "remove":
+                return element
+            case "first", "last", "removeLast":
+                return .optional(element)
+            default:
+                return nil
+            }
+        case .generic(let base, let arguments):
+            guard case .named(let baseName) = base else {
+                return nil
+            }
+            switch (baseName, memberName, arguments.count) {
+            case ("Dictionary", "value", 2), ("Dictionary", "removeValue", 2):
+                return .optional(arguments[1])
+            case ("Dictionary", "contains", 2):
+                return .named("Bool")
+            case ("Dictionary", "updateValue", 2), ("Dictionary", "clear", 2):
+                return .named("Void")
+            case ("Set", "contains", 1):
+                return .named("Bool")
+            case ("Set", "insert", 1), ("Set", "clear", 1):
+                return .named("Void")
+            case ("Set", "remove", 1):
+                return .optional(arguments[0])
+            default:
+                return nil
+            }
+        default:
+            return nil
+        }
     }
 
     private static func inferImplicitSelfMemberCallType(
@@ -965,6 +1031,46 @@ public enum ExpressionTypeSemantics {
         }
 
         return isCompatibleNamedType(expected: expected, actual: actual)
+    }
+
+    private static func enumCaseCallMatchesExpectedType(
+        name: String,
+        expression: Expression,
+        expected: TypeReference,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) -> Bool {
+        guard case .call(_, let arguments) = expression else {
+            return false
+        }
+
+        let typedArguments = arguments.map { argument in
+            let inferred = try? inferType(
+                of: argument.value,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
+            return DeclarationMemberResolver.MemberCallArgument(
+                label: argument.label,
+                typeReference: inferred.flatMap {
+                    defaultDestinationTypeReference(for: $0, resolver: resolver)
+                }
+            )
+        }
+
+        return memberResolver.enumCaseCallMatches(
+            name: name,
+            expected: expected,
+            arguments: typedArguments
+        )
     }
 
     private static func inferNilCoalescingType(
