@@ -6,7 +6,6 @@ struct SwiftBackendEmitter {
         var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
         var failableInitializersByProtocolName: [String: [FailableInitializerSignature]] = [:]
         var genericParameterNames: Set<String> = []
-        var genericParameterConstraintsByName: [String: [TypeReference]] = [:]
 
         init() {}
 
@@ -29,9 +28,6 @@ struct SwiftBackendEmitter {
                 fromProtocols: protocols
             )
             self.genericParameterNames = Self.collectGenericParameterNames(from: program)
-            self.genericParameterConstraintsByName = Self.collectGenericParameterConstraints(
-                from: program
-            )
         }
 
         private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<String> {
@@ -72,51 +68,6 @@ struct SwiftBackendEmitter {
             }
 
             return names
-        }
-
-        private static func collectGenericParameterConstraints(
-            from program: LoweredProgram
-        ) -> [String: [TypeReference]] {
-            var constraintsByName: [String: [TypeReference]] = [:]
-
-            func record(_ parameters: [GenericParameter]) {
-                for parameter in parameters {
-                    guard case .type(let name, let constraint?, _) = parameter else {
-                        continue
-                    }
-                    if constraintsByName[name, default: []].contains(constraint) {
-                        continue
-                    }
-                    constraintsByName[name, default: []].append(constraint)
-                }
-            }
-
-            func record(_ declaration: ConstructDeclaration) {
-                record(declaration.genericParameters)
-                for callable in declaration.callables {
-                    record(callable.genericParameters)
-                }
-                for nested in declaration.constructs {
-                    record(nested)
-                }
-            }
-
-            for declaration in allDeclarations(in: program) {
-                record(declaration)
-            }
-            for protocolDeclaration in allProtocols(in: program) {
-                record(protocolDeclaration.genericParameters)
-                for callable in protocolDeclaration.callables {
-                    record(callable.genericParameters)
-                }
-            }
-            for extensionDeclaration in allExtensions(in: program) {
-                for callable in extensionDeclaration.callables {
-                    record(callable.genericParameters)
-                }
-            }
-
-            return constraintsByName
         }
 
         private static func allDeclarations(in program: LoweredProgram) -> [ConstructDeclaration] {
@@ -265,6 +216,48 @@ struct SwiftBackendEmitter {
         var constructName: String
         var labels: [String?]
         var failureType: TypeReference
+    }
+
+    private struct EmissionScope {
+        static let empty = EmissionScope()
+
+        var genericParameterNames: Set<String> = []
+        var genericParameterConstraintsByName: [String: [TypeReference]] = [:]
+
+        init() {}
+
+        init(genericParameters: [GenericParameter]) {
+            self = Self.empty.adding(genericParameters: genericParameters)
+        }
+
+        func adding(genericParameters: [GenericParameter]) -> EmissionScope {
+            var copy = self
+            for parameter in genericParameters {
+                switch parameter {
+                case .type(let name, let constraint?, _):
+                    copy.genericParameterNames.insert(name)
+                    if copy.genericParameterConstraintsByName[name, default: []].contains(constraint) {
+                        continue
+                    }
+                    copy.genericParameterConstraintsByName[name, default: []].append(constraint)
+                case .type(let name, nil, _), .value(let name, _, _):
+                    copy.genericParameterNames.insert(name)
+                }
+            }
+            return copy
+        }
+
+        func adding(extensionConstraints: [ExtensionGenericArgumentConstraint]) -> EmissionScope {
+            var copy = self
+            for constraint in extensionConstraints {
+                copy.genericParameterNames.insert(constraint.parameterName)
+                if copy.genericParameterConstraintsByName[constraint.parameterName, default: []].contains(constraint.constraint) {
+                    continue
+                }
+                copy.genericParameterConstraintsByName[constraint.parameterName, default: []].append(constraint.constraint)
+            }
+            return copy
+        }
     }
 
     private let swiftNativeTypeNames: Set<String> = [
@@ -774,7 +767,8 @@ struct SwiftBackendEmitter {
         let functionBody = try emitStatements(
             body,
             indent: 1,
-            enclosingReturnType: callable.returnType ?? .named("Void")
+            enclosingReturnType: callable.returnType ?? .named("Void"),
+            scope: EmissionScope(genericParameters: callable.genericParameters)
         )
 
         return """
@@ -918,7 +912,8 @@ struct SwiftBackendEmitter {
             try emitInitializer(
                 $0,
                 genericParameterNames: genericParameterNames,
-                bindingNames: bindingNames
+                bindingNames: bindingNames,
+                scope: EmissionScope(genericParameters: declaration.genericParameters)
             )
         }.joined(
             separator: "\n\n")
@@ -928,6 +923,7 @@ struct SwiftBackendEmitter {
                 try emitMethod(
                     $0,
                     constructGenericParameterNames: genericParameterNames,
+                    constructGenericParameters: declaration.genericParameters,
                     isReferenceType: isReferenceType
                 )
             }
@@ -965,11 +961,15 @@ struct SwiftBackendEmitter {
             try emitInitializer(
                 $0,
                 genericParameterNames: genericParameterNames,
-                bindingNames: []
+                bindingNames: [],
+                scope: EmissionScope().adding(extensionConstraints: declaration.genericArgumentConstraints)
             )
         }.joined(separator: "\n\n")
         let methods = try declaration.callables.map {
-            try emitMethod($0)
+            try emitMethod(
+                $0,
+                inheritedScope: EmissionScope().adding(extensionConstraints: declaration.genericArgumentConstraints)
+            )
         }.joined(separator: "\n\n")
 
         let memberSections = [
@@ -1346,9 +1346,12 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func emitLocalBindingExpression(_ declaration: LocalBindingDeclaration) throws -> String
+    private func emitLocalBindingExpression(
+        _ declaration: LocalBindingDeclaration,
+        scope: EmissionScope = .empty
+    ) throws -> String
     {
-        try emitExpression(declaration.expression)
+        try emitExpression(declaration.expression, scope: scope)
     }
 
     private func emitDerivedMember(
@@ -1379,7 +1382,8 @@ struct SwiftBackendEmitter {
     private func emitInitializer(
         _ initializer: InitializerDeclaration,
         genericParameterNames: Set<String> = [],
-        bindingNames: Set<String> = []
+        bindingNames: Set<String> = [],
+        scope: EmissionScope = .empty
     ) throws -> String {
         let parameters = try initializer.parameters.map {
             try emitParameter($0, genericParameterNames: genericParameterNames)
@@ -1395,7 +1399,8 @@ struct SwiftBackendEmitter {
             indent: 2,
             bindingNames: bindingNames,
             bindingParameterNames: bindingParameterNames,
-            initializerReturnType: initializer.returnType
+            initializerReturnType: initializer.returnType,
+            scope: scope
         )
         return """
             init(\(parameters))\(throwsClause) {
@@ -1407,6 +1412,8 @@ struct SwiftBackendEmitter {
     private func emitMethod(
         _ callable: CallableDeclaration,
         constructGenericParameterNames: Set<String> = [],
+        constructGenericParameters: [GenericParameter] = [],
+        inheritedScope: EmissionScope = .empty,
         isReferenceType: Bool = false
     ) throws -> String {
         guard let body = callable.body else {
@@ -1421,6 +1428,9 @@ struct SwiftBackendEmitter {
         let genericParameterNames = constructGenericParameterNames.union(
             genericParameterNames(callable.genericParameters)
         )
+        let scope = inheritedScope
+            .adding(genericParameters: constructGenericParameters)
+            .adding(genericParameters: callable.genericParameters)
         let parameters = try callable.parameters.map {
             try emitParameter($0, genericParameterNames: genericParameterNames)
         }.joined(separator: ", ")
@@ -1431,7 +1441,8 @@ struct SwiftBackendEmitter {
         let functionBody = try emitStatements(
             body,
             indent: 2,
-            enclosingReturnType: callable.returnType ?? .named("Void")
+            enclosingReturnType: callable.returnType ?? .named("Void"),
+            scope: scope
         )
         let mutatingPrefix = !isReferenceType && methodNeedsMutation(callable) ? "mutating " : ""
 
@@ -1593,10 +1604,18 @@ struct SwiftBackendEmitter {
     private func emitStatements(
         _ statements: [NeatStatement],
         indent: Int,
-        enclosingReturnType: TypeReference? = nil
+        enclosingReturnType: TypeReference? = nil,
+        scope: EmissionScope = .empty
     ) throws -> String {
         try statements
-            .map { try emitStatement($0, indent: indent, enclosingReturnType: enclosingReturnType) }
+            .map {
+                try emitStatement(
+                    $0,
+                    indent: indent,
+                    enclosingReturnType: enclosingReturnType,
+                    scope: scope
+                )
+            }
             .joined(separator: "\n")
     }
 
@@ -1605,7 +1624,8 @@ struct SwiftBackendEmitter {
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
-        initializerReturnType: TypeReference?
+        initializerReturnType: TypeReference?,
+        scope: EmissionScope = .empty
     ) throws -> String {
         try statements
             .map {
@@ -1614,7 +1634,8 @@ struct SwiftBackendEmitter {
                     indent: indent,
                     bindingNames: bindingNames,
                     bindingParameterNames: bindingParameterNames,
-                    initializerReturnType: initializerReturnType
+                    initializerReturnType: initializerReturnType,
+                    scope: scope
                 )
             }
             .joined(separator: "\n")
@@ -1625,7 +1646,8 @@ struct SwiftBackendEmitter {
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
-        initializerReturnType: TypeReference?
+        initializerReturnType: TypeReference?,
+        scope: EmissionScope = .empty
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
 
@@ -1644,7 +1666,8 @@ struct SwiftBackendEmitter {
             return try emitFailableInitializerReturn(
                 expression,
                 initializerReturnType: initializerReturnType,
-                indent: indent
+                indent: indent,
+                scope: scope
             )
         }
 
@@ -1655,7 +1678,8 @@ struct SwiftBackendEmitter {
                 indent: indent,
                 bindingNames: bindingNames,
                 bindingParameterNames: bindingParameterNames,
-                initializerReturnType: initializerReturnType
+                initializerReturnType: initializerReturnType,
+                scope: scope
             )
         case .switchStatement(let expression, let cases, let defaultBody):
             return try emitInitializerSwitch(
@@ -1665,7 +1689,8 @@ struct SwiftBackendEmitter {
                 indent: indent,
                 bindingNames: bindingNames,
                 bindingParameterNames: bindingParameterNames,
-                initializerReturnType: initializerReturnType
+                initializerReturnType: initializerReturnType,
+                scope: scope
             )
         case .forEach(let name, let sequence, let body):
             let bodyText = try emitInitializerStatements(
@@ -1673,23 +1698,30 @@ struct SwiftBackendEmitter {
                 indent: indent + 1,
                 bindingNames: bindingNames,
                 bindingParameterNames: bindingParameterNames,
-                initializerReturnType: initializerReturnType
+                initializerReturnType: initializerReturnType,
+                scope: scope
             )
-            return "\(prefix)for \(name) in \(try emitExpression(sequence)) {\n\(bodyText)\n\(prefix)}"
+            return "\(prefix)for \(name) in \(try emitExpression(sequence, scope: scope)) {\n\(bodyText)\n\(prefix)}"
         case .whileLoop(let condition, let body):
             let bodyText = try emitInitializerStatements(
                 body,
                 indent: indent + 1,
                 bindingNames: bindingNames,
                 bindingParameterNames: bindingParameterNames,
-                initializerReturnType: initializerReturnType
+                initializerReturnType: initializerReturnType,
+                scope: scope
             )
-            return "\(prefix)while \(try emitExpression(condition)) {\n\(bodyText)\n\(prefix)}"
+            return "\(prefix)while \(try emitExpression(condition, scope: scope)) {\n\(bodyText)\n\(prefix)}"
         default:
             break
         }
 
-        return try emitStatement(statement, indent: indent, enclosingReturnType: .named("Void"))
+        return try emitStatement(
+            statement,
+            indent: indent,
+            enclosingReturnType: .named("Void"),
+            scope: scope
+        )
     }
 
     private func emitInitializerConditional(
@@ -1697,7 +1729,8 @@ struct SwiftBackendEmitter {
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
-        initializerReturnType: TypeReference?
+        initializerReturnType: TypeReference?,
+        scope: EmissionScope = .empty
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
         var rendered: [String] = []
@@ -1708,12 +1741,13 @@ struct SwiftBackendEmitter {
                 indent: indent + 1,
                 bindingNames: bindingNames,
                 bindingParameterNames: bindingParameterNames,
-                initializerReturnType: initializerReturnType
+                initializerReturnType: initializerReturnType,
+                scope: scope
             )
             if let condition = branch.condition {
                 let keyword = index == 0 ? "if" : "else if"
                 rendered.append(
-                    "\(prefix)\(keyword) \(try emitExpression(condition)) {\n\(bodyText)\n\(prefix)}"
+                    "\(prefix)\(keyword) \(try emitExpression(condition, scope: scope)) {\n\(bodyText)\n\(prefix)}"
                 )
             } else {
                 rendered.append("\(prefix)else {\n\(bodyText)\n\(prefix)}")
@@ -1730,10 +1764,11 @@ struct SwiftBackendEmitter {
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
-        initializerReturnType: TypeReference?
+        initializerReturnType: TypeReference?,
+        scope: EmissionScope = .empty
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
-        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject)) {"]
+        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject, scope: scope)) {"]
 
         for switchCase in cases {
             lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
@@ -1743,7 +1778,8 @@ struct SwiftBackendEmitter {
                     indent: indent + 1,
                     bindingNames: bindingNames,
                     bindingParameterNames: bindingParameterNames,
-                    initializerReturnType: initializerReturnType
+                    initializerReturnType: initializerReturnType,
+                    scope: scope
                 )
             )
         }
@@ -1756,7 +1792,8 @@ struct SwiftBackendEmitter {
                     indent: indent + 1,
                     bindingNames: bindingNames,
                     bindingParameterNames: bindingParameterNames,
-                    initializerReturnType: initializerReturnType
+                    initializerReturnType: initializerReturnType,
+                    scope: scope
                 )
             )
         } else {
@@ -1771,7 +1808,8 @@ struct SwiftBackendEmitter {
     private func emitFailableInitializerReturn(
         _ expression: NeatExpression?,
         initializerReturnType: TypeReference?,
-        indent: Int
+        indent: Int,
+        scope: EmissionScope = .empty
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
         guard let expression else {
@@ -1785,7 +1823,7 @@ struct SwiftBackendEmitter {
                 )
             }
 
-            return "\(prefix)throw __NeatThrownFailure<\(emitTypeName(failureType))>(failure: \(try emitExpression(failureExpression)))"
+            return "\(prefix)throw __NeatThrownFailure<\(emitTypeName(failureType))>(failure: \(try emitExpression(failureExpression, scope: scope)))"
         }
 
         if isResultSuccessExpression(expression) {
@@ -1813,7 +1851,8 @@ struct SwiftBackendEmitter {
     private func emitStatement(
         _ statement: NeatStatement,
         indent: Int,
-        enclosingReturnType: TypeReference? = nil
+        enclosingReturnType: TypeReference? = nil,
+        scope: EmissionScope = .empty
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
 
@@ -1826,7 +1865,8 @@ struct SwiftBackendEmitter {
             let bodyText = try emitStatements(
                 background.body,
                 indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
             )
             return """
                 \(prefix)Task.detached {
@@ -1846,12 +1886,13 @@ struct SwiftBackendEmitter {
             let typeAnnotation =
                 declaration.hasExplicitTypeAnnotation ? ": \(emitTypeName(declaration.type))" : ""
             return
-                "\(prefix)\(keyword) \(declaration.name)\(typeAnnotation) = \(try emitLocalBindingExpression(declaration))"
+                "\(prefix)\(keyword) \(declaration.name)\(typeAnnotation) = \(try emitLocalBindingExpression(declaration, scope: scope))"
         case .derived(let name, let typeName, let body):
             let bodyText = try emitStatements(
                 body,
                 indent: indent + 2,
-                enclosingReturnType: .named(typeName)
+                enclosingReturnType: .named(typeName),
+                scope: scope
             )
             return """
                 \(prefix)let \(name): \(typeName) = {
@@ -1860,37 +1901,40 @@ struct SwiftBackendEmitter {
                 """
         case .assignment(let target, let expression):
             return
-                "\(prefix)\(try emitAssignmentTarget(target)) = \(try emitExpression(expression))"
+                "\(prefix)\(try emitAssignmentTarget(target)) = \(try emitExpression(expression, scope: scope))"
         case .compoundAssignment(let target, .plusEquals, let expression):
             return
-                "\(prefix)\(try emitAssignmentTarget(target)) += \(try emitExpression(expression))"
+                "\(prefix)\(try emitAssignmentTarget(target)) += \(try emitExpression(expression, scope: scope))"
         case .expression(let expression):
-            return "\(prefix)\(try emitExpression(expression))"
+            return "\(prefix)\(try emitExpression(expression, scope: scope))"
         case .return(let expression):
             if let expression {
-                return "\(prefix)return \(try emitExpression(expression))"
+                return "\(prefix)return \(try emitExpression(expression, scope: scope))"
             }
             return "\(prefix)return"
         case .conditional(let branches):
             return try emitConditional(
                 branches,
                 indent: indent,
-                enclosingReturnType: enclosingReturnType
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
             )
         case .forEach(let name, let sequence, let body):
-            let header = "\(prefix)for \(name) in \(try emitExpression(sequence)) {"
+            let header = "\(prefix)for \(name) in \(try emitExpression(sequence, scope: scope)) {"
             let bodyText = try emitStatements(
                 body,
                 indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
             )
             return "\(header)\n\(bodyText)\n\(prefix)}"
         case .whileLoop(let condition, let body):
-            let header = "\(prefix)while \(try emitExpression(condition)) {"
+            let header = "\(prefix)while \(try emitExpression(condition, scope: scope)) {"
             let bodyText = try emitStatements(
                 body,
                 indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
             )
             return "\(header)\n\(bodyText)\n\(prefix)}"
         case .break:
@@ -1903,7 +1947,8 @@ struct SwiftBackendEmitter {
                 cases: cases,
                 defaultBody: defaultBody,
                 indent: indent,
-                enclosingReturnType: enclosingReturnType
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
             )
         case .environmentProvision:
             throw SwiftBackendError(
@@ -1914,7 +1959,8 @@ struct SwiftBackendEmitter {
     private func emitConditional(
         _ branches: [StatementConditionalBranch],
         indent: Int,
-        enclosingReturnType: TypeReference? = nil
+        enclosingReturnType: TypeReference? = nil,
+        scope: EmissionScope = .empty
     ) throws
         -> String
     {
@@ -1925,12 +1971,13 @@ struct SwiftBackendEmitter {
             let bodyText = try emitStatements(
                 branch.body,
                 indent: indent + 1,
-                enclosingReturnType: enclosingReturnType
+                enclosingReturnType: enclosingReturnType,
+                scope: scope
             )
             if let condition = branch.condition {
                 let keyword = index == 0 ? "if" : "else if"
                 rendered.append(
-                    "\(prefix)\(keyword) \(try emitExpression(condition)) {\n\(bodyText)\n\(prefix)}"
+                    "\(prefix)\(keyword) \(try emitExpression(condition, scope: scope)) {\n\(bodyText)\n\(prefix)}"
                 )
             } else {
                 rendered.append("\(prefix)else {\n\(bodyText)\n\(prefix)}")
@@ -1945,10 +1992,11 @@ struct SwiftBackendEmitter {
         cases: [SwitchCase],
         defaultBody: [NeatStatement]?,
         indent: Int,
-        enclosingReturnType: TypeReference? = nil
+        enclosingReturnType: TypeReference? = nil,
+        scope: EmissionScope = .empty
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
-        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject)) {"]
+        var lines: [String] = ["\(prefix)switch \(try emitExpression(subject, scope: scope)) {"]
 
         for switchCase in cases {
             lines.append("\(prefix)case \(try emitSwitchCasePattern(switchCase.pattern)):")
@@ -1956,7 +2004,8 @@ struct SwiftBackendEmitter {
                 try emitStatements(
                     switchCase.body,
                     indent: indent + 1,
-                    enclosingReturnType: enclosingReturnType
+                    enclosingReturnType: enclosingReturnType,
+                    scope: scope
                 )
             )
         }
@@ -1967,7 +2016,8 @@ struct SwiftBackendEmitter {
                 try emitStatements(
                     defaultBody,
                     indent: indent + 1,
-                    enclosingReturnType: enclosingReturnType
+                    enclosingReturnType: enclosingReturnType,
+                    scope: scope
                 )
             )
         } else {
@@ -2007,13 +2057,15 @@ struct SwiftBackendEmitter {
     }
 
     private func emitExpression(
-        _ expression: NeatExpression
+        _ expression: NeatExpression,
+        scope: EmissionScope = .empty
     ) throws -> String {
-        return try emitRawExpression(expression)
+        return try emitRawExpression(expression, scope: scope)
     }
 
     private func emitRawExpression(
-        _ expression: NeatExpression
+        _ expression: NeatExpression,
+        scope: EmissionScope = .empty
     ) throws -> String {
         switch expression {
         case .integer(let value):
@@ -2023,7 +2075,7 @@ struct SwiftBackendEmitter {
         case .string(let value):
             return "\"\(escapeString(decodeNeatStringEscapes(value)))\""
         case .interpolatedString(let value):
-            return "\"\(try emitInterpolatedString(value))\""
+            return "\"\(try emitInterpolatedString(value, scope: scope))\""
         case .boolean(let value):
             return value ? "true" : "false"
         case .nilLiteral:
@@ -2032,48 +2084,51 @@ struct SwiftBackendEmitter {
             throw SwiftBackendError(
                 "Expression macro invocation #\(name) must be expanded before Swift emission.")
         case .block(let body):
-            return try emitClosureExpression(body)
+            return try emitClosureExpression(body, scope: scope)
         case .identifier(let name):
-            return emitSwiftReferenceName(name)
+            return emitSwiftReferenceName(name, scope: scope)
         case .call(let name, let arguments):
-            if let closure = try emitCoreClosureCall(name: name, arguments: arguments) {
+            if let closure = try emitCoreClosureCall(name: name, arguments: arguments, scope: scope) {
                 return closure
             }
             if let lowered = try emitKnownCollectionCall(
                 name: name,
-                arguments: arguments
+                arguments: arguments,
+                scope: scope
             ) {
                 return lowered
             }
             if let failableInitializer = failableInitializerSignature(
                 forConstructorCallName: name,
-                arguments: arguments
+                arguments: arguments,
+                scope: scope
             ) {
                 return try emitFailableInitializerCall(
                     failableInitializer,
                     name: name,
-                    arguments: arguments
+                    arguments: arguments,
+                    scope: scope
                 )
             }
-            return try emitRawCall(name: name, arguments: arguments)
+            return try emitRawCall(name: name, arguments: arguments, scope: scope)
         case .bindingReference(let name):
             return "__NeatBinding(get: { \(name) }, set: { \(name) = $0 })"
         case .array(let elements):
-            let rendered = try elements.map { try emitExpression($0) }.joined(separator: ", ")
+            let rendered = try elements.map { try emitExpression($0, scope: scope) }.joined(separator: ", ")
             return "[\(rendered)]"
         case .dictionary(let elements):
             let rendered = try elements.map { element in
-                "\(try emitExpression(element.key)): \(try emitExpression(element.value))"
+                "\(try emitExpression(element.key, scope: scope)): \(try emitExpression(element.value, scope: scope))"
             }.joined(separator: ", ")
             return "[\(rendered)]"
         case .ternary(let condition, let trueExpression, let falseExpression):
             return
-                "\(try emitExpression(condition)) ? \(try emitExpression(trueExpression)) : \(try emitExpression(falseExpression))"
+                "\(try emitExpression(condition, scope: scope)) ? \(try emitExpression(trueExpression, scope: scope)) : \(try emitExpression(falseExpression, scope: scope))"
         case .unary(let operatorSymbol, let nested):
-            return "\(operatorSymbol.rawValue)\(try emitExpression(nested))"
+            return "\(operatorSymbol.rawValue)\(try emitExpression(nested, scope: scope))"
         case .binary(let lhs, let operatorSymbol, let rhs):
             return
-                "\(try emitExpression(lhs)) \(operatorSymbol.rawValue) \(try emitExpression(rhs))"
+                "\(try emitExpression(lhs, scope: scope)) \(operatorSymbol.rawValue) \(try emitExpression(rhs, scope: scope))"
         }
     }
 
@@ -2113,13 +2168,16 @@ struct SwiftBackendEmitter {
         return "Neat_\(name.replacingOccurrences(of: ".", with: "_"))"
     }
 
-    private func emitSwiftReferenceName(_ name: String) -> String {
+    private func emitSwiftReferenceName(
+        _ name: String,
+        scope: EmissionScope = .empty
+    ) -> String {
         if name.hasPrefix(".") {
             return name
         }
 
         guard let dotIndex = name.firstIndex(of: ".") else {
-            if context.genericParameterNames.contains(name) {
+            if scope.genericParameterNames.contains(name) || context.genericParameterNames.contains(name) {
                 return name
             }
             guard name.first?.isUppercase == true else {
@@ -2133,12 +2191,16 @@ struct SwiftBackendEmitter {
         guard base.first?.isUppercase == true else {
             return name
         }
+        if scope.genericParameterNames.contains(base) || context.genericParameterNames.contains(base) {
+            return name
+        }
         return "\(emitSwiftSymbolName(base))\(suffix)"
     }
 
     private func emitCoreClosureCall(
         name: String,
-        arguments: [CallArgument]
+        arguments: [CallArgument],
+        scope: EmissionScope = .empty
     ) throws -> String? {
         guard name == "Closure",
             let parameters = arguments.first(where: { $0.label == "parameters" })?.value,
@@ -2165,10 +2227,15 @@ struct SwiftBackendEmitter {
         }
 
         if statements.count == 1, case .expression(let expression) = statements[0] {
-            return "{ \(parameterNames.joined(separator: ", ")) in \(try emitExpression(expression)) }"
+            return "{ \(parameterNames.joined(separator: ", ")) in \(try emitExpression(expression, scope: scope)) }"
         }
 
-        let bodyText = try emitStatements(statements, indent: 1, enclosingReturnType: nil)
+        let bodyText = try emitStatements(
+            statements,
+            indent: 1,
+            enclosingReturnType: nil,
+            scope: scope
+        )
         return """
             { \(parameterNames.joined(separator: ", ")) in
             \(bodyText)
@@ -2177,25 +2244,28 @@ struct SwiftBackendEmitter {
     }
 
     private func emitCallArgument(
-        _ argument: CallArgument
+        _ argument: CallArgument,
+        scope: EmissionScope = .empty
     ) throws -> String {
         if let label = argument.label {
-            return "\(label): \(try emitExpression(argument.value))"
+            return "\(label): \(try emitExpression(argument.value, scope: scope))"
         }
-        return try emitExpression(argument.value)
+        return try emitExpression(argument.value, scope: scope)
     }
 
     private func emitCallArguments(
         _ arguments: [CallArgument],
-        for callee: String
+        for callee: String,
+        scope: EmissionScope = .empty
     ) throws -> String {
         _ = callee
-        return try arguments.map { try emitCallArgument($0) }.joined(separator: ", ")
+        return try arguments.map { try emitCallArgument($0, scope: scope) }.joined(separator: ", ")
     }
 
     private func emitKnownCollectionCall(
         name: String,
-        arguments: [CallArgument]
+        arguments: [CallArgument],
+        scope: EmissionScope = .empty
     ) throws -> String? {
         guard let dot = name.lastIndex(of: ".") else {
             return nil
@@ -2218,29 +2288,29 @@ struct SwiftBackendEmitter {
         switch member {
         case "append":
             guard let element = argument("element") else { return nil }
-            return "\(base).append(\(try emitExpression(element)))"
+            return "\(base).append(\(try emitExpression(element, scope: scope)))"
         case "element":
             guard let index = argument("index") else { return nil }
-            return "\(base)[\(try emitExpression(index))]"
+            return "\(base)[\(try emitExpression(index, scope: scope))]"
         case "update":
             guard let element = argument("element"), let index = argument("index") else {
                 return nil
             }
             return
-                "\(base)[\(try emitExpression(index))] = \(try emitExpression(element))"
+                "\(base)[\(try emitExpression(index, scope: scope))] = \(try emitExpression(element, scope: scope))"
         case "insert":
             guard let element = argument("element") else { return nil }
             if let index = argument("index") {
                 return
-                    "\(base).insert(\(try emitExpression(element)), at: \(try emitExpression(index)))"
+                    "\(base).insert(\(try emitExpression(element, scope: scope)), at: \(try emitExpression(index, scope: scope)))"
             }
-            return "\(base).insert(\(try emitExpression(element)))"
+            return "\(base).insert(\(try emitExpression(element, scope: scope)))"
         case "remove":
             if let index = argument("index") {
-                return "\(base).remove(at: \(try emitExpression(index)))"
+                return "\(base).remove(at: \(try emitExpression(index, scope: scope)))"
             }
             guard let element = argument("element") else { return nil }
-            return "\(base).remove(\(try emitExpression(element)))"
+            return "\(base).remove(\(try emitExpression(element, scope: scope)))"
         case "removeLast":
             guard arguments.isEmpty else { return nil }
             return "\(base).popLast()"
@@ -2255,37 +2325,45 @@ struct SwiftBackendEmitter {
             return "\(base).last"
         case "filter":
             guard let include = argument("include") else { return nil }
-            return "\(base).filter(\(try emitExpression(include)))"
+            return "\(base).filter(\(try emitExpression(include, scope: scope)))"
         case "map", "compactMap", "flatMap", "forEach":
             guard let transform = unlabeledArgument() else { return nil }
-            return "\(base).\(member)(\(try emitExpression(transform)))"
+            return "\(base).\(member)(\(try emitExpression(transform, scope: scope)))"
         case "value":
             guard let key = argument("key") else { return nil }
-            return "\(base)[\(try emitExpression(key))]"
+            return "\(base)[\(try emitExpression(key, scope: scope))]"
         case "updateValue":
             guard let value = argument("value"), let key = argument("key") else { return nil }
             return
-                "\(base).updateValue(\(try emitExpression(value)), forKey: \(try emitExpression(key)))"
+                "\(base).updateValue(\(try emitExpression(value, scope: scope)), forKey: \(try emitExpression(key, scope: scope)))"
         case "removeValue":
             guard let key = argument("key") else { return nil }
-            return "\(base).removeValue(forKey: \(try emitExpression(key)))"
+            return "\(base).removeValue(forKey: \(try emitExpression(key, scope: scope)))"
         case "contains":
             if let key = argument("key") {
-                return "\(base).keys.contains(\(try emitExpression(key)))"
+                return "\(base).keys.contains(\(try emitExpression(key, scope: scope)))"
             }
             guard let element = argument("element") else { return nil }
-            return "\(base).contains(\(try emitExpression(element)))"
+            return "\(base).contains(\(try emitExpression(element, scope: scope)))"
         default:
             return nil
         }
     }
 
-    private func emitClosureExpression(_ body: [NeatStatement]) throws -> String {
+    private func emitClosureExpression(
+        _ body: [NeatStatement],
+        scope: EmissionScope = .empty
+    ) throws -> String {
         if body.count == 1, case .expression(let expression) = body[0] {
-            return "{ \(try emitExpression(expression)) }"
+            return "{ \(try emitExpression(expression, scope: scope)) }"
         }
 
-        let bodyText = try emitStatements(body, indent: 1, enclosingReturnType: nil)
+        let bodyText = try emitStatements(
+            body,
+            indent: 1,
+            enclosingReturnType: nil,
+            scope: scope
+        )
         return "{\n\(bodyText)\n}"
     }
 
@@ -2547,7 +2625,10 @@ struct SwiftBackendEmitter {
         return lines.joined(separator: "\n")
     }
 
-    private func emitInterpolatedString(_ string: InterpolatedString) throws -> String {
+    private func emitInterpolatedString(
+        _ string: InterpolatedString,
+        scope: EmissionScope = .empty
+    ) throws -> String {
         var result = ""
 
         for segment in string.segments {
@@ -2555,7 +2636,7 @@ struct SwiftBackendEmitter {
             case .text(let text):
                 result += escapeString(decodeNeatStringEscapes(text))
             case .expression(let expression):
-                result += "\\(\(try emitExpression(expression)))"
+                result += "\\(\(try emitExpression(expression, scope: scope)))"
             }
         }
 
@@ -2613,20 +2694,22 @@ struct SwiftBackendEmitter {
 
     private func emitRawCall(
         name: String,
-        arguments: [CallArgument]
+        arguments: [CallArgument],
+        scope: EmissionScope = .empty
     ) throws -> String {
-        let rendered = try emitCallArguments(arguments, for: name)
-        return "\(emitSwiftReferenceName(name))(\(rendered))"
+        let rendered = try emitCallArguments(arguments, for: name, scope: scope)
+        return "\(emitSwiftReferenceName(name, scope: scope))(\(rendered))"
     }
 
     private func emitFailableInitializerCall(
         _ signature: FailableInitializerSignature,
         name: String,
-        arguments: [CallArgument]
+        arguments: [CallArgument],
+        scope: EmissionScope = .empty
     ) throws -> String {
-        let constructedType = emitSwiftReferenceName(signature.constructName)
+        let constructedType = emitSwiftReferenceName(signature.constructName, scope: scope)
         let failureType = emitTypeName(signature.failureType)
-        let call = try emitRawCall(name: name, arguments: arguments)
+        let call = try emitRawCall(name: name, arguments: arguments, scope: scope)
 
         return """
             ({ () -> Neat_Result<\(constructedType), \(failureType)> in
@@ -2643,13 +2726,15 @@ struct SwiftBackendEmitter {
 
     private func failableInitializerSignature(
         forConstructorCallName name: String,
-        arguments: [CallArgument]
+        arguments: [CallArgument],
+        scope: EmissionScope = .empty
     ) -> FailableInitializerSignature? {
         let constructName = constructorConstructName(from: name)
         if context.genericParameterNames.contains(constructName),
             let signature = genericFailableInitializerSignature(
                 forGenericParameter: constructName,
-                arguments: arguments
+                arguments: arguments,
+                scope: scope
             )
         {
             return FailableInitializerSignature(
@@ -2667,9 +2752,10 @@ struct SwiftBackendEmitter {
 
     private func genericFailableInitializerSignature(
         forGenericParameter name: String,
-        arguments: [CallArgument]
+        arguments: [CallArgument],
+        scope: EmissionScope = .empty
     ) -> FailableInitializerSignature? {
-        let matches = context.genericParameterConstraintsByName[name, default: []].compactMap {
+        let matches = scope.genericParameterConstraintsByName[name, default: []].compactMap {
             constraint -> FailableInitializerSignature? in
             guard let constraintName = nominalTypeName(constraint),
                 let signatures = context.failableInitializersByProtocolName[constraintName]
