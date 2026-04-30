@@ -1,0 +1,16 @@
+@core
+construct Marker: Syntax {
+    @core
+    construct Declaration: Syntax {
+        let name: String
+        let parameters: [Parameter.Declaration]
+        let target: TypeReference
+        let valueType: TypeReference
+    }
+
+    @core
+    construct Application<Value>: Syntax {
+        let name: String
+        let value: Value
+    }
+}

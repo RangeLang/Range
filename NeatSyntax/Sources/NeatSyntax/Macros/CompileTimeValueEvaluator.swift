@@ -79,7 +79,7 @@ struct CompileTimeValueEvaluator {
         switch name {
         case "Enum", "Enum.Declaration", "Enum.Case", "NamedTypeReference", "MemberTypeReference",
             "Let", "State", "Binding", "Derived", "Init.Declaration", "Function.Declaration",
-            "Construct.Declaration", "Extension", "MacroApplication":
+            "Construct.Declaration", "Extension", "Macro.Application":
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
                 guard let label = argument.label,

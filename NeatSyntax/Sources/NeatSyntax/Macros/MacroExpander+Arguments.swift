@@ -88,6 +88,57 @@ extension MacroExpander {
         return bindings
     }
 
+    static func parseMarkerArgumentBindings(
+        for marker: MarkerDeclaration,
+        argumentClause: String?
+    ) throws -> [String: Expression] {
+        let parameters = marker.parameters
+        let normalizedArgumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !parameters.isEmpty || normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
+            throw ParseError("Marker #\(marker.name) requires arguments.")
+        }
+        guard !parameters.isEmpty else {
+            return [:]
+        }
+        guard let normalizedArgumentClause, !normalizedArgumentClause.isEmpty else {
+            throw ParseError("Marker #\(marker.name) requires arguments.")
+        }
+
+        var parser = try Parser(source: "marker(\(normalizedArgumentClause))")
+        _ = try parser.consumeCallableName()
+        let arguments = try parser.parseInvocationArgumentsIfPresent()
+        try parser.consume(Token.eof)
+
+        guard arguments.count == parameters.count else {
+            throw ParseError(
+                "Marker #\(marker.name) expects \(parameters.count) argument(s), got \(arguments.count)."
+            )
+        }
+
+        var bindings: [String: Expression] = [:]
+        for (parameter, argument) in zip(parameters, arguments) {
+            let expectedLabel = macroArgumentLabel(for: parameter)
+            let actualLabel = argument.label
+
+            if actualLabel == nil {
+                // Marker arguments can be passed positionally.
+            } else if let expectedLabel, let actualLabel, expectedLabel == actualLabel {
+                // Label matched.
+            } else if let expectedLabel, let actualLabel {
+                throw ParseError(
+                    "Marker #\(marker.name) expects argument label \(expectedLabel), got \(actualLabel)."
+                )
+            } else if let actualLabel {
+                throw ParseError(
+                    "Marker #\(marker.name) argument for \(parameter.localName) should not use label \(actualLabel)."
+                )
+            }
+            bindings[parameter.localName] = argument.value
+        }
+        return bindings
+    }
+
     static func macroArgumentLabel(for parameter: NeatFunctionParameter) -> String? {
         parameter.externalLabel ?? parameter.localName
     }

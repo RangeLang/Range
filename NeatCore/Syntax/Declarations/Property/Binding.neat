@@ -1,6 +1,6 @@
 @core
 construct Binding<T>: Property {
-    let macros: [MacroApplication]
+    let macros: [Macro.Application]
     let name: String
     let type: TypeReference
     let getterBody: Block?

@@ -8,6 +8,7 @@ public enum MacroExpander {
         defer { expansionLock.unlock() }
 
         let registry = collectMacros(from: files)
+        let markerRegistry = collectMarkers(from: files)
         let declarationGraph = DeclarationGraph(files: files)
         let protocols = declarationGraph.protocolsByName
         let graphViews = declarationGraph.views
@@ -15,7 +16,10 @@ public enum MacroExpander {
             macros: Array(registry.values),
             syntaxResolver: graphViews.syntaxResolver
         )
-        let context = declarationGraph.macroExpansionContext(macrosByName: registry)
+        let context = declarationGraph.macroExpansionContext(
+            macrosByName: registry,
+            markersByName: markerRegistry
+        )
         return try files.map { parsedFile in
             ParsedSourceFile(
                 path: parsedFile.path,

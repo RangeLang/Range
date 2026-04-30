@@ -431,6 +431,18 @@ extension MacroExpander {
     ) throws {
         for application in applications {
             guard let macro = macros[application.name] else {
+                if let marker = context.markerDeclarationsByName[application.name] {
+                    guard macroTargetKind(for: marker.target.typeReference) == .construct else {
+                        throw ParseError(
+                            "Marker #\(application.name) is used on a construct but targets \(marker.target.typeReference.displayName)."
+                        )
+                    }
+                    _ = try parseMarkerArgumentBindings(
+                        for: marker,
+                        argumentClause: application.argumentClause
+                    )
+                    continue
+                }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
             guard macroTargetKind(for: macro) == .construct else {

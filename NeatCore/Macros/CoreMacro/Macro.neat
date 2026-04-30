@@ -1,0 +1,18 @@
+@core
+construct Macro: Syntax {
+    @core
+    construct Declaration: Syntax {
+        let name: String
+        let parameters: [Parameter.Declaration]
+        let target: TypeReference
+        let expansionType: TypeReference?
+    }
+
+    @core
+    construct Application: Syntax {
+        let name: String
+        let genericArguments: [TypeReference]
+        let argumentClause: String
+        let arguments: [Expression]
+    }
+}

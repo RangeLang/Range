@@ -119,6 +119,7 @@ extension MacroExpander {
                     enumerations: module.enumerations + emittedDeclarationBundles.flatMap(\.enumerations),
                     protocols: module.protocols + emittedDeclarationBundles.flatMap(\.protocols),
                     macros: module.macros,
+                    markers: module.markers,
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
                     extensions: module.extensions + emittedDeclarationBundles.flatMap(\.extensions)
@@ -159,6 +160,7 @@ extension MacroExpander {
                     enumerations: emittedBundle.enumerations,
                     protocols: emittedBundle.protocols,
                     macros: [],
+                    markers: [],
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
@@ -183,6 +185,7 @@ extension MacroExpander {
                     enumerations: [declaration] + emittedBundle.enumerations,
                     protocols: emittedBundle.protocols,
                     macros: [],
+                    markers: [],
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
@@ -207,12 +210,13 @@ extension MacroExpander {
                     enumerations: emittedBundle.enumerations,
                     protocols: [declaration] + emittedBundle.protocols,
                     macros: [],
+                    markers: [],
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
                 )
             )
-        case .namespace, .macro, .extensions:
+        case .namespace, .macro, .marker, .extensions:
             return sourceFile
         }
     }
@@ -640,6 +644,29 @@ extension MacroExpander {
 
         for application in applications {
             guard let macro = macros[application.name] else {
+                if let marker = context.markerDeclarationsByName[application.name] {
+                    guard allowedMacroTargetKinds(for: propertyKind)
+                        .contains(macroTargetKind(for: marker.target.typeReference))
+                    else {
+                        throw ParseError(
+                            "Marker #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(marker.target.typeReference.displayName)."
+                        )
+                    }
+                    guard context.propertyMarkerTargetMatches(
+                        marker,
+                        propertyTypeName: propertyTypeName,
+                        propertyValueType: propertyValueType
+                    ) else {
+                        throw ParseError(
+                            "Marker #\(application.name) targeting \(marker.target.typeReference.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
+                        )
+                    }
+                    _ = try parseMarkerArgumentBindings(
+                        for: marker,
+                        argumentClause: application.argumentClause
+                    )
+                    continue
+                }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
             guard allowedMacroTargetKinds(for: propertyKind).contains(macroTargetKind(for: macro)) else {
@@ -1836,7 +1863,7 @@ extension MacroExpander {
             )
         case .mainBlock:
             throw ParseError("Macros cannot emit @main blocks.")
-        case .macro:
+        case .macro, .marker:
             throw ParseError("Macros cannot emit macro declarations.")
         }
     }

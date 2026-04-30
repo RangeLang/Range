@@ -481,7 +481,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return declaration.constructs + declaration.namespaces.flatMap { declarations(in: .namespace($0)) }
         case .module(let module):
             return module.constructs + module.namespaces.flatMap { declarations(in: .namespace($0)) }
-        case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
+        case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro, .marker:
             return []
         }
     }
@@ -490,7 +490,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .namespace, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
+        case .construct, .namespace, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro, .marker:
             return []
         }
     }
@@ -501,7 +501,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return module.callables + module.namespaces.flatMap { callables(in: .namespace($0)) }
         case .namespace(let declaration):
             return declaration.callables + declaration.namespaces.flatMap { callables(in: .namespace($0)) }
-        case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
+        case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro, .marker:
             return []
         }
     }
@@ -512,7 +512,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return [declaration]
         case .module(let module):
             return module.protocols
-        case .construct, .namespace, .mainBlock, .extensions, .enumeration, .macro:
+        case .construct, .namespace, .mainBlock, .extensions, .enumeration, .macro, .marker:
             return []
         }
     }
@@ -523,7 +523,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return [declaration]
         case .module(let module):
             return module.enumerations
-        case .construct, .namespace, .mainBlock, .extensions, .protocolDefinition, .macro:
+        case .construct, .namespace, .mainBlock, .extensions, .protocolDefinition, .macro, .marker:
             return []
         }
     }

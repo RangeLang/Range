@@ -500,6 +500,7 @@ struct RewriteSiteDescriptor {
 struct MacroExpansionContext {
     let macroRealizationView: MacroRealizationView
     let rewriteSurfaceView: RewriteSurfaceView
+    let markerDeclarationsByName: [String: MarkerDeclaration]
 
     func propertyMacroTargetMatches(
         _ macro: MacroDeclaration,
@@ -519,6 +520,27 @@ struct MacroExpansionContext {
         return matcher.matches(
             actual: actualTargetType,
             expected: macro.target.typeReference
+        )
+    }
+
+    func propertyMarkerTargetMatches(
+        _ marker: MarkerDeclaration,
+        propertyTypeName: String,
+        propertyValueType: TypeReference
+    ) -> Bool {
+        let actualTargetType = TypeReference.generic(
+            base: .named(propertyTypeName),
+            arguments: [propertyValueType]
+        )
+
+        let matcher = MacroTargetTypeMatcher(
+            syntaxResolver: rewriteSurfaceView.syntaxResolver,
+            genericParameters: marker.genericParameters
+        )
+
+        return matcher.matches(
+            actual: actualTargetType,
+            expected: marker.target.typeReference
         )
     }
 

@@ -46,7 +46,28 @@ extension MacroExpander {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .namespace, .enumeration, .protocolDefinition, .mainBlock, .extensions:
+        case .construct, .namespace, .enumeration, .protocolDefinition, .marker, .mainBlock, .extensions:
+            return []
+        }
+    }
+
+    public static func collectMarkers(from files: [ParsedSourceFile]) -> [String: MarkerDeclaration] {
+        var registry: [String: MarkerDeclaration] = [:]
+        for parsedFile in files {
+            for marker in self.markers(in: parsedFile.sourceFile) {
+                registry[marker.name] = marker
+            }
+        }
+        return registry
+    }
+
+    static func markers(in sourceFile: SourceFileNode) -> [MarkerDeclaration] {
+        switch sourceFile {
+        case .marker(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.markers
+        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
             return []
         }
     }

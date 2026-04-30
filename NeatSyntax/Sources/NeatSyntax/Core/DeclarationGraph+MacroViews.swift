@@ -1,10 +1,14 @@
 import Foundation
 
 extension DeclarationGraph {
-    func macroExpansionContext(macrosByName: [String: MacroDeclaration]) -> MacroExpansionContext {
+    func macroExpansionContext(
+        macrosByName: [String: MacroDeclaration],
+        markersByName: [String: MarkerDeclaration] = [:]
+    ) -> MacroExpansionContext {
         MacroExpansionContext(
             macroRealizationView: macroRealizationView(macrosByName: macrosByName),
-            rewriteSurfaceView: rewriteSurfaceView
+            rewriteSurfaceView: rewriteSurfaceView,
+            markerDeclarationsByName: markersByName
         )
     }
 

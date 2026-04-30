@@ -596,7 +596,7 @@ public struct DeclarationGraph {
                     registry: &registry,
                     qualifiedPrefix: namespace.name
                 )
-            case .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+            case .enumeration, .protocolDefinition, .macro, .marker, .mainBlock, .extensions:
                 continue
             }
         }
@@ -997,7 +997,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.protocols
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .extensions:
             return []
         }
     }
@@ -1008,7 +1008,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.constructs
-        case .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1019,7 +1019,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.namespaces
-        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1028,7 +1028,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .marker, .mainBlock, .extensions:
             return []
         }
     }
@@ -1039,7 +1039,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.enumerations
-        case .construct, .namespace, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .namespace, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1050,7 +1050,18 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .namespace, .enumeration, .mainBlock, .protocolDefinition, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .protocolDefinition, .marker, .extensions:
+            return []
+        }
+    }
+
+    static func markers(in sourceFile: SourceFileNode) -> [MarkerDeclaration] {
+        switch sourceFile {
+        case .marker(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.markers
+        case .construct, .namespace, .enumeration, .mainBlock, .protocolDefinition, .macro, .extensions:
             return []
         }
     }
@@ -1061,7 +1072,7 @@ public struct DeclarationGraph {
             return declarations
         case .module(let module):
             return module.extensions
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition:
             return []
         }
     }
@@ -1072,7 +1083,7 @@ public struct DeclarationGraph {
             return module.callables
         case .namespace(let declaration):
             return declaration.callables
-        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1216,6 +1227,8 @@ private struct SemanticGraphCollector {
             addProtocol(declaration, parentID: fileID)
         case .macro(let declaration):
             addMacroDeclaration(declaration, parentID: fileID)
+        case .marker(let declaration):
+            addMarkerDeclaration(declaration, parentID: fileID)
         case .extensions(let declarations):
             for declaration in declarations {
                 addExtension(declaration, parentID: fileID)
@@ -1246,6 +1259,9 @@ private struct SemanticGraphCollector {
             }
             for declaration in module.macros {
                 addMacroDeclaration(declaration, parentID: fileID)
+            }
+            for declaration in module.markers {
+                addMarkerDeclaration(declaration, parentID: fileID)
             }
             for declaration in module.extensions {
                 addExtension(declaration, parentID: fileID)
@@ -1329,6 +1345,14 @@ private struct SemanticGraphCollector {
         addEntity(id: macroID, kind: .macro, label: declaration.name)
         addRelation(from: parentID, to: macroID, kind: .contains)
         addTypeReference(declaration.target.typeReference, from: macroID, kind: .targetsMacro)
+    }
+
+    private mutating func addMarkerDeclaration(_ declaration: MarkerDeclaration, parentID: String) {
+        let markerID = "\(parentID)/marker:\(declaration.name)"
+        addEntity(id: markerID, kind: .marker, label: declaration.name)
+        addRelation(from: parentID, to: markerID, kind: .contains)
+        addTypeReference(declaration.target.typeReference, from: markerID, kind: .targetsMacro)
+        addTypeReference(declaration.valueType, from: markerID, kind: .referencesType)
     }
 
     private mutating func addExtension(_ declaration: ExtensionDeclaration, parentID: String) {

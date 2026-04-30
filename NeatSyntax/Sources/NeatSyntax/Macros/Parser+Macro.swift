@@ -5,6 +5,10 @@ extension Parser {
         peek() == .keyword(NeatSyntax.Keyword.macro.rawValue)
     }
 
+    func isMarkerDeclarationStart() -> Bool {
+        peek() == .keyword(NeatSyntax.Keyword.marker.rawValue)
+    }
+
     mutating func parseMacroDeclaration(signatureOnly: Bool = false) throws -> MacroDeclaration {
         try consumeKeyword(.macro)
 
@@ -62,6 +66,61 @@ extension Parser {
 
     mutating func parseMacroTarget() throws -> MacroTarget {
         .syntax(try parseTypeReferenceNode())
+    }
+
+    mutating func parseMarkerDeclaration(signatureOnly: Bool = false) throws -> MarkerDeclaration {
+        try consumeKeyword(.marker)
+
+        let name = try consumeCallableName()
+        let genericParameters = try parseGenericParameterClauseIfPresent()
+        guard peek() == .leftParen else {
+            throw ParseError(
+                "Marker declarations must declare an explicit parameter clause. Use () for zero-argument markers."
+            )
+        }
+        let parameters = try parseFunctionParameters(allowSyntaxCapture: false)
+
+        try consume(.colon)
+        let target = try parseMacroTarget()
+        try consume(.arrow)
+        let valueType = try parseTypeReferenceNode()
+
+        let body: [Statement]
+        if signatureOnly {
+            try consume(.leftBrace)
+            try skipUnknownBlockBody()
+            try consume(.rightBrace)
+            body = []
+        } else {
+            body = try parseMarkerBody(parameters: parameters)
+        }
+
+        return MarkerDeclaration(
+            name: name,
+            genericParameters: genericParameters,
+            parameters: parameters,
+            target: target,
+            valueType: valueType,
+            body: body
+        )
+    }
+
+    mutating func parseMarkerBody(parameters: [NeatFunctionParameter]) throws -> [Statement] {
+        try consume(.leftBrace)
+        var localBindings = Dictionary(
+            uniqueKeysWithValues: parameters.map {
+                (
+                    $0.localName,
+                    LocalBindingSymbol(kind: .constant, type: $0.typeReference ?? .named("Unknown"))
+                )
+            }
+        )
+        var statements: [Statement] = []
+        while peek() != .rightBrace {
+            statements.append(try parseStatement(localBindings: &localBindings))
+        }
+        try consume(.rightBrace)
+        return statements
     }
 
     mutating func parseMacroBody() throws -> (bindings: MacroBindings, body: [Statement]) {

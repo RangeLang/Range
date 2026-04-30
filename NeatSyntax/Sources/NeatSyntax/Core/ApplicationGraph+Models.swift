@@ -17,6 +17,7 @@ public enum ApplicationGraphNodeKind: String, Sendable {
     case enumeration
     case protocolDefinition
     case macro
+    case marker
     case typeExtension
     case mainBlock
     case state
@@ -39,6 +40,7 @@ public enum ApplicationGraphNodeKind: String, Sendable {
         case .enumeration: return .enumeration
         case .protocolDefinition: return .protocolDefinition
         case .macro: return .macro
+        case .marker: return .marker
         case .typeExtension: return .typeExtension
         case .mainBlock: return .mainBlock
         case .state: return .state

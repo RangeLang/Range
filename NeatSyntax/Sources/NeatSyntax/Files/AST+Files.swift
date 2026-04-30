@@ -6,6 +6,7 @@ public enum SourceFileNode {
     case enumeration(EnumDeclaration)
     case protocolDefinition(ProtocolDeclaration)
     case macro(MacroDeclaration)
+    case marker(MarkerDeclaration)
     case mainBlock(MainBlockNode)
     case extensions([ExtensionDeclaration])
     case module(ModuleFileNode)
@@ -28,6 +29,7 @@ public struct ModuleFileNode {
     public let enumerations: [EnumDeclaration]
     public let protocols: [ProtocolDeclaration]
     public let macros: [MacroDeclaration]
+    public let markers: [MarkerDeclaration]
     public let precedenceGroups: [PrecedenceGroupDeclaration]
     public let operators: [OperatorDeclaration]
     public let extensions: [ExtensionDeclaration]
@@ -41,6 +43,7 @@ public struct ModuleFileNode {
         enumerations: [EnumDeclaration],
         protocols: [ProtocolDeclaration],
         macros: [MacroDeclaration],
+        markers: [MarkerDeclaration],
         precedenceGroups: [PrecedenceGroupDeclaration],
         operators: [OperatorDeclaration],
         extensions: [ExtensionDeclaration]
@@ -53,6 +56,7 @@ public struct ModuleFileNode {
         self.enumerations = enumerations
         self.protocols = protocols
         self.macros = macros
+        self.markers = markers
         self.precedenceGroups = precedenceGroups
         self.operators = operators
         self.extensions = extensions

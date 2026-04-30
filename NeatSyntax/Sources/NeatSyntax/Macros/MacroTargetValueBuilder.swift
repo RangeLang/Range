@@ -130,7 +130,7 @@ struct MacroTargetValueBuilder {
 
     private func value(for application: MacroApplication) -> CompileTimeValue {
         .object(
-            typeName: "MacroApplication",
+            typeName: "Macro.Application",
             fields: [
                 "name": .string(application.name),
                 "genericArguments": .array(application.genericArguments.map(typeReferenceValue)),
