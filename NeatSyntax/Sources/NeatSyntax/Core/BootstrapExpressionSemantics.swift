@@ -789,13 +789,6 @@ public enum ExpressionTypeSemantics {
             return nil
         }
 
-        if let collectionReturnType = inferKnownCollectionMemberCallType(
-            baseType: baseReference,
-            memberName: memberName
-        ) {
-            return collectionReturnType
-        }
-
         let typedArguments = arguments.map { argument in
             let inferred = try? inferType(
                 of: argument.value,
@@ -813,11 +806,18 @@ public enum ExpressionTypeSemantics {
             )
         }
 
-        return memberResolver.memberCallableReturnType(
+        if let graphReturnType = memberResolver.memberCallableReturnType(
             baseType: baseReference,
             memberName: memberName,
             genericArguments: genericArguments,
             arguments: typedArguments
+        ) {
+            return graphReturnType
+        }
+
+        return inferKnownCollectionMemberCallType(
+            baseType: baseReference,
+            memberName: memberName
         )
     }
 
