@@ -763,14 +763,41 @@ public enum ExpressionTypeSemantics {
         accessibleTypes: [String: BootstrapLiteralType],
         memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
+        if let selfMemberName = name.strippingSelfMemberPrefix(),
+            let memberType = inferKnownMemberIdentifierType(
+                name: selfMemberName,
+                accessibleTypes: accessibleTypes,
+                memberResolver: memberResolver
+            )
+        {
+            return memberType
+        }
+
         guard let (baseName, memberName, _) = splitMemberName(name),
-            let baseType = accessibleTypes[baseName],
-            case .typed(let baseReference) = baseType
+            let baseReference = resolveMemberBaseType(
+                baseName,
+                accessibleTypes: accessibleTypes,
+                memberResolver: memberResolver
+            )
         else {
             return nil
         }
 
-        return memberResolver.memberType(baseType: baseReference, memberName: memberName)
+        if let memberType = memberResolver.memberType(
+            baseType: baseReference,
+            memberName: memberName
+        ) {
+            return memberType
+        }
+
+        if baseName == "self",
+            let type = accessibleTypes[memberName],
+            case .typed(let reference) = type
+        {
+            return reference
+        }
+
+        return nil
     }
 
     private static func inferKnownMemberCallType(
@@ -782,9 +809,26 @@ public enum ExpressionTypeSemantics {
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver
     ) -> TypeReference? {
+        if let selfMemberName = name.strippingSelfMemberPrefix(),
+            let memberType = inferKnownMemberCallType(
+                name: selfMemberName,
+                arguments: arguments,
+                accessibleTypes: accessibleTypes,
+                callableReturnTypes: callableReturnTypes,
+                macroExpansionTypes: macroExpansionTypes,
+                resolver: resolver,
+                memberResolver: memberResolver
+            )
+        {
+            return memberType
+        }
+
         guard let (baseName, memberName, genericArguments) = splitMemberName(name),
-            let baseType = accessibleTypes[baseName],
-            case .typed(let baseReference) = baseType
+            let baseReference = resolveMemberBaseType(
+                baseName,
+                accessibleTypes: accessibleTypes,
+                memberResolver: memberResolver
+            )
         else {
             return nil
         }
@@ -821,6 +865,44 @@ public enum ExpressionTypeSemantics {
         )
     }
 
+    private static func resolveMemberBaseType(
+        _ name: String,
+        accessibleTypes: [String: BootstrapLiteralType],
+        memberResolver: DeclarationMemberResolver
+    ) -> TypeReference? {
+        if let type = accessibleTypes[name],
+            case .typed(let reference) = type
+        {
+            return reference
+        }
+
+        if let metatype = inferMetatypeValue(named: name) {
+            return metatype
+        }
+
+        guard let (baseName, memberName, _) = splitMemberName(name),
+            let baseReference = resolveMemberBaseType(
+                baseName,
+                accessibleTypes: accessibleTypes,
+                memberResolver: memberResolver
+            )
+        else {
+            return nil
+        }
+
+        if let graphMemberType = memberResolver.memberType(
+            baseType: baseReference,
+            memberName: memberName
+        ) {
+            return graphMemberType
+        }
+
+        return inferKnownCollectionMemberIdentifierType(
+            baseType: baseReference,
+            memberName: memberName
+        )
+    }
+
     private static func inferKnownCollectionMemberCallType(
         baseType: TypeReference,
         memberName: String
@@ -844,6 +926,16 @@ public enum ExpressionTypeSemantics {
                 return nil
             }
             switch (baseName, memberName, arguments.count) {
+            case ("Array", "map", 1), ("Array", "compactMap", 1), ("Array", "flatMap", 1),
+                ("Array", "filter", 1):
+                return baseType
+            case ("Array", "forEach", 1), ("Array", "append", 1), ("Array", "update", 1),
+                ("Array", "insert", 1), ("Array", "clear", 1):
+                return .named("Void")
+            case ("Array", "element", 1), ("Array", "remove", 1):
+                return arguments[0]
+            case ("Array", "first", 1), ("Array", "last", 1), ("Array", "removeLast", 1):
+                return .optional(arguments[0])
             case ("Dictionary", "value", 2), ("Dictionary", "removeValue", 2):
                 return .optional(arguments[1])
             case ("Dictionary", "contains", 2):
@@ -856,6 +948,37 @@ public enum ExpressionTypeSemantics {
                 return .named("Void")
             case ("Set", "remove", 1):
                 return .optional(arguments[0])
+            default:
+                return nil
+            }
+        default:
+            return nil
+        }
+    }
+
+    private static func inferKnownCollectionMemberIdentifierType(
+        baseType: TypeReference,
+        memberName: String
+    ) -> TypeReference? {
+        switch baseType {
+        case .array:
+            switch memberName {
+            case "count":
+                return .named("Int")
+            case "isEmpty":
+                return .named("Bool")
+            default:
+                return nil
+            }
+        case .generic(let base, let arguments):
+            guard case .named(let baseName) = base else {
+                return nil
+            }
+            switch (baseName, memberName, arguments.count) {
+            case ("Array", "count", 1), ("Dictionary", "count", 2), ("Set", "count", 1):
+                return .named("Int")
+            case ("Array", "isEmpty", 1), ("Dictionary", "isEmpty", 2), ("Set", "isEmpty", 1):
+                return .named("Bool")
             default:
                 return nil
             }
@@ -1373,5 +1496,18 @@ public enum ExpressionTypeSemantics {
         }
 
         return (arguments[0], arguments[1])
+    }
+}
+
+private extension String {
+    func strippingSelfMemberPrefix() -> String? {
+        guard hasPrefix("self.") else {
+            return nil
+        }
+        let stripped = dropFirst("self.".count)
+        guard !stripped.isEmpty else {
+            return nil
+        }
+        return String(stripped)
     }
 }

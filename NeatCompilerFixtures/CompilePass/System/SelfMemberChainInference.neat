@@ -1,0 +1,14 @@
+construct ChainInferenceBox {
+    state values: [Int]
+
+    init(values: [Int]) {
+        self.values = values
+
+        let count = self.values.count
+        let first = self.values.element(index: 0)
+    }
+}
+
+@main {
+    let box = ChainInferenceBox(values: [1, 2, 3])
+}
