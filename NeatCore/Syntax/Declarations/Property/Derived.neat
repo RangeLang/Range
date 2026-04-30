@@ -1,5 +1,6 @@
 @core
 construct Derived<T>: Property {
+    let macros: [MacroApplication]
     let name: String
     let type: TypeReference
     let body: Block?

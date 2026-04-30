@@ -1,5 +1,6 @@
 @core
 construct Let<T>: Property, SyntaxEmittable {
+  let macros: [MacroApplication]
   let name: String
   let type: TypeReference
   let value: Expression?

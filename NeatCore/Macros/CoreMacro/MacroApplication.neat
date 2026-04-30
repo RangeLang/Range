@@ -1,0 +1,7 @@
+@core
+construct MacroApplication: Syntax {
+    let name: String
+    let genericArguments: [TypeReference]
+    let argumentClause: String
+    let arguments: [Expression]
+}

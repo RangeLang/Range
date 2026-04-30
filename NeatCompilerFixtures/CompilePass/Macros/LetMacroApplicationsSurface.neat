@@ -1,0 +1,26 @@
+macro codingKeyCases(): Construct { target, diagnostics in
+    let codingKeys: Enum.Declaration = Enum.Declaration(
+        self: NamedTypeReference(name: "CodingKeys"),
+        cases: target.declaration.lets.flatMap { property in
+            property.macros.flatMap { application in
+                application.arguments.map { argument in
+                    Enum.Case(name: argument, associatedValues: [])
+                }
+            }
+        }
+    )
+
+    target.declaration.expand {
+        extension #(target.declaration.self) {
+            #(codingKeys)
+        }
+    }
+}
+
+#codingKeyCases
+construct LetMacroApplicationsSurfaceFixture {
+    #codingKey("user_id")
+    let id: Int
+
+    let name: String
+}

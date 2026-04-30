@@ -1,0 +1,1 @@
+macro codingKey<T>(_ value: String): Let<T> { target, diagnostics in }

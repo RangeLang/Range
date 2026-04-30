@@ -88,6 +88,7 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Let",
             fields: [
+                "macros": .array(declaration.macros.map(value(for:))),
                 "name": .string(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
             ]
@@ -98,6 +99,7 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "State",
             fields: [
+                "macros": .array(declaration.macros.map(value(for:))),
                 "name": .string(declaration.name),
                 "type": typeReferenceValue(declaration.type.displayName),
             ]
@@ -108,6 +110,7 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Binding",
             fields: [
+                "macros": .array(declaration.macros.map(value(for:))),
                 "name": .string(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
             ]
@@ -118,10 +121,50 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Derived",
             fields: [
+                "macros": .array(declaration.macros.map(value(for:))),
                 "name": .string(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
             ]
         )
+    }
+
+    private func value(for application: MacroApplication) -> CompileTimeValue {
+        .object(
+            typeName: "MacroApplication",
+            fields: [
+                "name": .string(application.name),
+                "genericArguments": .array(application.genericArguments.map(typeReferenceValue)),
+                "argumentClause": .string(application.argumentClause ?? ""),
+                "arguments": .array(argumentValues(for: application)),
+            ]
+        )
+    }
+
+    private func argumentValues(for application: MacroApplication) -> [CompileTimeValue] {
+        guard let argumentClause = application.argumentClause?.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ), !argumentClause.isEmpty else {
+            return []
+        }
+
+        do {
+            var parser = try Parser(source: "macro(\(argumentClause))")
+            _ = try parser.consumeCallableName()
+            let arguments = try parser.parseInvocationArgumentsIfPresent()
+            try parser.consume(.eof)
+            return arguments.compactMap { value(for: $0.value) }
+        } catch {
+            return []
+        }
+    }
+
+    private func value(for expression: Expression) -> CompileTimeValue? {
+        switch expression {
+        case .string(let value):
+            return .string(value)
+        default:
+            return nil
+        }
     }
 
     private func value(for declaration: InitializerDeclaration) -> CompileTimeValue {
@@ -186,4 +229,3 @@ struct MacroTargetValueBuilder {
         nominalTypeReference(name)
     }
 }
-
