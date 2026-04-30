@@ -45,6 +45,7 @@ extension ApplicationGraphValidator {
                     try validateCallableReturnSemantics(
                         callable,
                         accessibleTypes: topLevelAccessibleTypes,
+                        declarationGraph: declarationGraph,
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
@@ -94,6 +95,7 @@ extension ApplicationGraphValidator {
             try validateCallableReturnSemantics(
                 callable,
                 accessibleTypes: [:],
+                declarationGraph: declarationGraph,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver,
@@ -146,12 +148,33 @@ extension ApplicationGraphValidator {
                 ($0.name, BootstrapLiteralType.typed($0.type))
             }
         )
-        let accessibleTypes = stateTypes.merging(environmentTypes) { current, _ in current }
+        let bindingTypes = Dictionary(
+            uniqueKeysWithValues: declarationGraph.bindings(onConstruct: declaration.name).map {
+                ($0.name, BootstrapLiteralType.typed(.named($0.typeName)))
+            }
+        )
+        let derivedTypes = Dictionary(
+            uniqueKeysWithValues: declarationGraph.deriveds(onConstruct: declaration.name).map {
+                ($0.name, BootstrapLiteralType.typed(.named($0.typeName)))
+            }
+        )
+        let valueTypes = Dictionary(
+            uniqueKeysWithValues: declarationGraph.values(onConstruct: declaration.name).map {
+                ($0.name, BootstrapLiteralType.typed(.named($0.typeName)))
+            }
+        )
+        var accessibleTypes = stateTypes
+            .merging(environmentTypes) { current, _ in current }
+            .merging(bindingTypes) { current, _ in current }
+            .merging(derivedTypes) { current, _ in current }
+            .merging(valueTypes) { current, _ in current }
+        accessibleTypes["self"] = .typed(.named(declaration.name))
 
         for callable in declarationGraph.callables(onConstruct: declaration.name) {
             try validateCallableReturnSemantics(
                 callable,
                 accessibleTypes: accessibleTypes,
+                declarationGraph: declarationGraph,
                 resolver: resolver,
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver,
@@ -164,6 +187,7 @@ extension ApplicationGraphValidator {
     func validateCallableReturnSemantics(
         _ callable: CallableDeclaration,
         accessibleTypes: [String: BootstrapLiteralType],
+        declarationGraph: DeclarationGraph,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
@@ -177,6 +201,7 @@ extension ApplicationGraphValidator {
         try validateCallableReturnSemanticsInLocalCallables(
             in: body,
             accessibleTypes: accessibleTypes,
+            declarationGraph: declarationGraph,
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver,
@@ -210,7 +235,24 @@ extension ApplicationGraphValidator {
         }
 
         if needsValueReturn {
-            guard blockAlwaysReturnsValue(body) else {
+            let parameterTypes: [String: BootstrapLiteralType] = Dictionary(
+                uniqueKeysWithValues: callable.parameters.compactMap { parameter in
+                    guard let typeReference = parameter.typeReference else {
+                        return nil
+                    }
+                    return (parameter.localName, BootstrapLiteralType.typed(typeReference))
+                }
+            )
+            let visibleTypes = accessibleTypes.merging(parameterTypes) { current, _ in current }
+
+            guard blockAlwaysReturnsValue(
+                body,
+                accessibleTypes: visibleTypes,
+                declarationGraph: declarationGraph,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            ) else {
                 throw SemanticValidationError(
                     "Callable \(renderCallableSignature(callable)) in \(fileName) declares return type \(explicitReturnType!.displayName) but does not return a value on all paths."
                 )
@@ -272,6 +314,7 @@ extension ApplicationGraphValidator {
     func validateCallableReturnSemanticsInLocalCallables(
         in statements: [Statement],
         accessibleTypes: [String: BootstrapLiteralType],
+        declarationGraph: DeclarationGraph,
         resolver: LiteralBridgeResolver,
         memberResolver: DeclarationMemberResolver,
         operatorResolver: DeclarationOperatorResolver,
@@ -297,6 +340,7 @@ extension ApplicationGraphValidator {
                         body: declaration.body
                     ),
                     accessibleTypes: accessibleTypes,
+                    declarationGraph: declarationGraph,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
@@ -310,6 +354,7 @@ extension ApplicationGraphValidator {
                 try validateCallableReturnSemanticsInLocalCallables(
                     in: body,
                     accessibleTypes: accessibleTypes,
+                    declarationGraph: declarationGraph,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
@@ -320,6 +365,7 @@ extension ApplicationGraphValidator {
                 try validateCallableReturnSemanticsInLocalCallables(
                     in: background.body,
                     accessibleTypes: accessibleTypes,
+                    declarationGraph: declarationGraph,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
@@ -330,6 +376,7 @@ extension ApplicationGraphValidator {
                 try validateCallableReturnSemanticsInLocalCallables(
                     in: deferred.body,
                     accessibleTypes: accessibleTypes,
+                    declarationGraph: declarationGraph,
                     resolver: resolver,
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver,
@@ -341,6 +388,7 @@ extension ApplicationGraphValidator {
                     try validateCallableReturnSemanticsInLocalCallables(
                         in: branch.body,
                         accessibleTypes: accessibleTypes,
+                        declarationGraph: declarationGraph,
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
@@ -356,6 +404,7 @@ extension ApplicationGraphValidator {
                             switchCase.pattern,
                             base: accessibleTypes
                         ),
+                        declarationGraph: declarationGraph,
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
@@ -367,6 +416,7 @@ extension ApplicationGraphValidator {
                     try validateCallableReturnSemanticsInLocalCallables(
                         in: defaultBody,
                         accessibleTypes: accessibleTypes,
+                        declarationGraph: declarationGraph,
                         resolver: resolver,
                         memberResolver: memberResolver,
                         operatorResolver: operatorResolver,
@@ -435,37 +485,163 @@ extension ApplicationGraphValidator {
         typeReference.displayName == "Void"
     }
 
-    func blockAlwaysReturnsValue(_ statements: [Statement]) -> Bool {
+    func blockAlwaysReturnsValue(
+        _ statements: [Statement],
+        accessibleTypes: [String: BootstrapLiteralType],
+        declarationGraph: DeclarationGraph,
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) -> Bool {
+        var accessibleTypes = accessibleTypes
         for statement in statements {
-            if statementAlwaysReturnsValue(statement) {
+            if statementAlwaysReturnsValue(
+                statement,
+                accessibleTypes: accessibleTypes,
+                declarationGraph: declarationGraph,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            ) {
                 return true
+            }
+            if case .localBinding(let declaration) = statement {
+                accessibleTypes[declaration.name] = .typed(declaration.type)
             }
         }
         return false
     }
 
-    func statementAlwaysReturnsValue(_ statement: Statement) -> Bool {
+    func statementAlwaysReturnsValue(
+        _ statement: Statement,
+        accessibleTypes: [String: BootstrapLiteralType],
+        declarationGraph: DeclarationGraph,
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) -> Bool {
         switch statement {
         case .macroInvocation(_, _, let body):
-            return blockAlwaysReturnsValue(body)
+            return blockAlwaysReturnsValue(
+                body,
+                accessibleTypes: accessibleTypes,
+                declarationGraph: declarationGraph,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
         case .return(let expression):
             return expression != nil
         case .conditional(let branches):
             guard branches.contains(where: { $0.condition == nil }) else {
                 return false
             }
-            return branches.allSatisfy { blockAlwaysReturnsValue($0.body) }
-        case .switchStatement(_, let cases, let defaultBody):
+            return branches.allSatisfy {
+                blockAlwaysReturnsValue(
+                    $0.body,
+                    accessibleTypes: accessibleTypes,
+                    declarationGraph: declarationGraph,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                )
+            }
+        case .switchStatement(let subject, let cases, let defaultBody):
             guard !cases.isEmpty else { return false }
-            guard cases.allSatisfy({ blockAlwaysReturnsValue($0.body) }) else { return false }
-            guard let defaultBody else { return true }
-            return blockAlwaysReturnsValue(defaultBody)
+            guard cases.allSatisfy({
+                blockAlwaysReturnsValue(
+                    $0.body,
+                    accessibleTypes: accessibleTypesForSwitchCasePattern(
+                        $0.pattern,
+                        base: accessibleTypes
+                    ),
+                    declarationGraph: declarationGraph,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                )
+            }) else { return false }
+            guard let defaultBody else {
+                return switchCoversAllEnumCases(
+                    subject: subject,
+                    cases: cases,
+                    accessibleTypes: accessibleTypes,
+                    declarationGraph: declarationGraph,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                )
+            }
+            return blockAlwaysReturnsValue(
+                defaultBody,
+                accessibleTypes: accessibleTypes,
+                declarationGraph: declarationGraph,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
         case .background, .localCallable:
             return false
         case .deferBlock(let deferred):
-            return blockAlwaysReturnsValue(deferred.body)
+            return blockAlwaysReturnsValue(
+                deferred.body,
+                accessibleTypes: accessibleTypes,
+                declarationGraph: declarationGraph,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            )
         default:
             return false
+        }
+    }
+
+    func switchCoversAllEnumCases(
+        subject: Expression,
+        cases: [SwitchCase],
+        accessibleTypes: [String: BootstrapLiteralType],
+        declarationGraph: DeclarationGraph,
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) -> Bool {
+        guard
+            let inferred = try? ExpressionTypeSemantics.inferType(
+                of: subject,
+                accessibleTypes: accessibleTypes,
+                resolver: resolver,
+                memberResolver: memberResolver,
+                operatorResolver: operatorResolver
+            ),
+            case .typed(let subjectType) = inferred,
+            let enumName = enumName(for: subjectType),
+            let enumeration = declarationGraph.enumsByName[enumName]
+        else {
+            return false
+        }
+
+        let declaredCases = Set(enumeration.cases.map(\.name))
+        let coveredCases = Set(cases.compactMap { switchCase -> String? in
+            guard case .enumCase(let name, _) = switchCase.pattern else {
+                return nil
+            }
+            return name.hasPrefix(".") ? String(name.dropFirst()) : name
+        })
+        return !declaredCases.isEmpty && declaredCases.isSubset(of: coveredCases)
+    }
+
+    func enumName(for type: TypeReference) -> String? {
+        switch type {
+        case .named(let name):
+            return name
+        case .member:
+            return type.displayName
+        case .generic(let base, _):
+            return enumName(for: base)
+        case .optional(let wrapped):
+            return enumName(for: wrapped)
+        case .array, .function, .variadic:
+            return nil
         }
     }
 
