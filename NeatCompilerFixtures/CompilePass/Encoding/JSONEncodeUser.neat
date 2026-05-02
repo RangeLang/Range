@@ -3,23 +3,11 @@ construct User {
     let name: String
 }
 
-construct UserCodingKey: CodingKey {
-    let value: String
-
-    function stringValue() -> String {
-        return value
-    }
-}
-
 extension User: Encodable {
     function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
-        state container = encoder.container(
-            keyedBy: UserCodingKey.self
-        )
-        let idKey = UserCodingKey(value: "id")
-        state nameKey = UserCodingKey(value: "name")
-        container.encode(id, forKey: idKey)
-        return container.encode(name, forKey: nameKey)
+        state container = encoder.keyedContainer()
+        container.encode(id, forKey: "id")
+        return container.encode(name, forKey: "name")
     }
 }
 

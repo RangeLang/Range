@@ -28,28 +28,28 @@ construct FixtureSingleValueEncodingContainer: SingleValueEncodingContainer {
     }
 }
 
-construct FixtureKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer<Key> {
-    function encode(_ value: Bool, forKey key: Key) -> Result<Void, EncodingError> {
+construct FixtureKeyedEncodingContainer: KeyedEncodingContainer {
+    function encode(_ value: Bool, forKey key: String) -> Result<Void, EncodingError> {
         return .success(result: Void())
     }
 
-    function encode(_ value: Data, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: Data, forKey key: String) -> Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }
 
-    function encode(_ value: Float, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: Float, forKey key: String) -> Result<Void, EncodingError> {
         return .success(result: Void())
     }
 
-    function encode(_ value: Int, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: Int, forKey key: String) -> Result<Void, EncodingError> {
         return .success(result: Void())
     }
 
-    function encode(_ value: String, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: String, forKey key: String) -> Result<Void, EncodingError> {
         return .success(result: Void())
     }
 
-    function encode<T: Encodable>(_ value: T, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode<T: Encodable>(_ value: T, forKey key: String) -> Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }
 }
@@ -58,8 +58,8 @@ function makeSingleValueContainer() -> SingleValueEncodingContainer {
     return FixtureSingleValueEncodingContainer()
 }
 
-function makeKeyedContainer<Key: CodingKey>() -> KeyedEncodingContainer<Key> {
-    return FixtureKeyedEncodingContainer<Key>()
+function makeKeyedContainer() -> KeyedEncodingContainer {
+    return FixtureKeyedEncodingContainer()
 }
 
 @main {

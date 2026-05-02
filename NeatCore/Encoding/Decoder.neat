@@ -1,7 +1,5 @@
 protocol Decoder<Input> {
-    function container<Key: CodingKey>(
-        keyedBy keyType: Key.Type
-    ) -> KeyedDecodingContainer<Key>
+    function keyedContainer() -> KeyedDecodingContainer
 
     function unkeyedContainer() -> UnkeyedDecodingContainer
     function singleValueContainer() -> SingleValueDecodingContainer

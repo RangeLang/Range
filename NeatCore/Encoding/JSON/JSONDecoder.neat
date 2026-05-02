@@ -21,14 +21,12 @@ construct JSONDecoder: Decoder<JSONValue> {
         return String(from: decoder)
     }
 
-    function container<Key: CodingKey>(
-        keyedBy keyType: Key.Type
-    ) -> KeyedDecodingContainer<Key> {
+    function keyedContainer() -> KeyedDecodingContainer {
         switch value {
         case .object(let fields):
-            return JSONKeyedDecodingContainer<Key>(fields: fields)
+            return JSONKeyedDecodingContainer(fields: fields)
         case .array, .bool, .float, .int, .null, .string:
-            return JSONKeyedDecodingContainer<Key>(fields: [])
+            return JSONKeyedDecodingContainer(fields: [])
         }
     }
 

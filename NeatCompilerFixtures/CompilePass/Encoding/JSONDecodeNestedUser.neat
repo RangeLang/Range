@@ -2,19 +2,11 @@ construct NestedAddress {
     let city: String
 }
 
-construct NestedAddressCodingKey: CodingKey {
-    let value: String
-
-    function stringValue() -> String {
-        return value
-    }
-}
-
 extension NestedAddress: Decodable {
     init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
-        let container = decoder.container(keyedBy: NestedAddressCodingKey.self)
+        let container = decoder.keyedContainer()
 
-        switch container.decode(String.self, forKey: NestedAddressCodingKey(value: "city")) {
+        switch container.decode(String.self, forKey: "city") {
         case .success(let city):
             self.city = city
         case .failure(let error):
@@ -30,26 +22,18 @@ construct NestedDecodedUser {
     let address: NestedAddress
 }
 
-construct NestedDecodedUserCodingKey: CodingKey {
-    let value: String
-
-    function stringValue() -> String {
-        return value
-    }
-}
-
 extension NestedDecodedUser: Decodable {
     init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
-        let container = decoder.container(keyedBy: NestedDecodedUserCodingKey.self)
+        let container = decoder.keyedContainer()
 
-        switch container.decode(Int.self, forKey: NestedDecodedUserCodingKey(value: "id")) {
+        switch container.decode(Int.self, forKey: "id") {
         case .success(let id):
             self.id = id
         case .failure(let error):
             return .failure(cause: error)
         }
 
-        switch container.decode(NestedAddress.self, forKey: NestedDecodedUserCodingKey(value: "address")) {
+        switch container.decode(NestedAddress.self, forKey: "address") {
         case .success(let address):
             self.address = address
         case .failure(let error):

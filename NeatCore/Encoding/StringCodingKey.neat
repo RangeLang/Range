@@ -1,7 +1,0 @@
-construct StringCodingKey: CodingKey {
-    let value: String
-
-    function stringValue() -> String {
-        return value
-    }
-}

@@ -3,21 +3,13 @@ construct Address {
     let zip: Int
 }
 
-construct AddressCodingKey: CodingKey {
-    let value: String
-
-    function stringValue() -> String {
-        return value
-    }
-}
-
 extension Address: Encodable {
     function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
-        state container = encoder.container(keyedBy: AddressCodingKey.self)
+        state container = encoder.keyedContainer()
 
-        switch container.encode(city, forKey: AddressCodingKey(value: "city")) {
+        switch container.encode(city, forKey: "city") {
         case .success:
-            return container.encode(zip, forKey: AddressCodingKey(value: "zip"))
+            return container.encode(zip, forKey: "zip")
         case .failure(let error):
             return .failure(cause: error)
         }
@@ -32,23 +24,15 @@ construct User {
     let scores: [Int]
 }
 
-construct UserCodingKey: CodingKey {
-    let value: String
-
-    function stringValue() -> String {
-        return value
-    }
-}
-
 extension User: Encodable {
     function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
-        state container = encoder.container(keyedBy: UserCodingKey.self)
+        state container = encoder.keyedContainer()
 
-        switch container.encode(name, forKey: UserCodingKey(value: "name")) {
+        switch container.encode(name, forKey: "name") {
         case .success:
-            switch container.encode(address, forKey: UserCodingKey(value: "address")) {
+            switch container.encode(address, forKey: "address") {
             case .success:
-                return container.encode(scores, forKey: UserCodingKey(value: "scores"))
+                return container.encode(scores, forKey: "scores")
             case .failure(let error):
                 return .failure(cause: error)
             }

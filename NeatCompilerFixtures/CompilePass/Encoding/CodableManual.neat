@@ -3,32 +3,24 @@ construct CodableManualUser {
     let name: String
 }
 
-construct CodableManualUserCodingKey: CodingKey {
-    let value: String
-
-    function stringValue() -> String {
-        return value
-    }
-}
-
 extension CodableManualUser: Codable {
     function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
-        state container = encoder.container(keyedBy: CodableManualUserCodingKey.self)
-        container.encode(id, forKey: CodableManualUserCodingKey(value: "id"))
-        return container.encode(name, forKey: CodableManualUserCodingKey(value: "name"))
+        state container = encoder.keyedContainer()
+        container.encode(id, forKey: "id")
+        return container.encode(name, forKey: "name")
     }
 
     init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
-        let container = decoder.container(keyedBy: CodableManualUserCodingKey.self)
+        let container = decoder.keyedContainer()
 
-        switch container.decode(Int.self, forKey: CodableManualUserCodingKey(value: "id")) {
+        switch container.decode(Int.self, forKey: "id") {
         case .success(let id):
             self.id = id
         case .failure(let error):
             return .failure(cause: error)
         }
 
-        switch container.decode(String.self, forKey: CodableManualUserCodingKey(value: "name")) {
+        switch container.decode(String.self, forKey: "name") {
         case .success(let name):
             self.name = name
         case .failure(let error):

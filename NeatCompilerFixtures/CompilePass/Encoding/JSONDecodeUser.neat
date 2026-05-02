@@ -3,26 +3,18 @@ construct DecodedUser {
     let name: String
 }
 
-construct DecodedUserCodingKey: CodingKey {
-    let value: String
-
-    function stringValue() -> String {
-        return value
-    }
-}
-
 extension DecodedUser: Decodable {
     init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
-        let container = decoder.container(keyedBy: DecodedUserCodingKey.self)
+        let container = decoder.keyedContainer()
 
-        switch container.decode(Int.self, forKey: DecodedUserCodingKey(value: "id")) {
+        switch container.decode(Int.self, forKey: "id") {
         case .success(let id):
             self.id = id
         case .failure(let error):
             return .failure(cause: error)
         }
 
-        switch container.decode(String.self, forKey: DecodedUserCodingKey(value: "name")) {
+        switch container.decode(String.self, forKey: "name") {
         case .success(let name):
             self.name = name
         case .failure(let error):

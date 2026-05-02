@@ -1,4 +1,4 @@
-construct JSONKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer<Key> {
+construct JSONKeyedEncodingContainer: KeyedEncodingContainer {
     binding output: String
     binding isObject: Bool
     state wroteField: Bool = false
@@ -9,31 +9,31 @@ construct JSONKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer<Key
         self.isObject = true
     }
 
-    function encode(_ value: Bool, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: Bool, forKey key: String) -> Result<Void, EncodingError> {
         appendField(key: key, value: "\(value)")
         return .success(result: Void())
     }
 
-    function encode(_ value: Data, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: Data, forKey key: String) -> Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }
 
-    function encode(_ value: Float, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: Float, forKey key: String) -> Result<Void, EncodingError> {
         appendField(key: key, value: "\(value)")
         return .success(result: Void())
     }
 
-    function encode(_ value: Int, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: Int, forKey key: String) -> Result<Void, EncodingError> {
         appendField(key: key, value: "\(value)")
         return .success(result: Void())
     }
 
-    function encode(_ value: String, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode(_ value: String, forKey key: String) -> Result<Void, EncodingError> {
         appendField(key: key, value: "\"\(value)\"")
         return .success(result: Void())
     }
 
-    function encode<T: Encodable>(_ value: T, forKey key: Key) -> Result<Void, EncodingError> {
+    function encode<T: Encodable>(_ value: T, forKey key: String) -> Result<Void, EncodingError> {
         let encoder: JSONEncoder = JSONEncoder()
 
         switch encoder.encode(value) {
@@ -47,13 +47,13 @@ construct JSONKeyedEncodingContainer<Key: CodingKey>: KeyedEncodingContainer<Key
         return .failure(cause: .failed)
     }
 
-    function appendField(key: Key, value: String) {
+    function appendField(key: String, value: String) {
         if wroteField {
             output = output + ","
         } else {
             wroteField = true
         }
 
-        output = output + "\"" + key.stringValue() + "\":" + value
+        output = output + "\"" + key + "\":" + value
     }
 }

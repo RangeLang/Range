@@ -1,6 +1,6 @@
-macro codingKeysSyntaxValue(): Construct { target, diagnostics in
-    let codingKeys: Enum.Declaration = Enum.Declaration(
-        self: NamedTypeReference(name: "CodingKeys"),
+macro enumSyntaxValue(): Construct { target, diagnostics in
+    let generatedFields: Enum.Declaration = Enum.Declaration(
+        self: NamedTypeReference(name: "GeneratedFields"),
         cases: [
             Enum.Case(name: "id", associatedValues: []),
             Enum.Case(name: "name", associatedValues: [])
@@ -9,13 +9,13 @@ macro codingKeysSyntaxValue(): Construct { target, diagnostics in
 
     target.declaration.expand {
         extension #(target.declaration.self) {
-            #(codingKeys)
+            #(generatedFields)
         }
     }
 }
 
-#codingKeysSyntaxValue
-construct SyntaxValueCodingKeysFixture {
+#enumSyntaxValue
+construct SyntaxValueEnumFixture {
     let id: Int
     let name: String
 }
