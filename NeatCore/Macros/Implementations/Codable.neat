@@ -7,7 +7,7 @@ macro codable(): Construct { target, diagnostics in
                     SwitchCase(
                         pattern: ".success",
                         body: Block(statements: [
-                            ExpressionStatement(expression: "Void()")
+                            Break()
                         ])
                     ),
                     SwitchCase(

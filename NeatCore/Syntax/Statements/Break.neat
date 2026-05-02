@@ -1,0 +1,3 @@
+@core
+construct Break: Statement {
+}

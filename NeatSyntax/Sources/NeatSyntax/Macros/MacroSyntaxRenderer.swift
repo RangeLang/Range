@@ -170,6 +170,8 @@ struct MacroSyntaxRenderer {
                 return "return"
             }
             return "return \(renderExpressionForSyntax(expression))"
+        case .object(let typeName, _) where typeName == "Break":
+            return "break"
         case .object(let typeName, let fields) where typeName == "Assignment":
             guard let target = fields["target"],
                 let expression = fields["expression"]
@@ -211,6 +213,8 @@ struct MacroSyntaxRenderer {
                 return "return"
             }
             return "return \(renderExpressionForSyntax(returnExpression))"
+        case .call(let name, _) where name == "Break":
+            return "break"
         case .call(let name, let arguments) where name == "Assignment":
             guard let target = argument("target", in: arguments),
                 let assignmentExpression = argument("expression", in: arguments)
