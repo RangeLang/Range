@@ -1,5 +1,7 @@
 #codable
 construct CodableMacroFixture {
+    #codingKey("user_id")
     let id: Int
+
     let displayName: String
 }

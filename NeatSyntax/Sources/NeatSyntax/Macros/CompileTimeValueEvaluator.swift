@@ -34,6 +34,20 @@ struct CompileTimeValueEvaluator {
             }
             return .array(values)
         case .call(let name, let arguments):
+            if let syntaxValue = evaluateSyntaxHelper(
+                name: name,
+                arguments: arguments,
+                locals: locals
+            ) {
+                return syntaxValue
+            }
+            if let markerValue = evaluateMarkerCollectionAccess(
+                name: name,
+                arguments: arguments,
+                locals: locals
+            ) {
+                return markerValue
+            }
             if let transformed = evaluateArrayTransform(
                 name: name,
                 arguments: arguments,
@@ -107,6 +121,58 @@ struct CompileTimeValueEvaluator {
         default:
             return nil
         }
+    }
+
+    private func evaluateSyntaxHelper(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        guard name == "stringLiteralSyntax",
+            arguments.count == 1,
+            arguments[0].label == nil,
+            case .string(let value) = evaluate(arguments[0].value, locals: locals)
+        else {
+            return nil
+        }
+
+        return .string("\"\(value)\"")
+    }
+
+    private func evaluateMarkerCollectionAccess(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        let suffix = ".value"
+        guard name.hasSuffix(suffix),
+            let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
+            case .array(let markers) = source,
+            let markerNameExpression = argument("named", in: arguments),
+            case .string(let markerName) = evaluate(markerNameExpression, locals: locals)
+        else {
+            return nil
+        }
+
+        let defaultValue: CompileTimeValue?
+        if let defaultExpression = argument("default", in: arguments) {
+            defaultValue = evaluate(defaultExpression, locals: locals)
+        } else {
+            defaultValue = nil
+        }
+
+        let value =
+            markers.compactMap { marker -> CompileTimeValue? in
+                guard case .object(_, let fields) = marker,
+                    case .string(markerName) = fields["name"]
+                else {
+                    return nil
+                }
+                return fields["value"]
+            }
+            .first ?? defaultValue
+
+        return value
     }
 
     private func evaluateArrayTransform(

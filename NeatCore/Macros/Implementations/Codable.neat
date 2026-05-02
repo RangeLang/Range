@@ -2,7 +2,7 @@ macro codable(): Construct { target, diagnostics in
     let encodeBody: Block = Block(
         statements: target.declaration.lets.map { property in
             Switch(
-                expression: "container.encode(" + property.name + ", forKey: " + property.codingKeyLiteral + ")",
+                expression: "container.encode(" + property.name + ", forKey: " + stringLiteralSyntax(property.markers.value(named: "codingKey", default: property.name)) + ")",
                 cases: [
                     SwitchCase(
                         pattern: ".success",
@@ -24,7 +24,7 @@ macro codable(): Construct { target, diagnostics in
     let decodeBody: Block = Block(
         statements: target.declaration.lets.map { property in
             Switch(
-                expression: "container.decode(" + property.typeName + ".self, forKey: " + property.codingKeyLiteral + ")",
+                expression: "container.decode(" + property.typeName + ".self, forKey: " + stringLiteralSyntax(property.markers.value(named: "codingKey", default: property.name)) + ")",
                 cases: [
                     SwitchCase(
                         pattern: ".success(let " + property.name + ")",

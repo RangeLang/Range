@@ -91,15 +91,12 @@ struct MacroTargetValueBuilder {
     }
 
     private func value(for declaration: ValueDeclaration) -> CompileTimeValue {
-        let markerValues = markerValues(for: declaration.macros)
         return .object(
             typeName: "Let",
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
-                "markers": .array(markerValues),
+                "markers": .array(markerValues(for: declaration.macros)),
                 "name": .string(declaration.name),
-                "codingKey": .string(codingKey(for: declaration.name, markers: markerValues)),
-                "codingKeyLiteral": .string("\"\(codingKey(for: declaration.name, markers: markerValues))\""),
                 "type": typeReferenceValue(declaration.typeName),
                 "typeName": .string(declaration.typeName),
             ]
@@ -153,24 +150,12 @@ struct MacroTargetValueBuilder {
                 typeName: "Marker.Application",
                 fields: [
                     "name": .string(application.name),
+                    "valueType": typeReferenceValue(marker.valueType),
+                    "valueTypeName": .string(marker.valueType.displayName),
                     "value": value,
                 ]
             )
         }
-    }
-
-    private func codingKey(for propertyName: String, markers: [CompileTimeValue]) -> String {
-        for marker in markers {
-            guard case .object(_, let fields) = marker,
-                case .string("codingKey") = fields["name"],
-                case .string(let value) = fields["value"]
-            else {
-                continue
-            }
-            return value
-        }
-
-        return propertyName
     }
 
     static func evaluateMarkerValue(
