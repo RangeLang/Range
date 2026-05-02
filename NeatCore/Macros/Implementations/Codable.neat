@@ -1,6 +1,64 @@
 macro codable(): Construct { target, diagnostics in
+    let encodeBody: Block = Block(
+        statements: target.declaration.lets.map { property in
+            Switch(
+                expression: "container.encode(" + property.name + ", forKey: " + property.codingKeyLiteral + ")",
+                cases: [
+                    SwitchCase(
+                        pattern: ".success",
+                        body: Block(statements: [
+                            ExpressionStatement(expression: "Void()")
+                        ])
+                    ),
+                    SwitchCase(
+                        pattern: ".failure(let error)",
+                        body: Block(statements: [
+                            Return(expression: ".failure(cause: error)")
+                        ])
+                    )
+                ]
+            )
+        }
+    )
+
+    let decodeBody: Block = Block(
+        statements: target.declaration.lets.map { property in
+            Switch(
+                expression: "container.decode(" + property.typeName + ".self, forKey: " + property.codingKeyLiteral + ")",
+                cases: [
+                    SwitchCase(
+                        pattern: ".success(let " + property.name + ")",
+                        body: Block(statements: [
+                            Assignment(
+                                target: "self." + property.name,
+                                expression: property.name
+                            )
+                        ])
+                    ),
+                    SwitchCase(
+                        pattern: ".failure(let error)",
+                        body: Block(statements: [
+                            Return(expression: ".failure(cause: error)")
+                        ])
+                    )
+                ]
+            )
+        }
+    )
+
     target.declaration.expand {
         extension #(target.declaration.self): Codable {
+            function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+                let container: KeyedEncodingContainer = encoder.keyedContainer()
+                #(encodeBody)
+                return .success(result: Void())
+            }
+
+            init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
+                let container: KeyedDecodingContainer = decoder.keyedContainer()
+                #(decodeBody)
+                return .success(result: self)
+            }
         }
     }
 }

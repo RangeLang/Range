@@ -134,6 +134,8 @@ struct MacroTargetSurface {
             return [.callableName, .declaration]
         case .integer, .double, .boolean, .array:
             return [.expression]
+        case .object(let typeName, _) where typeName == "Block":
+            return [.declaration]
         case .object(let typeName, _):
             if let kinds = emittedSyntaxKinds(forConstructedTypeNamed: typeName) {
                 return kinds

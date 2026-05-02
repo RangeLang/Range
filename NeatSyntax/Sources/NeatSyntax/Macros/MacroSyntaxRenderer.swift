@@ -13,6 +13,8 @@ struct MacroSyntaxRenderer {
             return renderEnum(declaration)
         case .object(let typeName, _) where typeName == "Enum.Declaration":
             return renderEnum(value)
+        case .object(let typeName, _) where typeName == "Block":
+            return renderBlock(value)
         case .object(let typeName, _) where typeName == "NamedTypeReference" || typeName == "MemberTypeReference":
             return renderNominalTypeReference(value)
         case .string(let value):
@@ -41,6 +43,8 @@ struct MacroSyntaxRenderer {
                 return renderEnum(declaration)
             case "Enum.Declaration":
                 return renderEnum(expression)
+            case "Block":
+                return renderBlock(expression)
             default:
                 return nil
             }
@@ -123,6 +127,133 @@ struct MacroSyntaxRenderer {
         return "case \(caseName)"
     }
 
+    private func renderBlock(_ value: CompileTimeValue) -> String? {
+        guard case .object(let typeName, let fields) = value,
+            typeName == "Block",
+            let statementsValue = fields["statements"],
+            case .array(let statements) = statementsValue
+        else {
+            return nil
+        }
+
+        return statements.compactMap(renderStatement).joined(separator: " ")
+    }
+
+    private func renderBlock(_ expression: Expression) -> String? {
+        guard case .call(let name, let arguments) = expression,
+            name == "Block",
+            let statementsExpression = argument("statements", in: arguments),
+            case .array(let statements) = statementsExpression
+        else {
+            return nil
+        }
+
+        return statements.compactMap(renderStatement).joined(separator: " ")
+    }
+
+    private func renderStatement(_ value: CompileTimeValue) -> String? {
+        switch value {
+        case .object(let typeName, let fields) where typeName == "Switch":
+            guard let expression = fields["expression"],
+                let casesValue = fields["cases"],
+                case .array(let cases) = casesValue
+            else {
+                return nil
+            }
+            let renderedCases = cases.compactMap(renderSwitchCase)
+            guard renderedCases.count == cases.count else {
+                return nil
+            }
+            return "switch \(renderExpressionForSyntax(expression)) { \(renderedCases.joined(separator: " ")) }"
+        case .object(let typeName, let fields) where typeName == "Return":
+            guard let expression = fields["expression"] else {
+                return "return"
+            }
+            return "return \(renderExpressionForSyntax(expression))"
+        case .object(let typeName, let fields) where typeName == "Assignment":
+            guard let target = fields["target"],
+                let expression = fields["expression"]
+            else {
+                return nil
+            }
+            return "\(renderExpressionForSyntax(target)) = \(renderExpressionForSyntax(expression))"
+        case .object(let typeName, let fields) where typeName == "ExpressionStatement":
+            guard let expression = fields["expression"] else {
+                return nil
+            }
+            return renderExpressionForSyntax(expression)
+        case .string(let expression):
+            return expression
+        default:
+            guard let expression = value.expression else {
+                return nil
+            }
+            return renderExpressionForSyntax(expression)
+        }
+    }
+
+    private func renderStatement(_ expression: Expression) -> String? {
+        switch expression {
+        case .call(let name, let arguments) where name == "Switch":
+            guard let switchExpression = argument("expression", in: arguments),
+                let casesExpression = argument("cases", in: arguments),
+                case .array(let cases) = casesExpression
+            else {
+                return nil
+            }
+            let renderedCases = cases.compactMap(renderSwitchCase)
+            guard renderedCases.count == cases.count else {
+                return nil
+            }
+            return "switch \(renderExpressionForSyntax(switchExpression)) { \(renderedCases.joined(separator: " ")) }"
+        case .call(let name, let arguments) where name == "Return":
+            guard let returnExpression = argument("expression", in: arguments) else {
+                return "return"
+            }
+            return "return \(renderExpressionForSyntax(returnExpression))"
+        case .call(let name, let arguments) where name == "Assignment":
+            guard let target = argument("target", in: arguments),
+                let assignmentExpression = argument("expression", in: arguments)
+            else {
+                return nil
+            }
+            return "\(renderExpressionForSyntax(target)) = \(renderExpressionForSyntax(assignmentExpression))"
+        case .call(let name, let arguments) where name == "ExpressionStatement":
+            guard let statementExpression = argument("expression", in: arguments) else {
+                return nil
+            }
+            return renderExpressionForSyntax(statementExpression)
+        default:
+            return renderExpressionForSyntax(expression)
+        }
+    }
+
+    private func renderSwitchCase(_ value: CompileTimeValue) -> String? {
+        guard case .object(let typeName, let fields) = value,
+            typeName == "SwitchCase",
+            let pattern = fields["pattern"],
+            let body = fields["body"],
+            let renderedBody = renderBlock(body)
+        else {
+            return nil
+        }
+
+        return "case \(renderExpressionForSyntax(pattern)): \(renderedBody)"
+    }
+
+    private func renderSwitchCase(_ expression: Expression) -> String? {
+        guard case .call(let name, let arguments) = expression,
+            name == "SwitchCase",
+            let pattern = argument("pattern", in: arguments),
+            let body = argument("body", in: arguments),
+            let renderedBody = renderBlock(body)
+        else {
+            return nil
+        }
+
+        return "case \(renderExpressionForSyntax(pattern)): \(renderedBody)"
+    }
+
     private func renderNominalTypeReference(_ value: CompileTimeValue) -> String? {
         switch value {
         case .object(let typeName, let fields) where typeName == "NamedTypeReference":
@@ -192,6 +323,18 @@ struct MacroSyntaxRenderer {
             return value
         default:
             return MacroExpander.renderExpressionForStringify(expression)
+        }
+    }
+
+    private func renderExpressionForSyntax(_ value: CompileTimeValue) -> String {
+        switch value {
+        case .string(let value):
+            return value
+        default:
+            guard let expression = value.expression else {
+                return ""
+            }
+            return renderExpressionForSyntax(expression)
         }
     }
 }

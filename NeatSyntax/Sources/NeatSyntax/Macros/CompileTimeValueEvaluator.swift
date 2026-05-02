@@ -42,6 +42,13 @@ struct CompileTimeValueEvaluator {
                 return transformed
             }
             return evaluateObjectConstruction(name: name, arguments: arguments, locals: locals)
+        case .binary(let lhs, .addition, let rhs):
+            guard case .string(let left) = evaluate(lhs, locals: locals),
+                case .string(let right) = evaluate(rhs, locals: locals)
+            else {
+                return nil
+            }
+            return .string(left + right)
         default:
             return nil
         }
@@ -85,7 +92,8 @@ struct CompileTimeValueEvaluator {
         switch name {
         case "Enum", "Enum.Declaration", "Enum.Case", "NamedTypeReference", "MemberTypeReference",
             "Let", "State", "Binding", "Derived", "Init.Declaration", "Function.Declaration",
-            "Construct.Declaration", "Extension", "Macro.Application", "Marker.Application":
+            "Construct.Declaration", "Extension", "Macro.Application", "Marker.Application",
+            "Block", "Switch", "SwitchCase", "Return", "Assignment", "ExpressionStatement":
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
                 guard let label = argument.label,

@@ -124,7 +124,7 @@ extension Parser {
         }
 
         if let explicitType,
-            try ExpressionTypeSemantics.isExpressionCompatible(
+            (try? ExpressionTypeSemantics.isExpressionCompatible(
                 expression,
                 expected: explicitType,
                 accessibleTypes: accessibleTypes.mapValues(BootstrapLiteralType.typed),
@@ -134,7 +134,13 @@ extension Parser {
                 memberResolver: declarationMemberResolver,
                 operatorResolver: declarationOperatorResolver,
                 macroExpansionResolver: declarationMacroExpansionResolver
-            )
+            )) == true
+        {
+            return explicitType
+        }
+
+        if let explicitType,
+            case .call = expression
         {
             return explicitType
         }
