@@ -607,14 +607,6 @@ struct SwiftBackendEmitter {
             }
         }
 
-        private struct __NeatStringCodingKey: Neat_CodingKey {
-            let value: String
-
-            func stringValue() -> String {
-                value
-            }
-        }
-
         extension Array: Neat_Encodable where Element: Neat_Encodable {
             func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.unkeyedContainer()
@@ -646,14 +638,14 @@ struct SwiftBackendEmitter {
 
         extension Dictionary: Neat_Encodable where Key == String, Value: Neat_Encodable {
             func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
-                var container = encoder.container(keyedBy: __NeatStringCodingKey.self)
+                var container = encoder.keyedContainer()
 
                 for key in keys.sorted() {
                     guard let value = self[key] else {
                         continue
                     }
 
-                    switch container.encode(value, forKey: __NeatStringCodingKey(value: key)) {
+                    switch container.encode(value, forKey: key) {
                     case .success:
                         continue
                     case .failure(let error):
