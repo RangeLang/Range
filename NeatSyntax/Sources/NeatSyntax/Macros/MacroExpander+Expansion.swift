@@ -665,6 +665,10 @@ extension MacroExpander {
                         for: marker,
                         argumentClause: application.argumentClause
                     )
+                    _ = try MacroTargetValueBuilder.evaluateMarkerValue(
+                        for: application,
+                        marker: marker
+                    )
                     continue
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
@@ -1636,7 +1640,9 @@ extension MacroExpander {
             emitted.merge(
                 try emittedDeclarations(
                     from: macro,
-                    targetValue: MacroTargetValueBuilder().targetValue(for: enumeration),
+                    targetValue: MacroTargetValueBuilder(
+                        markerDeclarationsByName: context.markerDeclarationsByName
+                    ).targetValue(for: enumeration),
                     context: context
                 )
             )
@@ -1662,7 +1668,9 @@ extension MacroExpander {
             emitted.merge(
                 try emittedDeclarations(
                     from: macro,
-                    targetValue: MacroTargetValueBuilder().targetValue(for: protocolDeclaration),
+                    targetValue: MacroTargetValueBuilder(
+                        markerDeclarationsByName: context.markerDeclarationsByName
+                    ).targetValue(for: protocolDeclaration),
                     context: context
                 )
             )
@@ -1678,7 +1686,9 @@ extension MacroExpander {
     ) throws -> EmittedDeclarationBundle {
         try emittedDeclarations(
             from: macro,
-            targetValue: MacroTargetValueBuilder().targetValue(for: construct),
+            targetValue: MacroTargetValueBuilder(
+                markerDeclarationsByName: context.markerDeclarationsByName
+            ).targetValue(for: construct),
             context: context
         )
     }

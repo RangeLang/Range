@@ -132,7 +132,7 @@ struct MacroTargetSurface {
         switch value {
         case .string:
             return [.callableName, .declaration]
-        case .array:
+        case .integer, .double, .boolean, .array:
             return [.expression]
         case .object(let typeName, _):
             if let kinds = emittedSyntaxKinds(forConstructedTypeNamed: typeName) {

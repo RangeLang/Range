@@ -2,6 +2,9 @@ import Foundation
 
 indirect enum CompileTimeValue {
     case string(String)
+    case integer(Int)
+    case double(Double)
+    case boolean(Bool)
     case array([CompileTimeValue])
     case object(typeName: String, fields: [String: CompileTimeValue])
 
@@ -16,6 +19,12 @@ indirect enum CompileTimeValue {
         switch self {
         case .string(let value):
             return .string(value)
+        case .integer(let value):
+            return .integer(value)
+        case .double(let value):
+            return .double(value)
+        case .boolean(let value):
+            return .boolean(value)
         case .array(let values):
             let elements = values.compactMap(\.expression)
             guard elements.count == values.count else {
@@ -36,4 +45,3 @@ indirect enum CompileTimeValue {
         }
     }
 }
-

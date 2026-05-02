@@ -441,6 +441,10 @@ extension MacroExpander {
                         for: marker,
                         argumentClause: application.argumentClause
                     )
+                    _ = try MacroTargetValueBuilder.evaluateMarkerValue(
+                        for: application,
+                        marker: marker
+                    )
                     continue
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")

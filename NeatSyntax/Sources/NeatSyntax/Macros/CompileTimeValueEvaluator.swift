@@ -16,6 +16,12 @@ struct CompileTimeValueEvaluator {
         switch expression {
         case .string(let value):
             return .string(value)
+        case .integer(let value):
+            return .integer(value)
+        case .double(let value):
+            return .double(value)
+        case .boolean(let value):
+            return .boolean(value)
         case .identifier(let path):
             if let bound = locals[path] {
                 return evaluate(bound, locals: locals)
@@ -79,7 +85,7 @@ struct CompileTimeValueEvaluator {
         switch name {
         case "Enum", "Enum.Declaration", "Enum.Case", "NamedTypeReference", "MemberTypeReference",
             "Let", "State", "Binding", "Derived", "Init.Declaration", "Function.Declaration",
-            "Construct.Declaration", "Extension", "Macro.Application":
+            "Construct.Declaration", "Extension", "Macro.Application", "Marker.Application":
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
                 guard let label = argument.label,

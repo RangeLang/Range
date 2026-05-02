@@ -1,6 +1,12 @@
 import Foundation
 
 struct MacroTargetValueBuilder {
+    let markerDeclarationsByName: [String: MarkerDeclaration]
+
+    init(markerDeclarationsByName: [String: MarkerDeclaration] = [:]) {
+        self.markerDeclarationsByName = markerDeclarationsByName
+    }
+
     func targetValue(for construct: ConstructDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Construct",
@@ -89,6 +95,7 @@ struct MacroTargetValueBuilder {
             typeName: "Let",
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
+                "markers": .array(markerValues(for: declaration.macros)),
                 "name": .string(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
             ]
@@ -100,6 +107,7 @@ struct MacroTargetValueBuilder {
             typeName: "State",
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
+                "markers": .array(markerValues(for: declaration.macros)),
                 "name": .string(declaration.name),
                 "type": typeReferenceValue(declaration.type.displayName),
             ]
@@ -111,6 +119,7 @@ struct MacroTargetValueBuilder {
             typeName: "Binding",
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
+                "markers": .array(markerValues(for: declaration.macros)),
                 "name": .string(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
             ]
@@ -122,10 +131,85 @@ struct MacroTargetValueBuilder {
             typeName: "Derived",
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
+                "markers": .array(markerValues(for: declaration.macros)),
                 "name": .string(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
             ]
         )
+    }
+
+    private func markerValues(for applications: [MacroApplication]) -> [CompileTimeValue] {
+        applications.compactMap { application in
+            guard let marker = markerDeclarationsByName[application.name],
+                let value = try? Self.evaluateMarkerValue(for: application, marker: marker)
+            else {
+                return nil
+            }
+            return .object(
+                typeName: "Marker.Application",
+                fields: [
+                    "name": .string(application.name),
+                    "value": value,
+                ]
+            )
+        }
+    }
+
+    static func evaluateMarkerValue(
+        for application: MacroApplication,
+        marker: MarkerDeclaration
+    ) throws -> CompileTimeValue {
+        let bindings = try MacroExpander.parseMarkerArgumentBindings(
+            for: marker,
+            argumentClause: application.argumentClause
+        )
+
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "__marker_target__",
+            targetValue: .object(typeName: "Marker.Target", fields: [:]),
+            localBindings: bindings
+        )
+
+        guard marker.body.count == 1 else {
+            throw ParseError("Marker #\(marker.name) body must evaluate to one compile-time value.")
+        }
+
+        let value: CompileTimeValue?
+        switch marker.body[0] {
+        case .return(let expression?):
+            value = evaluator.evaluate(expression)
+        case .expression(let expression):
+            value = evaluator.evaluate(expression)
+        default:
+            value = nil
+        }
+
+        guard let value else {
+            throw ParseError("Marker #\(marker.name) body could not be evaluated at compile time.")
+        }
+
+        guard markerValue(value, matches: marker.valueType) else {
+            throw ParseError(
+                "Marker #\(marker.name) evaluated value does not match \(marker.valueType.displayName)."
+            )
+        }
+
+        return value
+    }
+
+    private static func markerValue(_ value: CompileTimeValue, matches type: TypeReference) -> Bool {
+        switch (value, type) {
+        case (.string, .named("String")):
+            return true
+        case (.integer, .named("Int")):
+            return true
+        case (.double, .named("Float")):
+            return true
+        case (.boolean, .named("Bool")):
+            return true
+        default:
+            return false
+        }
     }
 
     private func value(for application: MacroApplication) -> CompileTimeValue {

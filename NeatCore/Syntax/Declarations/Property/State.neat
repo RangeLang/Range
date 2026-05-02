@@ -1,6 +1,7 @@
 @core
 construct State<T>: Property {
     let macros: [Macro.Application]
+    let markers: [Marker.Application]
     let name: String
     let type: TypeReference
     let value: Expression?
