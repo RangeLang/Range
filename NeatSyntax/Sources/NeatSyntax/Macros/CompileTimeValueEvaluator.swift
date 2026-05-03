@@ -51,19 +51,19 @@ struct CompileTimeValueEvaluator {
             ) {
                 return stringValue
             }
-            if let markerValue = evaluateMarkerCollectionAccess(
-                name: name,
-                arguments: arguments,
-                locals: locals
-            ) {
-                return markerValue
-            }
             if let transformed = evaluateArrayTransform(
                 name: name,
                 arguments: arguments,
                 locals: locals
             ) {
                 return transformed
+            }
+            if let element = evaluateArrayElementAccess(
+                name: name,
+                arguments: arguments,
+                locals: locals
+            ) {
+                return element
             }
             return evaluateObjectConstruction(name: name, arguments: arguments, locals: locals)
         case .ternary(let condition, let trueExpression, let falseExpression):
@@ -238,40 +238,27 @@ struct CompileTimeValueEvaluator {
         return result
     }
 
-    private func evaluateMarkerCollectionAccess(
+    private func evaluateArrayElementAccess(
         name: String,
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        let suffix = ".value"
+        let suffix = ".first"
         guard name.hasSuffix(suffix),
             let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
-            case .array(let markers) = source,
-            let markerNameExpression = argument("named", in: arguments),
-            case .string(let markerName) = evaluate(markerNameExpression, locals: locals)
+            case .array(let elements) = source
         else {
             return nil
         }
 
-        let defaultValue: CompileTimeValue?
-        if let defaultExpression = argument("default", in: arguments) {
-            defaultValue = evaluate(defaultExpression, locals: locals)
-        } else {
-            defaultValue = nil
+        if let first = elements.first {
+            return first
         }
 
-        let value =
-            markers.compactMap { marker -> CompileTimeValue? in
-                guard case .object(_, let fields) = marker,
-                    case .string(markerName) = fields["name"]
-                else {
-                    return nil
-                }
-                return fields["value"]
-            }
-            .first ?? defaultValue
-
-        return value
+        guard let defaultExpression = argument("default", in: arguments) else {
+            return nil
+        }
+        return evaluate(defaultExpression, locals: locals)
     }
 
     private func evaluateArrayTransform(
@@ -279,7 +266,7 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        let supportedSuffixes = [".map", ".compactMap", ".flatMap"]
+        let supportedSuffixes = [".map", ".compactMap", ".flatMap", ".filter"]
         guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
             arguments.count == 1,
             arguments[0].label == nil,
@@ -315,6 +302,17 @@ struct CompileTimeValueEvaluator {
                 flattened.append(contentsOf: nested)
             }
             return .array(flattened)
+        case ".filter":
+            var filtered: [CompileTimeValue] = []
+            for (element, value) in zip(elements, transformed) {
+                guard case .boolean(let include) = value else {
+                    return nil
+                }
+                if include {
+                    filtered.append(element)
+                }
+            }
+            return .array(filtered)
         default:
             return nil
         }
@@ -338,18 +336,20 @@ struct CompileTimeValueEvaluator {
         var nestedLocals = locals
         nestedLocals[parameterName] = element.expression
 
-        guard body.count == 1 else {
-            return nil
+        for statement in body {
+            switch statement {
+            case .localBinding(let declaration):
+                nestedLocals[declaration.name] = declaration.expression
+            case .expression(let expression):
+                return evaluate(expression, locals: nestedLocals)
+            case .return(let expression?):
+                return evaluate(expression, locals: nestedLocals)
+            default:
+                return nil
+            }
         }
 
-        switch body[0] {
-        case .expression(let expression):
-            return evaluate(expression, locals: nestedLocals)
-        case .return(let expression?):
-            return evaluate(expression, locals: nestedLocals)
-        default:
-            return nil
-        }
+        return nil
     }
 
     private func argument(_ label: String, in arguments: [CallArgument]) -> Expression? {

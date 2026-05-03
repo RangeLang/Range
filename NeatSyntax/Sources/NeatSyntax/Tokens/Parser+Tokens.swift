@@ -43,7 +43,7 @@ extension Parser {
 
     mutating func consumeIdentifier() throws -> String {
         guard case .identifier(let value) = peek() else {
-            throw ParseError("Expected identifier.")
+            throw ParseError("Expected identifier, found \(peek()).")
         }
         advance()
         return value
