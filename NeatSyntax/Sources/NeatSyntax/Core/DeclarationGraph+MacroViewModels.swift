@@ -190,6 +190,7 @@ struct RewriteSurfaceView {
             if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
                 || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
                 || syntaxResolver.declaration(named: text, conformsTo: "SyntaxExpandable")
+                || syntaxResolver.declaration(named: text, conformsTo: "SyntaxOmittable")
             {
                 return (text, isArray)
             }
@@ -349,6 +350,7 @@ struct RewriteSurfaceView {
         if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
             || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
             || syntaxResolver.declaration(named: text, conformsTo: "SyntaxExpandable")
+            || syntaxResolver.declaration(named: text, conformsTo: "SyntaxOmittable")
         {
             return (text, isArray)
         }
