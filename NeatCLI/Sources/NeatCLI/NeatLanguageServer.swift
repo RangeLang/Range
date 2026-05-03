@@ -409,9 +409,9 @@ struct NeatLanguageServer {
             let fileURL = URL(string: uri),
             fileURL.isFileURL
         else {
-            return try NeatCoreLoader.sourceInputs() + [
+            return uniqueSourceInputs(try NeatCoreLoader.sourceInputs() + [
                 SourceInput(path: uri, source: text, role: .project)
-            ]
+            ])
         }
 
         let standardizedFileURL = fileURL.standardizedFileURL
@@ -419,9 +419,9 @@ struct NeatLanguageServer {
         do {
             loadedProject = try ProjectLoader.load(at: standardizedFileURL.path)
         } catch {
-            return try NeatCoreLoader.sourceInputs() + [
+            return uniqueSourceInputs(try NeatCoreLoader.sourceInputs() + [
                 SourceInput(path: standardizedFileURL.path, source: text, role: .project)
-            ]
+            ])
         }
 
         let openDocumentSources = Dictionary(
@@ -431,7 +431,7 @@ struct NeatLanguageServer {
             }
         )
 
-        return loadedProject.sourceInputs.map { input in
+        return uniqueSourceInputs(loadedProject.sourceInputs.map { input in
             guard input.role == .project else { return input }
             if input.path == standardizedFileURL.path {
                 return SourceInput(path: input.path, source: text, role: input.role)
@@ -440,7 +440,21 @@ struct NeatLanguageServer {
                 return SourceInput(path: input.path, source: override, role: input.role)
             }
             return input
+        })
+    }
+
+    private func uniqueSourceInputs(_ inputs: [SourceInput]) -> [SourceInput] {
+        var seen: Set<String> = []
+        var unique: [SourceInput] = []
+
+        for input in inputs.reversed() {
+            guard seen.insert(input.path).inserted else {
+                continue
+            }
+            unique.append(input)
         }
+
+        return unique.reversed()
     }
 
     private func requestContext(from message: [String: Any]) -> RequestContext? {
@@ -1028,6 +1042,8 @@ private struct DocumentIndex {
             #"\bfunction\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let macroDeclarationPattern =
             #"\bmacro\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
+        let markerDeclarationPattern =
+            #"\bmarker\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
         let macroPattern = #"#([a-z_][A-Za-z0-9_]*)\b"#
@@ -1054,15 +1070,15 @@ private struct DocumentIndex {
             "background", "binding", "break", "builder", "capture", "case", "construct",
             "continue", "core", "default", "derived", "else", "enum", "environment",
             "extension", "for", "function", "get", "if", "in", "infix", "init",
-            "macro", "main", "nil", "on", "operator", "postfix", "precedencegroup", "prefix",
-            "protocol", "return", "self", "set", "state", "switch", "let", "var",
+            "macro", "main", "marker", "nil", "on", "operator", "postfix", "precedencegroup",
+            "prefix", "protocol", "return", "self", "set", "state", "switch", "let", "var",
             "while",
         ]
         let keywordLikeIdentifierNames = Set(localVariableNames.union(parameterNames)).intersection(
             keywordNames
         )
         let identifierKeywordExclusions: Set<String> = [
-            "if", "for", "while", "switch", "return", "macro", "function", "init",
+            "if", "for", "while", "switch", "return", "macro", "marker", "function", "init",
             "construct", "enum", "protocol", "extension", "background", "state",
             "environment", "binding", "derived", "let", "var", "case", "default", "break",
             "continue", "true", "false", "nil", "self",
@@ -1147,6 +1163,16 @@ private struct DocumentIndex {
             }
 
             if let match = firstMatch(in: line, pattern: macroDeclarationPattern), match.count > 1 {
+                let name = match[1]
+                record(
+                    line: lineIndex,
+                    range: nsRange(in: line, value: name),
+                    type: .macro,
+                    modifiers: [.declaration]
+                )
+            }
+
+            if let match = firstMatch(in: line, pattern: markerDeclarationPattern), match.count > 1 {
                 let name = match[1]
                 record(
                     line: lineIndex,
@@ -1558,7 +1584,7 @@ private struct DocumentIndex {
         guard
             let match = firstMatch(
                 in: trimmed,
-                pattern: #"^([a-z_][A-Za-z0-9_]*)(?:\s+_)?\s*:"#
+                pattern: #"^(?:[A-Za-z_][A-Za-z0-9_]*\s+)?([a-z_][A-Za-z0-9_]*)\s*:"#
             ),
             match.count > 1
         else {
@@ -1590,6 +1616,7 @@ private struct DocumentIndex {
         let declarationPatterns = [
             #"\bfunction\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
             #"\bmacro\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
+            #"\bmarker\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
         ]
 
         return declarationPatterns.contains { pattern in

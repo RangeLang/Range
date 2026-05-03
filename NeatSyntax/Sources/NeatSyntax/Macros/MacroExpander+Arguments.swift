@@ -101,10 +101,14 @@ extension MacroExpander {
             let expectedLabel = macroArgumentLabel(for: parameter)
             let actualLabel = argument.label
 
-            if actualLabel == nil {
-                // Macro and marker arguments can be passed positionally.
+            if actualLabel == nil, expectedLabel == nil {
+                // Unlabeled macro and marker arguments require an explicit `_` label erasure.
             } else if let expectedLabel, let actualLabel, expectedLabel == actualLabel {
                 // Label matched.
+            } else if let expectedLabel, actualLabel == nil {
+                throw ParseError(
+                    "\(kind) #\(name) expects argument label \(expectedLabel)."
+                )
             } else if let expectedLabel, let actualLabel {
                 throw ParseError(
                     "\(kind) #\(name) expects argument label \(expectedLabel), got \(actualLabel)."
@@ -128,6 +132,6 @@ extension MacroExpander {
     }
 
     static func macroArgumentLabel(for parameter: NeatFunctionParameter) -> String? {
-        parameter.externalLabel ?? parameter.localName
+        parameter.externalLabel
     }
 }

@@ -137,6 +137,21 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(containsToken(tokens, text: "#stringify", type: .macro, modifiers: []))
     }
 
+    @Test("Marker declarations emit semantic tokens")
+    func markerDeclarationsEmitSemanticTokens() {
+        let source = """
+        marker codingKey<T>(_ value: String): Let<T> -> String {
+            return value
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "marker", type: .keyword, modifiers: []))
+        #expect(containsToken(tokens, text: "codingKey", type: .macro, modifiers: [.declaration]))
+        #expect(containsToken(tokens, text: "value", type: .parameter, modifiers: [.declaration]))
+    }
+
     @Test("Nil emits a keyword semantic token")
     func nilEmitsKeywordToken() {
         let source = """

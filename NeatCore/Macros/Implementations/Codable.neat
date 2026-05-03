@@ -1,4 +1,4 @@
-macro codable(strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
+macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
     let encodeBody: Block = Block(
         statements: target.declaration.lets.map { property in
             let defaultKey: String = strategy == .snakeCase ? property.name.snakeCase() : property.name
