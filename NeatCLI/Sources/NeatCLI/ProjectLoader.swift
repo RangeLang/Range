@@ -195,12 +195,16 @@ enum ProjectLoader {
         includeCore: Bool
     ) throws -> [SourceInput] {
         let coreInputs = includeCore ? try NeatCoreLoader.sourceInputs() : []
-        let projectInputs = try files.map { fileURL in
+        let projectInputs = try files.compactMap { fileURL -> SourceInput? in
+            let isCoreFile = try NeatCoreLoader.isCoreFile(fileURL)
+            if includeCore, isCoreFile {
+                return nil
+            }
             do {
                 return SourceInput(
                     path: fileURL.path,
                     source: try String(contentsOf: fileURL, encoding: .utf8),
-                    role: .project
+                    role: isCoreFile ? .core : .project
                 )
             } catch {
                 throw ValidationError("Failed to read \(fileURL.path): \(error)")

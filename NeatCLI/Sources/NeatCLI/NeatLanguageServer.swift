@@ -415,12 +415,14 @@ struct NeatLanguageServer {
         }
 
         let standardizedFileURL = fileURL.standardizedFileURL
+        let openedFileRole: SourceInputRole =
+            (try? NeatCoreLoader.isCoreFile(standardizedFileURL)) == true ? .core : .project
         let loadedProject: LoadedProject
         do {
             loadedProject = try ProjectLoader.load(at: standardizedFileURL.path)
         } catch {
             return uniqueSourceInputs(try NeatCoreLoader.sourceInputs() + [
-                SourceInput(path: standardizedFileURL.path, source: text, role: .project)
+                SourceInput(path: standardizedFileURL.path, source: text, role: openedFileRole)
             ])
         }
 
@@ -432,7 +434,6 @@ struct NeatLanguageServer {
         )
 
         return uniqueSourceInputs(loadedProject.sourceInputs.map { input in
-            guard input.role == .project else { return input }
             if input.path == standardizedFileURL.path {
                 return SourceInput(path: input.path, source: text, role: input.role)
             }

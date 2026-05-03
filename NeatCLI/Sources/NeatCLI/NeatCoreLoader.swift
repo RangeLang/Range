@@ -3,7 +3,7 @@ import Foundation
 import NeatSyntax
 
 enum NeatCoreLoader {
-    static func coreFiles() throws -> [URL] {
+    static func coreRoot() throws -> URL {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -17,6 +17,18 @@ enum NeatCoreLoader {
         else {
             throw ValidationError("Missing NeatCore sources at \(coreRoot.path)")
         }
+
+        return coreRoot.standardizedFileURL
+    }
+
+    static func isCoreFile(_ fileURL: URL) throws -> Bool {
+        let coreRootPath = try coreRoot().path
+        let filePath = fileURL.standardizedFileURL.path
+        return filePath == coreRootPath || filePath.hasPrefix(coreRootPath + "/")
+    }
+
+    static func coreFiles() throws -> [URL] {
+        let coreRoot = try coreRoot()
 
         guard
             let enumerator = FileManager.default.enumerator(
