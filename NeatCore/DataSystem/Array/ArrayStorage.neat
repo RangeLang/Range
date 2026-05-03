@@ -7,6 +7,7 @@ construct ArrayStorage<Element> {
     function append(element: Element)
     function element(index: Int) -> Element
     function first() -> Element?
+    function first(where include: (Element) -> Bool) -> Element?
     function last() -> Element?
     function update(element: Element, index: Int)
     function insert(element: Element, index: Int)

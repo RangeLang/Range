@@ -940,10 +940,18 @@ public enum ExpressionTypeSemantics {
                 return .optional(arguments[1])
             case ("Dictionary", "contains", 2):
                 return .named("Bool")
+            case ("Dictionary", "filter", 2):
+                return .array(dictionaryEntryType(key: arguments[0], value: arguments[1]))
+            case ("Dictionary", "first", 2):
+                return .optional(dictionaryEntryType(key: arguments[0], value: arguments[1]))
             case ("Dictionary", "updateValue", 2), ("Dictionary", "clear", 2):
                 return .named("Void")
             case ("Set", "contains", 1):
                 return .named("Bool")
+            case ("Set", "filter", 1):
+                return .array(arguments[0])
+            case ("Set", "first", 1):
+                return .optional(arguments[0])
             case ("Set", "insert", 1), ("Set", "clear", 1):
                 return .named("Void")
             case ("Set", "remove", 1):
@@ -1496,6 +1504,13 @@ public enum ExpressionTypeSemantics {
         }
 
         return (arguments[0], arguments[1])
+    }
+
+    private static func dictionaryEntryType(
+        key: TypeReference,
+        value: TypeReference
+    ) -> TypeReference {
+        .generic(base: .named("DictionaryEntry"), arguments: [key, value])
     }
 }
 

@@ -251,7 +251,26 @@ struct CompileTimeValueEvaluator {
             return nil
         }
 
-        if let first = elements.first {
+        let candidates: [CompileTimeValue]
+        if let predicate = argument("where", in: arguments) {
+            candidates = elements.filter { element in
+                guard case .call("Closure", let closureArguments) = predicate else {
+                    return false
+                }
+                guard case .boolean(true) = evaluateSingleParameterClosure(
+                    closureArguments,
+                    element: element,
+                    locals: locals
+                ) else {
+                    return false
+                }
+                return true
+            }
+        } else {
+            candidates = elements
+        }
+
+        if let first = candidates.first {
             return first
         }
 

@@ -32,6 +32,10 @@ construct Array<Element>: ExpressibleByArrayLiteral {
         return storage.first()
     }
 
+    function first(where include: (Element) -> Bool) -> Element? {
+        return storage.first(where: include)
+    }
+
     function last() -> Element? {
         return storage.last()
     }

@@ -2310,13 +2310,16 @@ struct SwiftBackendEmitter {
             guard arguments.isEmpty else { return nil }
             return "\(base).removeAll()"
         case "first":
-            guard arguments.isEmpty else { return nil }
-            return "\(base).first"
+            if arguments.isEmpty {
+                return "\(base).first"
+            }
+            guard let include = argument("where") else { return nil }
+            return "\(base).first(where: \(try emitExpression(include, scope: scope)))"
         case "last":
             guard arguments.isEmpty else { return nil }
             return "\(base).last"
         case "filter":
-            guard let include = argument("include") else { return nil }
+            guard let include = argument("include") ?? unlabeledArgument() else { return nil }
             return "\(base).filter(\(try emitExpression(include, scope: scope)))"
         case "map", "compactMap", "flatMap", "forEach":
             guard let transform = unlabeledArgument() else { return nil }

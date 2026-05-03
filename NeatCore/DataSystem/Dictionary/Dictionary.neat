@@ -35,6 +35,14 @@ construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
         return storage.entries()
     }
 
+    function filter(include: (DictionaryEntry<Key, Value>) -> Bool) -> [DictionaryEntry<Key, Value>] {
+        return storage.filter(include: include)
+    }
+
+    function first(where include: (DictionaryEntry<Key, Value>) -> Bool) -> DictionaryEntry<Key, Value>? {
+        return storage.first(where: include)
+    }
+
     function clear() {
         storage.clear()
     }

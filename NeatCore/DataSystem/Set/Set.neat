@@ -31,6 +31,14 @@ construct Set<Element: Hashable>: ExpressibleBySetLiteral {
         return storage.elements()
     }
 
+    function filter(include: (Element) -> Bool) -> [Element] {
+        return storage.filter(include: include)
+    }
+
+    function first(where include: (Element) -> Bool) -> Element? {
+        return storage.first(where: include)
+    }
+
     function clear() {
         storage.clear()
     }

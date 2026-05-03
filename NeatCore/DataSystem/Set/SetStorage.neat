@@ -8,5 +8,7 @@ construct SetStorage<Element: Hashable> {
     function insert(element: Element)
     function remove(element: Element) -> Element?
     function elements() -> [Element]
+    function filter(include: (Element) -> Bool) -> [Element]
+    function first(where include: (Element) -> Bool) -> Element?
     function clear()
 }

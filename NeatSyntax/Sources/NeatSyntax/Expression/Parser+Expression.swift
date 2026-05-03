@@ -22,11 +22,17 @@ extension Parser {
         if case .identifier(let label) = peek(), peek(offset: 1) == .colon {
             advance()
             try consume(.colon)
+            if peek() == .leftBrace, isClosureExpressionStart() {
+                return CallArgument(label: label, value: try parseClosureExpression())
+            }
             return CallArgument(label: label, value: try parseExpression())
         }
         if case .keyword(let label) = peek(), peek(offset: 1) == .colon {
             advance()
             try consume(.colon)
+            if peek() == .leftBrace, isClosureExpressionStart() {
+                return CallArgument(label: label, value: try parseClosureExpression())
+            }
             return CallArgument(label: label, value: try parseExpression())
         }
         return CallArgument(label: nil, value: try parseExpression())
