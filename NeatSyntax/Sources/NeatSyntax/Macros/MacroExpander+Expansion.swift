@@ -1292,6 +1292,7 @@ extension MacroExpander {
                 localName: parameter.localName,
                 externalLabel: parameter.externalLabel,
                 typeReference: rewrittenType,
+                defaultValue: parameter.defaultValue,
                 slotName: parameter.slotName,
                 isBinding: parameter.isBinding,
                 capturesSyntax: parameter.capturesSyntax
@@ -1599,7 +1600,18 @@ extension MacroExpander {
             guard let macro = macros[application.name], macroTargetKind(for: macro) == .construct else {
                 continue
             }
-            emitted.merge(try emittedDeclarations(from: macro, construct: construct, context: context))
+            let argumentBindings = try parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: application.argumentClause
+            )
+            emitted.merge(
+                try emittedDeclarations(
+                    from: macro,
+                    construct: construct,
+                    context: context,
+                    argumentBindings: argumentBindings
+                )
+            )
         }
 
         for nested in construct.constructs {
@@ -1682,25 +1694,30 @@ extension MacroExpander {
     static func emittedDeclarations(
         from macro: MacroDeclaration,
         construct: ConstructDeclaration,
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        argumentBindings: [String: Expression] = [:]
     ) throws -> EmittedDeclarationBundle {
         try emittedDeclarations(
             from: macro,
             targetValue: MacroTargetValueBuilder(
                 markerDeclarationsByName: context.markerDeclarationsByName
             ).targetValue(for: construct),
-            context: context
+            context: context,
+            argumentBindings: argumentBindings
         )
     }
 
     static func emittedDeclarations(
         from macro: MacroDeclaration,
         targetValue: CompileTimeValue,
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        argumentBindings: [String: Expression] = [:]
     ) throws -> EmittedDeclarationBundle {
         var emitted = EmittedDeclarationBundle()
 
-        for (targetPath, block, localBindings) in emittedCodeBlocks(in: macro.body) {
+        let body = substituteMacroBindings(in: macro.body, bindings: argumentBindings)
+
+        for (targetPath, block, localBindings) in emittedCodeBlocks(in: body) {
             if let targetPath {
                 try context.validateExpansionPath(targetPath, for: macro)
             }

@@ -257,12 +257,21 @@ extension Parser {
                     }
                 }
 
+                let defaultValue: Expression?
+                if peek() == .equal {
+                    try consume(.equal)
+                    defaultValue = try parseExpression(terminatingAt: [.comma, .rightParen])
+                } else {
+                    defaultValue = nil
+                }
+
                 parameters.append(
                     NeatFunctionParameter(
                         macros: macros,
                         localName: localName,
                         externalLabel: externalLabel,
                         typeReference: typeReference,
+                        defaultValue: defaultValue,
                         slotName: slotName,
                         isBinding: isBinding,
                         capturesSyntax: capturesSyntax

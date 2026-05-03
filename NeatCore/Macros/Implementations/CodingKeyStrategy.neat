@@ -1,0 +1,4 @@
+enum CodingKeyStrategy {
+    case identity
+    case snakeCase
+}

@@ -649,6 +649,7 @@ private extension NeatFunctionParameter {
             localName: localName,
             externalLabel: externalLabel,
             typeReference: typeReference.map { substitute($0, using: bindings) },
+            defaultValue: defaultValue,
             slotName: slotName,
             isBinding: isBinding,
             capturesSyntax: capturesSyntax

@@ -5,6 +5,7 @@ public struct NeatFunctionParameter {
     public let localName: String
     public let externalLabel: String?
     public let typeReference: TypeReference?
+    public let defaultValue: Expression?
     public let slotName: String?
     public let isBinding: Bool
     public let capturesSyntax: Bool
@@ -14,6 +15,7 @@ public struct NeatFunctionParameter {
         localName: String,
         externalLabel: String?,
         typeReference: TypeReference?,
+        defaultValue: Expression? = nil,
         slotName: String?,
         isBinding: Bool = false,
         capturesSyntax: Bool = false
@@ -22,6 +24,7 @@ public struct NeatFunctionParameter {
         self.localName = localName
         self.externalLabel = externalLabel
         self.typeReference = typeReference
+        self.defaultValue = defaultValue
         self.slotName = slotName
         self.isBinding = isBinding
         self.capturesSyntax = capturesSyntax

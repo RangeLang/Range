@@ -26,6 +26,9 @@ struct CompileTimeValueEvaluator {
             if let bound = locals[path] {
                 return evaluate(bound, locals: locals)
             }
+            if path.hasPrefix(".") {
+                return enumCaseValue(named: String(path.dropFirst()))
+            }
             return evaluatePath(path, locals: locals)
         case .array(let elements):
             let values = elements.compactMap { evaluate($0, locals: locals) }
@@ -40,6 +43,13 @@ struct CompileTimeValueEvaluator {
                 locals: locals
             ) {
                 return syntaxValue
+            }
+            if let stringValue = evaluateStringTransform(
+                name: name,
+                arguments: arguments,
+                locals: locals
+            ) {
+                return stringValue
             }
             if let markerValue = evaluateMarkerCollectionAccess(
                 name: name,
@@ -56,6 +66,11 @@ struct CompileTimeValueEvaluator {
                 return transformed
             }
             return evaluateObjectConstruction(name: name, arguments: arguments, locals: locals)
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            guard case .boolean(let conditionValue) = evaluate(condition, locals: locals) else {
+                return nil
+            }
+            return evaluate(conditionValue ? trueExpression : falseExpression, locals: locals)
         case .binary(let lhs, .addition, let rhs):
             guard case .string(let left) = evaluate(lhs, locals: locals),
                 case .string(let right) = evaluate(rhs, locals: locals)
@@ -63,8 +78,54 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return .string(left + right)
+        case .binary(let lhs, .equal, let rhs):
+            guard let left = evaluate(lhs, locals: locals),
+                let right = evaluate(rhs, locals: locals)
+            else {
+                return nil
+            }
+            return .boolean(valuesEqual(left, right))
+        case .binary(let lhs, .notEqual, let rhs):
+            guard let left = evaluate(lhs, locals: locals),
+                let right = evaluate(rhs, locals: locals)
+            else {
+                return nil
+            }
+            return .boolean(!valuesEqual(left, right))
         default:
             return nil
+        }
+    }
+
+    private func enumCaseValue(named name: String) -> CompileTimeValue {
+        .object(
+            typeName: "Enum.Case",
+            fields: [
+                "name": .string(name),
+                "associatedValues": .array([]),
+            ]
+        )
+    }
+
+    private func valuesEqual(_ lhs: CompileTimeValue, _ rhs: CompileTimeValue) -> Bool {
+        switch (lhs, rhs) {
+        case (.string(let left), .string(let right)):
+            return left == right
+        case (.integer(let left), .integer(let right)):
+            return left == right
+        case (.double(let left), .double(let right)):
+            return left == right
+        case (.boolean(let left), .boolean(let right)):
+            return left == right
+        case (.object("Enum.Case", let left), .object("Enum.Case", let right)):
+            guard case .string(let leftName)? = left["name"],
+                case .string(let rightName)? = right["name"]
+            else {
+                return false
+            }
+            return leftName == rightName
+        default:
+            return false
         }
     }
 
@@ -138,6 +199,43 @@ struct CompileTimeValueEvaluator {
         }
 
         return .string("\"\(value)\"")
+    }
+
+    private func evaluateStringTransform(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        guard name.hasSuffix(".snakeCase"),
+            arguments.isEmpty,
+            let source = evaluatePath(String(name.dropLast(".snakeCase".count)), locals: locals),
+            case .string(let value) = source
+        else {
+            return nil
+        }
+        return .string(snakeCase(value))
+    }
+
+    private func snakeCase(_ name: String) -> String {
+        var result = ""
+        var previousWasLowercaseOrDigit = false
+
+        for scalar in name.unicodeScalars {
+            let character = Character(scalar)
+            let string = String(character)
+            let isUppercase = string.uppercased() == string && string.lowercased() != string
+            let isLowercase = string.lowercased() == string && string.uppercased() != string
+            let isDigit = CharacterSet.decimalDigits.contains(scalar)
+
+            if isUppercase && previousWasLowercaseOrDigit && !result.isEmpty {
+                result.append("_")
+            }
+
+            result.append(string.lowercased())
+            previousWasLowercaseOrDigit = isLowercase || isDigit
+        }
+
+        return result
     }
 
     private func evaluateMarkerCollectionAccess(

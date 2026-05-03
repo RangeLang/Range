@@ -6,35 +6,12 @@ extension MacroExpander {
         arguments: [CallArgument]
     ) throws -> [String: Expression] {
         let parameters = macro.parameters
-        guard arguments.count == parameters.count else {
-            throw ParseError(
-                "Macro #\(macro.name) expects \(parameters.count) argument(s), got \(arguments.count)."
-            )
-        }
-
-        var bindings: [String: Expression] = [:]
-        for (parameter, argument) in zip(parameters, arguments) {
-            let expectedLabel = macroArgumentLabel(for: parameter)
-            let actualLabel = argument.label
-
-            if actualLabel == nil {
-                // Macro arguments can be passed positionally.
-            } else if let expectedLabel, let actualLabel, expectedLabel == actualLabel {
-                // Label matched.
-            } else if let expectedLabel, let actualLabel {
-                throw ParseError(
-                    "Macro #\(macro.name) expects argument label \(expectedLabel), got \(actualLabel)."
-                )
-            } else if let actualLabel {
-                throw ParseError(
-                    "Macro #\(macro.name) argument for \(parameter.localName) should not use label \(actualLabel)."
-                )
-            }
-
-            bindings[parameter.localName] = argument.value
-        }
-
-        return bindings
+        return try argumentBindings(
+            kind: "Macro",
+            name: macro.name,
+            parameters: parameters,
+            arguments: arguments
+        )
     }
 
     static func parseMacroArgumentBindings(
@@ -51,7 +28,12 @@ extension MacroExpander {
             return [:]
         }
         guard let normalizedArgumentClause, !normalizedArgumentClause.isEmpty else {
-            throw ParseError("Macro #\(macro.name) requires arguments.")
+            return try argumentBindings(
+                kind: "Macro",
+                name: macro.name,
+                parameters: parameters,
+                arguments: []
+            )
         }
 
         var parser = try Parser(source: "macro(\(normalizedArgumentClause))")
@@ -59,33 +41,12 @@ extension MacroExpander {
         let arguments = try parser.parseInvocationArgumentsIfPresent()
         try parser.consume(Token.eof)
 
-        guard arguments.count == parameters.count else {
-            throw ParseError(
-                "Macro #\(macro.name) expects \(parameters.count) argument(s), got \(arguments.count)."
-            )
-        }
-
-        var bindings: [String: Expression] = [:]
-        for (parameter, argument) in zip(parameters, arguments) {
-            let expectedLabel = macroArgumentLabel(for: parameter)
-            let actualLabel = argument.label
-
-            if actualLabel == nil {
-                // Macro arguments can be passed positionally.
-            } else if let expectedLabel, let actualLabel, expectedLabel == actualLabel {
-                // Label matched.
-            } else if let expectedLabel, let actualLabel {
-                throw ParseError(
-                    "Macro #\(macro.name) expects argument label \(expectedLabel), got \(actualLabel)."
-                )
-            } else if let actualLabel {
-                throw ParseError(
-                    "Macro #\(macro.name) argument for \(parameter.localName) should not use label \(actualLabel)."
-                )
-            }
-            bindings[parameter.localName] = argument.value
-        }
-        return bindings
+        return try argumentBindings(
+            kind: "Macro",
+            name: macro.name,
+            parameters: parameters,
+            arguments: arguments
+        )
     }
 
     static func parseMarkerArgumentBindings(
@@ -102,7 +63,12 @@ extension MacroExpander {
             return [:]
         }
         guard let normalizedArgumentClause, !normalizedArgumentClause.isEmpty else {
-            throw ParseError("Marker #\(marker.name) requires arguments.")
+            return try argumentBindings(
+                kind: "Marker",
+                name: marker.name,
+                parameters: parameters,
+                arguments: []
+            )
         }
 
         var parser = try Parser(source: "marker(\(normalizedArgumentClause))")
@@ -110,9 +76,23 @@ extension MacroExpander {
         let arguments = try parser.parseInvocationArgumentsIfPresent()
         try parser.consume(Token.eof)
 
-        guard arguments.count == parameters.count else {
+        return try argumentBindings(
+            kind: "Marker",
+            name: marker.name,
+            parameters: parameters,
+            arguments: arguments
+        )
+    }
+
+    private static func argumentBindings(
+        kind: String,
+        name: String,
+        parameters: [NeatFunctionParameter],
+        arguments: [CallArgument]
+    ) throws -> [String: Expression] {
+        guard arguments.count <= parameters.count else {
             throw ParseError(
-                "Marker #\(marker.name) expects \(parameters.count) argument(s), got \(arguments.count)."
+                "\(kind) #\(name) expects \(parameters.count) argument(s), got \(arguments.count)."
             )
         }
 
@@ -122,20 +102,28 @@ extension MacroExpander {
             let actualLabel = argument.label
 
             if actualLabel == nil {
-                // Marker arguments can be passed positionally.
+                // Macro and marker arguments can be passed positionally.
             } else if let expectedLabel, let actualLabel, expectedLabel == actualLabel {
                 // Label matched.
             } else if let expectedLabel, let actualLabel {
                 throw ParseError(
-                    "Marker #\(marker.name) expects argument label \(expectedLabel), got \(actualLabel)."
+                    "\(kind) #\(name) expects argument label \(expectedLabel), got \(actualLabel)."
                 )
             } else if let actualLabel {
                 throw ParseError(
-                    "Marker #\(marker.name) argument for \(parameter.localName) should not use label \(actualLabel)."
+                    "\(kind) #\(name) argument for \(parameter.localName) should not use label \(actualLabel)."
                 )
             }
             bindings[parameter.localName] = argument.value
         }
+
+        for parameter in parameters.dropFirst(arguments.count) {
+            guard let defaultValue = parameter.defaultValue else {
+                throw ParseError("\(kind) #\(name) requires argument \(parameter.localName).")
+            }
+            bindings[parameter.localName] = defaultValue
+        }
+
         return bindings
     }
 
