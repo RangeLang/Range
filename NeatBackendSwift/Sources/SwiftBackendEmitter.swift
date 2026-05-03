@@ -489,6 +489,31 @@ struct SwiftBackendEmitter {
                 }
             }
 
+            extension String {
+                func __neatSnakeCase() -> String {
+                    var result = ""
+                    var previousWasLowercaseOrDigit = false
+
+                    for scalar in unicodeScalars {
+                        let character = Character(scalar)
+                        let string = String(character)
+                        let isUppercase = string.uppercased() == string && string.lowercased() != string
+                        let isLowercase = string.lowercased() == string && string.uppercased() != string
+                        let isDigit = CharacterSet.decimalDigits.contains(scalar)
+
+                        if isUppercase && previousWasLowercaseOrDigit && !result.isEmpty {
+                            result.append("_")
+                        }
+
+                        result.append(string.lowercased())
+                        previousWasLowercaseOrDigit = isLowercase || isDigit
+                    }
+
+                    return result
+                }
+
+            }
+
             final class __NeatBinding<Value> {
                 private let getter: () -> Value
                 private let setter: (Value) -> Void
@@ -2321,6 +2346,9 @@ struct SwiftBackendEmitter {
         case "filter":
             guard let include = argument("include") ?? unlabeledArgument() else { return nil }
             return "\(base).filter(\(try emitExpression(include, scope: scope)))"
+        case "snakeCase":
+            guard arguments.isEmpty else { return nil }
+            return "\(base).__neatSnakeCase()"
         case "map", "compactMap", "flatMap", "forEach":
             guard let transform = unlabeledArgument() else { return nil }
             return "\(base).\(member)(\(try emitExpression(transform, scope: scope)))"

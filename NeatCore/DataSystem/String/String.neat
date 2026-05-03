@@ -13,6 +13,10 @@ construct String: ExpressibleByStringLiteral, Equatable, Hashable, Comparable {
     derived isEmpty: Bool {
         storage.isEmpty
     }
+
+    function snakeCase() -> String {
+        return storage.snakeCase()
+    }
 }
 
 extension String: Decodable {

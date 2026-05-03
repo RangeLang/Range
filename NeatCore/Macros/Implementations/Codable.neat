@@ -11,7 +11,7 @@ macro codable(strategy: CodingKeyStrategy = .identity): Construct { target, diag
             let key: String = codingKeyValues.first(default: defaultKey)
 
             Switch(
-                expression: "container.encode(" + property.name + ", forKey: " + stringLiteralSyntax(key) + ")",
+                expression: "container.encode(" + property.name + ", forKey: \"" + key + "\")",
                 cases: [
                     SwitchCase(
                         pattern: ".success",
@@ -42,7 +42,7 @@ macro codable(strategy: CodingKeyStrategy = .identity): Construct { target, diag
             let key: String = codingKeyValues.first(default: defaultKey)
 
             Switch(
-                expression: "container.decode(" + property.typeName + ".self, forKey: " + stringLiteralSyntax(key) + ")",
+                expression: "container.decode(" + property.typeName + ".self, forKey: \"" + key + "\")",
                 cases: [
                     SwitchCase(
                         pattern: ".success(let " + property.name + ")",

@@ -37,13 +37,6 @@ struct CompileTimeValueEvaluator {
             }
             return .array(values)
         case .call(let name, let arguments):
-            if let syntaxValue = evaluateSyntaxHelper(
-                name: name,
-                arguments: arguments,
-                locals: locals
-            ) {
-                return syntaxValue
-            }
             if let stringValue = evaluateStringTransform(
                 name: name,
                 arguments: arguments,
@@ -185,34 +178,20 @@ struct CompileTimeValueEvaluator {
         }
     }
 
-    private func evaluateSyntaxHelper(
-        name: String,
-        arguments: [CallArgument],
-        locals: [String: Expression]
-    ) -> CompileTimeValue? {
-        guard name == "stringLiteralSyntax",
-            arguments.count == 1,
-            arguments[0].label == nil,
-            case .string(let value) = evaluate(arguments[0].value, locals: locals)
-        else {
-            return nil
-        }
-
-        return .string("\"\(value)\"")
-    }
-
     private func evaluateStringTransform(
         name: String,
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        guard name.hasSuffix(".snakeCase"),
+        let supportedSuffixes = [".snakeCase"]
+        guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
             arguments.isEmpty,
-            let source = evaluatePath(String(name.dropLast(".snakeCase".count)), locals: locals),
+            let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
             case .string(let value) = source
         else {
             return nil
         }
+
         return .string(snakeCase(value))
     }
 

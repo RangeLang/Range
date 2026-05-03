@@ -897,6 +897,13 @@ public enum ExpressionTypeSemantics {
             return graphMemberType
         }
 
+        if let stringMemberType = inferKnownStringMemberIdentifierType(
+            baseType: baseReference,
+            memberName: memberName
+        ) {
+            return stringMemberType
+        }
+
         return inferKnownCollectionMemberIdentifierType(
             baseType: baseReference,
             memberName: memberName
@@ -926,6 +933,8 @@ public enum ExpressionTypeSemantics {
                 return nil
             }
             switch (baseName, memberName, arguments.count) {
+            case ("String", "snakeCase", 0):
+                return baseType
             case ("Array", "map", 1), ("Array", "compactMap", 1), ("Array", "flatMap", 1),
                 ("Array", "filter", 1):
                 return baseType
@@ -990,6 +999,23 @@ public enum ExpressionTypeSemantics {
             default:
                 return nil
             }
+        default:
+            return nil
+        }
+    }
+
+    private static func inferKnownStringMemberIdentifierType(
+        baseType: TypeReference,
+        memberName: String
+    ) -> TypeReference? {
+        guard case .named("String") = baseType else {
+            return nil
+        }
+        switch memberName {
+        case "count":
+            return .named("Int")
+        case "isEmpty":
+            return .named("Bool")
         default:
             return nil
         }

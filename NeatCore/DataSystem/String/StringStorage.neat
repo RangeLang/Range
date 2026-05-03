@@ -3,4 +3,5 @@ construct StringStorage {
     init()
     derived count: Int
     derived isEmpty: Bool
+    function snakeCase() -> String
 }
