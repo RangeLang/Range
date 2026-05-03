@@ -2090,7 +2090,7 @@ struct SwiftBackendEmitter {
         case .double(let value):
             return "\(value)"
         case .string(let value):
-            return "\"\(escapeString(decodeNeatStringEscapes(value)))\""
+            return "\"\(escapeString(StringLiteral.decodeEscapes(value)))\""
         case .interpolatedString(let value):
             return "\"\(try emitInterpolatedString(value, scope: scope))\""
         case .boolean(let value):
@@ -2657,7 +2657,7 @@ struct SwiftBackendEmitter {
         for segment in string.segments {
             switch segment {
             case .text(let text):
-                result += escapeString(decodeNeatStringEscapes(text))
+                result += escapeString(StringLiteral.decodeEscapes(text))
             case .expression(let expression):
                 result += "\\(\(try emitExpression(expression, scope: scope)))"
             }
@@ -2671,48 +2671,6 @@ struct SwiftBackendEmitter {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\n", with: "\\n")
-    }
-
-    private func decodeNeatStringEscapes(_ value: String) -> String {
-        var result = ""
-        var index = value.startIndex
-
-        while index < value.endIndex {
-            let character = value[index]
-            guard character == "\\" else {
-                result.append(character)
-                index = value.index(after: index)
-                continue
-            }
-
-            let nextIndex = value.index(after: index)
-            guard nextIndex < value.endIndex else {
-                result.append(character)
-                index = nextIndex
-                continue
-            }
-
-            let escaped = value[nextIndex]
-            switch escaped {
-            case "\"":
-                result.append("\"")
-            case "\\":
-                result.append("\\")
-            case "n":
-                result.append("\n")
-            case "r":
-                result.append("\r")
-            case "t":
-                result.append("\t")
-            default:
-                result.append(character)
-                result.append(escaped)
-            }
-
-            index = value.index(after: nextIndex)
-        }
-
-        return result
     }
 
     private func emitRawCall(

@@ -15,7 +15,9 @@ struct CompileTimeValueEvaluator {
     ) -> CompileTimeValue? {
         switch expression {
         case .string(let value):
-            return .string(value)
+            return .string(StringLiteral.decodeEscapes(value))
+        case .interpolatedString(let string):
+            return evaluateInterpolatedString(string, locals: locals)
         case .integer(let value):
             return .integer(value)
         case .double(let value):
@@ -215,6 +217,44 @@ struct CompileTimeValueEvaluator {
         }
 
         return result
+    }
+
+    private func evaluateInterpolatedString(
+        _ string: InterpolatedString,
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        var result = ""
+
+        for segment in string.segments {
+            switch segment {
+            case .text(let text):
+                result.append(StringLiteral.decodeEscapes(text))
+            case .expression(let expression):
+                guard let value = evaluate(expression, locals: locals),
+                    let string = interpolatedStringValue(value)
+                else {
+                    return nil
+                }
+                result.append(string)
+            }
+        }
+
+        return .string(result)
+    }
+
+    private func interpolatedStringValue(_ value: CompileTimeValue) -> String? {
+        switch value {
+        case .string(let string):
+            return string
+        case .integer(let integer):
+            return String(integer)
+        case .double(let double):
+            return String(double)
+        case .boolean(let boolean):
+            return boolean ? "true" : "false"
+        default:
+            return nil
+        }
     }
 
     private func evaluateArrayElementAccess(
