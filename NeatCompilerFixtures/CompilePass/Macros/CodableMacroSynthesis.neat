@@ -1,13 +1,16 @@
 #codable(.snakeCase)
-construct CodableMacroFixture {
-    #codingKey("user_id")
-    let id: Int
-
+construct SnakeCaseCodableMacroFixture {
+    let userId: Int
     let displayName: String
-    let avatarURL: String
 }
 
 #codable
 construct IdentityCodableMacroFixture {
     let displayName: String
+}
+
+#codable(.snakeCase)
+construct MarkerOverrideCodableMacroFixture {
+    #codingKey("id")
+    let userId: Int
 }

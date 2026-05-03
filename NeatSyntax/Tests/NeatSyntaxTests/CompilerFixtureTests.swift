@@ -530,6 +530,50 @@ struct CompilerFixtureTests {
         #expect(module.constructs.contains(where: { $0.name == "SiblingConstruct" }))
     }
 
+    @Test("Codable macro synthesizes string keyed encode and decode")
+    func codableMacroSynthesizesStringKeyedEncodeAndDecode() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CodableMacroSynthesis.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let module: ModuleFileNode
+        switch expandedFile.sourceFile {
+        case .module(let expandedModule):
+            module = expandedModule
+        default:
+            Issue.record("Expected expanded Codable macro fixture to become a module.")
+            return
+        }
+
+        #expect(module.enumerations.contains(where: { $0.name == "CodingKeys" }) == false)
+        #expect(
+            module.extensions.allSatisfy { extensionDeclaration in
+                extensionDeclaration.enumerations.contains(where: { $0.name == "CodingKeys" }) == false
+            }
+        )
+
+        let snakeCase = try #require(
+            module.extensions.first(where: { $0.targetName == "SnakeCaseCodableMacroFixture" })
+        )
+        #expect(snakeCase.conformances.map(\.displayName) == ["Codable"])
+        #expect(encodeKeys(in: snakeCase) == ["userId": "user_id", "displayName": "display_name"])
+        #expect(decodeKeys(in: snakeCase) == ["userId": "user_id", "displayName": "display_name"])
+
+        let identity = try #require(
+            module.extensions.first(where: { $0.targetName == "IdentityCodableMacroFixture" })
+        )
+        #expect(encodeKeys(in: identity) == ["displayName": "displayName"])
+        #expect(decodeKeys(in: identity) == ["displayName": "displayName"])
+
+        let markerOverride = try #require(
+            module.extensions.first(where: { $0.targetName == "MarkerOverrideCodableMacroFixture" })
+        )
+        #expect(encodeKeys(in: markerOverride) == ["userId": "id"])
+        #expect(decodeKeys(in: markerOverride) == ["userId": "id"])
+    }
+
     @Test("Derived property macro rewrites reads")
     func derivedPropertyMacroRewritesReads() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedProperty.neat")
@@ -642,6 +686,54 @@ private func expectSharedGenericShape(_ parameters: [GenericParameter]) {
     #expect(value == 3 || value == 1)
 }
 
+
+private func encodeKeys(in extensionDeclaration: ExtensionDeclaration) -> [String: String] {
+    guard let encode = extensionDeclaration.callables.first(where: { $0.name == "encode" }),
+        let body = encode.body
+    else {
+        return [:]
+    }
+
+    return body.reduce(into: [:]) { keys, statement in
+        guard case .switchStatement(let expression, _, _) = statement,
+            case .call(let name, let arguments) = expression,
+            name == "container.encode",
+            case .identifier(let propertyName)? = arguments.first(where: { $0.label == nil })?.value,
+            case .string(let key)? = arguments.first(where: { $0.label == "forKey" })?.value
+        else {
+            return
+        }
+
+        keys[propertyName] = key
+    }
+}
+
+private func decodeKeys(in extensionDeclaration: ExtensionDeclaration) -> [String: String] {
+    guard let initializer = extensionDeclaration.initializers.first,
+        let body = initializer.body
+    else {
+        return [:]
+    }
+
+    return body.reduce(into: [:]) { keys, statement in
+        guard case .switchStatement(let expression, let cases, _) = statement,
+            case .call(let name, let arguments) = expression,
+            name == "container.decode",
+            case .string(let key)? = arguments.first(where: { $0.label == "forKey" })?.value,
+            let successCase = cases.first(where: { switchCase in
+                guard case .enumCase(let name, _) = switchCase.pattern else {
+                    return false
+                }
+                return name == ".success"
+            }),
+            case .enumCase(_, let binding?) = successCase.pattern
+        else {
+            return
+        }
+
+        keys[binding.name] = key
+    }
+}
 
 private func compile(fixture: URL, expectedRole: FixtureRole) throws -> CompiledProgram {
     var inputs = try neatCoreInputs()
