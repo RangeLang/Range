@@ -5,7 +5,7 @@ construct Function: Syntax {
 
     @core
     construct Declaration: SyntaxEmittable {
-        let name: String
+        let identifier: Identifier
         let parameters: [Parameter.Declaration]
         let returnType: TypeReference?
         let body: Block
@@ -13,7 +13,7 @@ construct Function: Syntax {
 
     @core
     construct Application: SyntaxEmittable {
-        let name: String
+        let identifier: Identifier
         let arguments: [Parameter.Application]
     }
 }

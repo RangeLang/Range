@@ -2,7 +2,7 @@
 construct Marker: Syntax {
     @core
     construct Declaration: Syntax {
-        let name: String
+        let identifier: Identifier
         let parameters: [Parameter.Declaration]
         let target: TypeReference
         let valueType: TypeReference
@@ -10,7 +10,7 @@ construct Marker: Syntax {
 
     @core
     construct Application<Value>: Syntax {
-        let name: String
+        let identifier: Identifier
         let value: Value
     }
 }

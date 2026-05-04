@@ -1,0 +1,4 @@
+@core
+construct Identifier: SyntaxEmittable {
+    let name: String
+}

@@ -96,7 +96,7 @@ struct CompileTimeValueEvaluator {
         .object(
             typeName: "Enum.Case",
             fields: [
-                "name": .string(name),
+                "identifier": .object(typeName: "Identifier", fields: ["name": .string(name)]),
                 "associatedValues": .array([]),
             ]
         )
@@ -113,8 +113,8 @@ struct CompileTimeValueEvaluator {
         case (.boolean(let left), .boolean(let right)):
             return left == right
         case (.object("Enum.Case", let left), .object("Enum.Case", let right)):
-            guard case .string(let leftName)? = left["name"],
-                case .string(let rightName)? = right["name"]
+            guard let leftName = enumCaseName(left),
+                let rightName = enumCaseName(right)
             else {
                 return false
             }
@@ -122,6 +122,18 @@ struct CompileTimeValueEvaluator {
         default:
             return false
         }
+    }
+
+    private func enumCaseName(_ fields: [String: CompileTimeValue]) -> String? {
+        if case .string(let name)? = fields["name"] {
+            return name
+        }
+        guard case .object("Identifier", let identifierFields)? = fields["identifier"],
+            case .string(let name)? = identifierFields["name"]
+        else {
+            return nil
+        }
+        return name
     }
 
     private func evaluatePath(_ path: String, locals: [String: Expression]) -> CompileTimeValue? {
@@ -160,10 +172,10 @@ struct CompileTimeValueEvaluator {
         locals: [String: Expression]
     ) -> CompileTimeValue? {
         switch name {
-        case "Enum", "Enum.Declaration", "Enum.Case", "NamedTypeReference", "MemberTypeReference",
-            "Let", "State", "Binding", "Derived", "Init.Declaration", "Function.Declaration",
-            "Construct.Declaration", "Extension", "Macro.Application", "Marker.Application",
-            "Block", "Switch", "SwitchCase", "Return", "Break", "Assignment",
+        case "Enum", "Enum.Declaration", "Enum.Case", "Identifier", "NamedTypeReference",
+            "MemberTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
+            "Function.Declaration", "Construct.Declaration", "Extension", "Macro.Application",
+            "Marker.Application", "Block", "Switch", "SwitchCase", "Return", "Break", "Assignment",
             "ExpressionStatement":
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {

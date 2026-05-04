@@ -119,14 +119,14 @@ construct Function: Syntax {
     let application: Application
 
     construct Declaration {
-        let name: String
+        let identifier: Identifier
         let parameters: [Parameter.Declaration]
         let returnType: TypeReference?
         let body: Block
     }
 
     construct Application {
-        let name: String
+        let identifier: Identifier
         let arguments: [Parameter.Application]
     }
 }

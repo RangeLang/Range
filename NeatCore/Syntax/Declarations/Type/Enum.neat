@@ -12,7 +12,7 @@ construct Enum: Syntax {
 
     @core
     construct Case: SyntaxEmittable {
-        let name: String
+        let identifier: Identifier
         let associatedValues: [AssociatedValue]
     }
 

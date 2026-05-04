@@ -1,5 +1,5 @@
 @core
 protocol Property: Syntax {
-    let name: String
+    let identifier: Identifier
     let type: TypeReference
 }

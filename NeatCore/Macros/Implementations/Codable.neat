@@ -1,9 +1,9 @@
 macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
     let encodeBody: Block = Block(
         statements: target.declaration.lets.map { property in
-            let defaultKey: String = strategy == .snakeCase ? property.name.snakeCase() : property.name
+            let defaultKey: String = strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name
             let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
-                application.name == "codingKey"
+                application.identifier.name == "codingKey"
             }
             let codingKeyValues: [String] = codingKeyMarkers.map { application in
                 application.value
@@ -11,7 +11,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
             let key: String = codingKeyValues.first(default: defaultKey)
 
             Switch(
-                expression: "container.encode(\(property.name), forKey: \"\(key)\")",
+                expression: "container.encode(\(property.identifier.name), forKey: \"\(key)\")",
                 cases: [
                     SwitchCase(
                         pattern: ".success",
@@ -32,9 +32,9 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
 
     let decodeBody: Block = Block(
         statements: target.declaration.lets.map { property in
-            let defaultKey: String = strategy == .snakeCase ? property.name.snakeCase() : property.name
+            let defaultKey: String = strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name
             let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
-                application.name == "codingKey"
+                application.identifier.name == "codingKey"
             }
             let codingKeyValues: [String] = codingKeyMarkers.map { application in
                 application.value
@@ -45,11 +45,11 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
                 expression: "container.decode(\(property.typeName).self, forKey: \"\(key)\")",
                 cases: [
                     SwitchCase(
-                        pattern: ".success(let " + property.name + ")",
+                        pattern: ".success(let " + property.identifier.name + ")",
                         body: Block(statements: [
                             Assignment(
-                                target: "self." + property.name,
-                                expression: property.name
+                                target: "self." + property.identifier.name,
+                                expression: property.identifier.name
                             )
                         ])
                     ),

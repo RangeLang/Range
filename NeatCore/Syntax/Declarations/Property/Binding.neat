@@ -2,7 +2,7 @@
 construct Binding<T>: Property {
     let macros: [Macro.Application]
     let markers: [Marker.Application]
-    let name: String
+    let identifier: Identifier
     let type: TypeReference
     let getterBody: Block?
     let setterBody: Block?

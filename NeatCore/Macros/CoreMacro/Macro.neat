@@ -2,7 +2,7 @@
 construct Macro: Syntax {
     @core
     construct Declaration: Syntax {
-        let name: String
+        let identifier: Identifier
         let parameters: [Parameter.Declaration]
         let target: TypeReference
         let expansionType: TypeReference?
@@ -10,7 +10,7 @@ construct Macro: Syntax {
 
     @core
     construct Application: Syntax {
-        let name: String
+        let identifier: Identifier
         let genericArguments: [TypeReference]
         let argumentClause: String
         let arguments: [Expression]

@@ -15,6 +15,8 @@ struct MacroSyntaxRenderer {
             return renderEnum(value)
         case .object(let typeName, _) where typeName == "Block":
             return renderBlock(value)
+        case .object(let typeName, _) where typeName == "Identifier":
+            return renderIdentifier(value)
         case .object(let typeName, _) where typeName == "NamedTypeReference" || typeName == "MemberTypeReference":
             return renderNominalTypeReference(value)
         case .string(let value):
@@ -103,8 +105,7 @@ struct MacroSyntaxRenderer {
     private func renderEnumCase(_ value: CompileTimeValue) -> String {
         guard case .object(let typeName, let fields) = value,
             typeName == "Enum.Case",
-            let nameValue = fields["name"],
-            let caseName = renderString(nameValue)
+            let caseName = renderIdentifierField(fields)
         else {
             guard let expression = value.expression else {
                 return ""
@@ -118,8 +119,7 @@ struct MacroSyntaxRenderer {
     private func renderEnumCase(_ expression: Expression) -> String {
         guard case .call(let name, let arguments) = expression,
             name == "Enum.Case",
-            let nameExpression = argument("name", in: arguments),
-            let caseName = renderString(nameExpression)
+            let caseName = renderIdentifierArgument(arguments)
         else {
             return renderExpressionForSyntax(expression)
         }
@@ -272,6 +272,62 @@ struct MacroSyntaxRenderer {
         }
     }
 
+    private func renderIdentifierField(_ fields: [String: CompileTimeValue]) -> String? {
+        if let identifier = fields["identifier"] {
+            return renderIdentifier(identifier)
+        }
+        if let name = fields["name"] {
+            return renderString(name)
+        }
+        return nil
+    }
+
+    private func renderIdentifierArgument(_ arguments: [CallArgument]) -> String? {
+        if let identifier = argument("identifier", in: arguments) {
+            return renderIdentifier(identifier)
+        }
+        if let name = argument("name", in: arguments) {
+            return renderString(name)
+        }
+        return nil
+    }
+
+    private func renderIdentifier(_ value: CompileTimeValue) -> String? {
+        switch value {
+        case .object(let typeName, let fields) where typeName == "Identifier":
+            guard let name = fields["name"] else {
+                return nil
+            }
+            return renderString(name)
+        case .string(let value):
+            return value
+        default:
+            return nil
+        }
+    }
+
+    private func renderIdentifier(_ expression: Expression) -> String? {
+        switch expression {
+        case .identifier(let path):
+            if let bound = localBindings[path] {
+                return renderIdentifier(bound)
+            }
+            if let rendered = renderedTargetPath(path) {
+                return renderExpressionForSyntax(rendered)
+            }
+            return path
+        case .string(let value):
+            return value
+        case .call(let name, let arguments) where name == "Identifier":
+            guard let nameExpression = argument("name", in: arguments) else {
+                return nil
+            }
+            return renderString(nameExpression)
+        default:
+            return nil
+        }
+    }
+
     private func renderNominalTypeReference(_ expression: Expression) -> String? {
         switch expression {
         case .identifier(let path):
@@ -325,6 +381,8 @@ struct MacroSyntaxRenderer {
             return value
         case .string(let value):
             return value
+        case .call(let name, _) where name == "Identifier":
+            return renderIdentifier(expression) ?? MacroExpander.renderExpressionForStringify(expression)
         default:
             return MacroExpander.renderExpressionForStringify(expression)
         }
@@ -334,6 +392,8 @@ struct MacroSyntaxRenderer {
         switch value {
         case .string(let value):
             return value
+        case .object(let typeName, _) where typeName == "Identifier":
+            return renderIdentifier(value) ?? ""
         default:
             guard let expression = value.expression else {
                 return ""

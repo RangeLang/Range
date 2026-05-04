@@ -96,7 +96,7 @@ struct MacroTargetValueBuilder {
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
                 "markers": .array(markerValues(for: declaration.macros)),
-                "name": .string(declaration.name),
+                "identifier": identifier(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
                 "typeName": .string(declaration.typeName),
             ]
@@ -109,7 +109,7 @@ struct MacroTargetValueBuilder {
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
                 "markers": .array(markerValues(for: declaration.macros)),
-                "name": .string(declaration.name),
+                "identifier": identifier(declaration.name),
                 "type": typeReferenceValue(declaration.type.displayName),
             ]
         )
@@ -121,7 +121,7 @@ struct MacroTargetValueBuilder {
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
                 "markers": .array(markerValues(for: declaration.macros)),
-                "name": .string(declaration.name),
+                "identifier": identifier(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
             ]
         )
@@ -133,7 +133,7 @@ struct MacroTargetValueBuilder {
             fields: [
                 "macros": .array(declaration.macros.map(value(for:))),
                 "markers": .array(markerValues(for: declaration.macros)),
-                "name": .string(declaration.name),
+                "identifier": identifier(declaration.name),
                 "type": typeReferenceValue(declaration.typeName),
             ]
         )
@@ -149,7 +149,7 @@ struct MacroTargetValueBuilder {
             return .object(
                 typeName: "Marker.Application",
                 fields: [
-                    "name": .string(application.name),
+                    "identifier": identifier(application.name),
                     "valueType": typeReferenceValue(marker.valueType),
                     "valueTypeName": .string(marker.valueType.displayName),
                     "value": value,
@@ -219,7 +219,7 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Macro.Application",
             fields: [
-                "name": .string(application.name),
+                "identifier": identifier(application.name),
                 "genericArguments": .array(application.genericArguments.map(typeReferenceValue)),
                 "argumentClause": .string(application.argumentClause ?? ""),
                 "arguments": .array(argumentValues(for: application)),
@@ -267,7 +267,7 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Function.Declaration",
             fields: [
-                "name": .string(declaration.name),
+                "identifier": identifier(declaration.name),
                 "parameters": .array(declaration.parameters.map(value(for:))),
                 "returnType": declaration.returnType.map(typeReferenceValue) ?? .string("Void"),
             ]
@@ -278,8 +278,10 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Parameter.Declaration",
             fields: [
-                "name": .string(declaration.name),
+                "externalName": declaration.externalLabel.map(CompileTimeValue.string) ?? .string(""),
+                "localName": .string(declaration.localName),
                 "type": declaration.typeReference.map(typeReferenceValue) ?? .string("Void"),
+                "defaultValue": declaration.defaultValue.flatMap(value(for:)) ?? .string(""),
             ]
         )
     }
@@ -288,7 +290,7 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Enum.Case",
             fields: [
-                "name": .string(declaration.name),
+                "identifier": identifier(declaration.name),
                 "associatedValues": .array(
                     declaration.associatedValues.map { associatedValue in
                         .object(
@@ -306,6 +308,10 @@ struct MacroTargetValueBuilder {
 
     private func nominalTypeReference(_ name: String) -> CompileTimeValue {
         .object(typeName: "NamedTypeReference", fields: ["name": .string(name)])
+    }
+
+    private func identifier(_ name: String) -> CompileTimeValue {
+        .object(typeName: "Identifier", fields: ["name": .string(name)])
     }
 
     private func typeReferenceValue(_ typeReference: TypeReference) -> CompileTimeValue {
