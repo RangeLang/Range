@@ -4,7 +4,7 @@ construct Address {
 }
 
 extension Address: Encodable {
-    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         state container = encoder.keyedContainer()
 
         switch container.encode(city, forKey: "city") {
@@ -25,7 +25,7 @@ construct User {
 }
 
 extension User: Encodable {
-    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         state container = encoder.keyedContainer()
 
         switch container.encode(name, forKey: "name") {

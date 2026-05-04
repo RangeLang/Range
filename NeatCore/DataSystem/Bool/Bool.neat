@@ -8,7 +8,7 @@ construct Bool: ExpressibleByBoolLiteral, Equatable, Hashable {
 }
 
 extension Bool: Decodable {
-    init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
+    init(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container = decoder.singleValueContainer()
         switch container.decode(Bool.self) {
         case .success(let value):
@@ -21,7 +21,7 @@ extension Bool: Decodable {
 }
 
 extension Bool: Encodable {
-    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         let container = encoder.singleValueContainer()
         return container.encode(self)
     }

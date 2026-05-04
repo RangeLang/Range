@@ -49,7 +49,7 @@ construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
 }
 
 extension Dictionary<String, Value: Encodable>: Encodable {
-    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         state container = encoder.keyedContainer()
         let values: [DictionaryEntry<String, Value>] = entries()
         state index = 0

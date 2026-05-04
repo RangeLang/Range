@@ -1,4 +1,4 @@
-protocol Decoder<Input> {
+protocol Decoder {
     function keyedContainer() -> KeyedDecodingContainer
 
     function unkeyedContainer() -> UnkeyedDecodingContainer

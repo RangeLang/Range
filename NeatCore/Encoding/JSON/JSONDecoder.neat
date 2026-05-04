@@ -1,4 +1,4 @@
-construct JSONDecoder: Decoder<JSONValue> {
+construct JSONDecoder: Decoder {
     let value: JSONValue
 
     function decode(_ type: Bool.Type, from value: JSONValue) -> Result<Bool, DecodingError> {

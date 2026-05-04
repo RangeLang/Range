@@ -4,7 +4,7 @@ construct User {
 }
 
 extension User: Encodable {
-    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         state container = encoder.keyedContainer()
         container.encode(id, forKey: "id")
         return container.encode(name, forKey: "name")

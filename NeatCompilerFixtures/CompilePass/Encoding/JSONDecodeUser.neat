@@ -4,7 +4,7 @@ construct DecodedUser {
 }
 
 extension DecodedUser: Decodable {
-    init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
+    init(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container = decoder.keyedContainer()
 
         switch container.decode(Int.self, forKey: "id") {

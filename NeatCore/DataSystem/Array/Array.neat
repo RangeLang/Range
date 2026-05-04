@@ -82,7 +82,7 @@ construct Array<Element>: ExpressibleByArrayLiteral {
 }
 
 extension Array: Encodable {
-    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         state container = encoder.unkeyedContainer()
         state index = 0
 

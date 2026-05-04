@@ -1,4 +1,4 @@
-protocol Encoder<Output> {
+protocol Encoder {
     function keyedContainer() -> KeyedEncodingContainer
 
     function unkeyedContainer() -> UnkeyedEncodingContainer

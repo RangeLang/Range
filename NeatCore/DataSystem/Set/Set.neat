@@ -45,7 +45,7 @@ construct Set<Element: Hashable>: ExpressibleBySetLiteral {
 }
 
 extension Set<Element: Encodable>: Encodable {
-    function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         state container = encoder.unkeyedContainer()
         let values: [Element] = elements()
         state index = 0

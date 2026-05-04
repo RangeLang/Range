@@ -66,13 +66,13 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
 
     target.declaration.expand {
         extension #(target.declaration.self): Codable {
-            function encode<Output>(to encoder: Encoder<Output>) -> Result<Void, EncodingError> {
+            function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
                 #(encodeBody)
                 return .success(result: Void())
             }
 
-            init(from decoder: Decoder<JSONValue>) -> Result<Self, DecodingError> {
+            init(from decoder: Decoder) -> Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer = decoder.keyedContainer()
                 #(decodeBody)
                 return .success(result: self)
