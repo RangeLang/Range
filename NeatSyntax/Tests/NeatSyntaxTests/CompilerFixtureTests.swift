@@ -27,6 +27,32 @@ struct CompilerFixtureTests {
         }
     }
 
+    @Test("Compiler diagnostics include macro warnings")
+    func compilerDiagnosticsIncludeMacroWarnings() throws {
+        let fixture = try fixtureFile(
+            in: "CompilePass",
+            path: "Macros/SyntaxProducingMacroIdentifierMemberAccess.neat"
+        )
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: fixture.path,
+                source: try String(contentsOf: fixture, encoding: .utf8),
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+
+        #expect(
+            diagnostics.contains {
+                $0.severity == .warning
+                    && $0.code == "macro.identifier-member-splice"
+                    && $0.path == fixture.path
+            }
+        )
+    }
+
     @Test("Project macros infer across project files")
     func projectMacrosInferAcrossProjectFiles() throws {
         var inputs = try neatCoreInputs()

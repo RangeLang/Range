@@ -507,6 +507,19 @@ struct MacroExpansionContext {
     let rewriteSurfaceView: RewriteSurfaceView
     let macroDeclarationsByName: [String: MacroDeclaration]
     let markerDeclarationsByName: [String: MarkerDeclaration]
+    let diagnosticEngine: NeatDiagnosticEngine?
+    let currentPath: String?
+
+    func withCurrentPath(_ path: String) -> MacroExpansionContext {
+        MacroExpansionContext(
+            macroRealizationView: macroRealizationView,
+            rewriteSurfaceView: rewriteSurfaceView,
+            macroDeclarationsByName: macroDeclarationsByName,
+            markerDeclarationsByName: markerDeclarationsByName,
+            diagnosticEngine: diagnosticEngine,
+            currentPath: path
+        )
+    }
 
     func propertyMacroTargetMatches(
         _ macro: MacroDeclaration,

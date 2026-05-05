@@ -3,13 +3,16 @@ import Foundation
 extension DeclarationGraph {
     func macroExpansionContext(
         macrosByName: [String: MacroDeclaration],
-        markersByName: [String: MarkerDeclaration] = [:]
+        markersByName: [String: MarkerDeclaration] = [:],
+        diagnosticEngine: NeatDiagnosticEngine? = nil
     ) -> MacroExpansionContext {
         MacroExpansionContext(
             macroRealizationView: macroRealizationView(macrosByName: macrosByName),
             rewriteSurfaceView: rewriteSurfaceView,
             macroDeclarationsByName: macrosByName,
-            markerDeclarationsByName: markersByName
+            markerDeclarationsByName: markersByName,
+            diagnosticEngine: diagnosticEngine,
+            currentPath: nil
         )
     }
 

@@ -1899,7 +1899,7 @@ extension MacroExpander {
             )
         }
 
-        noteSyntaxMacroSpliceMemberAccessRisk(syntaxBody, macro: macro)
+        noteSyntaxMacroSpliceMemberAccessRisk(syntaxBody, macro: macro, context: context)
         try validateFreestandingSyntaxMacroTemplate(
             syntaxBody,
             macro: macro,
@@ -2040,7 +2040,8 @@ extension MacroExpander {
 
     static func noteSyntaxMacroSpliceMemberAccessRisk(
         _ block: EmittedCodeBlock,
-        macro: MacroDeclaration
+        macro: MacroDeclaration,
+        context: MacroExpansionContext
     ) {
         // TODO: Emit a compiler warning once the expander has a retained warning
         // channel. Identifier splices in member chains are allowed because the
@@ -2066,6 +2067,12 @@ extension MacroExpander {
         guard hasIdentifierMemberSplice else {
             return
         }
+        context.diagnosticEngine?.warning(
+            "Spliced Identifier is used as a member-access base. This chain is checked after macro expansion.",
+            source: "neat-macro-expander",
+            code: "macro.identifier-member-splice",
+            path: context.currentPath
+        )
     }
 
     static func syntaxTextStartsWithMemberAccess(_ text: String) -> Bool {

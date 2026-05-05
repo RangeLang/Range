@@ -76,7 +76,10 @@ public struct CompiledProgram {
 public struct CompilerPipeline {
     public init() {}
 
-    public func build(inputs: [SourceInput]) throws -> CompiledProgram {
+    public func build(
+        inputs: [SourceInput],
+        diagnosticEngine: NeatDiagnosticEngine? = nil
+    ) throws -> CompiledProgram {
         let orderedInputs = inputs.sorted { lhs, rhs in
             if lhs.role != rhs.role {
                 return lhs.role == .core
@@ -140,7 +143,10 @@ public struct CompilerPipeline {
         )
 
         let parsedFiles = parsedCoreFiles + parsedProjectFiles
-        let expandedFiles = try MacroExpander.expand(files: parsedFiles)
+        let expandedFiles = try MacroExpander.expand(
+            files: parsedFiles,
+            diagnosticEngine: diagnosticEngine
+        )
         let declarationGraph = DeclarationGraph(files: expandedFiles)
 
         return CompiledProgram(
@@ -151,10 +157,28 @@ public struct CompilerPipeline {
         )
     }
 
-    public func buildValidated(inputs: [SourceInput]) throws -> CompiledProgram {
-        let program = try build(inputs: inputs)
+    public func buildValidated(
+        inputs: [SourceInput],
+        diagnosticEngine: NeatDiagnosticEngine? = nil
+    ) throws -> CompiledProgram {
+        let program = try build(inputs: inputs, diagnosticEngine: diagnosticEngine)
         try CompiledProgramValidator().validate(program)
         return program
+    }
+
+    public func diagnostics(inputs: [SourceInput], fallbackPath: String? = nil) -> [NeatDiagnostic] {
+        let diagnosticEngine = NeatDiagnosticEngine()
+        do {
+            _ = try buildValidated(inputs: inputs, diagnosticEngine: diagnosticEngine)
+        } catch {
+            diagnosticEngine.emit(
+                NeatDiagnosticConverter.diagnostic(
+                    from: error,
+                    path: fallbackPath ?? inputs.first(where: { $0.role == .project })?.path
+                )
+            )
+        }
+        return diagnosticEngine.diagnostics
     }
 
     public func validatePrimaryDeclarations(inputs: [SourceInput]) throws {

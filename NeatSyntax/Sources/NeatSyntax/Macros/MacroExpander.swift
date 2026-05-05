@@ -3,7 +3,10 @@ import Foundation
 public enum MacroExpander {
     private static let expansionLock = NSLock()
 
-    public static func expand(files: [ParsedSourceFile]) throws -> [ParsedSourceFile] {
+    public static func expand(
+        files: [ParsedSourceFile],
+        diagnosticEngine: NeatDiagnosticEngine? = nil
+    ) throws -> [ParsedSourceFile] {
         expansionLock.lock()
         defer { expansionLock.unlock() }
 
@@ -18,7 +21,8 @@ public enum MacroExpander {
         )
         let context = declarationGraph.macroExpansionContext(
             macrosByName: registry,
-            markersByName: markerRegistry
+            markersByName: markerRegistry,
+            diagnosticEngine: diagnosticEngine
         )
         return try files.map { parsedFile in
             ParsedSourceFile(
@@ -29,7 +33,7 @@ public enum MacroExpander {
                     protocols: protocols,
                     parameterMacroSignatures: context.macroRealizationView.parameterMacroSignatures,
                     literalBridges: context.macroRealizationView.realizedLiteralBridges,
-                    context: context
+                    context: context.withCurrentPath(parsedFile.path)
                 )
             )
         }

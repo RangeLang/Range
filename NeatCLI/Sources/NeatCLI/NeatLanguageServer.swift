@@ -387,20 +387,81 @@ struct NeatLanguageServer {
     }
 
     private func diagnosticPayload(for uri: String, text: String, index: DocumentIndex) -> [[String: Any]] {
+        let inputs: [SourceInput]
         do {
-            let inputs = try diagnosticInputs(for: uri, text: text)
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
-            return []
+            inputs = try diagnosticInputs(for: uri, text: text)
         } catch {
-            let fallbackRange = index.firstNonWhitespaceRange ?? index.fullDocumentRange
             return [
-                [
-                    "range": fallbackRange.json,
-                    "severity": 1,
-                    "source": "neat-lsp",
-                    "message": String(describing: error),
-                ]
+                lspDiagnostic(
+                    from: NeatDiagnosticConverter.diagnostic(from: error),
+                    index: index
+                )
             ]
+        }
+
+        return CompilerPipeline()
+            .diagnostics(inputs: inputs, fallbackPath: documentPath(for: uri))
+            .filter { diagnosticAppliesToDocument($0, uri: uri) }
+            .map { lspDiagnostic(from: $0, index: index) }
+    }
+
+    private func documentPath(for uri: String) -> String? {
+        guard let fileURL = URL(string: uri),
+            fileURL.isFileURL
+        else {
+            return nil
+        }
+        return fileURL.standardizedFileURL.path
+    }
+
+    private func diagnosticAppliesToDocument(_ diagnostic: NeatDiagnostic, uri: String) -> Bool {
+        guard let path = diagnostic.path,
+            let fileURL = URL(string: uri),
+            fileURL.isFileURL
+        else {
+            return true
+        }
+        return URL(fileURLWithPath: path).standardizedFileURL.path
+            == fileURL.standardizedFileURL.path
+    }
+
+    private func lspDiagnostic(
+        from diagnostic: NeatDiagnostic,
+        index: DocumentIndex
+    ) -> [String: Any] {
+        let range = lspRange(for: diagnostic, fallback: index.firstNonWhitespaceRange ?? index.fullDocumentRange)
+        var payload: [String: Any] = [
+            "range": range.json,
+            "severity": lspSeverity(for: diagnostic.severity),
+            "source": diagnostic.source,
+            "message": diagnostic.message,
+        ]
+        if let code = diagnostic.code {
+            payload["code"] = code
+        }
+        return payload
+    }
+
+    private func lspRange(for diagnostic: NeatDiagnostic, fallback: RangePosition) -> RangePosition {
+        guard let range = diagnostic.range else {
+            return fallback
+        }
+        return RangePosition(
+            start: Position(line: range.start.line, character: range.start.character),
+            end: Position(line: range.end.line, character: range.end.character)
+        )
+    }
+
+    private func lspSeverity(for severity: NeatDiagnosticSeverity) -> Int {
+        switch severity {
+        case .error:
+            return 1
+        case .warning:
+            return 2
+        case .information:
+            return 3
+        case .hint:
+            return 4
         }
     }
 

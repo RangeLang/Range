@@ -11,6 +11,9 @@ enum ErrorPresenter {
     }
 
     private static func detailMessage(for error: Error) -> String {
+        if let diagnostic = error as? NeatDiagnostic {
+            return diagnostic.description
+        }
         if let parse = error as? ParseError {
             return parse.description
         }
