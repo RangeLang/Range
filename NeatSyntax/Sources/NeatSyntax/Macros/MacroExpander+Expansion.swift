@@ -1787,7 +1787,6 @@ extension MacroExpander {
             localBindings: localBindings,
             context: context
         )
-
         var parser = try Parser(source: rendered)
         let sourceFile = try parser.parseSourceFile()
         return try declarationBundle(from: sourceFile)
@@ -1834,6 +1833,28 @@ extension MacroExpander {
                     return renderedSyntax
                 }
                 return renderExpressionForStringify(substituted)
+            case .syntaxMacroInvocation(let name, let arguments):
+                guard let syntaxMacro = context.macroDeclarationsByName[name],
+                    syntaxMacro.target == nil,
+                    let value = try evaluateFreestandingSyntaxMacro(
+                        syntaxMacro,
+                        arguments: arguments,
+                        callerLocals: localBindings,
+                        callerTargetBinding: bindings.target,
+                        callerTargetValue: targetValue,
+                        context: context
+                    )
+                else {
+                    throw ParseError("Unknown syntax macro #\(name).")
+                }
+                let renderer = MacroSyntaxRenderer(
+                    localBindings: localBindings,
+                    renderedTargetPath: { targetSurface.renderedTargetPath($0) }
+                )
+                guard let rendered = renderer.renderSyntax(value) else {
+                    throw ParseError("Syntax macro #\(name) did not produce renderable syntax.")
+                }
+                return rendered
             }
         }.joined(separator: " ")
     }
@@ -1842,19 +1863,40 @@ extension MacroExpander {
         _ macro: MacroDeclaration,
         arguments: [CallArgument],
         callerLocals: [String: Expression],
+        callerTargetBinding: String = "__syntax_macro_argument_target__",
+        callerTargetValue: CompileTimeValue = .object(
+            typeName: "SyntaxMacro.ArgumentTarget",
+            fields: [:]
+        ),
         context: MacroExpansionContext
     ) throws -> CompileTimeValue? {
         guard macro.target == nil,
-            let returnType = macro.expansionType,
-            let syntaxBody = macro.syntaxBody
+            let returnType = macro.expansionType
         else {
             return nil
         }
 
         var bindings = callerLocals
         let argumentBindings = try expressionMacroArgumentBindings(for: macro, arguments: arguments)
+        var resolvedArgumentBindings: [String: Expression] = [:]
         for (name, expression) in argumentBindings {
-            bindings[name] = expression
+            let resolvedExpression = resolvedSyntaxMacroArgument(
+                expression,
+                callerLocals: callerLocals,
+                callerTargetBinding: callerTargetBinding,
+                callerTargetValue: callerTargetValue,
+                context: context
+            )
+            bindings[name] = resolvedExpression
+            resolvedArgumentBindings[name] = resolvedExpression
+        }
+
+        guard let syntaxBody = macro.syntaxBody else {
+            return try evaluateFreestandingSyntaxMacroValueBody(
+                macro,
+                localBindings: bindings,
+                context: context
+            )
         }
 
         try validateSyntaxMacroSpliceMemberAccess(syntaxBody, macro: macro)
@@ -1866,10 +1908,72 @@ extension MacroExpander {
         let rendered = try renderFreestandingSyntaxMacroBody(
             syntaxBody,
             localBindings: bindings,
-            parameterBindings: argumentBindings,
+            parameterBindings: resolvedArgumentBindings,
             context: context
         )
         return try syntaxValue(from: rendered, as: returnType)
+    }
+
+    static func evaluateFreestandingSyntaxMacroValueBody(
+        _ macro: MacroDeclaration,
+        localBindings: [String: Expression],
+        context: MacroExpansionContext
+    ) throws -> CompileTimeValue? {
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "__syntax_macro_target__",
+            targetValue: .object(typeName: "SyntaxMacro.Target", fields: [:]),
+            localBindings: localBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            context: context
+        )
+        var locals = localBindings
+        for statement in macro.body {
+            switch statement {
+            case .localBinding(let declaration):
+                locals[declaration.name] = declaration.expression
+            case .return(let expression?):
+                return evaluator.evaluate(expression, with: locals)
+            case .expression(let expression):
+                return evaluator.evaluate(expression, with: locals)
+            default:
+                return nil
+            }
+        }
+        return nil
+    }
+
+    static func resolvedSyntaxMacroArgument(
+        _ expression: Expression,
+        callerLocals: [String: Expression],
+        callerTargetBinding: String,
+        callerTargetValue: CompileTimeValue,
+        context: MacroExpansionContext
+    ) -> Expression {
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: callerTargetBinding,
+            targetValue: callerTargetValue,
+            localBindings: callerLocals,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            context: context
+        )
+        if let value = evaluator.evaluate(expression),
+            let evaluatedExpression = value.expression
+        {
+            return evaluatedExpression
+        }
+
+        guard case .identifier(let name) = expression,
+            let callerExpression = callerLocals[name]
+        else {
+            return expression
+        }
+        return resolvedSyntaxMacroArgument(
+            callerExpression,
+            callerLocals: callerLocals,
+            callerTargetBinding: callerTargetBinding,
+            callerTargetValue: callerTargetValue,
+            context: context
+        )
     }
 
     static func renderFreestandingSyntaxMacroBody(
@@ -1916,6 +2020,20 @@ extension MacroExpander {
                     return ""
                 }
                 return renderExpressionForStringify(rendered)
+            case .syntaxMacroInvocation(let name, let arguments):
+                guard let macro = context.macroDeclarationsByName[name],
+                    macro.target == nil,
+                    let value = try evaluateFreestandingSyntaxMacro(
+                        macro,
+                        arguments: arguments,
+                        callerLocals: localBindings,
+                        context: context
+                    ),
+                    let rendered = renderer.renderSyntax(value)
+                else {
+                    throw ParseError("Could not render syntax macro #\(name).")
+                }
+                return rendered
             }
         }.joined(separator: " ")
     }
@@ -1924,6 +2042,10 @@ extension MacroExpander {
         _ block: EmittedCodeBlock,
         macro: MacroDeclaration
     ) throws {
+        // TODO: Decide the final policy for member-position identifier splicing.
+        // `#(identifier).member` is rejected because an Identifier does not prove
+        // the base has that member. `self.#(identifier)` currently remains allowed
+        // as member-name substitution, but that is not yet a fully verified access.
         let parameterTypes = Dictionary(
             uniqueKeysWithValues: macro.parameters.map {
                 ($0.localName, $0.typeReference?.displayName ?? "")
@@ -2073,6 +2195,10 @@ extension MacroExpander {
                 let name = "__splice_\(index)"
                 spliceNames.insert(name)
                 return name
+            case .syntaxMacroInvocation:
+                let name = "__syntax_macro_\(index)"
+                spliceNames.insert(name)
+                return name
             }
         }.joined(separator: " ")
         let allowedIdentifiers = Set(macro.parameters.map(\.localName)).union(spliceNames)
@@ -2090,6 +2216,7 @@ extension MacroExpander {
             )
         case "Statement", "Switch":
             var parser = try Parser(source: source)
+            parser.currentSelfAvailable = true
             var localBindings: [String: LocalBindingSymbol] = [:]
             let statement = try parser.parseStatement(localBindings: &localBindings)
             try parser.consume(.eof)
@@ -2101,6 +2228,7 @@ extension MacroExpander {
             )
         case "Block":
             var parser = try Parser(source: source)
+            parser.currentSelfAvailable = true
             var parserLocals: [String: LocalBindingSymbol] = [:]
             var validatorLocals: Set<String> = []
             while parser.peek() != .eof {
@@ -2393,12 +2521,14 @@ extension MacroExpander {
             return expressionSyntaxValue(expression)
         case "Statement":
             var parser = try Parser(source: source)
+            parser.currentSelfAvailable = true
             var localBindings: [String: LocalBindingSymbol] = [:]
             let statement = try parser.parseStatement(localBindings: &localBindings)
             try parser.consume(.eof)
             return try statementSyntaxValue(statement)
         case "Switch":
             var parser = try Parser(source: source)
+            parser.currentSelfAvailable = true
             var localBindings: [String: LocalBindingSymbol] = [:]
             let statement = try parser.parseStatement(localBindings: &localBindings)
             guard case .switchStatement = statement else {
@@ -2408,6 +2538,7 @@ extension MacroExpander {
             return try statementSyntaxValue(statement)
         case "Block":
             var parser = try Parser(source: source)
+            parser.currentSelfAvailable = true
             var localBindings: [String: LocalBindingSymbol] = [:]
             var statements: [Statement] = []
             while parser.peek() != .eof {
@@ -2480,10 +2611,11 @@ extension MacroExpander {
         case .expression(let expression):
             return renderExpressionForStringify(expression)
         case .enumCase(let name, nil):
-            return ".\(name)"
+            return name.hasPrefix(".") ? name : ".\(name)"
         case .enumCase(let name, let binding?):
             let keyword = binding.kind == .mutable ? "var" : "let"
-            return ".\(name)(\(keyword) \(binding.name))"
+            let caseName = name.hasPrefix(".") ? name : ".\(name)"
+            return "\(caseName)(\(keyword) \(binding.name))"
         }
     }
 

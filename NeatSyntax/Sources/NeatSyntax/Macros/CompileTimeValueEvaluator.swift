@@ -25,6 +25,10 @@ struct CompileTimeValueEvaluator {
         evaluate(expression, locals: localBindings)
     }
 
+    func evaluate(_ expression: Expression, with locals: [String: Expression]) -> CompileTimeValue? {
+        evaluate(expression, locals: locals)
+    }
+
     private func evaluate(
         _ expression: Expression,
         locals: [String: Expression]

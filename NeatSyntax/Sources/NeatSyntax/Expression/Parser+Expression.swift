@@ -236,11 +236,14 @@ extension Parser {
 
         try consumeKeyword(.inKeyword)
 
-        var localBindings = Dictionary(
+        var localBindings = currentClosureBaseLocalBindings
+        for (name, binding) in Dictionary(
             uniqueKeysWithValues: parameterNames.map {
                 ($0, LocalBindingSymbol(kind: .constant, type: .named("Unknown")))
             }
-        )
+        ) {
+            localBindings[name] = binding
+        }
         var statements: [Statement] = []
         while peek() != .rightBrace {
             statements.append(try parseStatement(localBindings: &localBindings))

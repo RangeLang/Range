@@ -186,6 +186,7 @@ public struct Parser {
     var macroDeclarationsByName: [String: MacroDeclaration]
     var macroExpansionTypes: [String: TypeReference] = [:]
     var currentMacroBodyDepth: Int = 0
+    var currentClosureBaseLocalBindings: [String: LocalBindingSymbol] = [:]
 
     public init(
         source: String,

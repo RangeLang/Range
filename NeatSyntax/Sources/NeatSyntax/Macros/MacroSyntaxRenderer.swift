@@ -15,10 +15,20 @@ struct MacroSyntaxRenderer {
             return renderEnum(value)
         case .object(let typeName, _) where typeName == "Block":
             return renderBlock(value)
+        case .object(let typeName, _) where typeName == "Switch" || typeName == "Return"
+            || typeName == "Break" || typeName == "Assignment"
+            || typeName == "ExpressionStatement":
+            return renderStatement(value)
         case .object(let typeName, _) where typeName == "Identifier":
             return renderIdentifier(value)
         case .object(let typeName, _) where typeName == "NamedTypeReference" || typeName == "MemberTypeReference":
             return renderNominalTypeReference(value)
+        case .array(let values):
+            let rendered = values.compactMap(renderSyntax)
+            guard rendered.count == values.count else {
+                return nil
+            }
+            return rendered.joined(separator: " ")
         case .string(let value):
             return value
         default:

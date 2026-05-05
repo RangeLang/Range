@@ -22,6 +22,9 @@ extension MacroExpander {
         syntaxResolver: DeclarationSyntaxResolver
     ) throws {
         for macro in macros {
+            guard macro.target != nil else {
+                continue
+            }
             for parameter in macro.parameters {
                 guard syntaxResolver.typeConformsToSyntax(parameter.typeReference) else {
                     if parameter.capturesSyntax {

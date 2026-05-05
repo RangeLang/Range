@@ -156,7 +156,7 @@ struct MacroTargetSurface {
         path == targetBinding || path.hasPrefix("\(targetBinding).")
     }
 
-    private func renderedTargetPath(_ path: String) -> Expression? {
+    func renderedTargetPath(_ path: String) -> Expression? {
         guard isTargetPath(path) else {
             return nil
         }

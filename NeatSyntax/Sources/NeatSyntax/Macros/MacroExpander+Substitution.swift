@@ -25,6 +25,19 @@ extension MacroExpander {
                                 expression: substituteMacroBindings(in: expression, bindings: bindings),
                                 expected: expected
                             )
+                        case .syntaxMacroInvocation(let name, let arguments):
+                            return .syntaxMacroInvocation(
+                                name: name,
+                                arguments: arguments.map {
+                                    CallArgument(
+                                        label: $0.label,
+                                        value: substituteMacroBindings(
+                                            in: $0.value,
+                                            bindings: bindings
+                                        )
+                                    )
+                                }
+                            )
                         }
                     }
                 )

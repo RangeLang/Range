@@ -8,16 +8,14 @@ macro invalidEncodeSwitch(value: Identifier, key: String) -> Switch {
 }
 
 macro emitInvalidEncodingSwitch(): Construct { target, diagnostics in
-    let statement: Switch = #invalidEncodeSwitch(
-        value: Identifier(name: "id"),
-        key: "id"
-    )
-
     target.declaration.expand {
         extension #(target.declaration.self): Encodable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
-                #(statement)
+                #invalidEncodeSwitch(
+                    value: Identifier(name: "id"),
+                    key: "id"
+                )
                 return .success(result: Void())
             }
         }

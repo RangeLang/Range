@@ -32,7 +32,17 @@ extension Parser {
                 syntaxBody = nil
             } else {
                 try consume(.leftBrace)
-                syntaxBody = try parseEmittedCodeBlock()
+                if isFreestandingMacroValueBodyStart() {
+                    syntaxBody = nil
+                } else {
+                    syntaxBody = try parseEmittedCodeBlock()
+                }
+            }
+            let body: [Statement]
+            if syntaxBody == nil, !signatureOnly {
+                body = try parseFreestandingMacroValueBody(parameters: parameters)
+            } else {
+                body = []
             }
             return MacroDeclaration(
                 name: name,
@@ -41,7 +51,7 @@ extension Parser {
                 target: nil,
                 expansionType: expansionType,
                 bindings: nil,
-                body: [],
+                body: body,
                 syntaxBody: syntaxBody
             )
         }
@@ -129,6 +139,36 @@ extension Parser {
             valueType: valueType,
             body: body
         )
+    }
+
+    func isFreestandingMacroValueBodyStart() -> Bool {
+        switch peek() {
+        case .keyword(NeatSyntax.Keyword.returnStatement.rawValue),
+            .keyword(NeatSyntax.Keyword.let.rawValue),
+            .keyword(NeatSyntax.Keyword.state.rawValue):
+            return true
+        default:
+            return false
+        }
+    }
+
+    mutating func parseFreestandingMacroValueBody(parameters: [NeatFunctionParameter]) throws
+        -> [Statement]
+    {
+        var localBindings = Dictionary(
+            uniqueKeysWithValues: parameters.map {
+                (
+                    $0.localName,
+                    LocalBindingSymbol(kind: .constant, type: $0.typeReference ?? .named("Unknown"))
+                )
+            }
+        )
+        var statements: [Statement] = []
+        while peek() != .rightBrace {
+            statements.append(try parseStatement(localBindings: &localBindings))
+        }
+        try consume(.rightBrace)
+        return statements
     }
 
     mutating func parseMarkerBody(parameters: [NeatFunctionParameter]) throws -> [Statement] {
@@ -251,6 +291,11 @@ extension Parser {
                         )
                     )
                 )
+            case .hashDirective(let name):
+                flushText()
+                advance()
+                let arguments = try parseInvocationArgumentsIfPresent()
+                parts.append(.syntaxMacroInvocation(name: name, arguments: arguments))
             default:
                 let consumed = advance()
                 emittedTokens.append(consumed)

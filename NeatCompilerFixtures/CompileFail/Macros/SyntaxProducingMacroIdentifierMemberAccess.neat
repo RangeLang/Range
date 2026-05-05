@@ -8,17 +8,15 @@ macro invalidIdentifierContainerSwitch(container: Identifier, value: Identifier,
 }
 
 macro emitInvalidIdentifierContainerSwitch(): Construct { target, diagnostics in
-    let statement: Switch = #invalidIdentifierContainerSwitch(
-        container: Identifier(name: "container"),
-        value: Identifier(name: "id"),
-        key: "id"
-    )
-
     target.declaration.expand {
         extension #(target.declaration.self): Encodable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
-                #(statement)
+                #invalidIdentifierContainerSwitch(
+                    container: Identifier(name: "container"),
+                    value: Identifier(name: "id"),
+                    key: "id"
+                )
                 return .success(result: Void())
             }
         }

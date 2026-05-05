@@ -1,80 +1,60 @@
+macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: String) -> Switch {
+    switch container.encode(#(value), forKey: key) {
+    case .success:
+        break
+    case .failure(let error):
+        return .failure(cause: error)
+    }
+}
+
+macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, value: Identifier, key: String) -> Switch {
+    switch container.decode(#(type).self, forKey: key) {
+    case .success(let #(value)):
+        self.#(value) = #(value)
+    case .failure(let error):
+        return .failure(cause: error)
+    }
+}
+
 macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
-    let encodeBody: Block = Block(
-        statements: target.declaration.lets.map { property in
-            let defaultKey: String = strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name
-            let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
-                application.identifier.name == "codingKey"
-            }
-            let codingKeyValues: [String] = codingKeyMarkers.map { application in
-                application.value
-            }
-            let key: String = codingKeyValues.first(default: defaultKey)
-
-            Switch(
-                expression: "container.encode(\(property.identifier.name), forKey: \"\(key)\")",
-                cases: [
-                    SwitchCase(
-                        pattern: ".success",
-                        body: Block(statements: [
-                            Break()
-                        ])
-                    ),
-                    SwitchCase(
-                        pattern: ".failure(let error)",
-                        body: Block(statements: [
-                            Return(expression: ".failure(cause: error)")
-                        ])
-                    )
-                ]
-            )
-        }
-    )
-
-    let decodeBody: Block = Block(
-        statements: target.declaration.lets.map { property in
-            let defaultKey: String = strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name
-            let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
-                application.identifier.name == "codingKey"
-            }
-            let codingKeyValues: [String] = codingKeyMarkers.map { application in
-                application.value
-            }
-            let key: String = codingKeyValues.first(default: defaultKey)
-
-            Switch(
-                expression: "container.decode(\(property.typeName).self, forKey: \"\(key)\")",
-                cases: [
-                    SwitchCase(
-                        pattern: ".success(let " + property.identifier.name + ")",
-                        body: Block(statements: [
-                            Assignment(
-                                target: "self." + property.identifier.name,
-                                expression: property.identifier.name
-                            )
-                        ])
-                    ),
-                    SwitchCase(
-                        pattern: ".failure(let error)",
-                        body: Block(statements: [
-                            Return(expression: ".failure(cause: error)")
-                        ])
-                    )
-                ]
-            )
-        }
-    )
-
     target.declaration.expand {
         extension #(target.declaration.self): Codable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
-                #(encodeBody)
+                #(target.declaration.lets.map { property in
+                    let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
+                        application.identifier.name == "codingKey"
+                    }
+                    let codingKeyValues: [String] = codingKeyMarkers.map { application in
+                        application.value
+                    }
+
+                    #encodeProperty(
+                        container: container,
+                        value: property.identifier,
+                        key: codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
+                    )
+                })
                 return .success(result: Void())
             }
 
             init(from decoder: Decoder) -> Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer = decoder.keyedContainer()
-                #(decodeBody)
+                #(target.declaration.lets.map { property in
+                    let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
+                        application.identifier.name == "codingKey"
+                    }
+                    let codingKeyValues: [String] = codingKeyMarkers.map { application in
+                        application.value
+                    }
+
+                    #decodeProperty(
+                        container: container,
+                        type: property.type,
+                        value: property.identifier,
+                        key: codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
+                    )
+                })
                 return .success(result: self)
             }
         }

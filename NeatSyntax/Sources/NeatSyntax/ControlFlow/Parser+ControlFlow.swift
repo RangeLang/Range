@@ -4,6 +4,10 @@ extension Parser {
     mutating func parseStatement(
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
+        let previousClosureBaseLocalBindings = currentClosureBaseLocalBindings
+        currentClosureBaseLocalBindings = localBindings
+        defer { currentClosureBaseLocalBindings = previousClosureBaseLocalBindings }
+
         if let targetPath = targetExpandStatementPath() {
             guard currentMacroBodyDepth > 0 else {
                 throw ParseError("expand is only valid inside macro bodies.")
@@ -12,7 +16,7 @@ extension Parser {
         }
 
         if isMacroApplicationStart() {
-            throw ParseError("Block macros are not supported.")
+            return .expression(try parseExpression())
         }
 
         if isLocalBackgroundCallableStart() {

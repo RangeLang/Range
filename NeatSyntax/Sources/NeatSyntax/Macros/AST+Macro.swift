@@ -54,6 +54,7 @@ public enum EmittedSyntaxKind: String {
 public enum EmittedCodePart {
     case text(String)
     case splice(expression: Expression, expected: EmittedSyntaxKind)
+    case syntaxMacroInvocation(name: String, arguments: [CallArgument])
 }
 
 public struct MacroApplication {
