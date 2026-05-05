@@ -4,6 +4,22 @@ struct CompileTimeValueEvaluator {
     let targetBinding: String
     let targetValue: CompileTimeValue
     let localBindings: [String: Expression]
+    let macroDeclarationsByName: [String: MacroDeclaration]
+    let context: MacroExpansionContext?
+
+    init(
+        targetBinding: String,
+        targetValue: CompileTimeValue,
+        localBindings: [String: Expression],
+        macroDeclarationsByName: [String: MacroDeclaration] = [:],
+        context: MacroExpansionContext? = nil
+    ) {
+        self.targetBinding = targetBinding
+        self.targetValue = targetValue
+        self.localBindings = localBindings
+        self.macroDeclarationsByName = macroDeclarationsByName
+        self.context = context
+    }
 
     func evaluate(_ expression: Expression) -> CompileTimeValue? {
         evaluate(expression, locals: localBindings)
@@ -24,6 +40,20 @@ struct CompileTimeValueEvaluator {
             return .double(value)
         case .boolean(let value):
             return .boolean(value)
+        case .macroInvocation(let name, let arguments):
+            guard let macro = macroDeclarationsByName[name],
+                macro.target == nil,
+                let context,
+                let value = try? MacroExpander.evaluateFreestandingSyntaxMacro(
+                    macro,
+                    arguments: arguments,
+                    callerLocals: locals,
+                    context: context
+                )
+            else {
+                return nil
+            }
+            return value
         case .identifier(let path):
             if let bound = locals[path] {
                 return evaluate(bound, locals: locals)

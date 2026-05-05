@@ -1344,7 +1344,12 @@ private struct SemanticGraphCollector {
         let macroID = "\(parentID)/macro:\(declaration.name)"
         addEntity(id: macroID, kind: .macro, label: declaration.name)
         addRelation(from: parentID, to: macroID, kind: .contains)
-        addTypeReference(declaration.target.typeReference, from: macroID, kind: .targetsMacro)
+        if let target = declaration.target {
+            addTypeReference(target.typeReference, from: macroID, kind: .targetsMacro)
+        }
+        if let expansionType = declaration.expansionType {
+            addTypeReference(expansionType, from: macroID, kind: .referencesType)
+        }
     }
 
     private mutating func addMarkerDeclaration(_ declaration: MarkerDeclaration, parentID: String) {

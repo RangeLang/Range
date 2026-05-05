@@ -63,7 +63,7 @@ extension MacroExpander {
 
         return executeInitRewriteExpression(
             rewriteExpression,
-            targetBinding: macro.bindings.target,
+            targetBinding: macro.bindings!.target,
             applicationArguments: applicationArguments,
             initTarget: initTarget
         )
@@ -184,7 +184,7 @@ extension MacroExpander {
                 continue
             }
 
-            let targetBinding = macro.bindings.target
+            let targetBinding = macro.bindings!.target
             var bindings: [String: Expression] = [
                 "\(targetBinding).application.arguments": .array(callArguments.map(\.value))
             ]
@@ -451,7 +451,7 @@ extension MacroExpander {
             }
             guard macroTargetKind(for: macro) == .construct else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on a construct but targets \(macro.target.typeReference.displayName)."
+                    "Macro #\(application.name) is used on a construct but targets \(macro.target!.typeReference.displayName)."
                 )
             }
             if !macroOperationExpressions(in: macro.body).isEmpty {
@@ -465,7 +465,7 @@ extension MacroExpander {
         to typeReference: TypeReference,
         context: MacroExpansionContext
     ) throws -> TypeReference {
-        let targetBinding = macro.bindings.target
+        let targetBinding = macro.bindings!.target
         for rewrite in try resolvedRewriteCalls(for: macro, context: context)
         where rewrite.site == .parameterDeclarationType {
             if let rewrittenType = interpretTypeReferenceRewriteExpression(
@@ -486,7 +486,7 @@ extension MacroExpander {
         arguments: [CallArgument],
         context: MacroExpansionContext
     ) throws -> CallArgument {
-        let targetBinding = macro.bindings.target
+        let targetBinding = macro.bindings!.target
         let primaryArgument = arguments.first ?? CallArgument(label: nil, value: .array([]))
         guard let plan = try parameterApplicationRewritePlan(for: macro, context: context) else {
             return primaryArgument
@@ -518,7 +518,7 @@ extension MacroExpander {
         for macro: MacroDeclaration,
         context: MacroExpansionContext
     ) throws -> ParameterApplicationRewritePlan? {
-        let targetBinding = macro.bindings.target
+        let targetBinding = macro.bindings!.target
         for rewrite in try resolvedRewriteCalls(for: macro, context: context)
         where rewrite.site == .parameterApplicationArguments
             || rewrite.site == .parameterApplicationArgument
@@ -642,7 +642,7 @@ extension MacroExpander {
     }
 
     static func propertyTransformRegistrations(for macro: MacroDeclaration) throws -> [PropertyTransformRegistration] {
-        let targetBinding = macro.bindings.target
+        let targetBinding = macro.bindings!.target
         let operationExpressions = macroOperationExpressions(in: macro.body)
         var registrations: [PropertyTransformRegistration] = []
 
@@ -739,7 +739,7 @@ extension MacroExpander {
 
         guard let rewriteBody = rewriteCalls.first else {
             throw ParseError(
-                "Macro #\(macro.name) must call \(macro.bindings.target).replace(with: ...) with a block expression."
+                "Macro #\(macro.name) must call \(macro.bindings!.target).replace(with: ...) with a block expression."
             )
         }
 
@@ -764,7 +764,7 @@ extension MacroExpander {
 
         guard let rewriteExpression = rewriteExpressions.first else {
             throw ParseError(
-                "Macro #\(macro.name) must call \(macro.bindings.target).replace(with: ...) with an expression."
+                "Macro #\(macro.name) must call \(macro.bindings!.target).replace(with: ...) with an expression."
             )
         }
 

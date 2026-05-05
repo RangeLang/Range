@@ -4,10 +4,11 @@ public struct MacroDeclaration {
     public let name: String
     public let genericParameters: [GenericParameter]
     public let parameters: [NeatFunctionParameter]
-    public let target: MacroTarget
+    public let target: MacroTarget?
     public let expansionType: TypeReference?
-    public let bindings: MacroBindings
+    public let bindings: MacroBindings?
     public let body: [Statement]
+    public let syntaxBody: EmittedCodeBlock?
 }
 
 public struct MarkerDeclaration {

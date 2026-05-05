@@ -29,7 +29,10 @@ enum MacroTargetKind: Hashable {
 }
 
 func macroTargetKind(for macro: MacroDeclaration) -> MacroTargetKind {
-    macroTargetKind(for: macro.target.typeReference)
+    guard let target = macro.target else {
+        return .other("__freestanding")
+    }
+    return macroTargetKind(for: target.typeReference)
 }
 
 func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
@@ -502,6 +505,7 @@ struct RewriteSiteDescriptor {
 struct MacroExpansionContext {
     let macroRealizationView: MacroRealizationView
     let rewriteSurfaceView: RewriteSurfaceView
+    let macroDeclarationsByName: [String: MacroDeclaration]
     let markerDeclarationsByName: [String: MarkerDeclaration]
 
     func propertyMacroTargetMatches(
@@ -521,7 +525,7 @@ struct MacroExpansionContext {
 
         return matcher.matches(
             actual: actualTargetType,
-            expected: macro.target.typeReference
+            expected: macro.target!.typeReference
         )
     }
 
@@ -552,11 +556,11 @@ struct MacroExpansionContext {
         operationExpressions: [Expression],
         acceptsResolvedRewrite: (Expression) -> Bool
     ) throws {
-        let targetBinding = macro.bindings.target
+        let targetBinding = macro.bindings!.target
         let targetPrefix = "\(targetBinding)."
         let allowedPaths = rewriteSurfaceView.allowedPaths(
             targetBinding: targetBinding,
-            targetType: macro.target.typeReference
+            targetType: macro.target!.typeReference
         )
 
         var invalidPaths: [String] = []
@@ -574,7 +578,7 @@ struct MacroExpansionContext {
                 rewriteSurfaceView.declaredRewritePathExists(
                     normalizedPath,
                     targetBinding: targetBinding,
-                    targetType: macro.target.typeReference
+                    targetType: macro.target!.typeReference
                 )
             else {
                 invalidPaths.append(name)
@@ -590,7 +594,7 @@ struct MacroExpansionContext {
                 allowedDescription = allowedPaths.sorted().joined(separator: ", ")
             }
             throw ParseError(
-                "Macro #\(macro.name) targeting \(macro.target.typeReference.displayName) uses unsupported replace site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
+                "Macro #\(macro.name) targeting \(macro.target!.typeReference.displayName) uses unsupported replace site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
             )
         }
     }
@@ -601,11 +605,11 @@ struct MacroExpansionContext {
     ) throws {
         guard rewriteSurfaceView.declaredExpansionPathExists(
             path,
-            targetBinding: macro.bindings.target,
-            targetType: macro.target.typeReference
+            targetBinding: macro.bindings!.target,
+            targetType: macro.target!.typeReference
         ) else {
             throw ParseError(
-                "Macro #\(macro.name) targeting \(macro.target.typeReference.displayName) uses unsupported expand site '\(path).expand'."
+                "Macro #\(macro.name) targeting \(macro.target!.typeReference.displayName) uses unsupported expand site '\(path).expand'."
             )
         }
     }

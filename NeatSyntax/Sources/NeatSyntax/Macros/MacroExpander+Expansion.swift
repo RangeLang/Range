@@ -675,7 +675,7 @@ extension MacroExpander {
             }
             guard allowedMacroTargetKinds(for: propertyKind).contains(macroTargetKind(for: macro)) else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target.typeReference.displayName)."
+                    "Macro #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target!.typeReference.displayName)."
                 )
             }
             guard context.propertyMacroTargetMatches(
@@ -684,7 +684,7 @@ extension MacroExpander {
                 propertyValueType: propertyValueType
             ) else {
                 throw ParseError(
-                    "Macro #\(application.name) targeting \(macro.target.typeReference.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
+                    "Macro #\(application.name) targeting \(macro.target!.typeReference.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                 )
             }
 
@@ -1800,10 +1800,13 @@ extension MacroExpander {
         localBindings: [String: Expression],
         context: MacroExpansionContext
     ) throws -> String {
+        guard let bindings = macro.bindings, let target = macro.target else {
+            throw ParseError("Macro #\(macro.name) cannot render an attached expansion block without a target.")
+        }
         let targetDeclarationName = MacroTargetValueBuilder().declarationName(for: targetValue)
         let targetSurface = MacroTargetSurface(
-            targetBinding: macro.bindings.target,
-            targetType: macro.target.typeReference,
+            targetBinding: bindings.target,
+            targetType: target.typeReference,
             targetDeclarationName: targetDeclarationName,
             localBindings: localBindings,
             targetValue: targetValue,
@@ -1833,6 +1836,192 @@ extension MacroExpander {
                 return renderExpressionForStringify(substituted)
             }
         }.joined(separator: " ")
+    }
+
+    static func evaluateFreestandingSyntaxMacro(
+        _ macro: MacroDeclaration,
+        arguments: [CallArgument],
+        callerLocals: [String: Expression],
+        context: MacroExpansionContext
+    ) throws -> CompileTimeValue? {
+        guard macro.target == nil,
+            let returnType = macro.expansionType,
+            let syntaxBody = macro.syntaxBody
+        else {
+            return nil
+        }
+
+        var bindings = callerLocals
+        let argumentBindings = try expressionMacroArgumentBindings(for: macro, arguments: arguments)
+        for (name, expression) in argumentBindings {
+            bindings[name] = expression
+        }
+
+        let rendered = try renderFreestandingSyntaxMacroBody(
+            syntaxBody,
+            localBindings: bindings,
+            context: context
+        )
+        return try syntaxValue(from: rendered, as: returnType)
+    }
+
+    static func renderFreestandingSyntaxMacroBody(
+        _ block: EmittedCodeBlock,
+        localBindings: [String: Expression],
+        context: MacroExpansionContext
+    ) throws -> String {
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "__syntax_macro_target__",
+            targetValue: .object(typeName: "SyntaxMacro.Target", fields: [:]),
+            localBindings: localBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            context: context
+        )
+        let renderer = MacroSyntaxRenderer(
+            localBindings: localBindings,
+            renderedTargetPath: { _ in nil }
+        )
+
+        return try block.parts.map { part in
+            switch part {
+            case .text(let text):
+                return text
+            case .splice(let expression, let expected):
+                guard let value = evaluator.evaluate(expression) else {
+                    throw ParseError("Could not evaluate syntax macro splice.")
+                }
+                if (expected == .callableName || expected == .declaration),
+                    case .string(let name) = value
+                {
+                    return name
+                }
+                if expected == .expression, case .string = value {
+                    guard let rendered = value.expression else {
+                        return ""
+                    }
+                    return renderExpressionForStringify(rendered)
+                }
+                if let renderedSyntax = renderer.renderSyntax(value) {
+                    return renderedSyntax
+                }
+                guard let rendered = value.expression else {
+                    return ""
+                }
+                return renderExpressionForStringify(rendered)
+            }
+        }.joined(separator: " ")
+    }
+
+    static func syntaxValue(from source: String, as type: TypeReference) throws -> CompileTimeValue {
+        switch type.displayName {
+        case "Expression":
+            var parser = try Parser(source: source)
+            let expression = try parser.parseExpression()
+            try parser.consume(.eof)
+            return expressionSyntaxValue(expression)
+        case "Statement":
+            var parser = try Parser(source: source)
+            var localBindings: [String: LocalBindingSymbol] = [:]
+            let statement = try parser.parseStatement(localBindings: &localBindings)
+            try parser.consume(.eof)
+            return try statementSyntaxValue(statement)
+        case "Switch":
+            var parser = try Parser(source: source)
+            var localBindings: [String: LocalBindingSymbol] = [:]
+            let statement = try parser.parseStatement(localBindings: &localBindings)
+            guard case .switchStatement = statement else {
+                throw ParseError("Syntax macro expected Switch output.")
+            }
+            try parser.consume(.eof)
+            return try statementSyntaxValue(statement)
+        case "Block":
+            var parser = try Parser(source: source)
+            var localBindings: [String: LocalBindingSymbol] = [:]
+            var statements: [Statement] = []
+            while parser.peek() != .eof {
+                statements.append(try parser.parseStatement(localBindings: &localBindings))
+            }
+            return .object(
+                typeName: "Block",
+                fields: ["statements": .array(try statements.map(statementSyntaxValue))]
+            )
+        default:
+            throw ParseError("Unsupported syntax macro return type \(type.displayName).")
+        }
+    }
+
+    static func statementSyntaxValue(_ statement: Statement) throws -> CompileTimeValue {
+        switch statement {
+        case .switchStatement(let expression, let cases, nil):
+            return .object(
+                typeName: "Switch",
+                fields: [
+                    "expression": expressionSyntaxValue(expression),
+                    "cases": .array(try cases.map(switchCaseSyntaxValue)),
+                ]
+            )
+        case .return(let expression):
+            var fields: [String: CompileTimeValue] = [:]
+            if let expression {
+                fields["expression"] = expressionSyntaxValue(expression)
+            }
+            return .object(typeName: "Return", fields: fields)
+        case .break:
+            return .object(typeName: "Break", fields: [:])
+        case .assignment(let target, let expression):
+            return .object(
+                typeName: "Assignment",
+                fields: [
+                    "target": .string(renderAssignmentTarget(target)),
+                    "expression": expressionSyntaxValue(expression),
+                ]
+            )
+        case .expression(let expression):
+            return .object(
+                typeName: "ExpressionStatement",
+                fields: ["expression": expressionSyntaxValue(expression)]
+            )
+        default:
+            throw ParseError("Unsupported statement in syntax macro output.")
+        }
+    }
+
+    static func switchCaseSyntaxValue(_ switchCase: SwitchCase) throws -> CompileTimeValue {
+        .object(
+            typeName: "SwitchCase",
+            fields: [
+                "pattern": .string(renderSwitchCasePattern(switchCase.pattern)),
+                "body": .object(
+                    typeName: "Block",
+                    fields: ["statements": .array(try switchCase.body.map(statementSyntaxValue))]
+                ),
+            ]
+        )
+    }
+
+    static func expressionSyntaxValue(_ expression: Expression) -> CompileTimeValue {
+        .string(renderExpressionForStringify(expression))
+    }
+
+    static func renderSwitchCasePattern(_ pattern: SwitchCasePattern) -> String {
+        switch pattern {
+        case .expression(let expression):
+            return renderExpressionForStringify(expression)
+        case .enumCase(let name, nil):
+            return ".\(name)"
+        case .enumCase(let name, let binding?):
+            let keyword = binding.kind == .mutable ? "var" : "let"
+            return ".\(name)(\(keyword) \(binding.name))"
+        }
+    }
+
+    static func renderAssignmentTarget(_ target: AssignmentTarget) -> String {
+        switch target {
+        case .state(let name), .binding(let name), .environment(let name), .local(let name):
+            return name
+        case .member(let base, let name):
+            return "\(renderAssignmentTarget(base)).\(name)"
+        }
     }
 
     static func emittedSyntaxKind(

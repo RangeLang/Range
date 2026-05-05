@@ -59,7 +59,9 @@ struct MacroTargetSurface {
         CompileTimeValueEvaluator(
             targetBinding: targetBinding,
             targetValue: targetValue,
-            localBindings: localBindings
+            localBindings: localBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            context: context
         )
     }
 

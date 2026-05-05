@@ -1,0 +1,30 @@
+macro encodeSwitch(value: Identifier, key: String) -> Switch {
+    switch container.encode(#(value), forKey: #(key)) {
+    case .success:
+        break
+    case .failure(let error):
+        return .failure(cause: error)
+    }
+}
+
+macro emitEncodingSwitch(): Construct { target, diagnostics in
+    let statement: Switch = #encodeSwitch(
+        value: Identifier(name: "id"),
+        key: "id"
+    )
+
+    target.declaration.expand {
+        extension #(target.declaration.self): Encodable {
+            function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+                let container: KeyedEncodingContainer = encoder.keyedContainer()
+                #(statement)
+                return .success(result: Void())
+            }
+        }
+    }
+}
+
+#emitEncodingSwitch
+construct SyntaxProducingMacroSwitchFixture {
+    let id: Int
+}

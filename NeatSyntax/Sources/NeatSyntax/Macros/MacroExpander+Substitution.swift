@@ -337,7 +337,7 @@ extension MacroExpander {
         for macro: MacroDeclaration,
         context: MacroExpansionContext
     ) throws -> [ResolvedRewriteCall] {
-        let targetBinding = macro.bindings.target
+        let targetBinding = macro.bindings!.target
         let targetKind = macroTargetKind(for: macro)
         let operationExpressions = macroOperationExpressions(in: macro.body)
         try context.validateRewriteSites(
@@ -348,14 +348,14 @@ extension MacroExpander {
             context.resolvedRewriteCall(
                 from: expression,
                 targetBinding: targetBinding,
-                targetType: macro.target.typeReference
+                targetType: macro.target!.typeReference
             ) != nil
         }
         return operationExpressions.compactMap {
             context.resolvedRewriteCall(
                 from: $0,
                 targetBinding: targetBinding,
-                targetType: macro.target.typeReference
+                targetType: macro.target!.typeReference
             )
         }
     }

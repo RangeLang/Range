@@ -126,6 +126,13 @@ extension Parser {
     mutating func parseExtensionTarget() throws -> (
         type: TypeReference, genericArgumentConstraints: [ExtensionGenericArgumentConstraint]
     ) {
+        if peek() == .leftBracket || peek() == .leftParen {
+            let typeReference = try parseTypeReferenceNode()
+            throw ParseError(
+                "Extension target must be a nominal type reference, got \(typeReference.displayName)."
+            )
+        }
+
         var base: TypeReference = .named(try consumeTypeName())
         while peek() == .dot {
             try consume(.dot)

@@ -8,6 +8,7 @@ extension DeclarationGraph {
         MacroExpansionContext(
             macroRealizationView: macroRealizationView(macrosByName: macrosByName),
             rewriteSurfaceView: rewriteSurfaceView,
+            macroDeclarationsByName: macrosByName,
             markerDeclarationsByName: markersByName
         )
     }

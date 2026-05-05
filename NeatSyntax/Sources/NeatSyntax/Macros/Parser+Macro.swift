@@ -21,6 +21,31 @@ extension Parser {
         }
         let parameters = try parseFunctionParameters(allowSyntaxCapture: true)
 
+        if peek() == .arrow {
+            try consume(.arrow)
+            let expansionType = try parseTypeReferenceNode()
+            let syntaxBody: EmittedCodeBlock?
+            if signatureOnly {
+                try consume(.leftBrace)
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+                syntaxBody = nil
+            } else {
+                try consume(.leftBrace)
+                syntaxBody = try parseEmittedCodeBlock()
+            }
+            return MacroDeclaration(
+                name: name,
+                genericParameters: genericParameters,
+                parameters: parameters,
+                target: nil,
+                expansionType: expansionType,
+                bindings: nil,
+                body: [],
+                syntaxBody: syntaxBody
+            )
+        }
+
         try consume(.colon)
         let target = try parseMacroTarget()
         let expansionType: TypeReference?
@@ -60,7 +85,8 @@ extension Parser {
             target: target,
             expansionType: expansionType,
             bindings: bindings,
-            body: body
+            body: body,
+            syntaxBody: nil
         )
     }
 
