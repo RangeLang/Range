@@ -1,4 +1,4 @@
-macro encodeSwitch(container: KeyedEncodingContainer, value: Identifier, key: String) -> Switch {
+macro invalidEncodeSwitch(value: Identifier, key: String) -> Switch {
     switch container.encode(#(value), forKey: #(key)) {
     case .success:
         break
@@ -7,9 +7,8 @@ macro encodeSwitch(container: KeyedEncodingContainer, value: Identifier, key: St
     }
 }
 
-macro emitEncodingSwitch(): Construct { target, diagnostics in
-    let statement: Switch = #encodeSwitch(
-        container: container,
+macro emitInvalidEncodingSwitch(): Construct { target, diagnostics in
+    let statement: Switch = #invalidEncodeSwitch(
         value: Identifier(name: "id"),
         key: "id"
     )
@@ -25,7 +24,7 @@ macro emitEncodingSwitch(): Construct { target, diagnostics in
     }
 }
 
-#emitEncodingSwitch
-construct SyntaxProducingMacroSwitchFixture {
+#emitInvalidEncodingSwitch
+construct InvalidSyntaxProducingMacroSwitchFixture {
     let id: Int
 }

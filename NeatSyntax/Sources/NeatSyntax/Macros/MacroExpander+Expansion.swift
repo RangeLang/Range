@@ -1857,9 +1857,15 @@ extension MacroExpander {
             bindings[name] = expression
         }
 
+        try validateFreestandingSyntaxMacroTemplate(
+            syntaxBody,
+            macro: macro,
+            returnType: returnType
+        )
         let rendered = try renderFreestandingSyntaxMacroBody(
             syntaxBody,
             localBindings: bindings,
+            parameterBindings: argumentBindings,
             context: context
         )
         return try syntaxValue(from: rendered, as: returnType)
@@ -1868,6 +1874,7 @@ extension MacroExpander {
     static func renderFreestandingSyntaxMacroBody(
         _ block: EmittedCodeBlock,
         localBindings: [String: Expression],
+        parameterBindings: [String: Expression],
         context: MacroExpansionContext
     ) throws -> String {
         let evaluator = CompileTimeValueEvaluator(
@@ -1885,7 +1892,7 @@ extension MacroExpander {
         return try block.parts.map { part in
             switch part {
             case .text(let text):
-                return text
+                return try renderSyntaxMacroText(text, parameterBindings: parameterBindings)
             case .splice(let expression, let expected):
                 guard let value = evaluator.evaluate(expression) else {
                     throw ParseError("Could not evaluate syntax macro splice.")
@@ -1910,6 +1917,436 @@ extension MacroExpander {
                 return renderExpressionForStringify(rendered)
             }
         }.joined(separator: " ")
+    }
+
+    static func renderSyntaxMacroText(
+        _ text: String,
+        parameterBindings: [String: Expression]
+    ) throws -> String {
+        var lexer = Lexer(source: text)
+        let tokens = try lexer.tokenize().filter { $0 != .eof }
+        return tokens.map { token in
+            switch token {
+            case .identifier(let name), .keyword(let name):
+                if let expression = parameterBindings[name] {
+                    return renderExpressionForStringify(expression)
+                }
+                return name
+            default:
+                return renderMacroToken(token)
+            }
+        }.joined(separator: " ")
+    }
+
+    static func renderMacroToken(_ token: Token) -> String {
+        switch token {
+        case .hash:
+            return "#"
+        case .identifier(let value):
+            return value
+        case .hashDirective(let value):
+            return "#\(value)"
+        case .stringLiteral(let value):
+            return "\"\(value)\""
+        case .integer(let value):
+            return String(value)
+        case .double(let value):
+            return String(value)
+        case .keyword(let value):
+            return value
+        case .atAttribute(let name, let argument):
+            if let argument {
+                return "@\(name)(\(argument))"
+            }
+            return "@\(name)"
+        case .leftBrace:
+            return "{"
+        case .rightBrace:
+            return "}"
+        case .leftParen:
+            return "("
+        case .rightParen:
+            return ")"
+        case .leftBracket:
+            return "["
+        case .rightBracket:
+            return "]"
+        case .asterisk:
+            return "*"
+        case .dot:
+            return "."
+        case .ellipsis:
+            return "..."
+        case .colon:
+            return ":"
+        case .arrow:
+            return "->"
+        case .bang:
+            return "!"
+        case .equal:
+            return "="
+        case .equalEqual:
+            return "=="
+        case .bangEqual:
+            return "!="
+        case .minus:
+            return "-"
+        case .less:
+            return "<"
+        case .lessEqual:
+            return "<="
+        case .greater:
+            return ">"
+        case .greaterEqual:
+            return ">="
+        case .plus:
+            return "+"
+        case .plusEqual:
+            return "+="
+        case .slash:
+            return "/"
+        case .andAnd:
+            return "&&"
+        case .orOr:
+            return "||"
+        case .question:
+            return "?"
+        case .questionQuestion:
+            return "??"
+        case .dollar:
+            return "$"
+        case .percent:
+            return "%"
+        case .comma:
+            return ","
+        case .eof:
+            return ""
+        }
+    }
+
+    static func validateFreestandingSyntaxMacroTemplate(
+        _ block: EmittedCodeBlock,
+        macro: MacroDeclaration,
+        returnType: TypeReference
+    ) throws {
+        var spliceNames: Set<String> = []
+        let source = block.parts.enumerated().map { index, part in
+            switch part {
+            case .text(let text):
+                return text
+            case .splice:
+                let name = "__splice_\(index)"
+                spliceNames.insert(name)
+                return name
+            }
+        }.joined(separator: " ")
+        let allowedIdentifiers = Set(macro.parameters.map(\.localName)).union(spliceNames)
+
+        switch returnType.displayName {
+        case "Expression":
+            var parser = try Parser(source: source)
+            let expression = try parser.parseExpression()
+            try parser.consume(.eof)
+            try validateSyntaxMacroExpression(
+                expression,
+                macroName: macro.name,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: []
+            )
+        case "Statement", "Switch":
+            var parser = try Parser(source: source)
+            var localBindings: [String: LocalBindingSymbol] = [:]
+            let statement = try parser.parseStatement(localBindings: &localBindings)
+            try parser.consume(.eof)
+            try validateSyntaxMacroStatement(
+                statement,
+                macroName: macro.name,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: []
+            )
+        case "Block":
+            var parser = try Parser(source: source)
+            var parserLocals: [String: LocalBindingSymbol] = [:]
+            var validatorLocals: Set<String> = []
+            while parser.peek() != .eof {
+                let statement = try parser.parseStatement(localBindings: &parserLocals)
+                try validateSyntaxMacroStatement(
+                    statement,
+                    macroName: macro.name,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: validatorLocals
+                )
+                if case .localBinding(let declaration) = statement {
+                    validatorLocals.insert(declaration.name)
+                }
+            }
+        default:
+            return
+        }
+    }
+
+    static func validateSyntaxMacroStatement(
+        _ statement: Statement,
+        macroName: String,
+        allowedIdentifiers: Set<String>,
+        localIdentifiers: Set<String>
+    ) throws {
+        switch statement {
+        case .switchStatement(let expression, let cases, let defaultBody):
+            try validateSyntaxMacroExpression(
+                expression,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+            for switchCase in cases {
+                var caseLocals = localIdentifiers
+                if case .enumCase(_, let binding?) = switchCase.pattern {
+                    caseLocals.insert(binding.name)
+                } else if case .expression(let patternExpression) = switchCase.pattern {
+                    try validateSyntaxMacroExpression(
+                        patternExpression,
+                        macroName: macroName,
+                        allowedIdentifiers: allowedIdentifiers,
+                        localIdentifiers: localIdentifiers
+                    )
+                }
+                try validateSyntaxMacroStatements(
+                    switchCase.body,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: caseLocals
+                )
+            }
+            if let defaultBody {
+                try validateSyntaxMacroStatements(
+                    defaultBody,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: localIdentifiers
+                )
+            }
+        case .return(let expression):
+            if let expression {
+                try validateSyntaxMacroExpression(
+                    expression,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: localIdentifiers
+                )
+            }
+        case .assignment(_, let expression), .compoundAssignment(_, _, let expression),
+            .expression(let expression):
+            try validateSyntaxMacroExpression(
+                expression,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+        case .localBinding(let declaration):
+            try validateSyntaxMacroExpression(
+                declaration.expression,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+        case .forEach(let name, let sequence, let body):
+            try validateSyntaxMacroExpression(
+                sequence,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+            var loopLocals = localIdentifiers
+            loopLocals.insert(name)
+            try validateSyntaxMacroStatements(
+                body,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: loopLocals
+            )
+        case .whileLoop(let condition, let body):
+            try validateSyntaxMacroExpression(
+                condition,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+            try validateSyntaxMacroStatements(
+                body,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+        case .conditional(let branches):
+            for branch in branches {
+                if let condition = branch.condition {
+                    try validateSyntaxMacroExpression(
+                        condition,
+                        macroName: macroName,
+                        allowedIdentifiers: allowedIdentifiers,
+                        localIdentifiers: localIdentifiers
+                    )
+                }
+                try validateSyntaxMacroStatements(
+                    branch.body,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: localIdentifiers
+                )
+            }
+        case .break, .continue:
+            return
+        default:
+            return
+        }
+    }
+
+    static func validateSyntaxMacroStatements(
+        _ statements: [Statement],
+        macroName: String,
+        allowedIdentifiers: Set<String>,
+        localIdentifiers: Set<String>
+    ) throws {
+        var scopedLocals = localIdentifiers
+        for statement in statements {
+            try validateSyntaxMacroStatement(
+                statement,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: scopedLocals
+            )
+            if case .localBinding(let declaration) = statement {
+                scopedLocals.insert(declaration.name)
+            }
+        }
+    }
+
+    static func validateSyntaxMacroExpression(
+        _ expression: Expression,
+        macroName: String,
+        allowedIdentifiers: Set<String>,
+        localIdentifiers: Set<String>
+    ) throws {
+        switch expression {
+        case .identifier(let name):
+            try validateSyntaxMacroIdentifier(
+                name,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+        case .call(let name, let arguments):
+            if name.contains(".") {
+                try validateSyntaxMacroIdentifier(
+                    name,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: localIdentifiers
+                )
+            }
+            for argument in arguments {
+                try validateSyntaxMacroExpression(
+                    argument.value,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: localIdentifiers
+                )
+            }
+        case .array(let elements):
+            for element in elements {
+                try validateSyntaxMacroExpression(
+                    element,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: localIdentifiers
+                )
+            }
+        case .dictionary(let elements):
+            for element in elements {
+                try validateSyntaxMacroExpression(
+                    element.key,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: localIdentifiers
+                )
+                try validateSyntaxMacroExpression(
+                    element.value,
+                    macroName: macroName,
+                    allowedIdentifiers: allowedIdentifiers,
+                    localIdentifiers: localIdentifiers
+                )
+            }
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            try validateSyntaxMacroExpression(
+                condition,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+            try validateSyntaxMacroExpression(
+                trueExpression,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+            try validateSyntaxMacroExpression(
+                falseExpression,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+        case .unary(_, let expression):
+            try validateSyntaxMacroExpression(
+                expression,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+        case .binary(let lhs, _, let rhs):
+            try validateSyntaxMacroExpression(
+                lhs,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+            try validateSyntaxMacroExpression(
+                rhs,
+                macroName: macroName,
+                allowedIdentifiers: allowedIdentifiers,
+                localIdentifiers: localIdentifiers
+            )
+        case .interpolatedString(let string):
+            for segment in string.segments {
+                if case .expression(let expression) = segment {
+                    try validateSyntaxMacroExpression(
+                        expression,
+                        macroName: macroName,
+                        allowedIdentifiers: allowedIdentifiers,
+                        localIdentifiers: localIdentifiers
+                    )
+                }
+            }
+        default:
+            return
+        }
+    }
+
+    static func validateSyntaxMacroIdentifier(
+        _ name: String,
+        macroName: String,
+        allowedIdentifiers: Set<String>,
+        localIdentifiers: Set<String>
+    ) throws {
+        guard !name.hasPrefix(".") else {
+            return
+        }
+        let root = name.split(separator: ".", maxSplits: 1).first.map(String.init) ?? name
+        guard allowedIdentifiers.contains(root) || localIdentifiers.contains(root) else {
+            throw ParseError(
+                "Syntax macro #\(macroName) references unknown template identifier '\(root)'. Pass it as a macro parameter or splice it explicitly."
+            )
+        }
     }
 
     static func syntaxValue(from source: String, as type: TypeReference) throws -> CompileTimeValue {
