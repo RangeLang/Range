@@ -1951,12 +1951,19 @@ extension MacroExpander {
                 source: "neat-macro",
                 code: "macro.diagnostic.warning"
             )
-        case "\(diagnosticsBinding).note":
+        case "\(diagnosticsBinding).information", "\(diagnosticsBinding).note":
             return NeatDiagnostic(
                 severity: .information,
                 message: message,
                 source: "neat-macro",
-                code: "macro.diagnostic.note"
+                code: "macro.diagnostic.information"
+            )
+        case "\(diagnosticsBinding).hint":
+            return NeatDiagnostic(
+                severity: .hint,
+                message: message,
+                source: "neat-macro",
+                code: "macro.diagnostic.hint"
             )
         default:
             return nil
@@ -1972,6 +1979,8 @@ extension MacroExpander {
         }
         return name == "\(diagnosticsBinding).error"
             || name == "\(diagnosticsBinding).warning"
+            || name == "\(diagnosticsBinding).information"
+            || name == "\(diagnosticsBinding).hint"
             || name == "\(diagnosticsBinding).note"
     }
 

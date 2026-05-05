@@ -1,5 +1,6 @@
 construct MacroDiagnostics {
     function error(_ message: String)
     function warning(_ message: String)
-    function note(_ message: String)
+    function information(_ message: String)
+    function hint(_ message: String)
 }

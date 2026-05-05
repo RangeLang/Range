@@ -79,6 +79,24 @@ struct CompilerFixtureTests {
                     && $0.path == fixture.path
             }
         )
+        #expect(
+            diagnostics.contains {
+                $0.severity == .information
+                    && $0.source == "neat-macro"
+                    && $0.code == "macro.diagnostic.information"
+                    && $0.message == "custom macro information"
+                    && $0.path == fixture.path
+            }
+        )
+        #expect(
+            diagnostics.contains {
+                $0.severity == .hint
+                    && $0.source == "neat-macro"
+                    && $0.code == "macro.diagnostic.hint"
+                    && $0.message == "custom macro hint"
+                    && $0.path == fixture.path
+            }
+        )
     }
 
     @Test("Project macros infer across project files")

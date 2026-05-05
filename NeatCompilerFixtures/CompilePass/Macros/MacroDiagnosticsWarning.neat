@@ -1,5 +1,7 @@
 macro warnOnConstruct(): Construct { target, diagnostics in
     diagnostics.warning("custom macro warning")
+    diagnostics.information("custom macro information")
+    diagnostics.hint("custom macro hint")
 
     target.declaration.expand {
         extension #(target.declaration.self) {
