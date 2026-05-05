@@ -1857,6 +1857,7 @@ extension MacroExpander {
             bindings[name] = expression
         }
 
+        try validateSyntaxMacroSpliceMemberAccess(syntaxBody, macro: macro)
         try validateFreestandingSyntaxMacroTemplate(
             syntaxBody,
             macro: macro,
@@ -1917,6 +1918,40 @@ extension MacroExpander {
                 return renderExpressionForStringify(rendered)
             }
         }.joined(separator: " ")
+    }
+
+    static func validateSyntaxMacroSpliceMemberAccess(
+        _ block: EmittedCodeBlock,
+        macro: MacroDeclaration
+    ) throws {
+        let parameterTypes = Dictionary(
+            uniqueKeysWithValues: macro.parameters.map {
+                ($0.localName, $0.typeReference?.displayName ?? "")
+            }
+        )
+        for (index, part) in block.parts.enumerated() {
+            guard case .splice(let expression, _) = part,
+                case .identifier(let name) = expression,
+                parameterTypes[name] == "Identifier",
+                index + 1 < block.parts.count,
+                case .text(let followingText) = block.parts[index + 1],
+                syntaxTextStartsWithMemberAccess(followingText)
+            else {
+                continue
+            }
+            throw ParseError(
+                "Syntax macro #\(macro.name) cannot member-access spliced Identifier parameter '\(name)'. Pass a typed expression parameter instead."
+            )
+        }
+    }
+
+    static func syntaxTextStartsWithMemberAccess(_ text: String) -> Bool {
+        do {
+            var lexer = Lexer(source: text)
+            return try lexer.tokenize().first { $0 != .eof } == .dot
+        } catch {
+            return false
+        }
     }
 
     static func renderSyntaxMacroText(
