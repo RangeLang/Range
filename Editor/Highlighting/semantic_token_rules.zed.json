@@ -1,0 +1,91 @@
+[
+  {
+    "token_type": "keyword",
+    "style": ["keyword"]
+  },
+  {
+    "token_type": "comment",
+    "style": ["comment"]
+  },
+  {
+    "token_type": "string",
+    "style": ["string"]
+  },
+  {
+    "token_type": "number",
+    "style": ["number"]
+  },
+  {
+    "token_type": "type",
+    "token_modifiers": ["declaration"],
+    "style": ["type.neat.declaration", "constructor"]
+  },
+  {
+    "token_type": "type",
+    "token_modifiers": ["application"],
+    "style": ["type.neat.application", "type.application", "type"]
+  },
+  {
+    "token_type": "type",
+    "style": ["type.neat", "type"]
+  },
+  {
+    "token_type": "function",
+    "token_modifiers": ["declaration"],
+    "style": ["function.neat.declaration", "function"]
+  },
+  {
+    "token_type": "function",
+    "style": ["function.neat", "function"]
+  },
+  {
+    "token_type": "method",
+    "style": ["function.neat.method", "function.method", "function"]
+  },
+  {
+    "token_type": "variable",
+    "token_modifiers": ["declaration"],
+    "style": ["variable.neat.declaration", "variable"]
+  },
+  {
+    "token_type": "variable",
+    "token_modifiers": ["argument"],
+    "style": ["variable.neat.argument", "variable.parameter", "variable"]
+  },
+  {
+    "token_type": "variable",
+    "style": ["variable.neat", "variable"]
+  },
+  {
+    "token_type": "property",
+    "token_modifiers": ["declaration"],
+    "style": ["property.neat.declaration", "property", "variable"]
+  },
+  {
+    "token_type": "property",
+    "style": ["property.neat", "property", "variable"]
+  },
+  {
+    "token_type": "parameter",
+    "token_modifiers": ["argument"],
+    "style": ["parameter.neat.argument", "variable.parameter"]
+  },
+  {
+    "token_type": "parameter",
+    "token_modifiers": ["declaration"],
+    "style": ["parameter.neat.declaration", "variable.parameter"]
+  },
+  {
+    "token_type": "parameter",
+    "style": ["parameter.neat", "variable.parameter"]
+  },
+  {
+    "token_type": "macro",
+    "token_modifiers": ["declaration"],
+    "style": ["macro.neat.declaration", "function.macro", "function"]
+  },
+  {
+    "token_type": "macro",
+    "style": ["macro.neat", "function.macro", "function"]
+  }
+]
