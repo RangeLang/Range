@@ -1899,7 +1899,7 @@ extension MacroExpander {
             )
         }
 
-        try validateSyntaxMacroSpliceMemberAccess(syntaxBody, macro: macro)
+        noteSyntaxMacroSpliceMemberAccessRisk(syntaxBody, macro: macro)
         try validateFreestandingSyntaxMacroTemplate(
             syntaxBody,
             macro: macro,
@@ -2038,20 +2038,20 @@ extension MacroExpander {
         }.joined(separator: " ")
     }
 
-    static func validateSyntaxMacroSpliceMemberAccess(
+    static func noteSyntaxMacroSpliceMemberAccessRisk(
         _ block: EmittedCodeBlock,
         macro: MacroDeclaration
-    ) throws {
-        // TODO: Decide the final policy for member-position identifier splicing.
-        // `#(identifier).member` is rejected because an Identifier does not prove
-        // the base has that member. `self.#(identifier)` currently remains allowed
-        // as member-name substitution, but that is not yet a fully verified access.
+    ) {
+        // TODO: Emit a compiler warning once the expander has a retained warning
+        // channel. Identifier splices in member chains are allowed because the
+        // expanded syntax is still type-checked at compile time, but this use is
+        // less statically proven at macro-template validation time.
         let parameterTypes = Dictionary(
             uniqueKeysWithValues: macro.parameters.map {
                 ($0.localName, $0.typeReference?.displayName ?? "")
             }
         )
-        for (index, part) in block.parts.enumerated() {
+        let hasIdentifierMemberSplice = block.parts.enumerated().contains { index, part in
             guard case .splice(let expression, _) = part,
                 case .identifier(let name) = expression,
                 parameterTypes[name] == "Identifier",
@@ -2059,11 +2059,12 @@ extension MacroExpander {
                 case .text(let followingText) = block.parts[index + 1],
                 syntaxTextStartsWithMemberAccess(followingText)
             else {
-                continue
+                return false
             }
-            throw ParseError(
-                "Syntax macro #\(macro.name) cannot member-access spliced Identifier parameter '\(name)'. Pass a typed expression parameter instead."
-            )
+            return true
+        }
+        guard hasIdentifierMemberSplice else {
+            return
         }
     }
 

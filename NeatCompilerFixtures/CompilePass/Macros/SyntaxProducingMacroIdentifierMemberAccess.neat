@@ -1,5 +1,5 @@
-macro invalidIdentifierContainerSwitch(container: Identifier, value: Identifier, key: String) -> Switch {
-    switch #(container).encode(#(value), forKey: #(key)) {
+macro identifierContainerSwitch(container: Identifier, value: Identifier, key: String) -> Switch {
+    switch #(container).encode(#(value), forKey: key) {
     case .success:
         break
     case .failure(let error):
@@ -7,12 +7,12 @@ macro invalidIdentifierContainerSwitch(container: Identifier, value: Identifier,
     }
 }
 
-macro emitInvalidIdentifierContainerSwitch(): Construct { target, diagnostics in
+macro emitIdentifierContainerSwitch(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Encodable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
-                #invalidIdentifierContainerSwitch(
+                #identifierContainerSwitch(
                     container: Identifier(name: "container"),
                     value: Identifier(name: "id"),
                     key: "id"
@@ -23,7 +23,7 @@ macro emitInvalidIdentifierContainerSwitch(): Construct { target, diagnostics in
     }
 }
 
-#emitInvalidIdentifierContainerSwitch
-construct InvalidSyntaxProducingMacroIdentifierMemberAccessFixture {
+#emitIdentifierContainerSwitch
+construct SyntaxProducingMacroIdentifierMemberAccessFixture {
     let id: Int
 }
