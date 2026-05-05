@@ -67,6 +67,21 @@ public struct NeatDiagnostic: Error, CustomStringConvertible, Sendable {
     }
 
     public var description: String { message }
+
+    public func withPath(_ path: String?) -> NeatDiagnostic {
+        guard self.path == nil, let path else {
+            return self
+        }
+        return NeatDiagnostic(
+            severity: severity,
+            message: message,
+            source: source,
+            code: code,
+            path: path,
+            range: range,
+            notes: notes
+        )
+    }
 }
 
 public final class NeatDiagnosticEngine {
@@ -107,6 +122,25 @@ public final class NeatDiagnosticEngine {
         emit(
             NeatDiagnostic(
                 severity: .error,
+                message: message,
+                source: source,
+                code: code,
+                path: path,
+                range: range
+            )
+        )
+    }
+
+    public func information(
+        _ message: String,
+        source: String = "neat",
+        code: String? = nil,
+        path: String? = nil,
+        range: NeatSourceRange? = nil
+    ) {
+        emit(
+            NeatDiagnostic(
+                severity: .information,
                 message: message,
                 source: source,
                 code: code,

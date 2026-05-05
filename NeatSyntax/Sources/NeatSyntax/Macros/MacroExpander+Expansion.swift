@@ -692,6 +692,11 @@ extension MacroExpander {
                 for: macro,
                 argumentClause: application.argumentClause
             )
+            try emitMacroDiagnostics(
+                from: substituteMacroBindings(in: macro.body, bindings: argumentBindings),
+                macro: macro,
+                context: context
+            )
 
             for registration in try propertyTransformRegistrations(for: macro) {
                 guard supportedHooks(for: propertyKind).contains(registration.hook) else {
@@ -1418,6 +1423,11 @@ extension MacroExpander {
                 for: macro,
                 arguments: arguments
             )
+            try emitMacroDiagnostics(
+                from: substituteMacroBindings(in: macro.body, bindings: argumentBindings),
+                macro: macro,
+                context: context
+            )
             let rewrite = try rewriteExpression(for: macro, context: context)
             let interpreted = interpretExpressionMacroRewrite(rewrite, bindings: argumentBindings)
             let substituted = substituteMacroBindings(in: interpreted, bindings: argumentBindings)
@@ -1716,6 +1726,7 @@ extension MacroExpander {
         var emitted = EmittedDeclarationBundle()
 
         let body = substituteMacroBindings(in: macro.body, bindings: argumentBindings)
+        try emitMacroDiagnostics(from: body, macro: macro, context: context)
 
         for (targetPath, block, localBindings) in emittedCodeBlocks(in: body) {
             if let targetPath {
@@ -1771,6 +1782,197 @@ extension MacroExpander {
         }
 
         return blocks
+    }
+
+    static func emitMacroDiagnostics(
+        from statements: [Statement],
+        macro: MacroDeclaration,
+        context: MacroExpansionContext
+    ) throws {
+        guard let bindings = macro.bindings else {
+            return
+        }
+        let diagnostics = try macroDiagnostics(
+            in: statements,
+            macro: macro,
+            diagnosticsBinding: bindings.diagnostics,
+            localBindings: [:]
+        )
+        for diagnostic in diagnostics {
+            switch diagnostic.severity {
+            case .error:
+                if let engine = context.diagnosticEngine {
+                    engine.emit(diagnostic.withPath(context.currentPath))
+                } else {
+                    throw ParseError(diagnostic.message)
+                }
+            case .warning, .information, .hint:
+                context.diagnosticEngine?.emit(diagnostic.withPath(context.currentPath))
+            }
+        }
+    }
+
+    static func macroDiagnostics(
+        in statements: [Statement],
+        macro: MacroDeclaration,
+        diagnosticsBinding: String,
+        localBindings: [String: Expression]
+    ) throws -> [NeatDiagnostic] {
+        var diagnostics: [NeatDiagnostic] = []
+        var locals = localBindings
+
+        for statement in statements {
+            switch statement {
+            case .localBinding(let declaration):
+                locals[declaration.name] = declaration.expression
+            case .expression(let expression):
+                if let diagnostic = try macroDiagnostic(
+                    from: expression,
+                    macro: macro,
+                    diagnosticsBinding: diagnosticsBinding,
+                    localBindings: locals
+                ) {
+                    diagnostics.append(diagnostic)
+                }
+            case .conditional(let branches):
+                for branch in branches {
+                    diagnostics.append(
+                        contentsOf: try macroDiagnostics(
+                            in: branch.body,
+                            macro: macro,
+                            diagnosticsBinding: diagnosticsBinding,
+                            localBindings: locals
+                        )
+                    )
+                }
+            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
+                diagnostics.append(
+                    contentsOf: try macroDiagnostics(
+                        in: body,
+                        macro: macro,
+                        diagnosticsBinding: diagnosticsBinding,
+                        localBindings: locals
+                    )
+                )
+            case .background(let background):
+                diagnostics.append(
+                    contentsOf: try macroDiagnostics(
+                        in: background.body,
+                        macro: macro,
+                        diagnosticsBinding: diagnosticsBinding,
+                        localBindings: locals
+                    )
+                )
+            case .deferBlock(let deferred):
+                diagnostics.append(
+                    contentsOf: try macroDiagnostics(
+                        in: deferred.body,
+                        macro: macro,
+                        diagnosticsBinding: diagnosticsBinding,
+                        localBindings: locals
+                    )
+                )
+            case .localCallable(let declaration):
+                diagnostics.append(
+                    contentsOf: try macroDiagnostics(
+                        in: declaration.body,
+                        macro: macro,
+                        diagnosticsBinding: diagnosticsBinding,
+                        localBindings: locals
+                    )
+                )
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    diagnostics.append(
+                        contentsOf: try macroDiagnostics(
+                            in: switchCase.body,
+                            macro: macro,
+                            diagnosticsBinding: diagnosticsBinding,
+                            localBindings: locals
+                        )
+                    )
+                }
+                if let defaultBody {
+                    diagnostics.append(
+                        contentsOf: try macroDiagnostics(
+                            in: defaultBody,
+                            macro: macro,
+                            diagnosticsBinding: diagnosticsBinding,
+                            localBindings: locals
+                        )
+                    )
+                }
+            case .expand, .macroInvocation, .assignment, .compoundAssignment, .return,
+                .environmentProvision, .break, .continue:
+                continue
+            }
+        }
+
+        return diagnostics
+    }
+
+    static func macroDiagnostic(
+        from expression: Expression,
+        macro: MacroDeclaration,
+        diagnosticsBinding: String,
+        localBindings: [String: Expression]
+    ) throws -> NeatDiagnostic? {
+        guard case .call(let name, let arguments) = expression,
+            isMacroDiagnosticsCall(expression, diagnosticsBinding: diagnosticsBinding)
+        else {
+            return nil
+        }
+
+        guard let firstArgument = arguments.first(where: { $0.label == nil })?.value else {
+            throw ParseError("Macro #\(macro.name) \(name)(...) requires a message.")
+        }
+
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "__macro_diagnostics__",
+            targetValue: .object(typeName: "MacroDiagnostics", fields: [:]),
+            localBindings: localBindings
+        )
+        guard case .string(let message) = evaluator.evaluate(firstArgument) else {
+            throw ParseError("Macro #\(macro.name) \(name)(...) message must evaluate to String.")
+        }
+
+        switch name {
+        case "\(diagnosticsBinding).error":
+            return NeatDiagnostic(
+                severity: .error,
+                message: message,
+                source: "neat-macro",
+                code: "macro.diagnostic.error"
+            )
+        case "\(diagnosticsBinding).warning":
+            return NeatDiagnostic(
+                severity: .warning,
+                message: message,
+                source: "neat-macro",
+                code: "macro.diagnostic.warning"
+            )
+        case "\(diagnosticsBinding).note":
+            return NeatDiagnostic(
+                severity: .information,
+                message: message,
+                source: "neat-macro",
+                code: "macro.diagnostic.note"
+            )
+        default:
+            return nil
+        }
+    }
+
+    static func isMacroDiagnosticsCall(
+        _ expression: Expression,
+        diagnosticsBinding: String
+    ) -> Bool {
+        guard case .call(let name, _) = expression else {
+            return false
+        }
+        return name == "\(diagnosticsBinding).error"
+            || name == "\(diagnosticsBinding).warning"
+            || name == "\(diagnosticsBinding).note"
     }
 
     static func emittedDeclarationBundle(

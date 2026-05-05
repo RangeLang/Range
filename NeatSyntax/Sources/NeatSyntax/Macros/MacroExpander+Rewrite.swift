@@ -454,6 +454,7 @@ extension MacroExpander {
                     "Macro #\(application.name) is used on a construct but targets \(macro.target!.typeReference.displayName)."
                 )
             }
+            try emitMacroDiagnostics(from: macro.body, macro: macro, context: context)
             if !macroOperationExpressions(in: macro.body).isEmpty {
                 _ = try resolvedRewriteCalls(for: macro, context: context)
             }
@@ -465,6 +466,7 @@ extension MacroExpander {
         to typeReference: TypeReference,
         context: MacroExpansionContext
     ) throws -> TypeReference {
+        try emitMacroDiagnostics(from: macro.body, macro: macro, context: context)
         let targetBinding = macro.bindings!.target
         for rewrite in try resolvedRewriteCalls(for: macro, context: context)
         where rewrite.site == .parameterDeclarationType {
@@ -486,6 +488,7 @@ extension MacroExpander {
         arguments: [CallArgument],
         context: MacroExpansionContext
     ) throws -> CallArgument {
+        try emitMacroDiagnostics(from: macro.body, macro: macro, context: context)
         let targetBinding = macro.bindings!.target
         let primaryArgument = arguments.first ?? CallArgument(label: nil, value: .array([]))
         guard let plan = try parameterApplicationRewritePlan(for: macro, context: context) else {

@@ -352,7 +352,9 @@ extension MacroExpander {
     ) throws -> [ResolvedRewriteCall] {
         let targetBinding = macro.bindings!.target
         let targetKind = macroTargetKind(for: macro)
-        let operationExpressions = macroOperationExpressions(in: macro.body)
+        let operationExpressions = macroOperationExpressions(in: macro.body).filter {
+            !isMacroDiagnosticsCall($0, diagnosticsBinding: macro.bindings!.diagnostics)
+        }
         try context.validateRewriteSites(
             for: macro,
             targetKind: targetKind,

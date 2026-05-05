@@ -1,0 +1,16 @@
+macro warnOnConstruct(): Construct { target, diagnostics in
+    diagnostics.warning("custom macro warning")
+
+    target.declaration.expand {
+        extension #(target.declaration.self) {
+            function macroDiagnosticProbe() -> String {
+                return "ok"
+            }
+        }
+    }
+}
+
+#warnOnConstruct
+construct MacroDiagnosticsWarningFixture {
+    let value: Int
+}

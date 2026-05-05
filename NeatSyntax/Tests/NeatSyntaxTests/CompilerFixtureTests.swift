@@ -53,6 +53,34 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("User macro diagnostics feed compiler diagnostics")
+    func userMacroDiagnosticsFeedCompilerDiagnostics() throws {
+        let fixture = try fixtureFile(
+            in: "CompilePass",
+            path: "Macros/MacroDiagnosticsWarning.neat"
+        )
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: fixture.path,
+                source: try String(contentsOf: fixture, encoding: .utf8),
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+
+        #expect(
+            diagnostics.contains {
+                $0.severity == .warning
+                    && $0.source == "neat-macro"
+                    && $0.code == "macro.diagnostic.warning"
+                    && $0.message == "custom macro warning"
+                    && $0.path == fixture.path
+            }
+        )
+    }
+
     @Test("Project macros infer across project files")
     func projectMacrosInferAcrossProjectFiles() throws {
         var inputs = try neatCoreInputs()
