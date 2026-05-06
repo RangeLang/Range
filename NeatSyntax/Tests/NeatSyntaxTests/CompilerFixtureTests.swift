@@ -99,6 +99,37 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Parser diagnostics point at invalid hash syntax")
+    func parserDiagnosticsPointAtInvalidHashSyntax() throws {
+        let projectPath = "/tmp/InvalidHashMacro.neat"
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: projectPath,
+                source: """
+                macro bad(): Parameter { target, diagnostics in
+                    parameters: #[]
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+        let diagnostic = try #require(
+            diagnostics.first {
+                $0.message == "Expected identifier after #."
+                    && $0.source == "neat-parser"
+                    && $0.path == projectPath
+            }
+        )
+
+        #expect(diagnostic.range?.start.line == 1)
+        #expect(diagnostic.range?.start.character == 16)
+        #expect(diagnostic.range?.end.line == 1)
+        #expect(diagnostic.range?.end.character == 17)
+    }
+
     @Test("Project macros infer across project files")
     func projectMacrosInferAcrossProjectFiles() throws {
         var inputs = try neatCoreInputs()

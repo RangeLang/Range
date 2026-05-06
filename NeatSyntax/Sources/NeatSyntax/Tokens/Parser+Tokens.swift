@@ -2,13 +2,13 @@ import Foundation
 
 extension Parser {
     func peek() -> Token {
-        tokens[index]
+        tokens[index].token
     }
 
     @discardableResult
     mutating func advance() -> Token {
         defer { index += 1 }
-        return tokens[index]
+        return tokens[index].token
     }
 
     func peek(offset: Int) -> Token {
@@ -16,7 +16,7 @@ extension Parser {
         if position >= tokens.count {
             return .eof
         }
-        return tokens[position]
+        return tokens[position].token
     }
 
     func previous() -> Token {
@@ -24,26 +24,33 @@ extension Parser {
         if position < 0 {
             return .eof
         }
-        return tokens[position]
+        return tokens[position].token
+    }
+
+    func currentRange() -> NeatSourceRange? {
+        guard index < tokens.count else {
+            return tokens.last?.range
+        }
+        return tokens[index].range
     }
 
     mutating func consume(_ expected: Token) throws {
         guard peek() == expected else {
-            throw ParseError("Expected \(expected), found \(peek()).")
+            throw ParseError("Expected \(expected), found \(peek()).", range: currentRange())
         }
         advance()
     }
 
     mutating func consumeKeyword(_ keyword: NeatSyntax.Keyword) throws {
         guard peek() == .keyword(keyword.rawValue) else {
-            throw ParseError("Expected keyword \(keyword.rawValue).")
+            throw ParseError("Expected keyword \(keyword.rawValue).", range: currentRange())
         }
         advance()
     }
 
     mutating func consumeIdentifier() throws -> String {
         guard case .identifier(let value) = peek() else {
-            throw ParseError("Expected identifier, found \(peek()).")
+            throw ParseError("Expected identifier, found \(peek()).", range: currentRange())
         }
         advance()
         return value
@@ -58,7 +65,7 @@ extension Parser {
             advance()
             return value
         default:
-            throw ParseError("Expected enum case name.")
+            throw ParseError("Expected enum case name.", range: currentRange())
         }
     }
 
@@ -107,13 +114,13 @@ extension Parser {
             advance()
             return "??"
         default:
-            throw ParseError("Expected callable name.")
+            throw ParseError("Expected callable name.", range: currentRange())
         }
     }
 
     mutating func consumeStringLiteral() throws -> String {
         guard case .stringLiteral(let value) = peek() else {
-            throw ParseError("Expected string literal.")
+            throw ParseError("Expected string literal.", range: currentRange())
         }
         advance()
         return value

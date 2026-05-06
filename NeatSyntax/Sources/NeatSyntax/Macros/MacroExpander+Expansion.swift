@@ -2289,7 +2289,7 @@ extension MacroExpander {
     static func syntaxTextStartsWithMemberAccess(_ text: String) -> Bool {
         do {
             var lexer = Lexer(source: text)
-            return try lexer.tokenize().first { $0 != .eof } == .dot
+            return try lexer.tokenize().first { $0.token != .eof }?.token == .dot
         } catch {
             return false
         }
@@ -2300,16 +2300,16 @@ extension MacroExpander {
         parameterBindings: [String: Expression]
     ) throws -> String {
         var lexer = Lexer(source: text)
-        let tokens = try lexer.tokenize().filter { $0 != .eof }
-        return tokens.map { token in
-            switch token {
+        let tokens = try lexer.tokenize().filter { $0.token != .eof }
+        return tokens.map { lexedToken in
+            switch lexedToken.token {
             case .identifier(let name), .keyword(let name):
                 if let expression = parameterBindings[name] {
                     return renderExpressionForStringify(expression)
                 }
                 return name
             default:
-                return renderMacroToken(token)
+                return renderMacroToken(lexedToken.token)
             }
         }.joined(separator: " ")
     }

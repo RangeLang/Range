@@ -41,3 +41,8 @@ enum Token: Equatable {
     case comma
     case eof
 }
+
+struct LexedToken {
+    let token: Token
+    let range: NeatSourceRange
+}

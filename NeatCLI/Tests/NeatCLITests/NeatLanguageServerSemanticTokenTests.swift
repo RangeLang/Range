@@ -119,6 +119,42 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(!containsExactToken(tokens, text: "task", type: .method, modifiers: []))
     }
 
+    @Test("Switch pattern bindings stay plain text")
+    func switchPatternBindingsStayPlainText() {
+        let source = """
+        function encode() -> Result<Void, EncodingError> {
+            switch container.encode(id, forKey: "id") {
+            case .success:
+                break
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: [.argument]))
+        #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: []))
+    }
+
+    @Test("External parameter labels emit plain label semantic tokens")
+    func externalParameterLabelsEmitLabelTokens() {
+        let source = """
+        protocol KeyedDecodingContainer {
+            function decode(_ type: Bool.Type, forKey key: String) -> Result<Bool, DecodingError>
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "forKey", type: .label, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "type", type: .parameter, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "key", type: .parameter, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "forKey", type: .property, modifiers: []))
+    }
+
     @Test("Macro applications, including parameter macros, emit semantic tokens")
     func macroApplicationsEmitSemanticTokens() {
         let source = """
@@ -163,6 +199,19 @@ struct NeatLanguageServerSemanticTokenTests {
         let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "nil", type: .keyword, modifiers: []))
+    }
+
+    @Test("Enum case declarations emit enum member semantic tokens")
+    func enumCaseDeclarationsEmitEnumMemberTokens() {
+        let source = """
+        enum EncodingError {
+            case failed
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "failed", type: .enumMember, modifiers: [.declaration]))
     }
 
     @Test("Member call receivers do not emit plain variable read tokens")

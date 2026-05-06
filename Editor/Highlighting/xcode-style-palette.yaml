@@ -1,0 +1,621 @@
+# Human-editable Xcode-style palette for Neat.
+#
+# This file is intentionally human-editable. The importer can refresh Xcode-
+# derived color/font fields while preserving Neat support metadata.
+#
+# Style field notes:
+# - XcodeSyntax is the source plist key in Xcode's .xccolortheme files.
+# - ZedStyle is the closest Zed syntax style key we currently emit or want to map to.
+# - Supported means current end-to-end support in the Neat editor pipeline:
+#   true = Tree-sitter/LSP can emit it today and Zed can style it.
+#   partial = some path exists, but it is incomplete or not 1:1 with Xcode.
+#   false = this is design intent only until the listed work is done.
+# - ZedNative means whether Zed has a direct style key/category we can target
+#   without custom Neat semantic token work.
+# - Needs lists the missing Neat-side pieces. Use [] when no known work remains.
+# - FontWeight values to use: normal, medium, semibold, bold.
+# - FontStyle values to use: normal, italic.
+# - TextDecoration values to use: none, underline, strikethrough.
+# - FontSize is included for design intent, but most editors may not support
+#   per-token font sizes safely.
+
+- Name: "Plain Text"
+  XcodeCategory: "Plain Text"
+  XcodeSyntax: "xcode.syntax.plain"
+  ZedStyle: "text"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Default unclassified source text."
+
+- Name: "Comments"
+  XcodeCategory: "Comments"
+  XcodeSyntax: "xcode.syntax.comment"
+  ZedStyle: "comment"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#6C7986FF"
+  Light: "#5D6C79FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Line comments."
+
+- Name: "Documentation Markup"
+  XcodeCategory: "Documentation Markup"
+  XcodeSyntax: "xcode.syntax.comment.doc"
+  ZedStyle: "comment.doc"
+  Supported: false
+  ZedNative: "partial"
+  Needs:
+    - documentation-comment-parser
+    - tree-sitter-captures
+  Dark: "#6C7986FF"
+  Light: "#5D6C79FF"
+  FontSize: 12
+  FontWeight: "normal"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs documentation comment parsing before this can be distinct."
+
+- Name: "Documentation Markup Keywords"
+  XcodeCategory: "Documentation Markup Keywords"
+  XcodeSyntax: "xcode.syntax.comment.doc.keyword"
+  ZedStyle: "comment.doc.keyword"
+  Supported: false
+  ZedNative: "partial"
+  Needs:
+    - documentation-comment-parser
+    - documentation-keyword-captures
+  Dark: "#92A1B1FF"
+  Light: "#4A5560FF"
+  FontSize: 12
+  FontWeight: "bold"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs documentation comment parsing before this can be distinct."
+
+- Name: "Marks"
+  XcodeCategory: "Marks"
+  XcodeSyntax: "xcode.syntax.mark"
+  ZedStyle: "mark"
+  Supported: false
+  ZedNative: "partial"
+  Needs:
+    - mark-comment-parser
+    - tree-sitter-captures
+  Dark: "#92A1B1FF"
+  Light: "#4A5560FF"
+  FontSize: 12
+  FontWeight: "bold"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Candidate for future // MARK style support."
+
+- Name: "Strings"
+  XcodeCategory: "Strings"
+  XcodeSyntax: "xcode.syntax.string"
+  ZedStyle: "string"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#FC6A5DFF"
+  Light: "#C41A16FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "String delimiters and contents."
+
+- Name: "Characters"
+  XcodeCategory: "Characters"
+  XcodeSyntax: "xcode.syntax.character"
+  ZedStyle: "character"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - character-literals
+    - tree-sitter-captures
+  Dark: "#D0BF69FF"
+  Light: "#1C00CFFF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs character literal support."
+
+- Name: "Numbers"
+  XcodeCategory: "Numbers"
+  XcodeSyntax: "xcode.syntax.number"
+  ZedStyle: "number"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#D0BF69FF"
+  Light: "#1C00CFFF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Integer and float literals."
+
+- Name: "Regex Literals"
+  XcodeCategory: "Regex Literals"
+  XcodeSyntax: "xcode.syntax.regex"
+  ZedStyle: "string.regex"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - regex-literals
+    - tree-sitter-captures
+  Dark: "#FC6A5DFF"
+  Light: "#C41A16FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs regex literal support."
+
+- Name: "Regex Literal Numbers"
+  XcodeCategory: "Regex Literal Numbers"
+  XcodeSyntax: "xcode.syntax.regex.number"
+  ZedStyle: "number.regex"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - regex-literals
+    - regex-number-captures
+  Dark: "#D0BF69FF"
+  Light: "#1C00CFFF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs regex literal support."
+
+- Name: "Regex Literal Capture Names"
+  XcodeCategory: "Regex Literal Capture Names"
+  XcodeSyntax: "xcode.syntax.regex.capturename"
+  ZedStyle: "variable.regex.capture"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - regex-literals
+    - regex-capture-name-captures
+  Dark: "#67B7A4FF"
+  Light: "#326D74FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs regex literal support."
+
+- Name: "Regex Literal Character Class Names"
+  XcodeCategory: "Regex Literal Character Class Names"
+  XcodeSyntax: "xcode.syntax.regex.charname"
+  ZedStyle: "type.regex.character-class"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - regex-literals
+    - regex-character-class-captures
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs regex literal support."
+
+- Name: "Regex Literal Operators"
+  XcodeCategory: "Regex Literal Operators"
+  XcodeSyntax: "xcode.syntax.regex.other"
+  ZedStyle: "operator.regex"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - regex-literals
+    - regex-operator-captures
+  Dark: "#FFFFFFD9"
+  Light: "#000000D9"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs regex literal support."
+
+- Name: "Keywords"
+  XcodeCategory: "Keywords"
+  XcodeSyntax: "xcode.syntax.keyword"
+  ZedStyle: "keyword"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#FC5FA3FF"
+  Light: "#9B2393FF"
+  FontSize: 12
+  FontWeight: "bold"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Language keywords."
+
+- Name: "Preprocessor Statements"
+  XcodeCategory: "Preprocessor Statements"
+  XcodeSyntax: "xcode.syntax.preprocessor"
+  ZedStyle: "preprocessor"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - directive-syntax
+    - tree-sitter-captures
+  Dark: "#FD8F3FFF"
+  Light: "#643820FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Candidate for future compiler directives or syntax macros."
+
+- Name: "URLs"
+  XcodeCategory: "URLs"
+  XcodeSyntax: "xcode.syntax.url"
+  ZedStyle: "string.url"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - url-detection
+  Dark: "#5482FFFF"
+  Light: "#0E0EFFFF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs URL detection."
+
+- Name: "Attributes"
+  XcodeCategory: "Attributes"
+  XcodeSyntax: "xcode.syntax.attribute"
+  ZedStyle: "attribute"
+  Supported: "partial"
+  ZedNative: true
+  Needs:
+    - attribute-tokenization
+    - semantic-token-mapping
+  Dark: "#BF8555FF"
+  Light: "#815F03FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "'@main' is currently keyword-colored; future attributes can be distinct."
+
+- Name: "Type Declarations"
+  XcodeCategory: "Type Declarations"
+  XcodeSyntax: "xcode.syntax.declaration.type"
+  ZedStyle: "constructor"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#5DD8FFFF"
+  Light: "#0B4F79FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Construct, protocol, enum, and similar declaration names."
+
+- Name: "Other Declarations"
+  XcodeCategory: "Other Declarations"
+  XcodeSyntax: "xcode.syntax.declaration.other"
+  ZedStyle: "declaration"
+  Supported: false
+  ZedNative: "partial"
+  Needs:
+    - declaration-category-policy
+    - semantic-token-mapping
+  Dark: "#41A1C0FF"
+  Light: "#0F68A0FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Generic declaration bucket; not currently emitted directly."
+
+- Name: "Project Class Names"
+  XcodeCategory: "Project Class Names"
+  XcodeSyntax: "xcode.syntax.identifier.class"
+  ZedStyle: "type.project.class"
+  Supported: false
+  ZedNative: false
+  Needs:
+    - project-vs-library-index
+    - semantic-token-modifiers
+    - zed-style-mapping
+  Dark: "#9EF1DDFF"
+  Light: "#1C464AFF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs project-vs-library semantic split."
+
+- Name: "Project Function and Method Names"
+  XcodeCategory: "Project Function and Method Names"
+  XcodeSyntax: "xcode.syntax.identifier.function"
+  ZedStyle: "function.project"
+  Supported: false
+  ZedNative: false
+  Needs:
+    - project-vs-library-index
+    - semantic-token-modifiers
+    - zed-style-mapping
+  Dark: "#67B7A4FF"
+  Light: "#326D74FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs project-vs-library semantic split."
+
+- Name: "Project Constants"
+  XcodeCategory: "Project Constants"
+  XcodeSyntax: "xcode.syntax.identifier.constant"
+  ZedStyle: "constant.project"
+  Supported: false
+  ZedNative: false
+  Needs:
+    - project-vs-library-index
+    - constant-global-semantic-split
+    - zed-style-mapping
+  Dark: "#67B7A4FF"
+  Light: "#326D74FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs constant/global semantic split."
+
+- Name: "Project Type Names"
+  XcodeCategory: "Project Type Names"
+  XcodeSyntax: "xcode.syntax.identifier.type"
+  ZedStyle: "type.project"
+  Supported: false
+  ZedNative: false
+  Needs:
+    - project-vs-library-index
+    - semantic-token-modifiers
+    - zed-style-mapping
+  Dark: "#9EF1DDFF"
+  Light: "#1C464AFF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs project-vs-library semantic split."
+
+- Name: "Project Properties and Globals"
+  XcodeCategory: "Project Properties and Globals"
+  XcodeSyntax: "xcode.syntax.identifier.variable"
+  ZedStyle: "property.project"
+  Supported: false
+  ZedNative: false
+  Needs:
+    - project-vs-library-index
+    - property-global-semantic-split
+    - zed-style-mapping
+  Dark: "#67B7A4FF"
+  Light: "#326D74FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Needs project-vs-library and property/global semantic split."
+
+- Name: "Project Preprocessor Macros"
+  XcodeCategory: "Project Preprocessor Macros"
+  XcodeSyntax: "xcode.syntax.identifier.macro"
+  ZedStyle: "macro.project"
+  Supported: false
+  ZedNative: false
+  Needs:
+    - project-vs-library-index
+    - macro-semantic-token-modifiers
+    - zed-style-mapping
+  Dark: "#FD8F3FFF"
+  Light: "#643820FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Neat macros currently use function.macro."
+
+- Name: "Other Class Names"
+  XcodeCategory: "Other Class Names"
+  XcodeSyntax: "xcode.syntax.identifier.class.system"
+  ZedStyle: "type.class"
+  Supported: false
+  ZedNative: "partial"
+  Needs:
+    - class-vs-type-semantic-split
+  Dark: "#D0A8FFFF"
+  Light: "#3900A0FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Not separated from type yet."
+
+- Name: "Other Function Names"
+  XcodeCategory: "Other Function and Method Names"
+  XcodeSyntax: "xcode.syntax.identifier.function.system"
+  ZedStyle: "function"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Free function declarations and calls."
+
+- Name: "Other Method Names"
+  XcodeCategory: "Other Function and Method Names"
+  XcodeSyntax: "xcode.syntax.identifier.function.system"
+  ZedStyle: "function.method"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Member calls."
+
+- Name: "Other Constants"
+  XcodeCategory: "Other Constants"
+  XcodeSyntax: "xcode.syntax.identifier.constant.system"
+  ZedStyle: "constant"
+  Supported: "partial"
+  ZedNative: true
+  Needs:
+    - constant-semantic-token-policy
+    - enum-case-style-policy
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Enum cases are currently intentionally mapped to text."
+
+- Name: "Other Type Names"
+  XcodeCategory: "Other Type Names"
+  XcodeSyntax: "xcode.syntax.identifier.type.system"
+  ZedStyle: "type"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#D0A8FFFF"
+  Light: "#3900A0FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Type references."
+
+- Name: "Other Properties and Globals"
+  XcodeCategory: "Other Properties and Globals"
+  XcodeSyntax: "xcode.syntax.identifier.variable.system"
+  ZedStyle: "property"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Properties and member accesses."
+
+- Name: "Other Variables"
+  XcodeCategory: "Other Properties and Globals"
+  XcodeSyntax: "xcode.syntax.identifier.variable.system"
+  ZedStyle: "variable"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Local variable declarations and uses."
+
+- Name: "Other Parameters"
+  XcodeCategory: "Other Properties and Globals"
+  XcodeSyntax: "xcode.syntax.identifier.variable.system"
+  ZedStyle: "variable.parameter"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Parameters."
+
+- Name: "Other Preprocessor Macros"
+  XcodeCategory: "Other Preprocessor Macros"
+  XcodeSyntax: "xcode.syntax.identifier.macro.system"
+  ZedStyle: "function.macro"
+  Supported: true
+  ZedNative: true
+  Needs: []
+  Dark: "#FD8F3FFF"
+  Light: "#643820FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Macro declarations and applications."
+
+- Name: "Neat Macro Declaration Names"
+  XcodeCategory: "Other Function and Method Names"
+  XcodeSyntax: "xcode.syntax.identifier.function.system"
+  ZedStyle: "macro.neat.declaration"
+  Supported: true
+  ZedNative: false
+  Needs: []
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Macro declaration names."
+
+- Name: "Neat Macro Applications"
+  XcodeCategory: "Other Function and Method Names"
+  XcodeSyntax: "xcode.syntax.identifier.function.system"
+  ZedStyle: "macro.neat"
+  Supported: true
+  ZedNative: false
+  Needs: []
+  Dark: "#A167E6FF"
+  Light: "#6C36A9FF"
+  FontSize: 12
+  FontWeight: "medium"
+  FontStyle: "normal"
+  TextDecoration:
+  Notes: "Macro application sigils and names."
+
+- Name: "Heading"
+  XcodeCategory: "Heading"
+  ZedStyle: "heading"
+  Supported: false
+  ZedNative: true
+  Needs:
+    - heading-syntax-or-comment-policy
+  Dark:
+  Light:
+  FontSize:
+  FontWeight:
+  FontStyle:
+  TextDecoration:
+  Notes: "Not used yet."

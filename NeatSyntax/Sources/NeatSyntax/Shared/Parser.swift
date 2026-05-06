@@ -164,7 +164,7 @@ public struct Parser {
         }
     }
 
-    let tokens: [Token]
+    let tokens: [LexedToken]
     var index: Int = 0
     var currentStateNames: Set<String> = []
     var currentMutableStateNames: Set<String> = []

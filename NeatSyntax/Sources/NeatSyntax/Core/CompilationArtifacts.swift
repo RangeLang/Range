@@ -32,7 +32,7 @@ public struct CompilationArtifactsEmitter {
         let tokens = try lexer.tokenize()
         return renderSection(
             title: "Tokens",
-            lines: tokens.map(render)
+            lines: tokens.map { render($0.token) }
         )
     }
 

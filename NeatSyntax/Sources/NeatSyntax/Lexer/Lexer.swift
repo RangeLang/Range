@@ -3,13 +3,19 @@ import Foundation
 struct Lexer {
     private let characters: [Character]
     private var index: Int = 0
+    private var line: Int = 0
+    private var character: Int = 0
 
     init(source: String) {
         self.characters = Array(source)
     }
 
-    mutating func tokenize() throws -> [Token] {
-        var tokens: [Token] = []
+    mutating func tokenize() throws -> [LexedToken] {
+        var tokens: [LexedToken] = []
+
+        func emit(_ token: Token, start: NeatSourceLocation) {
+            tokens.append(LexedToken(token: token, range: range(from: start)))
+        }
 
         while let character = peek() {
             if character.isWhitespace {
@@ -17,154 +23,156 @@ struct Lexer {
                 continue
             }
 
+            let start = currentLocation()
             switch character {
             case "/":
                 advance()
                 if match("/") {
                     skipLineComment()
                 } else {
-                    tokens.append(.slash)
+                    emit(.slash, start: start)
                 }
             case "{":
                 advance()
-                tokens.append(.leftBrace)
+                emit(.leftBrace, start: start)
             case "}":
                 advance()
-                tokens.append(.rightBrace)
+                emit(.rightBrace, start: start)
             case "(":
                 advance()
-                tokens.append(.leftParen)
+                emit(.leftParen, start: start)
             case ")":
                 advance()
-                tokens.append(.rightParen)
+                emit(.rightParen, start: start)
             case "[":
                 advance()
-                tokens.append(.leftBracket)
+                emit(.leftBracket, start: start)
             case "]":
                 advance()
-                tokens.append(.rightBracket)
+                emit(.rightBracket, start: start)
             case "*":
                 advance()
-                tokens.append(.asterisk)
+                emit(.asterisk, start: start)
             case ".":
                 advance()
                 if match(".") {
                     guard match(".") else {
-                        throw ParseError("Unexpected character sequence ..")
+                        throw ParseError("Unexpected character sequence ..", range: range(from: start))
                     }
-                    tokens.append(.ellipsis)
+                    emit(.ellipsis, start: start)
                 } else {
-                    tokens.append(.dot)
+                    emit(.dot, start: start)
                 }
             case ":":
                 advance()
-                tokens.append(.colon)
+                emit(.colon, start: start)
             case "-":
                 advance()
                 if match(">") {
-                    tokens.append(.arrow)
+                    emit(.arrow, start: start)
                 } else {
-                    tokens.append(.minus)
+                    emit(.minus, start: start)
                 }
             case "!":
                 advance()
                 if match("=") {
-                    tokens.append(.bangEqual)
+                    emit(.bangEqual, start: start)
                 } else {
-                    tokens.append(.bang)
+                    emit(.bang, start: start)
                 }
             case ",":
                 advance()
-                tokens.append(.comma)
+                emit(.comma, start: start)
             case "=":
                 advance()
                 if match("=") {
-                    tokens.append(.equalEqual)
+                    emit(.equalEqual, start: start)
                 } else {
-                    tokens.append(.equal)
+                    emit(.equal, start: start)
                 }
             case "<":
                 advance()
                 if match("=") {
-                    tokens.append(.lessEqual)
+                    emit(.lessEqual, start: start)
                 } else {
-                    tokens.append(.less)
+                    emit(.less, start: start)
                 }
             case ">":
                 advance()
                 if match("=") {
-                    tokens.append(.greaterEqual)
+                    emit(.greaterEqual, start: start)
                 } else {
-                    tokens.append(.greater)
+                    emit(.greater, start: start)
                 }
             case "+":
                 advance()
                 if match("=") {
-                    tokens.append(.plusEqual)
+                    emit(.plusEqual, start: start)
                 } else {
-                    tokens.append(.plus)
+                    emit(.plus, start: start)
                 }
             case "?":
                 advance()
                 if match("?") {
-                    tokens.append(.questionQuestion)
+                    emit(.questionQuestion, start: start)
                 } else {
-                    tokens.append(.question)
+                    emit(.question, start: start)
                 }
             case "$":
                 advance()
-                tokens.append(.dollar)
+                emit(.dollar, start: start)
             case "&":
                 advance()
                 guard match("&") else {
-                    throw ParseError("Unexpected character &.")
+                    throw ParseError("Unexpected character &.", range: range(from: start))
                 }
-                tokens.append(.andAnd)
+                emit(.andAnd, start: start)
             case "|":
                 advance()
                 guard match("|") else {
-                    throw ParseError("Unexpected character |.")
+                    throw ParseError("Unexpected character |.", range: range(from: start))
                 }
-                tokens.append(.orOr)
+                emit(.orOr, start: start)
             case "%":
                 advance()
-                tokens.append(.percent)
+                emit(.percent, start: start)
             case "\"":
-                tokens.append(.stringLiteral(try readString()))
+                emit(.stringLiteral(try readString(start: start)), start: start)
             case "#":
                 if peek(offset: 1) == "(" {
                     advance()
-                    tokens.append(.hash)
+                    emit(.hash, start: start)
                 } else {
-                    let identifier = try readHashIdentifier()
-                    tokens.append(.hashDirective(identifier))
+                    let identifier = try readHashIdentifier(start: start)
+                    emit(.hashDirective(identifier), start: start)
                 }
             case "@":
-                let identifier = try readSigilIdentifier()
+                let identifier = try readSigilIdentifier(start: start)
                 guard NeatSyntax.attributeIdentifiers.contains(identifier) else {
-                    throw ParseError("Unknown attribute @\(identifier).")
+                    throw ParseError("Unknown attribute @\(identifier).", range: range(from: start))
                 }
-                tokens.append(.atAttribute(name: identifier, argument: nil))
+                emit(.atAttribute(name: identifier, argument: nil), start: start)
             case "`":
-                let identifier = try readEscapedIdentifier()
-                tokens.append(.identifier(identifier))
+                let identifier = try readEscapedIdentifier(start: start)
+                emit(.identifier(identifier), start: start)
             default:
                 if character.isNumber {
-                    tokens.append(try readNumberLiteral())
+                    emit(try readNumberLiteral(start: start), start: start)
                 } else if character.isLetter || character == "_" {
                     let identifier = readIdentifier()
                     if NeatSyntax.keywordIdentifiers.contains(identifier) {
-                        tokens.append(.keyword(identifier))
+                        emit(.keyword(identifier), start: start)
                     } else {
-                        tokens.append(.identifier(identifier))
+                        emit(.identifier(identifier), start: start)
                     }
                 } else {
-                    throw ParseError("Unexpected character \(character).")
+                    throw ParseError("Unexpected character \(character).", range: range(from: start))
                 }
             }
         }
 
-        tokens.append(.eof)
+        let eof = currentLocation()
+        tokens.append(LexedToken(token: .eof, range: NeatSourceRange(start: eof, end: eof)))
         return tokens
     }
 
@@ -176,8 +184,23 @@ struct Lexer {
     @discardableResult
     private mutating func advance() -> Character? {
         guard index < characters.count else { return nil }
-        defer { index += 1 }
-        return characters[index]
+        let value = characters[index]
+        index += 1
+        if value == "\n" {
+            line += 1
+            character = 0
+        } else {
+            character += 1
+        }
+        return value
+    }
+
+    private func currentLocation() -> NeatSourceLocation {
+        NeatSourceLocation(line: line, character: character)
+    }
+
+    private func range(from start: NeatSourceLocation) -> NeatSourceRange {
+        NeatSourceRange(start: start, end: currentLocation())
     }
 
     private mutating func match(_ expected: Character) -> Bool {
@@ -194,63 +217,63 @@ struct Lexer {
         return String(characters[start..<index])
     }
 
-    private mutating func readEscapedIdentifier() throws -> String {
+    private mutating func readEscapedIdentifier(start: NeatSourceLocation) throws -> String {
         advance()
         guard let next = peek(), next.isLetter || next == "_" else {
-            throw ParseError("Expected identifier after `.")
+            throw ParseError("Expected identifier after `.", range: range(from: start))
         }
 
         let identifier = readIdentifier()
 
         guard match("`") else {
-            throw ParseError("Unterminated escaped identifier.")
+            throw ParseError("Unterminated escaped identifier.", range: range(from: start))
         }
 
         return identifier
     }
 
-    private mutating func readSigilIdentifier() throws -> String {
+    private mutating func readSigilIdentifier(start: NeatSourceLocation) throws -> String {
         advance()
         guard let next = peek() else {
-            throw ParseError("Expected identifier after @.")
+            throw ParseError("Expected identifier after @.", range: range(from: start))
         }
         if next == "`" {
-            return try readEscapedIdentifier()
+            return try readEscapedIdentifier(start: start)
         }
         guard next.isLetter else {
-            throw ParseError("Expected identifier after @.")
+            throw ParseError("Expected identifier after @.", range: range(from: start))
         }
         return readIdentifier()
     }
 
-    private mutating func readHashIdentifier() throws -> String {
+    private mutating func readHashIdentifier(start: NeatSourceLocation) throws -> String {
         advance()
         guard let next = peek() else {
-            throw ParseError("Expected identifier after #.")
+            throw ParseError("Expected identifier after #.", range: range(from: start))
         }
         if next == "`" {
-            return try readEscapedIdentifier()
+            return try readEscapedIdentifier(start: start)
         }
         guard next.isLetter else {
-            throw ParseError("Expected identifier after #.")
+            throw ParseError("Expected identifier after #.", range: range(from: start))
         }
         return readIdentifier()
     }
 
-    private mutating func readInteger() throws -> Int {
-        let start = index
+    private mutating func readInteger(start: NeatSourceLocation) throws -> Int {
+        let digitStart = index
         while let character = peek(), character.isNumber {
             advance()
         }
-        let value = String(characters[start..<index])
+        let value = String(characters[digitStart..<index])
         guard let integer = Int(value) else {
-            throw ParseError("Invalid integer literal \(value).")
+            throw ParseError("Invalid integer literal \(value).", range: range(from: start))
         }
         return integer
     }
 
-    private mutating func readNumberLiteral() throws -> Token {
-        let integerPart = try readInteger()
+    private mutating func readNumberLiteral(start: NeatSourceLocation) throws -> Token {
+        let integerPart = try readInteger(start: start)
 
         guard let character = peek(), character == ".", let next = peek(offset: 1), next.isNumber
         else {
@@ -266,7 +289,7 @@ struct Lexer {
         let fractionalPart = String(characters[fractionalStart..<index])
         let raw = "\(integerPart).\(fractionalPart)"
         guard let value = Double(raw) else {
-            throw ParseError("Invalid numeric literal \(raw).")
+            throw ParseError("Invalid numeric literal \(raw).", range: range(from: start))
         }
         return .double(value)
     }
@@ -277,7 +300,7 @@ struct Lexer {
         return characters[position]
     }
 
-    private mutating func readString() throws -> String {
+    private mutating func readString(start: NeatSourceLocation) throws -> String {
         advance()
         var result = ""
         var interpolationDepth = 0
@@ -291,7 +314,7 @@ struct Lexer {
             if character == "\\" {
                 advance()
                 guard let escaped = advance() else {
-                    throw ParseError("Unterminated escape sequence in string literal.")
+                    throw ParseError("Unterminated escape sequence in string literal.", range: range(from: start))
                 }
                 result.append("\\")
                 result.append(escaped)
@@ -303,7 +326,7 @@ struct Lexer {
 
             if interpolationDepth > 0 {
                 if character == "\"" {
-                    result.append(try readInterpolatedStringLiteral())
+                    result.append(try readInterpolatedStringLiteral(start: start))
                     continue
                 }
 
@@ -318,10 +341,10 @@ struct Lexer {
             advance()
         }
 
-        throw ParseError("Unterminated string literal.")
+        throw ParseError("Unterminated string literal.", range: range(from: start))
     }
 
-    private mutating func readInterpolatedStringLiteral() throws -> String {
+    private mutating func readInterpolatedStringLiteral(start: NeatSourceLocation) throws -> String {
         var result = "\""
         advance()
 
@@ -331,7 +354,7 @@ struct Lexer {
 
             if character == "\\" {
                 guard let escaped = advance() else {
-                    throw ParseError("Unterminated escape sequence in string literal.")
+                    throw ParseError("Unterminated escape sequence in string literal.", range: range(from: start))
                 }
                 result.append(escaped)
                 continue
@@ -342,7 +365,7 @@ struct Lexer {
             }
         }
 
-        throw ParseError("Unterminated string literal inside interpolation.")
+        throw ParseError("Unterminated string literal inside interpolation.", range: range(from: start))
     }
 
     private mutating func skipLineComment() {

@@ -161,7 +161,8 @@ public enum NeatDiagnosticConverter {
                 severity: .error,
                 message: parse.description,
                 source: "neat-parser",
-                path: path
+                path: path,
+                range: parse.range
             )
         }
         if let semantic = error as? SemanticValidationError {

@@ -825,6 +825,13 @@ private struct DocumentState {
     }
 }
 
+private struct ParameterDeclaration {
+    let externalName: String?
+    let externalRange: NSRange?
+    let name: String
+    let range: NSRange
+}
+
 private struct DocumentIndex {
     let text: String
     let uri: String
@@ -1108,9 +1115,9 @@ private struct DocumentIndex {
             #"\bmarker\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
-        let macroPattern = #"#([a-z_][A-Za-z0-9_]*)\b"#
         let macroTokenPattern = #"(#[a-z_][A-Za-z0-9_]*)\b"#
         let attributeKeywordPattern = #"@[A-Za-z_][A-Za-z0-9_]*\b"#
+        let enumCaseDeclarationPattern = #"^\s*case\s+([a-z_][A-Za-z0-9_]*)\b"#
         let argumentValuePattern = #"(?:\(\s*|,\s*|:\s*)([a-z_][A-Za-z0-9_]*)\s*(?=[,)])"#
         let argumentLabelPattern = #"(?:\(\s*|,\s*|^\s*)([a-z_][A-Za-z0-9_]*)\s*:"#
         let localIdentifierPattern = #"\b([a-z_][A-Za-z0-9_]*)\b"#
@@ -1244,12 +1251,25 @@ private struct DocumentIndex {
                 )
             }
 
+            if let match = firstMatch(in: line, pattern: enumCaseDeclarationPattern), match.count > 1 {
+                let name = match[1]
+                record(
+                    line: lineIndex,
+                    range: nsRange(in: line, value: name),
+                    type: .enumMember,
+                    modifiers: [.declaration]
+                )
+            }
+
             if let declarationKeywordRegex = try? NSRegularExpression(pattern: declarationKeywordPattern) {
                 let matches = declarationKeywordRegex.matches(
                     in: line,
                     range: NSRange(location: 0, length: nsLine.length)
                 )
                 for match in matches {
+                    if isPatternBindingStorageKeyword(in: line, keywordStart: match.range.location) {
+                        continue
+                    }
                     if overlapsExisting(
                         line: lineIndex,
                         start: match.range.location,
@@ -1272,6 +1292,9 @@ private struct DocumentIndex {
                 )
                 for match in matches {
                     guard match.numberOfRanges > 1 else { continue }
+                    if isPatternBindingStorageKeyword(in: line, keywordStart: match.range.location) {
+                        continue
+                    }
                     let name = nsLine.substring(with: match.range(at: 1))
                     if keywordLikeIdentifierNames.contains(name) {
                         continue
@@ -1455,6 +1478,18 @@ private struct DocumentIndex {
             }
 
             for parameter in parameterDeclarationsByLine[lineIndex] ?? [] {
+                if let externalName = parameter.externalName,
+                    let externalRange = parameter.externalRange,
+                    externalName != "_"
+                {
+                    record(
+                        line: lineIndex,
+                        range: externalRange,
+                        type: .label,
+                        modifiers: [.declaration]
+                    )
+                }
+
                 if keywordLikeIdentifierNames.contains(parameter.name) {
                     continue
                 }
@@ -1574,8 +1609,8 @@ private struct DocumentIndex {
         return encoded
     }
 
-    private static func collectParameterDeclarationRanges(in lines: [String]) -> [Int: [(name: String, range: NSRange)]] {
-        var results: [Int: [(name: String, range: NSRange)]] = [:]
+    private static func collectParameterDeclarationRanges(in lines: [String]) -> [Int: [ParameterDeclaration]] {
+        var results: [Int: [ParameterDeclaration]] = [:]
         var insideParameterClause = false
 
         for (lineIndex, line) in lines.enumerated() {
@@ -1629,38 +1664,58 @@ private struct DocumentIndex {
         in searchRange: NSRange,
         line: String,
         lineIndex: Int,
-        into results: inout [Int: [(name: String, range: NSRange)]]
+        into results: inout [Int: [ParameterDeclaration]]
     ) {
         guard searchRange.length > 0 else { return }
 
         let nsLine = line as NSString
-        let segment = nsLine.substring(with: searchRange).trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !segment.isEmpty else { return }
+        let segment = nsLine.substring(with: searchRange)
+        guard !segment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
-        var trimmed = segment
-        while trimmed.hasPrefix("#") {
-            guard let firstSpace = trimmed.firstIndex(where: \.isWhitespace) else { break }
-            trimmed = String(trimmed[firstSpace...]).trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        guard let regex = try? NSRegularExpression(
+            pattern: #"(?:^|,)\s*(?:#[A-Za-z_][A-Za-z0-9_]*\s+)*(?:(_|[A-Za-z_][A-Za-z0-9_]*)\s+)?([a-z_][A-Za-z0-9_]*)\s*:"#
+        ) else { return }
 
-        guard
-            let match = firstMatch(
-                in: trimmed,
-                pattern: #"^(?:[A-Za-z_][A-Za-z0-9_]*\s+)?([a-z_][A-Za-z0-9_]*)\s*:"#
-            ),
-            match.count > 1
-        else {
-            return
-        }
-
-        let name = match[1]
-        let nameRange = nsLine.range(
-            of: name,
-            options: [],
-            range: searchRange
+        let matches = regex.matches(
+            in: segment,
+            range: NSRange(location: 0, length: (segment as NSString).length)
         )
-        guard nameRange.location != NSNotFound else { return }
-        results[lineIndex, default: []].append((name, nameRange))
+        let nsSegment = segment as NSString
+
+        for match in matches {
+            guard match.numberOfRanges > 2 else { continue }
+
+            let nameRangeInSegment = match.range(at: 2)
+            guard nameRangeInSegment.location != NSNotFound else { continue }
+
+            let externalRangeInSegment = match.range(at: 1)
+            let externalName: String?
+            let externalRange: NSRange?
+            if externalRangeInSegment.location != NSNotFound {
+                externalName = nsSegment.substring(with: externalRangeInSegment)
+                externalRange = NSRange(
+                    location: searchRange.location + externalRangeInSegment.location,
+                    length: externalRangeInSegment.length
+                )
+            } else {
+                externalName = nil
+                externalRange = nil
+            }
+
+            let name = nsSegment.substring(with: nameRangeInSegment)
+            let nameRange = NSRange(
+                location: searchRange.location + nameRangeInSegment.location,
+                length: nameRangeInSegment.length
+            )
+            results[lineIndex, default: []].append(
+                ParameterDeclaration(
+                    externalName: externalName,
+                    externalRange: externalRange,
+                    name: name,
+                    range: nameRange
+                )
+            )
+        }
     }
 
     private static func isParameterDeclarationContext(_ line: String) -> Bool {
@@ -1805,10 +1860,28 @@ private struct DocumentIndex {
                 range: NSRange(location: 0, length: nsLine.length)
             )
             for match in matches where match.numberOfRanges > 2 {
+                if isPatternBindingStorageKeyword(in: line, keywordStart: match.range(at: 1).location) {
+                    continue
+                }
                 result.insert(nsLine.substring(with: match.range(at: 2)))
             }
         }
         return result
+    }
+
+    private static func isPatternBindingStorageKeyword(in line: String, keywordStart: Int) -> Bool {
+        guard keywordStart > 0 else { return false }
+
+        let nsLine = line as NSString
+        var cursor = keywordStart - 1
+        while cursor >= 0 {
+            let character = nsLine.substring(with: NSRange(location: cursor, length: 1))
+            if character.rangeOfCharacter(from: .whitespacesAndNewlines) == nil {
+                return character == "(" || character == ","
+            }
+            cursor -= 1
+        }
+        return false
     }
 
     private static func collectDeclaredParameterNames(in lines: [String]) -> Set<String> {
@@ -1873,6 +1946,8 @@ enum SemanticTokenType: String, CaseIterable {
     case variable
     case property
     case parameter
+    case enumMember
+    case label
     case keyword
     case comment
     case string
