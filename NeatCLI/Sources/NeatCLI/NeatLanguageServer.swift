@@ -1065,6 +1065,15 @@ private struct DocumentIndex {
     fileprivate static func collectSemanticTokenOccurrences(in lines: [String]) -> [SemanticTokenOccurrence] {
         var seen: Set<SemanticTokenOccurrence> = []
         var tokens: [SemanticTokenOccurrence] = []
+        var stringLiteralRangesByLine: [Int: [NSRange]] = [:]
+
+        func overlapsStringLiteral(line: Int, start: Int, length: Int) -> Bool {
+            let end = start + length
+            return stringLiteralRangesByLine[line, default: []].contains { range in
+                let rangeEnd = range.location + range.length
+                return start < rangeEnd && range.location < end
+            }
+        }
 
         func record(_ token: SemanticTokenOccurrence) {
             guard seen.insert(token).inserted else { return }
@@ -1078,6 +1087,11 @@ private struct DocumentIndex {
             modifiers: Set<SemanticTokenModifier> = []
         ) {
             guard range.location != NSNotFound, range.length > 0 else { return }
+            if type != .string && type != .comment,
+                overlapsStringLiteral(line: line, start: range.location, length: range.length)
+            {
+                return
+            }
             record(
                 SemanticTokenOccurrence(
                     line: line,
@@ -1172,6 +1186,11 @@ private struct DocumentIndex {
                     range: NSRange(location: 0, length: nsLine.length)
                 )
                 for match in matches {
+                    stringLiteralRangesByLine[lineIndex, default: []].append(match.range)
+                    let literal = nsLine.substring(with: match.range)
+                    if literal.contains(#"\("#) {
+                        continue
+                    }
                     record(line: lineIndex, range: match.range, type: .string)
                 }
             }
@@ -1455,7 +1474,7 @@ private struct DocumentIndex {
                     let name = nsLine.substring(with: nameRange)
                     let tokenType: SemanticTokenType
                     if parameterNames.contains(name) {
-                        tokenType = .parameter
+                        continue
                     } else if localVariableNames.contains(name) {
                         tokenType = .variable
                     } else {
@@ -1478,16 +1497,14 @@ private struct DocumentIndex {
             }
 
             for parameter in parameterDeclarationsByLine[lineIndex] ?? [] {
-                if let externalName = parameter.externalName,
-                    let externalRange = parameter.externalRange,
-                    externalName != "_"
-                {
+                if let externalRange = parameter.externalRange {
                     record(
                         line: lineIndex,
                         range: externalRange,
                         type: .label,
                         modifiers: [.declaration]
                     )
+                    continue
                 }
 
                 if keywordLikeIdentifierNames.contains(parameter.name) {
@@ -1531,7 +1548,7 @@ private struct DocumentIndex {
                     let nameRange = match.range(at: 1)
                     let name = nsLine.substring(with: nameRange)
                     guard !identifierKeywordExclusions.contains(name) else { continue }
-                    guard localVariableNames.contains(name) || parameterNames.contains(name) else {
+                    guard localVariableNames.contains(name) else {
                         continue
                     }
                     if keywordLikeIdentifierNames.contains(name) {
@@ -1572,8 +1589,7 @@ private struct DocumentIndex {
                         continue
                     }
 
-                    let tokenType: SemanticTokenType = parameterNames.contains(name) ? .parameter : .variable
-                    record(line: lineIndex, range: nameRange, type: tokenType)
+                    record(line: lineIndex, range: nameRange, type: .variable)
                 }
             }
         }

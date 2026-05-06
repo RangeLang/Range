@@ -82,7 +82,7 @@
   {
     "token_type": "enumMember",
     "token_modifiers": ["declaration"],
-    "style": ["text", "enumMember.neat.declaration"]
+    "style": ["declaration", "enumMember.neat.declaration"]
   },
   {
     "token_type": "enumMember",
@@ -91,7 +91,7 @@
   {
     "token_type": "label",
     "token_modifiers": ["declaration"],
-    "style": ["text", "label.neat.declaration"]
+    "style": ["declaration", "label.neat.declaration"]
   },
   {
     "token_type": "label",

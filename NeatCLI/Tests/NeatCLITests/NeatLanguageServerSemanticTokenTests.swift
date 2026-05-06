@@ -139,6 +139,28 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: []))
     }
 
+    @Test("Parameter references stay plain text")
+    func parameterReferencesStayPlainText() {
+        let source = """
+        macro clamped<T: Comparable>(min: T, max: T): State<T> { target, diagnostics in
+            target.initializer { value in
+                Math.clamp(value: value, min: min, max: max)
+            }
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let highlightedParameterReferences = tokens.filter { token in
+            token.line == 2
+                && (token.text == "min" || token.text == "max")
+                && (token.type == .parameter || token.type == .variable)
+        }
+
+        #expect(containsExactToken(tokens, text: "min", type: .parameter, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "max", type: .parameter, modifiers: [.declaration]))
+        #expect(highlightedParameterReferences.isEmpty)
+    }
+
     @Test("External parameter labels emit plain label semantic tokens")
     func externalParameterLabelsEmitLabelTokens() {
         let source = """
@@ -150,9 +172,42 @@ struct NeatLanguageServerSemanticTokenTests {
         let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "forKey", type: .label, modifiers: [.declaration]))
-        #expect(containsExactToken(tokens, text: "type", type: .parameter, modifiers: [.declaration]))
-        #expect(containsExactToken(tokens, text: "key", type: .parameter, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "type", type: .parameter, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "key", type: .parameter, modifiers: [.declaration]))
         #expect(!containsExactToken(tokens, text: "forKey", type: .property, modifiers: []))
+    }
+
+    @Test("Two-name parameters keep internal names plain")
+    func twoNameParametersKeepInternalNamesPlain() {
+        let source = """
+        extension User: Encodable {
+            function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+                let container: KeyedEncodingContainer = encoder.keyedContainer()
+                return .success(result: Void())
+            }
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "to", type: .label, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "encoder", type: .parameter, modifiers: [.declaration]))
+    }
+
+    @Test("Underscore external labels are declaration tokens")
+    func underscoreExternalLabelsAreDeclarationTokens() {
+        let source = """
+        macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
+            target.declaration.expand {
+            }
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "strategy", type: .parameter, modifiers: [.declaration]))
     }
 
     @Test("Macro applications, including parameter macros, emit semantic tokens")
@@ -173,6 +228,25 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(containsToken(tokens, text: "#stringify", type: .macro, modifiers: []))
     }
 
+    @Test("String interpolation contents stay plain text")
+    func stringInterpolationContentsStayPlainText() {
+        let source = #"""
+        macro stringify(_ value: capture Expression): Expression -> String { target, diagnostics in
+            target.replace(with: "\(value)")
+        }
+        """#
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let interpolationIdentifierHasSemanticToken = tokens.contains(where: { token in
+            token.line == 1
+                && token.text == "value"
+                && (token.type == .parameter || token.type == .variable)
+        })
+
+        #expect(!containsExactToken(tokens, text: #""\(value)""#, type: .string, modifiers: []))
+        #expect(!interpolationIdentifierHasSemanticToken)
+    }
+
     @Test("Marker declarations emit semantic tokens")
     func markerDeclarationsEmitSemanticTokens() {
         let source = """
@@ -185,7 +259,8 @@ struct NeatLanguageServerSemanticTokenTests {
 
         #expect(containsExactToken(tokens, text: "marker", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "codingKey", type: .macro, modifiers: [.declaration]))
-        #expect(containsToken(tokens, text: "value", type: .parameter, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "value", type: .parameter, modifiers: [.declaration]))
     }
 
     @Test("Nil emits a keyword semantic token")
