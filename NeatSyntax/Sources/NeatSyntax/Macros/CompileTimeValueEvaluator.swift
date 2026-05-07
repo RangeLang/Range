@@ -60,6 +60,9 @@ struct CompileTimeValueEvaluator {
             return value
         case .identifier(let path):
             if let bound = locals[path] {
+                if case .identifier(path) = bound {
+                    return evaluatePath(path, locals: locals)
+                }
                 return evaluate(bound, locals: locals)
             }
             if path.hasPrefix(".") {
@@ -181,6 +184,9 @@ struct CompileTimeValueEvaluator {
         if root == targetBinding {
             value = targetValue
         } else if let local = locals[root] {
+            if case .identifier(root) = local {
+                return nil
+            }
             value = evaluate(local, locals: locals)
         } else {
             value = nil

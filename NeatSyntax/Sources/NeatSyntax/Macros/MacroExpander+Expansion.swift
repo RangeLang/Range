@@ -2178,6 +2178,9 @@ extension MacroExpander {
         else {
             return expression
         }
+        if case .identifier(name) = callerExpression {
+            return expression
+        }
         return resolvedSyntaxMacroArgument(
             callerExpression,
             callerLocals: callerLocals,
@@ -2732,6 +2735,24 @@ extension MacroExpander {
     }
 
     static func syntaxValue(from source: String, as type: TypeReference) throws -> CompileTimeValue {
+        if case .array(let elementType) = type {
+            var parser = try Parser(source: source)
+            parser.currentSelfAvailable = true
+            var localBindings: [String: LocalBindingSymbol] = [:]
+            var values: [CompileTimeValue] = []
+            while parser.peek() != .eof {
+                let statement = try parser.parseStatement(localBindings: &localBindings)
+                if elementType.displayName == "Switch", case .switchStatement = statement {
+                    values.append(try statementSyntaxValue(statement))
+                } else if elementType.displayName == "Statement" {
+                    values.append(try statementSyntaxValue(statement))
+                } else {
+                    throw ParseError("Unsupported syntax macro return type \(type.displayName).")
+                }
+            }
+            return .array(values)
+        }
+
         switch type.displayName {
         case "Expression":
             var parser = try Parser(source: source)

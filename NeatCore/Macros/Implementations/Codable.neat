@@ -7,6 +7,24 @@ macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: 
     }
 }
 
+macro encodeBody(container: KeyedEncodingContainer, properties: [Let], strategy: CodingKeyStrategy) -> [Switch] {
+    #(properties.map { property in
+        let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
+            application.identifier.name == "codingKey"
+        }
+        let codingKeyValues: [String] = codingKeyMarkers.map { application in
+            application.value
+        }
+        let key = codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
+
+        #encodeProperty(
+            container: container,
+            value: property.identifier,
+            key: key
+        )
+    })
+}
+
 macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, value: Identifier, key: String) -> Switch {
     switch container.decode(#(type).self, forKey: key) {
     case .success(let #(value)):
@@ -16,45 +34,45 @@ macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, val
     }
 }
 
+macro decodeBody(container: KeyedDecodingContainer, properties: [Let], strategy: CodingKeyStrategy) -> [Switch] {
+    #(properties.map { property in
+        let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
+            application.identifier.name == "codingKey"
+        }
+        let codingKeyValues: [String] = codingKeyMarkers.map { application in
+            application.value
+        }
+        let key = codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
+
+        #decodeProperty(
+            container: container,
+            type: property.type,
+            value: property.identifier,
+            key: key
+        )
+    })
+}
+
 macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Codable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
-                #(target.declaration.lets.map { property in
-                    let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
-                        application.identifier.name == "codingKey"
-                    }
-                    let codingKeyValues: [String] = codingKeyMarkers.map { application in
-                        application.value
-                    }
-
-                    #encodeProperty(
-                        container: container,
-                        value: property.identifier,
-                        key: codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
-                    )
-                })
+                #encodeBody(
+                    container: container,
+                    properties: target.declaration.lets,
+                    strategy: strategy
+                )
                 return .success(result: Void())
             }
 
             init(from decoder: Decoder) -> Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer = decoder.keyedContainer()
-                #(target.declaration.lets.map { property in
-                    let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
-                        application.identifier.name == "codingKey"
-                    }
-                    let codingKeyValues: [String] = codingKeyMarkers.map { application in
-                        application.value
-                    }
-
-                    #decodeProperty(
-                        container: container,
-                        type: property.type,
-                        value: property.identifier,
-                        key: codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
-                    )
-                })
+                #decodeBody(
+                    container: container,
+                    properties: target.declaration.lets,
+                    strategy: strategy
+                )
                 return .success(result: self)
             }
         }
