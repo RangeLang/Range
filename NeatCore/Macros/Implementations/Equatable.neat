@@ -1,0 +1,27 @@
+macro compareProperty(lhs: Identifier, rhs: Identifier, value: Identifier) -> If {
+    if #(lhs).#(value) != #(rhs).#(value) {
+        return false
+    }
+}
+
+macro equatableBody(lhs: Identifier, rhs: Identifier, properties: [Let]) -> [Statement] {
+    #(properties.map { property in
+        #compareProperty(lhs: lhs, rhs: rhs, value: property.identifier)
+    })
+
+    return true
+}
+
+macro equatable(): Construct { target, diagnostics in
+    target.declaration.expand {
+        extension #(target.declaration.self): Equatable {
+            function ==(lhs: Self, rhs: Self) -> Bool {
+                #equatableBody(
+                    lhs: Identifier(name: "lhs"),
+                    rhs: Identifier(name: "rhs"),
+                    properties: target.declaration.lets
+                )
+            }
+        }
+    }
+}

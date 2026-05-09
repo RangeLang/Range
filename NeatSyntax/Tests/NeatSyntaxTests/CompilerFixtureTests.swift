@@ -712,6 +712,37 @@ struct CompilerFixtureTests {
         #expect(decodeKeys(in: markerOverride) == ["userId": "id"])
     }
 
+    @Test("Equatable macro synthesizes field comparisons")
+    func equatableMacroSynthesizesFieldComparisons() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/EquatableMacroSynthesis.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let module: ModuleFileNode
+        switch expandedFile.sourceFile {
+        case .module(let expandedModule):
+            module = expandedModule
+        default:
+            Issue.record("Expected expanded Equatable macro fixture to become a module.")
+            return
+        }
+
+        let fixtureExtension = try #require(
+            module.extensions.first(where: { $0.targetName == "EquatableMacroFixture" })
+        )
+        #expect(fixtureExtension.conformances.map(\.displayName) == ["Equatable"])
+        #expect(equalityComparisons(in: fixtureExtension) == ["id", "name", "active"])
+        #expect(equalityReturnsTrue(in: fixtureExtension))
+
+        let emptyExtension = try #require(
+            module.extensions.first(where: { $0.targetName == "EmptyEquatableMacroFixture" })
+        )
+        #expect(equalityComparisons(in: emptyExtension).isEmpty)
+        #expect(equalityReturnsTrue(in: emptyExtension))
+    }
+
     @Test("Derived property macro rewrites reads")
     func derivedPropertyMacroRewritesReads() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedProperty.neat")
@@ -871,6 +902,42 @@ private func decodeKeys(in extensionDeclaration: ExtensionDeclaration) -> [Strin
 
         keys[binding.name] = key
     }
+}
+
+private func equalityComparisons(in extensionDeclaration: ExtensionDeclaration) -> [String] {
+    guard let equality = extensionDeclaration.callables.first(where: { $0.name == "==" }),
+        let body = equality.body
+    else {
+        return []
+    }
+
+    return body.compactMap { statement in
+        guard case .conditional(let branches) = statement,
+            branches.count == 1,
+            case .binary(let lhs, let operatorSymbol, let rhs)? = branches.first?.condition,
+            operatorSymbol == .notEqual,
+            case .identifier(let lhsPath) = lhs,
+            case .identifier(let rhsPath) = rhs,
+            lhsPath.hasPrefix("lhs."),
+            rhsPath.hasPrefix("rhs."),
+            lhsPath.dropFirst(4) == rhsPath.dropFirst(4)
+        else {
+            return nil
+        }
+
+        return String(lhsPath.dropFirst(4))
+    }
+}
+
+private func equalityReturnsTrue(in extensionDeclaration: ExtensionDeclaration) -> Bool {
+    guard let equality = extensionDeclaration.callables.first(where: { $0.name == "==" }),
+        let body = equality.body,
+        case .return(.boolean(true))? = body.last
+    else {
+        return false
+    }
+
+    return true
 }
 
 private func compile(fixture: URL, expectedRole: FixtureRole) throws -> CompiledProgram {

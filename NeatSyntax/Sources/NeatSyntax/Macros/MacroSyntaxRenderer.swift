@@ -15,7 +15,7 @@ struct MacroSyntaxRenderer {
             return renderEnum(value)
         case .object(let typeName, _) where typeName == "Block":
             return renderBlock(value)
-        case .object(let typeName, _) where typeName == "Switch" || typeName == "Return"
+        case .object(let typeName, _) where typeName == "Switch" || typeName == "If" || typeName == "Return"
             || typeName == "Break" || typeName == "Assignment"
             || typeName == "ExpressionStatement":
             return renderStatement(value)
@@ -175,6 +175,15 @@ struct MacroSyntaxRenderer {
                 return nil
             }
             return "switch \(renderExpressionForSyntax(expression)) { \(renderedCases.joined(separator: " ")) }"
+        case .object(let typeName, let fields) where typeName == "If":
+            guard let condition = fields["condition"],
+                let thenBody = fields["thenBody"],
+                let renderedThenBody = renderBlock(thenBody)
+            else {
+                return nil
+            }
+            let renderedElse = fields["elseBody"].flatMap(renderBlock).map { " else { \($0) }" } ?? ""
+            return "if \(renderExpressionForSyntax(condition)) { \(renderedThenBody) }\(renderedElse)"
         case .object(let typeName, let fields) where typeName == "Return":
             guard let expression = fields["expression"] else {
                 return "return"
@@ -218,6 +227,17 @@ struct MacroSyntaxRenderer {
                 return nil
             }
             return "switch \(renderExpressionForSyntax(switchExpression)) { \(renderedCases.joined(separator: " ")) }"
+        case .call(let name, let arguments) where name == "If":
+            guard let condition = argument("condition", in: arguments),
+                let thenBody = argument("thenBody", in: arguments),
+                let renderedThenBody = renderBlock(thenBody)
+            else {
+                return nil
+            }
+            let renderedElse = argument("elseBody", in: arguments)
+                .flatMap(renderBlock)
+                .map { " else { \($0) }" } ?? ""
+            return "if \(renderExpressionForSyntax(condition)) { \(renderedThenBody) }\(renderedElse)"
         case .call(let name, let arguments) where name == "Return":
             guard let returnExpression = argument("expression", in: arguments) else {
                 return "return"

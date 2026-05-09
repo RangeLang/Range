@@ -2436,7 +2436,7 @@ extension MacroExpander {
                 allowedIdentifiers: allowedIdentifiers,
                 localIdentifiers: []
             )
-        case "Statement", "Switch":
+        case "Statement", "Switch", "If":
             var parser = try Parser(source: source)
             parser.currentSelfAvailable = true
             var localBindings: [String: LocalBindingSymbol] = [:]
@@ -2744,6 +2744,8 @@ extension MacroExpander {
                 let statement = try parser.parseStatement(localBindings: &localBindings)
                 if elementType.displayName == "Switch", case .switchStatement = statement {
                     values.append(try statementSyntaxValue(statement))
+                } else if elementType.displayName == "If", case .conditional = statement {
+                    values.append(try statementSyntaxValue(statement))
                 } else if elementType.displayName == "Statement" {
                     values.append(try statementSyntaxValue(statement))
                 } else {
@@ -2776,6 +2778,16 @@ extension MacroExpander {
             }
             try parser.consume(.eof)
             return try statementSyntaxValue(statement)
+        case "If":
+            var parser = try Parser(source: source)
+            parser.currentSelfAvailable = true
+            var localBindings: [String: LocalBindingSymbol] = [:]
+            let statement = try parser.parseStatement(localBindings: &localBindings)
+            guard case .conditional = statement else {
+                throw ParseError("Syntax macro expected If output.")
+            }
+            try parser.consume(.eof)
+            return try statementSyntaxValue(statement)
         case "Block":
             var parser = try Parser(source: source)
             parser.currentSelfAvailable = true
@@ -2803,6 +2815,20 @@ extension MacroExpander {
                     "cases": .array(try cases.map(switchCaseSyntaxValue)),
                 ]
             )
+        case .conditional(let branches):
+            guard let first = branches.first, let condition = first.condition else {
+                throw ParseError("Syntax macro expected If output.")
+            }
+            var fields: [String: CompileTimeValue] = [
+                "condition": expressionSyntaxValue(condition),
+                "thenBody": try blockSyntaxValue(first.body),
+            ]
+            if branches.count == 2, branches[1].condition == nil {
+                fields["elseBody"] = try blockSyntaxValue(branches[1].body)
+            } else if branches.count > 1 {
+                throw ParseError("Unsupported if statement in syntax macro output.")
+            }
+            return .object(typeName: "If", fields: fields)
         case .return(let expression):
             var fields: [String: CompileTimeValue] = [:]
             if let expression {
@@ -2829,15 +2855,19 @@ extension MacroExpander {
         }
     }
 
+    static func blockSyntaxValue(_ statements: [Statement]) throws -> CompileTimeValue {
+        .object(
+            typeName: "Block",
+            fields: ["statements": .array(try statements.map(statementSyntaxValue))]
+        )
+    }
+
     static func switchCaseSyntaxValue(_ switchCase: SwitchCase) throws -> CompileTimeValue {
         .object(
             typeName: "SwitchCase",
             fields: [
                 "pattern": .string(renderSwitchCasePattern(switchCase.pattern)),
-                "body": .object(
-                    typeName: "Block",
-                    fields: ["statements": .array(try switchCase.body.map(statementSyntaxValue))]
-                ),
+                "body": try blockSyntaxValue(switchCase.body),
             ]
         )
     }
