@@ -1,0 +1,19 @@
+macro enumCaseExpression(value: Enum.Case) -> Expression {
+    .#(value.identifier)
+}
+
+macro allCasesBody(cases: [Enum.Case]) -> [Statement] {
+    return [#(cases.map { enumCase in
+        #enumCaseExpression(value: enumCase)
+    })]
+}
+
+macro caseIterable(): Enum { target, diagnostics in
+    target.declaration.expand {
+        extension #(target.declaration.self): CaseIterable {
+            function allCases() -> [Self] {
+                #allCasesBody(cases: target.declaration.cases)
+            }
+        }
+    }
+}

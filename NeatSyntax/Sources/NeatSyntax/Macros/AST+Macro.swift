@@ -31,6 +31,7 @@ public struct EmittedCodeBlock {
 public enum EmittedSyntaxKind: String {
     case declaration
     case expression
+    case expressionList
     case typeReference
     case nominalTypeReference
     case callableName
@@ -41,6 +42,8 @@ public enum EmittedSyntaxKind: String {
             return "a declaration"
         case .expression:
             return "an expression"
+        case .expressionList:
+            return "an expression list"
         case .typeReference:
             return "a type reference"
         case .nominalTypeReference:

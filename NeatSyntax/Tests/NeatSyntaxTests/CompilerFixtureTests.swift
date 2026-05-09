@@ -743,6 +743,35 @@ struct CompilerFixtureTests {
         #expect(equalityReturnsTrue(in: emptyExtension))
     }
 
+    @Test("CaseIterable macro synthesizes allCases function")
+    func caseIterableMacroSynthesizesAllCasesFunction() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CaseIterableMacroSynthesis.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let module: ModuleFileNode
+        switch expandedFile.sourceFile {
+        case .module(let expandedModule):
+            module = expandedModule
+        default:
+            Issue.record("Expected expanded CaseIterable macro fixture to become a module.")
+            return
+        }
+
+        let fixtureExtension = try #require(
+            module.extensions.first(where: { $0.targetName == "CaseIterableMacroFixture" })
+        )
+        #expect(fixtureExtension.conformances.map(\.displayName) == ["CaseIterable"])
+        #expect(allCasesReturnValues(in: fixtureExtension) == [".loading", ".ready", ".failed"])
+
+        let emptyExtension = try #require(
+            module.extensions.first(where: { $0.targetName == "EmptyCaseIterableMacroFixture" })
+        )
+        #expect(allCasesReturnValues(in: emptyExtension).isEmpty)
+    }
+
     @Test("Derived property macro rewrites reads")
     func derivedPropertyMacroRewritesReads() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedProperty.neat")
@@ -938,6 +967,22 @@ private func equalityReturnsTrue(in extensionDeclaration: ExtensionDeclaration) 
     }
 
     return true
+}
+
+private func allCasesReturnValues(in extensionDeclaration: ExtensionDeclaration) -> [String] {
+    guard let allCases = extensionDeclaration.callables.first(where: { $0.name == "allCases" }),
+        let body = allCases.body,
+        case .return(.array(let cases))? = body.first
+    else {
+        return []
+    }
+
+    return cases.compactMap { expression in
+        guard case .identifier(let name) = expression else {
+            return nil
+        }
+        return name
+    }
 }
 
 private func compile(fixture: URL, expectedRole: FixtureRole) throws -> CompiledProgram {

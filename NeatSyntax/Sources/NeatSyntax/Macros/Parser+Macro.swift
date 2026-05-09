@@ -32,11 +32,7 @@ extension Parser {
                 syntaxBody = nil
             } else {
                 try consume(.leftBrace)
-                if isFreestandingMacroValueBodyStart() {
-                    syntaxBody = nil
-                } else {
-                    syntaxBody = try parseEmittedCodeBlock()
-                }
+                syntaxBody = try parseEmittedCodeBlock()
             }
             let body: [Statement]
             if syntaxBody == nil, !signatureOnly {
@@ -139,17 +135,6 @@ extension Parser {
             valueType: valueType,
             body: body
         )
-    }
-
-    func isFreestandingMacroValueBodyStart() -> Bool {
-        switch peek() {
-        case .keyword(NeatSyntax.Keyword.returnStatement.rawValue),
-            .keyword(NeatSyntax.Keyword.let.rawValue),
-            .keyword(NeatSyntax.Keyword.state.rawValue):
-            return true
-        default:
-            return false
-        }
     }
 
     mutating func parseFreestandingMacroValueBody(parameters: [NeatFunctionParameter]) throws
@@ -347,6 +332,8 @@ extension Parser {
             return .typeReference
         case .leftParen where nextToken == .rightParen || nextToken == .comma:
             return .typeReference
+        case .leftBracket where nextToken == .rightBracket:
+            return .expressionList
         default:
             return .expression
         }

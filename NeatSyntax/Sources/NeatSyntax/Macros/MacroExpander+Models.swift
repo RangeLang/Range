@@ -65,7 +65,7 @@ struct MacroTargetSurface {
         )
     }
 
-    private var syntaxRenderer: MacroSyntaxRenderer {
+    var syntaxRenderer: MacroSyntaxRenderer {
         MacroSyntaxRenderer(
             localBindings: localBindings,
             renderedTargetPath: renderedTargetPath

@@ -2040,6 +2040,11 @@ extension MacroExpander {
                 {
                     return name
                 }
+                if expected == .expressionList,
+                    let rendered = renderExpressionList(substituted)
+                {
+                    return rendered
+                }
                 if let renderedSyntax = targetSurface.renderSyntax(expression) {
                     return renderedSyntax
                 }
@@ -2220,6 +2225,9 @@ extension MacroExpander {
                     case .string(let name) = value
                 {
                     return name
+                }
+                if expected == .expressionList, let rendered = renderExpressionList(value, renderer: renderer) {
+                    return rendered
                 }
                 if expected == .expression, case .string = value {
                     guard let rendered = value.expression else {
@@ -2741,15 +2749,19 @@ extension MacroExpander {
             var localBindings: [String: LocalBindingSymbol] = [:]
             var values: [CompileTimeValue] = []
             while parser.peek() != .eof {
-                let statement = try parser.parseStatement(localBindings: &localBindings)
-                if elementType.displayName == "Switch", case .switchStatement = statement {
-                    values.append(try statementSyntaxValue(statement))
-                } else if elementType.displayName == "If", case .conditional = statement {
-                    values.append(try statementSyntaxValue(statement))
-                } else if elementType.displayName == "Statement" {
-                    values.append(try statementSyntaxValue(statement))
+                if elementType.displayName == "Expression" {
+                    values.append(expressionSyntaxValue(try parser.parseExpression()))
                 } else {
-                    throw ParseError("Unsupported syntax macro return type \(type.displayName).")
+                    let statement = try parser.parseStatement(localBindings: &localBindings)
+                    if elementType.displayName == "Switch", case .switchStatement = statement {
+                        values.append(try statementSyntaxValue(statement))
+                    } else if elementType.displayName == "If", case .conditional = statement {
+                        values.append(try statementSyntaxValue(statement))
+                    } else if elementType.displayName == "Statement" {
+                        values.append(try statementSyntaxValue(statement))
+                    } else {
+                        throw ParseError("Unsupported syntax macro return type \(type.displayName).")
+                    }
                 }
             }
             return .array(values)
@@ -2902,7 +2914,7 @@ extension MacroExpander {
         _ actual: Set<EmittedSyntaxKind>,
         isCompatibleWith expected: EmittedSyntaxKind
     ) -> Bool {
-        if expected == .expression {
+        if expected == .expression || expected == .expressionList {
             return true
         }
         return actual.contains(expected)
@@ -2920,6 +2932,8 @@ extension MacroExpander {
             return "declaration"
         case .expression:
             return "expression"
+        case .expressionList:
+            return "expression list"
         case .typeReference:
             return "type reference"
         case .nominalTypeReference:
@@ -2927,6 +2941,37 @@ extension MacroExpander {
         case .callableName:
             return "function name"
         }
+    }
+
+    static func renderExpressionList(
+        _ expression: Expression
+    ) -> String? {
+        guard case .array(let elements) = expression else {
+            return renderExpressionForStringify(expression)
+        }
+        return elements.map(renderExpressionForStringify).joined(separator: ", ")
+    }
+
+    static func renderExpressionList(
+        _ value: CompileTimeValue,
+        renderer: MacroSyntaxRenderer
+    ) -> String? {
+        guard case .array(let values) = value else {
+            return renderer.renderSyntax(value)
+        }
+        let rendered = values.compactMap { element -> String? in
+            if let syntax = renderer.renderSyntax(element) {
+                return syntax
+            }
+            guard let expression = element.expression else {
+                return nil
+            }
+            return renderExpressionForStringify(expression)
+        }
+        guard rendered.count == values.count else {
+            return nil
+        }
+        return rendered.joined(separator: ", ")
     }
 
     static func declarationBundle(from sourceFile: SourceFileNode) throws -> EmittedDeclarationBundle {
