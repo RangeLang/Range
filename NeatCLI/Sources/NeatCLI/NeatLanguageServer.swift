@@ -3,6 +3,8 @@ import NeatSyntax
 
 struct NeatLanguageServer {
     private var documents: [String: DocumentState] = [:]
+    private var navigationIndexesByDocumentURI: [String: NavigationIndexCacheEntry] = [:]
+    private var navigationIndexGeneration = 0
     private var shutdownRequested = false
     private var shouldExit = false
 
@@ -150,6 +152,7 @@ struct NeatLanguageServer {
             diagnosticsMode: .validated
         )
         documents[uri] = state
+        rebuildNavigationIndex(for: uri, text: state.text)
         try publishDiagnostics(for: uri, diagnostics: state.diagnostics)
     }
 
@@ -163,6 +166,8 @@ struct NeatLanguageServer {
         }
 
         documents.removeValue(forKey: uri)
+        invalidateNavigationIndexes()
+        navigationIndexesByDocumentURI.removeValue(forKey: uri)
     }
 
     private mutating func updateDocument(
@@ -172,6 +177,7 @@ struct NeatLanguageServer {
     ) throws {
         let state = buildDocumentState(uri: uri, text: text, diagnosticsMode: diagnosticsMode)
         documents[uri] = state
+        rebuildNavigationIndex(for: uri, text: state.text)
         try publishDiagnostics(for: uri, diagnostics: state.diagnostics)
     }
 
@@ -193,13 +199,13 @@ struct NeatLanguageServer {
         ]
     }
 
-    private func definitionResult(for message: [String: Any]) -> [String: Any]? {
+    private mutating func definitionResult(for message: [String: Any]) -> [String: Any]? {
         guard
             let request = requestContext(from: message),
-            let word = request.state.word(at: request.position),
-            let definition = documents.values
-                .flatMap(\.symbols)
-                .first(where: { $0.name == word })
+            let definition = graphDefinition(
+                for: request.state,
+                position: request.position
+            )
         else {
             return nil
         }
@@ -462,6 +468,56 @@ struct NeatLanguageServer {
             return 3
         case .hint:
             return 4
+        }
+    }
+
+    private mutating func graphDefinition(for state: DocumentState, position: Position) -> DefinitionLocation? {
+        guard let word = state.word(at: position), !word.isEmpty else {
+            return nil
+        }
+        if state.isArgumentLabel(at: position) {
+            return nil
+        }
+
+        let occurrence = state.semanticTokenOccurrence(at: position)
+        guard let navigationIndex = navigationIndex(for: state) else {
+            return nil
+        }
+        return navigationIndex.definition(named: word, occurrence: occurrence)
+    }
+
+    private mutating func navigationIndex(for state: DocumentState) -> ProjectNavigationIndex? {
+        if let entry = navigationIndexesByDocumentURI[state.uri],
+            entry.generation == navigationIndexGeneration
+        {
+            return entry.index
+        }
+
+        rebuildNavigationIndex(for: state.uri, text: state.text, invalidating: false)
+        return navigationIndexesByDocumentURI[state.uri]?.index
+    }
+
+    private mutating func invalidateNavigationIndexes() {
+        navigationIndexGeneration += 1
+    }
+
+    private mutating func rebuildNavigationIndex(
+        for uri: String,
+        text: String,
+        invalidating: Bool = true
+    ) {
+        if invalidating {
+            invalidateNavigationIndexes()
+        }
+        do {
+            let inputs = try diagnosticInputs(for: uri, text: text)
+            navigationIndexesByDocumentURI[uri] = NavigationIndexCacheEntry(
+                generation: navigationIndexGeneration,
+                index: try ProjectNavigationIndex(inputs: inputs)
+            )
+        } catch {
+            navigationIndexesByDocumentURI.removeValue(forKey: uri)
+            debugLog("navigation index failed for \(uri): \(error)")
         }
     }
 
@@ -736,9 +792,9 @@ struct NeatLanguageServer {
         if let data = line.data(using: .utf8) {
             if FileManager.default.fileExists(atPath: path) {
                 if let handle = FileHandle(forWritingAtPath: path) {
-                    try? handle.seekToEnd()
-                    try? handle.write(contentsOf: data)
-                    try? handle.close()
+                    _ = try? handle.seekToEnd()
+                    _ = try? handle.write(contentsOf: data)
+                    _ = try? handle.close()
                 }
             } else {
                 FileManager.default.createFile(atPath: path, contents: data)
@@ -820,6 +876,14 @@ private struct DocumentState {
         index.character(before: position)
     }
 
+    func isArgumentLabel(at position: Position) -> Bool {
+        index.isArgumentLabel(at: position)
+    }
+
+    func semanticTokenOccurrence(at position: Position) -> SemanticTokenOccurrence? {
+        index.semanticTokenOccurrence(at: position)
+    }
+
     func references(named name: String) -> [ReferenceOccurrence] {
         index.references(named: name)
     }
@@ -866,18 +930,15 @@ private struct DocumentIndex {
     }
 
     func word(at position: Position) -> String? {
-        guard lines.indices.contains(position.line) else { return nil }
-        let target = Array(lines[position.line])
-        guard !target.isEmpty else { return nil }
-
-        let clamped = max(0, min(position.character, target.count - 1))
-        if isWordCharacter(target[clamped]) {
-            return sliceWord(in: target, around: clamped)
+        wordRange(at: position).map { range in
+            let nsLine = lines[position.line] as NSString
+            return nsLine.substring(
+                with: NSRange(
+                    location: range.start.character,
+                    length: range.end.character - range.start.character
+                )
+            )
         }
-        if clamped > 0, isWordCharacter(target[clamped - 1]) {
-            return sliceWord(in: target, around: clamped - 1)
-        }
-        return nil
     }
 
     func wordPrefix(at position: Position) -> String {
@@ -906,7 +967,71 @@ private struct DocumentIndex {
         referencesByName[name] ?? []
     }
 
+    func isArgumentLabel(at position: Position) -> Bool {
+        guard let range = wordRange(at: position), lines.indices.contains(position.line) else {
+            return false
+        }
+        let line = lines[position.line]
+        let nsLine = line as NSString
+        var cursor = range.end.character
+        while cursor < nsLine.length {
+            let character = nsLine.substring(with: NSRange(location: cursor, length: 1))
+            guard character.rangeOfCharacter(from: .whitespacesAndNewlines) != nil else {
+                break
+            }
+            cursor += 1
+        }
+        guard cursor < nsLine.length,
+            nsLine.substring(with: NSRange(location: cursor, length: 1)) == ":"
+        else {
+            return false
+        }
+        return Self.argumentLabelTokenKind(
+            in: lines,
+            lineIndex: position.line,
+            labelStart: range.start.character
+        ) != nil
+    }
+
+    func semanticTokenOccurrence(at position: Position) -> SemanticTokenOccurrence? {
+        semanticTokenOccurrences.first { occurrence in
+            occurrence.line == position.line
+                && position.character >= occurrence.startCharacter
+                && position.character <= occurrence.startCharacter + occurrence.length
+        }
+    }
+
+    private func wordRange(at position: Position) -> RangePosition? {
+        guard lines.indices.contains(position.line) else { return nil }
+        let target = Array(lines[position.line])
+        guard !target.isEmpty else { return nil }
+
+        let clamped = max(0, min(position.character, target.count - 1))
+        if isWordCharacter(target[clamped]) {
+            return sliceWordRange(in: target, line: position.line, around: clamped)
+        }
+        if clamped > 0, isWordCharacter(target[clamped - 1]) {
+            return sliceWordRange(in: target, line: position.line, around: clamped - 1)
+        }
+        return nil
+    }
+
     private func sliceWord(in target: [Character], around index: Int) -> String {
+        let range = sliceWordBounds(in: target, around: index)
+        return String(target[range.start..<range.end])
+    }
+
+    private func sliceWordRange(in target: [Character], line: Int, around index: Int)
+        -> RangePosition
+    {
+        let range = sliceWordBounds(in: target, around: index)
+        return RangePosition(
+            start: Position(line: line, character: range.start),
+            end: Position(line: line, character: range.end)
+        )
+    }
+
+    private func sliceWordBounds(in target: [Character], around index: Int) -> (start: Int, end: Int) {
         var start = index
         var end = index
 
@@ -917,7 +1042,7 @@ private struct DocumentIndex {
             end += 1
         }
 
-        return String(target[start..<end])
+        return (start, end)
     }
 
     private func isWordCharacter(_ character: Character) -> Bool {
@@ -2006,6 +2131,14 @@ struct SemanticTokenSnapshot: Equatable {
     let modifiers: Set<SemanticTokenModifier>
 }
 
+struct DefinitionSnapshot: Equatable {
+    let uri: String
+    let line: Int
+    let startCharacter: Int
+    let endCharacter: Int
+    let name: String
+}
+
 extension NeatLanguageServer {
     static func debugSemanticTokenSnapshots(in text: String) -> [SemanticTokenSnapshot] {
         let lines = text.components(separatedBy: .newlines)
@@ -2024,6 +2157,47 @@ extension NeatLanguageServer {
                 modifiers: occurrence.modifiers
             )
         }
+    }
+
+    static func debugDefinitionSnapshot(
+        in text: String,
+        line: Int,
+        character: Int,
+        supportDocuments: [(uri: String, text: String)] = []
+    ) -> DefinitionSnapshot? {
+        let primary = DocumentState(
+            uri: "file:///Primary.neat",
+            text: text,
+            index: DocumentIndex(text: text, uri: "file:///Primary.neat"),
+            diagnostics: []
+        )
+        let position = Position(line: line, character: character)
+        let inputs = supportDocuments.map { document in
+            SourceInput(path: URL(string: document.uri)?.path ?? document.uri, source: document.text, role: .core)
+        } + [
+            SourceInput(path: "/Primary.neat", source: text, role: .project)
+        ]
+
+        guard
+            let word = primary.word(at: position),
+            !primary.isArgumentLabel(at: position),
+            let navigationIndex = try? ProjectNavigationIndex(inputs: inputs)
+        else {
+            return nil
+        }
+
+        let occurrence = primary.semanticTokenOccurrence(at: position)
+        guard let definition = navigationIndex.definition(named: word, occurrence: occurrence) else {
+            return nil
+        }
+
+        return DefinitionSnapshot(
+            uri: definition.uri,
+            line: definition.range.start.line,
+            startCharacter: definition.range.start.character,
+            endCharacter: definition.range.end.character,
+            name: definition.name
+        )
     }
 }
 
@@ -2129,6 +2303,155 @@ private enum SymbolKind {
 private struct ReferenceOccurrence {
     let name: String
     let range: RangePosition
+}
+
+private struct DefinitionLocation {
+    let name: String
+    let uri: String
+    let range: RangePosition
+    let kind: DefinitionKind
+}
+
+private enum DefinitionKind {
+    case type
+    case namespace
+    case macro
+    case marker
+    case function
+}
+
+private struct NavigationIndexCacheEntry {
+    let generation: Int
+    let index: ProjectNavigationIndex
+}
+
+private struct ProjectNavigationIndex {
+    let declarationGraph: DeclarationGraph
+    let definitions: DefinitionIndex
+
+    init(inputs: [SourceInput]) throws {
+        self.declarationGraph = try CompilerPipeline().build(inputs: inputs).declarationGraph
+        self.definitions = DefinitionIndex(inputs: inputs)
+    }
+
+    func definition(named word: String, occurrence: SemanticTokenOccurrence?) -> DefinitionLocation? {
+        if word.first?.isUppercase == true || occurrence?.type == .type {
+            if declarationGraph.registryView.hasConstruct(named: word)
+                || declarationGraph.registryView.hasProtocol(named: word)
+                || declarationGraph.registryView.hasEnumeration(named: word)
+                || declarationGraph.hasNamespace(named: word)
+            {
+                return definitions.location(named: word, kinds: [.type, .namespace])
+            }
+        }
+
+        if occurrence?.type == .macro || declarationGraph.registryView.hasMacro(named: word) {
+            return definitions.location(named: word, kinds: [.macro, .marker])
+        }
+
+        if occurrence?.type == .function || occurrence?.type == .method {
+            if !declarationGraph.registryView.callables(named: word).isEmpty {
+                return definitions.location(named: word, kinds: [.function])
+            }
+        }
+
+        return nil
+    }
+}
+
+private struct DefinitionIndex {
+    private let locations: [DefinitionLocation]
+
+    init(inputs: [SourceInput]) {
+        self.locations = inputs.flatMap(Self.locations)
+    }
+
+    func location(named name: String, kinds: Set<DefinitionKind>) -> DefinitionLocation? {
+        locations.first { $0.name == name && kinds.contains($0.kind) }
+    }
+
+    private static func locations(in input: SourceInput) -> [DefinitionLocation] {
+        let uri = URL(fileURLWithPath: input.path).absoluteString
+        let lines = input.source.components(separatedBy: .newlines)
+        var result: [DefinitionLocation] = []
+
+        for (lineIndex, line) in lines.enumerated() {
+            result.append(
+                contentsOf: declarationLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    uri: uri,
+                    pattern: #"\b(?:construct|protocol|enum)\s+([A-Z][A-Za-z0-9_]*)"#,
+                    kind: .type
+                )
+            )
+            result.append(
+                contentsOf: declarationLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    uri: uri,
+                    pattern: #"\bnamespace\s+([A-Z][A-Za-z0-9_]*)"#,
+                    kind: .namespace
+                )
+            )
+            result.append(
+                contentsOf: declarationLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    uri: uri,
+                    pattern: #"\bmacro\s+([A-Za-z_][A-Za-z0-9_]*)"#,
+                    kind: .macro
+                )
+            )
+            result.append(
+                contentsOf: declarationLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    uri: uri,
+                    pattern: #"\bmarker\s+([A-Za-z_][A-Za-z0-9_]*)"#,
+                    kind: .marker
+                )
+            )
+            result.append(
+                contentsOf: declarationLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    uri: uri,
+                    pattern: #"\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)"#,
+                    kind: .function
+                )
+            )
+        }
+
+        return result
+    }
+
+    private static func declarationLocations(
+        in line: String,
+        lineIndex: Int,
+        uri: String,
+        pattern: String,
+        kind: DefinitionKind
+    ) -> [DefinitionLocation] {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let nsLine = line as NSString
+        return regex.matches(in: line, range: NSRange(location: 0, length: nsLine.length))
+            .compactMap { match in
+                guard match.numberOfRanges > 1 else { return nil }
+                let nameRange = match.range(at: 1)
+                guard nameRange.location != NSNotFound else { return nil }
+                let name = nsLine.substring(with: nameRange)
+                return DefinitionLocation(
+                    name: name,
+                    uri: uri,
+                    range: RangePosition(
+                        start: Position(line: lineIndex, character: nameRange.location),
+                        end: Position(line: lineIndex, character: nameRange.location + nameRange.length)
+                    ),
+                    kind: kind
+                )
+            }
+    }
 }
 
 private struct RangePosition {

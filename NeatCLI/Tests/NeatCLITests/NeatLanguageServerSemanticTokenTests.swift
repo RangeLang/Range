@@ -161,6 +161,54 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(highlightedParameterReferences.isEmpty)
     }
 
+    @Test("Definition ignores argument labels")
+    func definitionIgnoresArgumentLabels() {
+        let source = """
+        macro clamped<T: Comparable>(min: T, max: T): State<T> { target, diagnostics in
+            target.initializer { value in
+                Math.clamp(value: value, min: min, max: max)
+            }
+        }
+        """
+        let support = """
+        construct Let<T> {
+            let value: Expression?
+        }
+        """
+
+        let definition = NeatLanguageServer.debugDefinitionSnapshot(
+            in: source,
+            line: 2,
+            character: 20,
+            supportDocuments: [(uri: "file:///Let.neat", text: support)]
+        )
+
+        #expect(definition == nil)
+    }
+
+    @Test("Definition resolves core types through graph")
+    func definitionResolvesCoreTypesThroughGraph() {
+        let source = """
+        @main {
+            let enabled: Bool = true
+        }
+        """
+        let support = """
+        construct Bool {
+        }
+        """
+
+        let definition = NeatLanguageServer.debugDefinitionSnapshot(
+            in: source,
+            line: 1,
+            character: 17,
+            supportDocuments: [(uri: "file:///Bool.neat", text: support)]
+        )
+
+        #expect(definition?.uri == "file:///Bool.neat")
+        #expect(definition?.name == "Bool")
+    }
+
     @Test("External parameter labels emit plain label semantic tokens")
     func externalParameterLabelsEmitLabelTokens() {
         let source = """
