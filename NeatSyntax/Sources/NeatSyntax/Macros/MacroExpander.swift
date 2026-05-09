@@ -27,6 +27,7 @@ public enum MacroExpander {
         return try files.map { parsedFile in
             ParsedSourceFile(
                 path: parsedFile.path,
+                source: parsedFile.source,
                 sourceFile: try expand(
                     sourceFile: parsedFile.sourceFile,
                     macros: registry,

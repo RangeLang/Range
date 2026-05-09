@@ -214,6 +214,7 @@ public struct CompilerPipeline {
             )
             let parsedFile = ParsedSourceFile(
                 path: input.path,
+                source: input.source,
                 sourceFile: try parser.parseSourceFile()
             )
 
@@ -239,6 +240,7 @@ public struct CompilerPipeline {
             var parser = try Parser(source: input.source)
             return ParsedSourceFile(
                 path: input.path,
+                source: input.source,
                 sourceFile: try parser.parseSourceFileForDeclarationDiscovery()
             )
         }

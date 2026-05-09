@@ -2309,15 +2309,7 @@ private struct DefinitionLocation {
     let name: String
     let uri: String
     let range: RangePosition
-    let kind: DefinitionKind
-}
-
-private enum DefinitionKind {
-    case type
-    case namespace
-    case macro
-    case marker
-    case function
+    let kind: DeclarationSourceKind
 }
 
 private struct NavigationIndexCacheEntry {
@@ -2327,11 +2319,9 @@ private struct NavigationIndexCacheEntry {
 
 private struct ProjectNavigationIndex {
     let declarationGraph: DeclarationGraph
-    let definitions: DefinitionIndex
 
     init(inputs: [SourceInput]) throws {
         self.declarationGraph = try CompilerPipeline().build(inputs: inputs).declarationGraph
-        self.definitions = DefinitionIndex(inputs: inputs)
     }
 
     func definition(named word: String, occurrence: SemanticTokenOccurrence?) -> DefinitionLocation? {
@@ -2341,116 +2331,48 @@ private struct ProjectNavigationIndex {
                 || declarationGraph.registryView.hasEnumeration(named: word)
                 || declarationGraph.hasNamespace(named: word)
             {
-                return definitions.location(named: word, kinds: [.type, .namespace])
+                return definitionLocation(named: word, kinds: [.type, .namespace])
             }
         }
 
-        if occurrence?.type == .macro || declarationGraph.registryView.hasMacro(named: word) {
-            return definitions.location(named: word, kinds: [.macro, .marker])
+        if occurrence?.type == .macro
+            || declarationGraph.registryView.hasMacro(named: word)
+            || declarationGraph.markersByName[word] != nil
+        {
+            return definitionLocation(named: word, kinds: [.macro, .marker])
         }
 
         if occurrence?.type == .function || occurrence?.type == .method {
             if !declarationGraph.registryView.callables(named: word).isEmpty {
-                return definitions.location(named: word, kinds: [.function])
+                return definitionLocation(named: word, kinds: [.function])
             }
         }
 
         return nil
     }
-}
 
-private struct DefinitionIndex {
-    private let locations: [DefinitionLocation]
-
-    init(inputs: [SourceInput]) {
-        self.locations = inputs.flatMap(Self.locations)
-    }
-
-    func location(named name: String, kinds: Set<DefinitionKind>) -> DefinitionLocation? {
-        locations.first { $0.name == name && kinds.contains($0.kind) }
-    }
-
-    private static func locations(in input: SourceInput) -> [DefinitionLocation] {
-        let uri = URL(fileURLWithPath: input.path).absoluteString
-        let lines = input.source.components(separatedBy: .newlines)
-        var result: [DefinitionLocation] = []
-
-        for (lineIndex, line) in lines.enumerated() {
-            result.append(
-                contentsOf: declarationLocations(
-                    in: line,
-                    lineIndex: lineIndex,
-                    uri: uri,
-                    pattern: #"\b(?:construct|protocol|enum)\s+([A-Z][A-Za-z0-9_]*)"#,
-                    kind: .type
-                )
-            )
-            result.append(
-                contentsOf: declarationLocations(
-                    in: line,
-                    lineIndex: lineIndex,
-                    uri: uri,
-                    pattern: #"\bnamespace\s+([A-Z][A-Za-z0-9_]*)"#,
-                    kind: .namespace
-                )
-            )
-            result.append(
-                contentsOf: declarationLocations(
-                    in: line,
-                    lineIndex: lineIndex,
-                    uri: uri,
-                    pattern: #"\bmacro\s+([A-Za-z_][A-Za-z0-9_]*)"#,
-                    kind: .macro
-                )
-            )
-            result.append(
-                contentsOf: declarationLocations(
-                    in: line,
-                    lineIndex: lineIndex,
-                    uri: uri,
-                    pattern: #"\bmarker\s+([A-Za-z_][A-Za-z0-9_]*)"#,
-                    kind: .marker
-                )
-            )
-            result.append(
-                contentsOf: declarationLocations(
-                    in: line,
-                    lineIndex: lineIndex,
-                    uri: uri,
-                    pattern: #"\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)"#,
-                    kind: .function
-                )
-            )
+    private func definitionLocation(
+        named name: String,
+        kinds: Set<DeclarationSourceKind>
+    ) -> DefinitionLocation? {
+        guard let location = declarationGraph.sourceLocation(named: name, kinds: kinds) else {
+            return nil
         }
-
-        return result
-    }
-
-    private static func declarationLocations(
-        in line: String,
-        lineIndex: Int,
-        uri: String,
-        pattern: String,
-        kind: DefinitionKind
-    ) -> [DefinitionLocation] {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let nsLine = line as NSString
-        return regex.matches(in: line, range: NSRange(location: 0, length: nsLine.length))
-            .compactMap { match in
-                guard match.numberOfRanges > 1 else { return nil }
-                let nameRange = match.range(at: 1)
-                guard nameRange.location != NSNotFound else { return nil }
-                let name = nsLine.substring(with: nameRange)
-                return DefinitionLocation(
-                    name: name,
-                    uri: uri,
-                    range: RangePosition(
-                        start: Position(line: lineIndex, character: nameRange.location),
-                        end: Position(line: lineIndex, character: nameRange.location + nameRange.length)
-                    ),
-                    kind: kind
+        return DefinitionLocation(
+            name: location.name,
+            uri: URL(fileURLWithPath: location.path).absoluteString,
+            range: RangePosition(
+                start: Position(
+                    line: location.range.start.line,
+                    character: location.range.start.character
+                ),
+                end: Position(
+                    line: location.range.end.line,
+                    character: location.range.end.character
                 )
-            }
+            ),
+            kind: location.kind
+        )
     }
 }
 

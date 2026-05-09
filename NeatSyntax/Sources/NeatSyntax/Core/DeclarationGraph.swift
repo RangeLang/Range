@@ -1,11 +1,39 @@
 import Foundation
 
+public enum DeclarationSourceKind: Hashable {
+    case type
+    case namespace
+    case macro
+    case marker
+    case function
+}
+
+public struct DeclarationSourceLocation {
+    public let name: String
+    public let path: String
+    public let range: NeatSourceRange
+    public let kind: DeclarationSourceKind
+
+    public init(
+        name: String,
+        path: String,
+        range: NeatSourceRange,
+        kind: DeclarationSourceKind
+    ) {
+        self.name = name
+        self.path = path
+        self.range = range
+        self.kind = kind
+    }
+}
+
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
     public let namespacesByName: [String: NamespaceDeclaration]
     public let constructsByName: [String: ConstructDeclaration]
     public let enumsByName: [String: EnumDeclaration]
     public let macrosByName: [String: MacroDeclaration]
+    public let markersByName: [String: MarkerDeclaration]
     public let extensionsByTargetName: [String: [ExtensionDeclaration]]
     public let topLevelStatesByFilePath: [String: [StateDeclaration]]
     public let statesByConstructName: [String: [StateDeclaration]]
@@ -17,6 +45,7 @@ public struct DeclarationGraph {
     public let parametersByCallableIdentity: [String: [NeatFunctionParameter]]
     public let parametersByInitializerIdentity: [String: [NeatFunctionParameter]]
     public let callablesByName: [String: [CallableDeclaration]]
+    public let sourceLocations: [DeclarationSourceLocation]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
     public let realizedInitMacroTargets: [RealizedInitMacroTarget]
     public let programGraph: ProgramGraph
@@ -28,6 +57,7 @@ public struct DeclarationGraph {
         let constructs = Self.collectConstructs(from: files, protocols: protocols)
         let enumerations = Self.collectEnums(from: files)
         let macros = Self.collectMacros(from: files)
+        let markers = Self.collectMarkers(from: files)
         let topLevelStates = Self.collectTopLevelStates(from: files)
         let statesByConstructName = Self.collectStatesByConstructName(from: constructs)
         let environmentsByConstructName = Self.collectEnvironmentsByConstructName(from: constructs)
@@ -50,6 +80,7 @@ public struct DeclarationGraph {
         self.constructsByName = constructs
         self.enumsByName = enumerations
         self.macrosByName = macros
+        self.markersByName = markers
         self.extensionsByTargetName = extensions
         self.topLevelStatesByFilePath = topLevelStates
         self.statesByConstructName = statesByConstructName
@@ -61,6 +92,7 @@ public struct DeclarationGraph {
         self.parametersByCallableIdentity = parametersByCallableIdentity
         self.parametersByInitializerIdentity = parametersByInitializerIdentity
         self.callablesByName = callables
+        self.sourceLocations = Self.collectSourceLocations(from: files)
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
         self.programGraph = Self.collectProgramGraph(from: files)
@@ -177,6 +209,13 @@ public struct DeclarationGraph {
 
     public func namespace(named name: String) -> NamespaceDeclaration? {
         namespacesByName[name]
+    }
+
+    public func sourceLocation(
+        named name: String,
+        kinds: Set<DeclarationSourceKind>
+    ) -> DeclarationSourceLocation? {
+        sourceLocations.first { $0.name == name && kinds.contains($0.kind) }
     }
 
     public func hasConstruct(named name: String) -> Bool {
@@ -466,6 +505,124 @@ public struct DeclarationGraph {
             }
         }
         return registry
+    }
+
+    static func collectMarkers(from files: [ParsedSourceFile]) -> [String: MarkerDeclaration] {
+        var registry: [String: MarkerDeclaration] = [:]
+        for parsedFile in files {
+            for declaration in markers(in: parsedFile.sourceFile) {
+                registry[declaration.name] = declaration
+            }
+        }
+        return registry
+    }
+
+    static func collectSourceLocations(from files: [ParsedSourceFile]) -> [DeclarationSourceLocation] {
+        files.flatMap { parsedFile -> [DeclarationSourceLocation] in
+            guard let source = parsedFile.source else {
+                return []
+            }
+            return sourceLocations(in: source, path: parsedFile.path)
+        }
+    }
+
+    private static func sourceLocations(
+        in source: String,
+        path: String
+    ) -> [DeclarationSourceLocation] {
+        let lines = source.components(separatedBy: .newlines)
+        var result: [DeclarationSourceLocation] = []
+
+        for (lineIndex, line) in lines.enumerated() {
+            result.append(
+                contentsOf: declarationSourceLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    path: path,
+                    pattern: #"\b(?:construct|protocol|enum)\s+([A-Z][A-Za-z0-9_]*)"#,
+                    kind: .type
+                )
+            )
+            result.append(
+                contentsOf: declarationSourceLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    path: path,
+                    pattern: #"\bnamespace\s+([A-Z][A-Za-z0-9_]*)"#,
+                    kind: .namespace
+                )
+            )
+            result.append(
+                contentsOf: declarationSourceLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    path: path,
+                    pattern: #"\bmacro\s+([A-Za-z_][A-Za-z0-9_]*)"#,
+                    kind: .macro
+                )
+            )
+            result.append(
+                contentsOf: declarationSourceLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    path: path,
+                    pattern: #"\bmarker\s+([A-Za-z_][A-Za-z0-9_]*)"#,
+                    kind: .marker
+                )
+            )
+            result.append(
+                contentsOf: declarationSourceLocations(
+                    in: line,
+                    lineIndex: lineIndex,
+                    path: path,
+                    pattern: #"\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)"#,
+                    kind: .function
+                )
+            )
+        }
+
+        return result
+    }
+
+    private static func declarationSourceLocations(
+        in line: String,
+        lineIndex: Int,
+        path: String,
+        pattern: String,
+        kind: DeclarationSourceKind
+    ) -> [DeclarationSourceLocation] {
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return []
+        }
+        let nsLine = line as NSString
+        return regex.matches(in: line, range: NSRange(location: 0, length: nsLine.length))
+            .compactMap { match in
+                guard match.numberOfRanges > 1 else {
+                    return nil
+                }
+                let nameRange = match.range(at: 1)
+                guard nameRange.location != NSNotFound else {
+                    return nil
+                }
+                let name = nsLine.substring(with: nameRange)
+                return DeclarationSourceLocation(
+                    name: name,
+                    path: path,
+                    range: NeatSourceRange(
+                        start: NeatSourceLocation(
+                            path: path,
+                            line: lineIndex,
+                            character: nameRange.location
+                        ),
+                        end: NeatSourceLocation(
+                            path: path,
+                            line: lineIndex,
+                            character: nameRange.location + nameRange.length
+                        )
+                    ),
+                    kind: kind
+                )
+            }
     }
 
     static func collectExtensions(from files: [ParsedSourceFile]) -> [String: [ExtensionDeclaration]] {

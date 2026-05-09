@@ -238,6 +238,41 @@ struct CompilerFixtureTests {
         #expect(graph.syntaxResolver.declaration(named: "Init.Application", conformsTo: "SyntaxReplaceable"))
     }
 
+    @Test("Declaration graph carries source locations")
+    func declarationGraphCarriesSourceLocations() throws {
+        let source = """
+        macro codable(): Construct { target, diagnostics in
+        }
+
+        marker codingKey<T>(_ value: String): Let<T> -> String {
+            return value
+        }
+
+        construct User {
+        }
+
+        function makeUser() -> User {
+            return User()
+        }
+        """
+        let program = try CompilerPipeline().build(inputs: [
+            SourceInput(path: "/tmp/GraphLocations.neat", source: source, role: .project)
+        ])
+        let graph = program.declarationGraph
+
+        let construct = graph.sourceLocation(named: "User", kinds: [.type])
+        let macro = graph.sourceLocation(named: "codable", kinds: [.macro])
+        let marker = graph.sourceLocation(named: "codingKey", kinds: [.marker])
+        let function = graph.sourceLocation(named: "makeUser", kinds: [.function])
+
+        #expect(construct?.path == "/tmp/GraphLocations.neat")
+        #expect(construct?.range.start.line == 7)
+        #expect(construct?.range.start.character == 10)
+        #expect(macro?.range.start.line == 0)
+        #expect(marker?.range.start.line == 3)
+        #expect(function?.range.start.line == 10)
+    }
+
     @Test("Rewrite site decoding uses declaration-backed descriptors")
     func rewriteSiteDecodingUsesDeclarationBackedDescriptors() throws {
         let program = try CompilerPipeline().build(inputs: neatCoreInputs())
