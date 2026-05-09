@@ -21,6 +21,9 @@ struct MacroSyntaxRenderer {
             return renderStatement(value)
         case .object(let typeName, _) where typeName == "Identifier":
             return renderIdentifier(value)
+        case .object(let typeName, _) where typeName == "ArrayExpression"
+            || typeName == "EnumCaseExpression":
+            return renderExpressionForSyntax(value)
         case .object(let typeName, _) where typeName == "NamedTypeReference" || typeName == "MemberTypeReference":
             return renderNominalTypeReference(value)
         case .array(let values):
@@ -424,6 +427,20 @@ struct MacroSyntaxRenderer {
             return value
         case .object(let typeName, _) where typeName == "Identifier":
             return renderIdentifier(value) ?? ""
+        case .object(let typeName, let fields) where typeName == "ArrayExpression":
+            guard let elementsValue = fields["elements"],
+                case .array(let elements) = elementsValue
+            else {
+                return "[]"
+            }
+            return "[\(elements.map(renderExpressionForSyntax).joined(separator: ", "))]"
+        case .object(let typeName, let fields) where typeName == "EnumCaseExpression":
+            guard let identifierValue = fields["identifier"],
+                let identifier = renderIdentifier(identifierValue)
+            else {
+                return "."
+            }
+            return ".\(identifier)"
         default:
             guard let expression = value.expression else {
                 return ""

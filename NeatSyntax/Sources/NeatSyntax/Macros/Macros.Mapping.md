@@ -84,3 +84,8 @@ This document maps each macro target concept to the language-level structure it 
 - This is the exposure map, not the final syntax for every field.
 - Expression and block targets are syntax-first.
 - Declaration targets are resolved semantic structures.
+- Syntax values should follow the semantic ownership model described in
+  `NeatCore/Syntax/README.md`: granularize where the compiler graphs need stable
+  meaning, and prefer owned nested forms such as `Array.Expression`,
+  `Enum.Case.Expression`, and `Statement.Expression` over flat token-shaped
+  names.
