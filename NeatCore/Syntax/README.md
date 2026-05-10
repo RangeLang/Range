@@ -66,6 +66,8 @@ Enum.Case.Expression
 Statement.Expression
 Construct.Declaration
 Construct.Application
+Protocol.Declaration
+Protocol.Application<Construct.Declaration>
 ```
 
 over a flat namespace such as:
@@ -94,3 +96,24 @@ In short:
 - Nest syntax under the concept that semantically owns it.
 - Use broad syntax protocols for consumption across the compiler.
 - Do not promote punctuation or renderer details into syntax constructs.
+
+## Graph-Backed Relationships
+
+Not every field in the core syntax model describes inline parser storage.
+Some fields describe graph-backed semantic projections.
+
+Protocol conformance is one of those relationships. Source syntax may write a
+nominal conformance reference, but the declaration graph resolves that edge
+into a protocol application value:
+
+```neat
+Protocol.Application<Construct.Declaration>
+Protocol.Application<Enum.Declaration>
+Protocol.Application<Protocol.Declaration>
+```
+
+The protocol owns the application vocabulary because the protocol is what
+defines the requirements and carried macro semantics being applied. The
+declaration graph owns the actual cross-link, so inverse views from a conformer
+or from a protocol declaration should project the same graph edge rather than
+duplicating relationship storage.

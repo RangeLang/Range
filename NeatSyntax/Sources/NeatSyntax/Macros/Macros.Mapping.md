@@ -44,6 +44,10 @@ This document maps each macro target concept to the language-level structure it 
 - its required functions
 - its required initializers
 - its inherited protocols
+- graph-backed applications to conforming declarations, modeled as
+  `Protocol.Application<Construct.Declaration>`,
+  `Protocol.Application<Enum.Declaration>`, or
+  `Protocol.Application<Protocol.Declaration>`
 
 ### Extension exposes
 
