@@ -178,6 +178,15 @@ construct Point: Equatable {
 
 The graph should represent that `Point` conforms to `Equatable` and inherits the protocol-carried macro semantics attached to that conformance.
 
+For inherited protocols, carried macro semantics should compose through the
+protocol graph rather than being reimplemented by each derived macro. For
+example, `Hashable: Equatable` means a future protocol-carried `#hashable`
+macro should synthesize only the hash witness, while the inherited
+`Equatable` conformance realizes the protocol-carried `#equatable` macro for
+the equality witness. Any current `#hashable` implementation that emits
+equality directly is a bootstrap bridge until protocol-carried macro
+realization handles inherited conformances.
+
 ## Notes
 
 - The declaration graph is the right layer for protocol semantics, conformance realization, declaration-targeted macro carry, and similar declaration-to-declaration reasoning.
