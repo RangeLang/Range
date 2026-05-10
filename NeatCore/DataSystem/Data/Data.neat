@@ -1,5 +1,5 @@
 @core
-construct Data: Equatable, Hashable {
+construct Data: Equatable {
     let storage: DataStorage
 
     init(storage: DataStorage)
@@ -9,5 +9,11 @@ extension Data: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         let container = encoder.singleValueContainer()
         return container.encode(self)
+    }
+}
+
+extension Data: Hashable {
+    function hash(into hasher: Hasher) {
+        hasher.combineStorage(storage)
     }
 }

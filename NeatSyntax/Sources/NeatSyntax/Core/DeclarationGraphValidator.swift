@@ -143,6 +143,13 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 continue
             }
 
+            if skipsExplicitRequirementValidation(
+                for: construct,
+                protocol: protocolDeclaration
+            ) {
+                continue
+            }
+
             let substitution = genericSubstitution(
                 for: protocolDeclaration,
                 conformance: conformance

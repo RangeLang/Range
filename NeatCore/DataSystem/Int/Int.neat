@@ -1,5 +1,5 @@
 @core
-construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral, Equatable, Hashable, Comparable {
+construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral, Equatable, Comparable {
     let storage: IntStorage
 
     init(literal: IntLiteral) {
@@ -24,5 +24,11 @@ extension Int: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         let container = encoder.singleValueContainer()
         return container.encode(self)
+    }
+}
+
+extension Int: Hashable {
+    function hash(into hasher: Hasher) {
+        hasher.combineStorage(storage)
     }
 }

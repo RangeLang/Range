@@ -1,0 +1,10 @@
+#hashable
+construct HashableMacroFixture {
+    let id: Int
+    let name: String
+    let active: Bool
+}
+
+#hashable
+construct EmptyHashableMacroFixture {
+}

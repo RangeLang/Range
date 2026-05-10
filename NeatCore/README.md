@@ -69,7 +69,7 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 - Collection storage/lowering is not complete yet.
 - Scalar and collection `...Storage` types are still semantic boundary types rather than fully realized runtime/storage implementations.
 - `Set` and `Dictionary` do not yet have full `Equatable` or `Hashable` conformances.
-- There is no public `Hasher` model yet.
+- `Hasher` exists as a public core surface, but its storage and mixing behavior are still bootstrap/runtime responsibilities.
 - Conformance synthesis and macro-driven derivation are still exploratory.
 - Some language sugar is supported by the compiler but not yet fully documented as formal language rules.
 

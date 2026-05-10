@@ -743,6 +743,35 @@ struct CompilerFixtureTests {
         #expect(equalityReturnsTrue(in: emptyExtension))
     }
 
+    @Test("Hashable macro synthesizes field combines")
+    func hashableMacroSynthesizesFieldCombines() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/HashableMacroSynthesis.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let module: ModuleFileNode
+        switch expandedFile.sourceFile {
+        case .module(let expandedModule):
+            module = expandedModule
+        default:
+            Issue.record("Expected expanded Hashable macro fixture to become a module.")
+            return
+        }
+
+        let fixtureExtension = try #require(
+            module.extensions.first(where: { $0.targetName == "HashableMacroFixture" })
+        )
+        #expect(fixtureExtension.conformances.map(\.displayName) == ["Hashable"])
+        #expect(hashCombines(in: fixtureExtension) == ["id", "name", "active"])
+
+        let emptyExtension = try #require(
+            module.extensions.first(where: { $0.targetName == "EmptyHashableMacroFixture" })
+        )
+        #expect(hashCombines(in: emptyExtension).isEmpty)
+    }
+
     @Test("CaseIterable macro synthesizes allCases function")
     func caseIterableMacroSynthesizesAllCasesFunction() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CaseIterableMacroSynthesis.neat")
@@ -967,6 +996,27 @@ private func equalityReturnsTrue(in extensionDeclaration: ExtensionDeclaration) 
     }
 
     return true
+}
+
+private func hashCombines(in extensionDeclaration: ExtensionDeclaration) -> [String] {
+    guard let hash = extensionDeclaration.callables.first(where: { $0.name == "hash" }),
+        let body = hash.body
+    else {
+        return []
+    }
+
+    return body.compactMap { statement in
+        guard case .expression(.call(let name, let arguments)) = statement,
+            name == "hasher.combine",
+            arguments.count == 1,
+            arguments[0].label == nil,
+            case .identifier(let value) = arguments[0].value
+        else {
+            return nil
+        }
+
+        return value
+    }
 }
 
 private func allCasesReturnValues(in extensionDeclaration: ExtensionDeclaration) -> [String] {

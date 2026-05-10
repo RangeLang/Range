@@ -1,0 +1,16 @@
+@core
+construct HasherStorage {
+    init()
+
+    function combine(_ value: IntStorage)
+
+    function combine(_ value: StringStorage)
+
+    function combine(_ value: BoolStorage)
+
+    function combine(_ value: FloatStorage)
+
+    function combine(_ value: DataStorage)
+
+    function finalize() -> Int
+}

@@ -1,5 +1,5 @@
 @core
-construct Bool: ExpressibleByBoolLiteral, Equatable, Hashable {
+construct Bool: ExpressibleByBoolLiteral, Equatable {
     let storage: BoolStorage
 
     init(literal: BoolLiteral) {
@@ -24,5 +24,11 @@ extension Bool: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         let container = encoder.singleValueContainer()
         return container.encode(self)
+    }
+}
+
+extension Bool: Hashable {
+    function hash(into hasher: Hasher) {
+        hasher.combineStorage(storage)
     }
 }

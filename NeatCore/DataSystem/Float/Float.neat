@@ -1,5 +1,5 @@
 @core
-construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equatable, Hashable, Comparable {
+construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equatable, Comparable {
     let storage: FloatStorage
 
     init(literal: FloatLiteral) {
@@ -24,5 +24,11 @@ extension Float: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
         let container = encoder.singleValueContainer()
         return container.encode(self)
+    }
+}
+
+extension Float: Hashable {
+    function hash(into hasher: Hasher) {
+        hasher.combineStorage(storage)
     }
 }
