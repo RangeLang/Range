@@ -1,10 +1,18 @@
 @core
-construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral, Equatable, Comparable {
+construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral {
     let storage: IntStorage
 
     init(literal: IntLiteral) {
         self.storage = literal.storage()
     }
+}
+
+extension Int: Equatable {
+    function ==(lhs: Self, rhs: Self) -> Bool
+}
+
+extension Int: Comparable {
+    function <(lhs: Self, rhs: Self) -> Bool
 }
 
 extension Int: Decodable {

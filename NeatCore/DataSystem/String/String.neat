@@ -1,5 +1,5 @@
 @core
-construct String: ExpressibleByStringLiteral, Equatable, Comparable {
+construct String: ExpressibleByStringLiteral {
     let storage: StringStorage
 
     init(literal: StringLiteral) {
@@ -17,6 +17,14 @@ construct String: ExpressibleByStringLiteral, Equatable, Comparable {
     function snakeCase() -> String {
         return storage.snakeCase()
     }
+}
+
+extension String: Equatable {
+    function ==(lhs: Self, rhs: Self) -> Bool
+}
+
+extension String: Comparable {
+    function <(lhs: Self, rhs: Self) -> Bool
 }
 
 extension String: Decodable {

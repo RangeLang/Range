@@ -1,10 +1,14 @@
 @core
-construct Bool: ExpressibleByBoolLiteral, Equatable {
+construct Bool: ExpressibleByBoolLiteral {
     let storage: BoolStorage
 
     init(literal: BoolLiteral) {
         self.storage = literal.storage()
     }
+}
+
+extension Bool: Equatable {
+    function ==(lhs: Self, rhs: Self) -> Bool
 }
 
 extension Bool: Decodable {

@@ -45,6 +45,7 @@ public struct DeclarationGraph {
     public let parametersByCallableIdentity: [String: [NeatFunctionParameter]]
     public let parametersByInitializerIdentity: [String: [NeatFunctionParameter]]
     public let callablesByName: [String: [CallableDeclaration]]
+    public let operatorCallablesByName: [String: [CallableDeclaration]]
     public let sourceLocations: [DeclarationSourceLocation]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
     public let realizedInitMacroTargets: [RealizedInitMacroTarget]
@@ -69,6 +70,7 @@ public struct DeclarationGraph {
             extensions: extensions
         )
         let callables = Self.collectCallables(from: files)
+        let operatorCallables = Self.collectOperatorCallables(from: files)
         let parametersByCallableIdentity = Self.collectParametersByCallableIdentity(from: files)
         let parametersByInitializerIdentity = Self.collectParametersByInitializerIdentity(
             from: constructs,
@@ -92,6 +94,7 @@ public struct DeclarationGraph {
         self.parametersByCallableIdentity = parametersByCallableIdentity
         self.parametersByInitializerIdentity = parametersByInitializerIdentity
         self.callablesByName = callables
+        self.operatorCallablesByName = operatorCallables
         self.sourceLocations = Self.collectSourceLocations(from: files)
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
@@ -107,7 +110,7 @@ public struct DeclarationGraph {
                 protocolsByName: protocolsByName,
                 extensionsByTargetName: extensionsByTargetName
             ),
-            operatorResolver: DeclarationOperatorResolver(callablesByName: callablesByName),
+            operatorResolver: DeclarationOperatorResolver(callablesByName: operatorCallablesByName),
             typeCompatibilityResolver: DeclarationTypeCompatibilityResolver(
                 protocolsByName: protocolsByName,
                 constructsByName: constructsByName,
@@ -890,6 +893,21 @@ public struct DeclarationGraph {
         return registry
     }
 
+    static func collectOperatorCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]]
+    {
+        var registry = collectCallables(from: files)
+        let operatorSymbols = Set(files.flatMap { operators(in: $0.sourceFile).map(\.symbol) })
+        let extensions = collectExtensions(from: files)
+        for declarations in extensions.values {
+            for declaration in declarations {
+                for callable in declaration.callables where operatorSymbols.contains(callable.name) {
+                    registry[callable.name, default: []].append(callable)
+                }
+            }
+        }
+        return registry
+    }
+
     private static func collectNamespaceConstructs(
         in namespace: NamespaceDeclaration,
         qualifiedPrefix: String,
@@ -1230,6 +1248,15 @@ public struct DeclarationGraph {
         case .module(let module):
             return module.extensions
         case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition:
+            return []
+        }
+    }
+
+    static func operators(in sourceFile: SourceFileNode) -> [OperatorDeclaration] {
+        switch sourceFile {
+        case .module(let module):
+            return module.operators
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
     }

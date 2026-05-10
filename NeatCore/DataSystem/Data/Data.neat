@@ -1,8 +1,12 @@
 @core
-construct Data: Equatable {
+construct Data {
     let storage: DataStorage
 
     init(storage: DataStorage)
+}
+
+extension Data: Equatable {
+    function ==(lhs: Self, rhs: Self) -> Bool
 }
 
 extension Data: Encodable {

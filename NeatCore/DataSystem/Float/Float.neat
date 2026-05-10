@@ -1,10 +1,18 @@
 @core
-construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral, Equatable, Comparable {
+construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral {
     let storage: FloatStorage
 
     init(literal: FloatLiteral) {
         self.storage = literal.storage()
     }
+}
+
+extension Float: Equatable {
+    function ==(lhs: Self, rhs: Self) -> Bool
+}
+
+extension Float: Comparable {
+    function <(lhs: Self, rhs: Self) -> Bool
 }
 
 extension Float: Decodable {

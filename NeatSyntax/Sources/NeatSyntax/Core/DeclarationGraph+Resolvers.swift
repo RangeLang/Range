@@ -291,13 +291,14 @@ public struct DeclarationOperatorResolver: Sendable {
                 else {
                     return nil
                 }
+                let substitutions = callable.receiverType.map { ["Self": $0] } ?? [:]
 
                 return OperatorSignature(
                     genericParameterNames: Set(
                         callable.genericParameters.map(Self.genericParameterName)),
-                    lhsType: lhsParameter,
-                    rhsType: rhsParameter,
-                    returnType: callable.returnType ?? .named("Void")
+                    lhsType: Self.substitute(lhsParameter, using: substitutions),
+                    rhsType: Self.substitute(rhsParameter, using: substitutions),
+                    returnType: Self.substitute(callable.returnType ?? .named("Void"), using: substitutions)
                 )
             }
         }
