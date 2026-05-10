@@ -13,8 +13,8 @@ macro hashable(): Construct { target, diagnostics in
         extension #(target.declaration.self): Hashable {
             function ==(lhs: Self, rhs: Self) -> Bool {
                 #equatableBody(
-                    lhs: Identifier(name: "lhs"),
-                    rhs: Identifier(name: "rhs"),
+                    lhs: lhs,
+                    rhs: rhs,
                     properties: target.declaration.lets
                 )
             }

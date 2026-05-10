@@ -1,0 +1,39 @@
+macro compareOrderingProperty<T>(lhs: T, rhs: T, value: Identifier) -> [If] {
+    if lhs.#(value) < rhs.#(value) {
+        return true
+    }
+
+    if rhs.#(value) < lhs.#(value) {
+        return false
+    }
+}
+
+macro comparableBody<T>(lhs: T, rhs: T, properties: [Let]) -> [Statement] {
+    #(properties.map { property in
+        #compareOrderingProperty(lhs: lhs, rhs: rhs, value: property.identifier)
+    })
+
+    return false
+}
+
+macro comparable(): Construct { target, diagnostics in
+    target.declaration.expand {
+        extension #(target.declaration.self): Comparable {
+            function ==(lhs: Self, rhs: Self) -> Bool {
+                #equatableBody(
+                    lhs: lhs,
+                    rhs: rhs,
+                    properties: target.declaration.lets
+                )
+            }
+
+            function <(lhs: Self, rhs: Self) -> Bool {
+                #comparableBody(
+                    lhs: lhs,
+                    rhs: rhs,
+                    properties: target.declaration.lets
+                )
+            }
+        }
+    }
+}

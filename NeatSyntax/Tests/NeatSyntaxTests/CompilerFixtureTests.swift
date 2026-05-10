@@ -772,6 +772,45 @@ struct CompilerFixtureTests {
         #expect(hashCombines(in: emptyExtension).isEmpty)
     }
 
+    @Test("Comparable macro synthesizes lexicographic ordering")
+    func comparableMacroSynthesizesLexicographicOrdering() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ComparableMacroSynthesis.neat")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == fixture.path })
+        )
+
+        let module: ModuleFileNode
+        switch expandedFile.sourceFile {
+        case .module(let expandedModule):
+            module = expandedModule
+        default:
+            Issue.record("Expected expanded Comparable macro fixture to become a module.")
+            return
+        }
+
+        let fixtureExtension = try #require(
+            module.extensions.first(where: { $0.targetName == "ComparableMacroFixture" })
+        )
+        #expect(fixtureExtension.conformances.map(\.displayName) == ["Comparable"])
+        #expect(equalityComparisons(in: fixtureExtension) == ["major", "minor", "patch"])
+        #expect(comparisonChecks(in: fixtureExtension) == [
+            ComparisonCheck(property: "major", returns: true),
+            ComparisonCheck(property: "major", returns: false),
+            ComparisonCheck(property: "minor", returns: true),
+            ComparisonCheck(property: "minor", returns: false),
+            ComparisonCheck(property: "patch", returns: true),
+            ComparisonCheck(property: "patch", returns: false),
+        ])
+        #expect(comparisonReturnsFalse(in: fixtureExtension))
+
+        let emptyExtension = try #require(
+            module.extensions.first(where: { $0.targetName == "EmptyComparableMacroFixture" })
+        )
+        #expect(comparisonChecks(in: emptyExtension).isEmpty)
+        #expect(comparisonReturnsFalse(in: emptyExtension))
+    }
+
     @Test("CaseIterable macro synthesizes allCases function")
     func caseIterableMacroSynthesizesAllCasesFunction() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CaseIterableMacroSynthesis.neat")
@@ -1017,6 +1056,66 @@ private func hashCombines(in extensionDeclaration: ExtensionDeclaration) -> [Str
 
         return value
     }
+}
+
+private struct ComparisonCheck: Equatable {
+    let property: String
+    let returns: Bool
+}
+
+private func comparisonChecks(in extensionDeclaration: ExtensionDeclaration) -> [ComparisonCheck] {
+    guard let comparison = extensionDeclaration.callables.first(where: { $0.name == "<" }),
+        let body = comparison.body
+    else {
+        return []
+    }
+
+    return body.compactMap { statement in
+        guard case .conditional(let branches) = statement,
+            branches.count == 1,
+            case .binary(let lhs, let operatorSymbol, let rhs)? = branches.first?.condition,
+            operatorSymbol == .less,
+            case .identifier(let lhsPath) = lhs,
+            case .identifier(let rhsPath) = rhs
+        else {
+            return nil
+        }
+
+        if lhsPath.hasPrefix("lhs."), rhsPath.hasPrefix("rhs."),
+            lhsPath.dropFirst(4) == rhsPath.dropFirst(4),
+            branchReturns(branches[0], value: true)
+        {
+            return ComparisonCheck(property: String(lhsPath.dropFirst(4)), returns: true)
+        }
+
+        if lhsPath.hasPrefix("rhs."), rhsPath.hasPrefix("lhs."),
+            lhsPath.dropFirst(4) == rhsPath.dropFirst(4),
+            branchReturns(branches[0], value: false)
+        {
+            return ComparisonCheck(property: String(lhsPath.dropFirst(4)), returns: false)
+        }
+
+        return nil
+    }
+}
+
+private func comparisonReturnsFalse(in extensionDeclaration: ExtensionDeclaration) -> Bool {
+    guard let comparison = extensionDeclaration.callables.first(where: { $0.name == "<" }),
+        let body = comparison.body,
+        case .return(.boolean(false))? = body.last
+    else {
+        return false
+    }
+
+    return true
+}
+
+private func branchReturns(_ branch: StatementConditionalBranch, value: Bool) -> Bool {
+    guard case .return(.boolean(value))? = branch.body.first else {
+        return false
+    }
+
+    return true
 }
 
 private func allCasesReturnValues(in extensionDeclaration: ExtensionDeclaration) -> [String] {

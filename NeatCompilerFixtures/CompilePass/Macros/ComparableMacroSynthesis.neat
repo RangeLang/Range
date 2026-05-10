@@ -1,0 +1,10 @@
+#comparable
+construct ComparableMacroFixture {
+    let major: Int
+    let minor: Int
+    let patch: Int
+}
+
+#comparable
+construct EmptyComparableMacroFixture {
+}
