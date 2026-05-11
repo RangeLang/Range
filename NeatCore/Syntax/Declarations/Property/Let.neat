@@ -1,5 +1,5 @@
 @core
-construct Let<T>: Property, SyntaxEmittable {
+construct Let<T>: StoredProperty, SyntaxEmittable {
   let macros: [Macro.Application]
   let markers: [Marker.Application]
   let identifier: Identifier

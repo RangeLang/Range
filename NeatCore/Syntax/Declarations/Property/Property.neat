@@ -1,5 +1,12 @@
 @core
 protocol Property: Syntax {
+    let macros: [Macro.Application]
+    let markers: [Marker.Application]
     let identifier: Identifier
     let type: TypeReference
+}
+
+@core
+protocol StoredProperty: Property {
+    let value: Expression?
 }

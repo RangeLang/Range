@@ -1,5 +1,5 @@
 @core
-construct State<T>: Property {
+construct State<T>: StoredProperty {
     let macros: [Macro.Application]
     let markers: [Marker.Application]
     let identifier: Identifier
