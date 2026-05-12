@@ -33,6 +33,11 @@ construct JSONKeyedEncodingContainer: KeyedEncodingContainer {
         return .success(result: Void())
     }
 
+    function encode(_ value: UUID, forKey key: String) -> Result<Void, EncodingError> {
+        appendField(key: key, value: "\"\(value)\"")
+        return .success(result: Void())
+    }
+
     function encode<T: Encodable>(_ value: T, forKey key: String) -> Result<Void, EncodingError> {
         let encoder: JSONEncoder = JSONEncoder()
 

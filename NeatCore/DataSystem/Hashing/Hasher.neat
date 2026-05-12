@@ -30,6 +30,10 @@ construct Hasher {
         storage.combine(value)
     }
 
+    function combineStorage(_ value: UUIDStorage) {
+        storage.combine(value)
+    }
+
     function finalize() -> Int {
         return storage.finalize()
     }

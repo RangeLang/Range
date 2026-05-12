@@ -118,6 +118,21 @@ struct SwiftBackendEmitter {
                 "Float": [signature("Float")],
                 "Int": [signature("Int")],
                 "String": [signature("String")],
+                "UUID": [
+                    signature("UUID"),
+                    FailableInitializerSignature(
+                        constructName: "UUID",
+                        labels: ["uuidString"],
+                        failureType: failureType
+                    ),
+                ],
+                "UUIDStorage": [
+                    FailableInitializerSignature(
+                        constructName: "UUIDStorage",
+                        labels: ["uuidString"],
+                        failureType: failureType
+                    )
+                ],
             ]
         }
 
@@ -273,7 +288,17 @@ struct SwiftBackendEmitter {
         "Optional",
         "Set",
         "String",
+        "UUID",
         "Void",
+    ]
+
+    private let swiftNativeStorageTypeNames: [String: String] = [
+        "BoolStorage": "Bool",
+        "DataStorage": "Data",
+        "FloatStorage": "Float",
+        "IntStorage": "Int",
+        "StringStorage": "String",
+        "UUIDStorage": "UUID",
     ]
 
     private typealias NeatExpression = NeatSyntax.Expression
@@ -533,6 +558,14 @@ struct SwiftBackendEmitter {
                 let failure: Failure
             }
 
+            func __neatUUID(uuidString: String) throws -> UUID {
+                guard let value = UUID(uuidString: uuidString) else {
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: .failed)
+                }
+
+                return value
+            }
+
             enum __NeatDeferredControlFlow: Error {
                 case returnValue(Any)
                 case returnVoid
@@ -598,42 +631,49 @@ struct SwiftBackendEmitter {
     private func emitNativeEncodingConformances() -> String {
         """
         extension Bool: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
         extension Data: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
         extension Float: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
         extension Int: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
         extension String: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.singleValueContainer()
+                return container.encode(self)
+            }
+        }
+
+        extension UUID: Neat_Encodable {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
         extension Array: Neat_Encodable where Element: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.unkeyedContainer()
 
                 for element in self {
@@ -650,7 +690,7 @@ struct SwiftBackendEmitter {
         }
 
         extension Optional: Neat_Encodable where Wrapped: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 switch self {
                 case .some(let value):
                     return value.encode(to: encoder)
@@ -662,7 +702,7 @@ struct SwiftBackendEmitter {
         }
 
         extension Dictionary: Neat_Encodable where Key == String, Value: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.keyedContainer()
 
                 for key in keys.sorted() {
@@ -683,7 +723,7 @@ struct SwiftBackendEmitter {
         }
 
         extension Set: Neat_Encodable where Element: Neat_Encodable {
-            func encode<Output>(to encoder: Neat_Encoder<Output>) -> Neat_Result<Void, Neat_EncodingError> {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.unkeyedContainer()
 
                 for element in self {
@@ -704,7 +744,7 @@ struct SwiftBackendEmitter {
     private func emitNativeDecodingConformances() -> String {
         """
         extension Bool: Neat_Decodable {
-            init(from decoder: Neat_Decoder<Neat_JSONValue>) throws {
+            init(from decoder: Neat_Decoder) throws {
                 let container = decoder.singleValueContainer()
                 switch container.decode(Bool.self) {
                 case .success(let value):
@@ -716,7 +756,7 @@ struct SwiftBackendEmitter {
         }
 
         extension Float: Neat_Decodable {
-            init(from decoder: Neat_Decoder<Neat_JSONValue>) throws {
+            init(from decoder: Neat_Decoder) throws {
                 let container = decoder.singleValueContainer()
                 switch container.decode(Float.self) {
                 case .success(let value):
@@ -728,7 +768,7 @@ struct SwiftBackendEmitter {
         }
 
         extension Int: Neat_Decodable {
-            init(from decoder: Neat_Decoder<Neat_JSONValue>) throws {
+            init(from decoder: Neat_Decoder) throws {
                 let container = decoder.singleValueContainer()
                 switch container.decode(Int.self) {
                 case .success(let value):
@@ -740,9 +780,21 @@ struct SwiftBackendEmitter {
         }
 
         extension String: Neat_Decodable {
-            init(from decoder: Neat_Decoder<Neat_JSONValue>) throws {
+            init(from decoder: Neat_Decoder) throws {
                 let container = decoder.singleValueContainer()
                 switch container.decode(String.self) {
+                case .success(let value):
+                    self = value
+                case .failure(let error):
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
+                }
+            }
+        }
+
+        extension UUID: Neat_Decodable {
+            init(from decoder: Neat_Decoder) throws {
+                let container = decoder.singleValueContainer()
+                switch container.decode(UUID.self) {
                 case .success(let value):
                     self = value
                 case .failure(let error):
@@ -1120,6 +1172,9 @@ struct SwiftBackendEmitter {
     ) -> String {
         switch typeReference {
         case .named(let name):
+            if let storageTypeName = swiftNativeStorageTypeNames[name] {
+                return storageTypeName
+            }
             if swiftNativeTypeNames.contains(name) || genericParameterNames.contains(name) {
                 return name
             }
@@ -2176,6 +2231,9 @@ struct SwiftBackendEmitter {
     }
 
     private func emitSwiftSymbolName(_ name: String) -> String {
+        if let storageTypeName = swiftNativeStorageTypeNames[name] {
+            return storageTypeName
+        }
         if swiftNativeTypeNames.contains(name) {
             return name
         }
@@ -2678,8 +2736,52 @@ struct SwiftBackendEmitter {
         arguments: [CallArgument],
         scope: EmissionScope = .empty
     ) throws -> String {
+        if let knownInitializer = try emitKnownCoreStorageInitializer(
+            name: name,
+            arguments: arguments,
+            scope: scope
+        ) {
+            return knownInitializer
+        }
+
         let rendered = try emitCallArguments(arguments, for: name, scope: scope)
         return "\(emitSwiftReferenceName(name, scope: scope))(\(rendered))"
+    }
+
+    private func emitKnownCoreStorageInitializer(
+        name: String,
+        arguments: [CallArgument],
+        scope: EmissionScope = .empty
+    ) throws -> String? {
+        func singleArgument(label: String?) -> NeatSyntax.Expression? {
+            guard arguments.count == 1, arguments[0].label == label else {
+                return nil
+            }
+            return arguments[0].value
+        }
+
+        switch name {
+        case "DataStorage":
+            guard arguments.isEmpty else { return nil }
+            return "Data()"
+        case "Data":
+            guard let storage = singleArgument(label: "storage") else { return nil }
+            return try emitExpression(storage, scope: scope)
+        case "UUIDStorage":
+            if arguments.isEmpty {
+                return "UUID()"
+            }
+            guard let string = singleArgument(label: "uuidString") else { return nil }
+            return "__neatUUID(uuidString: \(try emitExpression(string, scope: scope)))"
+        case "UUID":
+            if let storage = singleArgument(label: "storage") {
+                return try emitExpression(storage, scope: scope)
+            }
+            guard let string = singleArgument(label: "uuidString") else { return nil }
+            return "__neatUUID(uuidString: \(try emitExpression(string, scope: scope)))"
+        default:
+            return nil
+        }
     }
 
     private func emitFailableInitializerCall(

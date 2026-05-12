@@ -4,5 +4,6 @@ protocol UnkeyedEncodingContainer {
     function encode(_ value: Float) -> Result<Void, EncodingError>
     function encode(_ value: Int) -> Result<Void, EncodingError>
     function encode(_ value: String) -> Result<Void, EncodingError>
+    function encode(_ value: UUID) -> Result<Void, EncodingError>
     function encode<T: Encodable>(_ value: T) -> Result<Void, EncodingError>
 }

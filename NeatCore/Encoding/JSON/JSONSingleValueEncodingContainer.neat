@@ -34,6 +34,11 @@ construct JSONSingleValueEncodingContainer: SingleValueEncodingContainer {
         return .success(result: Void())
     }
 
+    function encode(_ value: UUID) -> Result<Void, EncodingError> {
+        output = "\"\(value)\""
+        return .success(result: Void())
+    }
+
     function encode<T: Encodable>(_ value: T) -> Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }

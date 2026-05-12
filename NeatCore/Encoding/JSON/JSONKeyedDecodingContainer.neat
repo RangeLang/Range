@@ -41,6 +41,16 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
         }
     }
 
+    function decode(_ type: UUID.Type, forKey key: String) -> Result<UUID, DecodingError> {
+        switch value(forKey: key) {
+        case .success(let value):
+            let container = JSONSingleValueDecodingContainer(value: value)
+            return container.decode(UUID.self)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
+
     function decode<T: Decodable>(_ type: T.Type, forKey key: String) -> Result<T, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):

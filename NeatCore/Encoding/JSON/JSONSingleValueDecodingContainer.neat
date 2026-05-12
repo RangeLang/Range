@@ -48,4 +48,13 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
             return .failure(cause: .failed)
         }
     }
+
+    function decode(_ type: UUID.Type) -> Result<UUID, DecodingError> {
+        switch value {
+        case .string(let decoded):
+            return UUID(uuidString: decoded)
+        case .array, .bool, .float, .int, .null, .object:
+            return .failure(cause: .failed)
+        }
+    }
 }

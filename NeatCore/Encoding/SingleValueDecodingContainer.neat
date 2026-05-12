@@ -3,4 +3,5 @@ protocol SingleValueDecodingContainer {
     function decode(_ type: Float.Type) -> Result<Float, DecodingError>
     function decode(_ type: Int.Type) -> Result<Int, DecodingError>
     function decode(_ type: String.Type) -> Result<String, DecodingError>
+    function decode(_ type: UUID.Type) -> Result<UUID, DecodingError>
 }

@@ -1247,7 +1247,7 @@ private struct DocumentIndex {
 
         let typePattern = #"\b[A-Z][A-Za-z0-9_]*\b"#
         let functionDeclarationPattern =
-            #"\bfunction\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
+            #"\bfunction\s+([a-z_][A-Za-z0-9_]*|[!%&*+\-./<=>?^|~]+)(?:<[^>\n]+>)?\s*\("#
         let macroDeclarationPattern =
             #"\bmacro\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let markerDeclarationPattern =
@@ -1872,7 +1872,7 @@ private struct DocumentIndex {
         }
 
         let declarationPatterns = [
-            #"\bfunction\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
+            #"\bfunction\s+(?:[a-z_][A-Za-z0-9_]*|[!%&*+\-./<=>?^|~]+)(?:<[^>\n]+>)?\s*$"#,
             #"\bmacro\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
             #"\bmarker\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
         ]

@@ -12,5 +12,7 @@ construct HasherStorage {
 
     function combine(_ value: DataStorage)
 
+    function combine(_ value: UUIDStorage)
+
     function finalize() -> Int
 }

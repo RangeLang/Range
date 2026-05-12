@@ -119,6 +119,24 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(!containsExactToken(tokens, text: "task", type: .method, modifiers: []))
     }
 
+    @Test("Operator function declarations emit declaration tokens")
+    func operatorFunctionDeclarationsEmitDeclarationTokens() {
+        let source = """
+        protocol Comparable: Equatable {
+            function <(lhs: Self, rhs: Self) -> Bool
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "function", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "<", type: .function, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "lhs", type: .parameter, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "rhs", type: .parameter, modifiers: [.declaration]))
+        #expect(!containsExactToken(tokens, text: "lhs", type: .method, modifiers: []))
+        #expect(!containsExactToken(tokens, text: "rhs", type: .method, modifiers: []))
+    }
+
     @Test("Switch pattern bindings stay plain text")
     func switchPatternBindingsStayPlainText() {
         let source = """

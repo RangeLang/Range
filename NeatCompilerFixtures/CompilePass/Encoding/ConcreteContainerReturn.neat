@@ -23,6 +23,10 @@ construct FixtureSingleValueEncodingContainer: SingleValueEncodingContainer {
         return .success(result: Void())
     }
 
+    function encode(_ value: UUID) -> Result<Void, EncodingError> {
+        return .success(result: Void())
+    }
+
     function encode<T: Encodable>(_ value: T) -> Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }
@@ -46,6 +50,10 @@ construct FixtureKeyedEncodingContainer: KeyedEncodingContainer {
     }
 
     function encode(_ value: String, forKey key: String) -> Result<Void, EncodingError> {
+        return .success(result: Void())
+    }
+
+    function encode(_ value: UUID, forKey key: String) -> Result<Void, EncodingError> {
         return .success(result: Void())
     }
 
