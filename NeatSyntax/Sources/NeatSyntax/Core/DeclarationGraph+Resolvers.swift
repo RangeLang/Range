@@ -878,6 +878,7 @@ public struct DeclarationMemberResolver: Sendable {
     private let membersByConstructName: [String: ConstructMembers]
     private let enumCaseSignaturesByQualifiedName: [String: EnumCaseSignature]
     private let enumCaseSignaturesByEnumName: [String: [String: EnumCaseSignature]]
+    private let propertyTypesByProtocolName: [String: [String: TypeReference]]
     private let callableSignaturesByProtocolName: [String: [String: [MemberCallableSignature]]]
     private let genericParameterConstraintsByName: [String: TypeReference]
 
@@ -892,6 +893,9 @@ public struct DeclarationMemberResolver: Sendable {
             protocolsByName: protocolsByName,
             extensionsByTargetName: extensionsByTargetName
         )
+        self.propertyTypesByProtocolName = protocolsByName.mapValues { declaration in
+            Self.protocolPropertyTypes(for: declaration)
+        }
         self.callableSignaturesByProtocolName = protocolsByName.mapValues { declaration in
             Self.protocolCallableSignatures(for: declaration)
         }
@@ -1060,6 +1064,25 @@ public struct DeclarationMemberResolver: Sendable {
         return signatures
     }
 
+    private static func protocolPropertyTypes(
+        for declaration: ProtocolDeclaration
+    ) -> [String: TypeReference] {
+        var propertyTypes: [String: TypeReference] = [:]
+        for state in declaration.states {
+            propertyTypes[state.name] = state.type
+        }
+        for binding in declaration.bindings {
+            propertyTypes[binding.name] = simpleTypeReference(named: binding.typeName)
+        }
+        for derived in declaration.deriveds {
+            propertyTypes[derived.name] = simpleTypeReference(named: derived.typeName)
+        }
+        for value in declaration.values {
+            propertyTypes[value.name] = simpleTypeReference(named: value.typeName)
+        }
+        return propertyTypes
+    }
+
     private static func memberCallableParameters(
         _ parameters: [NeatFunctionParameter],
         using nestedTypeMap: [String: TypeReference]
@@ -1153,6 +1176,10 @@ public struct DeclarationMemberResolver: Sendable {
     }
 
     public func memberType(baseType: TypeReference, memberName: String) -> TypeReference? {
+        if let protocolType = protocolPropertyType(baseType: baseType, memberName: memberName) {
+            return protocolType
+        }
+
         guard let context = constructContext(for: baseType),
             let members = membersByConstructName[context.name],
             let type = members.propertyTypes[memberName]
@@ -1161,6 +1188,24 @@ public struct DeclarationMemberResolver: Sendable {
         }
         return Self.substitute(
             type, using: genericSubstitution(for: members, arguments: context.arguments))
+    }
+
+    private func protocolPropertyType(
+        baseType: TypeReference,
+        memberName: String
+    ) -> TypeReference? {
+        if case .named(let name) = baseType,
+            let constrainedType = genericParameterConstraintsByName[name]
+        {
+            return protocolPropertyType(baseType: constrainedType, memberName: memberName)
+        }
+
+        guard let context = constructContext(for: baseType),
+            let type = propertyTypesByProtocolName[context.name]?[memberName]
+        else {
+            return nil
+        }
+        return type
     }
 
     public func memberCallableReturnType(
@@ -1629,6 +1674,10 @@ public struct DeclarationMemberResolver: Sendable {
     }
 
     private static func simpleTypeReference(named name: String) -> TypeReference {
+        if let parsed = parseConstructTypeReference(from: name) {
+            return parsed
+        }
+
         var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.hasSuffix("?") {
             trimmed.removeLast()
