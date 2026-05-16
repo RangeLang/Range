@@ -246,19 +246,24 @@ struct SwiftBackendProgramBuilder {
     }
 
     private func coreSupportDeclarations(in compiledProgram: CompiledProgram) -> [ConstructDeclaration] {
-        compiledProgram.expandedFiles.compactMap { parsedFile in
+        compiledProgram.expandedFiles.flatMap { parsedFile -> [ConstructDeclaration] in
             guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core else {
-                return nil
+                return []
             }
 
-            guard case .construct(let declaration) = parsedFile.sourceFile,
-                declaration.isCore,
-                declaration.name == "Channel"
-            else {
-                return nil
+            let declarations: [ConstructDeclaration]
+            switch parsedFile.sourceFile {
+            case .construct(let declaration):
+                declarations = [declaration]
+            case .module(let module):
+                declarations = module.constructs
+            default:
+                declarations = []
             }
 
-            return declaration
+            return declarations.filter {
+                $0.isCore && $0.name == "Channel"
+            }
         }
     }
 

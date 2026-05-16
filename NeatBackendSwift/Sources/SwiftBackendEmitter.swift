@@ -316,6 +316,8 @@ struct SwiftBackendEmitter {
         "Int",
         "Never",
         "Optional",
+        "ClosedRange",
+        "Range",
         "Set",
         "String",
         "UUID",
@@ -2913,6 +2915,8 @@ struct SwiftBackendEmitter {
         arguments: [CallArgument],
         scope: EmissionScope = .empty
     ) throws -> String? {
+        let baseName = name.split(separator: "<", maxSplits: 1).first.map(String.init) ?? name
+
         func singleArgument(label: String?) -> NeatSyntax.Expression? {
             guard arguments.count == 1, arguments[0].label == label else {
                 return nil
@@ -2920,13 +2924,27 @@ struct SwiftBackendEmitter {
             return arguments[0].value
         }
 
-        switch name {
+        switch baseName {
         case "DataStorage":
             guard arguments.isEmpty else { return nil }
             return "Data()"
         case "Data":
             guard let storage = singleArgument(label: "storage") else { return nil }
             return try emitExpression(storage, scope: scope)
+        case "Range":
+            guard arguments.count == 2,
+                let lowerBound = arguments.first(where: { $0.label == "lowerBound" })?.value,
+                let upperBound = arguments.first(where: { $0.label == "upperBound" })?.value
+            else { return nil }
+            return
+                "\(try emitExpression(lowerBound, scope: scope)) ..< \(try emitExpression(upperBound, scope: scope))"
+        case "ClosedRange":
+            guard arguments.count == 2,
+                let lowerBound = arguments.first(where: { $0.label == "lowerBound" })?.value,
+                let upperBound = arguments.first(where: { $0.label == "upperBound" })?.value
+            else { return nil }
+            return
+                "\(try emitExpression(lowerBound, scope: scope)) ... \(try emitExpression(upperBound, scope: scope))"
         case "DateStorage":
             if arguments.isEmpty {
                 return "__NeatDateOnly()"
