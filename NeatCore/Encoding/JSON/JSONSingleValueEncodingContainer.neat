@@ -19,6 +19,16 @@ construct JSONSingleValueEncodingContainer: SingleValueEncodingContainer {
         return .failure(cause: .failed)
     }
 
+    function encode(_ value: Date) -> Result<Void, EncodingError> {
+        output = "\"\(value)\""
+        return .success(result: Void())
+    }
+
+    function encode(_ value: DateTime) -> Result<Void, EncodingError> {
+        output = "\"\(value)\""
+        return .success(result: Void())
+    }
+
     function encode(_ value: Float) -> Result<Void, EncodingError> {
         output = "\(value)"
         return .success(result: Void())

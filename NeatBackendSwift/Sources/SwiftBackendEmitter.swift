@@ -115,6 +115,36 @@ struct SwiftBackendEmitter {
 
             return [
                 "Bool": [signature("Bool")],
+                "Date": [
+                    signature("Date"),
+                    FailableInitializerSignature(
+                        constructName: "Date",
+                        labels: ["iso8601String"],
+                        failureType: failureType
+                    ),
+                ],
+                "DateStorage": [
+                    FailableInitializerSignature(
+                        constructName: "DateStorage",
+                        labels: ["iso8601String"],
+                        failureType: failureType
+                    )
+                ],
+                "DateTime": [
+                    signature("DateTime"),
+                    FailableInitializerSignature(
+                        constructName: "DateTime",
+                        labels: ["iso8601String"],
+                        failureType: failureType
+                    ),
+                ],
+                "DateTimeStorage": [
+                    FailableInitializerSignature(
+                        constructName: "DateTimeStorage",
+                        labels: ["iso8601String"],
+                        failureType: failureType
+                    )
+                ],
                 "Float": [signature("Float")],
                 "Int": [signature("Int")],
                 "String": [signature("String")],
@@ -295,6 +325,10 @@ struct SwiftBackendEmitter {
     private let swiftNativeStorageTypeNames: [String: String] = [
         "BoolStorage": "Bool",
         "DataStorage": "Data",
+        "Date": "__NeatDateOnly",
+        "DateStorage": "__NeatDateOnly",
+        "DateTime": "__NeatDateTime",
+        "DateTimeStorage": "__NeatDateTime",
         "FloatStorage": "Float",
         "IntStorage": "Int",
         "StringStorage": "String",
@@ -539,6 +573,86 @@ struct SwiftBackendEmitter {
 
             }
 
+            struct __NeatDateOnly: Hashable, Comparable, CustomStringConvertible, Sendable {
+                let year: Int
+                let month: Int
+                let day: Int
+
+                init() {
+                    let calendar = Calendar(identifier: .gregorian)
+                    let components = calendar.dateComponents(in: TimeZone(secondsFromGMT: 0)!, from: Foundation.Date())
+                    self.year = components.year!
+                    self.month = components.month!
+                    self.day = components.day!
+                }
+
+                init(iso8601String: String) throws {
+                    let formatter = DateFormatter()
+                    formatter.calendar = Calendar(identifier: .gregorian)
+                    formatter.locale = Locale(identifier: "en_US_POSIX")
+                    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                    formatter.dateFormat = "yyyy-MM-dd"
+
+                    guard let date = formatter.date(from: iso8601String),
+                        formatter.string(from: date) == iso8601String
+                    else {
+                        throw __NeatThrownFailure<Neat_DecodingError>(failure: .failed)
+                    }
+
+                    let components = formatter.calendar.dateComponents([.year, .month, .day], from: date)
+                    self.year = components.year!
+                    self.month = components.month!
+                    self.day = components.day!
+                }
+
+                var description: String {
+                    String(format: "%04d-%02d-%02d", year, month, day)
+                }
+
+                static func < (lhs: Self, rhs: Self) -> Bool {
+                    (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
+                }
+            }
+
+            struct __NeatDateTime: Hashable, Comparable, CustomStringConvertible, Sendable {
+                let storage: Foundation.Date
+
+                init() {
+                    self.storage = Foundation.Date()
+                }
+
+                init(iso8601String: String) throws {
+                    if let value = Self.makeFormatter(fractionalSeconds: false).date(from: iso8601String) {
+                        self.storage = value
+                        return
+                    }
+
+                    if let value = Self.makeFormatter(fractionalSeconds: true).date(from: iso8601String) {
+                        self.storage = value
+                        return
+                    }
+
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: .failed)
+                }
+
+                var description: String {
+                    Self.makeFormatter(fractionalSeconds: false).string(from: storage)
+                }
+
+                static func < (lhs: Self, rhs: Self) -> Bool {
+                    lhs.storage < rhs.storage
+                }
+
+                private static func makeFormatter(fractionalSeconds: Bool) -> ISO8601DateFormatter {
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = fractionalSeconds
+                        ? [.withInternetDateTime, .withFractionalSeconds]
+                        : [.withInternetDateTime]
+                    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+                    return formatter
+                }
+            }
+
             final class __NeatBinding<Value> {
                 private let getter: () -> Value
                 private let setter: (Value) -> Void
@@ -564,6 +678,14 @@ struct SwiftBackendEmitter {
                 }
 
                 return value
+            }
+
+            func __neatDate(iso8601String: String) throws -> __NeatDateOnly {
+                try __NeatDateOnly(iso8601String: iso8601String)
+            }
+
+            func __neatDateTime(iso8601String: String) throws -> __NeatDateTime {
+                try __NeatDateTime(iso8601String: iso8601String)
             }
 
             enum __NeatDeferredControlFlow: Error {
@@ -638,6 +760,20 @@ struct SwiftBackendEmitter {
         }
 
         extension Data: Neat_Encodable {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.singleValueContainer()
+                return container.encode(self)
+            }
+        }
+
+        extension __NeatDateOnly: Neat_Encodable {
+            func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
+                var container = encoder.singleValueContainer()
+                return container.encode(self)
+            }
+        }
+
+        extension __NeatDateTime: Neat_Encodable {
             func encode(to encoder: Neat_Encoder) -> Neat_Result<Void, Neat_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
@@ -747,6 +883,30 @@ struct SwiftBackendEmitter {
             init(from decoder: Neat_Decoder) throws {
                 let container = decoder.singleValueContainer()
                 switch container.decode(Bool.self) {
+                case .success(let value):
+                    self = value
+                case .failure(let error):
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
+                }
+            }
+        }
+
+        extension __NeatDateOnly: Neat_Decodable {
+            init(from decoder: Neat_Decoder) throws {
+                let container = decoder.singleValueContainer()
+                switch container.decode(__NeatDateOnly.self) {
+                case .success(let value):
+                    self = value
+                case .failure(let error):
+                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
+                }
+            }
+        }
+
+        extension __NeatDateTime: Neat_Decodable {
+            init(from decoder: Neat_Decoder) throws {
+                let container = decoder.singleValueContainer()
+                switch container.decode(__NeatDateTime.self) {
                 case .success(let value):
                     self = value
                 case .failure(let error):
@@ -2767,6 +2927,30 @@ struct SwiftBackendEmitter {
         case "Data":
             guard let storage = singleArgument(label: "storage") else { return nil }
             return try emitExpression(storage, scope: scope)
+        case "DateStorage":
+            if arguments.isEmpty {
+                return "__NeatDateOnly()"
+            }
+            guard let string = singleArgument(label: "iso8601String") else { return nil }
+            return "__neatDate(iso8601String: \(try emitExpression(string, scope: scope)))"
+        case "Date":
+            if let storage = singleArgument(label: "storage") {
+                return try emitExpression(storage, scope: scope)
+            }
+            guard let string = singleArgument(label: "iso8601String") else { return nil }
+            return "__neatDate(iso8601String: \(try emitExpression(string, scope: scope)))"
+        case "DateTimeStorage":
+            if arguments.isEmpty {
+                return "__NeatDateTime()"
+            }
+            guard let string = singleArgument(label: "iso8601String") else { return nil }
+            return "__neatDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
+        case "DateTime":
+            if let storage = singleArgument(label: "storage") {
+                return try emitExpression(storage, scope: scope)
+            }
+            guard let string = singleArgument(label: "iso8601String") else { return nil }
+            return "__neatDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
         case "UUIDStorage":
             if arguments.isEmpty {
                 return "UUID()"

@@ -20,6 +20,26 @@ construct JSONUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         }
     }
 
+    function decode(_ type: Date.Type) -> Result<Date, DecodingError> {
+        switch nextValue() {
+        case .success(let value):
+            let container = JSONSingleValueDecodingContainer(value: value)
+            return container.decode(Date.self)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
+
+    function decode(_ type: DateTime.Type) -> Result<DateTime, DecodingError> {
+        switch nextValue() {
+        case .success(let value):
+            let container = JSONSingleValueDecodingContainer(value: value)
+            return container.decode(DateTime.self)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
+
     function decode(_ type: Float.Type) -> Result<Float, DecodingError> {
         switch nextValue() {
         case .success(let value):

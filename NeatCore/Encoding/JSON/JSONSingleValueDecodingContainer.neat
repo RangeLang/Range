@@ -22,6 +22,24 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
         }
     }
 
+    function decode(_ type: Date.Type) -> Result<Date, DecodingError> {
+        switch value {
+        case .string(let decoded):
+            return Date(iso8601String: decoded)
+        case .array, .bool, .float, .int, .null, .object:
+            return .failure(cause: .failed)
+        }
+    }
+
+    function decode(_ type: DateTime.Type) -> Result<DateTime, DecodingError> {
+        switch value {
+        case .string(let decoded):
+            return DateTime(iso8601String: decoded)
+        case .array, .bool, .float, .int, .null, .object:
+            return .failure(cause: .failed)
+        }
+    }
+
     function decode(_ type: Float.Type) -> Result<Float, DecodingError> {
         switch value {
         case .float(let decoded):

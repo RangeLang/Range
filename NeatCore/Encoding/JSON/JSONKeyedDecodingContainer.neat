@@ -11,6 +11,26 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
         }
     }
 
+    function decode(_ type: Date.Type, forKey key: String) -> Result<Date, DecodingError> {
+        switch value(forKey: key) {
+        case .success(let value):
+            let container = JSONSingleValueDecodingContainer(value: value)
+            return container.decode(Date.self)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
+
+    function decode(_ type: DateTime.Type, forKey key: String) -> Result<DateTime, DecodingError> {
+        switch value(forKey: key) {
+        case .success(let value):
+            let container = JSONSingleValueDecodingContainer(value: value)
+            return container.decode(DateTime.self)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
+
     function decode(_ type: Float.Type, forKey key: String) -> Result<Float, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):

@@ -1,0 +1,32 @@
+function encodeDate() -> Result<String, EncodingError> {
+    let encoder = JSONEncoder()
+    switch Date(iso8601String: "2026-05-16") {
+    case .success(let value):
+        return encoder.encode(value)
+    case .failure:
+        return .failure(cause: .failed)
+    }
+}
+
+function decodeDate() -> Result<Date, DecodingError> {
+    let decoder = JSONDecoder(value: .string(value: "2026-05-16"))
+    return Date(from: decoder)
+}
+
+function encodeDateTime() -> Result<String, EncodingError> {
+    let encoder = JSONEncoder()
+    switch DateTime(iso8601String: "2026-05-16T12:34:56Z") {
+    case .success(let value):
+        return encoder.encode(value)
+    case .failure:
+        return .failure(cause: .failed)
+    }
+}
+
+function decodeDateTime() -> Result<DateTime, DecodingError> {
+    let decoder = JSONDecoder(value: .string(value: "2026-05-16T12:34:56Z"))
+    return DateTime(from: decoder)
+}
+
+@main {
+}

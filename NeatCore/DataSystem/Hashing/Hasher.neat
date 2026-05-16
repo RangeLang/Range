@@ -22,6 +22,14 @@ construct Hasher {
         storage.combine(value)
     }
 
+    function combineStorage(_ value: DateStorage) {
+        storage.combine(value)
+    }
+
+    function combineStorage(_ value: DateTimeStorage) {
+        storage.combine(value)
+    }
+
     function combineStorage(_ value: FloatStorage) {
         storage.combine(value)
     }

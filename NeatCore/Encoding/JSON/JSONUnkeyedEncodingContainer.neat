@@ -18,6 +18,16 @@ construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         return .failure(cause: .failed)
     }
 
+    function encode(_ value: Date) -> Result<Void, EncodingError> {
+        appendValue(value: "\"\(value)\"")
+        return .success(result: Void())
+    }
+
+    function encode(_ value: DateTime) -> Result<Void, EncodingError> {
+        appendValue(value: "\"\(value)\"")
+        return .success(result: Void())
+    }
+
     function encode(_ value: Float) -> Result<Void, EncodingError> {
         appendValue(value: "\(value)")
         return .success(result: Void())

@@ -1,0 +1,5 @@
+@core
+construct DateTimeStorage {
+    init()
+    init(iso8601String: String) -> Result<Self, DecodingError>
+}

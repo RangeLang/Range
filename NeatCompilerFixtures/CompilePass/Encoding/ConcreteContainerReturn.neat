@@ -11,6 +11,14 @@ construct FixtureSingleValueEncodingContainer: SingleValueEncodingContainer {
         return .failure(cause: .failed)
     }
 
+    function encode(_ value: Date) -> Result<Void, EncodingError> {
+        return .success(result: Void())
+    }
+
+    function encode(_ value: DateTime) -> Result<Void, EncodingError> {
+        return .success(result: Void())
+    }
+
     function encode(_ value: Float) -> Result<Void, EncodingError> {
         return .success(result: Void())
     }
@@ -39,6 +47,14 @@ construct FixtureKeyedEncodingContainer: KeyedEncodingContainer {
 
     function encode(_ value: Data, forKey key: String) -> Result<Void, EncodingError> {
         return .failure(cause: .failed)
+    }
+
+    function encode(_ value: Date, forKey key: String) -> Result<Void, EncodingError> {
+        return .success(result: Void())
+    }
+
+    function encode(_ value: DateTime, forKey key: String) -> Result<Void, EncodingError> {
+        return .success(result: Void())
     }
 
     function encode(_ value: Float, forKey key: String) -> Result<Void, EncodingError> {

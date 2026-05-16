@@ -1,6 +1,8 @@
 protocol KeyedEncodingContainer {
     function encode(_ value: Bool, forKey key: String) -> Result<Void, EncodingError>
     function encode(_ value: Data, forKey key: String) -> Result<Void, EncodingError>
+    function encode(_ value: Date, forKey key: String) -> Result<Void, EncodingError>
+    function encode(_ value: DateTime, forKey key: String) -> Result<Void, EncodingError>
     function encode(_ value: Float, forKey key: String) -> Result<Void, EncodingError>
     function encode(_ value: Int, forKey key: String) -> Result<Void, EncodingError>
     function encode(_ value: String, forKey key: String) -> Result<Void, EncodingError>
