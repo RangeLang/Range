@@ -126,7 +126,8 @@ struct MacroSyntaxRenderer {
             return renderExpressionForSyntax(expression)
         }
 
-        return "case \(caseName)"
+        let associatedValues = renderAssociatedValueClause(fields["associatedValues"]) ?? ""
+        return "case \(caseName)\(associatedValues)"
     }
 
     private func renderEnumCase(_ expression: Expression) -> String {
@@ -137,7 +138,63 @@ struct MacroSyntaxRenderer {
             return renderExpressionForSyntax(expression)
         }
 
-        return "case \(caseName)"
+        let associatedValues = renderAssociatedValueClause(argument("associatedValues", in: arguments)) ?? ""
+        return "case \(caseName)\(associatedValues)"
+    }
+
+    private func renderAssociatedValueClause(_ value: CompileTimeValue?) -> String? {
+        guard let value else { return "" }
+        guard case .array(let elements) = value else {
+            return nil
+        }
+        let rendered = elements.compactMap(renderAssociatedValue)
+        guard rendered.count == elements.count else {
+            return nil
+        }
+        return rendered.isEmpty ? "" : "(\(rendered.joined(separator: ", ")))"
+    }
+
+    private func renderAssociatedValueClause(_ expression: Expression?) -> String? {
+        guard let expression else { return "" }
+        guard case .array(let elements) = expression else {
+            return nil
+        }
+        let rendered = elements.compactMap(renderAssociatedValue)
+        guard rendered.count == elements.count else {
+            return nil
+        }
+        return rendered.isEmpty ? "" : "(\(rendered.joined(separator: ", ")))"
+    }
+
+    private func renderAssociatedValue(_ value: CompileTimeValue) -> String? {
+        guard case .object(let typeName, let fields) = value,
+            typeName == "Enum.AssociatedValue",
+            let typeValue = fields["type"],
+            let typeName = renderNominalTypeReference(typeValue)
+        else {
+            return nil
+        }
+        let label = (fields["label"] ?? fields["name"]).flatMap(renderString)
+        if let label, !label.isEmpty {
+            return "\(label): \(typeName)"
+        }
+        return typeName
+    }
+
+    private func renderAssociatedValue(_ expression: Expression) -> String? {
+        guard case .call(let name, let arguments) = expression,
+            name == "Enum.AssociatedValue",
+            let typeExpression = argument("type", in: arguments),
+            let typeName = renderNominalTypeReference(typeExpression)
+        else {
+            return nil
+        }
+        let label = (argument("label", in: arguments) ?? argument("name", in: arguments))
+            .flatMap(renderString)
+        if let label, !label.isEmpty {
+            return "\(label): \(typeName)"
+        }
+        return typeName
     }
 
     private func renderBlock(_ value: CompileTimeValue) -> String? {

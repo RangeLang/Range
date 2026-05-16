@@ -225,7 +225,7 @@ struct CompileTimeValueEvaluator {
         locals: [String: Expression]
     ) -> CompileTimeValue? {
         switch name {
-        case "Enum", "Enum.Declaration", "Enum.Case", "Identifier", "NamedTypeReference",
+        case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
             "ValueGeneric", "Macro.Application", "Marker.Application", "Block", "Switch",
