@@ -790,6 +790,20 @@ public enum ExpressionTypeSemantics {
             return memberType
         }
 
+        if let stringMemberType = inferKnownStringMemberIdentifierType(
+            baseType: baseReference,
+            memberName: memberName
+        ) {
+            return stringMemberType
+        }
+
+        if let collectionMemberType = inferKnownCollectionMemberIdentifierType(
+            baseType: baseReference,
+            memberName: memberName
+        ) {
+            return collectionMemberType
+        }
+
         if baseName == "self",
             let type = accessibleTypes[memberName],
             case .typed(let reference) = type

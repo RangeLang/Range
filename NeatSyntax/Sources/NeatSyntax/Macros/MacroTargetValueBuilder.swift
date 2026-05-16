@@ -15,6 +15,7 @@ struct MacroTargetValueBuilder {
                     typeName: "Construct.Declaration",
                     fields: [
                         "self": nominalTypeReference(construct.name),
+                        "generics": .array(construct.genericParameters.map(value(for:))),
                         "conformances": .array(construct.conformances.map(typeReferenceValue)),
                         "inits": .array(construct.initializers.map(value(for:))),
                         "lets": .array(construct.values.map(value(for:))),
@@ -38,6 +39,7 @@ struct MacroTargetValueBuilder {
                     typeName: "Enum.Declaration",
                     fields: [
                         "self": nominalTypeReference(enumeration.name),
+                        "generics": .array(enumeration.genericParameters.map(value(for:))),
                         "cases": .array(enumeration.cases.map(value(for:))),
                     ]
                 )
@@ -53,6 +55,7 @@ struct MacroTargetValueBuilder {
                     typeName: "Protocol.Declaration",
                     fields: [
                         "self": nominalTypeReference(protocolDeclaration.name),
+                        "generics": .array(protocolDeclaration.genericParameters.map(value(for:))),
                         "inits": .array(protocolDeclaration.initializers.map(value(for:))),
                         "functions": .array(protocolDeclaration.callables.map(value(for:))),
                     ]
@@ -77,6 +80,7 @@ struct MacroTargetValueBuilder {
             typeName: "Construct.Declaration",
             fields: [
                 "self": nominalTypeReference(declaration.name),
+                "generics": .array(declaration.genericParameters.map(value(for:))),
                 "conformances": .array(declaration.conformances.map(typeReferenceValue)),
                 "inits": .array(declaration.initializers.map(value(for:))),
                 "lets": .array(declaration.values.map(value(for:))),
@@ -268,10 +272,34 @@ struct MacroTargetValueBuilder {
             typeName: "Function.Declaration",
             fields: [
                 "identifier": identifier(declaration.name),
+                "generics": .array(declaration.genericParameters.map(value(for:))),
                 "parameters": .array(declaration.parameters.map(value(for:))),
                 "returnType": declaration.returnType.map(typeReferenceValue) ?? .string("Void"),
             ]
         )
+    }
+
+    private func value(for parameter: GenericParameter) -> CompileTimeValue {
+        switch parameter {
+        case .type(let name, let constraint, let defaultArgument):
+            return .object(
+                typeName: "TypeGeneric",
+                fields: [
+                    "identifier": identifier(name),
+                    "constraint": constraint.map(typeReferenceValue) ?? .string(""),
+                    "default": defaultArgument.map(typeReferenceValue) ?? .string(""),
+                ]
+            )
+        case .value(let name, let typeReference, let defaultValue):
+            return .object(
+                typeName: "ValueGeneric",
+                fields: [
+                    "identifier": identifier(name),
+                    "type": typeReferenceValue(typeReference),
+                    "default": defaultValue.flatMap(value(for:)) ?? .string(""),
+                ]
+            )
+        }
     }
 
     private func value(for declaration: NeatFunctionParameter) -> CompileTimeValue {

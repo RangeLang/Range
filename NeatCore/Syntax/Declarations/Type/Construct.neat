@@ -6,6 +6,7 @@ construct Construct: Syntax {
     @core
     construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType>, SyntaxEmittable {
         let self: SelfType
+        let generics: [Generic]
         let conformances: [NominalTypeReference]
         let inits: [Init.Declaration]
         let lets: [Let]

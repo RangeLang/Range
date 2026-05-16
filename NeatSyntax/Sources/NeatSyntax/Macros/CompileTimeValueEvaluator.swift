@@ -197,6 +197,19 @@ struct CompileTimeValueEvaluator {
         }
 
         for component in components.dropFirst() {
+            if case .array(let values) = current {
+                switch component {
+                case "count":
+                    current = .integer(values.count)
+                    continue
+                case "isEmpty":
+                    current = .boolean(values.isEmpty)
+                    continue
+                default:
+                    break
+                }
+            }
+
             guard let next = current.field(component) else {
                 return nil
             }

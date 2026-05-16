@@ -1,0 +1,5 @@
+@core
+protocol Generic: Syntax {
+    let identifier: Identifier
+}
+

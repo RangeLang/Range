@@ -1,0 +1,16 @@
+macro exposeGenericCount(): Construct { target, diagnostics in
+    let count = target.declaration.generics.count
+
+    target.declaration.expand {
+        extension #(target.declaration.self) {
+            function genericCount() -> Int {
+                return #(count)
+            }
+        }
+    }
+}
+
+#exposeGenericCount
+construct GenericDeclarationSurfaceFixture<T, let count: Int, Scalar = Float> {}
+
+@main {}

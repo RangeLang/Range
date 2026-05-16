@@ -5,6 +5,7 @@ construct Enum: Syntax {
     @core
     construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
         let self: NominalTypeReference
+        let generics: [Generic]
         let cases: [Case]
 
         function expand(_ expansion: () -> [Syntax])

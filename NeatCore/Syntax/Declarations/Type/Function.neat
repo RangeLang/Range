@@ -6,6 +6,7 @@ construct Function: Syntax {
     @core
     construct Declaration: SyntaxEmittable {
         let identifier: Identifier
+        let generics: [Generic]
         let parameters: [Parameter.Declaration]
         let returnType: TypeReference?
         let body: Block

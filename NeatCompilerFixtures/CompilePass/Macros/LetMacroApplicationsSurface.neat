@@ -1,6 +1,7 @@
 macro codingKeyCases(): Construct { target, diagnostics in
     let generatedKeys: Enum.Declaration = Enum.Declaration(
         self: NamedTypeReference(name: "GeneratedKeys"),
+        generics: [],
         cases: target.declaration.lets.flatMap { property in
             property.markers.map { marker in
                 Enum.Case(identifier: Identifier(name: marker.value), associatedValues: [])
