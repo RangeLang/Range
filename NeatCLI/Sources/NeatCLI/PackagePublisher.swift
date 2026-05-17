@@ -64,7 +64,8 @@ struct PackagePublisher {
     }
 
     private func updatingVersion(in source: String, to version: String) throws -> String {
-        let versionPattern = #"let\s+version\s*:\s*String\s*=\s*"([^"]*)""#
+        let versionPattern =
+            #"let\s+version\s*:\s*(?:Version\s*=\s*Version\([0-9]+\.[0-9]+\.[0-9]+\)|String\s*=\s*"[^"]*")"#
         let regex = try NSRegularExpression(pattern: versionPattern)
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
 
@@ -73,7 +74,7 @@ struct PackagePublisher {
         {
             return source.replacingCharacters(
                 in: matchRange,
-                with: #"let version: String = "\#(version)""#
+                with: #"let version: Version = Version(\#(version))"#
             )
         }
 
@@ -81,7 +82,7 @@ struct PackagePublisher {
         guard let openingIndex = lines.firstIndex(where: { $0.contains("{") }) else {
             throw ValidationError("Package.neat must declare a package body.")
         }
-        lines.insert(#"    let version: String = "\#(version)""#, at: openingIndex + 1)
+        lines.insert(#"    let version: Version = Version(\#(version))"#, at: openingIndex + 1)
         return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")
     }
 }

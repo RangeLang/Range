@@ -13,7 +13,7 @@ struct PackagePublisherTests {
         #expect(published.name == "Fixture")
         #expect(published.version == "0.1.1")
         #expect(published.git == .skipped("not a git repository"))
-        #expect(source.contains(#"let version: String = "0.1.1""#))
+        #expect(source.contains(#"let version: Version = Version(0.1.1)"#))
     }
 
     @Test("Minor and major publish reset lower version components")
@@ -52,7 +52,7 @@ struct PackagePublisherTests {
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
             construct Fixture: Package {
-                let version: String = "\(version)"
+                let version: Version = Version(\(version))
                 let author: String = "Test Author"
                 let remotes: [Remote] = []
             }

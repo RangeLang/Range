@@ -13,7 +13,7 @@ struct PackageManifestTests {
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
             construct Fixture: Package {
-                let version: String = "1.2.3"
+                let version: Version = Version(1.2.3)
                 let author: String = "Test Author"
                 let remote: String = "https://github.com/acme/fixture.git"
                 let remotes: [Remote] = [
@@ -54,7 +54,7 @@ struct PackageManifestTests {
             _ = try PackageManifestLoader.load(from: packageFile)
             Issue.record("Expected Package.neat validation to reject an untyped package version.")
         } catch {
-            #expect(String(describing: error).contains("requires let version: String"))
+            #expect(String(describing: error).contains("requires let version: Version"))
         }
     }
 }

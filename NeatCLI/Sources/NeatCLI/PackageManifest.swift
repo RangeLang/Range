@@ -38,7 +38,7 @@ enum PackageManifestLoader {
                     "Package.neat must declare exactly construct Name: Package.")
             }
 
-            let version = try requiredStringValue(named: "version", in: declaration)
+            let version = try requiredVersionValue(named: "version", in: declaration)
             let author = try requiredStringValue(named: "author", in: declaration)
             _ = try requireValue(named: "remotes", typeName: "[Remote]", in: declaration)
 
@@ -71,17 +71,50 @@ enum PackageManifestLoader {
         return string
     }
 
+    private static func requiredVersionValue(
+        named name: String,
+        in declaration: ConstructDeclaration
+    ) throws -> String {
+        let value = try requireValue(named: name, typeNames: ["Version", "String"], in: declaration)
+        if value.typeName == "String" {
+            guard case .string(let string)? = value.value else {
+                throw ValidationError("Package.neat requires let \(name): String = \"...\".")
+            }
+            return string
+        }
+
+        guard case .call(let callName, let arguments)? = value.value, callName == "Version" else {
+            throw ValidationError("Package.neat requires let \(name): Version = Version(0.1.0).")
+        }
+        guard arguments.count == 1, arguments[0].label == nil else {
+            throw ValidationError("Package.neat Version requires one unlabeled semantic version.")
+        }
+        guard case .string(let raw) = arguments[0].value else {
+            throw ValidationError("Package.neat Version requires a semantic version like Version(0.1.0).")
+        }
+        _ = try SemanticVersion.parse(raw)
+        return raw
+    }
+
     private static func requireValue(
         named name: String,
         typeName: String,
         in declaration: ConstructDeclaration
     ) throws -> ValueDeclaration {
+        try requireValue(named: name, typeNames: [typeName], in: declaration)
+    }
+
+    private static func requireValue(
+        named name: String,
+        typeNames: [String],
+        in declaration: ConstructDeclaration
+    ) throws -> ValueDeclaration {
         guard let value = declaration.values.first(where: { $0.name == name }) else {
-            throw ValidationError("Package.neat requires let \(name): \(typeName).")
+            throw ValidationError("Package.neat requires let \(name): \(typeNames[0]).")
         }
-        guard value.typeName == typeName else {
+        guard typeNames.contains(value.typeName) else {
             throw ValidationError(
-                "Package.neat requires let \(name): \(typeName), got \(value.typeName)."
+                "Package.neat requires let \(name): \(typeNames.joined(separator: " or ")), got \(value.typeName)."
             )
         }
         return value

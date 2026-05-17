@@ -295,7 +295,7 @@ struct ProjectScaffolder {
         let packageName = sanitizedSymbolName(from: name)
         return """
             construct \(packageName): Package {
-                let version: String = "0.1.0"
+                let version: Version = Version(0.1.0)
                 let author: String = "\(escapedStringLiteral(NSFullUserName()))"
                 let remotes: [Remote] = []
             }

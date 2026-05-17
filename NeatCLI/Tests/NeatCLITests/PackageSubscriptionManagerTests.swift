@@ -77,7 +77,7 @@ struct PackageSubscriptionManagerTests {
         )
         try """
             construct \(name): Package {
-                let version: String = "0.1.0"
+                let version: Version = Version(0.1.0)
                 let author: String = "Test Author"
                 let remotes: [Remote] = []
             }

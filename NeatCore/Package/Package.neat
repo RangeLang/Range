@@ -1,6 +1,6 @@
 @packaging
 protocol Package {
-    let version: String
+    let version: Version
     let author: String
     let remotes: [Remote]
 }

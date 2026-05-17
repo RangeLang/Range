@@ -13,9 +13,16 @@ Packaging declarations are ordinary language declarations with a semantic tag. T
 ```neat
 @packaging
 protocol Package {
-    let version: String
+    let version: Version
     let author: String
     let remotes: [Remote]
+}
+```
+
+```neat
+@packaging
+construct Version {
+    let raw: String
 }
 ```
 
@@ -24,6 +31,12 @@ protocol Package {
 construct Remote {
     let url: String
 }
+```
+
+Package manifests can write versions directly:
+
+```neat
+let version: Version = Version(0.1.8)
 ```
 
 ## Notes

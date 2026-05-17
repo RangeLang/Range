@@ -288,6 +288,17 @@ struct Lexer {
 
         let fractionalPart = String(characters[fractionalStart..<index])
         let raw = "\(integerPart).\(fractionalPart)"
+
+        if peek() == ".", let next = peek(offset: 1), next.isNumber {
+            advance()
+            let patchStart = index
+            while let character = peek(), character.isNumber {
+                advance()
+            }
+            let patchPart = String(characters[patchStart..<index])
+            return .stringLiteral("\(raw).\(patchPart)")
+        }
+
         guard let value = Double(raw) else {
             throw ParseError("Invalid numeric literal \(raw).", range: range(from: start))
         }
