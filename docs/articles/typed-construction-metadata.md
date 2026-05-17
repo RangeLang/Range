@@ -1,63 +1,154 @@
 # Typed Construction Metadata
 
-I want Neat to treat typed construction in declarations as first-class metadata. The syntax change is small, but the mental-model change is large: initialization should stop looking like assignment, and a binding should read like declared structure that is born with construction data.
+I want to describe this change as a move from point A to point B.
 
-## The Starting Point
-
-The ordinary way to write an explicitly typed initialized binding is:
+Point A was this:
 
 ```neat
 let version: Version = Version(0.1.8)
 ```
 
-That works, but I do not like the story it tells. It makes the declaration look like two events:
-
-```text
-declare a slot named version with type Version
-assign Version(0.1.8) into the slot
-```
-
-That is the right model for mutation. It is not the model I want for initialization.
-
-Initialization is not a later write into an already meaningful location. Initialization is the moment the binding becomes meaningful. For properties, this matters even more, because the initializer is part of the data that describes the construct.
-
-The repetition is the visible symptom:
-
-```neat
-Version = Version(...)
-```
-
-The deeper issue is that the source shape hides the declaration-level fact. I do not want the compiler to learn "there is a slot, and then a value gets assigned." I want it to learn "this binding is constructed as a `Version`."
-
-## The Turn
-
-The form I want is:
+Point B is this:
 
 ```neat
 let version: Version(0.1.8)
 ```
 
-I read that as:
+The visible change is small. The model change is not. We are moving from "typed slot, then assignment" to "binding born with construction data."
 
-```text
-version is a Version, constructed with 0.1.8
+That is the answer to the design question.
+
+## The Question
+
+Should an initialized typed binding be modeled as assignment into a slot, or as construction data attached to the declaration?
+
+At point A, the syntax pushed me toward assignment:
+
+```neat
+let version: Version = Version(0.1.8)
 ```
 
-The `:` opens a window into the type. What follows is not merely an annotation, and it is not a missing assignment expression. It is construction data attached to the declaration.
+At point B, the syntax pushes the compiler toward declaration metadata:
 
-The inferred constructor form still has its place:
+```neat
+let version: Version(0.1.8)
+```
+
+My answer is point B. Not because it is shorter, though it is. Because it tells the graph the right first fact: the binding is born as `Version`, with data.
+
+## Point A
+
+Point A worked, but it made the wrong thing look primary.
+
+```neat
+let version: Version = Version(0.1.8)
+```
+
+It reads like a sequence of operations: declare a slot named `version`, annotate it as `Version`, then assign `Version(0.1.8)` into it. This is the annoying part. The type appears twice, and the `=` makes initialization look like mutation.
+
+That model is useful when something is actually being assigned later:
+
+```neat
+version = Version(0.1.9)
+```
+
+But initialization is not that. Initialization is earlier. It is where the binding becomes real.
+
+Point A taught this first abstraction:
+
+```text
+slot
+then value
+```
+
+That is the wrong starting point for the graph. I want the compiler to begin with:
+
+```text
+binding
+type
+construction data
+```
+
+Same final value. Different truth.
+
+## Point B
+
+Point B says the thing directly:
+
+```neat
+let version: Version(0.1.8)
+```
+
+I read it as:
+
+```text
+version is a Version
+constructed with 0.1.8
+```
+
+The `:` opens the type, and the type receives data. The declaration owns the construction.
+
+So the state changes like this:
+
+```text
+point A: annotation plus assignment expression
+point B: typed construction metadata
+```
+
+The inferred form still matters:
 
 ```neat
 let version = Version(0.1.8)
 ```
 
-That form says the expression determines the type. The typed construction form says the declaration owns the type, and the construction inputs belong to that declaration.
+That form says the expression determines the type. Point B says the declaration already knows the type, and the data enters through that type.
 
-That is the distinction I want Neat to preserve before any backend lowering happens.
+Small syntax. Different source fact.
+
+## The Move
+
+The move from point A to point B removes two bits of noise:
+
+```text
+=
+repeated constructor type
+```
+
+But the important move is semantic.
+
+Point A makes the graph recover meaning from an expression:
+
+```text
+annotation: Version
+initializer expression: call Version(...)
+```
+
+Point B gives the graph the meaning directly:
+
+```text
+type: Version
+construction: Version(...)
+```
+
+That is the whole reason I want this. The compiler should not have to notice that the annotation and the constructor happen to match, then reverse-engineer the intent. The source should say the intent.
+
+Point A:
+
+```text
+the value is assigned
+```
+
+Point B:
+
+```text
+the binding is born
+```
+
+That is the move.
 
 ## The Model
 
-The graph should keep typed construction as binding metadata:
+At point B, the graph should represent the binding as born with construction data:
 
 ```text
 binding version
@@ -69,7 +160,7 @@ binding version
       0 -> 0.1.8
 ```
 
-At first, an unlabeled argument can be represented positionally. After constructor resolution, the graph can carry the resolved parameter shape:
+After constructor resolution, the graph can become more precise:
 
 ```text
 binding version
@@ -81,15 +172,15 @@ binding version
       value -> 0.1.8
 ```
 
-The important part is ownership. The construction belongs to the binding. It is declaration metadata, not an arbitrary expression glued onto the side.
+This gives the graph a stable fact: construction belongs to the declaration. It is not nearby. It is not inferred later. It is not recovered from a call expression because the source shape already said it.
 
-Assignment remains separate:
+Assignment remains a different operation:
 
 ```neat
 version = Version(0.1.9)
 ```
 
-That source line creates a mutation:
+That models mutation:
 
 ```text
 mutation
@@ -99,11 +190,25 @@ mutation
       value -> 0.1.9
 ```
 
-The two forms can eventually produce similar machine behavior, but I do not want them to mean the same thing in the source graph. One creates the binding. The other changes an existing binding.
+One creates. One changes. If the graph erases that difference, tools have to guess, and I do not want tools guessing.
 
-## The Property Shape
+## The Property Case
 
-Once the graph keeps that fact, properties become data-shaped:
+The move matters more for properties.
+
+At point A, a construct had this shape:
+
+```neat
+construct Package {
+    let name: String = String("Neat")
+    let version: Version = Version(0.1.8)
+    let license: License = License(.mit)
+}
+```
+
+String equals String. Version equals Version. License equals License. It is noisy, but noise is not the main problem. The real problem is that property defaults look like assignments.
+
+At point B:
 
 ```neat
 construct Package {
@@ -113,7 +218,7 @@ construct Package {
 }
 ```
 
-This reads like data about `Package`:
+Now the construct reads as data:
 
 ```text
 Package
@@ -133,70 +238,104 @@ Package
       value -> .mit
 ```
 
-That is the shape I want tools to see. A property should carry its storage kind, declared type, construction target, and construction inputs directly.
+The conclusion follows from the model. If properties are part of a construct's shape, their initial values should be represented as shape data: storage, type, construction.
 
-A documentation view can show the property as typed data. A diagnostic can point at the construction input that failed. A package or cloud view can inspect the construct shape without reverse-engineering repeated constructor calls.
-
-The old form still describes how to make a value:
-
-```neat
-let version: Version = Version(0.1.8)
-```
-
-The new form describes what the declaration is.
+That is enough for diagnostics. Enough for docs. Enough for editor hovers. Enough for package views. Enough for NeatCloud later, where constructs become shareable things with visible shape.
 
 ## The Boundary
 
-Lowering can still be ordinary Swift, but it should happen later.
+Point B does not require the backend to become clever. Lowering can stay boring.
 
-The source form:
+This Neat:
 
 ```neat
 let version: Version(0.1.8)
 ```
 
-can lower to:
+can still lower to this Swift:
 
 ```swift
 let version: Version = Version(0.1.8)
 ```
 
-That does not make the Neat feature assignment sugar. It means the Swift backend has a convenient target shape.
+That is fine. The backend may want assignment-shaped initialization. But the source graph should not collapse into that shape early.
 
-The source graph should preserve this operation:
+Source graph:
 
 ```text
 declare binding with construction metadata
 ```
 
-The backend can emit this operation:
+Swift backend:
 
 ```text
 typed variable initialized by constructor call
 ```
 
-The boundary matters because parser behavior, diagnostics, editor features, graph rendering, macro expansion, and future cloud/package metadata all operate before or beside backend lowering. I want those layers to see the source intent, not only the emitted shape.
+Different layers. Different jobs. The source layer answers what the Neat program means. The backend layer answers how to emit that meaning somewhere else. The source layer comes first, because parser behavior, diagnostics, graph rendering, macros, editor tooling, and package metadata all need the point-B shape.
 
 ## The Path
 
-The parser should recognize `let name: Type(args)` as a declaration initializer form. When a construction argument list follows the type, the parser should not treat the missing `=` as an error.
+The parser should recognize point B:
 
-The AST should store this initializer as typed construction metadata. It can reuse call-argument structures, but it should keep the declaration form distinct from a normal expression initializer.
+```neat
+let name: Type(args)
+```
 
-The graph builder should attach construction metadata to the binding or property node. Positional inputs can be stored first, then enriched with parameter labels after constructor resolution.
+as a typed construction initializer. It should not ask for `=`.
 
-The semantic validator should check that the construction target matches the declared type. In this position, the type after `:` owns the construction context, so `Version(...)` means construction of `Version`, not a chance to call something unrelated.
+The AST should store the distinction:
 
-The backend can lower the metadata to the target representation. Swift output can use a normal constructor call. The graph remains richer than the output because the graph is carrying Neat's source-level model.
+```text
+normal expression initializer
+typed construction initializer
+```
+
+They may share call argument structures, but they should not share meaning too early. The graph builder should attach construction data to the binding or property node. First positional:
+
+```text
+0 -> value
+```
+
+Then resolved:
+
+```text
+label -> value
+```
+
+The semantic validator should check that the construction target matches the declared type. In this position:
+
+```neat
+let version: Version(...)
+```
+
+`Version` owns the call. The backend lowers later. Swift gets the constructor call. Neat keeps the declaration fact.
 
 ## The Result
 
-This change makes declarations read like declarations again.
+The move is from point A to point B:
+
+```text
+point A: assignment-shaped initialization
+point B: declaration-shaped construction
+```
+
+Point A repeated the type. Point A made initialization look like mutation. Point A taught the graph `slot, then value`.
+
+Point B fixes the first story:
 
 ```neat
 let version: Version(0.1.8)
 ```
 
-The binding is born with construction data. The graph keeps that fact. Properties become key/value-shaped metadata about their construct. Assignment remains available for mutation, but it stops being the default metaphor for initialization.
+The binding is born with construction data. The graph keeps the birth shape. Properties become key/value-shaped metadata about a construct. Assignment stays alive, but later, for mutation, not birth.
 
-That is the compiler model I want for Neat: shorter code on the surface, but more explicit structure underneath. The real win is not removing `=`. The real win is that the source now says what the graph needs to know.
+The diff is small, but the model moves:
+
+```text
+point A repeats
+point B reveals
+model separates
+graph remembers
+lowering continues
+```

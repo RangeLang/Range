@@ -1,18 +1,45 @@
 ---
 name: neat-change-article
-description: Create GitHub-ready first-person technical design notes with a clear story for Neat language design changes. Use when asked to turn Neat syntax, compiler, graph, editor, or product-design conversations into developer-authored Markdown docs, docs/articles drafts, release-note narratives, or GitHub design posts.
+description: Create GitHub-ready first-person technical design notes from previous/current Neat language changes, with point-A to point-B transition narrative, annoyed developer story, academic question-answer flow, raw thought cadence, and coherent rhythmic chunks. Use when asked to turn Neat syntax, compiler, graph, editor, or product-design diffs into developer-authored Markdown docs, docs/articles drafts, release-note narratives, or GitHub design posts.
 ---
 
 # Neat Change Article
 
 ## Workflow
 
-1. Identify the language change and its motivation from the conversation, issue, PR, or local design notes.
-2. Preserve the user's core framing when it is specific and strong. For typed construction metadata, read `references/typed-construction-metadata.md`.
-3. Write to `docs/articles/<kebab-title>.md` unless the user names another destination.
-4. Make the document concrete before abstract: introduce the smallest motivating example, then expand the model step by step as a first-person story of the idea becoming clearer.
-5. Avoid calling a first-class language concept "sugar" unless the article is explicitly about surface syntax. Distinguish graph-level semantics from backend lowering.
-6. Do not generate an `Open Questions`, `Questions`, `Unresolved`, or speculative ending section. When uncertainty matters, phrase the chosen direction as implementation sequencing or constraints.
+1. Read both versions of the change first: the previous code/model and the current code/model. Treat them as point A and point B. If the user gives only one side, infer the missing side from context and state it inside the draft through examples.
+2. Extract the transition: what point A made the compiler/user think, what point B now makes clear, and what had to move between them.
+3. Turn the delta into the story of an annoyed developer. The irritation should be specific: repetition, wrong abstraction, compiler learning the wrong shape, graph losing source intent, editor/tooling forced to reverse-engineer meaning.
+4. Preserve the user's core framing when it is specific and strong. For typed construction metadata, read `references/typed-construction-metadata.md`.
+5. Write to `docs/articles/<kebab-title>.md` unless the user names another destination.
+6. Make the document concrete before abstract: show point A, show point B, then explain the path from A to B as a first-person story of the annoyance becoming a design.
+7. Frame the document as an answer to one design question. State that question early, then answer it by moving through evidence, model, consequences, and implementation.
+8. Avoid calling a first-class language concept "sugar" unless the article is explicitly about surface syntax. Distinguish graph-level semantics from backend lowering.
+9. Do not generate an `Open Questions`, `Questions`, `Unresolved`, or speculative ending section. When uncertainty matters, phrase the chosen direction as implementation sequencing or constraints.
+
+## Diff Reading
+
+Before writing, create a small internal transition map:
+
+```text
+point A / previous:
+  code/model shape
+  what it makes the compiler think
+  what annoys the developer
+
+point B / current:
+  code/model shape
+  what it lets the compiler know
+  what becomes simpler or more truthful
+
+transition:
+  tokens removed or added
+  graph fact preserved
+  backend boundary clarified
+  mental model moved from X to Y
+```
+
+Do not include this checklist verbatim unless it helps the article. Use it to find the story.
 
 ## Story Shape
 
@@ -23,13 +50,21 @@ Use this structure by default:
 
 Short first-person thesis paragraph that states the design direction and the shift in mental model.
 
-## The Starting Point
+## The Question
 
-Start with the ordinary code shape, what feels wrong about it, and the assumption it carries.
+State the design question the article answers.
 
-## The Turn
+## Point A
 
-Introduce the smaller syntax as the change the developer wants to make and explain what it reveals.
+Start with the previous code/model shape, what felt wrong about it, and the assumption it carried.
+
+## Point B
+
+Introduce the current code/model shape as the changed state and explain what it reveals.
+
+## The Move
+
+Explain the transition from point A to point B: what changed in syntax, graph meaning, and compiler responsibility.
 
 ## The Model
 
@@ -50,18 +85,32 @@ Explain effects on properties, tooling, diagnostics, codegen, docs, and cloud/pa
 
 Keep the document readable as a GitHub Markdown technical design document. Use fenced `neat` blocks for language examples and plain text blocks for graph sketches.
 
-The section titles may change, but the story arc should remain: old assumption, pressure point, new form, deeper model, implementation path, resulting system behavior.
+The section titles may change, but the story arc should remain: previous assumption, pressure point, current form, transition, deeper model, implementation path, resulting system behavior.
+
+## Academic Flow
+
+Make the document feel like it is answering a design question:
+
+1. Pose one central question, such as "Should initialization be modeled as assignment, or as declaration metadata?"
+2. Give a short answer before the evidence.
+3. Use previous/current examples as evidence.
+4. Define the terms that matter: assignment, initialization, construction metadata, source graph, lowering.
+5. Argue from model clarity, not preference alone.
+6. State consequences as conclusions from the model.
+
+The academic flow should organize the thought. It should not erase the annoyed developer voice.
 
 ## Narrative Rules
 
-Give the document a first-person technical story without making it casual fiction:
+Give the document a first-person technical story from the point-A to point-B transition without making it casual fiction:
 
 1. Write as a developer explaining the change they want to make: use "I want", "I think", "I do not want", and "the compiler should" where natural.
-2. Start from a real line of Neat code that feels slightly wrong or too repetitive.
-3. Explain the hidden assumption in that line.
-4. Introduce the proposed form as the moment the model becomes visible.
-5. Follow the consequence into the graph, then into properties, then into lowering.
-6. End by showing the system after the change, not by listing uncertainties.
+2. Start from point A and name the annoyance plainly.
+3. Show point B as the current state the change is moving toward, not as decoration.
+4. Explain the hidden assumption in point A.
+5. Introduce the proposed form as the moment the model becomes visible.
+6. Explain the move from A to B before going deeper into graph, properties, and lowering.
+7. End by showing the system at point B still moving, not by listing uncertainties.
 
 Use transitions that carry the reader forward: "That works, but it teaches the wrong model", "The smaller form changes what the declaration is saying", "Once the graph keeps that fact, properties become data-shaped", "Lowering can still be ordinary Swift, but it happens later."
 
@@ -79,6 +128,28 @@ Build the design in passes:
 ## Voice
 
 Use direct, design-forward prose in first person. The document should sound like a developer explaining why they want the change and walking the reader through the idea as it becomes inevitable, not like a changelog entry, brainstorming note, or detached spec dump.
+
+Use a lower-level thought cadence. Keep sentences short. Let some lines feel blunt and almost primitive:
+
+- "This works."
+- "But it lies a little."
+- "This is the annoying part."
+- "The slot is not the thing."
+- "The binding is being born."
+- "Assignment is later."
+- "The graph needs the birth shape."
+
+Do not make the prose sloppy. The cadence can be raw, but the technical model must stay precise.
+
+Use rhythmic chunks, not constant one-line fragments. The prose can feel sparse and iterative, but each paragraph should carry a complete thought. Do not use literal 5-7-5 syllable form. Do not make it decorative poetry. Use rhythm to make technical thought feel alive without making the article choppy:
+
+- short image-like statements where they help
+- repeated motifs
+- clean white space
+- coherent paragraphs that build one idea at a time
+- final lines that leave the model still moving forward
+
+The document must still be a technical design note. Code blocks, graph sketches, and implementation steps remain concrete.
 
 Prefer phrases like:
 
