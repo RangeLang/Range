@@ -224,6 +224,41 @@ struct ProjectScaffolder {
             atomically: true,
             encoding: .utf8
         )
+        try linkProjectPackages(in: targetDirectory)
+    }
+
+    private func linkProjectPackages(in targetDirectory: URL) throws {
+        let machinePackages = machinePackageStore()
+        try FileManager.default.createDirectory(
+            at: machinePackages,
+            withIntermediateDirectories: true
+        )
+
+        let projectNeatDirectory = targetDirectory
+            .appendingPathComponent(".neat", isDirectory: true)
+        let projectPackages = projectNeatDirectory
+            .appendingPathComponent("Packages", isDirectory: true)
+
+        try FileManager.default.createDirectory(
+            at: projectNeatDirectory,
+            withIntermediateDirectories: true
+        )
+
+        guard !FileManager.default.fileExists(atPath: projectPackages.path) else {
+            throw ValidationError("Target already contains .neat/Packages.")
+        }
+
+        try FileManager.default.createSymbolicLink(
+            at: projectPackages,
+            withDestinationURL: machinePackages
+        )
+    }
+
+    private func machinePackageStore() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent("Packages", isDirectory: true)
+            .standardizedFileURL
     }
 
     private func renderProgramPackage(name: String) -> String {
