@@ -132,9 +132,9 @@ struct ProjectUpdater {
             TerminalLog.subtleOut("Git: skipped (\(reason))")
         }
 
-        let manifestRemote = manifest.remote?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let manifestRemote = manifest.remoteURLs.first
         let remoteURL: String
-        if let manifestRemote, !manifestRemote.isEmpty {
+        if let manifestRemote {
             remoteURL = manifestRemote
         } else {
             remoteURL = try runProcessCapturing(

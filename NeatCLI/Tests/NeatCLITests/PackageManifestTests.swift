@@ -16,6 +16,10 @@ struct PackageManifestTests {
                 let version: String = "1.2.3"
                 let author: String = "Test Author"
                 let remote: String = "https://github.com/acme/fixture.git"
+                let remotes: [String] = [
+                    "https://github.com/acme/fixture.git",
+                    "git@github.com:acme/fixture.git",
+                ]
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 
@@ -25,5 +29,9 @@ struct PackageManifestTests {
         #expect(manifest.version == "1.2.3")
         #expect(manifest.author == "Test Author")
         #expect(manifest.remote == "https://github.com/acme/fixture.git")
+        #expect(manifest.remoteURLs == [
+            "https://github.com/acme/fixture.git",
+            "git@github.com:acme/fixture.git",
+        ])
     }
 }

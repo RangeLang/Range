@@ -1,5 +1,8 @@
 construct Neat: Package {
     let version: String = "0.1.8"
     let author: String = "George"
-    let remote: String = "https://github.com/georgetchelidze/Neat.git"
+    let remotes: [String] = [
+        "https://github.com/georgetchelidze/Neat.git",
+        "git@github.com:georgetchelidze/Neat.git",
+    ]
 }

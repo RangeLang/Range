@@ -7,6 +7,7 @@ struct PackageManifest {
     let version: String?
     let author: String?
     let remote: String?
+    let remoteURLs: [String]
     let declaration: ConstructDeclaration
 }
 
@@ -37,11 +38,13 @@ enum PackageManifestLoader {
                     "Package.neat must declare exactly construct Name: Package.")
             }
 
+            let remote = stringValue(named: "remote", in: declaration)
             return PackageManifest(
                 name: declaration.name,
                 version: stringValue(named: "version", in: declaration),
                 author: stringValue(named: "author", in: declaration),
-                remote: stringValue(named: "remote", in: declaration),
+                remote: remote,
+                remoteURLs: remoteURLs(remote: remote, in: declaration),
                 declaration: declaration
             )
         case .enumeration:
@@ -62,5 +65,45 @@ enum PackageManifestLoader {
             }
             return string
         }
+    }
+
+    private static func remoteURLs(remote: String?, in declaration: ConstructDeclaration) -> [String] {
+        uniqueStrings(
+            [remote].compactMap { $0 }
+                + stringArrayValue(named: "remotes", in: declaration)
+                + stringArrayValue(named: "remoteURLs", in: declaration)
+        )
+    }
+
+    private static func stringArrayValue(named name: String, in declaration: ConstructDeclaration)
+        -> [String]
+    {
+        declaration.values.first { $0.name == name }.flatMap { value in
+            guard case .array(let expressions)? = value.value else {
+                return nil
+            }
+
+            return expressions.compactMap { expression in
+                guard case .string(let string) = expression else {
+                    return nil
+                }
+                return string
+            }
+        } ?? []
+    }
+
+    private static func uniqueStrings(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for value in values {
+            let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty, !seen.contains(trimmed) else {
+                continue
+            }
+
+            seen.insert(trimmed)
+            result.append(trimmed)
+        }
+        return result
     }
 }

@@ -32,7 +32,14 @@ extension NeatCLI {
                 print(TerminalLog.style(manifest.name, level: .change, bold: true))
                 print("Version: \(manifest.version ?? "unknown")")
                 print("Author: \(manifest.author ?? "unknown")")
-                print("Remote: \(manifest.remote ?? "unknown")")
+                if manifest.remoteURLs.isEmpty {
+                    print("Remotes: unknown")
+                } else {
+                    print("Remotes:")
+                    for remoteURL in manifest.remoteURLs {
+                        print("  \(remoteURL)")
+                    }
+                }
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure
