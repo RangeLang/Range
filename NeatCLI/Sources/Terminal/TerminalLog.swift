@@ -80,10 +80,11 @@ struct TerminalContent {
 struct TerminalSection {
     let header: String
     let content: TerminalContent
+    let indentation: Int = 2
 
     func print() {
         Swift.print(header)
-        for line in content.render() {
+        for line in content.indented(indentation).render() {
             Swift.print(line)
         }
     }

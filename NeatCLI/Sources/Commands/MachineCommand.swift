@@ -23,7 +23,7 @@ extension NeatCLI {
                     machineInfoRow(label: "Architecture", value: MachineInfo.architecture, color: .custom(117)),
                     machineInfoRow(label: "Host", value: MachineInfo.hostName, color: .custom(114)),
                     machineInfoRow(label: "Packages", value: packageStore.path, color: .custom(222)),
-                ]).indented()
+                ])
             ).print()
         }
 
