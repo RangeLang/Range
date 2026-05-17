@@ -1,4 +1,4 @@
-@core
+@language
 construct GenericTypeReference: NominalTypeReference {
     let base: NominalTypeReference
     let arguments: [TypeReference]

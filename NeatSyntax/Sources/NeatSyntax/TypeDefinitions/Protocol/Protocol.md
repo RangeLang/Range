@@ -121,7 +121,7 @@ protocol Container<Item>
 protocol Mapping<Input: Comparable, Output>
 ```
 
-Generic syntax is documented separately from the core protocol concept.
+Generic syntax is documented separately from the language protocol concept.
 
 ## Notes
 

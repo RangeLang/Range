@@ -1,4 +1,4 @@
-@core
+@language
 construct Derived<T>: Property {
     let macros: [Macro.Application]
     let markers: [Marker.Application]

@@ -1,3 +1,4 @@
+@packaging
 construct Remote {
     let url: String
 }

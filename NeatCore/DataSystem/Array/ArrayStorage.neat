@@ -1,4 +1,4 @@
-@core
+@language
 construct ArrayStorage<Element> {
     init()
     init(literal: ArrayLiteral)

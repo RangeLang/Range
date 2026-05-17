@@ -1,4 +1,4 @@
-@core
+@language
 construct SwitchCase {
     let pattern: Expression
     let body: Block

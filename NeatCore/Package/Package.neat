@@ -1,3 +1,4 @@
+@packaging
 protocol Package {
     let version: String
     let author: String

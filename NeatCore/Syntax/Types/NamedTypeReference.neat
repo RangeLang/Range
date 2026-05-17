@@ -1,4 +1,4 @@
-@core
+@language
 construct NamedTypeReference: NominalTypeReference {
     let name: String
 

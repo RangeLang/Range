@@ -6,6 +6,8 @@ enum NeatSyntax {
         case background = "background"
         case `defer` = "defer"
         case core = "core"
+        case language = "language"
+        case packaging = "packaging"
         case expand = "expand"
     }
 

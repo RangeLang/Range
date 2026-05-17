@@ -1,4 +1,4 @@
-@core
+@language
 construct If: Statement {
     let condition: Expression
     let thenBody: Block

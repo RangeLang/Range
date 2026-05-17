@@ -1,4 +1,4 @@
-@core
+@language
 construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral {
     let storage: FloatStorage
 

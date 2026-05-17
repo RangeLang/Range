@@ -203,7 +203,7 @@ extension Parser {
     }
 
     private func declarationIsCore(_ attribute: AttributeApplication?) -> Bool {
-        attribute?.name == "core"
+        attribute?.isLanguageBoundary == true
     }
 
     mutating func parseConstructHeader() throws

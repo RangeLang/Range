@@ -1,4 +1,4 @@
-@core
+@language
 construct UUIDStorage {
     init()
     init(uuidString: String) -> Result<Self, DecodingError>

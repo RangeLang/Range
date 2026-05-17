@@ -459,22 +459,22 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         for parsedFile in parsedFiles {
             for declaration in declarations(in: parsedFile.sourceFile) where declaration.isCore {
                 throw SemanticValidationError(
-                    "@core can only be used in NeatCore. Remove @core from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
+                    "@language can only be used in NeatCore. Remove @language from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
                 )
             }
             for callable in callables(in: parsedFile.sourceFile) where callable.isCore {
                 throw SemanticValidationError(
-                    "@core can only be used in NeatCore. Remove @core from \(callable.name) in \(lastPathComponent(of: parsedFile.path))."
+                    "@language can only be used in NeatCore. Remove @language from \(callable.name) in \(lastPathComponent(of: parsedFile.path))."
                 )
             }
             for declaration in protocols(in: parsedFile.sourceFile) where declaration.isCore {
                 throw SemanticValidationError(
-                    "@core can only be used in NeatCore. Remove @core from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
+                    "@language can only be used in NeatCore. Remove @language from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
                 )
             }
             for declaration in enumerations(in: parsedFile.sourceFile) where declaration.isCore {
                 throw SemanticValidationError(
-                    "@core can only be used in NeatCore. Remove @core from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
+                    "@language can only be used in NeatCore. Remove @language from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
                 )
             }
         }

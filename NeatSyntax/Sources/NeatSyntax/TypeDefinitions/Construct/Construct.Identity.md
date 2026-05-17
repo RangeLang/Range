@@ -101,8 +101,8 @@ Cycles are safe because construct references are identity references, not contai
 - `User.ID` is the compiler-provided identity type for `User`.
 - Ordinary fields such as `let id: UUID` are user-facing data and do not replace the intrinsic construct identity.
 - `construct` identity is part of the language model even though user code does not choose a separate reference type.
-- Foundational plain-value types such as `Int` belong to `@core construct`, not this identity model.
-- Compiler structural constructs such as `Closure` and `Block` may also belong to `@core construct` when they are non-identity-bearing values.
+- Foundational plain-value types such as `Int` belong to `@language construct`, not this identity model.
+- Compiler structural constructs such as `Closure` and `Block` may also belong to `@language construct` when they are non-identity-bearing values.
 
 ## Open Boundary
 

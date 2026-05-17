@@ -1,29 +1,29 @@
 infix operator +: AdditionPrecedence
 infix operator -: AdditionPrecedence
 
-@core
+@language
 function +(lhs: Int, rhs: Int) -> Int
 
-@core
+@language
 function +(lhs: Float, rhs: Float) -> Float
 
-@core
+@language
 function +(lhs: Int, rhs: Float) -> Float
 
-@core
+@language
 function +(lhs: Float, rhs: Int) -> Float
 
-@core
+@language
 function +(lhs: String, rhs: String) -> String
 
-@core
+@language
 function -(lhs: Int, rhs: Int) -> Int
 
-@core
+@language
 function -(lhs: Float, rhs: Float) -> Float
 
-@core
+@language
 function -(lhs: Int, rhs: Float) -> Float
 
-@core
+@language
 function -(lhs: Float, rhs: Int) -> Float

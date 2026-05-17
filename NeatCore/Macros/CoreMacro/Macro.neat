@@ -1,6 +1,6 @@
-@core
+@language
 construct Macro: Syntax {
-    @core
+    @language
     construct Declaration: Syntax {
         let identifier: Identifier
         let parameters: [Parameter.Declaration]
@@ -8,7 +8,7 @@ construct Macro: Syntax {
         let expansionType: TypeReference?
     }
 
-    @core
+    @language
     construct Application: Syntax {
         let identifier: Identifier
         let genericArguments: [TypeReference]

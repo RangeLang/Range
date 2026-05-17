@@ -55,7 +55,11 @@ public struct ConstructDeclaration {
     }
 
     public var isCore: Bool {
-        attribute?.name == "core"
+        attribute?.isLanguageBoundary == true
+    }
+
+    public var isPackaging: Bool {
+        attribute?.isPackaging == true
     }
 }
 
@@ -66,5 +70,13 @@ public struct AttributeApplication {
     public init(name: String, argument: String?) {
         self.name = name
         self.argument = argument
+    }
+
+    public var isLanguageBoundary: Bool {
+        name == "language" || name == "core"
+    }
+
+    public var isPackaging: Bool {
+        name == "packaging"
     }
 }

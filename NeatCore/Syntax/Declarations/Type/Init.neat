@@ -1,15 +1,15 @@
-@core
+@language
 construct Init: Syntax {
     let declaration: Declaration
     let application: Application
 
-    @core
+    @language
     construct Declaration {
         let parameters: [Parameter.Declaration]
         let body: Block
     }
 
-    @core
+    @language
     construct Application: SyntaxReplaceable<Expression> {
         let type: TypeReference
         let arguments: [Parameter.Application]

@@ -1,4 +1,4 @@
-@core
+@language
 construct Extension<Target: NominalTypeReference>: Syntax, SyntaxEmittable {
     let target: Target
     let conformances: [NominalTypeReference]

@@ -1,4 +1,4 @@
-@core
+@language
 protocol Generic: Syntax {
     let identifier: Identifier
 }

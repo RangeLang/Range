@@ -1,4 +1,4 @@
-@core
+@language
 construct Binding<T>: Property {
     let macros: [Macro.Application]
     let markers: [Marker.Application]

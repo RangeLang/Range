@@ -1,4 +1,4 @@
-@core
+@language
 construct ArrayLiteral {
     function storage<Element>() -> ArrayStorage<Element>
 }

@@ -90,7 +90,11 @@ public struct CallableDeclaration {
     }
 
     public var isCore: Bool {
-        attribute?.name == "core"
+        attribute?.isLanguageBoundary == true
+    }
+
+    public var isPackaging: Bool {
+        attribute?.isPackaging == true
     }
 }
 

@@ -1,6 +1,6 @@
-@core
+@language
 construct Marker: Syntax {
-    @core
+    @language
     construct Declaration: Syntax {
         let identifier: Identifier
         let parameters: [Parameter.Declaration]
@@ -8,7 +8,7 @@ construct Marker: Syntax {
         let valueType: TypeReference
     }
 
-    @core
+    @language
     construct Application<Value>: Syntax {
         let identifier: Identifier
         let value: Value
