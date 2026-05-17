@@ -42,6 +42,9 @@ let package = Package(
                 "Macros/Macros.Phase.md",
                 "Macros/Macros.md",
                 "TypeSystem/Generics.md",
+            ],
+            swiftSettings: [
+                .treatWarning("EmbeddedRestrictions", as: .warning),
             ]
         ),
         .testTarget(

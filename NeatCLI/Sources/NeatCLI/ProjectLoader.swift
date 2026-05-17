@@ -207,7 +207,7 @@ enum ProjectLoader {
                     role: isCoreFile ? .core : .project
                 )
             } catch {
-                throw ValidationError("Failed to read \(fileURL.path): \(error)")
+                throw ValidationError("Failed to read \(fileURL.path): \(ErrorDescription.message(for: error))")
             }
         }
         return coreInputs + projectInputs

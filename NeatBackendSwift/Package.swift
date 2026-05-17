@@ -22,7 +22,10 @@ let package = Package(
             dependencies: [
                 .product(name: "NeatSyntax", package: "NeatSyntax")
             ],
-            path: "Sources"
+            path: "Sources",
+            swiftSettings: [
+                .treatWarning("EmbeddedRestrictions", as: .warning),
+            ]
         )
     ]
 )

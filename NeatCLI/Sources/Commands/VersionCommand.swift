@@ -36,7 +36,7 @@ extension NeatCLI {
             } catch {
                 replaceCheckLines(
                     updates: "unavailable",
-                    checked: String(describing: error)
+                    checked: ErrorDescription.message(for: error)
                 )
             }
         }

@@ -1,3 +1,13 @@
+# Product Ideas
+
+- Create NeatCloud so people can share Neat packages, articles, examples, and language-design notes.
+
+# Embedded Swift Direction
+
+- Make Embedded Swift compatibility a design constraint for all Swift code in Neat.
+- Port in this order: `NeatSyntax`, `NeatBackendSwift`, then host adapters in `NeatCLI`.
+- Add an Embedded-capable SDK/toolchain build lane once local SwiftPM can load the Embedded standard library for the chosen target.
+
 # Syntax Highlighting Parity
 
 Current architecture is two-stage:

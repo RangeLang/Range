@@ -175,7 +175,7 @@ public enum NeatDiagnosticConverter {
         }
         return NeatDiagnostic(
             severity: .error,
-            message: String(describing: error),
+            message: "Unknown error",
             source: "neat",
             path: path
         )

@@ -26,6 +26,9 @@ let package = Package(
                 "Commands",
                 "NeatCLI",
                 "Terminal",
+            ],
+            swiftSettings: [
+                .treatWarning("EmbeddedRestrictions", as: .warning),
             ]
         ),
         .testTarget(

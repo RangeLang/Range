@@ -75,7 +75,7 @@ extension NeatCLI {
                     } catch {
                         let message = """
                             Parse error:
-                              \(error)
+                              \(ErrorDescription.message(for: error))
                             """
                         try message.write(
                             to: stageDirectory.appendingPathComponent("02-ast-error.txt"),

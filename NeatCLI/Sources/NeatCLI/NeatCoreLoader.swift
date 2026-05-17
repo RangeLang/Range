@@ -69,7 +69,7 @@ enum NeatCoreLoader {
                 )
             } catch {
                 throw ValidationError(
-                    "Failed to read NeatCore file \(fileURL.lastPathComponent): \(error)"
+                    "Failed to read NeatCore file \(fileURL.lastPathComponent): \(ErrorDescription.message(for: error))"
                 )
             }
         }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Neat Change Article"
+  short_description: "Draft Neat language-change articles for GitHub."
+  default_prompt: "Write a GitHub-ready article about a Neat language design change."

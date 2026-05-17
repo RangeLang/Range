@@ -29,7 +29,7 @@ struct NeatLanguageServer {
     private mutating func handle(message: [String: Any]) throws {
         let id = message["id"]
         let method = message["method"] as? String
-        debugLog("handle method=\(method ?? "<response>") id=\(id.map { "\($0)" } ?? "nil")")
+        debugLog("handle method=\(method ?? "<response>") id=\(jsonScalarDescription(id))")
 
         switch method {
         case "initialize":
@@ -517,7 +517,7 @@ struct NeatLanguageServer {
             )
         } catch {
             navigationIndexesByDocumentURI.removeValue(forKey: uri)
-            debugLog("navigation index failed for \(uri): \(error)")
+            debugLog("navigation index failed for \(uri): \(ErrorDescription.message(for: error))")
         }
     }
 
@@ -821,7 +821,7 @@ struct NeatLanguageServer {
             return "send notification method=\(method) params=\(paramsDescription)"
         }
 
-        let idDescription = message["id"].map { "\($0)" } ?? "nil"
+        let idDescription = jsonScalarDescription(message["id"])
         let resultDescription: String
         switch message["result"] {
         case nil:
@@ -837,6 +837,25 @@ struct NeatLanguageServer {
         }
 
         return "send response id=\(idDescription) result=\(resultDescription)"
+    }
+
+    private func jsonScalarDescription(_ value: Any?) -> String {
+        switch value {
+        case nil:
+            return "nil"
+        case is NSNull:
+            return "null"
+        case let string as String:
+            return string
+        case let int as Int:
+            return "\(int)"
+        case let double as Double:
+            return "\(double)"
+        case let bool as Bool:
+            return bool ? "true" : "false"
+        default:
+            return "value"
+        }
     }
 }
 
