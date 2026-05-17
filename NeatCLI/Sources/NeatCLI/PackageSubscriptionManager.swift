@@ -106,34 +106,41 @@ struct PackageSubscriptionManager {
             return []
         }
 
-        guard
-            let enumerator = FileManager.default.enumerator(
-                at: packagesRoot,
-                includingPropertiesForKeys: [.isDirectoryKey],
-                options: [.skipsHiddenFiles]
-            )
-        else {
-            throw ValidationError("Could not inspect installed packages in \(packagesRoot.path)")
-        }
-
         var packages: [InstalledPackage] = []
-        while let url = enumerator.nextObject() as? URL {
-            let isDirectory =
-                (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            guard !isDirectory, url.lastPathComponent == "Package.neat" else {
+        let owners = try FileManager.default.contentsOfDirectory(
+            at: packagesRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+
+        for ownerURL in owners {
+            guard isDirectory(ownerURL) else {
                 continue
             }
 
-            let manifest = try PackageManifestLoader.load(from: url)
-            let relative = relativePackageReference(for: url, packagesRoot: packagesRoot)
-            packages.append(
-                InstalledPackage(
-                    reference: relative,
-                    name: manifest.name,
-                    version: manifest.version,
-                    manifestURL: url
-                )
+            let repos = try FileManager.default.contentsOfDirectory(
+                at: ownerURL,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
             )
+
+            for repoURL in repos where isDirectory(repoURL) {
+                let url = repoURL.appendingPathComponent("Package.neat", isDirectory: false)
+                guard FileManager.default.fileExists(atPath: url.path) else {
+                    continue
+                }
+
+                let manifest = try PackageManifestLoader.load(from: url)
+                let relative = relativePackageReference(for: url, packagesRoot: packagesRoot)
+                packages.append(
+                    InstalledPackage(
+                        reference: relative,
+                        name: manifest.name,
+                        version: manifest.version,
+                        manifestURL: url
+                    )
+                )
+            }
         }
 
         return packages.sorted {
@@ -199,6 +206,10 @@ struct PackageSubscriptionManager {
             return String(relative.dropLast(4))
         }
         return relative
+    }
+
+    private func isDirectory(_ url: URL) -> Bool {
+        (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
     }
 
     private func parseModules(from source: String) -> Set<String> {
