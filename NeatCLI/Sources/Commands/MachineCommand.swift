@@ -51,7 +51,9 @@ extension NeatCLI {
                     let query = terms.joined(separator: " ")
                     let matches = manager.matchingPackages(packages, search: query)
 
-                    print(TerminalLog.style("Machine", level: .change, bold: true))
+                    print(TerminalLog.style("Machine", level: .change, bold: true)
+                        + " "
+                        + TerminalLog.subtleStdout(MachineInfo.hostName))
                     print(TerminalLog.captionStdout("\(packages.count) downloaded"))
 
                     if matches.isEmpty {
