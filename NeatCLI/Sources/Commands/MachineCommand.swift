@@ -12,24 +12,16 @@ extension NeatCLI {
         )
 
         mutating func run() throws {
-            do {
-                let root = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
-                let manager = PackageSubscriptionManager(projectPath: root.path)
-                let packages = try manager.installedPackages(in: root)
-                let packageStore = root
-                    .appendingPathComponent(".neat", isDirectory: true)
-                    .appendingPathComponent("Packages", isDirectory: true)
+            let root = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+            let packageStore = root
+                .appendingPathComponent(".neat", isDirectory: true)
+                .appendingPathComponent("Packages", isDirectory: true)
 
-                print(TerminalLog.style("Machine", level: .change, bold: true))
-                print(TerminalLog.captionStdout("\(packages.count) downloaded"))
-                print("OS: \(MachineInfo.operatingSystem)")
-                print("Architecture: \(MachineInfo.architecture)")
-                print("Host: \(MachineInfo.hostName)")
-                print("Packages: \(packageStore.path)")
-            } catch {
-                ErrorPresenter.printError(error)
-                throw ExitCode.failure
-            }
+            print(TerminalLog.style("Machine", level: .change, bold: true))
+            print("OS: \(MachineInfo.operatingSystem)")
+            print("Architecture: \(MachineInfo.architecture)")
+            print("Host: \(MachineInfo.hostName)")
+            print("Packages: \(packageStore.path)")
         }
 
         struct List: ParsableCommand {
