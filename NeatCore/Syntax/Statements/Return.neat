@@ -1,4 +1,4 @@
 @language
 construct Return: Statement {
-    let expression: Optional<Expression>
+    let expression: Expression?
 }

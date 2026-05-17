@@ -2,6 +2,6 @@
 construct ValueGeneric: Generic {
     let identifier: Identifier
     let type: TypeReference
-    let default: Optional<Expression>
+    let default: Expression?
 }
 

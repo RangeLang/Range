@@ -1,5 +1,5 @@
 @main {
-    state maybeCount: Optional<Int> = nil
+    state maybeCount: Int? = nil
 
     if maybeCount == nil {
         state fallback = 0

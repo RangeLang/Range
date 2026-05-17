@@ -6,9 +6,9 @@ construct SetStorage<Element: Hashable> {
     derived isEmpty: Bool
     function contains(element: Element) -> Bool
     function insert(element: Element)
-    function remove(element: Element) -> Optional<Element>
+    function remove(element: Element) -> Element?
     function elements() -> [Element]
     function filter(include: (Element) -> Bool) -> [Element]
-    function first(where include: (Element) -> Bool) -> Optional<Element>
+    function first(where include: (Element) -> Bool) -> Element?
     function clear()
 }

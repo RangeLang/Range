@@ -1,4 +1,4 @@
 infix operator ??: NilCoalescingPrecedence
 
 @language
-function ??<Wrapped>(lhs: Optional<Wrapped>, rhs: Wrapped) -> Wrapped
+function ??<Wrapped>(lhs: Wrapped?, rhs: Wrapped) -> Wrapped

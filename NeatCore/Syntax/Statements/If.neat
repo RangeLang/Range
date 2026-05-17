@@ -2,5 +2,5 @@
 construct If: Statement {
     let condition: Expression
     let thenBody: Block
-    let elseBody: Optional<Block>
+    let elseBody: Block?
 }

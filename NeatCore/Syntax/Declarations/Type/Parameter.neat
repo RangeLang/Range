@@ -5,15 +5,15 @@ construct Parameter: Syntax {
 
     @language
     construct Declaration {
-        let externalName: Optional<String>
+        let externalName: String?
         let localName: String
         let type: TypeReference
-        let defaultValue: Optional<Expression>
+        let defaultValue: Expression?
     }
 
     @language
     construct Application {
-        let label: Optional<String>
+        let label: String?
         let type: TypeReference
         let expression: Expression
     }

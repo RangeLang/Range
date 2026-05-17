@@ -4,8 +4,8 @@ construct Binding<T>: Property {
     let markers: [Marker.Application]
     let identifier: Identifier
     let type: TypeReference
-    let getterBody: Optional<Block>
-    let setterBody: Optional<Block>
+    let getterBody: Block?
+    let setterBody: Block?
 
     function getter(transform: (T) -> T)
     function setter(transform: (T) -> T)

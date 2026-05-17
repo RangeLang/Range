@@ -3,6 +3,6 @@ function fallback() -> Int {
 }
 
 @main {
-    state current: Optional<Int> = nil
+    state current: Int? = nil
     let resolved = current ?? fallback()
 }

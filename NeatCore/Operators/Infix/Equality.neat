@@ -8,10 +8,10 @@ function ==(lhs: Int, rhs: Float) -> Bool
 function ==(lhs: Float, rhs: Int) -> Bool
 
 @language
-function ==<Wrapped>(lhs: Optional<Wrapped>, rhs: NilLiteral) -> Bool
+function ==<Wrapped>(lhs: Wrapped?, rhs: NilLiteral) -> Bool
 
 @language
-function ==<Wrapped>(lhs: NilLiteral, rhs: Optional<Wrapped>) -> Bool
+function ==<Wrapped>(lhs: NilLiteral, rhs: Wrapped?) -> Bool
 
 @language
 function !=(lhs: Int, rhs: Int) -> Bool
@@ -32,7 +32,7 @@ function !=(lhs: String, rhs: String) -> Bool
 function !=(lhs: Bool, rhs: Bool) -> Bool
 
 @language
-function !=<Wrapped>(lhs: Optional<Wrapped>, rhs: NilLiteral) -> Bool
+function !=<Wrapped>(lhs: Wrapped?, rhs: NilLiteral) -> Bool
 
 @language
-function !=<Wrapped>(lhs: NilLiteral, rhs: Optional<Wrapped>) -> Bool
+function !=<Wrapped>(lhs: NilLiteral, rhs: Wrapped?) -> Bool

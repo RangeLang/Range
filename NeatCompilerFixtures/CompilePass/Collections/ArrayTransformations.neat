@@ -1,4 +1,4 @@
-function maybeNumber(_ value: Int) -> Optional<Int> {
+function maybeNumber(_ value: Int) -> Int? {
     return value
 }
 

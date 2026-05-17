@@ -158,9 +158,8 @@ extension Parser {
     mutating func parseTypeReferenceNode() throws -> TypeReference {
         var result = try parseTypeReferenceBaseNode()
         while peek() == .question {
-            throw ParseError(
-                "Postfix optional type syntax is removed. Use Optional<\(result.displayName)> or declaration metadata such as #optional."
-            )
+            try consume(.question)
+            result = .optional(result)
         }
         if peek() == .ellipsis {
             try consume(.ellipsis)

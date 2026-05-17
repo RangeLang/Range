@@ -8,7 +8,7 @@ construct Function: Syntax {
         let identifier: Identifier
         let generics: [Generic]
         let parameters: [Parameter.Declaration]
-        let returnType: Optional<TypeReference>
+        let returnType: TypeReference?
         let body: Block
     }
 

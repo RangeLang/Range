@@ -28,15 +28,15 @@ construct Array<Element>: ExpressibleByArrayLiteral {
         return storage.element(index: index)
     }
 
-    function first() -> Optional<Element> {
+    function first() -> Element? {
         return storage.first()
     }
 
-    function first(where include: (Element) -> Bool) -> Optional<Element> {
+    function first(where include: (Element) -> Bool) -> Element? {
         return storage.first(where: include)
     }
 
-    function last() -> Optional<Element> {
+    function last() -> Element? {
         return storage.last()
     }
 
@@ -52,7 +52,7 @@ construct Array<Element>: ExpressibleByArrayLiteral {
         return storage.remove(index: index)
     }
 
-    function removeLast() -> Optional<Element> {
+    function removeLast() -> Element? {
         return storage.removeLast()
     }
 
@@ -68,7 +68,7 @@ construct Array<Element>: ExpressibleByArrayLiteral {
         return Array<Output>(storage: storage.map(transform))
     }
 
-    function compactMap<Output>(_ transform: (Element) -> Optional<Output>) -> Array<Output> {
+    function compactMap<Output>(_ transform: (Element) -> Output?) -> Array<Output> {
         return Array<Output>(storage: storage.compactMap(transform))
     }
 

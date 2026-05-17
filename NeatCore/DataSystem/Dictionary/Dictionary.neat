@@ -15,7 +15,7 @@ construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
         storage.isEmpty
     }
 
-    function value(key: Key) -> Optional<Value> {
+    function value(key: Key) -> Value? {
         return storage.value(key: key)
     }
 
@@ -23,7 +23,7 @@ construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
         storage.updateValue(value: value, key: key)
     }
 
-    function removeValue(key: Key) -> Optional<Value> {
+    function removeValue(key: Key) -> Value? {
         return storage.removeValue(key: key)
     }
 
@@ -39,7 +39,7 @@ construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
         return storage.filter(include: include)
     }
 
-    function first(where include: (DictionaryEntry<Key, Value>) -> Bool) -> Optional<DictionaryEntry<Key, Value>> {
+    function first(where include: (DictionaryEntry<Key, Value>) -> Bool) -> DictionaryEntry<Key, Value>? {
         return storage.first(where: include)
     }
 
