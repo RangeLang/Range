@@ -1,7 +1,7 @@
 @language
 construct TypeGeneric: Generic {
     let identifier: Identifier
-    let constraint: TypeReference?
-    let default: TypeReference?
+    let constraint: Optional<TypeReference>
+    let default: Optional<TypeReference>
 }
 

@@ -1,6 +1,6 @@
 @language
 construct EnumCaseExpression: Expression {
-    let type: TypeReference?
+    let type: Optional<TypeReference>
     let identifier: Identifier
 
     function replace(with replacement: Expression) -> Expression

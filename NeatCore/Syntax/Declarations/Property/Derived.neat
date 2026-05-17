@@ -4,7 +4,7 @@ construct Derived<T>: Property {
     let markers: [Marker.Application]
     let identifier: Identifier
     let type: TypeReference
-    let body: Block?
+    let body: Optional<Block>
 
     function getter(transform: (T) -> T)
 }

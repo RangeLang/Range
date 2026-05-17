@@ -5,7 +5,7 @@ construct Macro: Syntax {
         let identifier: Identifier
         let parameters: [Parameter.Declaration]
         let target: TypeReference
-        let expansionType: TypeReference?
+        let expansionType: Optional<TypeReference>
     }
 
     @language

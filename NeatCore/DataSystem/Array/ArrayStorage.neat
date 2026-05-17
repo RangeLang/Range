@@ -6,17 +6,17 @@ construct ArrayStorage<Element> {
     derived isEmpty: Bool
     function append(element: Element)
     function element(index: Int) -> Element
-    function first() -> Element?
-    function first(where include: (Element) -> Bool) -> Element?
-    function last() -> Element?
+    function first() -> Optional<Element>
+    function first(where include: (Element) -> Bool) -> Optional<Element>
+    function last() -> Optional<Element>
     function update(element: Element, index: Int)
     function insert(element: Element, index: Int)
     function remove(index: Int) -> Element
-    function removeLast() -> Element?
+    function removeLast() -> Optional<Element>
     function clear()
     function filter(include: (Element) -> Bool) -> ArrayStorage<Element>
     function map<Output>(_ transform: (Element) -> Output) -> ArrayStorage<Output>
-    function compactMap<Output>(_ transform: (Element) -> Output?) -> ArrayStorage<Output>
+    function compactMap<Output>(_ transform: (Element) -> Optional<Output>) -> ArrayStorage<Output>
     function flatMap<Output>(_ transform: (Element) -> Array<Output>) -> ArrayStorage<Output>
     function forEach(_ body: (Element) -> Void)
 }

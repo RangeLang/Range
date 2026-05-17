@@ -4,7 +4,7 @@ construct Let<T>: StoredProperty, SyntaxEmittable {
   let markers: [Marker.Application]
   let identifier: Identifier
   let type: TypeReference
-  let value: Expression?
+  let value: Optional<Expression>
 
   function initializer(transform: (T) -> T)
   function getter(transform: (T) -> T)

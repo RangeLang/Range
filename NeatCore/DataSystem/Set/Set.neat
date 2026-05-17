@@ -23,7 +23,7 @@ construct Set<Element: Hashable>: ExpressibleBySetLiteral {
         storage.insert(element: element)
     }
 
-    function remove(element: Element) -> Element? {
+    function remove(element: Element) -> Optional<Element> {
         return storage.remove(element: element)
     }
 
@@ -35,7 +35,7 @@ construct Set<Element: Hashable>: ExpressibleBySetLiteral {
         return storage.filter(include: include)
     }
 
-    function first(where include: (Element) -> Bool) -> Element? {
+    function first(where include: (Element) -> Bool) -> Optional<Element> {
         return storage.first(where: include)
     }
 

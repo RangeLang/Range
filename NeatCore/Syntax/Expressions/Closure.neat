@@ -1,6 +1,6 @@
 @language
 construct Closure: Expression {
-    let type: TypeReference?
+    let type: Optional<TypeReference>
     let body: Block
 
     function replace(with replacement: Expression) -> Expression

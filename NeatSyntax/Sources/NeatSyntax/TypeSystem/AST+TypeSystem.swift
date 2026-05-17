@@ -29,7 +29,7 @@ public indirect enum TypeReference: Equatable, Sendable {
             let renderedParameters = parameters.map(\.displayName).joined(separator: ", ")
             return "(\(renderedParameters)) -> \(returnType.displayName)"
         case .optional(let wrapped):
-            return "\(wrapped.displayName)?"
+            return "Optional<\(wrapped.displayName)>"
         case .variadic(let element):
             return "\(element.displayName)..."
         }

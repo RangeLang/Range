@@ -8,5 +8,5 @@ protocol Property: Syntax {
 
 @language
 protocol StoredProperty: Property {
-    let value: Expression?
+    let value: Optional<Expression>
 }

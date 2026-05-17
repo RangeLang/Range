@@ -19,7 +19,7 @@ construct Enum: Syntax {
 
     @language
     construct AssociatedValue {
-        let label: String?
+        let label: Optional<String>
         let type: TypeReference
     }
 }
