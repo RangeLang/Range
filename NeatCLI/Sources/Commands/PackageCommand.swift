@@ -47,10 +47,20 @@ extension NeatCLI {
             )
             var projectPath: String = "."
 
+            @Flag(help: "Only bump Package.neat; do not commit or tag.")
+            var noGit: Bool = false
+
+            @Flag(help: "Commit and tag locally, but do not push to origin.")
+            var noPush: Bool = false
+
             mutating func run() throws {
                 do {
                     let publisher = PackagePublisher(projectPath: projectPath)
-                    let published = try publisher.publish(bump)
+                    let published = try publisher.publish(
+                        bump,
+                        automateGit: !noGit,
+                        push: !noPush
+                    )
                     TerminalLog.out(
                         "Published \(published.name) \(published.version).",
                         level: .success
@@ -59,6 +69,12 @@ extension NeatCLI {
                         TerminalLog.subtleOut("Author: \(author)")
                     }
                     TerminalLog.subtleOut("Package.neat: \(published.packageFile.path)")
+                    switch published.git {
+                    case .published(let commit, let tag, let pushed):
+                        TerminalLog.subtleOut("Git: \(commit), \(tag)\(pushed ? ", pushed" : ", not pushed")")
+                    case .skipped(let reason):
+                        TerminalLog.subtleOut("Git: skipped (\(reason))")
+                    }
                 } catch {
                     ErrorPresenter.printError(error)
                     throw ExitCode.failure
