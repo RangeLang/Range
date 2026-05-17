@@ -1,0 +1,4 @@
+interface:
+  display_name: "Neat Embedded Swift Direction"
+  short_description: "Use Embedded Swift constraints to catch Neat implementation drift."
+  default_prompt: "Review this Neat Swift change against the Embedded Swift direction."

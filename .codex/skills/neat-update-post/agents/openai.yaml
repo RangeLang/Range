@@ -1,0 +1,4 @@
+interface:
+  display_name: "Neat Update Post"
+  short_description: "Draft short Neat update posts with before, after, and why."
+  default_prompt: "Write a short Neat update post with before and after examples."

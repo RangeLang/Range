@@ -858,6 +858,7 @@ public struct DeclarationMemberResolver: Sendable {
         var localName: String
         var externalLabel: String?
         var typeReference: TypeReference?
+        var hasDefaultValue: Bool
     }
 
     private struct EnumCaseSignature: Sendable {
@@ -921,7 +922,8 @@ public struct DeclarationMemberResolver: Sendable {
                         MemberCallableParameter(
                             localName: associatedValue.label ?? "_",
                             externalLabel: associatedValue.label,
-                            typeReference: associatedValue.typeReference
+                            typeReference: associatedValue.typeReference,
+                            hasDefaultValue: false
                         )
                     }
                 )
@@ -966,7 +968,16 @@ public struct DeclarationMemberResolver: Sendable {
             }
 
             var callableSignatures: [String: [MemberCallableSignature]] = [:]
-            var initializerSignatures = construct.initializers.map { initializer in
+            var initializerSignatures = [
+                MemberInitializerSignature(
+                    parameters: Self.memberCallableParameters(
+                        DeclarationGraph.directConstructApplicationParameters(for: construct),
+                        using: nestedTypeMap
+                    ),
+                    returnType: nil
+                )
+            ]
+            initializerSignatures.append(contentsOf: construct.initializers.map { initializer in
                 MemberInitializerSignature(
                     parameters: Self.memberCallableParameters(
                         initializer.parameters,
@@ -976,7 +987,7 @@ public struct DeclarationMemberResolver: Sendable {
                         Self.qualifyNestedLocalTypes($0, using: nestedTypeMap)
                     }
                 )
-            }
+            })
             for extensionDeclaration in extensionsByTargetName[construct.name, default: []] {
                 initializerSignatures.append(
                     contentsOf: extensionDeclaration.initializers.map { initializer in
@@ -1093,7 +1104,8 @@ public struct DeclarationMemberResolver: Sendable {
                 externalLabel: parameter.externalLabel,
                 typeReference: parameter.typeReference.map {
                     qualifyNestedLocalTypes($0, using: nestedTypeMap)
-                }
+                },
+                hasDefaultValue: parameter.defaultValue != nil
             )
         }
     }
@@ -1538,13 +1550,33 @@ public struct DeclarationMemberResolver: Sendable {
         _ arguments: [MemberCallArgument],
         match parameters: [MemberCallableParameter]
     ) -> Bool {
-        guard arguments.count == parameters.count else {
-            return false
+        var parameterIndex = 0
+        for argument in arguments {
+            var didMatch = false
+            while parameterIndex < parameters.count {
+                let parameter = parameters[parameterIndex]
+                if argumentLabel(argument.label, matches: parameter) {
+                    parameterIndex += 1
+                    didMatch = true
+                    break
+                }
+                guard parameter.hasDefaultValue else {
+                    return false
+                }
+                parameterIndex += 1
+            }
+            guard didMatch else {
+                return false
+            }
         }
 
-        return zip(arguments, parameters).allSatisfy { argument, parameter in
-            argumentLabel(argument.label, matches: parameter)
+        while parameterIndex < parameters.count {
+            guard parameters[parameterIndex].hasDefaultValue else {
+                return false
+            }
+            parameterIndex += 1
         }
+        return true
     }
 
     private func enumCaseSignature(

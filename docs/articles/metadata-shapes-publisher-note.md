@@ -1,82 +1,64 @@
 # Metadata Shapes Publisher Note
 
-I am moving Neat away from small syntax traps and keyword piles.
+Neat is moving small declaration ideas into metadata shapes.
 
-Point A was this:
+## Before
 
 ```neat
 let version: Version = Version(0.1.8)
 let value: Optional<Int>
 namespace Math {}
-```
 
-Point B is this:
-
-```neat
-let version: Version(0.1.8)
-
-#optional
-let value: Int
-
-#namespace(.locked)
-construct Math {}
-```
-
-The change is simple: declarations should carry metadata. Not every idea needs a keyword. Not every shape needs punctuation. The graph should see the thing directly.
-
-## Message 1
-
-Typed construction moves initialization out of assignment language.
-
-Before:
-
-```neat
-let version: Version = Version(0.1.8)
-```
-
-After:
-
-```neat
-let version: Version(0.1.8)
-```
-
-The binding is born as `Version` with construction data. The graph should not learn "slot, then value" when the source means "binding, type, data".
-
-## Message 2
-
-Optionality and namespace behavior become declaration metadata.
-
-Before:
-
-```neat
-let value: Optional<Int>
-namespace Math {}
-```
-
-After:
-
-```neat
-#optional
-let value: Int
-
-#namespace(.locked)
-construct Math {}
-```
-
-This keeps optionality and namespace-ness out of type punctuation and keywords. `#namespace(.locked)` says the declaration is namespace-shaped and cannot be externally reopened or modified.
-
-## Message 3
-
-Visibility gets quieter.
-
-Default public. Explicit private.
-
-```neat
-#namespace(.locked)
-construct Math {
-    function sin(_ x: Float) -> Float
-    private function reduce(_ x: Float) -> Float
+public construct Package {
+    public function publish()
+    private function sign()
 }
 ```
 
-No `public` spam. Normal declarations are exported. Only the exception gets marked. The code gets smaller, and the graph gets clearer.
+## After
+
+```neat
+let version: Version(0.1.8)
+let value: Optional<Int>
+
+#namespace(.locked)
+construct Math {}
+
+construct Package {
+    function publish()
+    private function sign()
+}
+```
+
+## Why
+
+The old shape works, but it spreads declaration meaning across assignment syntax, namespace keywords, and visibility noise.
+
+The new shape keeps the facts on the declaration.
+
+`let version: Version(0.1.8)` says the binding is born as `Version` with construction data. It is not assignment into a slot.
+
+Optional is still a type shape. `Optional<Int>` stays explicit because the source is naming the wrapped type relationship, not attaching a separate declaration flag.
+
+`#namespace(.locked)` says the construct is namespace-shaped, and that outside code cannot reopen or modify it.
+
+Visibility gets quieter too. Public is the normal published shape. `private` marks the exception.
+
+The graph gets a cleaner job:
+
+```text
+declaration
+  metadata
+  type
+  construction data
+  visibility
+  namespace behavior
+```
+
+The publisher can read the declaration shape directly.
+
+No reverse-engineering.
+
+No keyword pile.
+
+The source says the thing the package model needs.

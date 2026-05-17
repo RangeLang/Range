@@ -185,6 +185,7 @@ public struct Parser {
     var discoveredCallableReturnTypes: [String: TypeReference]
     var macroDeclarationsByName: [String: MacroDeclaration]
     var macroExpansionTypes: [String: TypeReference] = [:]
+    var allowInitializerDeclarations: Bool
     var currentMacroBodyDepth: Int = 0
     var currentClosureBaseLocalBindings: [String: LocalBindingSymbol] = [:]
 
@@ -196,7 +197,8 @@ public struct Parser {
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
         discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
-        macroExpansionTypes: [String: TypeReference] = [:]
+        macroExpansionTypes: [String: TypeReference] = [:],
+        allowInitializerDeclarations: Bool = true
     ) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()
@@ -208,6 +210,7 @@ public struct Parser {
         self.discoveredCallableReturnTypes = discoveredCallableReturnTypes
         self.macroDeclarationsByName = macroDeclarationsByName
         self.macroExpansionTypes = macroExpansionTypes
+        self.allowInitializerDeclarations = allowInitializerDeclarations
     }
 
     mutating func registerMacroDeclaration(_ declaration: MacroDeclaration) {

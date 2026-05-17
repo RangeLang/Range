@@ -605,11 +605,17 @@ extension ApplicationGraphValidator {
     func callArguments(_ arguments: [CallArgument], match parameters: [NeatFunctionParameter])
         -> Bool
     {
-        if arguments.count != parameters.count,
-            parameters.contains(where: { !$0.macros.isEmpty }),
+        if parameters.contains(where: { !$0.macros.isEmpty }),
             arguments.allSatisfy({ $0.label == nil })
         {
             return true
+        }
+
+        if !parameters.contains(where: { !$0.macros.isEmpty }),
+            !parameters.contains(where: { $0.defaultValue != nil }),
+            arguments.count != parameters.count
+        {
+            return false
         }
 
         let parameterSequence: [NeatFunctionParameter]
@@ -633,8 +639,10 @@ extension ApplicationGraphValidator {
             )
             parameterSequence = expanded
         } else {
-            guard arguments.count == parameters.count else { return false }
-            parameterSequence = parameters
+            guard let matchedParameters = matchArguments(arguments, to: parameters) else {
+                return false
+            }
+            parameterSequence = matchedParameters
         }
 
         for (argument, parameter) in zip(arguments, parameterSequence) {
@@ -645,6 +653,44 @@ extension ApplicationGraphValidator {
             }
         }
         return true
+    }
+
+    func matchArguments(
+        _ arguments: [CallArgument],
+        to parameters: [NeatFunctionParameter]
+    ) -> [NeatFunctionParameter]? {
+        var matched: [NeatFunctionParameter] = []
+        var parameterIndex = 0
+
+        for argument in arguments {
+            var didMatch = false
+            while parameterIndex < parameters.count {
+                let candidate = parameters[parameterIndex]
+                if argument.label == candidate.externalLabel {
+                    matched.append(candidate)
+                    parameterIndex += 1
+                    didMatch = true
+                    break
+                }
+                guard candidate.defaultValue != nil else {
+                    return nil
+                }
+                parameterIndex += 1
+            }
+
+            if !didMatch {
+                return nil
+            }
+        }
+
+        while parameterIndex < parameters.count {
+            guard parameters[parameterIndex].defaultValue != nil else {
+                return nil
+            }
+            parameterIndex += 1
+        }
+
+        return matched
     }
 
     func renderCallArguments(_ arguments: [CallArgument]) -> String {

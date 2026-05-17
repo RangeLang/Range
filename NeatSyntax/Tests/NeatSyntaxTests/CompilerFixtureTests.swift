@@ -130,6 +130,89 @@ struct CompilerFixtureTests {
         #expect(diagnostic.range?.end.character == 17)
     }
 
+    @Test("Project source cannot declare initializers")
+    func projectSourceCannotDeclareInitializers() throws {
+        let projectPath = "/tmp/InitializerSyntax.neat"
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: projectPath,
+                source: """
+                construct Version {
+                    let value: String
+
+                    init(value: String) {
+                        self.value = value
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+        #expect(
+            diagnostics.contains {
+                $0.source == "neat-parser"
+                    && $0.path == projectPath
+                    && $0.message.contains("Initializer declarations are no longer source syntax")
+            }
+        )
+    }
+
+    @Test("Construct applications bind directly to stored declarations")
+    func constructApplicationsBindDirectlyToStoredDeclarations() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/DirectConstructApplication.neat",
+                source: """
+                construct User {
+                    let id: Int
+                    let name: String
+                }
+
+                @main {
+                    let user = User(id: 1, name: "George")
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
+    @Test("Construct applications reject labels with no stored declaration")
+    func constructApplicationsRejectLabelsWithNoStoredDeclaration() throws {
+        let projectPath = "/tmp/DirectConstructApplicationBadLabel.neat"
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: projectPath,
+                source: """
+                construct User {
+                    let id: Int
+                    let name: String
+                }
+
+                @main {
+                    let user = User(identifier: 1, name: "George")
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+        #expect(
+            diagnostics.contains {
+                $0.path == projectPath
+                    && $0.message.contains("does not match any available parameter labels")
+            }
+        )
+    }
+
     @Test("Namespace declarations provide attribute names")
     func namespaceDeclarationsProvideAttributeNames() throws {
         var inputs = try neatCoreInputs()

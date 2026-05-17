@@ -292,6 +292,11 @@ extension Parser {
         guard case .identifier(let name) = peek(), name == "init" else {
             throw ParseError("Expected initializer declaration.")
         }
+        guard allowInitializerDeclarations else {
+            throw ParseError(
+                "Initializer declarations are no longer source syntax. Describe construct data with stored declarations and use functions for behavior."
+            )
+        }
         advance()
         let parameters = try parseFunctionParameters(
             allowOmittedLocalName: signatureOnly

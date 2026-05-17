@@ -210,7 +210,8 @@ public struct CompilerPipeline {
                 declarationMacroExpansionResolver: currentMacroExpansionResolver,
                 discoveredCallableReturnTypes: discoveredCallableReturnTypes,
                 macroDeclarationsByName: currentMacrosByName,
-                macroExpansionTypes: currentMacroExpansionTypes
+                macroExpansionTypes: currentMacroExpansionTypes,
+                allowInitializerDeclarations: input.role == .core
             )
             let parsedFile = ParsedSourceFile(
                 path: input.path,
@@ -237,7 +238,10 @@ public struct CompilerPipeline {
 
     private func discoverProjectDeclarationFiles(inputs: [SourceInput]) throws -> [ParsedSourceFile] {
         try inputs.map { input in
-            var parser = try Parser(source: input.source)
+            var parser = try Parser(
+                source: input.source,
+                allowInitializerDeclarations: input.role == .core
+            )
             return ParsedSourceFile(
                 path: input.path,
                 source: input.source,

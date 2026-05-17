@@ -422,7 +422,24 @@ public struct DeclarationGraph {
     public func initializerSurfaces(
         onConstruct named: String
     ) -> [DeclaredInitializerSurface] {
-        return initializers(onConstruct: named).map { initializer in
+        var surfaces: [DeclaredInitializerSurface] = []
+        if let construct = constructsByName[named] {
+            let parameters = Self.directConstructApplicationParameters(for: construct)
+            if !parameters.isEmpty || construct.initializers.isEmpty {
+                surfaces.append(
+                    DeclaredInitializerSurface(
+                        ownerConstructName: named,
+                        labels: parameters.map(\.externalLabel),
+                        parameterTypeNames: parameters.map {
+                            $0.typeReference?.displayName ?? $0.slotName
+                        },
+                        parameters: parameters,
+                        returnTypeName: nil
+                    )
+                )
+            }
+        }
+        surfaces.append(contentsOf: initializers(onConstruct: named).map { initializer in
             DeclaredInitializerSurface(
                 ownerConstructName: named,
                 labels: initializer.parameters.map(\.externalLabel),
@@ -432,7 +449,46 @@ public struct DeclarationGraph {
                 parameters: initializer.parameters,
                 returnTypeName: initializer.returnType?.displayName
             )
+        })
+        return surfaces
+    }
+
+    static func directConstructApplicationParameters(
+        for construct: ConstructDeclaration
+    ) -> [NeatFunctionParameter] {
+        let values = construct.values.map { value in
+            let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
+            return NeatFunctionParameter(
+                macros: [],
+                localName: value.localName,
+                externalLabel: value.externalLabel ?? value.localName,
+                typeReference: .named(value.typeName),
+                defaultValue: defaultValue,
+                slotName: nil,
+                isBinding: false,
+                capturesSyntax: false
+            )
         }
+        let states = construct.states.map { state in
+            let defaultValue: Expression?
+            switch state.storage {
+            case .stored(let expression):
+                defaultValue = expression
+            case .declared:
+                defaultValue = nil
+            }
+            return NeatFunctionParameter(
+                macros: [],
+                localName: state.name,
+                externalLabel: state.name,
+                typeReference: state.type,
+                defaultValue: defaultValue,
+                slotName: nil,
+                isBinding: false,
+                capturesSyntax: false
+            )
+        }
+        return values + states
     }
 
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
