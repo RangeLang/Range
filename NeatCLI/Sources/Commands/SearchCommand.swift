@@ -19,14 +19,21 @@ extension NeatCLI {
         )
         var limit: Int = 10
 
+        @Option(
+            name: .shortAndLong,
+            help: "Project directory for local installed packages. Defaults to current directory."
+        )
+        var path: String = "."
+
         mutating func run() throws {
             do {
                 let searcher = PackageSearcher()
                 if terms.isEmpty {
                     try runInteractiveSearch(searcher: searcher)
                 } else {
-                    let results = try searcher.search(query: terms.joined(separator: " "), limit: limit)
-                    render(results)
+                    let query = terms.joined(separator: " ")
+                    let results = try searcher.search(query: query, limit: limit)
+                    render(query: query, cloudResults: results)
                 }
             } catch {
                 ErrorPresenter.printError(error)
@@ -53,32 +60,46 @@ extension NeatCLI {
                 }
 
                 let results = try searcher.search(query: query, limit: limit)
-                render(results)
+                render(query: query, cloudResults: results)
             }
         }
 
-        private func render(_ results: [PackageSearchResult]) {
-            guard !results.isEmpty else {
-                TerminalLog.out("No packages found. Try another search.", level: .waiting)
+        private func render(query: String, cloudResults: [PackageSearchResult]) {
+            let projectRoot = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+            let manager = PackageSubscriptionManager(projectPath: path)
+            let installed = (try? manager.installedPackages(in: projectRoot)) ?? []
+            let installedMatches = manager.matchingPackages(installed, search: query)
+
+            print(TerminalLog.style("Local", level: .change, bold: true))
+            print(TerminalLog.subtleStdout("\(installedMatches.count) of \(installed.count) installed"))
+            if installedMatches.isEmpty {
+                print(TerminalLog.subtleStdout("No installed packages match '\(query)'."))
+            } else {
+                for package in installedMatches {
+                    print("  " + TerminalLog.style(package.reference, level: .change, bold: true) + "  " + TerminalLog.subtleStdout(package.name))
+                }
+            }
+
+            print("")
+            print(TerminalLog.style("Cloud", level: .optimization, bold: true))
+            guard !cloudResults.isEmpty else {
+                print(TerminalLog.subtleStdout("No cloud packages found. Try another search."))
                 return
             }
 
-            TerminalLog.out("Found \(results.count) package\(results.count == 1 ? "" : "s").", level: .success)
-
-            for result in results {
+            print(TerminalLog.subtleStdout("\(cloudResults.count) found"))
+            for result in cloudResults {
                 let stars = result.stars == 1 ? "1 star" : "\(result.stars) stars"
-                print("")
-                print(TerminalLog.style(result.package, level: .change, bold: true) + "  " + TerminalLog.subtleStdout(stars))
+                print("  " + TerminalLog.style(result.package, level: .optimization, bold: true) + "  " + TerminalLog.subtleStdout(stars))
 
                 if let description = result.description?.trimmingCharacters(in: .whitespacesAndNewlines),
                     !description.isEmpty
                 {
-                    print(description)
+                    print("    " + description)
                 }
 
-                print(TerminalLog.subtleStdout(result.url.absoluteString))
-                print(TerminalLog.subtleStdout(result.manifestURL.absoluteString))
-                print(TerminalLog.subtleStdout("Package.neat: Module(\"\(result.package)\")"))
+                print("    " + TerminalLog.subtleStdout(result.url.absoluteString))
+                print("    " + TerminalLog.subtleStdout("Package.neat: Module(\"\(result.package)\")"))
             }
         }
     }
