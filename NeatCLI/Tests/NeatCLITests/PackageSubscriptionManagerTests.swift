@@ -78,6 +78,8 @@ struct PackageSubscriptionManagerTests {
         try """
             construct \(name): Package {
                 let version: String = "0.1.0"
+                let author: String = "Test Author"
+                let remotes: [Remote] = []
             }
             """.write(to: url, atomically: true, encoding: .utf8)
     }

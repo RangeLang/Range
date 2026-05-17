@@ -34,4 +34,27 @@ struct PackageManifestTests {
             "git@github.com:acme/fixture.git",
         ])
     }
+
+    @Test("Package manifest requires typed package protocol fields")
+    func packageManifestRequiresTypedPackageProtocolFields() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("neat-package-manifest-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
+        try """
+            construct Fixture: Package {
+                let version: Int = 1
+                let author: String = "Test Author"
+                let remotes: [Remote] = []
+            }
+            """.write(to: packageFile, atomically: true, encoding: .utf8)
+
+        do {
+            _ = try PackageManifestLoader.load(from: packageFile)
+            Issue.record("Expected Package.neat validation to reject an untyped package version.")
+        } catch {
+            #expect(String(describing: error).contains("requires let version: String"))
+        }
+    }
 }

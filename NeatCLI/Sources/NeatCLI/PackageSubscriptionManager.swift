@@ -131,7 +131,9 @@ struct PackageSubscriptionManager {
                     continue
                 }
 
-                let manifest = try PackageManifestLoader.load(from: url)
+                guard let manifest = try? PackageManifestLoader.load(from: url) else {
+                    continue
+                }
                 let relative = relativePackageReference(for: url, packagesRoot: packagesRoot)
                 packages.append(
                     InstalledPackage(

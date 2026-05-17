@@ -54,6 +54,7 @@ struct PackagePublisherTests {
             construct Fixture: Package {
                 let version: String = "\(version)"
                 let author: String = "Test Author"
+                let remotes: [Remote] = []
             }
             """.write(to: root.appendingPathComponent("Package.neat"), atomically: true, encoding: .utf8)
         return root

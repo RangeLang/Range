@@ -10,7 +10,7 @@ enum PackageVersionBump: String, ExpressibleByArgument {
 struct PublishedPackage {
     let name: String
     let version: String
-    let author: String?
+    let author: String
     let packageFile: URL
     let git: GitPublishResult
 }
@@ -36,7 +36,7 @@ struct PackagePublisher {
         }
 
         let manifest = try PackageManifestLoader.load(from: packageFile)
-        let currentVersion = try SemanticVersion.parse(manifest.version ?? "0.0.0")
+        let currentVersion = try SemanticVersion.parse(manifest.version)
         let nextVersion = currentVersion.bumping(bump)
         let source = try String(contentsOf: packageFile, encoding: .utf8)
         let updatedSource = try updatingVersion(

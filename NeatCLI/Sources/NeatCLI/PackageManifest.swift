@@ -4,8 +4,8 @@ import NeatSyntax
 
 struct PackageManifest {
     let name: String
-    let version: String?
-    let author: String?
+    let version: String
+    let author: String
     let remote: String?
     let remoteURLs: [String]
     let declaration: ConstructDeclaration
@@ -38,11 +38,15 @@ enum PackageManifestLoader {
                     "Package.neat must declare exactly construct Name: Package.")
             }
 
+            let version = try requiredStringValue(named: "version", in: declaration)
+            let author = try requiredStringValue(named: "author", in: declaration)
+            _ = try requireValue(named: "remotes", typeName: "[Remote]", in: declaration)
+
             let remote = stringValue(named: "remote", in: declaration)
             return PackageManifest(
                 name: declaration.name,
-                version: stringValue(named: "version", in: declaration),
-                author: stringValue(named: "author", in: declaration),
+                version: version,
+                author: author,
                 remote: remote,
                 remoteURLs: remoteURLs(remote: remote, in: declaration),
                 declaration: declaration
@@ -54,6 +58,33 @@ enum PackageManifestLoader {
         case .macro, .marker:
             throw ValidationError("Package.neat must declare construct Name: Package.")
         }
+    }
+
+    private static func requiredStringValue(
+        named name: String,
+        in declaration: ConstructDeclaration
+    ) throws -> String {
+        let value = try requireValue(named: name, typeName: "String", in: declaration)
+        guard case .string(let string)? = value.value else {
+            throw ValidationError("Package.neat requires let \(name): String = \"...\".")
+        }
+        return string
+    }
+
+    private static func requireValue(
+        named name: String,
+        typeName: String,
+        in declaration: ConstructDeclaration
+    ) throws -> ValueDeclaration {
+        guard let value = declaration.values.first(where: { $0.name == name }) else {
+            throw ValidationError("Package.neat requires let \(name): \(typeName).")
+        }
+        guard value.typeName == typeName else {
+            throw ValidationError(
+                "Package.neat requires let \(name): \(typeName), got \(value.typeName)."
+            )
+        }
+        return value
     }
 
     private static func stringValue(named name: String, in declaration: ConstructDeclaration)

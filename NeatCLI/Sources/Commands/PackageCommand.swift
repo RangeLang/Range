@@ -30,8 +30,8 @@ extension NeatCLI {
                 let manifest = try PackageManifestLoader.load(from: packageFile)
 
                 print(TerminalLog.style(manifest.name, level: .change, bold: true))
-                print("Version: \(manifest.version ?? "unknown")")
-                print("Author: \(manifest.author ?? "unknown")")
+                print("Version: \(manifest.version)")
+                print("Author: \(manifest.author)")
                 if manifest.remoteURLs.isEmpty {
                     print("Remotes: unknown")
                 } else {
@@ -62,8 +62,8 @@ extension NeatCLI {
                 "Published \(published.name) \(published.version).",
                 level: .success
             )
-            if let author = published.author, !author.isEmpty {
-                TerminalLog.subtleOut("Author: \(author)")
+            if !published.author.isEmpty {
+                TerminalLog.subtleOut("Author: \(published.author)")
             }
             TerminalLog.subtleOut("Package.neat: \(published.packageFile.path)")
             switch published.git {

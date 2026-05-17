@@ -1,0 +1,5 @@
+protocol Package {
+    let version: String
+    let author: String
+    let remotes: [Remote]
+}
