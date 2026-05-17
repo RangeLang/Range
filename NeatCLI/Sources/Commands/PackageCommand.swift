@@ -31,6 +31,7 @@ extension NeatCLI {
                 print(TerminalLog.style(manifest.name, level: .change, bold: true))
                 print("Version: \(manifest.version ?? "unknown")")
                 print("Author: \(manifest.author ?? "unknown")")
+                print("Remote: \(manifest.remote ?? "unknown")")
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure

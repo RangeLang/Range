@@ -30,7 +30,7 @@ struct ProjectUpdater {
         }
 
         if isNeatPackage {
-            try publishAndDownloadNeat(from: root)
+            try publishAndDownloadNeat(from: root, manifest: manifest)
         }
 
         TerminalLog.out("Update complete.", level: .success)
@@ -121,7 +121,7 @@ struct ProjectUpdater {
         TerminalLog.out("Updated Neat CLI", level: .success)
     }
 
-    private func publishAndDownloadNeat(from root: URL) throws {
+    private func publishAndDownloadNeat(from root: URL, manifest: PackageManifest) throws {
         TerminalLog.out("Publishing Neat", level: .change)
         let published = try PackagePublisher(projectPath: root.path).publish(.patch)
         TerminalLog.out("Published \(published.name) \(published.version).", level: .success)
@@ -132,10 +132,16 @@ struct ProjectUpdater {
             TerminalLog.subtleOut("Git: skipped (\(reason))")
         }
 
-        let remoteURL = try runProcessCapturing(
-            executable: "/usr/bin/env",
-            arguments: ["git", "-C", root.path, "remote", "get-url", "origin"]
-        )
+        let manifestRemote = manifest.remote?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let remoteURL: String
+        if let manifestRemote, !manifestRemote.isEmpty {
+            remoteURL = manifestRemote
+        } else {
+            remoteURL = try runProcessCapturing(
+                executable: "/usr/bin/env",
+                arguments: ["git", "-C", root.path, "remote", "get-url", "origin"]
+            )
+        }
         let reference = try gitHubReference(from: remoteURL)
         try downloadMachinePackage(reference: reference, remoteURL: remoteURL)
     }

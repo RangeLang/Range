@@ -6,6 +6,7 @@ struct PackageManifest {
     let name: String
     let version: String?
     let author: String?
+    let remote: String?
     let declaration: ConstructDeclaration
 }
 
@@ -40,6 +41,7 @@ enum PackageManifestLoader {
                 name: declaration.name,
                 version: stringValue(named: "version", in: declaration),
                 author: stringValue(named: "author", in: declaration),
+                remote: stringValue(named: "remote", in: declaration),
                 declaration: declaration
             )
         case .enumeration:
