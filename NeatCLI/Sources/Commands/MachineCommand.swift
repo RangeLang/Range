@@ -1,4 +1,5 @@
 import ArgumentParser
+import Darwin
 import Foundation
 
 extension NeatCLI {
@@ -9,6 +10,27 @@ extension NeatCLI {
                 List.self,
             ]
         )
+
+        mutating func run() throws {
+            do {
+                let root = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+                let manager = PackageSubscriptionManager(projectPath: root.path)
+                let packages = try manager.installedPackages(in: root)
+                let packageStore = root
+                    .appendingPathComponent(".neat", isDirectory: true)
+                    .appendingPathComponent("Packages", isDirectory: true)
+
+                print(TerminalLog.style("Machine", level: .change, bold: true))
+                print(TerminalLog.captionStdout("\(packages.count) downloaded"))
+                print("OS: \(MachineInfo.operatingSystem)")
+                print("Architecture: \(MachineInfo.architecture)")
+                print("Host: \(MachineInfo.hostName)")
+                print("Packages: \(packageStore.path)")
+            } catch {
+                ErrorPresenter.printError(error)
+                throw ExitCode.failure
+            }
+        }
 
         struct List: ParsableCommand {
             static let configuration = CommandConfiguration(
@@ -60,6 +82,31 @@ extension NeatCLI {
                 return TerminalLog.style(package, level: .change, bold: true)
                     + padding
                     + TerminalLog.subtleStdout(version)
+            }
+        }
+    }
+}
+
+private enum MachineInfo {
+    static var operatingSystem: String {
+        #if os(macOS)
+        return "macOS \(ProcessInfo.processInfo.operatingSystemVersionString)"
+        #else
+        return ProcessInfo.processInfo.operatingSystemVersionString
+        #endif
+    }
+
+    static var hostName: String {
+        ProcessInfo.processInfo.hostName
+    }
+
+    static var architecture: String {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+
+        return withUnsafePointer(to: &systemInfo.machine) { pointer in
+            pointer.withMemoryRebound(to: CChar.self, capacity: 1) { charPointer in
+                String(cString: charPointer)
             }
         }
     }
