@@ -18,10 +18,16 @@ extension NeatCLI {
                 .appendingPathComponent("Packages", isDirectory: true)
 
             print(TerminalLog.style("Machine", level: .change, bold: true))
-            print("OS: \(MachineInfo.operatingSystem)")
-            print("Architecture: \(MachineInfo.architecture)")
-            print("Host: \(MachineInfo.hostName)")
-            print("Packages: \(packageStore.path)")
+            print(machineInfoRow(label: "OS", value: MachineInfo.operatingSystem, level: .change))
+            print(machineInfoRow(label: "Architecture", value: MachineInfo.architecture, level: .optimization))
+            print(machineInfoRow(label: "Host", value: MachineInfo.hostName, level: .success))
+            print(machineInfoRow(label: "Packages", value: packageStore.path, level: .waiting))
+        }
+
+        private func machineInfoRow(label: String, value: String, level: CLIStatusLevel) -> String {
+            TerminalLog.style("\(label):", level: level, bold: true)
+                + " "
+                + TerminalLog.subtleStdout(value)
         }
 
         struct List: ParsableCommand {
