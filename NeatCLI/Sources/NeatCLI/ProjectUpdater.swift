@@ -20,12 +20,16 @@ struct ProjectUpdater {
         }
 
         let source = try String(contentsOf: packageFile, encoding: .utf8)
-        _ = try PackageManifestLoader.load(from: packageFile)
+        let manifest = try PackageManifestLoader.load(from: packageFile)
         let modules = parseModules(from: source)
         try updateModules(modules, projectRoot: root)
 
         if updateCLI {
             try updateNeatCLIIfAvailable(from: root)
+        }
+
+        if manifest.name == "Neat" {
+            try publishAndDownloadNeat(from: root)
         }
 
         TerminalLog.out("Update complete.", level: .success)
@@ -114,6 +118,82 @@ struct ProjectUpdater {
         TerminalLog.out("Updated Neat CLI", level: .success)
     }
 
+    private func publishAndDownloadNeat(from root: URL) throws {
+        TerminalLog.out("Publishing Neat package", level: .change)
+        let published = try PackagePublisher(projectPath: root.path).publish(.patch)
+        TerminalLog.out("Published \(published.name) \(published.version).", level: .success)
+        switch published.git {
+        case .published(let commit, let tag, let pushed):
+            TerminalLog.subtleOut("Git: \(commit), \(tag)\(pushed ? ", pushed" : ", not pushed")")
+        case .skipped(let reason):
+            TerminalLog.subtleOut("Git: skipped (\(reason))")
+        }
+
+        let remoteURL = try runProcessCapturing(
+            executable: "/usr/bin/env",
+            arguments: ["git", "-C", root.path, "remote", "get-url", "origin"]
+        )
+        let reference = try gitHubReference(from: remoteURL)
+        try downloadMachinePackage(reference: reference, remoteURL: remoteURL)
+    }
+
+    private func downloadMachinePackage(reference: String, remoteURL: String) throws {
+        let parts = reference.split(separator: "/").map(String.init)
+        guard parts.count == 2 else {
+            throw ValidationError("Invalid package reference '\(reference)'.")
+        }
+
+        let packageRoot =
+            FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent("Packages", isDirectory: true)
+            .appendingPathComponent(parts[0], isDirectory: true)
+            .appendingPathComponent(parts[1], isDirectory: true)
+            .standardizedFileURL
+
+        try FileManager.default.createDirectory(
+            at: packageRoot.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+
+        let gitDir = packageRoot.appendingPathComponent(".git", isDirectory: true)
+        if FileManager.default.fileExists(atPath: gitDir.path) {
+            try runProcess(
+                executable: "/usr/bin/env",
+                arguments: ["git", "-C", packageRoot.path, "pull", "--ff-only", "origin", "main"]
+            )
+            TerminalLog.out("Downloaded \(reference) from origin.", level: .success)
+        } else {
+            try runProcess(
+                executable: "/usr/bin/env",
+                arguments: ["git", "clone", remoteURL, packageRoot.path]
+            )
+            TerminalLog.out("Downloaded \(reference) from origin.", level: .success)
+        }
+    }
+
+    func gitHubReference(from remoteURL: String) throws -> String {
+        let trimmed = remoteURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let patterns = [
+            #"github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?$"#,
+        ]
+
+        for pattern in patterns {
+            let regex = try NSRegularExpression(pattern: pattern)
+            let range = NSRange(trimmed.startIndex..<trimmed.endIndex, in: trimmed)
+            guard let match = regex.firstMatch(in: trimmed, range: range),
+                let ownerRange = Range(match.range(at: 1), in: trimmed),
+                let repoRange = Range(match.range(at: 2), in: trimmed)
+            else {
+                continue
+            }
+
+            return "\(trimmed[ownerRange])/\(trimmed[repoRange])"
+        }
+
+        throw ValidationError("Could not infer GitHub owner/repo from origin '\(trimmed)'.")
+    }
+
     private func runProcess(executable: String, arguments: [String]) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
@@ -128,5 +208,34 @@ struct ProjectUpdater {
                 "Command failed (\(process.terminationStatus)): \(executable) \(arguments.joined(separator: " "))"
             )
         }
+    }
+
+    private func runProcessCapturing(executable: String, arguments: [String]) throws -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: executable)
+        process.arguments = arguments
+
+        let output = Pipe()
+        let error = Pipe()
+        process.standardOutput = output
+        process.standardError = error
+        try process.run()
+        process.waitUntilExit()
+
+        let outputText = String(data: output.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let errorText = String(data: error.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        guard process.terminationStatus == 0 else {
+            let message = errorText.isEmpty ? outputText : errorText
+            throw ValidationError(
+                message.isEmpty
+                    ? "Command failed (\(process.terminationStatus)): \(executable) \(arguments.joined(separator: " "))"
+                    : message
+            )
+        }
+
+        return outputText
     }
 }

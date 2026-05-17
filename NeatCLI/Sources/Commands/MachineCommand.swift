@@ -30,7 +30,7 @@ extension NeatCLI {
                     let matches = manager.matchingPackages(packages, search: query)
 
                     print(TerminalLog.style("Machine", level: .change, bold: true))
-                    print(TerminalLog.subtleStdout("\(packages.count) downloaded"))
+                    print(TerminalLog.captionStdout("\(packages.count) downloaded"))
 
                     if matches.isEmpty {
                         if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

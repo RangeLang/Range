@@ -275,6 +275,10 @@ enum TerminalLog {
         subtle(text, on: .stdout)
     }
 
+    static func captionStdout(_ text: String) -> String {
+        render(text, colors: [.gray, .dim], on: .stdout)
+    }
+
     static func subtleOut(_ text: String) {
         Swift.print(subtle(text, on: .stdout))
     }

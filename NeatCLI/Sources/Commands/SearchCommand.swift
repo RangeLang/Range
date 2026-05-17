@@ -94,7 +94,7 @@ extension NeatCLI.Package {
             let installedMatches = manager.matchingPackages(installed, search: query)
 
             print(TerminalLog.style(title, level: .change, bold: true))
-            print(TerminalLog.subtleStdout("\(installed.count) \(countLabel)"))
+            print(TerminalLog.captionStdout("\(installed.count) \(countLabel)"))
             if installedMatches.isEmpty {
                 print(TerminalLog.subtleStdout("No \(title.lowercased()) packages match '\(query)'."))
             } else {
