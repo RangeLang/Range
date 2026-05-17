@@ -1,7 +1,5 @@
 @language
 construct DictionaryStorage<Key: Hashable, Value> {
-    init()
-    init(literal: DictionaryLiteral)
     derived count: Int
     derived isEmpty: Bool
     function value(key: Key) -> Value?

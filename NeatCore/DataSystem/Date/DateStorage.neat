@@ -1,5 +1,3 @@
 @language
 construct DateStorage {
-    init()
-    init(iso8601String: String) -> Result<Self, DecodingError>
 }

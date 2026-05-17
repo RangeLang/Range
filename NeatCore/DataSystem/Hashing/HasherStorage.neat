@@ -1,7 +1,5 @@
 @language
 construct HasherStorage {
-    init()
-
     function combine(_ value: IntStorage)
 
     function combine(_ value: StringStorage)
