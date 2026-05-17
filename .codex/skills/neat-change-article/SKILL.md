@@ -1,6 +1,6 @@
 ---
 name: neat-change-article
-description: Create GitHub-ready first-person technical design notes from previous/current Neat language changes, with point-A to point-B transition narrative, annoyed developer story, academic question-answer flow, raw thought cadence, and coherent rhythmic chunks. Use when asked to turn Neat syntax, compiler, graph, editor, or product-design diffs into developer-authored Markdown docs, docs/articles drafts, release-note narratives, or GitHub design posts.
+description: Create GitHub-ready first-person technical design notes written as the Neat developer/user, from previous/current Neat language changes, with point-A to point-B transition narrative, annoyed developer story, academic question-answer flow, raw thought cadence, and super short information bursts. Use when asked to turn Neat syntax, compiler, graph, editor, or product-design diffs into user-authored Markdown docs, docs/articles drafts, release-note narratives, or GitHub design posts.
 ---
 
 # Neat Change Article
@@ -9,10 +9,10 @@ description: Create GitHub-ready first-person technical design notes from previo
 
 1. Read both versions of the change first: the previous code/model and the current code/model. Treat them as point A and point B. If the user gives only one side, infer the missing side from context and state it inside the draft through examples.
 2. Extract the transition: what point A made the compiler/user think, what point B now makes clear, and what had to move between them.
-3. Turn the delta into the story of an annoyed developer. The irritation should be specific: repetition, wrong abstraction, compiler learning the wrong shape, graph losing source intent, editor/tooling forced to reverse-engineer meaning.
+3. Turn the delta into the story of the user as the annoyed Neat developer. The irritation should be specific: repetition, wrong abstraction, compiler learning the wrong shape, graph losing source intent, editor/tooling forced to reverse-engineer meaning.
 4. Preserve the user's core framing when it is specific and strong. For typed construction metadata, read `references/typed-construction-metadata.md`.
 5. Write to `docs/articles/<kebab-title>.md` unless the user names another destination.
-6. Make the document concrete before abstract: show point A, show point B, then explain the path from A to B as a first-person story of the annoyance becoming a design.
+6. Make the document concrete before abstract: show point A, show point B, then explain the path from A to B as the user's first-person story of the annoyance becoming a design.
 7. Frame the document as an answer to one design question. State that question early, then answer it by moving through evidence, model, consequences, and implementation.
 8. Avoid calling a first-class language concept "sugar" unless the article is explicitly about surface syntax. Distinguish graph-level semantics from backend lowering.
 9. Do not generate an `Open Questions`, `Questions`, `Unresolved`, or speculative ending section. When uncertainty matters, phrase the chosen direction as implementation sequencing or constraints.
@@ -48,7 +48,7 @@ Use this structure by default:
 ```markdown
 # Title
 
-Short first-person thesis paragraph that states the design direction and the shift in mental model.
+Short first-person thesis paragraph in the user's voice that states the design direction and the shift in mental model.
 
 ## The Question
 
@@ -98,13 +98,13 @@ Make the document feel like it is answering a design question:
 5. Argue from model clarity, not preference alone.
 6. State consequences as conclusions from the model.
 
-The academic flow should organize the thought. It should not erase the annoyed developer voice.
+The academic flow should organize the thought. It should not erase the user's annoyed developer voice.
 
 ## Narrative Rules
 
 Give the document a first-person technical story from the point-A to point-B transition without making it casual fiction:
 
-1. Write as a developer explaining the change they want to make: use "I want", "I think", "I do not want", and "the compiler should" where natural.
+1. Write as the user/Neat developer explaining the change they want to make. Do not write as the AI or agent. Use "I want", "I think", "I do not want", and "the compiler should" where natural.
 2. Start from point A and name the annoyance plainly.
 3. Show point B as the current state the change is moving toward, not as decoration.
 4. Explain the hidden assumption in point A.
@@ -127,7 +127,7 @@ Build the design in passes:
 
 ## Voice
 
-Use direct, design-forward prose in first person. The document should sound like a developer explaining why they want the change and walking the reader through the idea as it becomes inevitable, not like a changelog entry, brainstorming note, or detached spec dump.
+Use direct, design-forward prose in the user's first person. The document should sound like the Neat developer explaining why they want the change and walking the reader through the idea as it becomes inevitable, not like an AI assistant, changelog entry, brainstorming note, or detached spec dump.
 
 Use a lower-level thought cadence. Keep sentences short. Let some lines feel blunt and almost primitive:
 
@@ -141,12 +141,13 @@ Use a lower-level thought cadence. Keep sentences short. Let some lines feel blu
 
 Do not make the prose sloppy. The cadence can be raw, but the technical model must stay precise.
 
-Use rhythmic chunks, not constant one-line fragments. The prose can feel sparse and iterative, but each paragraph should carry a complete thought. Do not use literal 5-7-5 syllable form. Do not make it decorative poetry. Use rhythm to make technical thought feel alive without making the article choppy:
+Use super short information bursts. Most paragraphs should be one to three short sentences. Keep each burst meaningful: one claim, one example, or one consequence. Do not make it decorative poetry. Use rhythm to make technical thought feel alive without making the article vague:
 
 - short image-like statements where they help
 - repeated motifs
 - clean white space
-- coherent paragraphs that build one idea at a time
+- compact chunks that build one idea at a time
+- fast movement from point A to point B
 - final lines that leave the model still moving forward
 
 The document must still be a technical design note. Code blocks, graph sketches, and implementation steps remain concrete.
