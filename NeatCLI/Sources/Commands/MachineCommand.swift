@@ -16,11 +16,15 @@ extension NeatCLI {
                 .appendingPathComponent(".neat", isDirectory: true)
                 .appendingPathComponent("Packages", isDirectory: true)
 
-            print(TerminalLog.style("Machine", level: .change, bold: true))
-            print(machineInfoRow(label: "OS", value: MachineInfo.operatingSystem, color: .custom(81)))
-            print(machineInfoRow(label: "Architecture", value: MachineInfo.architecture, color: .custom(117)))
-            print(machineInfoRow(label: "Host", value: MachineInfo.hostName, color: .custom(114)))
-            print(machineInfoRow(label: "Packages", value: packageStore.path, color: .custom(222)))
+            TerminalSection(
+                header: TerminalLog.style("Machine", level: .change, bold: true),
+                content: TerminalContent([
+                    machineInfoRow(label: "OS", value: MachineInfo.operatingSystem, color: .custom(81)),
+                    machineInfoRow(label: "Architecture", value: MachineInfo.architecture, color: .custom(117)),
+                    machineInfoRow(label: "Host", value: MachineInfo.hostName, color: .custom(114)),
+                    machineInfoRow(label: "Packages", value: packageStore.path, color: .custom(222)),
+                ]).indented()
+            ).print()
         }
 
         private func machineInfoRow(label: String, value: String, color: TerminalAccentColor) -> String {

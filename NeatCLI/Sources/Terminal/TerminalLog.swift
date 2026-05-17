@@ -58,6 +58,37 @@ enum TerminalAccentColor {
     }
 }
 
+struct TerminalContent {
+    private let lines: [String]
+
+    init(_ lines: [String]) {
+        self.lines = lines
+    }
+
+    func indented(_ spaces: Int = 2) -> TerminalContent {
+        let prefix = String(repeating: " ", count: spaces)
+        return TerminalContent(lines.map { line in
+            line.isEmpty ? line : prefix + line
+        })
+    }
+
+    func render() -> [String] {
+        lines
+    }
+}
+
+struct TerminalSection {
+    let header: String
+    let content: TerminalContent
+
+    func print() {
+        Swift.print(header)
+        for line in content.render() {
+            Swift.print(line)
+        }
+    }
+}
+
 enum TerminalLog {
     private enum Stream {
         case stdout
