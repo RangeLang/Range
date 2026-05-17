@@ -22,7 +22,7 @@ function server(requests: Channel<Request>) {
 }
 
 @main {
-    let requests = Channel<Request>(capacity: 2)
+    let requests = Channel<Request>.withCapacity(2)
     let replyA = Channel<String>()
     let replyB = Channel<String>()
     let requestA: Request = Request(id: 0, replyTo: replyA)

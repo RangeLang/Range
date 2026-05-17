@@ -1,6 +1,6 @@
 function encodeDate() -> Result<String, EncodingError> {
     let encoder = JSONEncoder()
-    switch Date(iso8601String: "2026-05-16") {
+    switch Date.parse(iso8601String: "2026-05-16") {
     case .success(let value):
         return encoder.encode(value)
     case .failure:
@@ -10,12 +10,12 @@ function encodeDate() -> Result<String, EncodingError> {
 
 function decodeDate() -> Result<Date, DecodingError> {
     let decoder = JSONDecoder(value: .string(value: "2026-05-16"))
-    return Date(from: decoder)
+    return Date.decode(from: decoder)
 }
 
 function encodeDateTime() -> Result<String, EncodingError> {
     let encoder = JSONEncoder()
-    switch DateTime(iso8601String: "2026-05-16T12:34:56Z") {
+    switch DateTime.parse(iso8601String: "2026-05-16T12:34:56Z") {
     case .success(let value):
         return encoder.encode(value)
     case .failure:
@@ -25,7 +25,7 @@ function encodeDateTime() -> Result<String, EncodingError> {
 
 function decodeDateTime() -> Result<DateTime, DecodingError> {
     let decoder = JSONDecoder(value: .string(value: "2026-05-16T12:34:56Z"))
-    return DateTime(from: decoder)
+    return DateTime.decode(from: decoder)
 }
 
 @main {

@@ -75,7 +75,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
         switch value(forKey: key) {
         case .success(let value):
             let decoder = JSONDecoder(value: value)
-            return T(from: decoder)
+            return T.decode(from: decoder)
         case .failure(let error):
             return .failure(cause: error)
         }

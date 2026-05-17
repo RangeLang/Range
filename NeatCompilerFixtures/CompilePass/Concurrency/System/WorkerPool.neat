@@ -15,8 +15,8 @@ function worker(jobs: Channel<Int>, results: Channel<Int>) {
 }
 
 @main {
-    let jobs = Channel<Int>(capacity: 4)
-    let results = Channel<Int>(capacity: 4)
+    let jobs = Channel<Int>.withCapacity(4)
+    let results = Channel<Int>.withCapacity(4)
 
     worker(jobs: jobs, results: results)
     worker(jobs: jobs, results: results)

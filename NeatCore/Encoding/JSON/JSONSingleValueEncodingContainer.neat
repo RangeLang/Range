@@ -1,10 +1,6 @@
 construct JSONSingleValueEncodingContainer: SingleValueEncodingContainer {
     binding output: String
 
-    init(output: binding String) {
-        self.output = output
-    }
-
     function encodeNil() -> Result<Void, EncodingError> {
         output = "null"
         return .success(result: Void())

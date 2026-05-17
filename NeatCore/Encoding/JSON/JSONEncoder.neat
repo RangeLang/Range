@@ -28,10 +28,12 @@ construct JSONEncoder: Encoder {
     }
 
     function keyedContainer() -> KeyedEncodingContainer {
+        isObject = true
         return JSONKeyedEncodingContainer(output: $self.output, isObject: $self.isObject)
     }
 
     function unkeyedContainer() -> UnkeyedEncodingContainer {
+        isArray = true
         return JSONUnkeyedEncodingContainer(output: $self.output, isArray: $self.isArray)
     }
 

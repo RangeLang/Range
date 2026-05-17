@@ -1,6 +1,6 @@
 function encodeUUID() -> Result<String, EncodingError> {
     let encoder = JSONEncoder()
-    switch UUID(uuidString: "123e4567-e89b-12d3-a456-426614174000") {
+    switch UUID.parse(uuidString: "123e4567-e89b-12d3-a456-426614174000") {
     case .success(let value):
         return encoder.encode(value)
     case .failure:
@@ -10,7 +10,7 @@ function encodeUUID() -> Result<String, EncodingError> {
 
 function decodeUUID() -> Result<UUID, DecodingError> {
     let decoder = JSONDecoder(value: .string(value: "123e4567-e89b-12d3-a456-426614174000"))
-    return UUID(from: decoder)
+    return UUID.decode(from: decoder)
 }
 
 @main {

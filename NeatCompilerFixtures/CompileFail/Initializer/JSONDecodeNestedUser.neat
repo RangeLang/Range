@@ -53,7 +53,7 @@ function decodeNestedUser() -> Result<NestedDecodedUser, DecodingError> {
         JSONField(key: "address", value: .object(fields: addressFields)),
     ]
     let decoder = JSONDecoder(value: .object(fields: fields))
-    return NestedDecodedUser(from: decoder)
+    return NestedDecodedUser.decode(from: decoder)
 }
 
 @main {

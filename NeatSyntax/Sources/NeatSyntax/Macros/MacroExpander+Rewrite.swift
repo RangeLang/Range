@@ -39,7 +39,7 @@ extension MacroExpander {
             )
         else {
             throw ParseError(
-                "Init macro #literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/application rewrite semantics."
+                "Literal macro #literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/application rewrite semantics."
             )
         }
 
@@ -53,7 +53,9 @@ extension MacroExpander {
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
     ) throws -> Expression? {
-        guard let macro = macros[macroName], macroTargetKind(for: macro) == .initializer else {
+        guard let macro = macros[macroName],
+            [.initializer, .function].contains(macroTargetKind(for: macro))
+        else {
             return nil
         }
 
@@ -74,7 +76,7 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws -> Expression? {
         for rewrite in try resolvedRewriteCalls(for: macro, context: context)
-        where rewrite.site == .initApplication
+        where rewrite.site == .initApplication || rewrite.site == .functionApplication
         {
             return rewrite.payload
         }

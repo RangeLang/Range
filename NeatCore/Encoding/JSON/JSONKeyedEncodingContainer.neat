@@ -3,12 +3,6 @@ construct JSONKeyedEncodingContainer: KeyedEncodingContainer {
     binding isObject: Bool
     state wroteField: Bool = false
 
-    init(output: binding String, isObject: binding Bool) {
-        self.output = output
-        self.isObject = isObject
-        self.isObject = true
-    }
-
     function encode(_ value: Bool, forKey key: String) -> Result<Void, EncodingError> {
         appendField(key: key, value: "\(value)")
         return .success(result: Void())

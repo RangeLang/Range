@@ -488,7 +488,18 @@ public struct DeclarationGraph {
                 capturesSyntax: false
             )
         }
-        return values + states
+        let bindings = construct.bindings.map { binding in
+            NeatFunctionParameter(
+                macros: [],
+                localName: binding.name,
+                externalLabel: binding.externalLabel ?? binding.name,
+                typeReference: .named(binding.typeName),
+                slotName: nil,
+                isBinding: true,
+                capturesSyntax: false
+            )
+        }
+        return values + states + bindings
     }
 
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
@@ -1185,13 +1196,13 @@ public struct DeclarationGraph {
         from constructs: [String: ConstructDeclaration]
     ) -> [RealizedLiteralBridge] {
         constructs.values.flatMap { construct in
-            construct.initializers.compactMap { initializer in
-                guard initializer.parameters.count == 1 else {
+            construct.callables.compactMap { callable in
+                guard callable.parameters.count == 1 else {
                     return nil
                 }
 
                 guard
-                    let literalMacro = initializer.macros.first(where: { $0.name == "literal" }),
+                    let literalMacro = callable.macros.first(where: { $0.name == "literal" }),
                     literalMacro.genericArguments.count == 1
                 else {
                     return nil
@@ -1200,7 +1211,7 @@ public struct DeclarationGraph {
                 return RealizedLiteralBridge(
                     initTarget: RealizedInitTarget(
                         constructName: construct.name,
-                        parameterLabels: initializer.parameters.map(\.externalLabel),
+                        parameterLabels: callable.parameters.map(\.externalLabel),
                         isCore: construct.isCore
                     ),
                     carrierTypeName: literalMacro.genericArguments[0].displayName

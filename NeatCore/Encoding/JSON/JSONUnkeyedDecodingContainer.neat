@@ -2,10 +2,6 @@ construct JSONUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     let values: [JSONValue]
     state index: Int = 0
 
-    init(values: [JSONValue]) {
-        self.values = values
-    }
-
     function isAtEnd() -> Bool {
         return index >= values.count
     }
@@ -84,7 +80,7 @@ construct JSONUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         switch nextValue() {
         case .success(let value):
             let decoder = JSONDecoder(value: value)
-            return T(from: decoder)
+            return T.decode(from: decoder)
         case .failure(let error):
             return .failure(cause: error)
         }

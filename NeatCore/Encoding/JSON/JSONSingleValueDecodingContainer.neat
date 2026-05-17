@@ -25,7 +25,7 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
     function decode(_ type: Date.Type) -> Result<Date, DecodingError> {
         switch value {
         case .string(let decoded):
-            return Date(iso8601String: decoded)
+            return Date.parse(iso8601String: decoded)
         case .array, .bool, .float, .int, .null, .object:
             return .failure(cause: .failed)
         }
@@ -34,7 +34,7 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
     function decode(_ type: DateTime.Type) -> Result<DateTime, DecodingError> {
         switch value {
         case .string(let decoded):
-            return DateTime(iso8601String: decoded)
+            return DateTime.parse(iso8601String: decoded)
         case .array, .bool, .float, .int, .null, .object:
             return .failure(cause: .failed)
         }
@@ -70,7 +70,7 @@ construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
     function decode(_ type: UUID.Type) -> Result<UUID, DecodingError> {
         switch value {
         case .string(let decoded):
-            return UUID(uuidString: decoded)
+            return UUID.parse(uuidString: decoded)
         case .array, .bool, .float, .int, .null, .object:
             return .failure(cause: .failed)
         }

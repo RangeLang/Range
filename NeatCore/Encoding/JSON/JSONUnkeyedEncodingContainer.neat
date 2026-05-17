@@ -3,12 +3,6 @@ construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     binding isArray: Bool
     state wroteValue: Bool = false
 
-    init(output: binding String, isArray: binding Bool) {
-        self.output = output
-        self.isArray = isArray
-        self.isArray = true
-    }
-
     function encode(_ value: Bool) -> Result<Void, EncodingError> {
         appendValue(value: "\(value)")
         return .success(result: Void())
