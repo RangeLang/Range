@@ -21,14 +21,15 @@ struct ProjectUpdater {
 
         let source = try String(contentsOf: packageFile, encoding: .utf8)
         let manifest = try PackageManifestLoader.load(from: packageFile)
+        let isNeatPackage = manifest.name == "Neat"
         let modules = parseModules(from: source)
-        try updateModules(modules, projectRoot: root)
+        try updateModules(modules, projectRoot: root, reportEmpty: !isNeatPackage)
 
         if updateCLI {
             try updateNeatCLIIfAvailable(from: root)
         }
 
-        if manifest.name == "Neat" {
+        if isNeatPackage {
             try publishAndDownloadNeat(from: root)
         }
 
@@ -48,9 +49,11 @@ struct ProjectUpdater {
         return Array(Set(values)).sorted()
     }
 
-    private func updateModules(_ modules: [String], projectRoot: URL) throws {
+    private func updateModules(_ modules: [String], projectRoot: URL, reportEmpty: Bool = true) throws {
         guard !modules.isEmpty else {
-            TerminalLog.out("No modules declared in Package.neat.", level: .waiting, dimmed: true)
+            if reportEmpty {
+                TerminalLog.subtleOut("Modules: none")
+            }
             return
         }
 
@@ -89,13 +92,13 @@ struct ProjectUpdater {
 
             let gitDir = modulePath.appendingPathComponent(".git", isDirectory: true)
             if FileManager.default.fileExists(atPath: gitDir.path) {
-                try runProcess(
+                try runProcessQuiet(
                     executable: "/usr/bin/env",
                     arguments: ["git", "-C", modulePath.path, "pull", "--ff-only"]
                 )
                 TerminalLog.out("Updated module \(module)", level: .success)
             } else {
-                try runProcess(
+                try runProcessQuiet(
                     executable: "/usr/bin/env",
                     arguments: ["git", "clone", "--depth", "1", repoURL, modulePath.path]
                 )
@@ -119,7 +122,7 @@ struct ProjectUpdater {
     }
 
     private func publishAndDownloadNeat(from root: URL) throws {
-        TerminalLog.out("Publishing Neat package", level: .change)
+        TerminalLog.out("Publishing Neat", level: .change)
         let published = try PackagePublisher(projectPath: root.path).publish(.patch)
         TerminalLog.out("Published \(published.name) \(published.version).", level: .success)
         switch published.git {
@@ -158,13 +161,13 @@ struct ProjectUpdater {
 
         let gitDir = packageRoot.appendingPathComponent(".git", isDirectory: true)
         if FileManager.default.fileExists(atPath: gitDir.path) {
-            try runProcess(
+            try runProcessQuiet(
                 executable: "/usr/bin/env",
                 arguments: ["git", "-C", packageRoot.path, "pull", "--ff-only", "origin", "main"]
             )
             TerminalLog.out("Downloaded \(reference) from origin.", level: .success)
         } else {
-            try runProcess(
+            try runProcessQuiet(
                 executable: "/usr/bin/env",
                 arguments: ["git", "clone", remoteURL, packageRoot.path]
             )
@@ -237,5 +240,9 @@ struct ProjectUpdater {
         }
 
         return outputText
+    }
+
+    private func runProcessQuiet(executable: String, arguments: [String]) throws {
+        _ = try runProcessCapturing(executable: executable, arguments: arguments)
     }
 }
