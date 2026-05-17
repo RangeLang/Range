@@ -20,6 +20,7 @@ struct PackageSubscriptionManagerTests {
         let packages = try manager.installedPackages(in: root)
 
         #expect(packages.map(\.reference) == ["acme/logger", "acme/ui"])
+        #expect(packages.map(\.version) == ["0.1.0", "0.1.0"])
         #expect(manager.matchingPackages(packages, search: "logging").map(\.reference) == ["acme/logger"])
         #expect(manager.matchingPackages(packages, search: "acme ui").map(\.reference) == ["acme/ui"])
     }
@@ -76,7 +77,7 @@ struct PackageSubscriptionManagerTests {
         )
         try """
             construct \(name): Package {
-
+                let version: String = "0.1.0"
             }
             """.write(to: url, atomically: true, encoding: .utf8)
     }

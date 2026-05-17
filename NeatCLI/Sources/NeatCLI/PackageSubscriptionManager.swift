@@ -4,6 +4,7 @@ import Foundation
 struct InstalledPackage: Equatable {
     let reference: String
     let name: String
+    let version: String?
     let manifestURL: URL
 }
 
@@ -129,6 +130,7 @@ struct PackageSubscriptionManager {
                 InstalledPackage(
                     reference: relative,
                     name: manifest.name,
+                    version: manifest.version,
                     manifestURL: url
                 )
             )

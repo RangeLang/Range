@@ -6,7 +6,11 @@ extension NeatCLI {
         static let configuration = CommandConfiguration(
             abstract: "Manage installed Neat packages.",
             subcommands: [
+                Patch.self,
+                Minor.self,
+                Major.self,
                 Publish.self,
+                Search.self,
                 Subscribe.self
             ]
         )
@@ -33,6 +37,121 @@ extension NeatCLI {
             }
         }
 
+        private static func publish(
+            bump: PackageVersionBump,
+            projectPath: String,
+            noGit: Bool,
+            noPush: Bool
+        ) throws {
+            let publisher = PackagePublisher(projectPath: projectPath)
+            let published = try publisher.publish(
+                bump,
+                automateGit: !noGit,
+                push: !noPush
+            )
+            TerminalLog.out(
+                "Published \(published.name) \(published.version).",
+                level: .success
+            )
+            if let author = published.author, !author.isEmpty {
+                TerminalLog.subtleOut("Author: \(author)")
+            }
+            TerminalLog.subtleOut("Package.neat: \(published.packageFile.path)")
+            switch published.git {
+            case .published(let commit, let tag, let pushed):
+                TerminalLog.subtleOut("Git: \(commit), \(tag)\(pushed ? ", pushed" : ", not pushed")")
+            case .skipped(let reason):
+                TerminalLog.subtleOut("Git: skipped (\(reason))")
+            }
+        }
+
+        struct Patch: ParsableCommand {
+            static let configuration = CommandConfiguration(
+                abstract: "Publish this package with a patch version bump."
+            )
+
+            @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
+            var projectPath: String = "."
+
+            @Flag(help: "Only bump Package.neat; do not commit or tag.")
+            var noGit: Bool = false
+
+            @Flag(help: "Commit and tag locally, but do not push to origin.")
+            var noPush: Bool = false
+
+            mutating func run() throws {
+                do {
+                    try Package.publish(
+                        bump: .patch,
+                        projectPath: projectPath,
+                        noGit: noGit,
+                        noPush: noPush
+                    )
+                } catch {
+                    ErrorPresenter.printError(error)
+                    throw ExitCode.failure
+                }
+            }
+        }
+
+        struct Minor: ParsableCommand {
+            static let configuration = CommandConfiguration(
+                abstract: "Publish this package with a minor version bump."
+            )
+
+            @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
+            var projectPath: String = "."
+
+            @Flag(help: "Only bump Package.neat; do not commit or tag.")
+            var noGit: Bool = false
+
+            @Flag(help: "Commit and tag locally, but do not push to origin.")
+            var noPush: Bool = false
+
+            mutating func run() throws {
+                do {
+                    try Package.publish(
+                        bump: .minor,
+                        projectPath: projectPath,
+                        noGit: noGit,
+                        noPush: noPush
+                    )
+                } catch {
+                    ErrorPresenter.printError(error)
+                    throw ExitCode.failure
+                }
+            }
+        }
+
+        struct Major: ParsableCommand {
+            static let configuration = CommandConfiguration(
+                abstract: "Publish this package with a major version bump."
+            )
+
+            @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
+            var projectPath: String = "."
+
+            @Flag(help: "Only bump Package.neat; do not commit or tag.")
+            var noGit: Bool = false
+
+            @Flag(help: "Commit and tag locally, but do not push to origin.")
+            var noPush: Bool = false
+
+            mutating func run() throws {
+                do {
+                    try Package.publish(
+                        bump: .major,
+                        projectPath: projectPath,
+                        noGit: noGit,
+                        noPush: noPush
+                    )
+                } catch {
+                    ErrorPresenter.printError(error)
+                    throw ExitCode.failure
+                }
+            }
+        }
+
         struct Publish: ParsableCommand {
             static let configuration = CommandConfiguration(
                 abstract: "Publish this package with a semantic version bump."
@@ -55,26 +174,12 @@ extension NeatCLI {
 
             mutating func run() throws {
                 do {
-                    let publisher = PackagePublisher(projectPath: projectPath)
-                    let published = try publisher.publish(
-                        bump,
-                        automateGit: !noGit,
-                        push: !noPush
+                    try Package.publish(
+                        bump: bump,
+                        projectPath: projectPath,
+                        noGit: noGit,
+                        noPush: noPush
                     )
-                    TerminalLog.out(
-                        "Published \(published.name) \(published.version).",
-                        level: .success
-                    )
-                    if let author = published.author, !author.isEmpty {
-                        TerminalLog.subtleOut("Author: \(author)")
-                    }
-                    TerminalLog.subtleOut("Package.neat: \(published.packageFile.path)")
-                    switch published.git {
-                    case .published(let commit, let tag, let pushed):
-                        TerminalLog.subtleOut("Git: \(commit), \(tag)\(pushed ? ", pushed" : ", not pushed")")
-                    case .skipped(let reason):
-                        TerminalLog.subtleOut("Git: skipped (\(reason))")
-                    }
                 } catch {
                     ErrorPresenter.printError(error)
                     throw ExitCode.failure

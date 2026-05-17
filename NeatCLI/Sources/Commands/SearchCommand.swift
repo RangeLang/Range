@@ -1,7 +1,8 @@
 import ArgumentParser
+import Darwin
 import Foundation
 
-extension NeatCLI {
+extension NeatCLI.Package {
     struct Search: ParsableCommand {
         static let configuration = CommandConfiguration(
             abstract: "Search the network for Neat packages."
@@ -32,8 +33,7 @@ extension NeatCLI {
                     try runInteractiveSearch(searcher: searcher)
                 } else {
                     let query = terms.joined(separator: " ")
-                    let results = try searcher.search(query: query, limit: limit)
-                    render(query: query, cloudResults: results)
+                    try renderSearch(query: query, searcher: searcher)
                 }
             } catch {
                 ErrorPresenter.printError(error)
@@ -59,28 +59,61 @@ extension NeatCLI {
                     return
                 }
 
-                let results = try searcher.search(query: query, limit: limit)
-                render(query: query, cloudResults: results)
+                try renderSearch(query: query, searcher: searcher)
             }
         }
 
-        private func render(query: String, cloudResults: [PackageSearchResult]) {
-            let projectRoot = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
+        private func renderSearch(query: String, searcher: PackageSearcher) throws {
+            renderInstalledSection(
+                title: "Machine",
+                root: machinePackageRoot(),
+                query: query
+            )
+            print("")
+            renderInstalledSection(
+                title: "Project",
+                root: URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL,
+                query: query
+            )
+            print("")
+            renderCloudLoading()
+            let results = try runCloudSearchWithSpinner(query: query, searcher: searcher)
+            renderCloud(results)
+        }
+
+        private func renderInstalledSection(title: String, root: URL, query: String) {
             let manager = PackageSubscriptionManager(projectPath: path)
-            let installed = (try? manager.installedPackages(in: projectRoot)) ?? []
+            let installed = (try? manager.installedPackages(in: root)) ?? []
             let installedMatches = manager.matchingPackages(installed, search: query)
 
-            print(TerminalLog.style("Local", level: .change, bold: true))
+            print(TerminalLog.style(title, level: .change, bold: true))
             print(TerminalLog.subtleStdout("\(installedMatches.count) of \(installed.count) installed"))
             if installedMatches.isEmpty {
-                print(TerminalLog.subtleStdout("No installed packages match '\(query)'."))
+                print(TerminalLog.subtleStdout("No \(title.lowercased()) packages match '\(query)'."))
             } else {
                 for package in installedMatches {
-                    print("  " + TerminalLog.style(package.reference, level: .change, bold: true) + "  " + TerminalLog.subtleStdout(package.name))
+                    print("  " + packageRow(
+                        reference: package.reference,
+                        version: package.version ?? "unknown",
+                        level: .change
+                    ))
                 }
             }
+        }
 
-            print("")
+        private func machinePackageRoot() -> URL {
+            FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+        }
+
+        private func renderCloudLoading(frame: String? = nil) {
+            print(TerminalLog.style("Cloud", level: .optimization, bold: true))
+            let suffix = frame.map { " \($0)" } ?? ""
+            print(TerminalLog.subtleStdout("Loading cloud packages\(suffix)..."))
+        }
+
+        private func renderCloud(_ cloudResults: [PackageSearchResult]) {
+            replaceCloudLines()
+
             print(TerminalLog.style("Cloud", level: .optimization, bold: true))
             guard !cloudResults.isEmpty else {
                 print(TerminalLog.subtleStdout("No cloud packages found. Try another search."))
@@ -90,7 +123,11 @@ extension NeatCLI {
             print(TerminalLog.subtleStdout("\(cloudResults.count) found"))
             for result in cloudResults {
                 let stars = result.stars == 1 ? "1 star" : "\(result.stars) stars"
-                print("  " + TerminalLog.style(result.package, level: .optimization, bold: true) + "  " + TerminalLog.subtleStdout(stars))
+                print("  " + packageRow(
+                    reference: result.package,
+                    version: "unknown",
+                    level: .optimization
+                ) + "  " + TerminalLog.subtleStdout(stars))
 
                 if let description = result.description?.trimmingCharacters(in: .whitespacesAndNewlines),
                     !description.isEmpty
@@ -102,5 +139,79 @@ extension NeatCLI {
                 print("    " + TerminalLog.subtleStdout("Package.neat: Module(\"\(result.package)\")"))
             }
         }
+
+        private func packageRow(
+            reference: String,
+            version: String,
+            level: CLIStatusLevel
+        ) -> String {
+            let package = "\(reference)@latest"
+            let width = max(32, package.count + 4)
+            let padding = String(repeating: " ", count: max(1, width - package.count))
+            return TerminalLog.style(package, level: level, bold: true)
+                + padding
+                + TerminalLog.subtleStdout(version)
+        }
+
+        private func runCloudSearchWithSpinner(query: String, searcher: PackageSearcher) throws
+            -> [PackageSearchResult]
+        {
+            let box = PackageSearchResultBox()
+            let thread = Thread {
+                do {
+                    box.store(.success(try searcher.search(query: query, limit: limit)))
+                } catch {
+                    box.store(.failure(error))
+                }
+            }
+            thread.start()
+
+            guard isatty(STDOUT_FILENO) == 1 else {
+                while box.load() == nil {
+                    Thread.sleep(forTimeInterval: 0.05)
+                }
+                return try box.load()!.get()
+            }
+
+            let frames = ["|", "/", "-", "\\"]
+            var index = 0
+            while box.load() == nil {
+                replaceCloudLines()
+                renderCloudLoading(frame: frames[index % frames.count])
+                index += 1
+                Thread.sleep(forTimeInterval: 0.1)
+            }
+
+            return try box.load()!.get()
+        }
+
+        private func replaceCloudLines() {
+            guard isatty(STDOUT_FILENO) == 1 else {
+                return
+            }
+
+            fputs("\u{001B}[2A", stdout)
+            fputs("\u{001B}[2K", stdout)
+            fputs("\u{001B}[1B", stdout)
+            fputs("\u{001B}[2K", stdout)
+            fputs("\u{001B}[1A", stdout)
+        }
+    }
+}
+
+private final class PackageSearchResultBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Result<[PackageSearchResult], Error>?
+
+    func store(_ result: Result<[PackageSearchResult], Error>) {
+        lock.lock()
+        self.result = result
+        lock.unlock()
+    }
+
+    func load() -> Result<[PackageSearchResult], Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return result
     }
 }
