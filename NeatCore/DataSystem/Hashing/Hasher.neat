@@ -1,10 +1,6 @@
 @language
 construct Hasher {
-    state storage: HasherStorage
-
-    init() {
-        self.storage = HasherStorage()
-    }
+    state storage: HasherStorage = HasherStorage()
 
     function combine<T: Hashable>(_ value: T) {
         value.hash(into: self)

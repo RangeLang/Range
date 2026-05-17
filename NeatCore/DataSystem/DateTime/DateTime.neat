@@ -2,13 +2,11 @@
 construct DateTime {
     let storage: DateTimeStorage
 
-    init(storage: DateTimeStorage)
-
-    init(iso8601String: String) -> Result<Self, DecodingError> {
+    
+    function parse(iso8601String: String) -> Result<Self, DecodingError> {
         switch DateTimeStorage(iso8601String: iso8601String) {
         case .success(let storage):
-            self.storage = storage
-            return .success(result: self)
+            return .success(result: Self(storage: storage))
         case .failure(let error):
             return .failure(cause: error)
         }
@@ -24,12 +22,11 @@ extension DateTime: Comparable {
 }
 
 extension DateTime: Decodable {
-    init(from decoder: Decoder) -> Result<Self, DecodingError> {
+    function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container = decoder.singleValueContainer()
         switch container.decode(DateTime.self) {
         case .success(let value):
-            self.storage = value.storage
-            return .success(result: self)
+            return .success(result: value)
         case .failure(let error):
             return .failure(cause: error)
         }

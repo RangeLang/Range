@@ -7,7 +7,7 @@ description: Use when changing typed construction syntax such as `let version: V
 
 ## Workflow
 
-1. Read `references/typed-construction-metadata.md` before changing typed construction parsing, graph storage, diagnostics, lowering, or docs.
+1. Read `docs/articles/typed-construction-metadata.md` before changing typed construction parsing, graph storage, diagnostics, lowering, or docs.
 2. Compare the reference against current code and tests. The note defines design intent, but examples may need cleanup if implementation changed.
 3. Preserve the core model unless the user explicitly changes direction: initialization is declaration metadata; assignment is later mutation.
 4. Keep source intent separate from backend lowering.
@@ -31,4 +31,4 @@ Do not model it first as slot assignment.
 
 ## Reference
 
-Load `references/typed-construction-metadata.md` for the full article.
+Load `docs/articles/typed-construction-metadata.md` for the full article. If it is stale, update that canonical doc.

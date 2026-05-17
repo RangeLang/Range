@@ -1,4 +1,5 @@
 @language
 construct Optional<Wrapped>: ExpressibleByNilLiteral {
-    init(literal: NilLiteral)
+    #literal<NilLiteral>
+    function literal(literal: NilLiteral) -> Self
 }

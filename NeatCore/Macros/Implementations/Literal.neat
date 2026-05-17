@@ -1,4 +1,4 @@
-macro literal<T>(): Init { target, diagnostics in
+macro literal<T>(): Function { target, diagnostics in
     if target.application.arguments.count == 1 && target.application.arguments[0].type == T.self {
         target.application.replace(with:
             target.application.arguments[0].expression

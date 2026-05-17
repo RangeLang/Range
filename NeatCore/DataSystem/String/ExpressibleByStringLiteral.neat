@@ -1,4 +1,4 @@
 protocol ExpressibleByStringLiteral {
     #literal<StringLiteral>
-    init(literal: StringLiteral)
+    function literal(literal: StringLiteral) -> Self
 }

@@ -66,7 +66,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
                 return .success(result: Void())
             }
 
-            init(from decoder: Decoder) -> Result<Self, DecodingError> {
+            function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer = decoder.keyedContainer()
                 #decodeBody(
                     container: container,

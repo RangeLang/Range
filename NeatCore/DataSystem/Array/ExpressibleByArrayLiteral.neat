@@ -1,4 +1,4 @@
 protocol ExpressibleByArrayLiteral {
     #literal<ArrayLiteral>
-    init(literal: ArrayLiteral)
+    function literal(literal: ArrayLiteral) -> Self
 }

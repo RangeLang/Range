@@ -7,7 +7,7 @@ description: Use when changing construct calls, initializer inference, direct co
 
 ## Workflow
 
-1. Read `references/direct-construct-application.md` before changing construct application, initializer inference, constructor fixtures, or docs around `init`.
+1. Read `docs/posts/direct-construct-application.md` before changing construct application, initializer inference, constructor fixtures, or docs around `init`.
 2. Check current compiler behavior and tests before deciding whether the note is current or stale.
 3. Preserve the design direction where possible: construct calls apply the construct data shape directly.
 4. Avoid reintroducing explicit `init` boilerplate as the language model unless the user explicitly changes direction.
@@ -28,4 +28,4 @@ The application should link arguments to construct members directly.
 
 ## Reference
 
-Load `references/direct-construct-application.md` for the full update note.
+Load `docs/posts/direct-construct-application.md` for the full update note. If it is stale, update that canonical doc.

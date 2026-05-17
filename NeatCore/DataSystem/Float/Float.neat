@@ -2,8 +2,9 @@
 construct Float<let width: FloatingPointWidth>: ExpressibleByFloatLiteral {
     let storage: FloatStorage
 
-    init(literal: FloatLiteral) {
-        self.storage = literal.storage()
+    #literal<FloatLiteral>
+    function literal(literal: FloatLiteral) -> Self {
+        return Self(storage: literal.storage())
     }
 }
 
@@ -16,12 +17,11 @@ extension Float: Comparable {
 }
 
 extension Float: Decodable {
-    init(from decoder: Decoder) -> Result<Self, DecodingError> {
+    function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container = decoder.singleValueContainer()
         switch container.decode(Float.self) {
         case .success(let value):
-            self.storage = value.storage
-            return .success(result: self)
+            return .success(result: value)
         case .failure(let error):
             return .failure(cause: error)
         }

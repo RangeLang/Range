@@ -1,10 +1,10 @@
 @language
 construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
-    state storage: DictionaryStorage<Key, Value>
+    state storage: DictionaryStorage<Key, Value> = DictionaryStorage<Key, Value>()
 
-    init()
-    init(literal: DictionaryLiteral) {
-        self.storage = literal.storage()
+    #literal<DictionaryLiteral>
+    function literal(literal: DictionaryLiteral) -> Self {
+        return Self(storage: literal.storage())
     }
 
     derived count: Int {

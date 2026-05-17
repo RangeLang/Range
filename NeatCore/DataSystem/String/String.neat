@@ -2,8 +2,9 @@
 construct String: ExpressibleByStringLiteral {
     let storage: StringStorage
 
-    init(literal: StringLiteral) {
-        self.storage = literal.storage()
+    #literal<StringLiteral>
+    function literal(literal: StringLiteral) -> Self {
+        return Self(storage: literal.storage())
     }
 
     derived count: Int {
@@ -28,12 +29,11 @@ extension String: Comparable {
 }
 
 extension String: Decodable {
-    init(from decoder: Decoder) -> Result<Self, DecodingError> {
+    function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container = decoder.singleValueContainer()
         switch container.decode(String.self) {
         case .success(let value):
-            self.storage = value.storage
-            return .success(result: self)
+            return .success(result: value)
         case .failure(let error):
             return .failure(cause: error)
         }

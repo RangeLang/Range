@@ -1,4 +1,4 @@
 protocol ExpressibleByBoolLiteral {
     #literal<BoolLiteral>
-    init(literal: BoolLiteral)
+    function literal(literal: BoolLiteral) -> Self
 }

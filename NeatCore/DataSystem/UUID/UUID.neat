@@ -2,13 +2,11 @@
 construct UUID {
     let storage: UUIDStorage
 
-    init(storage: UUIDStorage)
-
-    init(uuidString: String) -> Result<Self, DecodingError> {
+    
+    function parse(uuidString: String) -> Result<Self, DecodingError> {
         switch UUIDStorage(uuidString: uuidString) {
         case .success(let storage):
-            self.storage = storage
-            return .success(result: self)
+            return .success(result: Self(storage: storage))
         case .failure(let error):
             return .failure(cause: error)
         }
@@ -20,12 +18,11 @@ extension UUID: Equatable {
 }
 
 extension UUID: Decodable {
-    init(from decoder: Decoder) -> Result<Self, DecodingError> {
+    function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container = decoder.singleValueContainer()
         switch container.decode(UUID.self) {
         case .success(let value):
-            self.storage = value.storage
-            return .success(result: self)
+            return .success(result: value)
         case .failure(let error):
             return .failure(cause: error)
         }

@@ -1,13 +1,9 @@
 @language
 construct Channel<Element> {
-    let storage: ChannelStorage<Element>
+    let storage: ChannelStorage<Element> = ChannelStorage<Element>(capacity: 0)
 
-    init() {
-        self.storage = ChannelStorage(capacity: 0)
-    }
-
-    init(capacity: Int) {
-        self.storage = ChannelStorage(capacity: capacity)
+    function withCapacity(_ capacity: Int) -> Self {
+        return Self(storage: ChannelStorage<Element>(capacity: capacity))
     }
 
     function send(_ element: Element) {

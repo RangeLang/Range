@@ -1,4 +1,4 @@
 protocol ExpressibleByNilLiteral {
     #literal<NilLiteral>
-    init(literal: NilLiteral)
+    function literal(literal: NilLiteral) -> Self
 }

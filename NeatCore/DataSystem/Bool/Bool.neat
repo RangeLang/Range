@@ -2,8 +2,9 @@
 construct Bool: ExpressibleByBoolLiteral {
     let storage: BoolStorage
 
-    init(literal: BoolLiteral) {
-        self.storage = literal.storage()
+    #literal<BoolLiteral>
+    function literal(literal: BoolLiteral) -> Self {
+        return Self(storage: literal.storage())
     }
 }
 
@@ -12,12 +13,11 @@ extension Bool: Equatable {
 }
 
 extension Bool: Decodable {
-    init(from decoder: Decoder) -> Result<Self, DecodingError> {
+    function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container = decoder.singleValueContainer()
         switch container.decode(Bool.self) {
         case .success(let value):
-            self.storage = value.storage
-            return .success(result: self)
+            return .success(result: value)
         case .failure(let error):
             return .failure(cause: error)
         }

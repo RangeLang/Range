@@ -1,10 +1,10 @@
 @language
 construct Set<Element: Hashable>: ExpressibleBySetLiteral {
-    state storage: SetStorage<Element>
+    state storage: SetStorage<Element> = SetStorage<Element>()
 
-    init()
-    init(literal: SetLiteral) {
-        self.storage = literal.storage()
+    #literal<SetLiteral>
+    function literal(literal: SetLiteral) -> Self {
+        return Self(storage: literal.storage())
     }
 
     derived count: Int {

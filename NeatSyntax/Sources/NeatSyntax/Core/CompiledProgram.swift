@@ -211,7 +211,7 @@ public struct CompilerPipeline {
                 discoveredCallableReturnTypes: discoveredCallableReturnTypes,
                 macroDeclarationsByName: currentMacrosByName,
                 macroExpansionTypes: currentMacroExpansionTypes,
-                allowInitializerDeclarations: input.role == .core
+                allowInitializerDeclarations: false
             )
             let parsedFile = ParsedSourceFile(
                 path: input.path,
@@ -240,7 +240,7 @@ public struct CompilerPipeline {
         try inputs.map { input in
             var parser = try Parser(
                 source: input.source,
-                allowInitializerDeclarations: input.role == .core
+                allowInitializerDeclarations: false
             )
             return ParsedSourceFile(
                 path: input.path,

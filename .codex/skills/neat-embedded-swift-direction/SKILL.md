@@ -7,7 +7,7 @@ description: Use when changing Neat Swift implementation, Package.swift settings
 
 ## Workflow
 
-1. Read `references/embedded-swift-direction.md` before making or reviewing Swift implementation changes that touch runtime behavior, generated Swift, compiler package settings, or backend design.
+1. Read `docs/articles/embedded-swift-direction.md` before making or reviewing Swift implementation changes that touch runtime behavior, generated Swift, compiler package settings, or backend design.
 2. Check the current code before applying the note. The reference is design history, not automatic truth.
 3. If code contradicts the reference, decide whether the code is a regression or the doc is stale.
 4. Fix the implementation when it violates the intended direction. Clean the docs when the implementation has intentionally moved on.
@@ -22,4 +22,4 @@ description: Use when changing Neat Swift implementation, Package.swift settings
 
 ## Reference
 
-Load `references/embedded-swift-direction.md` for the full historical note.
+Load `docs/articles/embedded-swift-direction.md` for the full historical note. If it is stale, update that canonical doc.

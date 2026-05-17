@@ -1,15 +1,10 @@
 @language
 construct Array<Element>: ExpressibleByArrayLiteral {
-    state storage: ArrayStorage<Element>
+    state storage: ArrayStorage<Element> = ArrayStorage<Element>()
 
-    init()
-
-    init(storage: ArrayStorage<Element>) {
-        self.storage = storage
-    }
-
-    init(literal: ArrayLiteral) {
-        self.storage = literal.storage()
+    #literal<ArrayLiteral>
+    function literal(literal: ArrayLiteral) -> Self {
+        return Self(storage: literal.storage())
     }
 
     derived count: Int {

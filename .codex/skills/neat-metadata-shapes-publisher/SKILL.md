@@ -7,7 +7,7 @@ description: Use when changing Neat package publishing, metadata extraction, dec
 
 ## Workflow
 
-1. Read `references/metadata-shapes-publisher-note.md` when work touches publisher output, package model shape, declaration metadata, visibility, namespace behavior, or typed construction examples.
+1. Read `docs/articles/metadata-shapes-publisher-note.md` when work touches publisher output, package model shape, declaration metadata, visibility, namespace behavior, or typed construction examples.
 2. Verify the current parser, graph, backend, and tests before treating the note as current.
 3. If examples are outdated, update the docs instead of copying stale syntax into code.
 4. If implementation regressed from the intended shape, fix code/tests and keep docs aligned.
@@ -22,4 +22,4 @@ description: Use when changing Neat package publishing, metadata extraction, dec
 
 ## Reference
 
-Load `references/metadata-shapes-publisher-note.md` for the full before/after note.
+Load `docs/articles/metadata-shapes-publisher-note.md` for the full before/after note. If it is stale, update that canonical doc.

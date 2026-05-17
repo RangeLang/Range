@@ -7,7 +7,7 @@ description: Use when changing namespace declarations, namespace-backed attribut
 
 ## Workflow
 
-1. Read `references/namespace-declarations-as-attributes.md` before changing namespace-backed attribute behavior.
+1. Read `docs/articles/namespace-declarations-as-attributes.md` before changing namespace-backed attribute behavior.
 2. Check current parser, declaration graph, validator, diagnostics, and tests before deciding whether the note or implementation is stale.
 3. Prefer declaration graph facts over validator-local rediscovery.
 4. If the validator walks source files to rediscover namespaces, treat that as suspicious and inspect whether the graph should own the fact.
@@ -21,4 +21,4 @@ description: Use when changing namespace declarations, namespace-backed attribut
 
 ## Reference
 
-Load `references/namespace-declarations-as-attributes.md` for the full design note.
+Load `docs/articles/namespace-declarations-as-attributes.md` for the full design note. If it is stale, update that canonical doc.
