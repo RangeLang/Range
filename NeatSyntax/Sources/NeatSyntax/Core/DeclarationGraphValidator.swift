@@ -6,7 +6,10 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     public init() {}
 
     public func validate(_ program: CompiledProgram) throws {
-        try validateCoreAttributeUsage(in: program.projectParsedFiles)
+        try validateAttributeUsage(
+            in: program.projectParsedFiles,
+            availableNamespaces: namespaceNames(in: program.parsedFiles)
+        )
         try validatePrimaryDeclarations(in: program.parsedFiles)
         try validateTopLevelStates(in: program.parsedFiles)
         try validateProtocolConformances(in: program.declarationGraph)
@@ -455,29 +458,140 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         return Dictionary(uniqueKeysWithValues: zip(parameterNames, arguments))
     }
 
-    private func validateCoreAttributeUsage(in parsedFiles: [ParsedSourceFile]) throws {
+    private func validateAttributeUsage(
+        in parsedFiles: [ParsedSourceFile],
+        availableNamespaces: Set<String>
+    ) throws {
         for parsedFile in parsedFiles {
-            for declaration in declarations(in: parsedFile.sourceFile) where declaration.isCore {
-                throw SemanticValidationError(
-                    "@language can only be used in NeatCore. Remove @language from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
+            for declaration in attributedConstructs(in: parsedFile.sourceFile) {
+                try validateAttribute(
+                    declaration.attribute,
+                    declarationName: declaration.name,
+                    filePath: parsedFile.path,
+                    availableNamespaces: availableNamespaces
                 )
             }
-            for callable in callables(in: parsedFile.sourceFile) where callable.isCore {
-                throw SemanticValidationError(
-                    "@language can only be used in NeatCore. Remove @language from \(callable.name) in \(lastPathComponent(of: parsedFile.path))."
+            for callable in callables(in: parsedFile.sourceFile) {
+                try validateAttribute(
+                    callable.attribute,
+                    declarationName: callable.name,
+                    filePath: parsedFile.path,
+                    availableNamespaces: availableNamespaces
                 )
             }
-            for declaration in protocols(in: parsedFile.sourceFile) where declaration.isCore {
-                throw SemanticValidationError(
-                    "@language can only be used in NeatCore. Remove @language from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
+            for declaration in protocols(in: parsedFile.sourceFile) {
+                try validateAttribute(
+                    declaration.attribute,
+                    declarationName: declaration.name,
+                    filePath: parsedFile.path,
+                    availableNamespaces: availableNamespaces
                 )
             }
-            for declaration in enumerations(in: parsedFile.sourceFile) where declaration.isCore {
-                throw SemanticValidationError(
-                    "@language can only be used in NeatCore. Remove @language from \(declaration.name) in \(lastPathComponent(of: parsedFile.path))."
+            for declaration in enumerations(in: parsedFile.sourceFile) {
+                try validateAttribute(
+                    declaration.attribute,
+                    declarationName: declaration.name,
+                    filePath: parsedFile.path,
+                    availableNamespaces: availableNamespaces
                 )
             }
         }
+    }
+
+    private func validateAttribute(
+        _ attribute: AttributeApplication?,
+        declarationName: String,
+        filePath: String,
+        availableNamespaces: Set<String>
+    ) throws {
+        guard let attribute else {
+            return
+        }
+
+        if attribute.isLanguageBoundary {
+            throw SemanticValidationError(
+                "@language can only be used in NeatCore. Remove @language from \(declarationName) in \(lastPathComponent(of: filePath))."
+            )
+        }
+
+        guard NeatSyntax.attributeIdentifiers.contains(attribute.name)
+            || availableNamespaces.contains(attribute.name)
+        else {
+            throw SemanticValidationError(
+                "Unknown attribute @\(attribute.name) in \(lastPathComponent(of: filePath)). Declare namespace \(attribute.name) to use @\(attribute.name)."
+            )
+        }
+    }
+
+    private func namespaceNames(in parsedFiles: [ParsedSourceFile]) -> Set<String> {
+        Set(parsedFiles.flatMap { namespaces(in: $0.sourceFile).map(\.name) })
+    }
+
+    private func namespaces(in sourceFile: SourceFileNode) -> [NamespaceDeclaration] {
+        switch sourceFile {
+        case .namespace(let declaration):
+            return [declaration] + declaration.namespaces.flatMap { namespaces(in: .namespace($0)) }
+        case .module(let module):
+            return module.namespaces.flatMap { namespaces(in: .namespace($0)) }
+                + module.extensions.flatMap { namespaces(in: $0) }
+        case .extensions(let declarations):
+            return declarations.flatMap { namespaces(in: $0) }
+        case .construct(let declaration):
+            return declaration.constructs.flatMap { namespaces(in: .construct($0)) }
+        case .mainBlock, .enumeration, .protocolDefinition, .macro, .marker:
+            return []
+        }
+    }
+
+    private func namespaces(in declaration: ExtensionDeclaration) -> [NamespaceDeclaration] {
+        declaration.namespaces.flatMap { namespaces(in: .namespace($0)) }
+            + declaration.constructs.flatMap { namespaces(in: .construct($0)) }
+    }
+
+    private func attributedConstructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
+        switch sourceFile {
+        case .construct(let declaration):
+            return [declaration] + declaration.constructs.flatMap {
+                attributedConstructs(in: .construct($0))
+            }
+        case .namespace(let declaration):
+            return declaration.constructs.flatMap { attributedConstructs(in: .construct($0)) }
+                + declaration.namespaces.flatMap { attributedConstructs(in: .namespace($0)) }
+        case .module(let module):
+            return module.constructs.flatMap { attributedConstructs(in: .construct($0)) }
+                + module.namespaces.flatMap { attributedConstructs(in: .namespace($0)) }
+                + module.extensions.flatMap { attributedConstructs(in: $0) }
+        case .extensions(let declarations):
+            return declarations.flatMap { attributedConstructs(in: $0) }
+        case .mainBlock, .enumeration, .protocolDefinition, .macro, .marker:
+            return []
+        }
+    }
+
+    private func attributedConstructs(in declaration: ExtensionDeclaration) -> [ConstructDeclaration] {
+        declaration.constructs.flatMap { attributedConstructs(in: .construct($0)) }
+            + declaration.namespaces.flatMap { attributedConstructs(in: .namespace($0)) }
+    }
+
+    private func declarations(in declaration: ExtensionDeclaration) -> [ConstructDeclaration] {
+        declaration.constructs + declaration.constructs.flatMap { declarations(in: .construct($0)) }
+            + declaration.namespaces.flatMap { declarations(in: .namespace($0)) }
+    }
+
+    private func callables(in declaration: ExtensionDeclaration) -> [CallableDeclaration] {
+        declaration.callables
+            + declaration.constructs.flatMap { $0.callables }
+            + declaration.namespaces.flatMap { callables(in: .namespace($0)) }
+    }
+
+    private func protocols(in declaration: ExtensionDeclaration) -> [ProtocolDeclaration] {
+        declaration.protocols
+            + declaration.namespaces.flatMap { protocols(in: .namespace($0)) }
+    }
+
+    private func enumerations(in declaration: ExtensionDeclaration) -> [EnumDeclaration] {
+        declaration.enumerations
+            + declaration.namespaces.flatMap { enumerations(in: .namespace($0)) }
     }
 
     private func declarations(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
@@ -506,9 +620,16 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         switch sourceFile {
         case .module(let module):
             return module.callables + module.namespaces.flatMap { callables(in: .namespace($0)) }
+                + module.constructs.flatMap { callables(in: .construct($0)) }
+                + module.extensions.flatMap { callables(in: $0) }
         case .namespace(let declaration):
             return declaration.callables + declaration.namespaces.flatMap { callables(in: .namespace($0)) }
-        case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro, .marker:
+                + declaration.constructs.flatMap { callables(in: .construct($0)) }
+        case .construct(let declaration):
+            return declaration.callables + declaration.constructs.flatMap { callables(in: .construct($0)) }
+        case .extensions(let declarations):
+            return declarations.flatMap { callables(in: $0) }
+        case .mainBlock, .enumeration, .protocolDefinition, .macro, .marker:
             return []
         }
     }
@@ -518,8 +639,10 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         case .protocolDefinition(let declaration):
             return [declaration]
         case .module(let module):
-            return module.protocols
-        case .construct, .namespace, .mainBlock, .extensions, .enumeration, .macro, .marker:
+            return module.protocols + module.extensions.flatMap { protocols(in: $0) }
+        case .extensions(let declarations):
+            return declarations.flatMap { protocols(in: $0) }
+        case .construct, .namespace, .mainBlock, .enumeration, .macro, .marker:
             return []
         }
     }
@@ -529,8 +652,10 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         case .enumeration(let declaration):
             return [declaration]
         case .module(let module):
-            return module.enumerations
-        case .construct, .namespace, .mainBlock, .extensions, .protocolDefinition, .macro, .marker:
+            return module.enumerations + module.extensions.flatMap { enumerations(in: $0) }
+        case .extensions(let declarations):
+            return declarations.flatMap { enumerations(in: $0) }
+        case .construct, .namespace, .mainBlock, .protocolDefinition, .macro, .marker:
             return []
         }
     }

@@ -130,6 +130,51 @@ struct CompilerFixtureTests {
         #expect(diagnostic.range?.end.character == 17)
     }
 
+    @Test("Namespace declarations provide attribute names")
+    func namespaceDeclarationsProvideAttributeNames() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/NamespaceAttribute.neat",
+                source: """
+                namespace Styling {}
+
+                @Styling
+                construct Panel {
+                    let title: String
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
+    @Test("Unknown attributes require matching namespaces")
+    func unknownAttributesRequireMatchingNamespaces() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/UnknownAttribute.neat",
+                source: """
+                @Missing
+                construct Panel {
+                    let title: String
+                }
+                """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected @Missing to require a matching namespace.")
+        } catch {
+            #expect(String(describing: error).contains("Declare namespace Missing"))
+        }
+    }
+
     @Test("Project macros infer across project files")
     func projectMacrosInferAcrossProjectFiles() throws {
         var inputs = try neatCoreInputs()

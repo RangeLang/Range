@@ -148,9 +148,6 @@ struct Lexer {
                 }
             case "@":
                 let identifier = try readSigilIdentifier(start: start)
-                guard NeatSyntax.attributeIdentifiers.contains(identifier) else {
-                    throw ParseError("Unknown attribute @\(identifier).", range: range(from: start))
-                }
                 emit(.atAttribute(name: identifier, argument: nil), start: start)
             case "`":
                 let identifier = try readEscapedIdentifier(start: start)
