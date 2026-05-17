@@ -78,18 +78,32 @@ enum PackageManifestLoader {
     private static func stringArrayValue(named name: String, in declaration: ConstructDeclaration)
         -> [String]
     {
-        declaration.values.first { $0.name == name }.flatMap { value in
-            guard case .array(let expressions)? = value.value else {
-                return nil
-            }
+        guard
+            let value = declaration.values.first(where: { $0.name == name }),
+            case .array(let expressions)? = value.value
+        else {
+            return []
+        }
 
-            return expressions.compactMap { expression in
-                guard case .string(let string) = expression else {
+        return expressions.compactMap { expression in
+            remoteURL(from: expression)
+        }
+    }
+
+    private static func remoteURL(from expression: NeatSyntax.Expression) -> String? {
+        switch expression {
+        case .string(let string):
+            return string
+        case .call(let name, let arguments) where name == "Remote":
+            return arguments.first { $0.label == "url" }.flatMap { argument in
+                guard case .string(let string) = argument.value else {
                     return nil
                 }
                 return string
             }
-        } ?? []
+        default:
+            return nil
+        }
     }
 
     private static func uniqueStrings(_ values: [String]) -> [String] {

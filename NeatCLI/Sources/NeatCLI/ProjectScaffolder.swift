@@ -267,7 +267,7 @@ struct ProjectScaffolder {
             construct \(packageName): Package {
                 let version: String = "0.1.0"
                 let author: String = "\(escapedStringLiteral(NSFullUserName()))"
-                let remotes: [String] = []
+                let remotes: [Remote] = []
             }
             """
     }
