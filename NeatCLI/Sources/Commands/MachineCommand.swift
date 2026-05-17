@@ -17,13 +17,13 @@ extension NeatCLI {
                 .appendingPathComponent("Packages", isDirectory: true)
 
             print(TerminalLog.style("Machine", level: .change, bold: true))
-            print(machineInfoRow(label: "OS", value: MachineInfo.operatingSystem, color: .cyan))
-            print(machineInfoRow(label: "Architecture", value: MachineInfo.architecture, color: .lightGray))
-            print(machineInfoRow(label: "Host", value: MachineInfo.hostName, color: .cyan))
-            print(machineInfoRow(label: "Packages", value: packageStore.path, color: .lightGray))
+            print(machineInfoRow(label: "OS", value: MachineInfo.operatingSystem, color: .custom(81)))
+            print(machineInfoRow(label: "Architecture", value: MachineInfo.architecture, color: .custom(117)))
+            print(machineInfoRow(label: "Host", value: MachineInfo.hostName, color: .custom(114)))
+            print(machineInfoRow(label: "Packages", value: packageStore.path, color: .custom(222)))
         }
 
-        private func machineInfoRow(label: String, value: String, color: TerminalColor) -> String {
+        private func machineInfoRow(label: String, value: String, color: TerminalAccentColor) -> String {
             TerminalLog.accentStdout("\(label):", color: color, bold: true)
                 + " "
                 + TerminalLog.subtleStdout(value)

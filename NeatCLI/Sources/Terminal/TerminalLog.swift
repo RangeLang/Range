@@ -47,6 +47,17 @@ enum TerminalColor {
     }
 }
 
+enum TerminalAccentColor {
+    case custom(Int)
+
+    var string: String {
+        switch self {
+        case .custom(let code):
+            return "\u{001B}[38;5;\(code)m"
+        }
+    }
+}
+
 enum TerminalLog {
     private enum Stream {
         case stdout
@@ -284,6 +295,23 @@ enum TerminalLog {
             colors.append(.bold)
         }
         return render(text, colors: colors, on: .stdout)
+    }
+
+    static func accentStdout(
+        _ text: String,
+        color: TerminalAccentColor,
+        bold: Bool = false
+    ) -> String {
+        var colors = [color.string]
+        if bold {
+            colors.append(TerminalColor.bold.string)
+        }
+
+        guard supportsColor(on: .stdout) else {
+            return text
+        }
+
+        return "\(colors.joined())\(text)\(TerminalColor.reset.string)"
     }
 
     static func subtleOut(_ text: String) {
