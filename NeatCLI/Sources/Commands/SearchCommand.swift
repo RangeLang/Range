@@ -66,12 +66,14 @@ extension NeatCLI.Package {
         private func renderSearch(query: String, searcher: PackageSearcher) throws {
             renderInstalledSection(
                 title: "Machine",
+                countLabel: "downloaded",
                 root: machinePackageRoot(),
                 query: query
             )
             print("")
             renderInstalledSection(
                 title: "Project",
+                countLabel: "installed",
                 root: URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL,
                 query: query
             )
@@ -81,13 +83,18 @@ extension NeatCLI.Package {
             renderCloud(results)
         }
 
-        private func renderInstalledSection(title: String, root: URL, query: String) {
+        private func renderInstalledSection(
+            title: String,
+            countLabel: String,
+            root: URL,
+            query: String
+        ) {
             let manager = PackageSubscriptionManager(projectPath: path)
             let installed = (try? manager.installedPackages(in: root)) ?? []
             let installedMatches = manager.matchingPackages(installed, search: query)
 
             print(TerminalLog.style(title, level: .change, bold: true))
-            print(TerminalLog.subtleStdout("\(installedMatches.count) of \(installed.count) installed"))
+            print(TerminalLog.subtleStdout("\(installed.count) \(countLabel)"))
             if installedMatches.isEmpty {
                 print(TerminalLog.subtleStdout("No \(title.lowercased()) packages match '\(query)'."))
             } else {
