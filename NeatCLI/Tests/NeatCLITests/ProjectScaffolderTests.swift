@@ -22,5 +22,6 @@ struct ProjectScaffolderTests {
             .standardizedFileURL
 
         #expect(destination == machinePackages.path)
+        _ = try PackageSubscriptionManager(projectPath: root.path).installedPackages(in: root)
     }
 }

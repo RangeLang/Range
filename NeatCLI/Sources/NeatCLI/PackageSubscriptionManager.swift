@@ -101,6 +101,7 @@ struct PackageSubscriptionManager {
             .appendingPathComponent(".neat", isDirectory: true)
             .appendingPathComponent("Packages", isDirectory: true)
             .standardizedFileURL
+            .resolvingSymlinksInPath()
 
         guard FileManager.default.fileExists(atPath: packagesRoot.path) else {
             return []
