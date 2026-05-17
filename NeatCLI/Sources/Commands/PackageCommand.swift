@@ -6,12 +6,13 @@ extension NeatCLI {
         static let configuration = CommandConfiguration(
             abstract: "Manage installed Neat packages.",
             subcommands: [
+                Publish.self,
                 Subscribe.self
             ]
         )
 
         @Option(
-            name: .shortAndLong,
+            name: .customLong("project"),
             help: "Project directory. Defaults to current directory."
         )
         var path: String = "."
@@ -29,6 +30,39 @@ extension NeatCLI {
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure
+            }
+        }
+
+        struct Publish: ParsableCommand {
+            static let configuration = CommandConfiguration(
+                abstract: "Publish this package with a semantic version bump."
+            )
+
+            @Argument(help: "Version bump to publish: major, minor, or patch.")
+            var bump: PackageVersionBump
+
+            @Option(
+                name: [.short, .customLong("path")],
+                help: "Project directory. Defaults to current directory."
+            )
+            var projectPath: String = "."
+
+            mutating func run() throws {
+                do {
+                    let publisher = PackagePublisher(projectPath: projectPath)
+                    let published = try publisher.publish(bump)
+                    TerminalLog.out(
+                        "Published \(published.name) \(published.version).",
+                        level: .success
+                    )
+                    if let author = published.author, !author.isEmpty {
+                        TerminalLog.subtleOut("Author: \(author)")
+                    }
+                    TerminalLog.subtleOut("Package.neat: \(published.packageFile.path)")
+                } catch {
+                    ErrorPresenter.printError(error)
+                    throw ExitCode.failure
+                }
             }
         }
 
