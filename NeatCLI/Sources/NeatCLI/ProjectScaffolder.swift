@@ -224,33 +224,54 @@ struct ProjectScaffolder {
             atomically: true,
             encoding: .utf8
         )
-        try linkProjectPackages(in: targetDirectory)
+        try linkProjectWorkspace(name: name, in: targetDirectory)
     }
 
-    private func linkProjectPackages(in targetDirectory: URL) throws {
+    private func linkProjectWorkspace(name: String, in targetDirectory: URL) throws {
         let machinePackages = machinePackageStore()
         try FileManager.default.createDirectory(
             at: machinePackages,
             withIntermediateDirectories: true
         )
 
-        let projectNeatDirectory = targetDirectory
-            .appendingPathComponent(".neat", isDirectory: true)
-        let projectPackages = projectNeatDirectory
-            .appendingPathComponent("Packages", isDirectory: true)
-
+        let machineWorkspace = machineProjectWorkspace(name: name, projectDirectory: targetDirectory)
         try FileManager.default.createDirectory(
-            at: projectNeatDirectory,
+            at: machineWorkspace,
             withIntermediateDirectories: true
         )
 
-        guard !FileManager.default.fileExists(atPath: projectPackages.path) else {
-            throw ValidationError("Target already contains .neat/Packages.")
+        let workspacePackages = machineWorkspace
+            .appendingPathComponent("Packages", isDirectory: true)
+        let workspaceBuild = machineWorkspace
+            .appendingPathComponent("Build", isDirectory: true)
+        let workspaceArtifacts = machineWorkspace
+            .appendingPathComponent("Artifacts", isDirectory: true)
+
+        if !FileManager.default.fileExists(atPath: workspacePackages.path) {
+            try FileManager.default.createSymbolicLink(
+                at: workspacePackages,
+                withDestinationURL: machinePackages
+            )
+        }
+        try FileManager.default.createDirectory(
+            at: workspaceBuild,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: workspaceArtifacts,
+            withIntermediateDirectories: true
+        )
+
+        let projectNeatDirectory = targetDirectory
+            .appendingPathComponent(".neat", isDirectory: true)
+
+        guard !FileManager.default.fileExists(atPath: projectNeatDirectory.path) else {
+            throw ValidationError("Target already contains .neat.")
         }
 
         try FileManager.default.createSymbolicLink(
-            at: projectPackages,
-            withDestinationURL: machinePackages
+            at: projectNeatDirectory,
+            withDestinationURL: machineWorkspace
         )
     }
 
@@ -258,6 +279,15 @@ struct ProjectScaffolder {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".neat", isDirectory: true)
             .appendingPathComponent("Packages", isDirectory: true)
+            .standardizedFileURL
+    }
+
+    private func machineProjectWorkspace(name: String, projectDirectory: URL) -> URL {
+        let workspaceName = "\(sanitizedFileName(from: name))-\(stablePathHash(projectDirectory.path))"
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent("Projects", isDirectory: true)
+            .appendingPathComponent(workspaceName, isDirectory: true)
             .standardizedFileURL
     }
 
@@ -311,6 +341,24 @@ struct ProjectScaffolder {
             return "Neat\(joined)"
         }
         return joined
+    }
+
+    private func sanitizedFileName(from raw: String) -> String {
+        let pieces = raw
+            .lowercased()
+            .split { !$0.isLetter && !$0.isNumber }
+            .filter { !$0.isEmpty }
+        let name = pieces.joined(separator: "-")
+        return name.isEmpty ? "neat-project" : name
+    }
+
+    private func stablePathHash(_ path: String) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in path.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return String(hash, radix: 16)
     }
 
     private func escapedStringLiteral(_ raw: String) -> String {
