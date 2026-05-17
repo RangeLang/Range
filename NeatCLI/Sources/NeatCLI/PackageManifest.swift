@@ -4,6 +4,8 @@ import NeatSyntax
 
 struct PackageManifest {
     let name: String
+    let version: String?
+    let author: String?
     let declaration: ConstructDeclaration
 }
 
@@ -34,13 +36,29 @@ enum PackageManifestLoader {
                     "Package.neat must declare exactly construct Name: Package.")
             }
 
-            return PackageManifest(name: declaration.name, declaration: declaration)
+            return PackageManifest(
+                name: declaration.name,
+                version: stringValue(named: "version", in: declaration),
+                author: stringValue(named: "author", in: declaration),
+                declaration: declaration
+            )
         case .enumeration:
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .protocolDefinition:
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .macro, .marker:
             throw ValidationError("Package.neat must declare construct Name: Package.")
+        }
+    }
+
+    private static func stringValue(named name: String, in declaration: ConstructDeclaration)
+        -> String?
+    {
+        declaration.values.first { $0.name == name }.flatMap { value in
+            guard case .string(let string)? = value.value else {
+                return nil
+            }
+            return string
         }
     }
 }

@@ -1,4 +1,5 @@
 import ArgumentParser
+import Foundation
 
 extension NeatCLI {
     struct Package: ParsableCommand {
@@ -8,6 +9,28 @@ extension NeatCLI {
                 Subscribe.self
             ]
         )
+
+        @Option(
+            name: .shortAndLong,
+            help: "Project directory. Defaults to current directory."
+        )
+        var path: String = "."
+
+        mutating func run() throws {
+            do {
+                let packageFile = URL(fileURLWithPath: path, isDirectory: true)
+                    .standardizedFileURL
+                    .appendingPathComponent("Package.neat", isDirectory: false)
+                let manifest = try PackageManifestLoader.load(from: packageFile)
+
+                print(TerminalLog.style(manifest.name, level: .change, bold: true))
+                print("Version: \(manifest.version ?? "unknown")")
+                print("Author: \(manifest.author ?? "unknown")")
+            } catch {
+                ErrorPresenter.printError(error)
+                throw ExitCode.failure
+            }
+        }
 
         struct Subscribe: ParsableCommand {
             static let configuration = CommandConfiguration(

@@ -1,0 +1,4 @@
+construct Neat: Package {
+    let version: String = "0.1.0"
+    let author: String = "George"
+}

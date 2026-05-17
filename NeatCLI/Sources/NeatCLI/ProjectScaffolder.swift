@@ -224,7 +224,9 @@ struct ProjectScaffolder {
     private func renderProgramPackage(name: String) -> String {
         let packageName = sanitizedSymbolName(from: name)
         return """
-            #\(packageName): Package {
+            construct \(packageName): Package {
+                let version: String = "0.1.0"
+                let author: String = "\(escapedStringLiteral(NSFullUserName()))"
             }
             """
     }
@@ -268,6 +270,12 @@ struct ProjectScaffolder {
             return "Neat\(joined)"
         }
         return joined
+    }
+
+    private func escapedStringLiteral(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
     private func prompt(
