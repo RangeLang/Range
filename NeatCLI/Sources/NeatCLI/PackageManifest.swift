@@ -33,22 +33,34 @@ enum PackageManifestLoader {
             guard declaration.attribute == nil else {
                 throw ValidationError("Package.neat cannot use declaration attributes.")
             }
-            guard declaration.conformances == [.named("Package")] else {
+            let usesPackageMacro = declaration.macros.contains { $0.name == "package" }
+            guard usesPackageMacro || declaration.conformances == [.named("Package")] else {
                 throw ValidationError(
-                    "Package.neat must declare exactly construct Name: Package.")
+                    "Package.neat must declare construct Name: Package or #package construct Name.")
             }
 
+            let name =
+                try titleValue(named: "name", in: declaration)
+                ?? (usesPackageMacro ? declaration.name : nil)
+                ?? requiredTitleValue(named: "name", in: declaration)
             let version = try requiredVersionValue(named: "version", in: declaration)
             let author = try requiredStringValue(named: "author", in: declaration)
-            _ = try requireValue(named: "remotes", typeName: "[Remote]", in: declaration)
+            if !usesPackageMacro {
+                _ = try requireValue(named: "remotes", typeName: "[Remote]", in: declaration)
+            }
 
             let remote = stringValue(named: "remote", in: declaration)
+            let remoteURLs = remoteURLs(remote: remote, in: declaration)
+            let resolvedRemoteURLs =
+                remoteURLs.isEmpty && usesPackageMacro
+                ? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
+                : remoteURLs
             return PackageManifest(
-                name: declaration.name,
+                name: name,
                 version: version,
                 author: author,
                 remote: remote,
-                remoteURLs: remoteURLs(remote: remote, in: declaration),
+                remoteURLs: resolvedRemoteURLs,
                 declaration: declaration
             )
         case .enumeration:
@@ -69,6 +81,39 @@ enum PackageManifestLoader {
             throw ValidationError("Package.neat requires let \(name): String = \"...\".")
         }
         return string
+    }
+
+    private static func requiredTitleValue(
+        named name: String,
+        in declaration: ConstructDeclaration
+    ) throws -> String {
+        guard let title = try titleValue(named: name, in: declaration) else {
+            throw ValidationError("Package.neat requires let \(name): Title = Title(\"...\").")
+        }
+        return title
+    }
+
+    private static func titleValue(
+        named name: String,
+        in declaration: ConstructDeclaration
+    ) throws -> String? {
+        guard let value = declaration.values.first(where: { $0.name == name }) else {
+            return nil
+        }
+        guard value.typeName == "Title" else {
+            throw ValidationError(
+                "Package.neat requires let \(name): Title, got \(value.typeName)."
+            )
+        }
+        guard case .call(let callName, let arguments)? = value.value, callName == "Title" else {
+            throw ValidationError("Package.neat requires let \(name): Title = Title(\"...\").")
+        }
+        guard arguments.count == 1, arguments[0].label == nil,
+            case .string(let title) = arguments[0].value
+        else {
+            throw ValidationError("Package.neat Title requires one string value.")
+        }
+        return title
     }
 
     private static func requiredVersionValue(
@@ -183,5 +228,41 @@ enum PackageManifestLoader {
             result.append(trimmed)
         }
         return result
+    }
+
+    private static func gitRemoteURLs(in directory: URL) -> [String] {
+        guard let git = Platform.defaultExecutableLookupTool else {
+            return []
+        }
+
+        let process = Process()
+        process.executableURL = git
+        process.arguments = ["git", "remote", "-v"]
+        process.currentDirectoryURL = directory
+
+        let output = Pipe()
+        process.standardOutput = output
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else {
+                return []
+            }
+            let data = output.fileHandleForReading.readDataToEndOfFile()
+            let text = String(data: data, encoding: .utf8) ?? ""
+            return uniqueStrings(
+                text.split(separator: "\n").compactMap { line in
+                    let parts = line.split(whereSeparator: { $0 == " " || $0 == "\t" })
+                    guard parts.count >= 2 else {
+                        return nil
+                    }
+                    return String(parts[1])
+                }
+            )
+        } catch {
+            return []
+        }
     }
 }

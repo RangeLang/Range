@@ -51,10 +51,11 @@ struct PackagePublisherTests {
             .appendingPathComponent("neat-package-publish-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            construct Fixture: Package {
+            #package
+            construct Project {
+                let name: Title = Title("Fixture")
                 let version: Version = Version(\(version))
                 let author: String = "Test Author"
-                let remotes: [Remote] = []
             }
             """.write(to: root.appendingPathComponent("Package.neat"), atomically: true, encoding: .utf8)
         return root

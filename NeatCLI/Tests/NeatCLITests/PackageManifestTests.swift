@@ -12,7 +12,9 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
-            construct Fixture: Package {
+            #package
+            construct Project {
+                let name: Title = Title("Fixture")
                 let version: Version = Version(1.2.3)
                 let author: String = "Test Author"
                 let remote: String = "https://github.com/acme/fixture.git"
@@ -43,10 +45,11 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
-            construct Fixture: Package {
+            #package
+            construct Project {
+                let name: Title = Title("Fixture")
                 let version: Int = 1
                 let author: String = "Test Author"
-                let remotes: [Remote] = []
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 

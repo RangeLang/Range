@@ -76,10 +76,11 @@ struct PackageSubscriptionManagerTests {
             withIntermediateDirectories: true
         )
         try """
-            construct \(name): Package {
+            #package
+            construct Project {
+                let name: Title = Title("\(name)")
                 let version: Version = Version(0.1.0)
                 let author: String = "Test Author"
-                let remotes: [Remote] = []
             }
             """.write(to: url, atomically: true, encoding: .utf8)
     }
