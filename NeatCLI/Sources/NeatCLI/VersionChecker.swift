@@ -39,8 +39,12 @@ struct VersionChecker {
     }
 
     private func remoteTags() throws -> [String] {
+        guard let lookupTool = Platform.defaultExecutableLookupTool else {
+            throw ValidationError("Update checks require git on PATH and are not available on this platform yet.")
+        }
+
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.executableURL = lookupTool
         process.arguments = ["git", "ls-remote", "--tags", "--refs", repository]
 
         let output = Pipe()

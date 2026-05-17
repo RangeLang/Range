@@ -1,5 +1,4 @@
 import ArgumentParser
-import Darwin
 import Foundation
 
 extension NeatCLI {
@@ -18,14 +17,14 @@ extension NeatCLI {
                 .appendingPathComponent("Packages", isDirectory: true)
 
             print(TerminalLog.style("Machine", level: .change, bold: true))
-            print(machineInfoRow(label: "OS", value: MachineInfo.operatingSystem, level: .change))
-            print(machineInfoRow(label: "Architecture", value: MachineInfo.architecture, level: .optimization))
-            print(machineInfoRow(label: "Host", value: MachineInfo.hostName, level: .success))
-            print(machineInfoRow(label: "Packages", value: packageStore.path, level: .waiting))
+            print(machineInfoRow(label: "OS", value: MachineInfo.operatingSystem, color: .cyan))
+            print(machineInfoRow(label: "Architecture", value: MachineInfo.architecture, color: .lightGray))
+            print(machineInfoRow(label: "Host", value: MachineInfo.hostName, color: .cyan))
+            print(machineInfoRow(label: "Packages", value: packageStore.path, color: .lightGray))
         }
 
-        private func machineInfoRow(label: String, value: String, level: CLIStatusLevel) -> String {
-            TerminalLog.style("\(label):", level: level, bold: true)
+        private func machineInfoRow(label: String, value: String, color: TerminalColor) -> String {
+            TerminalLog.accentStdout("\(label):", color: color, bold: true)
                 + " "
                 + TerminalLog.subtleStdout(value)
         }
@@ -101,13 +100,6 @@ private enum MachineInfo {
     }
 
     static var architecture: String {
-        var systemInfo = utsname()
-        uname(&systemInfo)
-
-        return withUnsafePointer(to: &systemInfo.machine) { pointer in
-            pointer.withMemoryRebound(to: CChar.self, capacity: 1) { charPointer in
-                String(cString: charPointer)
-            }
-        }
+        Platform.machineArchitecture()
     }
 }

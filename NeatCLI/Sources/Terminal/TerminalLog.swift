@@ -1,4 +1,3 @@
-import Darwin
 import Foundation
 
 enum TerminalColor {
@@ -56,9 +55,9 @@ enum TerminalLog {
         var fileDescriptor: Int32 {
             switch self {
             case .stdout:
-                return STDOUT_FILENO
+                return Platform.standardOutputFileDescriptor
             case .stderr:
-                return STDERR_FILENO
+                return Platform.standardErrorFileDescriptor
             }
         }
     }
@@ -120,7 +119,7 @@ enum TerminalLog {
             return false
         }
 
-        return isatty(stream.fileDescriptor) == 1
+        return Platform.isTerminal(stream.fileDescriptor)
     }
 
     private static func render(
@@ -277,6 +276,14 @@ enum TerminalLog {
 
     static func captionStdout(_ text: String) -> String {
         render(text, colors: [.gray, .dim], on: .stdout)
+    }
+
+    static func accentStdout(_ text: String, color: TerminalColor, bold: Bool = false) -> String {
+        var colors = [color]
+        if bold {
+            colors.append(.bold)
+        }
+        return render(text, colors: colors, on: .stdout)
     }
 
     static func subtleOut(_ text: String) {

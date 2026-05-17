@@ -1,5 +1,4 @@
 import ArgumentParser
-import Darwin
 import Foundation
 
 extension NeatCLI {
@@ -21,7 +20,7 @@ extension NeatCLI {
                 return
             }
 
-            let canAnimate = isatty(STDOUT_FILENO) == 1
+            let canAnimate = Platform.isTerminal(Platform.standardOutputFileDescriptor)
             if canAnimate {
                 print("Updates: checking...")
                 print("Checked: checking...")
@@ -85,7 +84,7 @@ extension NeatCLI {
         }
 
         private func replaceCheckLines(updates: String, checked: String) {
-            if isatty(STDOUT_FILENO) == 1 {
+            if Platform.isTerminal(Platform.standardOutputFileDescriptor) {
                 fputs("\u{001B}[2A", stdout)
                 fputs("\u{001B}[2K", stdout)
                 print("Updates: \(updates)")
@@ -104,8 +103,12 @@ extension NeatCLI {
                 return URL(fileURLWithPath: executable).standardizedFileURL.path
             }
 
+            guard let lookupTool = Platform.defaultExecutableLookupTool else {
+                return executable
+            }
+
             let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.executableURL = lookupTool
             process.arguments = ["which", executable]
             let output = Pipe()
             process.standardOutput = output

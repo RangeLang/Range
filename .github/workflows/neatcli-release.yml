@@ -1,0 +1,88 @@
+name: NeatCLI Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.artifact }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            artifact: neat-macos-arm64
+            archive: neat-macos-arm64.tar.gz
+            shell: bash
+          - os: macos-13
+            artifact: neat-macos-x64
+            archive: neat-macos-x64.tar.gz
+            shell: bash
+          - os: ubuntu-24.04
+            artifact: neat-linux-x64
+            archive: neat-linux-x64.tar.gz
+            shell: bash
+          - os: windows-2022
+            artifact: neat-windows-x64
+            archive: neat-windows-x64.zip
+            shell: pwsh
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: "6.2.3"
+
+      - name: Build release binary
+        working-directory: NeatCLI
+        run: swift build -c release --product NeatCLI
+
+      - name: Package Unix binary
+        if: runner.os != 'Windows'
+        working-directory: NeatCLI
+        run: |
+          mkdir -p dist/${{ matrix.artifact }}
+          cp .build/release/NeatCLI dist/${{ matrix.artifact }}/neat
+          chmod 755 dist/${{ matrix.artifact }}/neat
+          tar -C dist -czf ${{ matrix.archive }} ${{ matrix.artifact }}
+
+      - name: Package Windows binary
+        if: runner.os == 'Windows'
+        working-directory: NeatCLI
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist/${{ matrix.artifact }}" | Out-Null
+          Copy-Item ".build/release/NeatCLI.exe" "dist/${{ matrix.artifact }}/neat.exe"
+          Compress-Archive -Path "dist/${{ matrix.artifact }}" -DestinationPath "${{ matrix.archive }}" -Force
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: NeatCLI/${{ matrix.archive }}
+
+  publish:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true

@@ -1,5 +1,4 @@
 import ArgumentParser
-import Darwin
 import Foundation
 
 extension NeatCLI.Package {
@@ -173,7 +172,7 @@ extension NeatCLI.Package {
             }
             thread.start()
 
-            guard isatty(STDOUT_FILENO) == 1 else {
+            guard Platform.isTerminal(Platform.standardOutputFileDescriptor) else {
                 while box.load() == nil {
                     Thread.sleep(forTimeInterval: 0.05)
                 }
@@ -193,7 +192,7 @@ extension NeatCLI.Package {
         }
 
         private func replaceCloudLines() {
-            guard isatty(STDOUT_FILENO) == 1 else {
+            guard Platform.isTerminal(Platform.standardOutputFileDescriptor) else {
                 return
             }
 

@@ -1,6 +1,11 @@
 import ArgumentParser
-import Darwin
 import Foundation
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 struct ProjectScaffolder {
     private let initialName: String?
@@ -303,7 +308,7 @@ struct ProjectScaffolder {
             return response
         }
 
-        guard isatty(STDIN_FILENO) == 1 else {
+        guard Platform.isTerminal(Platform.standardInputFileDescriptor) else {
             return fallback()
         }
 
@@ -325,7 +330,10 @@ struct ProjectScaffolder {
 
             while true {
                 var byte: UInt8 = 0
-                let readResult = Darwin.read(STDIN_FILENO, &byte, 1)
+                let readResult = Platform.readByte(
+                    from: Platform.standardInputFileDescriptor,
+                    into: &byte
+                )
                 if readResult <= 0 {
                     print()
                     return defaultValue ?? String(buffer)
@@ -392,12 +400,13 @@ struct ProjectScaffolder {
     }
 }
 
+#if canImport(Darwin) || canImport(Glibc)
 private struct RawTerminalMode {
     private let original: termios
 
     init() throws {
         var state = termios()
-        guard tcgetattr(STDIN_FILENO, &state) == 0 else {
+        guard tcgetattr(Platform.standardInputFileDescriptor, &state) == 0 else {
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
 
@@ -407,13 +416,22 @@ private struct RawTerminalMode {
         raw.c_cc.16 = 1
         raw.c_cc.17 = 0
 
-        guard tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == 0 else {
+        guard tcsetattr(Platform.standardInputFileDescriptor, TCSAFLUSH, &raw) == 0 else {
             throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
         }
     }
 
     func restore() {
         var state = original
-        tcsetattr(STDIN_FILENO, TCSAFLUSH, &state)
+        tcsetattr(Platform.standardInputFileDescriptor, TCSAFLUSH, &state)
     }
 }
+#else
+private struct RawTerminalMode {
+    init() throws {
+        throw NSError(domain: "NeatTerminal", code: 1)
+    }
+
+    func restore() {}
+}
+#endif
