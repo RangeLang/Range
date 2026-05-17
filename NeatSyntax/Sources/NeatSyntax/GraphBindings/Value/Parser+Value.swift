@@ -6,13 +6,11 @@ extension Parser {
         try consumeKeyword(.let)
         let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "let")
         try consume(.colon)
-        let typeName = try consumeTypeReference()
-        let value: Expression?
+        let annotation = try parseTypedConstructionAnnotation()
+        var value = annotation.initializer
         if peek() == .equal {
             try consume(.equal)
             value = try parseExpression()
-        } else {
-            value = nil
         }
         if peek() == .leftBrace {
             try consume(.leftBrace)
@@ -23,7 +21,7 @@ extension Parser {
             macros: macros,
             localName: localName,
             externalLabel: externalLabel,
-            typeName: typeName,
+            typeName: annotation.type.displayName,
             value: value
         )
     }

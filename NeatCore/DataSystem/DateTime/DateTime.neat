@@ -4,12 +4,13 @@ construct DateTime {
 
     
     function parse(iso8601String: String) -> Result<Self, DecodingError> {
-        switch DateTimeStorage(iso8601String: iso8601String) {
+        switch DateTimeStorage.parse(iso8601String: iso8601String) {
         case .success(let storage):
             return .success(result: Self(storage: storage))
         case .failure(let error):
             return .failure(cause: error)
         }
+        return .failure(cause: .failed)
     }
 }
 

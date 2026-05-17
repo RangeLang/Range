@@ -2,10 +2,6 @@
 construct Channel<Element> {
     let storage: ChannelStorage<Element> = ChannelStorage<Element>(capacity: 0)
 
-    function withCapacity(_ capacity: Int) -> Self {
-        return Self(storage: ChannelStorage<Element>(capacity: capacity))
-    }
-
     function send(_ element: Element) {
         storage.send(element: element)
     }

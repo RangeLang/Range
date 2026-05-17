@@ -183,6 +183,79 @@ struct CompilerFixtureTests {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
+    @Test("Typed construction annotations can be optional")
+    func typedConstructionAnnotationsCanBeOptional() throws {
+        let source = """
+        construct Version {
+            let value: Double
+        }
+
+        construct Counter {
+            let count: Int(5)?
+            let version: Version(value: 0.1)?
+            state current: Int(5)?
+        }
+
+        @main {
+            let local: Int(5)?
+        }
+        """
+
+        var parser = try Parser(source: source)
+        let file = try parser.parseSourceFile()
+
+        guard case .module(let module) = file,
+            let counter = module.constructs.first
+        else {
+            Issue.record("Expected module with Counter construct.")
+            return
+        }
+
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/TypedConstructionOptional.neat",
+                source: source,
+                role: .project
+            )
+        )
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+
+        let count = try #require(counter.values.first(where: { $0.name == "count" }))
+        #expect(count.typeName == "Int?")
+        guard case .integer(5)? = count.value else {
+            Issue.record("Expected typed construction literal initializer.")
+            return
+        }
+
+        let version = try #require(counter.values.first(where: { $0.name == "version" }))
+        #expect(version.typeName == "Version?")
+        guard case .call(let versionInitializer, let versionArguments)? = version.value else {
+            Issue.record("Expected typed construction value call.")
+            return
+        }
+        #expect(versionInitializer == "Version")
+        #expect(versionArguments.map(\.label) == ["value"])
+
+        let current = try #require(counter.states.first(where: { $0.name == "current" }))
+        #expect(current.type == .optional(.named("Int")))
+        guard case .stored(.integer(5)) = current.storage else {
+            Issue.record("Expected typed construction state initializer.")
+            return
+        }
+
+        let local = try #require(module.mainBlock?.body.first)
+        guard case .localBinding(let declaration) = local else {
+            Issue.record("Expected local typed construction binding.")
+            return
+        }
+        #expect(declaration.type == .optional(.named("Int")))
+        guard case .integer(5) = declaration.expression else {
+            Issue.record("Expected typed construction local initializer.")
+            return
+        }
+    }
+
     @Test("Construct applications reject labels with no stored declaration")
     func constructApplicationsRejectLabelsWithNoStoredDeclaration() throws {
         let projectPath = "/tmp/DirectConstructApplicationBadLabel.neat"

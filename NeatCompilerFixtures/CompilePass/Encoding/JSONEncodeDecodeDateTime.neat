@@ -6,6 +6,7 @@ function encodeDate() -> Result<String, EncodingError> {
     case .failure:
         return .failure(cause: .failed)
     }
+    return .failure(cause: .failed)
 }
 
 function decodeDate() -> Result<Date, DecodingError> {
@@ -21,6 +22,7 @@ function encodeDateTime() -> Result<String, EncodingError> {
     case .failure:
         return .failure(cause: .failed)
     }
+    return .failure(cause: .failed)
 }
 
 function decodeDateTime() -> Result<DateTime, DecodingError> {

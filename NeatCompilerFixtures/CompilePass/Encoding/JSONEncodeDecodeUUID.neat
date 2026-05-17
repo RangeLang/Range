@@ -6,6 +6,7 @@ function encodeUUID() -> Result<String, EncodingError> {
     case .failure:
         return .failure(cause: .failed)
     }
+    return .failure(cause: .failed)
 }
 
 function decodeUUID() -> Result<UUID, DecodingError> {

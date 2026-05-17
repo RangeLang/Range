@@ -7,7 +7,7 @@ function fetchUserName(id: Int) -> String {
 }
 
 @main {
-    let output = Channel<String>.withCapacity(2)
+    let output = Channel<String>(storage: ChannelStorage<String>(capacity: 2))
 
     @background {
         let name = fetchUserName(id: 0)

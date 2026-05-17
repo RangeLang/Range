@@ -284,15 +284,27 @@ extension Parser {
         }
 
         let explicitType: TypeReference?
+        let typedInitializer: Expression?
         if peek() == .colon {
             try consume(.colon)
-            explicitType = try parseTypeReferenceNode()
+            let annotation = try parseTypedConstructionAnnotation()
+            explicitType = annotation.type
+            typedInitializer = annotation.initializer
         } else {
             explicitType = nil
+            typedInitializer = nil
         }
 
-        try consume(.equal)
-        let expression = try parseExpression()
+        let expression: Expression
+        if peek() == .equal {
+            try consume(.equal)
+            expression = try parseExpression()
+        } else if let typedInitializer {
+            expression = typedInitializer
+        } else {
+            try consume(.equal)
+            expression = try parseExpression()
+        }
         let resolvedType = try inferInitializedBindingType(
             name: name,
             explicitType: explicitType,

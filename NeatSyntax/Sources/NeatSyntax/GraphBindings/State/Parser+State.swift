@@ -11,9 +11,12 @@ extension Parser {
         try consumeKeyword(.state)
         let name = try consumeIdentifier()
         var explicitType: TypeReference?
+        var typedInitializer: Expression?
         if peek() == .colon {
             try consume(.colon)
-            explicitType = try parseTypeReferenceNode()
+            let annotation = try parseTypedConstructionAnnotation()
+            explicitType = annotation.type
+            typedInitializer = annotation.initializer
         }
         let storage: StateStorage
         let inferredType: TypeReference
@@ -30,6 +33,16 @@ extension Parser {
                 allowPromiseResolution: false
             )
             storage = .stored(initialValue)
+        } else if let typedInitializer {
+            inferredType = try inferInitializedBindingType(
+                name: name,
+                explicitType: explicitType,
+                expression: typedInitializer,
+                accessibleTypes: accessibleContextTypes(),
+                bindingKindDescription: "state",
+                allowPromiseResolution: false
+            )
+            storage = .stored(typedInitializer)
         } else if allowDeclaredStorage, let explicitType {
             inferredType = explicitType
             storage = .declared

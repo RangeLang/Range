@@ -13,8 +13,10 @@ construct Function: Syntax {
     }
 
     @language
-    construct Application: SyntaxEmittable {
+    construct Application: SyntaxEmittable, SyntaxReplaceable<Expression> {
         let identifier: Identifier
         let arguments: [Parameter.Application]
+
+        function replace(with replacement: Expression) -> Expression
     }
 }

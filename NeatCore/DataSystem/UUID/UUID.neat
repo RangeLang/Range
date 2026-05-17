@@ -4,12 +4,13 @@ construct UUID {
 
     
     function parse(uuidString: String) -> Result<Self, DecodingError> {
-        switch UUIDStorage(uuidString: uuidString) {
+        switch UUIDStorage.parse(uuidString: uuidString) {
         case .success(let storage):
             return .success(result: Self(storage: storage))
         case .failure(let error):
             return .failure(cause: error)
         }
+        return .failure(cause: .failed)
     }
 }
 
