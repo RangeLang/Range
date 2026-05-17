@@ -10,6 +10,7 @@ extension NeatCLI {
                 Minor.self,
                 Major.self,
                 Publish.self,
+                List.self,
                 Search.self,
                 Subscribe.self
             ]
@@ -181,6 +182,36 @@ extension NeatCLI {
                         noGit: noGit,
                         noPush: noPush
                     )
+                } catch {
+                    ErrorPresenter.printError(error)
+                    throw ExitCode.failure
+                }
+            }
+        }
+
+        struct List: ParsableCommand {
+            static let configuration = CommandConfiguration(
+                abstract: "List packages from a machine or project scope."
+            )
+
+            @Argument(help: "Package scope to list: machine or project.")
+            var scope: PackageListScope
+
+            @Argument(
+                parsing: .remaining,
+                help: "Optional search terms."
+            )
+            var terms: [String] = []
+
+            @Option(
+                name: [.short, .customLong("path")],
+                help: "Project directory for project package listings. Defaults to current directory."
+            )
+            var path: String = "."
+
+            mutating func run() throws {
+                do {
+                    try PackageListRenderer.render(scope: scope, projectPath: path, terms: terms)
                 } catch {
                     ErrorPresenter.printError(error)
                     throw ExitCode.failure

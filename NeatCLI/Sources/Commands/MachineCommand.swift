@@ -46,45 +46,11 @@ extension NeatCLI {
 
             mutating func run() throws {
                 do {
-                    let root = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
-                    let manager = PackageSubscriptionManager(projectPath: root.path)
-                    let packages = try manager.installedPackages(in: root)
-                    let query = terms.joined(separator: " ")
-                    let matches = manager.matchingPackages(packages, search: query)
-
-                    print(TerminalLog.style("Machine", level: .change, bold: true)
-                        + " "
-                        + TerminalLog.subtleStdout(MachineInfo.hostName))
-                    print(TerminalLog.captionStdout("\(packages.count) downloaded"))
-
-                    if matches.isEmpty {
-                        if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            print(TerminalLog.subtleStdout("No machine packages downloaded."))
-                        } else {
-                            print(TerminalLog.subtleStdout("No machine packages match '\(query)'."))
-                        }
-                        return
-                    }
-
-                    for package in matches {
-                        print("  " + packageRow(
-                            reference: package.reference,
-                            version: package.version ?? "unknown"
-                        ))
-                    }
+                    try PackageListRenderer.render(scope: .machine, projectPath: ".", terms: terms)
                 } catch {
                     ErrorPresenter.printError(error)
                     throw ExitCode.failure
                 }
-            }
-
-            private func packageRow(reference: String, version: String) -> String {
-                let package = "\(reference)@latest"
-                let width = max(32, package.count + 4)
-                let padding = String(repeating: " ", count: max(1, width - package.count))
-                return TerminalLog.style(package, level: .change, bold: true)
-                    + padding
-                    + TerminalLog.subtleStdout(version)
             }
         }
     }
