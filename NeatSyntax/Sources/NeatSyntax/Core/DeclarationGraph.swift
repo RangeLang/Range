@@ -30,6 +30,7 @@ public struct DeclarationSourceLocation {
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
     public let namespacesByName: [String: NamespaceDeclaration]
+    public let namespaceAttributeNames: Set<String>
     public let constructsByName: [String: ConstructDeclaration]
     public let enumsByName: [String: EnumDeclaration]
     public let macrosByName: [String: MacroDeclaration]
@@ -54,6 +55,7 @@ public struct DeclarationGraph {
     public init(files: [ParsedSourceFile]) {
         let protocols = Self.collectProtocols(from: files)
         let namespaces = Self.collectNamespaces(from: files)
+        let namespaceAttributeNames = Self.collectNamespaceAttributeNames(from: files)
         let extensions = Self.collectExtensions(from: files)
         let constructs = Self.collectConstructs(from: files, protocols: protocols)
         let enumerations = Self.collectEnums(from: files)
@@ -79,6 +81,7 @@ public struct DeclarationGraph {
 
         self.protocolsByName = protocols
         self.namespacesByName = namespaces
+        self.namespaceAttributeNames = namespaceAttributeNames
         self.constructsByName = constructs
         self.enumsByName = enumerations
         self.macrosByName = macros
@@ -227,6 +230,10 @@ public struct DeclarationGraph {
 
     public func hasNamespace(named name: String) -> Bool {
         namespacesByName[name] != nil
+    }
+
+    public func hasNamespaceAttribute(named name: String) -> Bool {
+        namespaceAttributeNames.contains(name)
     }
 
     public func isCoreConstruct(named name: String) -> Bool {
@@ -488,6 +495,19 @@ public struct DeclarationGraph {
             }
         }
         return registry
+    }
+
+    static func collectNamespaceAttributeNames(from files: [ParsedSourceFile]) -> Set<String> {
+        var names: Set<String> = []
+        for parsedFile in files {
+            for declaration in namespaces(in: parsedFile.sourceFile) {
+                collectNamespaceAttributeName(declaration, into: &names)
+            }
+            for declaration in extensions(in: parsedFile.sourceFile) {
+                collectNamespaceAttributeNames(in: declaration, into: &names)
+            }
+        }
+        return names
     }
 
     static func collectEnums(from files: [ParsedSourceFile]) -> [String: EnumDeclaration] {
@@ -959,6 +979,25 @@ public struct DeclarationGraph {
                 qualifiedName: "\(qualifiedName).\(child.name)",
                 into: &registry
             )
+        }
+    }
+
+    private static func collectNamespaceAttributeName(
+        _ declaration: NamespaceDeclaration,
+        into names: inout Set<String>
+    ) {
+        names.insert(declaration.name)
+        for child in declaration.namespaces {
+            collectNamespaceAttributeName(child, into: &names)
+        }
+    }
+
+    private static func collectNamespaceAttributeNames(
+        in declaration: ExtensionDeclaration,
+        into names: inout Set<String>
+    ) {
+        for namespace in declaration.namespaces {
+            collectNamespaceAttributeName(namespace, into: &names)
         }
     }
 

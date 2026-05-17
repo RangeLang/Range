@@ -148,7 +148,8 @@ struct CompilerFixtureTests {
             )
         )
 
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        #expect(program.declarationGraph.hasNamespaceAttribute(named: "Styling"))
     }
 
     @Test("Unknown attributes require matching namespaces")

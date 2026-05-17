@@ -8,7 +8,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     public func validate(_ program: CompiledProgram) throws {
         try validateAttributeUsage(
             in: program.projectParsedFiles,
-            availableNamespaces: namespaceNames(in: program.parsedFiles)
+            declarationGraph: program.declarationGraph
         )
         try validatePrimaryDeclarations(in: program.parsedFiles)
         try validateTopLevelStates(in: program.parsedFiles)
@@ -460,7 +460,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
     private func validateAttributeUsage(
         in parsedFiles: [ParsedSourceFile],
-        availableNamespaces: Set<String>
+        declarationGraph: DeclarationGraph
     ) throws {
         for parsedFile in parsedFiles {
             for declaration in attributedConstructs(in: parsedFile.sourceFile) {
@@ -468,7 +468,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     declaration.attribute,
                     declarationName: declaration.name,
                     filePath: parsedFile.path,
-                    availableNamespaces: availableNamespaces
+                    declarationGraph: declarationGraph
                 )
             }
             for callable in callables(in: parsedFile.sourceFile) {
@@ -476,7 +476,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     callable.attribute,
                     declarationName: callable.name,
                     filePath: parsedFile.path,
-                    availableNamespaces: availableNamespaces
+                    declarationGraph: declarationGraph
                 )
             }
             for declaration in protocols(in: parsedFile.sourceFile) {
@@ -484,7 +484,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     declaration.attribute,
                     declarationName: declaration.name,
                     filePath: parsedFile.path,
-                    availableNamespaces: availableNamespaces
+                    declarationGraph: declarationGraph
                 )
             }
             for declaration in enumerations(in: parsedFile.sourceFile) {
@@ -492,7 +492,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     declaration.attribute,
                     declarationName: declaration.name,
                     filePath: parsedFile.path,
-                    availableNamespaces: availableNamespaces
+                    declarationGraph: declarationGraph
                 )
             }
         }
@@ -502,7 +502,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         _ attribute: AttributeApplication?,
         declarationName: String,
         filePath: String,
-        availableNamespaces: Set<String>
+        declarationGraph: DeclarationGraph
     ) throws {
         guard let attribute else {
             return
@@ -515,37 +515,12 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         }
 
         guard NeatSyntax.attributeIdentifiers.contains(attribute.name)
-            || availableNamespaces.contains(attribute.name)
+            || declarationGraph.hasNamespaceAttribute(named: attribute.name)
         else {
             throw SemanticValidationError(
                 "Unknown attribute @\(attribute.name) in \(lastPathComponent(of: filePath)). Declare namespace \(attribute.name) to use @\(attribute.name)."
             )
         }
-    }
-
-    private func namespaceNames(in parsedFiles: [ParsedSourceFile]) -> Set<String> {
-        Set(parsedFiles.flatMap { namespaces(in: $0.sourceFile).map(\.name) })
-    }
-
-    private func namespaces(in sourceFile: SourceFileNode) -> [NamespaceDeclaration] {
-        switch sourceFile {
-        case .namespace(let declaration):
-            return [declaration] + declaration.namespaces.flatMap { namespaces(in: .namespace($0)) }
-        case .module(let module):
-            return module.namespaces.flatMap { namespaces(in: .namespace($0)) }
-                + module.extensions.flatMap { namespaces(in: $0) }
-        case .extensions(let declarations):
-            return declarations.flatMap { namespaces(in: $0) }
-        case .construct(let declaration):
-            return declaration.constructs.flatMap { namespaces(in: .construct($0)) }
-        case .mainBlock, .enumeration, .protocolDefinition, .macro, .marker:
-            return []
-        }
-    }
-
-    private func namespaces(in declaration: ExtensionDeclaration) -> [NamespaceDeclaration] {
-        declaration.namespaces.flatMap { namespaces(in: .namespace($0)) }
-            + declaration.constructs.flatMap { namespaces(in: .construct($0)) }
     }
 
     private func attributedConstructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
