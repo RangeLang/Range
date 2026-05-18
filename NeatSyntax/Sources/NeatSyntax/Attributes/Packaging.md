@@ -44,7 +44,7 @@ construct Remote {
 Package manifests can write versions directly:
 
 ```neat
-let version: Version = Version(0.1.8)
+let version: Version(0.1.8)
 ```
 
 The CLI also recognizes `#package` as a manifest macro. When `remotes` is omitted,
@@ -53,8 +53,8 @@ the CLI resolves package remotes from git:
 ```neat
 #package
 construct Project {
-    let name: Title = Title("Neat")
-    let version: Version = Version(0.1.8)
+    let name: Title("Neat")
+    let version: Version(0.1.8)
     let author: String = "George"
 }
 ```

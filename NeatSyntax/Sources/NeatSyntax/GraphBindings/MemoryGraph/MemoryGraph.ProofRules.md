@@ -33,7 +33,7 @@ name = "Ava" // invalid
 - Mutation through a `let` root is always invalid, including member-path mutation.
 
 ```neat
-let person: Person = Person(name: "George", age: 26)
+let person: Person(name: "George", age: 26)
 person.age = 27 // invalid
 ```
 
@@ -54,13 +54,13 @@ state user: User = User(person: $person)
 - `let` cannot store a construct type that declares `binding` members.
 
 ```neat
-let user: User = User(person: $person) // invalid if User contains binding members
+let user: User(person: $person) // invalid if User contains binding members
 ```
 
 - Assigning a construct from `let` into `state` performs an owned copy, not aliasing.
 
 ```neat
-let person: Person = Person(name: "George", age: 26)
+let person: Person(name: "George", age: 26)
 state statefulPerson: Person = person
 ```
 
@@ -149,7 +149,7 @@ Valid:
 
 ```neat
 @main {
-    let person: Person = Person(name: "George", age: 26)
+    let person: Person(name: "George", age: 26)
     state statefulPerson: Person = person
     statefulPerson.age = 27
 }
@@ -159,7 +159,7 @@ Invalid:
 
 ```neat
 @main {
-    let person: Person = Person(name: "George", age: 26)
+    let person: Person(name: "George", age: 26)
     person.age = 27
 }
 ```
@@ -169,7 +169,7 @@ Invalid:
 ```neat
 @main {
     state person: Person = Person(name: "George", age: 26)
-    let user: User = User(person: $person) // User has binding members
+    let user: User(person: $person) // User has binding members
 }
 ```
 

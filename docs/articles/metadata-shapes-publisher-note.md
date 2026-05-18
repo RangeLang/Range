@@ -2,11 +2,11 @@
 
 Neat is moving small declaration ideas into metadata shapes.
 
-## Before
+## Source Shape
 
 ```neat
-let version: Version = Version(0.1.8)
-let count: Int? = 5
+let version: Version(0.1.8)
+let count: Int(5)?
 let value: Optional<Int>
 namespace Math {}
 
@@ -16,7 +16,7 @@ public construct Package {
 }
 ```
 
-## After
+## Publisher Shape
 
 ```neat
 let version: Version(0.1.8)
@@ -34,9 +34,7 @@ construct Package {
 
 ## Why
 
-The old shape works, but it spreads declaration meaning across assignment syntax, namespace keywords, and visibility noise.
-
-The new shape keeps the facts on the declaration.
+The source shape keeps declaration facts on the declaration instead of spreading them across namespace keywords and visibility noise.
 
 `let version: Version(0.1.8)` says the binding is born as `Version` with construction data. It is not assignment into a slot.
 

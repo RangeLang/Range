@@ -70,7 +70,7 @@ construct Person {
     state age: Int
 }
 
-let person: Person = Person(name: "George", age: 26)
+let person: Person(name: "George", age: 26)
 state editablePerson: Person = person
 ```
 
