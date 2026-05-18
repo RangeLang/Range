@@ -664,7 +664,8 @@ extension MacroExpander {
                     }
                     _ = try parseMarkerArgumentBindings(
                         for: marker,
-                        argumentClause: application.argumentClause
+                        argumentClause: application.argumentClause,
+                        rawBody: application.rawBody
                     )
                     if marker.valueType.isMarkerEffect {
                         continue
@@ -2405,6 +2406,8 @@ extension MacroExpander {
             return value
         case .hashDirective(let value):
             return "#\(value)"
+        case .foreignBody(_, let value):
+            return value
         case .stringLiteral(let value):
             return "\"\(value)\""
         case .integer(let value):

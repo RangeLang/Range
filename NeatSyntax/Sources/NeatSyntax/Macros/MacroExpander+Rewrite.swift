@@ -442,7 +442,8 @@ extension MacroExpander {
                     }
                     _ = try parseMarkerArgumentBindings(
                         for: marker,
-                        argumentClause: application.argumentClause
+                        argumentClause: application.argumentClause,
+                        rawBody: application.rawBody
                     )
                     if marker.valueType.isMarkerEffect {
                         continue

@@ -165,7 +165,8 @@ struct MacroTargetValueBuilder {
     ) throws -> CompileTimeValue {
         let bindings = try MacroExpander.parseMarkerArgumentBindings(
             for: marker,
-            argumentClause: application.argumentClause
+            argumentClause: application.argumentClause,
+            rawBody: application.rawBody
         )
         let markerBindings = marker.bindings
 
@@ -212,6 +213,8 @@ struct MacroTargetValueBuilder {
         switch (value, type) {
         case (.string, .named("String")):
             return true
+        case (.string, let type) where type.foreignBodyLanguageName != nil:
+            return true
         case (.integer, .named("Int")):
             return true
         case (.double, .named("Float")):
@@ -230,6 +233,8 @@ struct MacroTargetValueBuilder {
                 "identifier": identifier(application.name),
                 "genericArguments": .array(application.genericArguments.map(typeReferenceValue)),
                 "argumentClause": .string(application.argumentClause ?? ""),
+                "rawBodyLanguage": .string(application.rawBodyLanguage ?? ""),
+                "rawBody": .string(application.rawBody ?? ""),
                 "arguments": .array(argumentValues(for: application)),
             ]
         )

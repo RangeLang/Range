@@ -55,6 +55,13 @@ extension Parser {
                 }
             }
 
+            if peek(offset: offset) == .leftBrace,
+                peek(offset: offset + 1).isForeignBody,
+                peek(offset: offset + 2) == .rightBrace
+            {
+                offset += 3
+            }
+
             continue
         }
         return offset
@@ -71,11 +78,14 @@ extension Parser {
             advance()
             let genericArguments = try parseMacroGenericArgumentsIfPresent()
             let argumentClause = try parseMacroArgumentClauseIfPresent()
+            let rawBody = try parseMacroRawBodyIfPresent()
             macros.append(
                 MacroApplication(
                     name: name,
                     genericArguments: genericArguments,
-                    argumentClause: argumentClause
+                    argumentClause: argumentClause,
+                    rawBodyLanguage: rawBody?.language,
+                    rawBody: rawBody?.text
                 )
             )
         }
@@ -154,6 +164,20 @@ extension Parser {
         return parts.joined(separator: " ")
     }
 
+    mutating func parseMacroRawBodyIfPresent() throws -> (language: String, text: String)? {
+        guard peek() == .leftBrace else {
+            return nil
+        }
+        guard case .foreignBody(let language, let text) = peek(offset: 1) else {
+            return nil
+        }
+
+        try consume(.leftBrace)
+        advance()
+        try consume(.rightBrace)
+        return (language, text)
+    }
+
     func renderMacroToken(_ token: Token) -> String {
         switch token {
         case .hash:
@@ -162,6 +186,8 @@ extension Parser {
             return value
         case .hashDirective(let value):
             return "#\(value)"
+        case .foreignBody(_, let value):
+            return value
         case .stringLiteral(let value):
             return "\"\(value)\""
         case .integer(let value):

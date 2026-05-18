@@ -51,10 +51,22 @@ extension MacroExpander {
 
     static func parseMarkerArgumentBindings(
         for marker: MarkerDeclaration,
-        argumentClause: String?
+        argumentClause: String?,
+        rawBody: String? = nil
     ) throws -> [String: Expression] {
         let parameters = marker.parameters
         let normalizedArgumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let rawBody {
+            guard normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
+                throw ParseError("Marker #\(marker.name) cannot mix arguments with a raw body.")
+            }
+            guard marker.foreignBodyLanguage != nil else {
+                throw ParseError("Marker #\(marker.name) does not accept a foreign body.")
+            }
+            let parameter = parameters[0]
+            return [parameter.localName: .string(rawBody)]
+        }
 
         guard !parameters.isEmpty || normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
             throw ParseError("Marker #\(marker.name) requires arguments.")

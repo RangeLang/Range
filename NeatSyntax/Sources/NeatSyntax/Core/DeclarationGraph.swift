@@ -1869,6 +1869,8 @@ public struct DeclarationGraph {
                         $0.name == carriedMacro.name
                             && $0.genericArguments == carriedMacro.genericArguments
                             && $0.argumentClause == carriedMacro.argumentClause
+                            && $0.rawBodyLanguage == carriedMacro.rawBodyLanguage
+                            && $0.rawBody == carriedMacro.rawBody
                     }
                 }
 

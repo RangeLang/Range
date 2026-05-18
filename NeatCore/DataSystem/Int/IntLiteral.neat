@@ -2,6 +2,5 @@
 construct IntLiteral { }
 
 extension IntLiteral {
-    // Literal conversion stays intrinsic for now while the backend is still Swift-driven.
     function storage() -> IntStorage
 }

@@ -4,6 +4,7 @@ enum Token: Equatable {
     case hash
     case identifier(String)
     case hashDirective(String)
+    case foreignBody(language: String, text: String)
     case stringLiteral(String)
     case integer(Int)
     case double(Double)
@@ -40,6 +41,13 @@ enum Token: Equatable {
     case percent
     case comma
     case eof
+
+    var isForeignBody: Bool {
+        if case .foreignBody = self {
+            return true
+        }
+        return false
+    }
 }
 
 struct LexedToken {

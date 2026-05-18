@@ -28,6 +28,13 @@ public struct MarkerDeclaration {
     public var registersLanguageBoundary: Bool {
         valueType.isLanguageRegistration
     }
+
+    public var foreignBodyLanguage: String? {
+        guard parameters.count == 1 else {
+            return nil
+        }
+        return parameters[0].typeReference?.foreignBodyLanguageName
+    }
 }
 
 public enum MarkerGlobalRegistration: String, Equatable {
@@ -78,6 +85,22 @@ public struct MacroApplication {
     public let name: String
     public let genericArguments: [TypeReference]
     public let argumentClause: String?
+    public let rawBodyLanguage: String?
+    public let rawBody: String?
+
+    public init(
+        name: String,
+        genericArguments: [TypeReference],
+        argumentClause: String?,
+        rawBodyLanguage: String? = nil,
+        rawBody: String? = nil
+    ) {
+        self.name = name
+        self.genericArguments = genericArguments
+        self.argumentClause = argumentClause
+        self.rawBodyLanguage = rawBodyLanguage
+        self.rawBody = rawBody
+    }
 }
 
 public enum MacroTarget {
@@ -140,5 +163,22 @@ extension TypeReference {
 
     var isLanguageRegistration: Bool {
         languageRegistrationTarget != nil
+    }
+
+    var foreignBodyLanguageName: String? {
+        switch self {
+        case .named("Markdown"):
+            return "Markdown"
+        case .generic(let base, let arguments):
+            guard case .named("Foreign") = base,
+                arguments.count == 1,
+                case .named(let language) = arguments[0]
+            else {
+                return nil
+            }
+            return language
+        default:
+            return nil
+        }
     }
 }

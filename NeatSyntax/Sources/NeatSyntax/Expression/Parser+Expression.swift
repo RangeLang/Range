@@ -440,7 +440,7 @@ extension Parser {
                 .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .andAnd, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
-            case .hash, .hashDirective, .atAttribute, .dollar, .percent, .bang:
+            case .hash, .hashDirective, .foreignBody, .atAttribute, .dollar, .percent, .bang:
                 return false
             case .identifier, .keyword, .stringLiteral, .integer, .double, .leftBracket,
                 .leftParen, .asterisk, .dot, .ellipsis, .question, .comma:

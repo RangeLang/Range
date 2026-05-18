@@ -2,12 +2,17 @@ import Foundation
 
 struct Lexer {
     private let characters: [Character]
+    private let foreignBodyLanguage: (String) -> String?
     private var index: Int = 0
     private var line: Int = 0
     private var character: Int = 0
 
-    init(source: String) {
+    init(
+        source: String,
+        foreignBodyLanguage: @escaping (String) -> String? = { _ in nil }
+    ) {
         self.characters = Array(source)
+        self.foreignBodyLanguage = foreignBodyLanguage
     }
 
     mutating func tokenize() throws -> [LexedToken] {
@@ -28,7 +33,10 @@ struct Lexer {
             case "/":
                 advance()
                 if match("/") {
-                    skipLineComment()
+                    throw ParseError(
+                        "Line comments are not Neat syntax. Use a marker such as #description { ... } for source notes.",
+                        range: range(from: start)
+                    )
                 } else {
                     emit(.slash, start: start)
                 }
@@ -145,6 +153,24 @@ struct Lexer {
                 } else {
                     let identifier = try readHashIdentifier(start: start)
                     emit(.hashDirective(identifier), start: start)
+                    if let language = foreignBodyLanguage(identifier) {
+                        skipWhitespace()
+                        if peek() == "{" {
+                            let braceStart = currentLocation()
+                            advance()
+                            emit(.leftBrace, start: braceStart)
+
+                            let bodyStart = currentLocation()
+                            let body = try readForeignBodyBlock(language: language, start: bodyStart)
+                            emit(.foreignBody(language: language, text: body), start: bodyStart)
+
+                            let closeStart = currentLocation()
+                            guard match("}") else {
+                                throw ParseError("Unterminated #\(identifier) \(language) block.", range: range(from: start))
+                            }
+                            emit(.rightBrace, start: closeStart)
+                        }
+                    }
                 }
             case "@":
                 let identifier = try readSigilIdentifier(start: start)
@@ -204,6 +230,12 @@ struct Lexer {
         guard peek() == expected else { return false }
         advance()
         return true
+    }
+
+    private mutating func skipWhitespace() {
+        while let character = peek(), character.isWhitespace {
+            advance()
+        }
     }
 
     private mutating func readIdentifier() -> String {
@@ -376,9 +408,37 @@ struct Lexer {
         throw ParseError("Unterminated string literal inside interpolation.", range: range(from: start))
     }
 
-    private mutating func skipLineComment() {
-        while let character = peek(), character != "\n" {
+    private mutating func readForeignBodyBlock(language: String, start: NeatSourceLocation) throws -> String {
+        var result = ""
+
+        if peek() == "\n" {
             advance()
         }
+
+        while let character = peek() {
+            if character == "}" && isOnlyWhitespaceBeforeCurrentPositionOnLine() {
+                return result.trimmingCharacters(in: .newlines)
+            }
+
+            result.append(character)
+            advance()
+        }
+
+        throw ParseError("Unterminated \(language) block.", range: range(from: start))
+    }
+
+    private func isOnlyWhitespaceBeforeCurrentPositionOnLine() -> Bool {
+        var position = index - 1
+        while position >= 0 {
+            let character = characters[position]
+            if character == "\n" {
+                return true
+            }
+            if !character.isWhitespace {
+                return false
+            }
+            position -= 1
+        }
+        return true
     }
 }

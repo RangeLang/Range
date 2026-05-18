@@ -64,6 +64,8 @@ public struct CompilationArtifactsEmitter {
             return "identifier(\(value))"
         case .hashDirective(let value):
             return "hashDirective(#\(value))"
+        case .foreignBody(let language, let text):
+            return "foreignBody(\(language), \(text.debugDescription))"
         case .stringLiteral(let value):
             return "stringLiteral(\(value.debugDescription))"
         case .integer(let value):
