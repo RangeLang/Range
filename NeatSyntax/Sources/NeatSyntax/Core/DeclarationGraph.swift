@@ -33,6 +33,7 @@ public struct DeclarationGraph {
     public let packageValues: [ValueDeclaration]
     public let namespacesByName: [String: NamespaceDeclaration]
     public let namespaceAttributeNames: Set<String>
+    public let namespaceAttributeAttachments: [NamespaceAttributeAttachment]
     public let constructsByName: [String: ConstructDeclaration]
     public let enumsByName: [String: EnumDeclaration]
     public let macrosByName: [String: MacroDeclaration]
@@ -60,6 +61,10 @@ public struct DeclarationGraph {
         let protocols = Self.collectProtocols(from: files)
         let namespaces = Self.collectNamespaces(from: files)
         let namespaceAttributeNames = Self.collectNamespaceAttributeNames(from: files)
+        let namespaceAttributeAttachments = Self.collectNamespaceAttributeAttachments(
+            from: files,
+            namespacesByName: namespaces
+        )
         let extensions = Self.collectExtensions(from: files)
         let constructs = Self.collectConstructs(from: files, protocols: protocols)
         let enumerations = Self.collectEnums(from: files)
@@ -88,6 +93,7 @@ public struct DeclarationGraph {
         self.packageValues = packageValues
         self.namespacesByName = namespaces
         self.namespaceAttributeNames = namespaceAttributeNames
+        self.namespaceAttributeAttachments = namespaceAttributeAttachments
         self.constructsByName = constructs
         self.enumsByName = enumerations
         self.macrosByName = macros
@@ -244,6 +250,12 @@ public struct DeclarationGraph {
 
     public func hasNamespaceAttribute(named name: String) -> Bool {
         namespaceAttributeNames.contains(name)
+    }
+
+    public func namespaceAttributeAttachments(
+        onDeclarationNamed name: String
+    ) -> [NamespaceAttributeAttachment] {
+        namespaceAttributeAttachments.filter { $0.declarationName == name }
     }
 
     public func isCoreConstruct(named name: String) -> Bool {
@@ -589,6 +601,19 @@ public struct DeclarationGraph {
             }
         }
         return names
+    }
+
+    static func collectNamespaceAttributeAttachments(
+        from files: [ParsedSourceFile],
+        namespacesByName: [String: NamespaceDeclaration]
+    ) -> [NamespaceAttributeAttachment] {
+        files.flatMap { parsedFile in
+            namespaceAttributeAttachments(
+                in: parsedFile.sourceFile,
+                filePath: parsedFile.path,
+                namespacesByName: namespacesByName
+            )
+        }
     }
 
     static func collectEnums(from files: [ParsedSourceFile]) -> [String: EnumDeclaration] {
@@ -1082,6 +1107,224 @@ public struct DeclarationGraph {
         for namespace in declaration.namespaces {
             collectNamespaceAttributeName(namespace, into: &names)
         }
+    }
+
+    private static func namespaceAttributeAttachments(
+        in sourceFile: SourceFileNode,
+        filePath: String,
+        namespacesByName: [String: NamespaceDeclaration]
+    ) -> [NamespaceAttributeAttachment] {
+        switch sourceFile {
+        case .construct(let declaration):
+            return namespaceAttributeAttachments(
+                in: declaration,
+                qualifiedName: declaration.name,
+                filePath: filePath,
+                namespacesByName: namespacesByName
+            )
+        case .module(let module):
+            var attachments: [NamespaceAttributeAttachment] = []
+            for declaration in module.constructs + module.packageSpaces.flatMap(\.constructs) {
+                attachments.append(
+                    contentsOf: namespaceAttributeAttachments(
+                        in: declaration,
+                        qualifiedName: declaration.name,
+                        filePath: filePath,
+                        namespacesByName: namespacesByName
+                    )
+                )
+            }
+            attachments.append(
+                contentsOf: (module.protocols + module.packageSpaces.flatMap(\.protocols)).compactMap {
+                    namespaceAttributeAttachment(
+                        declarationName: $0.name,
+                        declarationKind: .type,
+                        attribute: $0.attribute,
+                        filePath: filePath,
+                        namespacesByName: namespacesByName
+                    )
+                }
+            )
+            attachments.append(
+                contentsOf: (module.enumerations + module.packageSpaces.flatMap(\.enumerations)).compactMap {
+                    namespaceAttributeAttachment(
+                        declarationName: $0.name,
+                        declarationKind: .type,
+                        attribute: $0.attribute,
+                        filePath: filePath,
+                        namespacesByName: namespacesByName
+                    )
+                }
+            )
+            for namespace in module.namespaces + module.packageSpaces.flatMap(\.namespaces) {
+                attachments.append(
+                    contentsOf: namespaceAttributeAttachments(
+                        in: namespace,
+                        qualifiedPrefix: namespace.name,
+                        filePath: filePath,
+                        namespacesByName: namespacesByName
+                    )
+                )
+            }
+            for declaration in module.extensions {
+                attachments.append(
+                    contentsOf: namespaceAttributeAttachments(
+                        in: declaration,
+                        qualifiedPrefix: declaration.targetName,
+                        filePath: filePath,
+                        namespacesByName: namespacesByName
+                    )
+                )
+            }
+            return attachments
+        case .namespace(let declaration):
+            return namespaceAttributeAttachments(
+                in: declaration,
+                qualifiedPrefix: declaration.name,
+                filePath: filePath,
+                namespacesByName: namespacesByName
+            )
+        case .protocolDefinition(let declaration):
+            return namespaceAttributeAttachment(
+                declarationName: declaration.name,
+                declarationKind: .type,
+                attribute: declaration.attribute,
+                filePath: filePath,
+                namespacesByName: namespacesByName
+            ).map { [$0] } ?? []
+        case .enumeration(let declaration):
+            return namespaceAttributeAttachment(
+                declarationName: declaration.name,
+                declarationKind: .type,
+                attribute: declaration.attribute,
+                filePath: filePath,
+                namespacesByName: namespacesByName
+            ).map { [$0] } ?? []
+        case .extensions(let declarations):
+            return declarations.flatMap {
+                namespaceAttributeAttachments(
+                    in: $0,
+                    qualifiedPrefix: $0.targetName,
+                    filePath: filePath,
+                    namespacesByName: namespacesByName
+                )
+            }
+        case .mainBlock, .macro, .marker:
+            return []
+        }
+    }
+
+    private static func namespaceAttributeAttachments(
+        in declaration: ConstructDeclaration,
+        qualifiedName: String,
+        filePath: String,
+        namespacesByName: [String: NamespaceDeclaration]
+    ) -> [NamespaceAttributeAttachment] {
+        var attachments: [NamespaceAttributeAttachment] = []
+        if let attachment = namespaceAttributeAttachment(
+            declarationName: qualifiedName,
+            declarationKind: .type,
+            attribute: declaration.attribute,
+            filePath: filePath,
+            namespacesByName: namespacesByName
+        ) {
+            attachments.append(attachment)
+        }
+        for child in declaration.constructs {
+            attachments.append(
+                contentsOf: namespaceAttributeAttachments(
+                    in: child,
+                    qualifiedName: "\(qualifiedName).\(child.name)",
+                    filePath: filePath,
+                    namespacesByName: namespacesByName
+                )
+            )
+        }
+        return attachments
+    }
+
+    private static func namespaceAttributeAttachments(
+        in declaration: NamespaceDeclaration,
+        qualifiedPrefix: String,
+        filePath: String,
+        namespacesByName: [String: NamespaceDeclaration]
+    ) -> [NamespaceAttributeAttachment] {
+        var attachments: [NamespaceAttributeAttachment] = []
+        for construct in declaration.constructs {
+            attachments.append(
+                contentsOf: namespaceAttributeAttachments(
+                    in: construct,
+                    qualifiedName: "\(qualifiedPrefix).\(construct.name)",
+                    filePath: filePath,
+                    namespacesByName: namespacesByName
+                )
+            )
+        }
+        for namespace in declaration.namespaces {
+            attachments.append(
+                contentsOf: namespaceAttributeAttachments(
+                    in: namespace,
+                    qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
+                    filePath: filePath,
+                    namespacesByName: namespacesByName
+                )
+            )
+        }
+        return attachments
+    }
+
+    private static func namespaceAttributeAttachments(
+        in declaration: ExtensionDeclaration,
+        qualifiedPrefix: String,
+        filePath: String,
+        namespacesByName: [String: NamespaceDeclaration]
+    ) -> [NamespaceAttributeAttachment] {
+        var attachments: [NamespaceAttributeAttachment] = []
+        for construct in declaration.constructs {
+            attachments.append(
+                contentsOf: namespaceAttributeAttachments(
+                    in: construct,
+                    qualifiedName: "\(qualifiedPrefix).\(construct.name)",
+                    filePath: filePath,
+                    namespacesByName: namespacesByName
+                )
+            )
+        }
+        for namespace in declaration.namespaces {
+            attachments.append(
+                contentsOf: namespaceAttributeAttachments(
+                    in: namespace,
+                    qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
+                    filePath: filePath,
+                    namespacesByName: namespacesByName
+                )
+            )
+        }
+        return attachments
+    }
+
+    private static func namespaceAttributeAttachment(
+        declarationName: String,
+        declarationKind: DeclarationSourceKind,
+        attribute: AttributeApplication?,
+        filePath: String,
+        namespacesByName: [String: NamespaceDeclaration]
+    ) -> NamespaceAttributeAttachment? {
+        guard
+            let attribute,
+            !NeatSyntax.attributeIdentifiers.contains(attribute.name),
+            let namespace = namespacesByName[attribute.name]
+        else {
+            return nil
+        }
+
+        return NamespaceAttributeAttachment(
+            declarationName: declarationName,
+            declarationKind: declarationKind,
+            attribute: attribute,
+            namespace: namespace,
+            filePath: filePath
+        )
     }
 
     private static func collectNamespaceExtensionConstructs(

@@ -40,6 +40,35 @@ attribute Language
   source: #namespace construct Language
 ```
 
+The attribute also attaches the namespace behavior to the declaration that uses it:
+
+```neat
+#namespace
+construct Persisted {
+    let keyPrefix: String("settings")
+
+    function key(_ name: String) -> String {
+        return keyPrefix + "." + name
+    }
+}
+
+@Persisted
+construct Profile {
+    let displayName: String
+}
+```
+
+The graph can read this as:
+
+```text
+construct Profile
+attribute attachment Persisted
+  namespace values: keyPrefix
+  namespace functions: key
+```
+
+That keeps attribute behavior script-defined. A later semantic or backend phase can ask the graph which namespace behavior is attached to `Profile`, instead of treating `@Persisted` as a parser keyword or a backend-private switch.
+
 ## Rule
 
 Validation asks the graph whether an attribute name is known.
@@ -57,5 +86,7 @@ Declare namespace Missing to use @Missing.
 Built-in attributes remain compiler-known.
 
 Namespace attributes are program-declared names.
+
+Getting rid of an extra keyword is always nice because it decreases the mental load.
 
 The parser should not hardcode every domain tag, and the validator should not rediscover namespace declarations by walking raw source.

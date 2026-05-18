@@ -349,6 +349,43 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.hasNamespaceAttribute(named: "Styling"))
     }
 
+    @Test("Namespace attributes attach namespace behavior")
+    func namespaceAttributesAttachNamespaceBehavior() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/NamespaceAttributeBehavior.neat",
+                source: """
+                #namespace
+                construct Persisted {
+                    let keyPrefix: String("settings")
+
+                    function key(_ name: String) -> String {
+                        return keyPrefix + "." + name
+                    }
+                }
+
+                @Persisted
+                construct Profile {
+                    let displayName: String
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let attachments = program.declarationGraph.namespaceAttributeAttachments(
+            onDeclarationNamed: "Profile"
+        )
+
+        #expect(attachments.count == 1)
+        #expect(attachments[0].attribute.name == "Persisted")
+        #expect(attachments[0].namespace.name == "Persisted")
+        #expect(attachments[0].namespace.values.map(\.name) == ["keyPrefix"])
+        #expect(attachments[0].namespace.callables.map(\.name) == ["key"])
+    }
+
     @Test("Package spaces collect package metadata")
     func packageSpacesCollectPackageMetadata() throws {
         var inputs = try neatCoreInputs()
