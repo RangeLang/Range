@@ -1,14 +1,13 @@
 # Neat Status And Working Checklist
 
 This is the current working checklist for aligning Neat's implementation with
-the direction captured in the docs, posts, and planning notes.
+the current compiler, editor, and packaging direction.
 
 The older notes remain useful context, but this file should be the first place
 to look when deciding what to do next.
 
-The design-language map lives in `docs/design-language.md`. Posts in
-`docs/posts` are the primary source for language direction; this checklist is
-the implementation tracking surface.
+The older docs and posts have been published elsewhere; this checklist is the
+implementation tracking surface.
 
 ## Where We Stand
 

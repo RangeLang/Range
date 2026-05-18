@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "post:x": "node scripts/x-post-articles.mjs",
     "speed": "python3 Benchmarks/Speed/run.py"
   }
 }

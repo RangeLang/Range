@@ -7,5 +7,3 @@ Neat is a language project with a Swift-hosted compiler, CLI, core library, and 
 Install the `neat` command line tool from the latest GitHub release:
 
 https://github.com/georgetchelidze/Neat/releases/latest
-
-See [docs/download.md](docs/download.md) for macOS, Linux, Windows, and source-build instructions.
