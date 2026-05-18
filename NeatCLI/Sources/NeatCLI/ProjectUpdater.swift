@@ -74,18 +74,17 @@ struct ProjectUpdater {
         let executablePrefix = installedExecutableURL()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        if isWritableInstallPrefix(executablePrefix) {
+        if isWritableInstallPrefix(executablePrefix), !isHomebrewPrefix(executablePrefix) {
             return executablePrefix
-        }
-
-        let homebrewPrefix = URL(fileURLWithPath: "/opt/homebrew", isDirectory: true)
-        if isWritableInstallPrefix(homebrewPrefix) {
-            return homebrewPrefix
         }
 
         return FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".local", isDirectory: true)
             .standardizedFileURL
+    }
+
+    private static func isHomebrewPrefix(_ prefix: URL) -> Bool {
+        prefix.standardizedFileURL.path == "/opt/homebrew"
     }
 
     private static func isWritableInstallPrefix(_ prefix: URL) -> Bool {

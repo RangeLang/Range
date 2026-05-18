@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-prefix="${NEAT_INSTALL_PREFIX:-/usr/local}"
+default_prefix="/usr/local"
+if [[ -z "${NEAT_INSTALL_PREFIX:-}" && ! -e "$default_prefix/bin/neat" ]]; then
+  default_prefix="$HOME/.local"
+fi
+prefix="${NEAT_INSTALL_PREFIX:-$default_prefix}"
 target="$prefix/bin/neat"
 core_target="$prefix/share/neat/NeatCore"
 skill_target="$prefix/share/neat/Skills"
@@ -19,19 +23,25 @@ if [[ ! -e "$target" && ! -e "$core_target" && ! -e "$skill_target" ]]; then
   exit 0
 fi
 
-if [[ -e "$target" && -w "$(dirname "$target")" ]]; then
+if [[ -L "$target" && -w "$(dirname "$target")" ]]; then
+  rm -f "$target"
+elif [[ -e "$target" && -w "$(dirname "$target")" ]]; then
   rm -f "$target"
 elif [[ -e "$target" ]]; then
   sudo rm -f "$target"
 fi
 
-if [[ -e "$core_target" && -w "$(dirname "$core_target")" ]]; then
+if [[ -L "$core_target" && -w "$(dirname "$core_target")" ]]; then
+  rm -f "$core_target"
+elif [[ -e "$core_target" && -w "$(dirname "$core_target")" ]]; then
   rm -rf "$core_target"
 elif [[ -e "$core_target" ]]; then
   sudo rm -rf "$core_target"
 fi
 
-if [[ -e "$skill_target" && -w "$(dirname "$skill_target")" ]]; then
+if [[ -L "$skill_target" && -w "$(dirname "$skill_target")" ]]; then
+  rm -f "$skill_target"
+elif [[ -e "$skill_target" && -w "$(dirname "$skill_target")" ]]; then
   rm -rf "$skill_target"
 elif [[ -e "$skill_target" ]]; then
   sudo rm -rf "$skill_target"

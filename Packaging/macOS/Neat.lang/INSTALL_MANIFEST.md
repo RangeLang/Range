@@ -2,13 +2,19 @@
 
 Package: Neat CLI
 
-This package installs one executable, the bundled NeatCore sources required
-by the CLI, and bundled Codex skills:
+This package stores one executable, the bundled NeatCore sources required
+by the CLI, and bundled Codex skills in a versioned Neat-owned directory:
 
 ```text
-bin/neat -> /usr/local/bin/neat
-share/neat/NeatCore -> /usr/local/share/neat/NeatCore
-share/neat/Skills -> /usr/local/share/neat/Skills
+$HOME/.neat/NeatCLI/<version>
+```
+
+The selected prefix exposes symlinks:
+
+```text
+/usr/local/bin/neat -> $HOME/.neat/NeatCLI/<version>/bin/neat
+/usr/local/share/neat/NeatCore -> $HOME/.neat/NeatCLI/<version>/share/neat/NeatCore
+/usr/local/share/neat/Skills -> $HOME/.neat/NeatCLI/<version>/share/neat/Skills
 ```
 
 The install location can be changed with `NEAT_INSTALL_PREFIX`:
@@ -17,7 +23,7 @@ The install location can be changed with `NEAT_INSTALL_PREFIX`:
 NEAT_INSTALL_PREFIX="$HOME/.local" ./install.sh
 ```
 
-With that setting, the files are installed to:
+With that setting, the visible symlinks are:
 
 ```text
 $HOME/.local/bin/neat

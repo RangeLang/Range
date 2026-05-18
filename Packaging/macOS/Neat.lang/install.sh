@@ -5,7 +5,12 @@ package_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 binary="$package_root/bin/neat"
 core_sources="$package_root/share/neat/NeatCore"
 skill_sources="$package_root/share/neat/Skills"
-prefix="${NEAT_INSTALL_PREFIX:-/usr/local}"
+default_prefix="/usr/local"
+if [[ -z "${NEAT_INSTALL_PREFIX:-}" && ! -w "$default_prefix/bin" ]]; then
+  default_prefix="$HOME/.local"
+fi
+prefix="${NEAT_INSTALL_PREFIX:-$default_prefix}"
+store_root="${NEAT_STORE_ROOT:-$HOME/.neat/NeatCLI}"
 install_dir="$prefix/bin"
 target="$install_dir/neat"
 share_dir="$prefix/share/neat"
@@ -18,6 +23,13 @@ if [[ -f "$version_file" ]]; then
   version="$(tr -d '\n' < "$version_file")"
 fi
 
+payload_dir="$store_root/$version"
+payload_bin_dir="$payload_dir/bin"
+payload_share_dir="$payload_dir/share/neat"
+payload_binary="$payload_bin_dir/neat"
+payload_core="$payload_share_dir/NeatCore"
+payload_skills="$payload_share_dir/Skills"
+
 if [[ ! -x "$binary" ]]; then
   echo "Missing executable: $binary" >&2
   echo "This package should contain bin/neat." >&2
@@ -27,6 +39,8 @@ fi
 echo "Neat CLI installer"
 echo
 echo "Will install Neat $version"
+echo "stored in:"
+echo "  $payload_dir"
 echo "to:"
 echo "  $target"
 echo "  $core_target"
@@ -79,11 +93,15 @@ if [[ ! -w "$install_dir" || ! -w "$share_dir" ]]; then
   exit 1
 fi
 
-install -m 755 "$binary" "$target"
-rm -rf "$core_target"
-cp -R "$core_sources" "$core_target"
-rm -rf "$skill_target"
-cp -R "$skill_sources" "$skill_target"
+mkdir -p "$payload_bin_dir" "$payload_share_dir"
+install -m 755 "$binary" "$payload_binary"
+rm -rf "$payload_core" "$payload_skills"
+cp -R "$core_sources" "$payload_core"
+cp -R "$skill_sources" "$payload_skills"
+
+ln -sfn "$payload_binary" "$target"
+ln -sfn "$payload_core" "$core_target"
+ln -sfn "$payload_skills" "$skill_target"
 
 echo
 echo "Installed $target"

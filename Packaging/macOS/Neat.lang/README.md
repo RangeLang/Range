@@ -8,9 +8,10 @@ the standard macOS Installer flow:
 - `neat-macos-arm64.pkg`
 - `neat-macos-x64.pkg`
 
-Those packages install `neat` to `/usr/local/bin/neat`, NeatCore sources to
-`/usr/local/share/neat/NeatCore`, and bundled Codex skills to
-`/usr/local/share/neat/Skills`.
+Those packages expose `neat` at `/usr/local/bin/neat`, NeatCore at
+`/usr/local/share/neat/NeatCore`, and bundled Codex skills at
+`/usr/local/share/neat/Skills`. The exposed paths are symlinks to a
+versioned Neat-owned store under `$HOME/.neat/NeatCLI/<version>`.
 
 ## Contents
 
@@ -28,12 +29,20 @@ Those packages install `neat` to `/usr/local/bin/neat`, NeatCore sources to
 ./install.sh
 ```
 
-By default, this installs:
+When `/usr/local` is writable, this exposes:
 
 ```text
 /usr/local/bin/neat
 /usr/local/share/neat/NeatCore
 /usr/local/share/neat/Skills
+```
+
+When `/usr/local` is not writable, the shell installer defaults to:
+
+```text
+$HOME/.local/bin/neat
+$HOME/.local/share/neat/NeatCore
+$HOME/.local/share/neat/Skills
 ```
 
 To install somewhere else:
@@ -48,6 +57,12 @@ That installs:
 $HOME/.local/bin/neat
 $HOME/.local/share/neat/NeatCore
 $HOME/.local/share/neat/Skills
+```
+
+In all cases, the versioned payload is stored under:
+
+```text
+$HOME/.neat/NeatCLI/<version>
 ```
 
 ## Verify
