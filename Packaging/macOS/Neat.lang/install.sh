@@ -41,32 +41,39 @@ if [[ "${NEAT_INSTALL_ASSUME_YES:-false}" != "true" ]]; then
   esac
 fi
 
-if [[ ! -d "$install_dir" ]]; then
-  mkdir -p "$install_dir" 2>/dev/null || sudo mkdir -p "$install_dir"
-fi
-
-if [[ -w "$install_dir" ]]; then
-  install -m 755 "$binary" "$target"
-else
-  sudo install -m 755 "$binary" "$target"
-fi
-
 if [[ ! -d "$core_sources" ]]; then
   echo "Missing NeatCore sources: $core_sources" >&2
   exit 1
 fi
 
 if [[ ! -d "$share_dir" ]]; then
-  mkdir -p "$share_dir" 2>/dev/null || sudo mkdir -p "$share_dir"
+  mkdir -p "$share_dir" 2>/dev/null || {
+    echo "Cannot create $share_dir." >&2
+    echo "Choose a writable prefix with NEAT_INSTALL_PREFIX, for example:" >&2
+    echo "  NEAT_INSTALL_PREFIX=\"\$HOME/.local\" ./install.sh" >&2
+    exit 1
+  }
 fi
 
-if [[ -w "$share_dir" ]]; then
-  rm -rf "$core_target"
-  cp -R "$core_sources" "$core_target"
-else
-  sudo rm -rf "$core_target"
-  sudo cp -R "$core_sources" "$core_target"
+if [[ ! -d "$install_dir" ]]; then
+  mkdir -p "$install_dir" 2>/dev/null || {
+    echo "Cannot create $install_dir." >&2
+    echo "Choose a writable prefix with NEAT_INSTALL_PREFIX, for example:" >&2
+    echo "  NEAT_INSTALL_PREFIX=\"\$HOME/.local\" ./install.sh" >&2
+    exit 1
+  }
 fi
+
+if [[ ! -w "$install_dir" || ! -w "$share_dir" ]]; then
+  echo "Cannot install to $prefix because it is not writable." >&2
+  echo "Choose a writable prefix with NEAT_INSTALL_PREFIX, for example:" >&2
+  echo "  NEAT_INSTALL_PREFIX=\"\$HOME/.local\" ./install.sh" >&2
+  exit 1
+fi
+
+install -m 755 "$binary" "$target"
+rm -rf "$core_target"
+cp -R "$core_sources" "$core_target"
 
 echo
 echo "Installed $target"

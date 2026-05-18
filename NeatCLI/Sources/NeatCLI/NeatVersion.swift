@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 enum NeatVersion {
-    static let current = SemanticVersion(major: 0, minor: 1, patch: 13)
+    static let current = SemanticVersion(major: 0, minor: 1, patch: 14)
     static let updateRepository = "https://github.com/georgetchelidze/Neat.git"
 }
 
