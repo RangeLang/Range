@@ -21,10 +21,6 @@ jobs:
             artifact: neat-macos-arm64
             archive: neat-macos-arm64.lang.tar.gz
             shell: bash
-          - os: macos-13
-            artifact: neat-macos-x64
-            archive: neat-macos-x64.lang.tar.gz
-            shell: bash
 
     defaults:
       run:
