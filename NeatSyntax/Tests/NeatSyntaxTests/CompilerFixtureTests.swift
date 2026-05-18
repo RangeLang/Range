@@ -256,6 +256,47 @@ struct CompilerFixtureTests {
         }
     }
 
+    @Test("Local typed declarations replace assignment-shaped type construction")
+    func localTypedDeclarationsReplaceAssignmentShapedTypeConstruction() throws {
+        let validSource = """
+        @main {
+            let input: Channel<Int>
+        }
+        """
+
+        var validInputs = try neatCoreInputs()
+        validInputs.append(
+            SourceInput(
+                path: "/tmp/TypedChannelDeclaration.neat",
+                source: validSource,
+                role: .project
+            )
+        )
+        _ = try CompilerPipeline().buildValidated(inputs: validInputs)
+
+        let invalidPath = "/tmp/AssignmentShapedTypeConstruction.neat"
+        var invalidInputs = try neatCoreInputs()
+        invalidInputs.append(
+            SourceInput(
+                path: invalidPath,
+                source: """
+                @main {
+                    let input = Channel<Int>
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: invalidInputs)
+        #expect(
+            diagnostics.contains {
+                $0.path == invalidPath
+                    && $0.message.contains("Use `let input: Channel<Int>`")
+            }
+        )
+    }
+
     @Test("Construct applications reject labels with no stored declaration")
     func constructApplicationsRejectLabelsWithNoStoredDeclaration() throws {
         let projectPath = "/tmp/DirectConstructApplicationBadLabel.neat"

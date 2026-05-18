@@ -299,8 +299,15 @@ extension Parser {
         if peek() == .equal {
             try consume(.equal)
             expression = try parseExpression()
+            try rejectAssignmentShapedTypeDeclaration(
+                name: name,
+                expression: expression,
+                bindingKindDescription: kind == .constant ? "let" : "state"
+            )
         } else if let typedInitializer {
             expression = typedInitializer
+        } else if let explicitType {
+            expression = .call(name: explicitType.displayName, arguments: [])
         } else {
             try consume(.equal)
             expression = try parseExpression()
@@ -322,6 +329,39 @@ extension Parser {
         )
         localBindings[name] = LocalBindingSymbol(kind: kind, type: declaration.type)
         return .localBinding(declaration)
+    }
+
+    func rejectAssignmentShapedTypeDeclaration(
+        name: String,
+        expression: Expression,
+        bindingKindDescription: String
+    ) throws {
+        guard case .identifier(let typeName) = expression,
+            isUppercaseTypeReferenceName(typeName),
+            canParseTypeReference(typeName)
+        else {
+            return
+        }
+
+        throw ParseError(
+            "\(bindingKindDescription) '\(name)' uses assignment-shaped type construction. Use `\(bindingKindDescription) \(name): \(typeName)`."
+        )
+    }
+
+    func isUppercaseTypeReferenceName(_ name: String) -> Bool {
+        guard let first = name.first else { return false }
+        return first.isUppercase
+    }
+
+    func canParseTypeReference(_ source: String) -> Bool {
+        do {
+            var parser = try Parser(source: source)
+            _ = try parser.parseTypeReferenceNode()
+            try parser.consume(.eof)
+            return true
+        } catch {
+            return false
+        }
     }
 
     mutating func parseLocalDerived(

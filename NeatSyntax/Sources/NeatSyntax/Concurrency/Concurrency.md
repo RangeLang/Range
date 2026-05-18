@@ -111,7 +111,7 @@ This is just a normal function.
 If you want to run it concurrently, you do that at the use site:
 
 ```neat
-let names = Channel<String>()
+let names: Channel<String>
 
 @background {
     let name = fetchUserName(id: 1)
@@ -163,7 +163,7 @@ Example:
 
 ```neat
 function loadUser(id: Int) {
-    let output = Channel<String>()
+    let output: Channel<String>
 
     @background {
         let name = fetchUserName(id: id)
@@ -340,7 +340,7 @@ function refreshCache() {
 
 ```neat
 function loadName(id: Int) {
-    let output = Channel<String>()
+    let output: Channel<String>
 
     @background {
         output.send(fetchUserName(id: id))
@@ -355,7 +355,7 @@ function loadName(id: Int) {
 
 ```neat
 function processJobs() {
-    let jobs = Channel<Int>(capacity: 8)
+    let jobs: Channel<Int>(capacity: 8)
 
     @background {
         jobs.send(1)

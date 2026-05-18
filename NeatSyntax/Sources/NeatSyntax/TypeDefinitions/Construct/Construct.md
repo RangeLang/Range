@@ -31,7 +31,7 @@ construct Person {
 - Instantiable
 
 ```neat
-let user = Person(name: "George")
+let user: Person(name: "George")
 ```
 
 - Does not inherit from other constructs

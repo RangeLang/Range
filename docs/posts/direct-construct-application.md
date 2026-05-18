@@ -15,7 +15,7 @@ construct User {
     }
 }
 
-let user = User(id: 1, name: "George")
+let user: User(id: 1, name: "George")
 ```
 
 ## After
@@ -26,7 +26,7 @@ construct User {
     let name: String
 }
 
-let user = User(id: 1, name: "George")
+let user: User(id: 1, name: "George")
 ```
 
 ## Why

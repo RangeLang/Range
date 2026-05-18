@@ -14,7 +14,7 @@ construct User {
     let age: Int
 }
 
-let user = User(name: "Ava", age: 20)
+let user: User(name: "Ava", age: 20)
 ```
 
 - Default values reduce the required initializer surface
@@ -25,7 +25,7 @@ construct User {
     let age: Int = 20
 }
 
-let user = User(name: "Ava")
+let user: User(name: "Ava")
 ```
 
 - A construct may declare custom initializers

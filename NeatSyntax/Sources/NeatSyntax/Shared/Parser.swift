@@ -198,7 +198,7 @@ public struct Parser {
         discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:],
-        allowInitializerDeclarations: Bool = true
+        allowInitializerDeclarations: Bool = false
     ) throws {
         var lexer = Lexer(source: source)
         self.tokens = try lexer.tokenize()

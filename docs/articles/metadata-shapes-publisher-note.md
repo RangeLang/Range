@@ -6,6 +6,7 @@ Neat is moving small declaration ideas into metadata shapes.
 
 ```neat
 let version: Version = Version(0.1.8)
+let count: Int? = 5
 let value: Optional<Int>
 namespace Math {}
 
@@ -19,6 +20,7 @@ public construct Package {
 
 ```neat
 let version: Version(0.1.8)
+let count: Int(5)?
 let value: Optional<Int>
 
 #namespace(.locked)
@@ -37,6 +39,8 @@ The old shape works, but it spreads declaration meaning across assignment syntax
 The new shape keeps the facts on the declaration.
 
 `let version: Version(0.1.8)` says the binding is born as `Version` with construction data. It is not assignment into a slot.
+
+`let count: Int(5)?` keeps the same construction shape and makes the resulting type optional.
 
 Optional is still a type shape. `Optional<Int>` stays explicit because the source is naming the wrapped type relationship, not attaching a separate declaration flag.
 

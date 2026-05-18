@@ -38,7 +38,7 @@ construct User {
     let age: Int
 }
 
-let user = User(name: "Ava", age: 20)
+let user: User(name: "Ava", age: 20)
 ```
 
 - Cannot be reassigned after initialization
@@ -57,7 +57,7 @@ construct Person {
     state age: Int
 }
 
-let person: Person = Person(name: "George", age: 26)
+let person: Person(name: "George", age: 26)
 ```
 
 `person.age = 27` is invalid because `person` is a `let` root.
