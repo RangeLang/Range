@@ -726,6 +726,43 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Registered marker declares namespace-shaped configuration")
+    func registeredMarkerDeclaresNamespaceShapedConfiguration() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/RegisteredNamespaceMarker.neat",
+                source: """
+                marker hostSpace(): Construct -> Bool registers namespace {
+                    true
+                }
+
+                #hostSpace
+                construct Client {
+                    function route() -> String {
+                        return "home"
+                    }
+                }
+
+                @Client
+                construct Screen {
+                    let title: String
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let graph = program.declarationGraph
+
+        #expect(graph.markersByName["hostSpace"]?.registersNamespace == true)
+        #expect(graph.hasNamespace(named: "Client"))
+        #expect(graph.hasNamespaceAttribute(named: "Client"))
+        #expect(graph.constructsByName["Client"] == nil)
+        #expect(graph.callablesByName["Client.route"] != nil)
+    }
+
     @Test("Core Math namespace is available")
     func coreMathNamespaceIsAvailable() throws {
         let program = try CompilerPipeline().buildValidated(inputs: neatCoreInputs())

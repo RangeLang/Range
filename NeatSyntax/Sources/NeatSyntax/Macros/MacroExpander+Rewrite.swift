@@ -432,9 +432,6 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws {
         for application in applications {
-            if application.isNamespace {
-                continue
-            }
             guard let macro = macros[application.name] else {
                 if let marker = context.markerDeclarationsByName[application.name] {
                     guard macroTargetKind(for: marker.target.typeReference) == .construct else {

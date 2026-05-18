@@ -184,6 +184,7 @@ public struct Parser {
     var declarationMacroExpansionResolver: DeclarationMacroExpansionResolver
     var discoveredCallableReturnTypes: [String: TypeReference]
     var macroDeclarationsByName: [String: MacroDeclaration]
+    var markerDeclarationsByName: [String: MarkerDeclaration]
     var macroExpansionTypes: [String: TypeReference] = [:]
     var allowInitializerDeclarations: Bool
     var currentMacroBodyDepth: Int = 0
@@ -197,6 +198,7 @@ public struct Parser {
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
         discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
+        markerDeclarationsByName: [String: MarkerDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:],
         allowInitializerDeclarations: Bool = false
     ) throws {
@@ -209,6 +211,7 @@ public struct Parser {
         self.declarationMacroExpansionResolver = declarationMacroExpansionResolver
         self.discoveredCallableReturnTypes = discoveredCallableReturnTypes
         self.macroDeclarationsByName = macroDeclarationsByName
+        self.markerDeclarationsByName = markerDeclarationsByName
         self.macroExpansionTypes = macroExpansionTypes
         self.allowInitializerDeclarations = allowInitializerDeclarations
     }
@@ -223,6 +226,18 @@ public struct Parser {
         } else {
             macroExpansionTypes.removeValue(forKey: declaration.name)
         }
+    }
+
+    mutating func registerMarkerDeclaration(_ declaration: MarkerDeclaration) {
+        markerDeclarationsByName[declaration.name] = declaration
+    }
+
+    func markerApplicationRegistersNamespace(_ application: MacroApplication) -> Bool {
+        markerDeclarationsByName[application.name]?.registersNamespace == true
+    }
+
+    func isNamespaceShaped(_ declaration: ConstructDeclaration) -> Bool {
+        declaration.macros.contains(where: markerApplicationRegistersNamespace)
     }
 
     func isCurrentExpressionTerminator(_ token: Token) -> Bool {
@@ -301,7 +316,9 @@ public struct Parser {
             }
 
             if isMarkerDeclarationStart() {
-                markers.append(try parseMarkerDeclaration())
+                let declaration = try parseMarkerDeclaration()
+                markers.append(declaration)
+                registerMarkerDeclaration(declaration)
                 continue
             }
 
@@ -502,7 +519,9 @@ public struct Parser {
             }
 
             if isMarkerDeclarationStart() {
-                markers.append(try parseMarkerDeclaration(signatureOnly: true))
+                let declaration = try parseMarkerDeclaration(signatureOnly: true)
+                markers.append(declaration)
+                registerMarkerDeclaration(declaration)
                 continue
             }
 

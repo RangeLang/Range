@@ -17,7 +17,16 @@ public struct MarkerDeclaration {
     public let parameters: [NeatFunctionParameter]
     public let target: MacroTarget
     public let valueType: TypeReference
+    public let globalRegistrations: [MarkerGlobalRegistration]
     public let body: [Statement]
+
+    public var registersNamespace: Bool {
+        globalRegistrations.contains(.namespace)
+    }
+}
+
+public enum MarkerGlobalRegistration: String, Equatable {
+    case namespace
 }
 
 public struct EmittedCodeBlock {
@@ -64,10 +73,6 @@ public struct MacroApplication {
     public let name: String
     public let genericArguments: [TypeReference]
     public let argumentClause: String?
-
-    public var isNamespace: Bool {
-        name == "namespace"
-    }
 }
 
 public enum MacroTarget {

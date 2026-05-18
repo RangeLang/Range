@@ -1,5 +1,7 @@
 # Core Migration TODO
 
-- [ ] Decide whether a normal `construct` can store a `@core construct` member as plain inline value data.
-- [ ] Replace the parser's hardcoded operator precedence table with explicit Neat operator and precedence declarations.
-- [ ] Shrink Swift-side operator typing rules so operator meaning can migrate toward Neat declarations instead of `BuiltinType` special cases.
+This checklist has been folded into:
+
+- [To-do/README.md](To-do/README.md)
+
+Keep this file only as a compatibility pointer for old references.

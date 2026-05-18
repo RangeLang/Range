@@ -61,10 +61,6 @@ public struct ConstructDeclaration {
     public var isPackaging: Bool {
         attribute?.isPackaging == true
     }
-
-    public var isNamespaceShaped: Bool {
-        macros.contains(where: \.isNamespace)
-    }
 }
 
 public struct AttributeApplication {

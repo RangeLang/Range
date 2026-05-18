@@ -22,13 +22,17 @@ construct Panel {
 Namespace-shaped configuration can use `#namespace` on a construct:
 
 ```neat
+marker namespace(): Construct -> Bool registers namespace {
+    true
+}
+
 #namespace
 construct Language {
     let defaultLocale: String("en")
 }
 ```
 
-This declares a namespace named `Language`. The `let` entries are namespace configuration, not instance fields.
+The marker's `registers namespace` effect declares a namespace named `Language`. The `let` entries are namespace configuration, not instance fields.
 
 ## Validation
 

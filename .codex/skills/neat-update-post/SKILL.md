@@ -70,7 +70,7 @@ Short intro sentence.
 
 Short description of the capability.
 
-## Example / Shape
+## Example
 
 ```neat
 example shape

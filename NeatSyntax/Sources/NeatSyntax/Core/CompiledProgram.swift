@@ -101,6 +101,9 @@ public struct CompilerPipeline {
         let discoveredCoreMacrosByName = MacroExpander.collectMacros(
             from: discoveredCoreDeclarationFiles
         )
+        let discoveredCoreMarkersByName = MacroExpander.collectMarkers(
+            from: discoveredCoreDeclarationFiles
+        )
         let discoveredCoreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
             from: discoveredCoreDeclarationFiles
         )
@@ -114,13 +117,16 @@ public struct CompilerPipeline {
             ),
             discoveredCallableReturnTypes: discoveredCoreCallableReturnTypes,
             macroDeclarationsByName: discoveredCoreMacrosByName,
+            markerDeclarationsByName: discoveredCoreMarkersByName,
             macroExpansionTypes: discoveredCoreMacroExpansionTypes
         )
 
         let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
+        let coreMarkersByName = MacroExpander.collectMarkers(from: parsedCoreFiles)
         let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(from: parsedCoreFiles)
         let discoveredProjectDeclarationFiles = try discoverProjectDeclarationFiles(
-            inputs: projectInputs
+            inputs: projectInputs,
+            markerDeclarationsByName: coreMarkersByName
         )
         let discoveredProjectGraph = DeclarationGraph(
             files: parsedCoreFiles + discoveredProjectDeclarationFiles
@@ -132,11 +138,17 @@ public struct CompilerPipeline {
         let discoveredProjectMacrosByName = MacroExpander.collectMacros(
             from: discoveredProjectDeclarationFiles
         )
+        let discoveredProjectMarkersByName = MacroExpander.collectMarkers(
+            from: discoveredProjectDeclarationFiles
+        )
         let discoveredProjectMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
             from: discoveredProjectDeclarationFiles
         )
         let projectMacrosByName = coreMacrosByName.merging(discoveredProjectMacrosByName) { _, new in
             new
+        }
+        let projectMarkersByName = coreMarkersByName.merging(discoveredProjectMarkersByName) {
+            _, new in new
         }
         let parsedProjectFiles = try parse(
             inputs: projectInputs,
@@ -148,6 +160,7 @@ public struct CompilerPipeline {
             ),
             discoveredCallableReturnTypes: discoveredProjectCallableReturnTypes,
             macroDeclarationsByName: projectMacrosByName,
+            markerDeclarationsByName: projectMarkersByName,
             macroExpansionTypes: coreMacroExpansionTypes.merging(
                 discoveredProjectMacroExpansionTypes
             ) { _, new in new }
@@ -205,9 +218,11 @@ public struct CompilerPipeline {
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
         discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
+        markerDeclarationsByName: [String: MarkerDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:]
     ) throws -> [ParsedSourceFile] {
         var currentMacrosByName = macroDeclarationsByName
+        var currentMarkersByName = markerDeclarationsByName
         var currentMacroExpansionResolver = declarationMacroExpansionResolver
         var currentMacroExpansionTypes = macroExpansionTypes
         var parsedFiles: [ParsedSourceFile] = []
@@ -221,6 +236,7 @@ public struct CompilerPipeline {
                 declarationMacroExpansionResolver: currentMacroExpansionResolver,
                 discoveredCallableReturnTypes: discoveredCallableReturnTypes,
                 macroDeclarationsByName: currentMacrosByName,
+                markerDeclarationsByName: currentMarkersByName,
                 macroExpansionTypes: currentMacroExpansionTypes,
                 allowInitializerDeclarations: false
             )
@@ -242,23 +258,69 @@ public struct CompilerPipeline {
                     MacroExpander.collectMacroExpansionTypes(from: [parsedFile])
                 ) { _, new in new }
             }
+            let discoveredMarkers = MacroExpander.collectMarkers(from: [parsedFile])
+            if !discoveredMarkers.isEmpty {
+                currentMarkersByName.merge(discoveredMarkers) { _, new in new }
+            }
         }
 
         return parsedFiles
     }
 
-    private func discoverProjectDeclarationFiles(inputs: [SourceInput]) throws -> [ParsedSourceFile] {
-        try inputs.map { input in
+    private func discoverProjectDeclarationFiles(
+        inputs: [SourceInput],
+        markerDeclarationsByName: [String: MarkerDeclaration] = [:]
+    ) throws -> [ParsedSourceFile] {
+        let discoveredMarkersByName = try discoverMarkerDeclarations(
+            inputs: inputs,
+            markerDeclarationsByName: markerDeclarationsByName
+        )
+        let markersByName = markerDeclarationsByName.merging(discoveredMarkersByName) {
+            _, new in new
+        }
+        var parsedFiles: [ParsedSourceFile] = []
+
+        for input in inputs {
             var parser = try Parser(
                 source: input.source,
+                markerDeclarationsByName: markersByName,
                 allowInitializerDeclarations: false
             )
-            return ParsedSourceFile(
+            let parsedFile = ParsedSourceFile(
                 path: input.path,
                 source: input.source,
                 sourceFile: try parser.parseSourceFileForDeclarationDiscovery()
             )
+            parsedFiles.append(parsedFile)
         }
+
+        return parsedFiles
+    }
+
+    private func discoverMarkerDeclarations(
+        inputs: [SourceInput],
+        markerDeclarationsByName: [String: MarkerDeclaration]
+    ) throws -> [String: MarkerDeclaration] {
+        var markersByName = markerDeclarationsByName
+
+        for input in inputs {
+            var parser = try Parser(
+                source: input.source,
+                markerDeclarationsByName: markersByName,
+                allowInitializerDeclarations: false
+            )
+            let parsedFile = ParsedSourceFile(
+                path: input.path,
+                source: input.source,
+                sourceFile: try parser.parseSourceFileForDeclarationDiscovery()
+            )
+            let discoveredMarkers = MacroExpander.collectMarkers(from: [parsedFile])
+            if !discoveredMarkers.isEmpty {
+                markersByName.merge(discoveredMarkers) { _, new in new }
+            }
+        }
+
+        return markersByName
     }
 
     private func collectCallableReturnTypes(

@@ -1,0 +1,3 @@
+marker namespace(): Construct -> Bool registers namespace {
+    true
+}

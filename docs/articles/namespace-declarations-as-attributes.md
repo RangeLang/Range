@@ -20,13 +20,17 @@ A namespace declaration makes an attribute name available.
 Namespace-shaped configuration can use the declaration macro form:
 
 ```neat
+marker namespace(): Construct -> Bool registers namespace {
+    true
+}
+
 #namespace
 construct Language {
     let defaultLocale: String("en")
 }
 ```
 
-This also makes `@Language` valid. The construct body acts like namespace-owned configuration instead of instance storage.
+The `registers namespace` marker registration makes every construct annotated with `#namespace` globally visible as a namespace. This also makes `@Language` valid. The construct body acts like namespace-owned configuration instead of instance storage.
 
 The declaration graph should collect that fact:
 
@@ -87,6 +91,6 @@ Built-in attributes remain compiler-known.
 
 Namespace attributes are program-declared names.
 
-Getting rid of an extra keyword is always nice because it decreases the mental load.
+`#namespace` is not a compiler-hardcoded macro name. It is a marker with a global registration effect. That keeps the same path open for later host-specific registrations such as client/server splits without adding one parser rule per host.
 
 The parser should not hardcode every domain tag, and the validator should not rediscover namespace declarations by walking raw source.

@@ -31,8 +31,8 @@ extension Parser {
             }
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
                 let construct = try parseConstructDeclaration(requiresEOF: false)
-                if construct.isNamespaceShaped {
-                    namespaces.append(Self.namespaceDeclaration(from: construct))
+                if isNamespaceShaped(construct) {
+                    namespaces.append(namespaceDeclaration(from: construct))
                 } else {
                     constructs.append(construct)
                 }
@@ -83,8 +83,8 @@ extension Parser {
             }
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
                 let construct = try parseConstructDeclarationForDeclarationDiscovery()
-                if construct.isNamespaceShaped {
-                    namespaces.append(Self.namespaceDeclaration(from: construct))
+                if isNamespaceShaped(construct) {
+                    namespaces.append(namespaceDeclaration(from: construct))
                 } else {
                     constructs.append(construct)
                 }
@@ -103,13 +103,13 @@ extension Parser {
         )
     }
 
-    static func namespaceDeclaration(from construct: ConstructDeclaration) -> NamespaceDeclaration {
+    func namespaceDeclaration(from construct: ConstructDeclaration) -> NamespaceDeclaration {
         NamespaceDeclaration(
             name: construct.name,
             values: construct.values,
             callables: construct.callables,
-            constructs: construct.constructs.filter { !$0.isNamespaceShaped },
-            namespaces: construct.constructs.filter(\.isNamespaceShaped).map(namespaceDeclaration(from:))
+            constructs: construct.constructs.filter { !isNamespaceShaped($0) },
+            namespaces: construct.constructs.filter(isNamespaceShaped).map(namespaceDeclaration(from:))
         )
     }
 }

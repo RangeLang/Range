@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import crypto from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -38,13 +39,23 @@ if (process.argv.includes("--help")) {
   npm run post:x -- --article value-generics
   npm run post:x -- --article namespace-collection
   npm run post:x -- --article value-generics --publish
+  npm run post:x -- --check-auth
 
 Environment:
-  X_ACCESS_TOKEN   OAuth user-context token with post.write permission.
+  X_CONSUMER_KEY          OAuth 1.0a API key.
+  X_CONSUMER_KEY_SECRET   OAuth 1.0a API key secret.
+  X_ACCESS_TOKEN          OAuth 1.0a user access token.
+  X_ACCESS_TOKEN_SECRET   OAuth 1.0a user access token secret.
   X_DRY_RUN        Defaults to true. Set false and pass --publish to post.
   X_MAX_CHARS      Defaults to 280.
 
 No local draft files are written.`);
+  process.exit(0);
+}
+
+if (process.argv.includes("--check-auth")) {
+  const user = await checkAuth();
+  console.log(`Authenticated as @${user.username} (${user.id}).`);
   process.exit(0);
 }
 
@@ -75,15 +86,11 @@ if (dryRun) {
   process.exit(0);
 }
 
-const token = process.env.X_ACCESS_TOKEN;
-if (!token) {
-  console.error("Missing X_ACCESS_TOKEN in .env or environment.");
-  process.exit(1);
-}
+validateOAuth1Environment();
 
 let replyToTweetId;
 for (const [index, text] of posts.entries()) {
-  const tweet = await createTweet({ text, replyToTweetId, token });
+  const tweet = await createTweet({ text, replyToTweetId });
   replyToTweetId = tweet.data?.id;
   if (!replyToTweetId) {
     console.error(`X API response for post ${index + 1} did not include data.id.`);
@@ -105,16 +112,34 @@ function validatePosts(posts, title) {
   }
 }
 
-async function createTweet({ text, replyToTweetId, token }) {
+async function checkAuth() {
+  validateOAuth1Environment();
+  const url = "https://api.x.com/2/users/me";
+  const response = await fetch(url, {
+    headers: {
+      Authorization: oauth1AuthorizationHeader("GET", url),
+    },
+  });
+  const json = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    console.error(`X API auth check failed ${response.status}:`);
+    console.error(JSON.stringify(safeXError(json), null, 2));
+    process.exit(1);
+  }
+  return json.data;
+}
+
+async function createTweet({ text, replyToTweetId }) {
   const body = { text };
   if (replyToTweetId) {
     body.reply = { in_reply_to_tweet_id: replyToTweetId };
   }
 
-  const response = await fetch("https://api.x.com/2/tweets", {
+  const url = "https://api.x.com/2/tweets";
+  const response = await fetch(url, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: oauth1AuthorizationHeader("POST", url),
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -127,6 +152,79 @@ async function createTweet({ text, replyToTweetId, token }) {
     process.exit(1);
   }
   return json;
+}
+
+function validateOAuth1Environment() {
+  const missing = [
+    "X_CONSUMER_KEY",
+    "X_CONSUMER_KEY_SECRET",
+    "X_ACCESS_TOKEN",
+    "X_ACCESS_TOKEN_SECRET",
+  ].filter((name) => !process.env[name]);
+
+  if (missing.length > 0) {
+    console.error(`Missing OAuth 1.0a setting(s): ${missing.join(", ")}`);
+    process.exit(1);
+  }
+}
+
+function oauth1AuthorizationHeader(method, rawUrl) {
+  const url = new URL(rawUrl);
+  const oauth = {
+    oauth_consumer_key: process.env.X_CONSUMER_KEY,
+    oauth_nonce: crypto.randomBytes(16).toString("hex"),
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_token: process.env.X_ACCESS_TOKEN,
+    oauth_version: "1.0",
+  };
+
+  const parameters = [
+    ...Array.from(url.searchParams.entries()),
+    ...Object.entries(oauth),
+  ].sort(([lhsKey, lhsValue], [rhsKey, rhsValue]) => {
+    const keyComparison = oauthEncode(lhsKey).localeCompare(oauthEncode(rhsKey));
+    if (keyComparison !== 0) return keyComparison;
+    return oauthEncode(lhsValue).localeCompare(oauthEncode(rhsValue));
+  });
+
+  const parameterString = parameters
+    .map(([key, value]) => `${oauthEncode(key)}=${oauthEncode(value)}`)
+    .join("&");
+  const baseUrl = `${url.protocol}//${url.host}${url.pathname}`;
+  const signatureBase = [
+    method.toUpperCase(),
+    oauthEncode(baseUrl),
+    oauthEncode(parameterString),
+  ].join("&");
+  const signingKey = `${oauthEncode(process.env.X_CONSUMER_KEY_SECRET)}&${oauthEncode(
+    process.env.X_ACCESS_TOKEN_SECRET
+  )}`;
+
+  oauth.oauth_signature = crypto
+    .createHmac("sha1", signingKey)
+    .update(signatureBase)
+    .digest("base64");
+
+  return `OAuth ${Object.entries(oauth)
+    .sort(([lhs], [rhs]) => lhs.localeCompare(rhs))
+    .map(([key, value]) => `${oauthEncode(key)}="${oauthEncode(value)}"`)
+    .join(", ")}`;
+}
+
+function oauthEncode(value) {
+  return encodeURIComponent(value)
+    .replace(/[!'()*]/g, (character) =>
+      `%${character.charCodeAt(0).toString(16).toUpperCase()}`
+    );
+}
+
+function safeXError(json) {
+  return {
+    title: json.title,
+    detail: json.detail,
+    errors: json.errors,
+  };
 }
 
 function argValue(name) {

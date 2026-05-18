@@ -1,5 +1,9 @@
 # Product Ideas
 
+Active compiler/language cleanup now lives in:
+
+- [To-do/README.md](To-do/README.md)
+
 - Create NeatCloud so people can share Neat packages, articles, examples, and language-design notes.
 
 # Embedded Swift Direction

@@ -53,8 +53,8 @@ struct GraphCollector {
 
         switch parsedFile.sourceFile {
         case .construct(let declaration):
-            if declaration.isNamespaceShaped {
-                let namespace = DeclarationGraph.namespaceDeclaration(from: declaration)
+            if declarationGraph.isNamespaceShaped(declaration) {
+                let namespace = declarationGraph.namespaceDeclaration(from: declaration)
                 analyzeNamespaceDeclaration(
                     namespace,
                     parentID: fileID,
@@ -85,12 +85,12 @@ struct GraphCollector {
             for state in topLevelStates {
                 analyzeStateDeclaration(state, parentID: fileID)
             }
-            for declaration in module.constructs where !declaration.isNamespaceShaped {
+            for declaration in module.constructs where !declarationGraph.isNamespaceShaped(declaration) {
                 analyzeConstructDeclaration(declaration, parentID: fileID)
             }
             let namespaceConstructs = module.constructs
-                .filter(\.isNamespaceShaped)
-                .map(DeclarationGraph.namespaceDeclaration(from:))
+                .filter(declarationGraph.isNamespaceShaped)
+                .map(declarationGraph.namespaceDeclaration(from:))
             for declaration in module.namespaces + namespaceConstructs {
                 analyzeNamespaceDeclaration(
                     declaration,

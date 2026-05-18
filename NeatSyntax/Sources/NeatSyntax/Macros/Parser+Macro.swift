@@ -116,6 +116,7 @@ extension Parser {
         let target = try parseMacroTarget()
         try consume(.arrow)
         let valueType = try parseTypeReferenceNode()
+        let globalRegistrations = try parseMarkerGlobalRegistrationsIfPresent()
 
         let body: [Statement]
         if signatureOnly {
@@ -133,8 +134,40 @@ extension Parser {
             parameters: parameters,
             target: target,
             valueType: valueType,
+            globalRegistrations: globalRegistrations,
             body: body
         )
+    }
+
+    mutating func parseMarkerGlobalRegistrationsIfPresent() throws -> [MarkerGlobalRegistration] {
+        guard case .identifier("registers") = peek() else {
+            return []
+        }
+        advance()
+
+        var registrations: [MarkerGlobalRegistration] = []
+        while true {
+            let rawKind: String
+            switch peek() {
+            case .identifier(let value), .keyword(let value):
+                rawKind = value
+                advance()
+            default:
+                throw ParseError("Expected marker global registration kind after 'registers'.")
+            }
+
+            guard let registration = MarkerGlobalRegistration(rawValue: rawKind) else {
+                throw ParseError("Unknown marker global registration '\(rawKind)'.")
+            }
+            registrations.append(registration)
+
+            guard peek() == .comma else {
+                break
+            }
+            advance()
+        }
+
+        return registrations
     }
 
     mutating func parseFreestandingMacroValueBody(parameters: [NeatFunctionParameter]) throws
