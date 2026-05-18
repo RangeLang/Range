@@ -8,13 +8,15 @@ the standard macOS Installer flow:
 - `neat-macos-arm64.pkg`
 - `neat-macos-x64.pkg`
 
-Those packages install `neat` to `/usr/local/bin/neat`.
+Those packages install `neat` to `/usr/local/bin/neat` and NeatCore sources to
+`/usr/local/share/neat/NeatCore`.
 
 ## Contents
 
 - `bin/neat`: the Neat CLI executable
+- `share/neat/NeatCore`: language core sources used by the CLI
 - `install.sh`: copies `bin/neat` into your command line path
-- `uninstall.sh`: removes the installed `neat` executable
+- `uninstall.sh`: removes the installed `neat` executable and NeatCore sources
 - `INSTALL_MANIFEST.md`: describes what the installer changes
 - `VERSION`: the release version packaged by GitHub Actions
 
@@ -28,6 +30,7 @@ By default, this installs:
 
 ```text
 /usr/local/bin/neat
+/usr/local/share/neat/NeatCore
 ```
 
 To install somewhere else:
@@ -40,6 +43,7 @@ That installs:
 
 ```text
 $HOME/.local/bin/neat
+$HOME/.local/share/neat/NeatCore
 ```
 
 ## Verify

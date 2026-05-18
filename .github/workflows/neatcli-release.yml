@@ -53,7 +53,9 @@ jobs:
           mkdir -p dist
           cp -R ../Packaging/macOS/Neat.lang "dist/${package}"
           mkdir -p "dist/${package}/bin"
+          mkdir -p "dist/${package}/share/neat"
           cp .build/release/NeatCLI "dist/${package}/bin/neat"
+          cp -R ../NeatCore "dist/${package}/share/neat/NeatCore"
           printf '%s\n' "$release_version" > "dist/${package}/VERSION"
           chmod 755 "dist/${package}/bin/neat"
           chmod 755 "dist/${package}/install.sh" "dist/${package}/uninstall.sh"
@@ -73,7 +75,9 @@ jobs:
           fi
           package_root="dist/${{ matrix.artifact }}.pkgroot"
           mkdir -p "${package_root}/usr/local/bin"
+          mkdir -p "${package_root}/usr/local/share/neat"
           cp .build/release/NeatCLI "${package_root}/usr/local/bin/neat"
+          cp -R ../NeatCore "${package_root}/usr/local/share/neat/NeatCore"
           chmod 755 "${package_root}/usr/local/bin/neat"
           pkgbuild \
             --root "${package_root}" \

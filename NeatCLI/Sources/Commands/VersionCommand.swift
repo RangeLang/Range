@@ -11,19 +11,23 @@ extension NeatCLI {
         var noCheck: Bool = false
 
         mutating func run() throws {
-            print("Neat \(NeatVersion.current)")
-            print("Installed: \(installedExecutablePath())")
+            print(
+                TerminalLog.style("Neat", level: .change, bold: true)
+                    + " "
+                    + TerminalLog.subtleStdout("\(NeatVersion.current)")
+            )
+            print(statusLine(label: "Installed", value: installedExecutablePath()))
 
             guard !noCheck else {
-                print("Updates: not checked")
-                print("Checked: not checked")
+                print(statusLine(label: "Updates", value: "not checked", level: .waiting))
+                print(statusLine(label: "Checked", value: "not checked"))
                 return
             }
 
             let canAnimate = Platform.isTerminal(Platform.standardOutputFileDescriptor)
             if canAnimate {
-                print("Updates: checking...")
-                print("Checked: checking...")
+                print(statusLine(label: "Updates", value: "checking...", level: .waiting))
+                print(statusLine(label: "Checked", value: "checking...", level: .waiting))
             }
 
             let result = runCheckWithSpinner(canAnimate: canAnimate)
@@ -31,12 +35,15 @@ extension NeatCLI {
                 let status = try result.get()
                 replaceCheckLines(
                     updates: updateText(for: status),
-                    checked: status.checkedRepository
+                    checked: status.checkedRepository,
+                    updatesLevel: updateLevel(for: status)
                 )
             } catch {
                 replaceCheckLines(
                     updates: "unavailable",
-                    checked: ErrorDescription.message(for: error)
+                    checked: ErrorDescription.message(for: error),
+                    updatesLevel: .error,
+                    checkedLevel: .error
                 )
             }
         }
@@ -83,16 +90,43 @@ extension NeatCLI {
             return "up to date"
         }
 
-        private func replaceCheckLines(updates: String, checked: String) {
+        private func updateLevel(for status: VersionUpdateStatus) -> CLIStatusLevel {
+            guard status.latest != nil else {
+                return .warning
+            }
+            return status.updateAvailable ? .waiting : .success
+        }
+
+        private func statusLine(
+            label: String,
+            value: String,
+            level: CLIStatusLevel? = nil
+        ) -> String {
+            let renderedLabel = TerminalLog.accentStdout("\(label):", color: .change, bold: true)
+            let renderedValue: String
+            if let level {
+                renderedValue = TerminalLog.style(value, level: level)
+            } else {
+                renderedValue = TerminalLog.subtleStdout(value)
+            }
+            return "\(renderedLabel) \(renderedValue)"
+        }
+
+        private func replaceCheckLines(
+            updates: String,
+            checked: String,
+            updatesLevel: CLIStatusLevel? = nil,
+            checkedLevel: CLIStatusLevel? = nil
+        ) {
             if Platform.isTerminal(Platform.standardOutputFileDescriptor) {
                 fputs("\u{001B}[2A", stdout)
                 fputs("\u{001B}[2K", stdout)
-                print("Updates: \(updates)")
+                print(statusLine(label: "Updates", value: updates, level: updatesLevel))
                 fputs("\u{001B}[2K", stdout)
-                print("Checked: \(checked)")
+                print(statusLine(label: "Checked", value: checked, level: checkedLevel))
             } else {
-                print("Updates: \(updates)")
-                print("Checked: \(checked)")
+                print(statusLine(label: "Updates", value: updates, level: updatesLevel))
+                print(statusLine(label: "Checked", value: checked, level: checkedLevel))
             }
             fflush(stdout)
         }

@@ -3,9 +3,12 @@ set -euo pipefail
 
 package_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 binary="$package_root/bin/neat"
+core_sources="$package_root/share/neat/NeatCore"
 prefix="${NEAT_INSTALL_PREFIX:-/usr/local}"
 install_dir="$prefix/bin"
 target="$install_dir/neat"
+share_dir="$prefix/share/neat"
+core_target="$share_dir/NeatCore"
 version_file="$package_root/VERSION"
 version="unknown"
 
@@ -24,8 +27,10 @@ echo "Version: $version"
 echo
 echo "Will install:"
 echo "  $binary"
+echo "  $core_sources"
 echo "to:"
 echo "  $target"
+echo "  $core_target"
 echo
 echo "Manifest:"
 echo "  $package_root/INSTALL_MANIFEST.md"
@@ -39,6 +44,23 @@ if [[ -w "$install_dir" ]]; then
   install -m 755 "$binary" "$target"
 else
   sudo install -m 755 "$binary" "$target"
+fi
+
+if [[ ! -d "$core_sources" ]]; then
+  echo "Missing NeatCore sources: $core_sources" >&2
+  exit 1
+fi
+
+if [[ ! -d "$share_dir" ]]; then
+  mkdir -p "$share_dir" 2>/dev/null || sudo mkdir -p "$share_dir"
+fi
+
+if [[ -w "$share_dir" ]]; then
+  rm -rf "$core_target"
+  cp -R "$core_sources" "$core_target"
+else
+  sudo rm -rf "$core_target"
+  sudo cp -R "$core_sources" "$core_target"
 fi
 
 echo

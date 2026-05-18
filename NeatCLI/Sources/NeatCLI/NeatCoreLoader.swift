@@ -4,21 +4,75 @@ import NeatSyntax
 
 enum NeatCoreLoader {
     static func coreRoot() throws -> URL {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-        let coreRoot = root.appendingPathComponent("NeatCore", isDirectory: true)
-
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: coreRoot.path, isDirectory: &isDirectory),
-            isDirectory.boolValue
-        else {
-            throw ValidationError("Missing NeatCore sources at \(coreRoot.path)")
+        let candidates = coreRootCandidates()
+        for candidate in candidates {
+            var isDirectory: ObjCBool = false
+            if FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
+                isDirectory.boolValue
+            {
+                return candidate.standardizedFileURL
+            }
         }
 
-        return coreRoot.standardizedFileURL
+        throw ValidationError(
+            "Missing NeatCore sources. Checked: \(candidates.map(\.path).joined(separator: ", "))"
+        )
+    }
+
+    private static func coreRootCandidates() -> [URL] {
+        let environment = ProcessInfo.processInfo.environment
+        let explicitPath = environment["NEAT_CORE_PATH"].map {
+            URL(fileURLWithPath: $0, isDirectory: true)
+        }
+
+        let executableURL = installedExecutableURL()
+        let executableDirectory = executableURL.deletingLastPathComponent()
+        let installShareRoot = executableDirectory
+            .deletingLastPathComponent()
+            .appendingPathComponent("share/neat/NeatCore", isDirectory: true)
+
+        let sourceRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("NeatCore", isDirectory: true)
+
+        return [explicitPath, installShareRoot, sourceRoot].compactMap(\.self)
+    }
+
+    private static func installedExecutableURL() -> URL {
+        let executable = CommandLine.arguments.first ?? "neat"
+        if executable.contains("/") {
+            return URL(fileURLWithPath: executable).standardizedFileURL
+        }
+
+        guard let lookupTool = Platform.defaultExecutableLookupTool else {
+            return URL(fileURLWithPath: executable).standardizedFileURL
+        }
+
+        let process = Process()
+        process.executableURL = lookupTool
+        process.arguments = ["which", executable]
+        let output = Pipe()
+        process.standardOutput = output
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                let data = output.fileHandleForReading.readDataToEndOfFile()
+                let path = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let path, !path.isEmpty {
+                    return URL(fileURLWithPath: path).standardizedFileURL
+                }
+            }
+        } catch {
+            return URL(fileURLWithPath: executable).standardizedFileURL
+        }
+
+        return URL(fileURLWithPath: executable).standardizedFileURL
     }
 
     static func isCoreFile(_ fileURL: URL) throws -> Bool {
