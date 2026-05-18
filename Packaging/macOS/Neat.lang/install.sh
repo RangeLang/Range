@@ -23,18 +23,23 @@ if [[ ! -x "$binary" ]]; then
 fi
 
 echo "Neat CLI installer"
-echo "Version: $version"
 echo
-echo "Will install:"
-echo "  $binary"
-echo "  $core_sources"
+echo "Will install Neat $version"
 echo "to:"
 echo "  $target"
 echo "  $core_target"
 echo
-echo "Manifest:"
-echo "  $package_root/INSTALL_MANIFEST.md"
-echo
+
+if [[ "${NEAT_INSTALL_ASSUME_YES:-false}" != "true" ]]; then
+  read -r -p "Continue? [y/N] " answer
+  case "$answer" in
+    y|Y|yes|YES) ;;
+    *)
+      echo "Cancelled."
+      exit 0
+      ;;
+  esac
+fi
 
 if [[ ! -d "$install_dir" ]]; then
   mkdir -p "$install_dir" 2>/dev/null || sudo mkdir -p "$install_dir"
