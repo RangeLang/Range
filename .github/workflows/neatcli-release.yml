@@ -25,10 +25,6 @@ jobs:
             artifact: neat-macos-x64
             archive: neat-macos-x64.lang.tar.gz
             shell: bash
-          - os: ubuntu-24.04
-            artifact: neat-linux-x64
-            archive: neat-linux-x64.tar.gz
-            shell: bash
 
     defaults:
       run:
@@ -89,15 +85,6 @@ jobs:
             --version "${release_version}" \
             --install-location "/" \
             "${{ matrix.artifact }}.pkg"
-
-      - name: Package Linux binary
-        if: runner.os == 'Linux'
-        working-directory: NeatCLI
-        run: |
-          mkdir -p dist/${{ matrix.artifact }}
-          cp .build/release/NeatCLI dist/${{ matrix.artifact }}/neat
-          chmod 755 dist/${{ matrix.artifact }}/neat
-          tar -C dist -czf ${{ matrix.archive }} ${{ matrix.artifact }}
 
       - uses: actions/upload-artifact@v4
         with:
