@@ -13,8 +13,8 @@ macro componentStorage(): Construct { target, diagnostics in
                 return storage.component(index: index)
             }
 
-            function map<Output>(_ transform: (Scalar) -> Output) -> #(target.declaration.self)<Output> {
-                return #(target.declaration.self)<Output>(storage: storage.map(transform))
+            function map<Output>(_ transform: (Scalar) -> Output) -> #(target.declaration.self)<dimensionality, Output> {
+                return #(target.declaration.self)<dimensionality, Output>(storage: storage.map(transform))
             }
         }
     }

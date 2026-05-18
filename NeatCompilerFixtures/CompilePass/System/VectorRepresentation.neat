@@ -1,8 +1,8 @@
 #main {
     let storage: ComponentStorage<Float> = ComponentStorage<Float>(components: [1.0, 2.0, 3.0])
-    let vector: Vector<Float> = Vector<Float>(storage: storage)
+    let vector: Vector<3, Float> = Vector<3, Float>(storage: storage)
     let first: Float = vector.component(index: 0)
-    let doubled: Vector<Float> = vector.map { value in value * 2.0 }
+    let doubled: Vector<3, Float> = vector.map { value in value * 2.0 }
 
     Logger.log(first)
     Logger.log(doubled.count())

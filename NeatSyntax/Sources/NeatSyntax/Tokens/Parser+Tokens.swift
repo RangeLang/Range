@@ -258,10 +258,10 @@ extension Parser {
 
         if peek() == .less {
             try consume(.less)
-            var genericArguments: [TypeReference] = [try parseTypeReferenceNode()]
+            var genericArguments: [TypeReference] = [try parseGenericArgumentReferenceNode()]
             while peek() == .comma {
                 advance()
-                genericArguments.append(try parseTypeReferenceNode())
+                genericArguments.append(try parseGenericArgumentReferenceNode())
             }
             try consume(.greater)
             if case .named("Optional") = result, genericArguments.count == 1 {
@@ -271,5 +271,30 @@ extension Parser {
         }
 
         return result
+    }
+
+    mutating func parseGenericArgumentReferenceNode() throws -> TypeReference {
+        switch peek() {
+        case .integer(let value):
+            advance()
+            return .named(String(value))
+        case .double(let value):
+            advance()
+            return .named(String(value))
+        case .stringLiteral(let value):
+            advance()
+            return .named("\"\(value)\"")
+        case .keyword("true"):
+            advance()
+            return .named("true")
+        case .keyword("false"):
+            advance()
+            return .named("false")
+        case .dot:
+            try consume(.dot)
+            return .named(".\(try consumeTypeName())")
+        default:
+            return try parseTypeReferenceNode()
+        }
     }
 }

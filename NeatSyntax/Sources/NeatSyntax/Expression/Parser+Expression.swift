@@ -407,10 +407,10 @@ extension Parser {
         }
 
         try consume(.less)
-        var arguments: [String] = [try consumeTypeReference()]
+        var arguments: [String] = [try parseGenericArgumentReferenceNode().displayName]
         while peek() == .comma {
             advance()
-            arguments.append(try consumeTypeReference())
+            arguments.append(try parseGenericArgumentReferenceNode().displayName)
         }
         try consume(.greater)
         return "<\(arguments.joined(separator: ", "))>"
@@ -418,7 +418,8 @@ extension Parser {
 
     func isGenericArgumentClauseStart() -> Bool {
         switch peek(offset: 1) {
-        case .identifier, .keyword, .leftBracket, .leftParen:
+        case .identifier, .keyword, .integer, .double, .stringLiteral, .dot, .leftBracket,
+            .leftParen:
             break
         default:
             return false
@@ -439,11 +440,10 @@ extension Parser {
                 .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .andAnd, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
-            case .stringLiteral, .integer, .double, .hash, .hashDirective, .atAttribute, .dollar,
-                .percent, .bang:
+            case .hash, .hashDirective, .atAttribute, .dollar, .percent, .bang:
                 return false
-            case .identifier, .keyword, .leftBracket, .leftParen, .asterisk, .dot, .ellipsis,
-                .question, .comma:
+            case .identifier, .keyword, .stringLiteral, .integer, .double, .leftBracket,
+                .leftParen, .asterisk, .dot, .ellipsis, .question, .comma:
                 break
             }
             offset += 1

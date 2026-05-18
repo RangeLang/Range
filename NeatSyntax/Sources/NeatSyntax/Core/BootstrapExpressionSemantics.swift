@@ -1145,7 +1145,7 @@ public enum ExpressionTypeSemantics {
     private static func parseTypeReference(_ source: String) -> TypeReference? {
         do {
             var parser = try Parser(source: source)
-            let type = try parser.parseTypeReferenceNode()
+            let type = try parser.parseGenericArgumentReferenceNode()
             try parser.consume(.eof)
             return type
         } catch {
