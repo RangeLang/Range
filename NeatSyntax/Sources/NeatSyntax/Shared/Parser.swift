@@ -235,6 +235,7 @@ public struct Parser {
 
         var mainBlock: MainBlockNode?
         var topLevelStates: [StateDeclaration] = []
+        var packageSpaces: [PackageSpaceDeclaration] = []
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
@@ -252,6 +253,11 @@ public struct Parser {
                     throw ParseError("Only one @main block is allowed per file.")
                 }
                 mainBlock = try parseMainBlock(requiresEOF: false)
+                continue
+            }
+
+            if isPackageSpaceStart() {
+                packageSpaces.append(try parsePackageSpace())
                 continue
             }
 
@@ -328,7 +334,7 @@ public struct Parser {
         try validateCallableDeclarations(topLevelCallables)
 
         if let mainBlock,
-            topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
+            topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
             protocols.isEmpty,
             constructs.isEmpty,
             namespaces.isEmpty,
@@ -341,7 +347,7 @@ public struct Parser {
             return .mainBlock(mainBlock)
         }
 
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
             constructs.count == 1,
@@ -355,7 +361,7 @@ public struct Parser {
             return .construct(constructs[0])
         }
 
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             namespaces.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
@@ -367,7 +373,7 @@ public struct Parser {
             return .enumeration(enumerations[0])
         }
 
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             namespaces.isEmpty,
             enumerations.isEmpty,
             protocols.count == 1,
@@ -380,7 +386,7 @@ public struct Parser {
             return .protocolDefinition(protocols[0])
         }
 
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             namespaces.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
@@ -393,7 +399,7 @@ public struct Parser {
             return .macro(macros[0])
         }
 
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             namespaces.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
@@ -406,7 +412,7 @@ public struct Parser {
             return .marker(markers[0])
         }
 
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             namespaces.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
@@ -419,7 +425,7 @@ public struct Parser {
             return .extensions(extensions)
         }
 
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
+        if mainBlock == nil, topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
             namespaces.count == 1,
@@ -436,6 +442,7 @@ public struct Parser {
             ModuleFileNode(
                 mainBlock: mainBlock,
                 states: topLevelStates,
+                packageSpaces: packageSpaces,
                 callables: topLevelCallables,
                 constructs: constructs,
                 namespaces: namespaces,
@@ -454,6 +461,7 @@ public struct Parser {
         currentStateTypes = [:]
         currentCallableReturnTypes = [:]
 
+        var packageSpaces: [PackageSpaceDeclaration] = []
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
@@ -468,6 +476,11 @@ public struct Parser {
         while peek() != .eof {
             if isMainBlockStart() {
                 try skipMainBlockForDeclarationDiscovery()
+                continue
+            }
+
+            if isPackageSpaceStart() {
+                packageSpaces.append(try parsePackageSpaceForDeclarationDiscovery())
                 continue
             }
 
@@ -541,6 +554,7 @@ public struct Parser {
             ModuleFileNode(
                 mainBlock: nil,
                 states: [],
+                packageSpaces: packageSpaces,
                 callables: topLevelCallables,
                 constructs: constructs,
                 namespaces: namespaces,

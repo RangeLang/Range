@@ -29,6 +29,8 @@ public struct DeclarationSourceLocation {
 
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
+    public let packageSpaces: [PackageSpaceDeclaration]
+    public let packageValues: [ValueDeclaration]
     public let namespacesByName: [String: NamespaceDeclaration]
     public let namespaceAttributeNames: Set<String>
     public let constructsByName: [String: ConstructDeclaration]
@@ -53,6 +55,8 @@ public struct DeclarationGraph {
     public let programGraph: ProgramGraph
 
     public init(files: [ParsedSourceFile]) {
+        let packageSpaces = Self.collectPackageSpaces(from: files)
+        let packageValues = packageSpaces.flatMap(\.values)
         let protocols = Self.collectProtocols(from: files)
         let namespaces = Self.collectNamespaces(from: files)
         let namespaceAttributeNames = Self.collectNamespaceAttributeNames(from: files)
@@ -80,6 +84,8 @@ public struct DeclarationGraph {
         )
 
         self.protocolsByName = protocols
+        self.packageSpaces = packageSpaces
+        self.packageValues = packageValues
         self.namespacesByName = namespaces
         self.namespaceAttributeNames = namespaceAttributeNames
         self.constructsByName = constructs
@@ -191,6 +197,10 @@ public struct DeclarationGraph {
 
     public func values(onConstruct named: String) -> [ValueDeclaration] {
         valuesByConstructName[named, default: []]
+    }
+
+    public func packageValues(named name: String) -> [ValueDeclaration] {
+        packageValues.filter { $0.name == name }
     }
 
     public func initializers(onConstruct named: String) -> [InitializerDeclaration] {
@@ -512,6 +522,10 @@ public struct DeclarationGraph {
         return registry
     }
 
+    static func collectPackageSpaces(from files: [ParsedSourceFile]) -> [PackageSpaceDeclaration] {
+        files.flatMap { packageSpaces(in: $0.sourceFile) }
+    }
+
     static func collectConstructs(
         from files: [ParsedSourceFile],
         protocols: [String: ProtocolDeclaration]
@@ -810,21 +824,21 @@ public struct DeclarationGraph {
         for parsedFile in files {
             switch parsedFile.sourceFile {
             case .module(let module):
-                for callable in module.callables {
+                for callable in module.callables + module.packageSpaces.flatMap(\.callables) {
                     let identity = callableIdentity(
                         ownerName: nil,
                         declaration: callable
                     )
                     registry[identity] = callable.parameters
                 }
-                for construct in module.constructs {
+                for construct in module.constructs + module.packageSpaces.flatMap(\.constructs) {
                     collectCallableParameters(
                         in: construct,
                         registry: &registry,
                         ownerName: construct.name
                     )
                 }
-                for namespace in module.namespaces {
+                for namespace in module.namespaces + module.packageSpaces.flatMap(\.namespaces) {
                     collectNamespaceCallableParameters(
                         in: namespace,
                         registry: &registry,
@@ -1277,8 +1291,17 @@ public struct DeclarationGraph {
         case .protocolDefinition(let declaration):
             return [declaration]
         case .module(let module):
-            return module.protocols
+            return module.protocols + module.packageSpaces.flatMap(\.protocols)
         case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .extensions:
+            return []
+        }
+    }
+
+    static func packageSpaces(in sourceFile: SourceFileNode) -> [PackageSpaceDeclaration] {
+        switch sourceFile {
+        case .module(let module):
+            return module.packageSpaces
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1288,7 +1311,7 @@ public struct DeclarationGraph {
         case .construct(let declaration):
             return [declaration]
         case .module(let module):
-            return module.constructs
+            return module.constructs + module.packageSpaces.flatMap(\.constructs)
         case .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
@@ -1299,7 +1322,7 @@ public struct DeclarationGraph {
         case .namespace(let declaration):
             return [declaration]
         case .module(let module):
-            return module.namespaces
+            return module.namespaces + module.packageSpaces.flatMap(\.namespaces)
         case .construct, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
@@ -1319,7 +1342,7 @@ public struct DeclarationGraph {
         case .enumeration(let declaration):
             return [declaration]
         case .module(let module):
-            return module.enumerations
+            return module.enumerations + module.packageSpaces.flatMap(\.enumerations)
         case .construct, .namespace, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
@@ -1370,7 +1393,7 @@ public struct DeclarationGraph {
     static func callables(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
         switch sourceFile {
         case .module(let module):
-            return module.callables
+            return module.callables + module.packageSpaces.flatMap(\.callables)
         case .namespace(let declaration):
             return declaration.callables
         case .construct, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:

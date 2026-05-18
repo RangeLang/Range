@@ -1,6 +1,127 @@
 import Foundation
 
 extension Parser {
+    func isPackageSpaceStart() -> Bool {
+        guard case .atAttribute(let name, _) = peek(), name == "package" else {
+            return false
+        }
+        return peek(offset: 1) == .leftBrace
+    }
+
+    mutating func parsePackageSpace() throws -> PackageSpaceDeclaration {
+        guard case .atAttribute(let name, _) = peek(), name == "package" else {
+            throw ParseError("Expected @package block.")
+        }
+        advance()
+
+        var values: [ValueDeclaration] = []
+        var callables: [CallableDeclaration] = []
+        var constructs: [ConstructDeclaration] = []
+        var namespaces: [NamespaceDeclaration] = []
+        var enumerations: [EnumDeclaration] = []
+        var protocols: [ProtocolDeclaration] = []
+
+        try consume(.leftBrace)
+        while isValueDeclarationStart()
+            || isCallableStart()
+            || isConstructDeclarationStart()
+            || isBuilderDeclarationStart()
+            || isNamespaceDeclarationStart()
+            || isEnumDeclarationStart()
+            || isProtocolDeclarationStart()
+        {
+            if isValueDeclarationStart() {
+                values.append(try parseValueDeclaration())
+                continue
+            }
+            if isCallableStart() {
+                callables.append(try parseCallableDeclaration())
+                continue
+            }
+            if isConstructDeclarationStart() || isBuilderDeclarationStart() {
+                constructs.append(try parseConstructDeclaration(requiresEOF: false))
+                continue
+            }
+            if isNamespaceDeclarationStart() {
+                namespaces.append(try parseNamespaceDeclaration(requiresEOF: false))
+                continue
+            }
+            if isEnumDeclarationStart() {
+                enumerations.append(try parseEnumDeclaration(requiresEOF: false))
+                continue
+            }
+            protocols.append(try parseProtocolDeclaration(requiresEOF: false))
+        }
+        try consume(.rightBrace)
+
+        try validateCallableDeclarations(callables)
+
+        return PackageSpaceDeclaration(
+            values: values,
+            callables: callables,
+            constructs: constructs,
+            namespaces: namespaces,
+            enumerations: enumerations,
+            protocols: protocols
+        )
+    }
+
+    mutating func parsePackageSpaceForDeclarationDiscovery() throws -> PackageSpaceDeclaration {
+        guard case .atAttribute(let name, _) = peek(), name == "package" else {
+            throw ParseError("Expected @package block.")
+        }
+        advance()
+
+        var values: [ValueDeclaration] = []
+        var callables: [CallableDeclaration] = []
+        var constructs: [ConstructDeclaration] = []
+        var namespaces: [NamespaceDeclaration] = []
+        var enumerations: [EnumDeclaration] = []
+        var protocols: [ProtocolDeclaration] = []
+
+        try consume(.leftBrace)
+        while isValueDeclarationStart()
+            || isCallableStart()
+            || isConstructDeclarationStart()
+            || isBuilderDeclarationStart()
+            || isNamespaceDeclarationStart()
+            || isEnumDeclarationStart()
+            || isProtocolDeclarationStart()
+        {
+            if isValueDeclarationStart() {
+                values.append(try parseValueDeclaration())
+                continue
+            }
+            if isCallableStart() {
+                callables.append(try parseCallableDeclaration(signatureOnly: true))
+                continue
+            }
+            if isConstructDeclarationStart() || isBuilderDeclarationStart() {
+                constructs.append(try parseConstructDeclarationForDeclarationDiscovery())
+                continue
+            }
+            if isNamespaceDeclarationStart() {
+                namespaces.append(try parseNamespaceDeclarationForDeclarationDiscovery())
+                continue
+            }
+            if isEnumDeclarationStart() {
+                enumerations.append(try parseEnumDeclaration(requiresEOF: false))
+                continue
+            }
+            protocols.append(try parseProtocolDeclaration(requiresEOF: false))
+        }
+        try consume(.rightBrace)
+
+        return PackageSpaceDeclaration(
+            values: values,
+            callables: callables,
+            constructs: constructs,
+            namespaces: namespaces,
+            enumerations: enumerations,
+            protocols: protocols
+        )
+    }
+
     func isMainBlockStart() -> Bool {
         guard case .atAttribute(let name, _) = peek(), name == "main" else {
             return false

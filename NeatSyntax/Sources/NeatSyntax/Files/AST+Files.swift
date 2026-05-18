@@ -23,6 +23,7 @@ public struct MainBlockNode {
 public struct ModuleFileNode {
     public let mainBlock: MainBlockNode?
     public let states: [StateDeclaration]
+    public let packageSpaces: [PackageSpaceDeclaration]
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]
     public let namespaces: [NamespaceDeclaration]
@@ -37,6 +38,7 @@ public struct ModuleFileNode {
     public init(
         mainBlock: MainBlockNode?,
         states: [StateDeclaration],
+        packageSpaces: [PackageSpaceDeclaration] = [],
         callables: [CallableDeclaration],
         constructs: [ConstructDeclaration],
         namespaces: [NamespaceDeclaration],
@@ -50,6 +52,7 @@ public struct ModuleFileNode {
     ) {
         self.mainBlock = mainBlock
         self.states = states
+        self.packageSpaces = packageSpaces
         self.callables = callables
         self.constructs = constructs
         self.namespaces = namespaces
@@ -60,5 +63,30 @@ public struct ModuleFileNode {
         self.precedenceGroups = precedenceGroups
         self.operators = operators
         self.extensions = extensions
+    }
+}
+
+public struct PackageSpaceDeclaration {
+    public let values: [ValueDeclaration]
+    public let callables: [CallableDeclaration]
+    public let constructs: [ConstructDeclaration]
+    public let namespaces: [NamespaceDeclaration]
+    public let enumerations: [EnumDeclaration]
+    public let protocols: [ProtocolDeclaration]
+
+    public init(
+        values: [ValueDeclaration],
+        callables: [CallableDeclaration],
+        constructs: [ConstructDeclaration],
+        namespaces: [NamespaceDeclaration],
+        enumerations: [EnumDeclaration],
+        protocols: [ProtocolDeclaration]
+    ) {
+        self.values = values
+        self.callables = callables
+        self.constructs = constructs
+        self.namespaces = namespaces
+        self.enumerations = enumerations
+        self.protocols = protocols
     }
 }
