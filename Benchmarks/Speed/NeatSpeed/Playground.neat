@@ -1,0 +1,12 @@
+#main {
+    let n: Int = 10000000
+
+    state i: Int = 0
+    state acc: Int = 1
+    while i < n {
+        acc = (acc * 1664525 + i) % 2147483647
+        i += 1
+    }
+
+    Logger.log("\(acc)")
+}

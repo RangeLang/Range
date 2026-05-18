@@ -318,6 +318,7 @@ struct SwiftBackendEmitter {
         "Optional",
         "ClosedRange",
         "Range",
+        "Self",
         "Set",
         "String",
         "UUID",
@@ -614,6 +615,14 @@ struct SwiftBackendEmitter {
                 static func < (lhs: Self, rhs: Self) -> Bool {
                     (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
                 }
+
+                static func parse(iso8601String: String) -> Neat_Result<Self, Neat_DecodingError> {
+                    do {
+                        return .success(result: try Self(iso8601String: iso8601String))
+                    } catch {
+                        return .failure(cause: .failed)
+                    }
+                }
             }
 
             struct __NeatDateTime: Hashable, Comparable, CustomStringConvertible, Sendable {
@@ -643,6 +652,14 @@ struct SwiftBackendEmitter {
 
                 static func < (lhs: Self, rhs: Self) -> Bool {
                     lhs.storage < rhs.storage
+                }
+
+                static func parse(iso8601String: String) -> Neat_Result<Self, Neat_DecodingError> {
+                    do {
+                        return .success(result: try Self(iso8601String: iso8601String))
+                    } catch {
+                        return .failure(cause: .failed)
+                    }
                 }
 
                 private static func makeFormatter(fractionalSeconds: Bool) -> ISO8601DateFormatter {
@@ -688,6 +705,15 @@ struct SwiftBackendEmitter {
 
             func __neatDateTime(iso8601String: String) throws -> __NeatDateTime {
                 try __NeatDateTime(iso8601String: iso8601String)
+            }
+
+            extension UUID {
+                static func parse(uuidString: String) -> Neat_Result<UUID, Neat_DecodingError> {
+                    guard let value = UUID(uuidString: uuidString) else {
+                        return .failure(cause: .failed)
+                    }
+                    return .success(result: value)
+                }
             }
 
             enum __NeatDeferredControlFlow: Error {
@@ -882,86 +908,51 @@ struct SwiftBackendEmitter {
     private func emitNativeDecodingConformances() -> String {
         """
         extension Bool: Neat_Decodable {
-            init(from decoder: Neat_Decoder) throws {
+            static func decode(from decoder: Neat_Decoder) -> Neat_Result<Bool, Neat_DecodingError> {
                 let container = decoder.singleValueContainer()
-                switch container.decode(Bool.self) {
-                case .success(let value):
-                    self = value
-                case .failure(let error):
-                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
-                }
+                return container.decode(Bool.self)
             }
         }
 
         extension __NeatDateOnly: Neat_Decodable {
-            init(from decoder: Neat_Decoder) throws {
+            static func decode(from decoder: Neat_Decoder) -> Neat_Result<__NeatDateOnly, Neat_DecodingError> {
                 let container = decoder.singleValueContainer()
-                switch container.decode(__NeatDateOnly.self) {
-                case .success(let value):
-                    self = value
-                case .failure(let error):
-                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
-                }
+                return container.decode(__NeatDateOnly.self)
             }
         }
 
         extension __NeatDateTime: Neat_Decodable {
-            init(from decoder: Neat_Decoder) throws {
+            static func decode(from decoder: Neat_Decoder) -> Neat_Result<__NeatDateTime, Neat_DecodingError> {
                 let container = decoder.singleValueContainer()
-                switch container.decode(__NeatDateTime.self) {
-                case .success(let value):
-                    self = value
-                case .failure(let error):
-                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
-                }
+                return container.decode(__NeatDateTime.self)
             }
         }
 
         extension Float: Neat_Decodable {
-            init(from decoder: Neat_Decoder) throws {
+            static func decode(from decoder: Neat_Decoder) -> Neat_Result<Float, Neat_DecodingError> {
                 let container = decoder.singleValueContainer()
-                switch container.decode(Float.self) {
-                case .success(let value):
-                    self = value
-                case .failure(let error):
-                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
-                }
+                return container.decode(Float.self)
             }
         }
 
         extension Int: Neat_Decodable {
-            init(from decoder: Neat_Decoder) throws {
+            static func decode(from decoder: Neat_Decoder) -> Neat_Result<Int, Neat_DecodingError> {
                 let container = decoder.singleValueContainer()
-                switch container.decode(Int.self) {
-                case .success(let value):
-                    self = value
-                case .failure(let error):
-                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
-                }
+                return container.decode(Int.self)
             }
         }
 
         extension String: Neat_Decodable {
-            init(from decoder: Neat_Decoder) throws {
+            static func decode(from decoder: Neat_Decoder) -> Neat_Result<String, Neat_DecodingError> {
                 let container = decoder.singleValueContainer()
-                switch container.decode(String.self) {
-                case .success(let value):
-                    self = value
-                case .failure(let error):
-                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
-                }
+                return container.decode(String.self)
             }
         }
 
         extension UUID: Neat_Decodable {
-            init(from decoder: Neat_Decoder) throws {
+            static func decode(from decoder: Neat_Decoder) -> Neat_Result<UUID, Neat_DecodingError> {
                 let container = decoder.singleValueContainer()
-                switch container.decode(UUID.self) {
-                case .success(let value):
-                    self = value
-                case .failure(let error):
-                    throw __NeatThrownFailure<Neat_DecodingError>(failure: error)
-                }
+                return container.decode(UUID.self)
             }
         }
         """
@@ -1148,6 +1139,10 @@ struct SwiftBackendEmitter {
             )
         }.joined(
             separator: "\n\n")
+        let synthesizedInitializer = try emitSynthesizedDataShapeInitializer(
+            declaration,
+            genericParameterNames: genericParameterNames
+        )
         let methods = try declaration.callables
             .filter { $0.targetType == nil }
             .map {
@@ -1166,6 +1161,7 @@ struct SwiftBackendEmitter {
             storedStates,
             storedBindings,
             deriveds,
+            synthesizedInitializer,
             initializers,
             methods,
         ].filter { !$0.isEmpty }
@@ -1178,6 +1174,54 @@ struct SwiftBackendEmitter {
         return """
             \(typeKeyword) \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {
             \(indentBlock(body, level: 1))
+            }
+            """
+    }
+
+    private func emitSynthesizedDataShapeInitializer(
+        _ declaration: ConstructDeclaration,
+        genericParameterNames: Set<String>
+    ) throws -> String {
+        var parameters: [String] = []
+        var assignments: [String] = []
+
+        for value in declaration.values where value.value == nil {
+            let typeName = emitDeclaredTypeName(
+                value.typeName,
+                genericParameterNames: genericParameterNames
+            )
+            parameters.append("\(value.name): \(typeName)")
+            assignments.append("self.\(value.name) = \(value.name)")
+        }
+
+        for state in declaration.states {
+            guard case .declared = state.storage else {
+                continue
+            }
+            let typeName = emitTypeName(state.type, genericParameterNames: genericParameterNames)
+            parameters.append("\(state.name): \(typeName)")
+            assignments.append("self.\(state.name) = \(state.name)")
+        }
+
+        for binding in declaration.bindings {
+            guard case .plain = binding.storage else {
+                continue
+            }
+            let typeName = emitDeclaredTypeName(
+                binding.typeName,
+                genericParameterNames: genericParameterNames
+            )
+            parameters.append("\(binding.name): __NeatBinding<\(typeName)>")
+            assignments.append("self.__binding_\(binding.name) = \(binding.name)")
+        }
+
+        guard !parameters.isEmpty else {
+            return ""
+        }
+
+        return """
+            init(\(parameters.joined(separator: ", "))) {
+            \(indentBlock(assignments.joined(separator: "\n"), level: 1))
             }
             """
     }
@@ -1507,11 +1551,13 @@ struct SwiftBackendEmitter {
             callable.returnType,
             genericParameterNames: genericParameterNames
         )
-        let mutatingPrefix = protocolRequirementNeedsMutation(
+        let isStatic = callableShouldEmitStatic(callable)
+        let mutatingPrefix = !isStatic && protocolRequirementNeedsMutation(
             callable,
             enclosingProtocolName: enclosingProtocolName
         ) ? "mutating " : ""
-        return "\(mutatingPrefix)func \(callable.name)\(genericClause)(\(parameters))\(returnClause)"
+        let staticPrefix = isStatic ? "static " : ""
+        return "\(staticPrefix)\(mutatingPrefix)func \(callable.name)\(genericClause)(\(parameters))\(returnClause)"
     }
 
     private func protocolRequirementNeedsMutation(
@@ -1678,13 +1724,163 @@ struct SwiftBackendEmitter {
             enclosingReturnType: callable.returnType ?? .named("Void"),
             scope: scope
         )
-        let mutatingPrefix = !isReferenceType && methodNeedsMutation(callable) ? "mutating " : ""
+        let isStatic = callableShouldEmitStatic(callable)
+        let staticPrefix = isStatic ? "static " : ""
+        let mutatingPrefix = !isStatic && !isReferenceType && methodNeedsMutation(callable) ? "mutating " : ""
 
         return """
-            \(mutatingPrefix)func \(callable.name)\(genericClause)(\(parameters))\(returnClause) {
+            \(staticPrefix)\(mutatingPrefix)func \(callable.name)\(genericClause)(\(parameters))\(returnClause) {
             \(functionBody)
             }
             """
+    }
+
+    private func callableShouldEmitStatic(_ callable: CallableDeclaration) -> Bool {
+        if callableNameIsOperator(callable.name) {
+            return true
+        }
+
+        if let body = callable.body {
+            return callableSignatureMentionsSelf(callable)
+                && !statementsReferenceInstanceSelf(body)
+        }
+
+        return callableSignatureMentionsSelf(callable)
+    }
+
+    private func callableSignatureMentionsSelf(_ callable: CallableDeclaration) -> Bool {
+        if let returnType = callable.returnType, typeReferenceMentionsSelf(returnType) {
+            return true
+        }
+
+        return callable.parameters.contains { parameter in
+            guard let typeReference = parameter.typeReference else {
+                return false
+            }
+            return typeReferenceMentionsSelf(typeReference)
+        }
+    }
+
+    private func callableNameIsOperator(_ name: String) -> Bool {
+        name.contains { character in
+            "+-*/%=!<>&|".contains(character)
+        }
+    }
+
+    private func typeReferenceMentionsSelf(_ typeReference: TypeReference) -> Bool {
+        switch typeReference {
+        case .named("Self"):
+            return true
+        case .named:
+            return false
+        case .member(let base, _):
+            return typeReferenceMentionsSelf(base)
+        case .generic(let base, let arguments):
+            return typeReferenceMentionsSelf(base)
+                || arguments.contains(where: typeReferenceMentionsSelf)
+        case .array(let element), .optional(let element), .variadic(let element):
+            return typeReferenceMentionsSelf(element)
+        case .function(let parameters, let returnType):
+            return parameters.contains(where: typeReferenceMentionsSelf)
+                || typeReferenceMentionsSelf(returnType)
+        }
+    }
+
+    private func statementsReferenceInstanceSelf(_ statements: [NeatStatement]) -> Bool {
+        statements.contains(where: statementReferencesInstanceSelf)
+    }
+
+    private func statementReferencesInstanceSelf(_ statement: NeatStatement) -> Bool {
+        switch statement {
+        case .localBinding(let declaration):
+            return expressionReferencesInstanceSelf(declaration.expression)
+        case .derived(_, _, let body):
+            return statementsReferenceInstanceSelf(body)
+        case .assignment(let target, let expression):
+            return assignmentTargetReferencesInstanceSelf(target)
+                || expressionReferencesInstanceSelf(expression)
+        case .compoundAssignment(let target, _, let expression):
+            return assignmentTargetReferencesInstanceSelf(target)
+                || expressionReferencesInstanceSelf(expression)
+        case .expression(let expression):
+            return expressionReferencesInstanceSelf(expression)
+        case .return(let expression):
+            return expression.map(expressionReferencesInstanceSelf) ?? false
+        case .conditional(let branches):
+            return branches.contains { branch in
+                (branch.condition.map(expressionReferencesInstanceSelf) ?? false)
+                    || statementsReferenceInstanceSelf(branch.body)
+            }
+        case .forEach(_, let sequence, let body):
+            return expressionReferencesInstanceSelf(sequence)
+                || statementsReferenceInstanceSelf(body)
+        case .whileLoop(let condition, let body):
+            return expressionReferencesInstanceSelf(condition)
+                || statementsReferenceInstanceSelf(body)
+        case .switchStatement(let expression, let cases, let defaultBody):
+            return expressionReferencesInstanceSelf(expression)
+                || cases.contains { statementsReferenceInstanceSelf($0.body) }
+                || (defaultBody.map(statementsReferenceInstanceSelf) ?? false)
+        case .background(let background):
+            return statementsReferenceInstanceSelf(background.body)
+        case .deferBlock(let deferred):
+            return statementsReferenceInstanceSelf(deferred.body)
+        case .localCallable(let declaration):
+            return statementsReferenceInstanceSelf(declaration.body)
+        case .macroInvocation(_, _, let body):
+            return statementsReferenceInstanceSelf(body)
+        case .expand, .environmentProvision, .break, .continue:
+            return false
+        }
+    }
+
+    private func expressionReferencesInstanceSelf(_ expression: NeatExpression) -> Bool {
+        switch expression {
+        case .identifier("self"):
+            return true
+        case .call(let name, let arguments):
+            return name == "self" || name.hasPrefix("self.")
+                || arguments.contains { expressionReferencesInstanceSelf($0.value) }
+        case .block(let body):
+            return statementsReferenceInstanceSelf(body)
+        case .array(let elements):
+            return elements.contains(where: expressionReferencesInstanceSelf)
+        case .dictionary(let elements):
+            return elements.contains {
+                expressionReferencesInstanceSelf($0.key)
+                    || expressionReferencesInstanceSelf($0.value)
+            }
+        case .interpolatedString(let string):
+            return string.segments.contains { segment in
+                guard case .expression(let expression) = segment else {
+                    return false
+                }
+                return expressionReferencesInstanceSelf(expression)
+            }
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return expressionReferencesInstanceSelf(condition)
+                || expressionReferencesInstanceSelf(trueExpression)
+                || expressionReferencesInstanceSelf(falseExpression)
+        case .unary(_, let nested):
+            return expressionReferencesInstanceSelf(nested)
+        case .binary(let lhs, _, let rhs):
+            return expressionReferencesInstanceSelf(lhs)
+                || expressionReferencesInstanceSelf(rhs)
+        case .integer, .double, .string, .boolean, .nilLiteral, .macroInvocation,
+            .identifier, .bindingReference:
+            return false
+        }
+    }
+
+    private func assignmentTargetReferencesInstanceSelf(_ target: AssignmentTarget) -> Bool {
+        switch target {
+        case .local("self"), .state("self"), .binding("self"), .environment("self"):
+            return true
+        case .member(let base, _):
+            return assignmentTargetReferencesInstanceSelf(base)
+        case .local, .state, .binding, .environment:
+            return false
+        }
     }
 
     private func methodNeedsMutation(_ callable: CallableDeclaration) -> Bool {
@@ -2362,7 +2558,7 @@ struct SwiftBackendEmitter {
             return "\(operatorSymbol.rawValue)\(try emitExpression(nested, scope: scope))"
         case .binary(let lhs, let operatorSymbol, let rhs):
             return
-                "\(try emitExpression(lhs, scope: scope)) \(operatorSymbol.rawValue) \(try emitExpression(rhs, scope: scope))"
+                "(\(try emitExpression(lhs, scope: scope)) \(operatorSymbol.rawValue) \(try emitExpression(rhs, scope: scope)))"
         }
     }
 

@@ -1,4 +1,5 @@
-namespace Math {
+#namespace
+construct Math {
     function abs(value: Int) -> Int {
         if value < 0 {
             return 0 - value

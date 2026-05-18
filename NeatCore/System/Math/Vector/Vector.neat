@@ -1,19 +1,4 @@
+@componentStorage
 construct Vector<Scalar> {
-    let storage: VectorStorage<Scalar> = VectorStorage<Scalar>()
-
-    derived count: Int {
-        storage.count
-    }
-
-    derived isEmpty: Bool {
-        storage.isEmpty
-    }
-
-    function component(index: Int) -> Scalar {
-        return storage.component(index: index)
-    }
-
-    function map<Output>(_ transform: (Scalar) -> Output) -> Vector<Output> {
-        return Vector<Output>(storage: storage.map(transform))
-    }
+    let storage: ComponentStorage<Scalar> = ComponentStorage<Scalar>()
 }

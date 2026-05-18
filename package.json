@@ -1,5 +1,8 @@
 {
   "name": "neat",
   "version": "0.1.0",
-  "private": true
+  "private": true,
+  "scripts": {
+    "speed": "python3 Benchmarks/Speed/run.py"
+  }
 }

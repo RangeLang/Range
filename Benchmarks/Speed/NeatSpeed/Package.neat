@@ -1,0 +1,5 @@
+@package {
+    let name: Title("NeatSpeed")
+    let version: Version(0.1.0)
+    let author: String("George")
+}
