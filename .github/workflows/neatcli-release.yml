@@ -55,6 +55,13 @@ jobs:
         run: |
           package="${{ matrix.artifact }}.lang"
           release_version="${GITHUB_REF_NAME#v}"
+          if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            release_version="$(
+              sed -nE 's/.*SemanticVersion\(major: ([0-9]+), minor: ([0-9]+), patch: ([0-9]+)\).*/\1.\2.\3/p' \
+                Sources/NeatCLI/NeatVersion.swift \
+                | head -n 1
+            )"
+          fi
           mkdir -p dist
           cp -R ../Packaging/macOS/Neat.lang "dist/${package}"
           mkdir -p "dist/${package}/bin"
@@ -63,6 +70,29 @@ jobs:
           chmod 755 "dist/${package}/bin/neat"
           chmod 755 "dist/${package}/install.sh" "dist/${package}/uninstall.sh"
           tar -C dist -czf ${{ matrix.archive }} "$package"
+
+      - name: Package macOS installer package
+        if: runner.os == 'macOS'
+        working-directory: NeatCLI
+        run: |
+          release_version="${GITHUB_REF_NAME#v}"
+          if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            release_version="$(
+              sed -nE 's/.*SemanticVersion\(major: ([0-9]+), minor: ([0-9]+), patch: ([0-9]+)\).*/\1.\2.\3/p' \
+                Sources/NeatCLI/NeatVersion.swift \
+                | head -n 1
+            )"
+          fi
+          package_root="dist/${{ matrix.artifact }}.pkgroot"
+          mkdir -p "${package_root}/usr/local/bin"
+          cp .build/release/NeatCLI "${package_root}/usr/local/bin/neat"
+          chmod 755 "${package_root}/usr/local/bin/neat"
+          pkgbuild \
+            --root "${package_root}" \
+            --identifier "com.georgetchelidze.neat.cli" \
+            --version "${release_version}" \
+            --install-location "/" \
+            "${{ matrix.artifact }}.pkg"
 
       - name: Package Linux binary
         if: runner.os == 'Linux'
@@ -85,6 +115,12 @@ jobs:
         with:
           name: ${{ matrix.archive }}
           path: NeatCLI/${{ matrix.archive }}
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: ${{ matrix.artifact }}.pkg
+          path: NeatCLI/${{ matrix.artifact }}.pkg
 
   publish:
     name: Publish GitHub release

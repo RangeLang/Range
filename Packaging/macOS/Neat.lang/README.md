@@ -1,6 +1,14 @@
-# Neat macOS Install Package
+# Neat macOS Install Folder
 
 This folder installs the Neat command line tool.
+
+GitHub releases also include `.pkg` installer artifacts for users who prefer
+the standard macOS Installer flow:
+
+- `neat-macos-arm64.pkg`
+- `neat-macos-x64.pkg`
+
+Those packages install `neat` to `/usr/local/bin/neat`.
 
 ## Contents
 
