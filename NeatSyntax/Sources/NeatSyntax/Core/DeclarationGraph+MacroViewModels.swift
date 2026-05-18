@@ -505,6 +505,7 @@ struct RewriteSiteDescriptor {
 struct MacroExpansionContext {
     let macroRealizationView: MacroRealizationView
     let rewriteSurfaceView: RewriteSurfaceView
+    let graphContext: MacroGraphContext
     let macroDeclarationsByName: [String: MacroDeclaration]
     let markerDeclarationsByName: [String: MarkerDeclaration]
     let diagnosticEngine: NeatDiagnosticEngine?
@@ -514,6 +515,7 @@ struct MacroExpansionContext {
         MacroExpansionContext(
             macroRealizationView: macroRealizationView,
             rewriteSurfaceView: rewriteSurfaceView,
+            graphContext: graphContext,
             macroDeclarationsByName: macroDeclarationsByName,
             markerDeclarationsByName: markerDeclarationsByName,
             diagnosticEngine: diagnosticEngine,
@@ -699,6 +701,106 @@ struct MacroExpansionContext {
         }
 
         return ResolvedRewriteCall(site: descriptor.site, payload: arguments[0].value)
+    }
+}
+
+struct MacroGraphContext {
+    let declarationsByID: [String: CompileTimeValue]
+    let membersByID: [String: [CompileTimeValue]]
+    let markersByID: [String: [CompileTimeValue]]
+
+    init(
+        declarationGraph: DeclarationGraph,
+        markerDeclarationsByName: [String: MarkerDeclaration]
+    ) {
+        let builder = MacroTargetValueBuilder(markerDeclarationsByName: markerDeclarationsByName)
+        var declarationsByID: [String: CompileTimeValue] = [:]
+        var membersByID: [String: [CompileTimeValue]] = [:]
+        var markersByID: [String: [CompileTimeValue]] = [:]
+
+        for construct in declarationGraph.constructsByName.values {
+            let constructID = "construct:\(construct.name)"
+            declarationsByID[constructID] = builder.declarationValue(
+                for: construct,
+                qualifiedName: construct.name
+            )
+
+            var members: [CompileTimeValue] = []
+            for value in construct.values {
+                let id = "let:\(construct.name).\(value.name)"
+                declarationsByID[id] = builder.value(for: value)
+                markersByID[id] = Self.markerValues(from: builder.value(for: value))
+                members.append(builder.graphIdentity(kind: "let", name: "\(construct.name).\(value.name)"))
+            }
+            for state in construct.states {
+                let id = "state:\(construct.name).\(state.name)"
+                declarationsByID[id] = builder.value(for: state)
+                markersByID[id] = Self.markerValues(from: builder.value(for: state))
+                members.append(builder.graphIdentity(kind: "state", name: "\(construct.name).\(state.name)"))
+            }
+            for binding in construct.bindings {
+                let id = "binding:\(construct.name).\(binding.name)"
+                declarationsByID[id] = builder.value(for: binding)
+                markersByID[id] = Self.markerValues(from: builder.value(for: binding))
+                members.append(builder.graphIdentity(kind: "binding", name: "\(construct.name).\(binding.name)"))
+            }
+            for derived in construct.deriveds {
+                let id = "derived:\(construct.name).\(derived.name)"
+                declarationsByID[id] = builder.value(for: derived)
+                markersByID[id] = Self.markerValues(from: builder.value(for: derived))
+                members.append(builder.graphIdentity(kind: "derived", name: "\(construct.name).\(derived.name)"))
+            }
+            for initializer in construct.initializers {
+                let name = "init"
+                let id = "init:\(construct.name).\(name)"
+                declarationsByID[id] = builder.value(for: initializer)
+                members.append(builder.graphIdentity(kind: "init", name: "\(construct.name).\(name)"))
+            }
+            for callable in construct.callables {
+                let id = "function:\(construct.name).\(callable.name)"
+                declarationsByID[id] = builder.value(for: callable)
+                members.append(builder.graphIdentity(kind: "function", name: "\(construct.name).\(callable.name)"))
+            }
+            for nested in construct.constructs {
+                members.append(builder.graphIdentity(kind: "construct", name: "\(construct.name).\(nested.name)"))
+            }
+            membersByID[constructID] = members
+        }
+
+        self.declarationsByID = declarationsByID
+        self.membersByID = membersByID
+        self.markersByID = markersByID
+    }
+
+    func declaration(for identity: CompileTimeValue) -> CompileTimeValue? {
+        guard let id = identityID(identity) else { return nil }
+        return declarationsByID[id]
+    }
+
+    func members(of identity: CompileTimeValue) -> CompileTimeValue? {
+        guard let id = identityID(identity) else { return nil }
+        return .array(membersByID[id, default: []])
+    }
+
+    func markers(on identity: CompileTimeValue) -> CompileTimeValue? {
+        guard let id = identityID(identity) else { return nil }
+        return .array(markersByID[id, default: []])
+    }
+
+    private func identityID(_ identity: CompileTimeValue) -> String? {
+        guard case .object("Graph.Identity", let fields) = identity,
+            case .string(let id)? = fields["id"]
+        else {
+            return nil
+        }
+        return id
+    }
+
+    private static func markerValues(from value: CompileTimeValue) -> [CompileTimeValue] {
+        guard case .array(let markers)? = value.field("markers") else {
+            return []
+        }
+        return markers
     }
 }
 

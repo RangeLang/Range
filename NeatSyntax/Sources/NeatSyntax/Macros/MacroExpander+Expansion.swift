@@ -1729,7 +1729,12 @@ extension MacroExpander {
         var emitted = EmittedDeclarationBundle()
 
         let body = substituteMacroBindings(in: macro.body, bindings: argumentBindings)
-        try emitMacroDiagnostics(from: body, macro: macro, context: context)
+        try emitMacroDiagnostics(
+            from: body,
+            macro: macro,
+            targetValue: targetValue,
+            context: context
+        )
 
         for (targetPath, block, localBindings) in emittedCodeBlocks(in: body) {
             if let targetPath {
@@ -1790,6 +1795,7 @@ extension MacroExpander {
     static func emitMacroDiagnostics(
         from statements: [Statement],
         macro: MacroDeclaration,
+        targetValue: CompileTimeValue? = nil,
         context: MacroExpansionContext
     ) throws {
         guard let bindings = macro.bindings else {
@@ -1799,6 +1805,10 @@ extension MacroExpander {
             in: statements,
             macro: macro,
             diagnosticsBinding: bindings.diagnostics,
+            targetBinding: bindings.target,
+            targetValue: targetValue,
+            graphBinding: bindings.graph,
+            context: context,
             localBindings: [:]
         )
         for diagnostic in diagnostics {
@@ -1819,6 +1829,10 @@ extension MacroExpander {
         in statements: [Statement],
         macro: MacroDeclaration,
         diagnosticsBinding: String,
+        targetBinding: String,
+        targetValue: CompileTimeValue?,
+        graphBinding: String?,
+        context: MacroExpansionContext,
         localBindings: [String: Expression]
     ) throws -> [NeatDiagnostic] {
         var diagnostics: [NeatDiagnostic] = []
@@ -1833,6 +1847,10 @@ extension MacroExpander {
                     from: expression,
                     macro: macro,
                     diagnosticsBinding: diagnosticsBinding,
+                    targetBinding: targetBinding,
+                    targetValue: targetValue,
+                    graphBinding: graphBinding,
+                    context: context,
                     localBindings: locals
                 ) {
                     diagnostics.append(diagnostic)
@@ -1844,6 +1862,10 @@ extension MacroExpander {
                             in: branch.body,
                             macro: macro,
                             diagnosticsBinding: diagnosticsBinding,
+                            targetBinding: targetBinding,
+                            targetValue: targetValue,
+                            graphBinding: graphBinding,
+                            context: context,
                             localBindings: locals
                         )
                     )
@@ -1854,6 +1876,10 @@ extension MacroExpander {
                         in: body,
                         macro: macro,
                         diagnosticsBinding: diagnosticsBinding,
+                        targetBinding: targetBinding,
+                        targetValue: targetValue,
+                        graphBinding: graphBinding,
+                        context: context,
                         localBindings: locals
                     )
                 )
@@ -1863,6 +1889,10 @@ extension MacroExpander {
                         in: background.body,
                         macro: macro,
                         diagnosticsBinding: diagnosticsBinding,
+                        targetBinding: targetBinding,
+                        targetValue: targetValue,
+                        graphBinding: graphBinding,
+                        context: context,
                         localBindings: locals
                     )
                 )
@@ -1872,6 +1902,10 @@ extension MacroExpander {
                         in: deferred.body,
                         macro: macro,
                         diagnosticsBinding: diagnosticsBinding,
+                        targetBinding: targetBinding,
+                        targetValue: targetValue,
+                        graphBinding: graphBinding,
+                        context: context,
                         localBindings: locals
                     )
                 )
@@ -1881,6 +1915,10 @@ extension MacroExpander {
                         in: declaration.body,
                         macro: macro,
                         diagnosticsBinding: diagnosticsBinding,
+                        targetBinding: targetBinding,
+                        targetValue: targetValue,
+                        graphBinding: graphBinding,
+                        context: context,
                         localBindings: locals
                     )
                 )
@@ -1891,6 +1929,10 @@ extension MacroExpander {
                             in: switchCase.body,
                             macro: macro,
                             diagnosticsBinding: diagnosticsBinding,
+                            targetBinding: targetBinding,
+                            targetValue: targetValue,
+                            graphBinding: graphBinding,
+                            context: context,
                             localBindings: locals
                         )
                     )
@@ -1901,6 +1943,10 @@ extension MacroExpander {
                             in: defaultBody,
                             macro: macro,
                             diagnosticsBinding: diagnosticsBinding,
+                            targetBinding: targetBinding,
+                            targetValue: targetValue,
+                            graphBinding: graphBinding,
+                            context: context,
                             localBindings: locals
                         )
                     )
@@ -1918,6 +1964,10 @@ extension MacroExpander {
         from expression: Expression,
         macro: MacroDeclaration,
         diagnosticsBinding: String,
+        targetBinding: String,
+        targetValue: CompileTimeValue?,
+        graphBinding: String?,
+        context: MacroExpansionContext,
         localBindings: [String: Expression]
     ) throws -> NeatDiagnostic? {
         guard case .call(let name, let arguments) = expression,
@@ -1931,9 +1981,12 @@ extension MacroExpander {
         }
 
         let evaluator = CompileTimeValueEvaluator(
-            targetBinding: "__macro_diagnostics__",
-            targetValue: .object(typeName: "MacroDiagnostics", fields: [:]),
-            localBindings: localBindings
+            targetBinding: targetBinding,
+            targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
+            graphBinding: graphBinding,
+            localBindings: localBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            context: context
         )
         guard case .string(let message) = evaluator.evaluate(firstArgument) else {
             throw ParseError("Macro #\(macro.name) \(name)(...) message must evaluate to String.")
@@ -2019,6 +2072,7 @@ extension MacroExpander {
         let targetDeclarationName = MacroTargetValueBuilder().declarationName(for: targetValue)
         let targetSurface = MacroTargetSurface(
             targetBinding: bindings.target,
+            graphBinding: bindings.graph,
             targetType: target.typeReference,
             targetDeclarationName: targetDeclarationName,
             localBindings: localBindings,

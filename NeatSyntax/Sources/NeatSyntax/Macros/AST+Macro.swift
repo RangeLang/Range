@@ -93,6 +93,7 @@ public enum MacroTarget {
 public struct MacroBindings {
     public let target: String
     public let diagnostics: String
+    public let graph: String?
 }
 
 extension TypeReference {

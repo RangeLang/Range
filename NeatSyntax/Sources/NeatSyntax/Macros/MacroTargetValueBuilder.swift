@@ -11,22 +11,8 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Construct",
             fields: [
-                "declaration": .object(
-                    typeName: "Construct.Declaration",
-                    fields: [
-                        "self": nominalTypeReference(construct.name),
-                        "generics": .array(construct.genericParameters.map(value(for:))),
-                        "conformances": .array(construct.conformances.map(typeReferenceValue)),
-                        "inits": .array(construct.initializers.map(value(for:))),
-                        "lets": .array(construct.values.map(value(for:))),
-                        "states": .array(construct.states.map(value(for:))),
-                        "bindings": .array(construct.bindings.map(value(for:))),
-                        "deriveds": .array(construct.deriveds.map(value(for:))),
-                        "functions": .array(construct.callables.map(value(for:))),
-                        "constructs": .array(construct.constructs.map(declarationValue(for:))),
-                        "extensions": .array([]),
-                    ]
-                )
+                "identity": graphIdentity(kind: "construct", name: construct.name),
+                "declaration": declarationValue(for: construct, qualifiedName: construct.name),
             ]
         )
     }
@@ -35,9 +21,11 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Enum",
             fields: [
+                "identity": graphIdentity(kind: "enum", name: enumeration.name),
                 "declaration": .object(
                     typeName: "Enum.Declaration",
                     fields: [
+                        "identity": graphIdentity(kind: "enum", name: enumeration.name),
                         "self": nominalTypeReference(enumeration.name),
                         "generics": .array(enumeration.genericParameters.map(value(for:))),
                         "cases": .array(enumeration.cases.map(value(for:))),
@@ -51,9 +39,11 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Protocol",
             fields: [
+                "identity": graphIdentity(kind: "protocol", name: protocolDeclaration.name),
                 "declaration": .object(
                     typeName: "Protocol.Declaration",
                     fields: [
+                        "identity": graphIdentity(kind: "protocol", name: protocolDeclaration.name),
                         "self": nominalTypeReference(protocolDeclaration.name),
                         "generics": .array(protocolDeclaration.genericParameters.map(value(for:))),
                         "inits": .array(protocolDeclaration.initializers.map(value(for:))),
@@ -75,11 +65,12 @@ struct MacroTargetValueBuilder {
         return name
     }
 
-    private func declarationValue(for declaration: ConstructDeclaration) -> CompileTimeValue {
+    func declarationValue(for declaration: ConstructDeclaration, qualifiedName: String) -> CompileTimeValue {
         .object(
             typeName: "Construct.Declaration",
             fields: [
-                "self": nominalTypeReference(declaration.name),
+                "identity": graphIdentity(kind: "construct", name: qualifiedName),
+                "self": nominalTypeReference(qualifiedName),
                 "generics": .array(declaration.genericParameters.map(value(for:))),
                 "conformances": .array(declaration.conformances.map(typeReferenceValue)),
                 "inits": .array(declaration.initializers.map(value(for:))),
@@ -88,13 +79,17 @@ struct MacroTargetValueBuilder {
                 "bindings": .array(declaration.bindings.map(value(for:))),
                 "deriveds": .array(declaration.deriveds.map(value(for:))),
                 "functions": .array(declaration.callables.map(value(for:))),
-                "constructs": .array(declaration.constructs.map(declarationValue(for:))),
+                "constructs": .array(
+                    declaration.constructs.map {
+                        graphIdentity(kind: "construct", name: "\(qualifiedName).\($0.name)")
+                    }
+                ),
                 "extensions": .array([]),
             ]
         )
     }
 
-    private func value(for declaration: ValueDeclaration) -> CompileTimeValue {
+    func value(for declaration: ValueDeclaration) -> CompileTimeValue {
         return .object(
             typeName: "Let",
             fields: [
@@ -107,7 +102,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: StateDeclaration) -> CompileTimeValue {
+    func value(for declaration: StateDeclaration) -> CompileTimeValue {
         .object(
             typeName: "State",
             fields: [
@@ -119,7 +114,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: BindingDeclaration) -> CompileTimeValue {
+    func value(for declaration: BindingDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Binding",
             fields: [
@@ -131,7 +126,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: DerivedDeclaration) -> CompileTimeValue {
+    func value(for declaration: DerivedDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Derived",
             fields: [
@@ -258,7 +253,7 @@ struct MacroTargetValueBuilder {
         }
     }
 
-    private func value(for declaration: InitializerDeclaration) -> CompileTimeValue {
+    func value(for declaration: InitializerDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Init.Declaration",
             fields: [
@@ -267,7 +262,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: CallableDeclaration) -> CompileTimeValue {
+    func value(for declaration: CallableDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Function.Declaration",
             fields: [
@@ -279,7 +274,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for parameter: GenericParameter) -> CompileTimeValue {
+    func value(for parameter: GenericParameter) -> CompileTimeValue {
         switch parameter {
         case .type(let name, let constraint, let defaultArgument):
             return .object(
@@ -302,7 +297,7 @@ struct MacroTargetValueBuilder {
         }
     }
 
-    private func value(for declaration: NeatFunctionParameter) -> CompileTimeValue {
+    func value(for declaration: NeatFunctionParameter) -> CompileTimeValue {
         .object(
             typeName: "Parameter.Declaration",
             fields: [
@@ -314,7 +309,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: EnumCaseDeclaration) -> CompileTimeValue {
+    func value(for declaration: EnumCaseDeclaration) -> CompileTimeValue {
         .object(
             typeName: "Enum.Case",
             fields: [
@@ -348,5 +343,16 @@ struct MacroTargetValueBuilder {
 
     private func typeReferenceValue(_ name: String) -> CompileTimeValue {
         nominalTypeReference(name)
+    }
+
+    func graphIdentity(kind: String, name: String) -> CompileTimeValue {
+        .object(
+            typeName: "Graph.Identity",
+            fields: [
+                "id": .string("\(kind):\(name)"),
+                "kind": .string(kind),
+                "name": .string(name),
+            ]
+        )
     }
 }

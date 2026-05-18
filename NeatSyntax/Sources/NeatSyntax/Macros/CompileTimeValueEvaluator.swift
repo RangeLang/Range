@@ -3,6 +3,7 @@ import Foundation
 struct CompileTimeValueEvaluator {
     let targetBinding: String
     let targetValue: CompileTimeValue
+    let graphBinding: String?
     let localBindings: [String: Expression]
     let macroDeclarationsByName: [String: MacroDeclaration]
     let context: MacroExpansionContext?
@@ -10,12 +11,14 @@ struct CompileTimeValueEvaluator {
     init(
         targetBinding: String,
         targetValue: CompileTimeValue,
+        graphBinding: String? = nil,
         localBindings: [String: Expression],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         context: MacroExpansionContext? = nil
     ) {
         self.targetBinding = targetBinding
         self.targetValue = targetValue
+        self.graphBinding = graphBinding
         self.localBindings = localBindings
         self.macroDeclarationsByName = macroDeclarationsByName
         self.context = context
@@ -76,6 +79,13 @@ struct CompileTimeValueEvaluator {
             }
             return .array(values)
         case .call(let name, let arguments):
+            if let graphValue = evaluateGraphCall(
+                name: name,
+                arguments: arguments,
+                locals: locals
+            ) {
+                return graphValue
+            }
             if let stringValue = evaluateStringTransform(
                 name: name,
                 arguments: arguments,
@@ -183,6 +193,8 @@ struct CompileTimeValueEvaluator {
         let value: CompileTimeValue?
         if root == targetBinding {
             value = targetValue
+        } else if root == graphBinding {
+            value = .object(typeName: "GraphContext", fields: [:])
         } else if let local = locals[root] {
             if case .identifier(root) = local {
                 return nil
@@ -228,7 +240,7 @@ struct CompileTimeValueEvaluator {
         case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
-            "ValueGeneric", "Macro.Application", "Marker.Application", "Block", "Switch",
+            "ValueGeneric", "Graph.Identity", "Macro.Application", "Marker.Application", "Block", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
             "ArrayExpression", "EnumCaseExpression":
             var fields: [String: CompileTimeValue] = [:]
@@ -241,6 +253,47 @@ struct CompileTimeValueEvaluator {
                 fields[label] = value
             }
             return .object(typeName: name, fields: fields)
+        default:
+            return nil
+        }
+    }
+
+    private func evaluateGraphCall(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        guard let graphBinding,
+            let context,
+            name.hasPrefix("\(graphBinding).")
+        else {
+            return nil
+        }
+
+        switch name {
+        case "\(graphBinding).declaration":
+            guard arguments.count == 1,
+                let identity = evaluate(arguments[0].value, locals: locals)
+            else {
+                return nil
+            }
+            return context.graphContext.declaration(for: identity)
+        case "\(graphBinding).members":
+            guard arguments.count == 1,
+                arguments[0].label == "of",
+                let identity = evaluate(arguments[0].value, locals: locals)
+            else {
+                return nil
+            }
+            return context.graphContext.members(of: identity)
+        case "\(graphBinding).markers":
+            guard arguments.count == 1,
+                arguments[0].label == "on",
+                let identity = evaluate(arguments[0].value, locals: locals)
+            else {
+                return nil
+            }
+            return context.graphContext.markers(on: identity)
         default:
             return nil
         }

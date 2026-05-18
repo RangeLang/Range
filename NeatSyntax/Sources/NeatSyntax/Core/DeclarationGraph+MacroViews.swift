@@ -9,6 +9,10 @@ extension DeclarationGraph {
         MacroExpansionContext(
             macroRealizationView: macroRealizationView(macrosByName: macrosByName),
             rewriteSurfaceView: rewriteSurfaceView,
+            graphContext: MacroGraphContext(
+                declarationGraph: self,
+                markerDeclarationsByName: markersByName
+            ),
             macroDeclarationsByName: macrosByName,
             markerDeclarationsByName: markersByName,
             diagnosticEngine: diagnosticEngine,

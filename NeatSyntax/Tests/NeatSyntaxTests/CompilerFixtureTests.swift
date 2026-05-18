@@ -43,6 +43,7 @@ struct CompilerFixtureTests {
         )
 
         let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+        fputs(diagnostics.map { "\($0.severity): \($0.message)\n" }.joined(), stderr)
 
         #expect(
             diagnostics.contains {
@@ -95,6 +96,46 @@ struct CompilerFixtureTests {
                     && $0.code == "macro.diagnostic.hint"
                     && $0.message == "custom macro hint"
                     && $0.path == fixture.path
+            }
+        )
+    }
+
+    @Test("Macros query graph through identities")
+    func macrosQueryGraphThroughIdentities() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MacroGraphIdentity.neat",
+                source: """
+                macro graphProbe(): Construct { target, diagnostics, graph in
+                    let declaration = graph.declaration(target.identity)
+                    let members = graph.members(of: target.identity)
+                    diagnostics.warning("graph \\(declaration.identity.name) members \\(members.count)")
+                }
+
+                #graphProbe
+                construct User {
+                    let name: String
+                    let age: Int
+
+                    construct Nested {
+                        let value: Int
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+
+        #expect(
+            diagnostics.contains {
+                $0.severity == .warning
+                    && $0.source == "neat-macro"
+                    && $0.code == "macro.diagnostic.warning"
+                    && $0.message == "graph User members 3"
+                    && $0.path == "/tmp/MacroGraphIdentity.neat"
             }
         )
     }

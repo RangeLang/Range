@@ -49,6 +49,7 @@ struct PropertyMacroEffects {
 
 struct MacroTargetSurface {
     let targetBinding: String
+    let graphBinding: String?
     let targetType: TypeReference
     let targetDeclarationName: String
     let localBindings: [String: Expression]
@@ -59,6 +60,7 @@ struct MacroTargetSurface {
         CompileTimeValueEvaluator(
             targetBinding: targetBinding,
             targetValue: targetValue,
+            graphBinding: graphBinding,
             localBindings: localBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
             context: context

@@ -69,10 +69,18 @@ extension Parser {
                 let targetBinding = try consumeIdentifier()
                 try consume(.comma)
                 let diagnosticsBinding = try consumeIdentifier()
+                let graphBinding: String?
+                if peek() == .comma {
+                    try consume(.comma)
+                    graphBinding = try consumeIdentifier()
+                } else {
+                    graphBinding = nil
+                }
                 try consumeKeyword(.inKeyword)
                 bindings = MacroBindings(
                     target: targetBinding,
-                    diagnostics: diagnosticsBinding
+                    diagnostics: diagnosticsBinding,
+                    graph: graphBinding
                 )
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
@@ -239,17 +247,28 @@ extension Parser {
         let targetBinding = try consumeIdentifier()
         try consume(.comma)
         let diagnosticsBinding = try consumeIdentifier()
+        let graphBinding: String?
+        if peek() == .comma {
+            try consume(.comma)
+            graphBinding = try consumeIdentifier()
+        } else {
+            graphBinding = nil
+        }
         try consumeKeyword(.inKeyword)
 
         let bindings = MacroBindings(
             target: targetBinding,
-            diagnostics: diagnosticsBinding
+            diagnostics: diagnosticsBinding,
+            graph: graphBinding
         )
 
         var localBindings: [String: LocalBindingSymbol] = [
             targetBinding: .init(kind: .constant, type: .named("MacroTarget")),
             diagnosticsBinding: .init(kind: .constant, type: .named("MacroDiagnostics")),
         ]
+        if let graphBinding {
+            localBindings[graphBinding] = .init(kind: .constant, type: .named("GraphContext"))
+        }
         var statements: [Statement] = []
         currentMacroBodyDepth += 1
         defer { currentMacroBodyDepth -= 1 }
