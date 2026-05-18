@@ -8,6 +8,7 @@ struct NeatCLI: ParsableCommand {
         abstract: "Create and validate Neat language projects.",
         subcommands: [
             Create.self,
+            Link.self,
             Run.self,
             Compile.self,
             Graph.self,

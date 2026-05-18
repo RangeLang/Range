@@ -7,6 +7,7 @@ extension NeatCLI {
             abstract: "Interact with machine-level Neat state.",
             subcommands: [
                 List.self,
+                Link.self,
             ]
         )
 
@@ -51,6 +52,23 @@ extension NeatCLI {
                     ErrorPresenter.printError(error)
                     throw ExitCode.failure
                 }
+            }
+        }
+
+        struct Link: ParsableCommand {
+            static let configuration = CommandConfiguration(
+                abstract: "Link the installed macOS Neat binary into a Package.neat project."
+            )
+
+            @Argument(help: "Package.neat project root.")
+            var project: String = "."
+
+            @Option(help: "Installed Neat binary to link.")
+            var binary: String = ProjectBinaryLinker.defaultMacOSBinaryPath
+
+            mutating func run() throws {
+                var command = NeatCLI.Link(project: project, binary: binary)
+                try command.run()
             }
         }
     }
