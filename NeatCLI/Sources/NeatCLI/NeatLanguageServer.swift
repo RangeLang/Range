@@ -619,7 +619,7 @@ struct NeatLanguageServer {
 
     private func attributeCompletions() -> [[String: Any]] {
         [
-            "@main", "@background", "@language", "@packaging",
+            "@main", "@background", "@language", "@package",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
     }
 

@@ -1555,6 +1555,9 @@ private struct SemanticGraphCollector {
             for state in module.states {
                 addState(state, parentID: fileID)
             }
+            for (index, declaration) in module.packageSpaces.enumerated() {
+                addPackageSpace(declaration, parentID: fileID, index: index)
+            }
             for callable in module.callables {
                 addCallable(callable, parentID: fileID)
             }
@@ -1583,6 +1586,35 @@ private struct SemanticGraphCollector {
             let mainID = "\(fileID)/main"
             addEntity(id: mainID, kind: .mainBlock, label: "@main")
             addRelation(from: fileID, to: mainID, kind: .contains)
+        }
+    }
+
+    private mutating func addPackageSpace(
+        _ declaration: PackageSpaceDeclaration,
+        parentID: String,
+        index: Int
+    ) {
+        let packageID = "\(parentID)/package:\(index)"
+        addEntity(id: packageID, kind: .packageSpace, label: "@package")
+        addRelation(from: parentID, to: packageID, kind: .contains)
+
+        for value in declaration.values {
+            addValue(value, parentID: packageID)
+        }
+        for callable in declaration.callables {
+            addCallable(callable, parentID: packageID)
+        }
+        for construct in declaration.constructs {
+            addConstruct(construct, parentID: packageID)
+        }
+        for namespace in declaration.namespaces {
+            addNamespace(namespace, parentID: packageID)
+        }
+        for declaration in declaration.enumerations {
+            addEnumeration(declaration, parentID: packageID)
+        }
+        for declaration in declaration.protocols {
+            addProtocol(declaration, parentID: packageID)
         }
     }
 

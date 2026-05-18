@@ -8,7 +8,7 @@ struct PackageManifest {
     let author: String
     let remote: String?
     let remoteURLs: [String]
-    let declaration: ConstructDeclaration
+    let declaration: ConstructDeclaration?
 }
 
 enum PackageManifestLoader {
@@ -25,8 +25,26 @@ enum PackageManifestLoader {
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .extensions:
             throw ValidationError("Package.neat must declare construct Name: Package.")
-        case .module:
-            throw ValidationError("Package.neat must declare construct Name: Package.")
+        case .module(let module):
+            guard let packageSpace = module.packageSpaces.first else {
+                throw ValidationError("Package.neat must declare @package { ... } or construct Name: Package.")
+            }
+            let name = try requiredTitleValue(named: "name", in: packageSpace.values)
+            let version = try requiredVersionValue(named: "version", in: packageSpace.values)
+            let author = try requiredStringValue(named: "author", in: packageSpace.values)
+            let remote = stringValue(named: "remote", in: packageSpace.values)
+            let remoteURLs = remoteURLs(remote: remote, in: packageSpace.values)
+            let resolvedRemoteURLs = remoteURLs.isEmpty
+                ? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
+                : remoteURLs
+            return PackageManifest(
+                name: name,
+                version: version,
+                author: author,
+                remote: remote,
+                remoteURLs: resolvedRemoteURLs,
+                declaration: nil
+            )
         case .namespace:
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .construct(let declaration):
@@ -40,17 +58,17 @@ enum PackageManifestLoader {
             }
 
             let name =
-                try titleValue(named: "name", in: declaration)
+                try titleValue(named: "name", in: declaration.values)
                 ?? (usesPackageMacro ? declaration.name : nil)
-                ?? requiredTitleValue(named: "name", in: declaration)
-            let version = try requiredVersionValue(named: "version", in: declaration)
-            let author = try requiredStringValue(named: "author", in: declaration)
+                ?? requiredTitleValue(named: "name", in: declaration.values)
+            let version = try requiredVersionValue(named: "version", in: declaration.values)
+            let author = try requiredStringValue(named: "author", in: declaration.values)
             if !usesPackageMacro {
-                _ = try requireValue(named: "remotes", typeName: "[Remote]", in: declaration)
+                _ = try requireValue(named: "remotes", typeName: "[Remote]", in: declaration.values)
             }
 
-            let remote = stringValue(named: "remote", in: declaration)
-            let remoteURLs = remoteURLs(remote: remote, in: declaration)
+            let remote = stringValue(named: "remote", in: declaration.values)
+            let remoteURLs = remoteURLs(remote: remote, in: declaration.values)
             let resolvedRemoteURLs =
                 remoteURLs.isEmpty && usesPackageMacro
                 ? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
@@ -74,9 +92,9 @@ enum PackageManifestLoader {
 
     private static func requiredStringValue(
         named name: String,
-        in declaration: ConstructDeclaration
+        in values: [ValueDeclaration]
     ) throws -> String {
-        let value = try requireValue(named: name, typeName: "String", in: declaration)
+        let value = try requireValue(named: name, typeName: "String", in: values)
         guard case .string(let string)? = value.value else {
             throw ValidationError("Package.neat requires let \(name): String = \"...\".")
         }
@@ -85,9 +103,9 @@ enum PackageManifestLoader {
 
     private static func requiredTitleValue(
         named name: String,
-        in declaration: ConstructDeclaration
+        in values: [ValueDeclaration]
     ) throws -> String {
-        guard let title = try titleValue(named: name, in: declaration) else {
+        guard let title = try titleValue(named: name, in: values) else {
             throw ValidationError("Package.neat requires let \(name): Title = Title(\"...\").")
         }
         return title
@@ -95,9 +113,9 @@ enum PackageManifestLoader {
 
     private static func titleValue(
         named name: String,
-        in declaration: ConstructDeclaration
+        in values: [ValueDeclaration]
     ) throws -> String? {
-        guard let value = declaration.values.first(where: { $0.name == name }) else {
+        guard let value = values.first(where: { $0.name == name }) else {
             return nil
         }
         guard value.typeName == "Title" else {
@@ -118,9 +136,9 @@ enum PackageManifestLoader {
 
     private static func requiredVersionValue(
         named name: String,
-        in declaration: ConstructDeclaration
+        in values: [ValueDeclaration]
     ) throws -> String {
-        let value = try requireValue(named: name, typeNames: ["Version", "String"], in: declaration)
+        let value = try requireValue(named: name, typeNames: ["Version", "String"], in: values)
         if value.typeName == "String" {
             guard case .string(let string)? = value.value else {
                 throw ValidationError("Package.neat requires let \(name): String = \"...\".")
@@ -144,17 +162,17 @@ enum PackageManifestLoader {
     private static func requireValue(
         named name: String,
         typeName: String,
-        in declaration: ConstructDeclaration
+        in values: [ValueDeclaration]
     ) throws -> ValueDeclaration {
-        try requireValue(named: name, typeNames: [typeName], in: declaration)
+        try requireValue(named: name, typeNames: [typeName], in: values)
     }
 
     private static func requireValue(
         named name: String,
         typeNames: [String],
-        in declaration: ConstructDeclaration
+        in values: [ValueDeclaration]
     ) throws -> ValueDeclaration {
-        guard let value = declaration.values.first(where: { $0.name == name }) else {
+        guard let value = values.first(where: { $0.name == name }) else {
             throw ValidationError("Package.neat requires let \(name): \(typeNames[0]).")
         }
         guard typeNames.contains(value.typeName) else {
@@ -165,10 +183,10 @@ enum PackageManifestLoader {
         return value
     }
 
-    private static func stringValue(named name: String, in declaration: ConstructDeclaration)
+    private static func stringValue(named name: String, in values: [ValueDeclaration])
         -> String?
     {
-        declaration.values.first { $0.name == name }.flatMap { value in
+        values.first { $0.name == name }.flatMap { value in
             guard case .string(let string)? = value.value else {
                 return nil
             }
@@ -176,19 +194,19 @@ enum PackageManifestLoader {
         }
     }
 
-    private static func remoteURLs(remote: String?, in declaration: ConstructDeclaration) -> [String] {
+    private static func remoteURLs(remote: String?, in values: [ValueDeclaration]) -> [String] {
         uniqueStrings(
             [remote].compactMap { $0 }
-                + stringArrayValue(named: "remotes", in: declaration)
-                + stringArrayValue(named: "remoteURLs", in: declaration)
+                + stringArrayValue(named: "remotes", in: values)
+                + stringArrayValue(named: "remoteURLs", in: values)
         )
     }
 
-    private static func stringArrayValue(named name: String, in declaration: ConstructDeclaration)
+    private static func stringArrayValue(named name: String, in values: [ValueDeclaration])
         -> [String]
     {
         guard
-            let value = declaration.values.first(where: { $0.name == name }),
+            let value = values.first(where: { $0.name == name }),
             case .array(let expressions)? = value.value
         else {
             return []

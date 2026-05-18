@@ -2,6 +2,7 @@ import Foundation
 
 public enum SemanticGraphEntityKind: String, Sendable {
     case file
+    case packageSpace
     case namespace
     case construct
     case enumeration

@@ -373,6 +373,7 @@ struct GraphCollector {
     private static func applicationNodeKind(for kind: SemanticGraphEntityKind) -> ApplicationGraphNodeKind? {
         switch kind {
         case .file: return .file
+        case .packageSpace: return .packageSpace
         case .namespace: return .namespace
         case .construct: return .construct
         case .enumeration: return .enumeration

@@ -349,6 +349,40 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.hasNamespaceAttribute(named: "Styling"))
     }
 
+    @Test("Package spaces collect package metadata")
+    func packageSpacesCollectPackageMetadata() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/PackageSpace.neat",
+                source: """
+                @package {
+                    let name: Title("Example")
+                    let version: Version(0.1.0)
+                    let author: String("George")
+
+                    construct PackageMarker {
+                        let raw: String
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().build(inputs: inputs)
+        #expect(program.declarationGraph.packageSpaces.contains { $0.values.count == 3 })
+        #expect(program.declarationGraph.packageValues(named: "name").count == 1)
+        #expect(program.declarationGraph.packageValues(named: "version").count == 1)
+        #expect(program.declarationGraph.packageValues(named: "author").count == 1)
+        #expect(program.declarationGraph.hasConstruct(named: "PackageMarker"))
+        #expect(
+            program.declarationGraph.programGraph.entities.contains {
+                $0.kind == .packageSpace && $0.label == "@package"
+            }
+        )
+    }
+
     @Test("Unknown attributes require matching namespaces")
     func unknownAttributesRequireMatchingNamespaces() throws {
         var inputs = try neatCoreInputs()

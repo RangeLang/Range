@@ -293,11 +293,10 @@ struct ProjectScaffolder {
 
     private func renderProgramPackage(name: String) -> String {
         return """
-            #package
-            construct Project {
-                let name: Title = Title("\(escapedStringLiteral(name))")
-                let version: Version = Version(0.1.0)
-                let author: String = "\(escapedStringLiteral(NSFullUserName()))"
+            @package {
+                let name: Title("\(escapedStringLiteral(name))")
+                let version: Version(0.1.0)
+                let author: String("\(escapedStringLiteral(NSFullUserName()))")
             }
             """
     }

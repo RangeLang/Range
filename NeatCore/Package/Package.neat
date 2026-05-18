@@ -1,7 +1,8 @@
-@packaging
-protocol Package {
-    let name: Title
-    let version: Version
-    let author: String
-    let remotes: [Remote]
+@package {
+    protocol Package {
+        let name: Title
+        let version: Version
+        let author: String
+        let remotes: [Remote]
+    }
 }
