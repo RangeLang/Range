@@ -210,7 +210,7 @@ extension ApplicationGraphValidator {
                         "'continue' in \(fileName) can only be used inside a loop."
                     )
                 }
-            case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
+            case .localBinding, .assignment, .compoundAssignment,
                 .expression:
                 continue
             }

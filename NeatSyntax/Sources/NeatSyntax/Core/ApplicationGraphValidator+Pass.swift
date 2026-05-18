@@ -31,10 +31,6 @@ extension ApplicationGraphValidator: CompiledProgramValidationPass {
             declarationGraph: program.declarationGraph,
             registryView: graphViews.registryView
         )
-        try validateEnvironmentStateResolution(
-            in: program.expandedFiles,
-            declarationGraph: program.declarationGraph
-        )
         try validateValueBindings(
             in: program.expandedFiles,
             declarationGraph: program.declarationGraph

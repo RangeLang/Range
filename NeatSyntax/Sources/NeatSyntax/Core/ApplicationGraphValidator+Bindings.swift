@@ -1,39 +1,6 @@
 import Foundation
 
 extension ApplicationGraphValidator {
-    func validateEnvironmentStateResolution(
-        in parsedFiles: [ParsedSourceFile],
-        declarationGraph: DeclarationGraph
-    ) throws {
-        let topLevelStateNames = Set(
-            parsedFiles.flatMap { parsedFile in
-                declarationGraph.topLevelStates(inFilePath: parsedFile.path).map(\.name)
-            }
-        )
-
-        for parsedFile in parsedFiles {
-            for declaration in declarations(in: parsedFile.sourceFile) {
-                let localStateNames = Set(
-                    declarationGraph.states(onConstruct: declaration.name).map(\.name)
-                )
-
-                for environment in declarationGraph.environments(onConstruct: declaration.name)
-                where environment.isState
-                {
-                    if localStateNames.contains(environment.name) {
-                        continue
-                    }
-
-                    guard topLevelStateNames.contains(environment.name) else {
-                        throw SemanticValidationError(
-                            "environment state \(environment.name): \(environment.typeName) in \(lastPathComponent(of: parsedFile.path)) could not be resolved from lexical outer scope."
-                        )
-                    }
-                }
-            }
-        }
-    }
-
     func validateBindingReferences(
         in parsedFiles: [ParsedSourceFile],
         declarationGraph: DeclarationGraph,
@@ -159,11 +126,6 @@ extension ApplicationGraphValidator {
         let memberMutableNames =
             Set(declarationGraph.states(onConstruct: declaration.name).map(\.name))
             .union(declarationGraph.bindings(onConstruct: declaration.name).map(\.name))
-            .union(
-                declarationGraph.environments(onConstruct: declaration.name)
-                    .filter(\.isState)
-                    .map(\.name)
-            )
 
         for derived in declarationGraph.deriveds(onConstruct: declaration.name) {
             if let body = derived.body {
@@ -293,13 +255,6 @@ extension ApplicationGraphValidator {
             case .derived(_, _, let body):
                 try validateBindingReferences(
                     in: body,
-                    declarationGraph: declarationGraph,
-                    context: context,
-                    fileName: fileName
-                )
-            case .environmentProvision(let provision):
-                try validateBindingReferences(
-                    in: provision.expression,
                     declarationGraph: declarationGraph,
                     context: context,
                     fileName: fileName

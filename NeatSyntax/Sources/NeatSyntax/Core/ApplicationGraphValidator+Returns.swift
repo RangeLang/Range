@@ -138,11 +138,6 @@ extension ApplicationGraphValidator {
         typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
         fileName: String
     ) throws {
-        let environmentTypes = Dictionary(
-            uniqueKeysWithValues: declarationGraph.environments(onConstruct: declaration.name).map {
-                ($0.name, BootstrapLiteralType.typed($0.type))
-            }
-        )
         let stateTypes = Dictionary(
             uniqueKeysWithValues: declarationGraph.states(onConstruct: declaration.name).map {
                 ($0.name, BootstrapLiteralType.typed($0.type))
@@ -164,7 +159,6 @@ extension ApplicationGraphValidator {
             }
         )
         var accessibleTypes = stateTypes
-            .merging(environmentTypes) { current, _ in current }
             .merging(bindingTypes) { current, _ in current }
             .merging(derivedTypes) { current, _ in current }
             .merging(valueTypes) { current, _ in current }
@@ -424,7 +418,7 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-            case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
+            case .localBinding, .assignment, .compoundAssignment,
                 .expression, .return, .break, .continue:
                 continue
             }
@@ -463,7 +457,7 @@ extension ApplicationGraphValidator {
                 expressions.append(contentsOf: collectReturnExpressions(in: deferred.body))
             case .localCallable:
                 continue
-            case .localBinding, .derived, .environmentProvision, .assignment, .compoundAssignment,
+            case .localBinding, .derived, .assignment, .compoundAssignment,
                 .expression, .break, .continue:
                 continue
             }

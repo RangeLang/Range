@@ -144,15 +144,9 @@ extension ApplicationGraphValidator {
         typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
         fileName: String
     ) throws {
-        let environmentTypes = Dictionary(
-            uniqueKeysWithValues: declarationGraph.environments(onConstruct: declaration.name).map {
-                ($0.name, BootstrapLiteralType.typed($0.type))
-            }
-        )
-
         try validateLiteralBridgeCompatibility(
             in: declarationGraph.states(onConstruct: declaration.name),
-            accessibleTypes: environmentTypes,
+            accessibleTypes: [:],
             resolver: resolver,
             memberResolver: memberResolver,
             operatorResolver: operatorResolver,
@@ -165,7 +159,7 @@ extension ApplicationGraphValidator {
                 ($0.name, BootstrapLiteralType.typed($0.type))
             }
         )
-        let accessibleTypes = stateTypes.merging(environmentTypes) { current, _ in current }
+        let accessibleTypes = stateTypes
 
         for callable in declarationGraph.callables(onConstruct: declaration.name) {
             try validateLiteralBridgeCompatibility(
@@ -389,7 +383,7 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-            case .localBinding, .environmentProvision, .assignment, .compoundAssignment,
+            case .localBinding, .assignment, .compoundAssignment,
                 .expression, .return, .break, .continue:
                 continue
             }

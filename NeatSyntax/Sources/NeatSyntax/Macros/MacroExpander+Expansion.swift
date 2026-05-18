@@ -268,7 +268,6 @@ extension MacroExpander {
                     stateEffects: constructStateEffects
                 )
             },
-            environments: construct.environments,
             bindings: try construct.bindings.map {
                 try expand(
                     binding: $0,
@@ -770,7 +769,7 @@ extension MacroExpander {
             return stateEffects[name]?.type
         case .member(let base, _):
             return expectedType(for: base, stateEffects: stateEffects)
-        case .environment, .local:
+        case .local:
             return nil
         }
     }
@@ -898,7 +897,7 @@ extension MacroExpander {
         switch target {
         case .state(let name), .binding(let name):
             return name
-        case .environment, .local, .member:
+        case .local, .member:
             return nil
         }
     }
@@ -1780,7 +1779,7 @@ extension MacroExpander {
                     blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
                 }
             case .macroInvocation, .assignment, .compoundAssignment, .expression,
-                .return, .environmentProvision, .break, .continue:
+                .return, .break, .continue:
                 continue
             }
         }
@@ -1907,7 +1906,7 @@ extension MacroExpander {
                     )
                 }
             case .expand, .macroInvocation, .assignment, .compoundAssignment, .return,
-                .environmentProvision, .break, .continue:
+                .break, .continue:
                 continue
             }
         }
@@ -2907,7 +2906,7 @@ extension MacroExpander {
 
     static func renderAssignmentTarget(_ target: AssignmentTarget) -> String {
         switch target {
-        case .state(let name), .binding(let name), .environment(let name), .local(let name):
+        case .state(let name), .binding(let name), .local(let name):
             return name
         case .member(let base, let name):
             return "\(renderAssignmentTarget(base)).\(name)"

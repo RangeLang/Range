@@ -19,9 +19,6 @@ construct ProfileView {
 
     binding name: String
 
-    environment theme: Theme
-    environment state session: Session
-
     derived displayTitle: String {
         return title + " - " + name
     }
@@ -61,15 +58,6 @@ derived displayTitle: String {
 ```
 
 It has no independent storage. It reads other graph bindings and changes when those inputs change.
-
-`environment` is graph-resolved context.
-
-```neat
-environment theme: Theme
-environment state session: Session
-```
-
-The read-only form reads state from higher in the graph. The `environment state` form can mutate the resolved outer state.
 
 ## Reason
 

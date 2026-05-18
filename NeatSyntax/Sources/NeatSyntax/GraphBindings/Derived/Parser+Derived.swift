@@ -112,8 +112,6 @@ extension Parser {
                 collectBuilderHooks(from: declaration.body, into: &hooks)
             case .assignment, .compoundAssignment:
                 continue
-            case .environmentProvision:
-                continue
             case .return, .break, .continue:
                 continue
             case .forEach(_, _, let body):
@@ -150,7 +148,7 @@ extension Parser {
 
         switch peek(offset: offset + 1) {
         case .identifier(let name), .keyword(let name):
-            guard name != "environment", name != "builder" else { return false }
+            guard name != "builder" else { return false }
         default:
             return false
         }

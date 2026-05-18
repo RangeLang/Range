@@ -71,7 +71,7 @@ extension Parser {
     }
 
     func accessibleContextTypes() -> [String: TypeReference] {
-        var types = currentStateTypes.merging(currentEnvironmentTypes) { current, _ in current }
+        var types = currentStateTypes
         if let currentSelfType {
             types["self"] = currentSelfType
         }
@@ -254,21 +254,16 @@ extension Parser {
 
     mutating func syncCurrentDeclarationSymbols(
         states: [StateDeclaration],
-        environments: [EnvironmentDeclaration],
         bindings: [BindingDeclaration]
     ) {
         currentStateNames = Set(states.map(\.name))
         currentMutableStateNames = Set(states.map(\.name))
-        currentEnvironmentNames = Set(environments.map(\.name))
-        currentMutableEnvironmentNames = Set(environments.filter(\.isState).map(\.name))
         currentBindingNames = Set(bindings.map(\.name))
     }
 
     mutating func clearCurrentDeclarationSymbols() {
         currentStateNames = []
         currentMutableStateNames = []
-        currentEnvironmentNames = []
-        currentMutableEnvironmentNames = []
         currentBindingNames = []
     }
 }

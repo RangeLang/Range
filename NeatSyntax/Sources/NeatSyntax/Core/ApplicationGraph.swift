@@ -196,7 +196,6 @@ struct GraphCollector {
         let constructID = "\(parentID)/construct:\(declaration.name)"
         let bindings = declarationGraph.bindings(onConstruct: declaration.name)
         let deriveds = declarationGraph.deriveds(onConstruct: declaration.name)
-        let environments = declarationGraph.environments(onConstruct: declaration.name)
         let states = declarationGraph.states(onConstruct: declaration.name)
         let values = declarationGraph.values(onConstruct: declaration.name)
         let initializers = declarationGraph.initializers(onConstruct: declaration.name)
@@ -204,9 +203,6 @@ struct GraphCollector {
         let scope = makeScope(
             bindings: bindings.map { ($0.name, "\(constructID)/binding:\($0.name)") },
             deriveds: deriveds.map { ($0.name, "\(constructID)/derived:\($0.name)") },
-            environments: environments.map {
-                ($0.name, "\(constructID)/environment:\($0.name)")
-            },
             states: states.map { ($0.name, "\(constructID)/state:\($0.name)") },
             values: values.map { ($0.name, "\(constructID)/value:\($0.name)") },
             selfID: constructID
@@ -325,7 +321,6 @@ struct GraphCollector {
             genericParameters: construct.genericParameters,
             conformances: construct.conformances,
             states: construct.states,
-            environments: construct.environments,
             bindings: construct.bindings,
             deriveds: construct.deriveds,
             values: construct.values,
@@ -399,7 +394,6 @@ struct GraphCollector {
         case .typeExtension: return .typeExtension
         case .mainBlock: return .mainBlock
         case .state: return .state
-        case .environment: return .environment
         case .binding: return .binding
         case .derived: return .derived
         case .value: return .value
@@ -621,7 +615,7 @@ struct GraphCollector {
                         defaultBody, ownerID: ownerID, scope: scope, visitedCalls: visitedCalls)
                 }
 
-            case .environmentProvision, .break, .continue:
+            case .break, .continue:
                 continue
             }
         }
@@ -833,11 +827,6 @@ struct GraphCollector {
                 baseID: instanceNodeID, name: memberName, kind: kind)
         }
         for (memberName, kind) in memberKinds {
-            guard kind == .environment else { continue }
-            scope.symbols[memberName] = ensureMemberNode(
-                baseID: instanceNodeID, name: memberName, kind: kind)
-        }
-        for (memberName, kind) in memberKinds {
             guard kind == .binding || kind == .derived || kind == .value else { continue }
             let nodeID = ensureMemberNode(baseID: instanceNodeID, name: memberName, kind: kind)
             if let typeName = constructTypedMembers[memberName] {
@@ -872,7 +861,7 @@ struct GraphCollector {
         scope: MemoryScope
     ) -> String {
         switch target {
-        case .state(let name), .binding(let name), .environment(let name), .local(let name):
+        case .state(let name), .binding(let name), .local(let name):
             return resolveSimpleName(name, scope: scope) ?? ensureFallbackNode(name: name)
         case .member(let base, let name):
             let baseID = resolveAssignmentTarget(base, scope: scope)
@@ -962,7 +951,6 @@ struct GraphCollector {
     private func makeScope(
         bindings: [(String, String)],
         deriveds: [(String, String)],
-        environments: [(String, String)],
         states: [(String, String)],
         values: [(String, String)],
         selfID: String? = nil
@@ -971,7 +959,7 @@ struct GraphCollector {
         if let selfID {
             scope.symbols["self"] = selfID
         }
-        for (name, id) in states + environments + bindings + deriveds + values {
+        for (name, id) in states + bindings + deriveds + values {
             scope.symbols[name] = id
         }
         return scope

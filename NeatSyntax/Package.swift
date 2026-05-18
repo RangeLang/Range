@@ -29,7 +29,6 @@ let package = Package(
                 "TypeDefinitions/Protocol/Protocol.md",
                 "GraphBindings/Binding/Binding.md",
                 "GraphBindings/Derived/Derived.md",
-                "GraphBindings/Environment/Environment.md",
                 "GraphBindings/MemoryGraph/DeclarationGraph.md",
                 "GraphBindings/MemoryGraph/MemoryGraph.md",
                 "GraphBindings/MemoryGraph/MemoryGraph.ProofRules.md",

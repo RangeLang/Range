@@ -29,7 +29,6 @@ extension Parser {
         let conformances = header.conformances
 
         var states: [StateDeclaration] = []
-        var environments: [EnvironmentDeclaration] = []
         var bindings: [BindingDeclaration] = []
         var deriveds: [DerivedDeclaration] = []
         var values: [ValueDeclaration] = []
@@ -41,17 +40,14 @@ extension Parser {
             try consume(.leftBrace)
 
             let outerStateTypes = currentStateTypes
-            let outerEnvironmentTypes = currentEnvironmentTypes
             let outerCallableReturnTypes = currentCallableReturnTypes
             let outerSelfAvailable = currentSelfAvailable
             let outerSelfType = currentSelfType
             currentStateTypes = outerStateTypes
-            currentEnvironmentTypes = outerEnvironmentTypes
             currentCallableReturnTypes = outerCallableReturnTypes
             currentSelfAvailable = true
             currentSelfType = .named(name)
             while isStateDeclarationStart()
-                || isEnvironmentDeclarationStart()
                 || isBindingDeclarationStart()
                 || isDerivedDeclarationStart()
                 || isValueDeclarationStart()
@@ -61,7 +57,6 @@ extension Parser {
             {
                 syncCurrentDeclarationSymbols(
                     states: states,
-                    environments: environments,
                     bindings: bindings
                 )
                 if isValueDeclarationStart() {
@@ -74,12 +69,6 @@ extension Parser {
                 }
                 if isDerivedDeclarationStart() {
                     deriveds.append(try parseDerivedDeclaration())
-                    continue
-                }
-                if isEnvironmentDeclarationStart() {
-                    let environment = try parseEnvironmentDeclaration()
-                    environments.append(environment)
-                    currentEnvironmentTypes[environment.name] = environment.type
                     continue
                 }
                 if isInitializerDeclarationStart() {
@@ -107,7 +96,6 @@ extension Parser {
             }
 
             currentStateTypes = outerStateTypes
-            currentEnvironmentTypes = outerEnvironmentTypes
             currentCallableReturnTypes = outerCallableReturnTypes
             currentSelfAvailable = outerSelfAvailable
             currentSelfType = outerSelfType
@@ -136,7 +124,6 @@ extension Parser {
             genericParameters: genericParameters,
             conformances: conformances,
             states: states,
-            environments: environments,
             bindings: bindings,
             deriveds: deriveds,
             values: values,
@@ -176,7 +163,6 @@ extension Parser {
             genericParameters: [],
             conformances: [],
             states: [],
-            environments: [],
             bindings: [],
             deriveds: [],
             values: [],

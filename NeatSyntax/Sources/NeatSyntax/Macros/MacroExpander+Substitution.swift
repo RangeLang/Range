@@ -138,7 +138,7 @@ extension MacroExpander {
                 argumentClause: argumentClause,
                 body: substituteMacroBindings(in: body, bindings: bindings)
             )
-        case .environmentProvision, .break, .continue:
+        case .break, .continue:
             return statement
         }
     }

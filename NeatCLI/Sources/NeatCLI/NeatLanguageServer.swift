@@ -612,7 +612,7 @@ struct NeatLanguageServer {
 
     private func keywordCompletions() -> [[String: Any]] {
         [
-            "case", "construct", "derived", "enum", "environment", "extension", "macro",
+            "case", "construct", "derived", "enum", "extension", "macro",
             "namespace", "protocol", "state", "switch", "let",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
@@ -1223,7 +1223,7 @@ private struct DocumentIndex {
             }
 
             if let match = firstMatch(
-                in: line, pattern: #"\b(environment\s+state|state)\s+([a-z_][A-Za-z0-9_]*)"#)
+                in: line, pattern: #"\b(state)\s+([a-z_][A-Za-z0-9_]*)"#)
             {
                 let name = match[2]
                 let symbolRange = range(in: line, line: lineIndex, value: name)
@@ -1235,7 +1235,7 @@ private struct DocumentIndex {
             }
 
             if let match = firstMatch(
-                in: line, pattern: #"\b(let|environment|derived)\s+([a-z_][A-Za-z0-9_]*)"#)
+                in: line, pattern: #"\b(let|derived)\s+([a-z_][A-Za-z0-9_]*)"#)
             {
                 let name = match[2]
                 let symbolRange = range(in: line, line: lineIndex, value: name)
@@ -1353,9 +1353,9 @@ private struct DocumentIndex {
         let numberPattern = #"\b(?:\d+(?:\.\d+)?|true|false)\b"#
         let lineCommentPattern = #"//.*$"#
         let declarationKeywordPattern =
-            #"\b(state|environment|binding|let|var|derived)\b(?=\s+[a-z][A-Za-z0-9_]*\b)"#
+            #"\b(state|binding|let|var|derived)\b(?=\s+[a-z][A-Za-z0-9_]*\b)"#
         let variableDeclarationPattern =
-            #"\b(?:state|environment|binding|let|var|derived)\s+([a-z][A-Za-z0-9_]*)\b"#
+            #"\b(?:state|binding|let|var|derived)\s+([a-z][A-Za-z0-9_]*)\b"#
         let localVariableNames = collectDeclaredVariableNames(in: lines)
         let parameterDeclarationsByLine = collectParameterDeclarationRanges(in: lines)
         let parameterNames = Set(
@@ -1365,7 +1365,7 @@ private struct DocumentIndex {
         )
         let keywordNames: Set<String> = [
             "background", "binding", "break", "builder", "capture", "case", "construct",
-            "continue", "core", "default", "derived", "else", "enum", "environment",
+            "continue", "core", "default", "derived", "else", "enum",
             "extension", "for", "function", "get", "if", "in", "infix", "init",
             "macro", "main", "marker", "namespace", "nil", "on", "operator", "postfix", "precedencegroup",
             "prefix", "protocol", "return", "self", "set", "state", "switch", "let", "var",
@@ -1377,7 +1377,7 @@ private struct DocumentIndex {
         let identifierKeywordExclusions: Set<String> = [
             "if", "for", "while", "switch", "return", "macro", "marker", "function", "init",
             "construct", "namespace", "enum", "protocol", "extension", "background", "state",
-            "environment", "binding", "derived", "let", "var", "case", "default", "break",
+            "binding", "derived", "let", "var", "case", "default", "break",
             "continue", "true", "false", "nil", "self",
         ]
 
@@ -2098,7 +2098,7 @@ private struct DocumentIndex {
     }
 
     private static func collectDeclaredVariableNames(in lines: [String]) -> Set<String> {
-        let pattern = #"\b(state|environment|binding|let|var|derived)\s+([a-z][A-Za-z0-9_]*)\b"#
+        let pattern = #"\b(state|binding|let|var|derived)\s+([a-z][A-Za-z0-9_]*)\b"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
 
         var result: Set<String> = []

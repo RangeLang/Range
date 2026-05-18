@@ -11,8 +11,7 @@ public struct EntityLowerer {
                 kind: construct.kind,
                 states: construct.states
             ),
-            states: construct.states.map(lowerState),
-            environments: construct.environments.map(lowerEnvironment)
+            states: construct.states.map(lowerState)
         )
     }
 
@@ -49,14 +48,6 @@ public struct EntityLowerer {
             name: state.name,
             type: state.type,
             storage: state.storage
-        )
-    }
-
-    private func lowerEnvironment(_ environment: EnvironmentDeclaration) -> EntityEnvironmentField {
-        EntityEnvironmentField(
-            isState: environment.isState,
-            name: environment.name,
-            typeName: environment.typeName
         )
     }
 }

@@ -39,9 +39,6 @@ construct ProfileView {
 
     binding name: String
 
-    environment theme: Theme
-    environment state session: Session
-
     derived displayTitle: String {
         return title + " - " + name
     }

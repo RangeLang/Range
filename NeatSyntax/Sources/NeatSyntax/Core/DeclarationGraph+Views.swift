@@ -33,7 +33,6 @@ public struct DeclarationRegistryView {
     private let extensionsByTargetName: [String: [ExtensionDeclaration]]
     private let topLevelStatesByFilePath: [String: [StateDeclaration]]
     private let statesByConstructName: [String: [StateDeclaration]]
-    private let environmentsByConstructName: [String: [EnvironmentDeclaration]]
     private let bindingsByConstructName: [String: [BindingDeclaration]]
     private let derivedsByConstructName: [String: [DerivedDeclaration]]
     private let valuesByConstructName: [String: [ValueDeclaration]]
@@ -50,7 +49,6 @@ public struct DeclarationRegistryView {
         extensionsByTargetName: [String: [ExtensionDeclaration]],
         topLevelStatesByFilePath: [String: [StateDeclaration]],
         statesByConstructName: [String: [StateDeclaration]],
-        environmentsByConstructName: [String: [EnvironmentDeclaration]],
         bindingsByConstructName: [String: [BindingDeclaration]],
         derivedsByConstructName: [String: [DerivedDeclaration]],
         valuesByConstructName: [String: [ValueDeclaration]],
@@ -66,7 +64,6 @@ public struct DeclarationRegistryView {
         self.extensionsByTargetName = extensionsByTargetName
         self.topLevelStatesByFilePath = topLevelStatesByFilePath
         self.statesByConstructName = statesByConstructName
-        self.environmentsByConstructName = environmentsByConstructName
         self.bindingsByConstructName = bindingsByConstructName
         self.derivedsByConstructName = derivedsByConstructName
         self.valuesByConstructName = valuesByConstructName
@@ -106,10 +103,6 @@ public struct DeclarationRegistryView {
 
     public func states(onConstruct named: String) -> [StateDeclaration] {
         statesByConstructName[named, default: []]
-    }
-
-    public func environments(onConstruct named: String) -> [EnvironmentDeclaration] {
-        environmentsByConstructName[named, default: []]
     }
 
     public func bindings(onConstruct named: String) -> [BindingDeclaration] {
@@ -195,10 +188,6 @@ public struct DeclarationRegistryView {
 
     public func hasStates(onConstruct named: String) -> Bool {
         !(statesByConstructName[named] ?? []).isEmpty
-    }
-
-    public func hasEnvironments(onConstruct named: String) -> Bool {
-        !(environmentsByConstructName[named] ?? []).isEmpty
     }
 
     public func hasBindings(onConstruct named: String) -> Bool {

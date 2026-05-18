@@ -21,16 +21,9 @@ public struct EntityStateField {
     public let storage: StateStorage
 }
 
-public struct EntityEnvironmentField {
-    public let isState: Bool
-    public let name: String
-    public let typeName: String
-}
-
 public struct EntityDefinition {
     public let kind: EntityKind
     public let identity: EntityIdentity
     public let capabilities: Set<EntityCapability>
     public let states: [EntityStateField]
-    public let environments: [EntityEnvironmentField]
 }

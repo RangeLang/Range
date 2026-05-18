@@ -42,7 +42,6 @@ struct SwiftLoweredProgramAdapter {
             genericParameters: construct.genericParameters,
             conformances: construct.conformances,
             states: construct.states,
-            environments: construct.environments,
             bindings: construct.bindings,
             deriveds: construct.deriveds.map(lower(derived:)),
             values: construct.values,
@@ -144,8 +143,6 @@ struct SwiftLoweredProgramAdapter {
             )
         case .derived(let name, let typeName, let body):
             return .derived(name: name, typeName: typeName, body: lower(statements: body))
-        case .environmentProvision:
-            return statement
         case .assignment(let target, let expression):
             return .assignment(target: target, expression: lower(expression: expression))
         case .compoundAssignment(let target, let operatorSymbol, let expression):

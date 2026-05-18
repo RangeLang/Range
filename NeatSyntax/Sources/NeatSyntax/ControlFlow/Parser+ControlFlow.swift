@@ -31,10 +31,6 @@ extension Parser {
             return try parseDeferStatement(localBindings: &localBindings)
         }
 
-        if isEnvironmentProvisionStart() {
-            return .environmentProvision(try parseEnvironmentProvision())
-        }
-
         if case .keyword(NeatSyntax.Keyword.ifStatement.rawValue) = peek() {
             return try parseIfStatement(localBindings: &localBindings)
         }
@@ -279,9 +275,6 @@ extension Parser {
         if currentStateNames.contains(name) {
             throw ParseError("Local binding '\(name)' conflicts with state '\(name)'.")
         }
-        if currentEnvironmentNames.contains(name) {
-            throw ParseError("Local binding '\(name)' conflicts with environment '\(name)'.")
-        }
 
         let explicitType: TypeReference?
         let typedInitializer: Expression?
@@ -374,9 +367,6 @@ extension Parser {
         if currentStateNames.contains(name) {
             throw ParseError("Local derived '\(name)' conflicts with state '\(name)'.")
         }
-        if currentEnvironmentNames.contains(name) {
-            throw ParseError("Local derived '\(name)' conflicts with environment '\(name)'.")
-        }
 
         try consume(.colon)
         let typeName = try consumeTypeReference()
@@ -423,14 +413,6 @@ extension Parser {
 
         if currentBindingNames.contains(name) {
             return .binding(name)
-        }
-
-        if currentMutableEnvironmentNames.contains(name) {
-            return .environment(name)
-        }
-
-        if currentEnvironmentNames.contains(name) {
-            throw ParseError("Cannot assign to environment '\(name)'.")
         }
 
         if currentStateNames.contains(name) {
@@ -539,10 +521,6 @@ extension Parser {
         guard !currentStateNames.contains(name) else {
             throw ParseError("Loop binding '\(name)' conflicts with state '\(name)'.")
         }
-        guard !currentEnvironmentNames.contains(name) else {
-            throw ParseError("Loop binding '\(name)' conflicts with environment '\(name)'.")
-        }
-
         try consumeKeyword(.inKeyword)
         let sequence = try parseExpression()
         try consume(.leftBrace)

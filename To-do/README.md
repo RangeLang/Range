@@ -19,7 +19,7 @@ to look when deciding what to do next.
 - [x] `DeclarationGraph` has first-class registries or query views for
       constructs, protocols, enums, macros, markers, extensions, namespaces,
       package spaces, top-level callables, operators, top-level states,
-      construct states, environments, bindings, deriveds, values,
+      construct states, bindings, deriveds, values,
       initializers, and parameters.
 - [x] Namespace-backed attribute facts are graph-owned through
       namespace attribute names and attachments.

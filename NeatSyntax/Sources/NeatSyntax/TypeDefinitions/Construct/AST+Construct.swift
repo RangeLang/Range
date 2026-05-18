@@ -14,7 +14,6 @@ public struct ConstructDeclaration {
     public let genericParameters: [GenericParameter]
     public let conformances: [TypeReference]
     public let states: [StateDeclaration]
-    public let environments: [EnvironmentDeclaration]
     public let bindings: [BindingDeclaration]
     public let deriveds: [DerivedDeclaration]
     public let values: [ValueDeclaration]
@@ -30,7 +29,6 @@ public struct ConstructDeclaration {
         genericParameters: [GenericParameter],
         conformances: [TypeReference],
         states: [StateDeclaration],
-        environments: [EnvironmentDeclaration],
         bindings: [BindingDeclaration],
         deriveds: [DerivedDeclaration],
         values: [ValueDeclaration],
@@ -45,7 +43,6 @@ public struct ConstructDeclaration {
         self.genericParameters = genericParameters
         self.conformances = conformances
         self.states = states
-        self.environments = environments
         self.bindings = bindings
         self.deriveds = deriveds
         self.values = values

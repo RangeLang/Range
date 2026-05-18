@@ -8,7 +8,6 @@ public indirect enum Statement {
     case localBinding(LocalBindingDeclaration)
     case localCallable(LocalCallableDeclaration)
     case derived(name: String, typeName: String, body: [Statement])
-    case environmentProvision(EnvironmentProvision)
     case assignment(target: AssignmentTarget, expression: Expression)
     case compoundAssignment(
         target: AssignmentTarget,
@@ -147,7 +146,6 @@ struct LocalBindingSymbol {
 public indirect enum AssignmentTarget {
     case state(String)
     case binding(String)
-    case environment(String)
     case local(String)
     case member(base: AssignmentTarget, name: String)
 }

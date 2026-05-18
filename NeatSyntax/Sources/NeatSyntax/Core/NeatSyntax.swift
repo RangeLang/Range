@@ -16,7 +16,6 @@ enum NeatSyntax {
         case namespace = "namespace"
         case `let` = "let"
         case state = "state"
-        case environment = "environment"
         case binding = "binding"
         case derived = "derived"
         case typeExtension = "extension"

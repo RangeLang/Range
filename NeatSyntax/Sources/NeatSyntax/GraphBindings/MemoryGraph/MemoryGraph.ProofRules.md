@@ -10,7 +10,7 @@ The rules here are the contract for memory safety in Neat's storage model. If an
 
 ## Mental Model
 
-- `let`, `state`, `binding`, `derived`, and `environment` are ownership declarations, not style hints.
+- `let`, `state`, `binding`, and `derived` are ownership declarations, not style hints.
 - The memory graph is the canonical semantic model used for validation.
 - Reactivity is layered on top later; these rules are memory-first.
 
@@ -107,7 +107,7 @@ function incrementAge() {
 
 ## Rejection Rules
 
-- Reject assignment to immutable storage (`let`, non-mutable `environment`, constants).
+- Reject assignment to immutable storage (`let`, constants).
 - Reject unresolved mutable targets.
 - Reject uninitialized required construct members at construction sites.
 - Reject invalid binding sources (non-addressable, temporary, or incompatible storage).

@@ -169,11 +169,8 @@ public struct Parser {
     var currentStateNames: Set<String> = []
     var currentMutableStateNames: Set<String> = []
     var currentStateTypes: [String: TypeReference] = [:]
-    var currentEnvironmentTypes: [String: TypeReference] = [:]
     var currentCallableReturnTypes: [String: TypeReference] = [:]
     var currentBindingNames: Set<String> = []
-    var currentEnvironmentNames: Set<String> = []
-    var currentMutableEnvironmentNames: Set<String> = []
     var currentSelfAvailable: Bool = false
     var currentSelfType: TypeReference?
     var currentExpressionTerminators: [Token] = []

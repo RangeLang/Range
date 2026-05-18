@@ -645,7 +645,6 @@ struct CompilerFixtureTests {
                 @Styling
                 construct Panel: Renderable {
                     state count: Int = 0
-                    environment theme: String
                     binding selected: Bool {
                         get {
                             return true
@@ -728,7 +727,6 @@ struct CompilerFixtureTests {
             .map(\.name) == ["globalCount"])
 
         #expect(registry.states(onConstruct: "Panel").map(\.name) == ["count"])
-        #expect(registry.environments(onConstruct: "Panel").map(\.name) == ["theme"])
         #expect(registry.bindings(onConstruct: "Panel").map(\.name) == ["selected"])
         #expect(registry.deriveds(onConstruct: "Panel").map(\.name) == ["label"])
         #expect(registry.values(onConstruct: "Panel").map(\.name) == ["title", "address"])

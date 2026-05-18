@@ -942,12 +942,6 @@ public struct DeclarationMemberResolver: Sendable {
                     using: nestedTypeMap
                 )
             }
-            for environment in construct.environments {
-                propertyTypes[environment.name] = Self.qualifyNestedLocalTypes(
-                    environment.type,
-                    using: nestedTypeMap
-                )
-            }
             for binding in construct.bindings {
                 propertyTypes[binding.name] = Self.qualifyNestedLocalTypes(
                     Self.simpleTypeReference(named: binding.typeName),

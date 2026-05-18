@@ -202,11 +202,6 @@ private struct MainProgramInterpreter {
             try declare(name: name, kind: .constant, value: value)
             return .none
 
-        case .environmentProvision:
-            throw ValidationError(
-                "Environment branching is not supported in the main program interpreter yet."
-            )
-
         case .assignment(let target, let expression):
             let value = try evaluate(expression)
             try assign(target: target, value: value)
@@ -812,11 +807,6 @@ private struct MainProgramInterpreter {
                 "Binding assignment is not supported in the main-program interpreter yet (\(name))."
             )
 
-        case .environment(let name):
-            throw ValidationError(
-                "Environment-state assignment is not supported in the main-program interpreter yet (\(name))."
-            )
-
         case .member(let base, let name):
             throw ValidationError(
                 "Member assignment is not supported in the main-program interpreter yet (\(try renderAssignmentTarget(base)).\(name))."
@@ -840,11 +830,6 @@ private struct MainProgramInterpreter {
             throw ValidationError(
                 "Binding reads are not supported in the main-program interpreter yet (\(name)).")
 
-        case .environment(let name):
-            throw ValidationError(
-                "Environment-state reads are not supported in the main-program interpreter yet (\(name))."
-            )
-
         case .member(let base, let name):
             throw ValidationError(
                 "Member reads are not supported in the main-program interpreter yet (\(try renderAssignmentTarget(base)).\(name))."
@@ -865,7 +850,7 @@ private struct MainProgramInterpreter {
 
     private func renderAssignmentTarget(_ target: AssignmentTarget) throws -> String {
         switch target {
-        case .local(let name), .state(let name), .binding(let name), .environment(let name):
+        case .local(let name), .state(let name), .binding(let name):
             return name
         case .member(let base, let name):
             return "\(try renderAssignmentTarget(base)).\(name)"

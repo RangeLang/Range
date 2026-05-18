@@ -42,7 +42,6 @@ let title: String
 state person: Person
 derived personString: String
 binding selectedPerson: Person
-environment session: Session
 ```
 
 - `let` is immutable owned data declared here.
@@ -115,14 +114,6 @@ binding selectedPerson: Person = $person
 ```
 
 The graph records `selectedPerson` as borrowed access to the storage owned by `person`.
-
-- `environment` is inherited storage from a higher scope.
-
-```neat
-environment theme: Theme
-```
-
-`environment` participates in the graph as externally provided storage rather than locally owned storage.
 
 - Ownership intent is declared by keyword rather than by extra borrow syntax.
 

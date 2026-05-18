@@ -576,7 +576,7 @@ extension MacroExpander {
                     expressions.append(contentsOf: macroOperationExpressions(in: defaultBody))
                 }
             case .localBinding, .assignment, .compoundAssignment, .return, .macroInvocation,
-                .environmentProvision, .break, .continue:
+                .break, .continue:
                 continue
             }
         }

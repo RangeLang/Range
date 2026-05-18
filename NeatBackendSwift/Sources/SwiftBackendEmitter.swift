@@ -1829,7 +1829,7 @@ struct SwiftBackendEmitter {
             return statementsReferenceInstanceSelf(declaration.body)
         case .macroInvocation(_, _, let body):
             return statementsReferenceInstanceSelf(body)
-        case .expand, .environmentProvision, .break, .continue:
+        case .expand, .break, .continue:
             return false
         }
     }
@@ -1874,11 +1874,11 @@ struct SwiftBackendEmitter {
 
     private func assignmentTargetReferencesInstanceSelf(_ target: AssignmentTarget) -> Bool {
         switch target {
-        case .local("self"), .state("self"), .binding("self"), .environment("self"):
+        case .local("self"), .state("self"), .binding("self"):
             return true
         case .member(let base, _):
             return assignmentTargetReferencesInstanceSelf(base)
-        case .local, .state, .binding, .environment:
+        case .local, .state, .binding:
             return false
         }
     }
@@ -1921,7 +1921,7 @@ struct SwiftBackendEmitter {
                 if let defaultBody, statementsContainMutation(defaultBody) {
                     return true
                 }
-            case .localBinding, .localCallable, .environmentProvision, .expression, .return, .break, .continue:
+            case .localBinding, .localCallable, .expression, .return, .break, .continue:
                 continue
             }
         }
@@ -1982,8 +1982,7 @@ struct SwiftBackendEmitter {
                 if statementsCallKnownMutatingMember(body) {
                     return true
                 }
-            case .localCallable, .macroInvocation, .expand, .return(nil), .break, .continue,
-                .environmentProvision:
+            case .localCallable, .macroInvocation, .expand, .return(nil), .break, .continue:
                 continue
             }
         }
@@ -2380,9 +2379,6 @@ struct SwiftBackendEmitter {
                 enclosingReturnType: enclosingReturnType,
                 scope: scope
             )
-        case .environmentProvision:
-            throw SwiftBackendError(
-                "Swift backend does not support environment provision statements yet.")
         }
     }
 
@@ -2479,7 +2475,7 @@ struct SwiftBackendEmitter {
 
     private func emitAssignmentTarget(_ target: AssignmentTarget) throws -> String {
         switch target {
-        case .state(let name), .binding(let name), .environment(let name), .local(let name):
+        case .state(let name), .binding(let name), .local(let name):
             return name
         case .member(let base, let name):
             return "\(try emitAssignmentTarget(base)).\(name)"
@@ -2958,9 +2954,6 @@ struct SwiftBackendEmitter {
                 indent: indent,
                 enclosingReturnType: enclosingReturnType
             )
-        case .environmentProvision:
-            throw SwiftBackendError(
-                "Swift backend does not support environment provision statements yet.")
         }
     }
 

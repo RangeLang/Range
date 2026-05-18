@@ -25,7 +25,6 @@ public enum ApplicationGraphNodeKind: String, Sendable {
     case typeExtension
     case mainBlock
     case state
-    case environment
     case binding
     case derived
     case value
@@ -50,7 +49,6 @@ public enum ApplicationGraphNodeKind: String, Sendable {
         case .typeExtension: return .typeExtension
         case .mainBlock: return .mainBlock
         case .state: return .state
-        case .environment: return .environment
         case .binding: return .binding
         case .derived: return .derived
         case .value: return .value

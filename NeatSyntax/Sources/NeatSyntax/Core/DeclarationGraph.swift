@@ -41,7 +41,6 @@ public struct DeclarationGraph {
     public let extensionsByTargetName: [String: [ExtensionDeclaration]]
     public let topLevelStatesByFilePath: [String: [StateDeclaration]]
     public let statesByConstructName: [String: [StateDeclaration]]
-    public let environmentsByConstructName: [String: [EnvironmentDeclaration]]
     public let bindingsByConstructName: [String: [BindingDeclaration]]
     public let derivedsByConstructName: [String: [DerivedDeclaration]]
     public let valuesByConstructName: [String: [ValueDeclaration]]
@@ -83,7 +82,6 @@ public struct DeclarationGraph {
         let macros = Self.collectMacros(from: files)
         let topLevelStates = Self.collectTopLevelStates(from: files)
         let statesByConstructName = Self.collectStatesByConstructName(from: constructs)
-        let environmentsByConstructName = Self.collectEnvironmentsByConstructName(from: constructs)
         let bindingsByConstructName = Self.collectBindingsByConstructName(from: constructs)
         let derivedsByConstructName = Self.collectDerivedsByConstructName(from: constructs)
         let valuesByConstructName = Self.collectValuesByConstructName(from: constructs)
@@ -112,7 +110,6 @@ public struct DeclarationGraph {
         self.extensionsByTargetName = extensions
         self.topLevelStatesByFilePath = topLevelStates
         self.statesByConstructName = statesByConstructName
-        self.environmentsByConstructName = environmentsByConstructName
         self.bindingsByConstructName = bindingsByConstructName
         self.derivedsByConstructName = derivedsByConstructName
         self.valuesByConstructName = valuesByConstructName
@@ -151,7 +148,6 @@ public struct DeclarationGraph {
                 extensionsByTargetName: extensionsByTargetName,
                 topLevelStatesByFilePath: topLevelStatesByFilePath,
                 statesByConstructName: statesByConstructName,
-                environmentsByConstructName: environmentsByConstructName,
                 bindingsByConstructName: bindingsByConstructName,
                 derivedsByConstructName: derivedsByConstructName,
                 valuesByConstructName: valuesByConstructName,
@@ -198,10 +194,6 @@ public struct DeclarationGraph {
 
     public func states(onConstruct named: String) -> [StateDeclaration] {
         statesByConstructName[named, default: []]
-    }
-
-    public func environments(onConstruct named: String) -> [EnvironmentDeclaration] {
-        environmentsByConstructName[named, default: []]
     }
 
     public func bindings(onConstruct named: String) -> [BindingDeclaration] {
@@ -300,7 +292,6 @@ public struct DeclarationGraph {
     ) -> [String: ApplicationGraphNodeKind] {
         var result: [String: ApplicationGraphNodeKind] = [:]
         for state in states(onConstruct: named) { result[state.name] = .state }
-        for environment in environments(onConstruct: named) { result[environment.name] = .environment }
         for binding in bindings(onConstruct: named) { result[binding.name] = .binding }
         for derived in deriveds(onConstruct: named) { result[derived.name] = .derived }
         for value in values(onConstruct: named) { result[value.name] = .value }
@@ -330,14 +321,6 @@ public struct DeclarationGraph {
                 name: $0.name,
                 kind: .state,
                 declaredTypeName: $0.type.displayName
-            )
-        })
-        result.append(contentsOf: environments(onConstruct: named).map {
-            DeclaredMemberSurface(
-                ownerConstructName: named,
-                name: $0.name,
-                kind: .environment,
-                declaredTypeName: $0.typeName
             )
         })
         result.append(contentsOf: bindings(onConstruct: named).map {
@@ -830,16 +813,6 @@ public struct DeclarationGraph {
         )
     }
 
-    static func collectEnvironmentsByConstructName(
-        from constructs: [String: ConstructDeclaration]
-    ) -> [String: [EnvironmentDeclaration]] {
-        Dictionary(
-            uniqueKeysWithValues: constructs.map { name, declaration in
-                (name, declaration.environments)
-            }.filter { !$0.1.isEmpty }
-        )
-    }
-
     static func collectBindingsByConstructName(
         from constructs: [String: ConstructDeclaration]
     ) -> [String: [BindingDeclaration]] {
@@ -1035,7 +1008,6 @@ public struct DeclarationGraph {
             genericParameters: declaration.genericParameters,
             conformances: declaration.conformances,
             states: declaration.states,
-            environments: declaration.environments,
             bindings: declaration.bindings,
             deriveds: declaration.deriveds,
             values: declaration.values,
@@ -1066,7 +1038,6 @@ public struct DeclarationGraph {
             genericParameters: declaration.genericParameters,
             conformances: declaration.conformances,
             states: declaration.states,
-            environments: declaration.environments,
             bindings: declaration.bindings,
             deriveds: declaration.deriveds,
             values: declaration.values,
@@ -2094,9 +2065,6 @@ private struct SemanticGraphCollector {
         for state in declaration.states {
             addState(state, parentID: constructID)
         }
-        for environment in declaration.environments {
-            addEnvironment(environment, parentID: constructID)
-        }
         for binding in declaration.bindings {
             addBinding(binding, parentID: constructID)
         }
@@ -2169,14 +2137,6 @@ private struct SemanticGraphCollector {
         addRelation(from: parentID, to: stateID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: stateID)
         addStorageTypeReference(declaration.type, from: stateID)
-    }
-
-    private mutating func addEnvironment(_ declaration: EnvironmentDeclaration, parentID: String) {
-        let environmentID = "\(parentID)/environment:\(declaration.name)"
-        addEntity(id: environmentID, kind: .environment, label: declaration.name)
-        addRelation(from: parentID, to: environmentID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: environmentID)
-        addStorageTypeReference(.named(declaration.typeName), from: environmentID)
     }
 
     private mutating func addBinding(_ declaration: BindingDeclaration, parentID: String) {

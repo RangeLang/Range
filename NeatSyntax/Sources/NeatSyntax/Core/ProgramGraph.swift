@@ -13,7 +13,6 @@ public enum SemanticGraphEntityKind: String, Sendable {
     case typeExtension
     case mainBlock
     case state
-    case environment
     case binding
     case derived
     case value
