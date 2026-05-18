@@ -186,13 +186,13 @@ struct CompilerFixtureTests {
     @Test("Typed construction annotations can be optional")
     func typedConstructionAnnotationsCanBeOptional() throws {
         let source = """
-        construct Version {
+        construct WidgetCount {
             let value: Double
         }
 
         construct Counter {
             let count: Int(5)?
-            let version: Version(value: 0.1)?
+            let widgetCount: WidgetCount(value: 0.1)?
             state current: Int(5)?
         }
 
@@ -204,12 +204,11 @@ struct CompilerFixtureTests {
         var parser = try Parser(source: source)
         let file = try parser.parseSourceFile()
 
-        guard case .module(let module) = file,
-            let counter = module.constructs.first
-        else {
-            Issue.record("Expected module with Counter construct.")
+        guard case .module(let module) = file else {
+            Issue.record("Expected module.")
             return
         }
+        let counter = try #require(module.constructs.first(where: { $0.name == "Counter" }))
 
         var inputs = try neatCoreInputs()
         inputs.append(
@@ -224,18 +223,19 @@ struct CompilerFixtureTests {
         let count = try #require(counter.values.first(where: { $0.name == "count" }))
         #expect(count.typeName == "Int?")
         guard case .integer(5)? = count.value else {
-            Issue.record("Expected typed construction literal initializer.")
+            Issue.record("Expected typed construction literal value.")
             return
         }
 
-        let version = try #require(counter.values.first(where: { $0.name == "version" }))
-        #expect(version.typeName == "Version?")
-        guard case .call(let versionInitializer, let versionArguments)? = version.value else {
+        let widgetCount = try #require(counter.values.first(where: { $0.name == "widgetCount" }))
+        #expect(widgetCount.typeName == "WidgetCount?")
+        guard case .call(let widgetCountInitializer, let widgetCountArguments)? = widgetCount.value
+        else {
             Issue.record("Expected typed construction value call.")
             return
         }
-        #expect(versionInitializer == "Version")
-        #expect(versionArguments.map(\.label) == ["value"])
+        #expect(widgetCountInitializer == "WidgetCount")
+        #expect(widgetCountArguments.map(\.label) == ["value"])
 
         let current = try #require(counter.states.first(where: { $0.name == "current" }))
         #expect(current.type == .optional(.named("Int")))
@@ -430,14 +430,14 @@ struct CompilerFixtureTests {
         #expect(arguments[1].label == "number")
     }
 
-    @Test("Init application surface is present in declaration graph")
-    func initApplicationSurfaceIsPresentInDeclarationGraph() throws {
+    @Test("Construct application surface is present in declaration graph")
+    func constructApplicationSurfaceIsPresentInDeclarationGraph() throws {
         let program = try CompilerPipeline().build(inputs: neatCoreInputs())
         let graph = program.declarationGraph
 
-        #expect(graph.constructsByName["Init"] != nil)
-        #expect(graph.constructsByName["Init.Application"] != nil)
-        #expect(graph.syntaxResolver.declaration(named: "Init.Application", conformsTo: "SyntaxReplaceable"))
+        #expect(graph.constructsByName["Construct"] != nil)
+        #expect(graph.constructsByName["Construct.Application"] != nil)
+        #expect(graph.syntaxResolver.declaration(named: "Construct.Application", conformsTo: "SyntaxReplaceable"))
     }
 
     @Test("Declaration graph carries source locations")
@@ -510,15 +510,15 @@ struct CompilerFixtureTests {
         )
         #expect(functionArgument?.site == .functionArgumentExpression)
 
-        let initializer = context.resolvedRewriteCall(
+        let functionApplication = context.resolvedRewriteCall(
             from: .call(
                 name: "target.application.replace",
                 arguments: [CallArgument(label: "with", value: .string("value"))]
             ),
             targetBinding: "target",
-            targetType: .named("Init")
+            targetType: .named("Function")
         )
-        #expect(initializer?.site == .initApplication)
+        #expect(functionApplication?.site == .functionApplication)
     }
 
     @Test("Namespaces qualify nested callables and constructs")
@@ -1177,8 +1177,8 @@ private func encodeKeys(in extensionDeclaration: ExtensionDeclaration) -> [Strin
 }
 
 private func decodeKeys(in extensionDeclaration: ExtensionDeclaration) -> [String: String] {
-    guard let initializer = extensionDeclaration.initializers.first,
-        let body = initializer.body
+    guard let decode = extensionDeclaration.callables.first(where: { $0.name == "decode" }),
+        let body = decode.body
     else {
         return [:]
     }
