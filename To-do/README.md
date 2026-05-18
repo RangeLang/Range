@@ -163,8 +163,9 @@ the implementation tracking surface.
 - [ ] Decide and implement the operational `@macro` vs descriptive `#marker`
       surface. Current implementation still accepts macro applications through
       the older `#` path in several places.
-- [ ] Prototype `@provided` as a property macro and `#secret` as marker metadata
-      to replace environment-style config and secret loading.
+- [ ] Keep config, sharing, and sensitive-value design at the property
+      marker/macro layer, without committing to concrete `@provided` or
+      `#secret` spellings yet.
 - [ ] Expand syntax-producing macro coverage for function bodies, initializer
       bodies, blocks, switches, assignments, and declaration lists.
 - [ ] Decide the syntax block story around future `# { ... }` blocks.
@@ -219,7 +220,7 @@ the implementation tracking surface.
 - [ ] Keep X publishing scripts separate from docs source generation.
 - [ ] Treat `.env` as only one local provider for typed config/secret
       declarations. The source of truth should be graph-visible declarations
-      such as `#secret @provided(...) let stripeKey: Key`.
+      with property metadata and behavior attached through markers/macros.
 
 ## Immediate Next Slice
 

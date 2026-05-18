@@ -60,16 +60,16 @@ The sigils should communicate intent.
 that declaration.
 
 ```neat
-@provided(.keychain("stripe_key"))
-let stripeKey: Key
+@behavior(...)
+let value: Value
 ```
 
 `#name` is descriptive. It attaches metadata that the graph, macros, backend, or
 tools can read later.
 
 ```neat
-#secret
-let stripeKey: Key
+#metadata
+let value: Value
 ```
 
 That split matters. A feature that transforms code, supplies values, rewrites
@@ -86,12 +86,12 @@ graph what kind of fact they project.
 
 ```neat
 marker namespace(): Namespace<Construct>
-marker secret<T>(): Let<T> -> Security.Secret<T>
+marker metadata<T>(): Let<T> -> Metadata.Fact<T>
 ```
 
 Use markers for:
 
-- secret or sensitive data classification
+- property classification
 - namespace projection
 - property sharing metadata
 - coding keys and encoding hints
@@ -108,9 +108,9 @@ They should receive typed compiler views and graph access, not scrape raw text
 as their default path.
 
 ```neat
-macro provided<T>(_ source: Provider): Let<T> { target, diagnostics, graph in
+macro behavior<T>(_ configuration: Configuration): Let<T> { target, diagnostics, graph in
     target.declaration.initializer { current in
-        Provider.load(source, as: T.self)
+        current
     }
 }
 ```
@@ -136,12 +136,9 @@ Environment-like values are ordinary properties plus markers/macros:
 
 ```neat
 construct Config {
-    #secret
-    @provided(.keychain("stripe_key"))
-    let stripeKey: Key
-
-    @provided(.system("API_BASE_URL"))
-    let apiBaseURL: URL
+    #metadata
+    @behavior(...)
+    let value: Value
 }
 ```
 
@@ -160,34 +157,32 @@ the same property substrate instead of creating another declaration category.
 
 Do not treat `.env` files as the language contract.
 
-Configuration and secrets should be typed declarations. A local `.env` file can
-be one provider, but the source of truth should be the graph-visible
-declaration:
+Configuration, sharing, and sensitive values should remain typed property
+declarations. A local `.env` file can be one provider later, but the source of
+truth should be the graph-visible declaration and its attached metadata or
+behavior.
 
 ```neat
 construct AppConfig {
-    #secret
-    @provided(.secretManager("stripe/prod/key"))
-    let stripeKey: Key
-
-    @provided(.build("API_BASE_URL"))
-    let apiBaseURL: URL
+    #metadata
+    @behavior(...)
+    let value: Value
 }
 ```
 
 The compiler and tooling can then derive:
 
 - required configuration keys
-- provider requirements
+- provider or policy requirements
 - local development fallbacks
 - redaction policy
 - generated loading code
 - deployment manifests
-- diagnostics for unsafe or missing providers
+- diagnostics for unsafe, missing, or mismatched policy
 
-`#secret` should be visible to other macros such as `@codable`, debug output,
-logging, test fixtures, and backend emitters so plaintext does not leak through
-unrelated generated behavior.
+The important part is not the concrete spelling yet. The important part is that
+property marker identity must be stable enough for other macros, tools, and
+backends to ask the graph what metadata is attached to a specific property.
 
 ## Namespace Projection
 
@@ -259,6 +254,8 @@ Treat these as review checks before implementing a new feature:
 - Is `@` being used for compiler work and `#` for metadata?
 - Are properties still the substrate for data shape?
 - Does a macro need graph identity instead of a recursive nested declaration?
+- Are property markers owner-qualified, so `Config.value` and `Other.value` are
+  distinct graph identities?
 - Is a marker exposing generic metadata instead of creating a one-off field?
 - Is `.env` being treated as one provider rather than the source of truth?
 - Does the backend consume graph facts instead of rediscovering source meaning?
