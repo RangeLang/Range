@@ -12,4 +12,13 @@ struct ProjectUpdaterTests {
         #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Neat.git") == "georgetchelidze/Neat")
         #expect(try updater.gitHubReference(from: "git@github.com:georgetchelidze/Neat.git") == "georgetchelidze/Neat")
     }
+
+    @Test("Release update archive name matches current platform")
+    func releaseUpdateArchiveNameMatchesCurrentPlatform() throws {
+        #if os(macOS) && arch(arm64)
+        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "neat-macos-arm64.lang.tar.gz")
+        #elseif os(macOS) && arch(x86_64)
+        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "neat-macos-x64.lang.tar.gz")
+        #endif
+    }
 }

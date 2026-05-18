@@ -3,12 +3,92 @@ import Foundation
 import NeatSyntax
 
 struct ProjectUpdater {
+    private static let releaseRepository = "georgetchelidze/Neat"
+
     private let path: String
     private let updateCLI: Bool
 
     init(path: String, updateCLI: Bool) {
         self.path = path
         self.updateCLI = updateCLI
+    }
+
+    static func updateInstalledCLI(
+        repository: String = releaseRepository,
+        version: String = "latest"
+    ) throws {
+        let platform = try releasePlatform()
+        let archive = try releaseArchiveNameForCurrentPlatform()
+        let urlString: String
+        if version == "latest" {
+            urlString = "https://github.com/\(repository)/releases/latest/download/\(archive)"
+        } else {
+            urlString = "https://github.com/\(repository)/releases/download/\(version)/\(archive)"
+        }
+
+        guard let url = URL(string: urlString) else {
+            throw ValidationError("Invalid release URL: \(urlString)")
+        }
+
+        let fileManager = FileManager.default
+        let temporaryRoot = fileManager.temporaryDirectory
+            .appendingPathComponent("neat-update-\(UUID().uuidString)", isDirectory: true)
+        try fileManager.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
+        defer {
+            try? fileManager.removeItem(at: temporaryRoot)
+        }
+
+        let archiveURL = temporaryRoot.appendingPathComponent(archive, isDirectory: false)
+        TerminalLog.out("Downloading Neat from \(url.absoluteString)", level: .change)
+        try download(url: url, to: archiveURL)
+
+        try runProcess(
+            executable: "/usr/bin/env",
+            arguments: ["tar", "-xzf", archiveURL.path, "-C", temporaryRoot.path]
+        )
+
+        let packageRoot = temporaryRoot.appendingPathComponent(
+            "neat-\(platform).lang",
+            isDirectory: true
+        )
+        let installScript = packageRoot.appendingPathComponent("install.sh", isDirectory: false)
+        guard fileManager.fileExists(atPath: installScript.path) else {
+            throw ValidationError("Release archive is missing install.sh.")
+        }
+
+        try runProcess(executable: installScript.path, arguments: [])
+        TerminalLog.out("Updated Neat CLI.", level: .success)
+    }
+
+    static func releaseArchiveNameForCurrentPlatform() throws -> String {
+        "neat-\(try releasePlatform()).lang.tar.gz"
+    }
+
+    private static func releasePlatform() throws -> String {
+        #if os(macOS)
+        let os = "macos"
+        #elseif os(Linux)
+        let os = "linux"
+        #else
+        throw ValidationError("Neat release updates are not supported on this operating system yet.")
+        #endif
+
+        #if arch(arm64)
+        let arch = "arm64"
+        #elseif arch(x86_64)
+        let arch = "x64"
+        #else
+        throw ValidationError("Neat release updates are not supported on this architecture yet.")
+        #endif
+
+        return "\(os)-\(arch)"
+    }
+
+    private static func download(url: URL, to destination: URL) throws {
+        try runProcess(
+            executable: "/usr/bin/env",
+            arguments: ["curl", "-fsSL", url.absoluteString, "-o", destination.path]
+        )
     }
 
     func run() throws {
@@ -92,13 +172,13 @@ struct ProjectUpdater {
 
             let gitDir = modulePath.appendingPathComponent(".git", isDirectory: true)
             if FileManager.default.fileExists(atPath: gitDir.path) {
-                try runProcessQuiet(
+                try Self.runProcessQuiet(
                     executable: "/usr/bin/env",
                     arguments: ["git", "-C", modulePath.path, "pull", "--ff-only"]
                 )
                 TerminalLog.out("Updated module \(module)", level: .success)
             } else {
-                try runProcessQuiet(
+                try Self.runProcessQuiet(
                     executable: "/usr/bin/env",
                     arguments: ["git", "clone", "--depth", "1", repoURL, modulePath.path]
                 )
@@ -117,7 +197,7 @@ struct ProjectUpdater {
             return
         }
 
-        try runProcess(executable: script.path, arguments: [])
+        try Self.runProcess(executable: script.path, arguments: [])
         TerminalLog.out("Updated Neat CLI", level: .success)
     }
 
@@ -167,13 +247,13 @@ struct ProjectUpdater {
 
         let gitDir = packageRoot.appendingPathComponent(".git", isDirectory: true)
         if FileManager.default.fileExists(atPath: gitDir.path) {
-            try runProcessQuiet(
+            try Self.runProcessQuiet(
                 executable: "/usr/bin/env",
                 arguments: ["git", "-C", packageRoot.path, "pull", "--ff-only", "origin", "main"]
             )
             TerminalLog.out("Downloaded \(reference) from origin.", level: .success)
         } else {
-            try runProcessQuiet(
+            try Self.runProcessQuiet(
                 executable: "/usr/bin/env",
                 arguments: ["git", "clone", remoteURL, packageRoot.path]
             )
@@ -203,7 +283,7 @@ struct ProjectUpdater {
         throw ValidationError("Could not infer GitHub owner/repo from origin '\(trimmed)'.")
     }
 
-    private func runProcess(executable: String, arguments: [String]) throws {
+    private static func runProcess(executable: String, arguments: [String]) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -220,6 +300,10 @@ struct ProjectUpdater {
     }
 
     private func runProcessCapturing(executable: String, arguments: [String]) throws -> String {
+        try Self.runProcessCapturing(executable: executable, arguments: arguments)
+    }
+
+    private static func runProcessCapturing(executable: String, arguments: [String]) throws -> String {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -248,7 +332,7 @@ struct ProjectUpdater {
         return outputText
     }
 
-    private func runProcessQuiet(executable: String, arguments: [String]) throws {
+    private static func runProcessQuiet(executable: String, arguments: [String]) throws {
         _ = try runProcessCapturing(executable: executable, arguments: arguments)
     }
 }

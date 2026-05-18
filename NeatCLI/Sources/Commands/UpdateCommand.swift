@@ -4,22 +4,26 @@ import NeatSyntax
 extension NeatCLI {
     struct Update: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Update project modules and optionally the Neat CLI."
+            abstract: "Update the Neat CLI or project modules."
         )
 
-        @Argument(help: "Project directory. Defaults to current directory.")
+        @Argument(help: "Project directory. When omitted, updates the Neat CLI.")
         var path: String?
 
         @Flag(
             name: .customLong("self"),
-            help: "Also update the Neat CLI binary if run inside the NeatCLI repo."
+            help: "Also update the Neat CLI after updating project modules."
         )
         var updateSelf: Bool = false
 
         mutating func run() throws {
             do {
-                let updater = ProjectUpdater(path: path ?? ".", updateCLI: updateSelf)
-                try updater.run()
+                if let path {
+                    let updater = ProjectUpdater(path: path, updateCLI: updateSelf)
+                    try updater.run()
+                } else {
+                    try ProjectUpdater.updateInstalledCLI()
+                }
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure
