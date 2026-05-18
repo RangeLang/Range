@@ -1601,6 +1601,9 @@ private struct SemanticGraphCollector {
         for value in declaration.values {
             addValue(value, parentID: packageID)
         }
+        for (index, entry) in declaration.entries.enumerated() {
+            addPackageEntry(entry, parentID: packageID, index: index)
+        }
         for callable in declaration.callables {
             addCallable(callable, parentID: packageID)
         }
@@ -1615,6 +1618,28 @@ private struct SemanticGraphCollector {
         }
         for declaration in declaration.protocols {
             addProtocol(declaration, parentID: packageID)
+        }
+    }
+
+    private mutating func addPackageEntry(_ entry: Expression, parentID: String, index: Int) {
+        let entryID = "\(parentID)/entry:\(index)"
+        addEntity(id: entryID, kind: .packageEntry, label: packageEntryLabel(entry))
+        addRelation(from: parentID, to: entryID, kind: .contains)
+    }
+
+    private func packageEntryLabel(_ entry: Expression) -> String {
+        switch entry {
+        case .call(let name, let arguments):
+            if arguments.count == 1, arguments[0].label == nil,
+                case .string(let value) = arguments[0].value
+            {
+                return "\(name)(\"\(value)\")"
+            }
+            return "\(name)(...)"
+        case .identifier(let name):
+            return name
+        default:
+            return "package entry"
         }
     }
 

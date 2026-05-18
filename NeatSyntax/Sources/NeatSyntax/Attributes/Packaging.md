@@ -40,6 +40,7 @@ Package manifests can write metadata directly in the package space:
     let name: Title("Neat")
     let version: Version(0.1.8)
     let author: String("George")
+    Module("acme/logger")
 }
 ```
 
@@ -48,4 +49,5 @@ Package manifests can write metadata directly in the package space:
 - `@package` is not a replacement for `@language`.
 - `@package` does not make declarations non-identity-bearing.
 - `@package` is not a namespace declaration. It is a package metadata space collected by the graph.
+- Package entries such as `Module("owner/repo")` are also collected in the package space.
 - When package remotes are omitted, the CLI can resolve package remotes from git.

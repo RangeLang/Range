@@ -42,6 +42,7 @@ struct PackageSubscriptionManagerTests {
         )
         #expect(action == .subscribed)
         #expect(source.contains(#"Module("acme/logger")"#))
+        _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.neat"))
     }
 
     @Test("Subscribe browses when search is empty or ambiguous")

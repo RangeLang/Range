@@ -360,6 +360,7 @@ struct CompilerFixtureTests {
                     let name: Title("Example")
                     let version: Version(0.1.0)
                     let author: String("George")
+                    Module("acme/logger")
 
                     construct PackageMarker {
                         let raw: String
@@ -376,6 +377,11 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.packageValues(named: "version").count == 1)
         #expect(program.declarationGraph.packageValues(named: "author").count == 1)
         #expect(program.declarationGraph.hasConstruct(named: "PackageMarker"))
+        #expect(
+            program.declarationGraph.programGraph.entities.contains {
+                $0.kind == .packageEntry && $0.label == #"Module("acme/logger")"#
+            }
+        )
         #expect(
             program.declarationGraph.programGraph.entities.contains {
                 $0.kind == .packageSpace && $0.label == "@package"

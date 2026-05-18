@@ -15,6 +15,7 @@ extension Parser {
         advance()
 
         var values: [ValueDeclaration] = []
+        var entries: [Expression] = []
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
@@ -29,6 +30,7 @@ extension Parser {
             || isNamespaceDeclarationStart()
             || isEnumDeclarationStart()
             || isProtocolDeclarationStart()
+            || isPackageEntryStart()
         {
             if isValueDeclarationStart() {
                 values.append(try parseValueDeclaration())
@@ -50,6 +52,10 @@ extension Parser {
                 enumerations.append(try parseEnumDeclaration(requiresEOF: false))
                 continue
             }
+            if isPackageEntryStart() {
+                entries.append(try parseExpression(terminatingAt: [.rightBrace]))
+                continue
+            }
             protocols.append(try parseProtocolDeclaration(requiresEOF: false))
         }
         try consume(.rightBrace)
@@ -58,6 +64,7 @@ extension Parser {
 
         return PackageSpaceDeclaration(
             values: values,
+            entries: entries,
             callables: callables,
             constructs: constructs,
             namespaces: namespaces,
@@ -73,6 +80,7 @@ extension Parser {
         advance()
 
         var values: [ValueDeclaration] = []
+        var entries: [Expression] = []
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
@@ -87,6 +95,7 @@ extension Parser {
             || isNamespaceDeclarationStart()
             || isEnumDeclarationStart()
             || isProtocolDeclarationStart()
+            || isPackageEntryStart()
         {
             if isValueDeclarationStart() {
                 values.append(try parseValueDeclaration())
@@ -108,18 +117,32 @@ extension Parser {
                 enumerations.append(try parseEnumDeclaration(requiresEOF: false))
                 continue
             }
+            if isPackageEntryStart() {
+                entries.append(try parseExpression(terminatingAt: [.rightBrace]))
+                continue
+            }
             protocols.append(try parseProtocolDeclaration(requiresEOF: false))
         }
         try consume(.rightBrace)
 
         return PackageSpaceDeclaration(
             values: values,
+            entries: entries,
             callables: callables,
             constructs: constructs,
             namespaces: namespaces,
             enumerations: enumerations,
             protocols: protocols
         )
+    }
+
+    private func isPackageEntryStart() -> Bool {
+        switch peek() {
+        case .identifier, .keyword:
+            return peek(offset: 1) == .leftParen
+        default:
+            return false
+        }
     }
 
     func isMainBlockStart() -> Bool {

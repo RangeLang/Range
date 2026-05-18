@@ -68,6 +68,7 @@ public struct ModuleFileNode {
 
 public struct PackageSpaceDeclaration {
     public let values: [ValueDeclaration]
+    public let entries: [Expression]
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]
     public let namespaces: [NamespaceDeclaration]
@@ -76,6 +77,7 @@ public struct PackageSpaceDeclaration {
 
     public init(
         values: [ValueDeclaration],
+        entries: [Expression] = [],
         callables: [CallableDeclaration],
         constructs: [ConstructDeclaration],
         namespaces: [NamespaceDeclaration],
@@ -83,6 +85,7 @@ public struct PackageSpaceDeclaration {
         protocols: [ProtocolDeclaration]
     ) {
         self.values = values
+        self.entries = entries
         self.callables = callables
         self.constructs = constructs
         self.namespaces = namespaces
