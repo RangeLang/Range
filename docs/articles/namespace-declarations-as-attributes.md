@@ -17,12 +17,27 @@ construct Panel {
 
 A namespace declaration makes an attribute name available.
 
+Namespace-shaped configuration can use the declaration macro form:
+
+```neat
+#namespace
+construct Language {
+    let defaultLocale: String("en")
+}
+```
+
+This also makes `@Language` valid. The construct body acts like namespace-owned configuration instead of instance storage.
+
 The declaration graph should collect that fact:
 
 ```text
 namespace Styling
 attribute Styling
   source: namespace Styling
+
+namespace Language
+attribute Language
+  source: #namespace construct Language
 ```
 
 ## Rule

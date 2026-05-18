@@ -1,4 +1,4 @@
-@language
+@syntax
 construct EnumCaseExpression: Expression {
     let type: TypeReference?
     let identifier: Identifier

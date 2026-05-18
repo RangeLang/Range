@@ -4,23 +4,21 @@ The syntax model is organized around language concepts first, then the ways thos
 
 ## Observation
 
-`Syntax` is the broad protocol for compiler-visible syntax.
+`@syntax` is the marker for compiler-visible syntax surfaces.
 
-More specific protocols describe how a compiler phase can consume a node:
+Specific protocols describe how a compiler phase can consume a node:
 
 ```neat
-@language
-protocol Syntax {}
+@syntax
+protocol Statement {}
 
-@language
-protocol Statement: Syntax {}
-
-protocol Expression: Syntax, Statement, SyntaxReplaceable<Expression> {
+@syntax
+protocol Expression: Statement, SyntaxReplaceable<Expression> {
     let type: TypeReference?
 }
 
-@language
-protocol TypeReference: Syntax, SyntaxReplaceable<TypeReference> {}
+@syntax
+protocol TypeReference: SyntaxReplaceable<TypeReference> {}
 ```
 
 Those protocols are not the whole tree.
@@ -28,12 +26,12 @@ Those protocols are not the whole tree.
 The AST language tree is owned by the thing being described:
 
 ```neat
-@language
-construct Construct: Syntax {
+@syntax
+construct Construct {
     let declaration: Declaration
     let application: Application
 
-    @language
+    @syntax
     construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType>, SyntaxEmittable {
         let self: SelfType
         let lets: [Let]
@@ -43,7 +41,7 @@ construct Construct: Syntax {
         function expand(_ expansion: () -> [Syntax])
     }
 
-    @language
+    @syntax
     construct Application: SyntaxReplaceable<Expression> {
         let type: TypeReference
         let arguments: [Parameter.Application]
@@ -58,12 +56,12 @@ A construct declaration and a construct application are related, but they are no
 The same split appears again for functions and parameters:
 
 ```neat
-@language
-construct Function: Syntax {
+@syntax
+construct Function {
     let declaration: Declaration
     let application: Application
 
-    @language
+    @syntax
     construct Declaration: SyntaxEmittable {
         let identifier: Identifier
         let parameters: [Parameter.Declaration]
@@ -71,7 +69,7 @@ construct Function: Syntax {
         let body: Block
     }
 
-    @language
+    @syntax
     construct Application: SyntaxEmittable, SyntaxReplaceable<Expression> {
         let identifier: Identifier
         let arguments: [Parameter.Application]
@@ -80,12 +78,12 @@ construct Function: Syntax {
 ```
 
 ```neat
-@language
-construct Parameter: Syntax {
+@syntax
+construct Parameter {
     let declaration: Declaration
     let application: Application
 
-    @language
+    @syntax
     construct Declaration {
         let externalName: String?
         let localName: String
@@ -93,7 +91,7 @@ construct Parameter: Syntax {
         let defaultValue: Expression?
     }
 
-    @language
+    @syntax
     construct Application {
         let label: String?
         let type: TypeReference
@@ -109,26 +107,26 @@ The application side records a use of what exists.
 ## Shape
 
 ```text
-Syntax
+@syntax
   Statement
   Expression
   TypeReference
 
-Construct
-  Declaration
-  Application
+  Construct
+    Declaration
+    Application
 
-Function
-  Declaration
-  Application
+  Function
+    Declaration
+    Application
 
-Parameter
-  Declaration
-  Application
+  Parameter
+    Declaration
+    Application
 
-Protocol
-  Declaration
-  Application<Conformer>
+  Protocol
+    Declaration
+    Application<Conformer>
 ```
 
 Protocols cut across the tree. Nested declarations keep ownership local.
@@ -139,4 +137,4 @@ Protocols cut across the tree. Nested declarations keep ownership local.
 
 This keeps the syntax model from becoming a flat bag of parser node names.
 
-The compiler can ask broad questions through protocols, while the language tree still says where each shape belongs. Declarations, applications, expansions, replacements, and graph-backed relationships get distinct names instead of being hidden inside one overloaded AST node.
+The compiler can ask broad questions from `@syntax` and capability protocols, while the language tree still says where each shape belongs. Declarations, applications, expansions, replacements, and graph-backed relationships get distinct names instead of being hidden inside one overloaded AST node.

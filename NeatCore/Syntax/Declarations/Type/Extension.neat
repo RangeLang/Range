@@ -1,5 +1,5 @@
-@language
-construct Extension<Target: NominalTypeReference>: Syntax, SyntaxEmittable {
+@syntax
+construct Extension<Target: NominalTypeReference>: SyntaxEmittable {
     let target: Target
     let conformances: [NominalTypeReference]
     let functions: [Function.Declaration]

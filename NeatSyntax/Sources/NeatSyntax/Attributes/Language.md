@@ -6,11 +6,11 @@
 
 ## Role
 
-`@language` keeps `construct` available as the single concrete declaration form while still giving the standard library and compiler a way to declare non-identity-bearing types such as `Int`, `Closure`, and `Block`.
+`@language` keeps `construct` available as the single concrete declaration form while still giving the standard library and compiler a way to declare non-identity-bearing types such as `Int` and storage boundary values.
 
 `@language` may also mark top-level functions whose bodies are primitive operations supplied outside ordinary Neat source, such as scalar operator functions.
 
-`@language` may also mark protocols that are reserved compiler-recognized semantic categories, such as future macro syntax categories.
+`@syntax` marks compiler-visible syntax surfaces. Use it for syntax-tree nodes exposed to macros instead of overloading `@language`.
 
 ## Mental Model
 
@@ -34,7 +34,7 @@
 - Members inside an `@language construct` may omit bodies when the operation is supplied by the compiler, runtime, or backend.
 - Top-level `@language function` declarations may omit bodies when the operation is supplied by the compiler, runtime, or backend.
 - `@language protocol` declarations are compiler-recognized semantic categories; `@language` does not cascade through protocol conformance.
-- `@language` exists for foundational language types and compiler-exposed structural constructs, not ordinary domain modeling.
+- `@language` exists for foundational language types, not ordinary domain modeling.
 - `@language construct` does not inherit from other constructs.
 
 ## Examples
@@ -53,13 +53,6 @@ construct IntLiteral { }
 
 ```neat
 @language
-construct Closure {
-    let body: Block
-}
-```
-
-```neat
-@language
 construct ArrayStorage<Element> {
     init()
     derived count: Int
@@ -74,11 +67,6 @@ construct ArrayStorage<Element> {
 function +(lhs: Int, rhs: Int) -> Int
 ```
 
-```neat
-@language
-protocol Syntax {}
-```
-
 ## Notes
 
 - `@language` does not imply that every operation is compiler-implemented.
@@ -86,4 +74,3 @@ protocol Syntax {}
 - Body omission in an `@language construct` member or top-level `@language function` is an explicit declaration that the implementation is provided outside normal Neat source for now.
 - `@language construct` means the compiler treats the declaration as a plain value type with privileged lowering semantics.
 - `@language protocol` means the compiler may recognize the protocol as a reserved semantic category; it does not provide protocol requirement bodies.
-- Syntax-tree nodes exposed to macros may also be modeled as `@language construct` when they are compiler-recognized structural values.

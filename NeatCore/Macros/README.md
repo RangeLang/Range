@@ -7,7 +7,6 @@ Current macro surface is split into:
 
 Compiler-owned syntax surfaces now live in `NeatCore/Syntax`:
 
-- `Syntax`
 - `Bodies`
 - `Statements`
 - `Expressions`
@@ -30,8 +29,8 @@ Current bootstrap rules:
 - Expression macros may declare an expansion result type with `-> T`. Generic
   result types are resolved from macro argument types where possible.
 - Macro parameters can use `capture T` to request call-site syntax capture for
-  syntax-category types such as `Expression`. Plain `Expression` is not syntax
-  capture.
+  `@syntax` surfaces such as `Expression`. Plain `Expression` is not
+  syntax capture.
 - Parameter-targeted macros operate through explicit declaration/application facets on `Parameter`, for example `target.declaration.type.rewrite(...)` and nested application-side expression rewrite paths such as `target.application.expression.rewrite(...)`.
 - `Init`-targeted macros are graph-driven declaration macros. A concrete initializer may carry them directly, and protocol initializer requirements may carry them onto conforming initializers through graph realization.
 - For literal bridging, the base form is `#literal<T>` on `init(literal: T)`, where `T` is a compiler-recognized literal carrier type.

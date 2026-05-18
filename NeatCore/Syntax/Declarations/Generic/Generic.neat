@@ -1,5 +1,4 @@
-@language
-protocol Generic: Syntax {
+@syntax
+protocol Generic {
     let identifier: Identifier
 }
-

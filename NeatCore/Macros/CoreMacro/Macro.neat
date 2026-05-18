@@ -1,15 +1,15 @@
-@language
-construct Macro: Syntax {
-    @language
-    construct Declaration: Syntax {
+@syntax
+construct Macro {
+    @syntax
+    construct Declaration {
         let identifier: Identifier
         let parameters: [Parameter.Declaration]
         let target: TypeReference
         let expansionType: TypeReference?
     }
 
-    @language
-    construct Application: Syntax {
+    @syntax
+    construct Application {
         let identifier: Identifier
         let genericArguments: [TypeReference]
         let argumentClause: String

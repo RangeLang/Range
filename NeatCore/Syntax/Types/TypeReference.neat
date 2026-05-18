@@ -1,2 +1,2 @@
-@language
-protocol TypeReference: Syntax, SyntaxReplaceable<TypeReference> {}
+@syntax
+protocol TypeReference: SyntaxReplaceable<TypeReference> {}

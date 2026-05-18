@@ -1,2 +1,2 @@
-@language
-protocol Statement: Syntax {}
+@syntax
+protocol Statement {}

@@ -1,4 +1,4 @@
-@language
-construct Block: Syntax {
+@syntax
+construct Block {
     let statements: [Statement]
 }

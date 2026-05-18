@@ -1,4 +1,4 @@
-@language
+@syntax
 construct VariadicTypeReference: StructuralTypeReference {
     let element: TypeReference
 

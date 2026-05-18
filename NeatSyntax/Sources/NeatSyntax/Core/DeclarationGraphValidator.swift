@@ -510,7 +510,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
         if attribute.isLanguageBoundary {
             throw SemanticValidationError(
-                "@language can only be used in NeatCore. Remove @language from \(declarationName) in \(lastPathComponent(of: filePath))."
+                "@\(attribute.name) can only be used in NeatCore. Remove @\(attribute.name) from \(declarationName) in \(lastPathComponent(of: filePath))."
             )
         }
 

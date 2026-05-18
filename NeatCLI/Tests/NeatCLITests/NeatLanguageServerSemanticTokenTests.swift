@@ -366,8 +366,9 @@ struct NeatLanguageServerSemanticTokenTests {
             let version: Version(0.1.0)
         }
 
-        #namespace(.locked)
-        construct Math {
+        #namespace
+        construct Language {
+            let defaultLocale: String("en")
         }
 
         @Styling

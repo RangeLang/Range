@@ -21,6 +21,7 @@ let package = Package(
                 "Attributes/Language.md",
                 "Attributes/Namespaces.md",
                 "Attributes/Packaging.md",
+                "Attributes/Syntax.md",
                 "Core/CompilerPipeline.md",
                 "TypeDefinitions/Enum/Enum.md",
                 "TypeDefinitions/Extension/Extension.md",

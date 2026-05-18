@@ -1,15 +1,15 @@
-@language
-construct Marker: Syntax {
-    @language
-    construct Declaration: Syntax {
+@syntax
+construct Marker {
+    @syntax
+    construct Declaration {
         let identifier: Identifier
         let parameters: [Parameter.Declaration]
         let target: TypeReference
         let valueType: TypeReference
     }
 
-    @language
-    construct Application<Value>: Syntax {
+    @syntax
+    construct Application<Value> {
         let identifier: Identifier
         let value: Value
     }

@@ -1,4 +1,4 @@
-@language
+@syntax
 construct Identifier: SyntaxEmittable {
     let name: String
 }

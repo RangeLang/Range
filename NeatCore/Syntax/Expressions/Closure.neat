@@ -1,4 +1,4 @@
-@language
+@syntax
 construct Closure: Expression {
     let type: TypeReference?
     let parameters: [Parameter.Declaration] = []

@@ -4,7 +4,6 @@ Compiler-owned syntax and declaration surfaces live here.
 
 This includes:
 
-- `Syntax`
 - `Bodies`
 - `Statements`
 - `Expressions`
@@ -81,8 +80,9 @@ ExpressionStatement
 
 The broad protocols still matter. `Array.Expression` can conform to
 `Expression`, and `Array.TypeReference` can conform to `StructuralTypeReference`.
-The important part is that the nested name records semantic ownership, while the
-protocol conformance records how the broader compiler pipeline can consume it.
+The `@syntax` attribute marks compiler-visible syntax surfaces. The nested
+name records semantic ownership, while capability protocol conformance records
+how the broader compiler pipeline can consume it.
 
 This same rule applies to property hooks. Getter and setter behavior is
 function-like, but the macro surface currently exposes it as property-specific
@@ -94,7 +94,8 @@ In short:
 
 - Granularize where the graphs need stable meaning.
 - Nest syntax under the concept that semantically owns it.
-- Use broad syntax protocols for consumption across the compiler.
+- Use `@syntax` for compiler-visible syntax surfaces.
+- Use capability protocols for consumption across the compiler.
 - Do not promote punctuation or renderer details into syntax constructs.
 
 ## Graph-Backed Relationships

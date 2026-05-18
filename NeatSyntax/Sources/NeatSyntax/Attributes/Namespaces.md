@@ -19,9 +19,20 @@ construct Panel {
 }
 ```
 
+Namespace-shaped configuration can use `#namespace` on a construct:
+
+```neat
+#namespace
+construct Language {
+    let defaultLocale: String("en")
+}
+```
+
+This declares a namespace named `Language`. The `let` entries are namespace configuration, not instance fields.
+
 ## Validation
 
-Built-in attributes such as `@main`, `@background`, `@language`, and `@package` are always available.
+Built-in attributes such as `@main`, `@background`, `@language`, `@syntax`, and `@package` are always available.
 
 Any other attribute must match a visible namespace name:
 

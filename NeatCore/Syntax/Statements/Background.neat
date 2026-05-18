@@ -1,4 +1,4 @@
-@language
+@syntax
 construct Background: Statement {
     let body: Block
 }

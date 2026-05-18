@@ -1,4 +1,4 @@
-@language
+@syntax
 construct State<T>: StoredProperty {
     let macros: [Macro.Application]
     let markers: [Marker.Application]

@@ -12,19 +12,30 @@ extension Parser {
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
+        var values: [ValueDeclaration] = []
 
         try consume(.leftBrace)
-        while isCallableStart()
+        while isValueDeclarationStart()
+            || isCallableStart()
             || isConstructDeclarationStart()
             || isBuilderDeclarationStart()
             || isNamespaceDeclarationStart()
         {
+            if isValueDeclarationStart() {
+                values.append(try parseValueDeclaration())
+                continue
+            }
             if isCallableStart() {
                 callables.append(try parseCallableDeclaration())
                 continue
             }
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
-                constructs.append(try parseConstructDeclaration(requiresEOF: false))
+                let construct = try parseConstructDeclaration(requiresEOF: false)
+                if construct.isNamespaceShaped {
+                    namespaces.append(Self.namespaceDeclaration(from: construct))
+                } else {
+                    constructs.append(construct)
+                }
                 continue
             }
             namespaces.append(try parseNamespaceDeclaration(requiresEOF: false))
@@ -39,6 +50,7 @@ extension Parser {
 
         return NamespaceDeclaration(
             name: name,
+            values: values,
             callables: callables,
             constructs: constructs,
             namespaces: namespaces
@@ -52,19 +64,30 @@ extension Parser {
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var namespaces: [NamespaceDeclaration] = []
+        var values: [ValueDeclaration] = []
 
         try consume(.leftBrace)
-        while isCallableStart()
+        while isValueDeclarationStart()
+            || isCallableStart()
             || isConstructDeclarationStart()
             || isBuilderDeclarationStart()
             || isNamespaceDeclarationStart()
         {
+            if isValueDeclarationStart() {
+                values.append(try parseValueDeclaration())
+                continue
+            }
             if isCallableStart() {
                 callables.append(try parseCallableDeclaration(signatureOnly: true))
                 continue
             }
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
-                constructs.append(try parseConstructDeclarationForDeclarationDiscovery())
+                let construct = try parseConstructDeclarationForDeclarationDiscovery()
+                if construct.isNamespaceShaped {
+                    namespaces.append(Self.namespaceDeclaration(from: construct))
+                } else {
+                    constructs.append(construct)
+                }
                 continue
             }
             namespaces.append(try parseNamespaceDeclarationForDeclarationDiscovery())
@@ -73,9 +96,20 @@ extension Parser {
 
         return NamespaceDeclaration(
             name: name,
+            values: values,
             callables: callables,
             constructs: constructs,
             namespaces: namespaces
+        )
+    }
+
+    static func namespaceDeclaration(from construct: ConstructDeclaration) -> NamespaceDeclaration {
+        NamespaceDeclaration(
+            name: construct.name,
+            values: construct.values,
+            callables: construct.callables,
+            constructs: construct.constructs.filter { !$0.isNamespaceShaped },
+            namespaces: construct.constructs.filter(\.isNamespaceShaped).map(namespaceDeclaration(from:))
         )
     }
 }

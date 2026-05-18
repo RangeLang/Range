@@ -1,8 +1,8 @@
-@language
-construct Enum: Syntax {
+@syntax
+construct Enum {
     let declaration: Declaration
 
-    @language
+    @syntax
     construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
         let self: NominalTypeReference
         let generics: [Generic]
@@ -11,13 +11,13 @@ construct Enum: Syntax {
         function expand(_ expansion: () -> [Syntax])
     }
 
-    @language
+    @syntax
     construct Case: SyntaxEmittable {
         let identifier: Identifier
         let associatedValues: [AssociatedValue]
     }
 
-    @language
+    @syntax
     construct AssociatedValue {
         let label: String?
         let type: TypeReference

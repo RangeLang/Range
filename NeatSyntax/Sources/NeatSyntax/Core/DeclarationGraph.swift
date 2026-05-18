@@ -1041,6 +1041,7 @@ public struct DeclarationGraph {
         let qualifiedChildren = declaration.namespaces.map { child in
             NamespaceDeclaration(
                 name: "\(qualifiedName).\(child.name)",
+                values: child.values,
                 callables: child.callables,
                 constructs: child.constructs,
                 namespaces: child.namespaces
@@ -1049,6 +1050,7 @@ public struct DeclarationGraph {
 
         registry[qualifiedName] = NamespaceDeclaration(
             name: qualifiedName,
+            values: declaration.values,
             callables: declaration.callables,
             constructs: declaration.constructs,
             namespaces: qualifiedChildren
@@ -1309,9 +1311,10 @@ public struct DeclarationGraph {
     static func constructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
         switch sourceFile {
         case .construct(let declaration):
-            return [declaration]
+            return declaration.isNamespaceShaped ? [] : [declaration]
         case .module(let module):
-            return module.constructs + module.packageSpaces.flatMap(\.constructs)
+            return (module.constructs + module.packageSpaces.flatMap(\.constructs))
+                .filter { !$0.isNamespaceShaped }
         case .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
@@ -1322,10 +1325,25 @@ public struct DeclarationGraph {
         case .namespace(let declaration):
             return [declaration]
         case .module(let module):
-            return module.namespaces + module.packageSpaces.flatMap(\.namespaces)
-        case .construct, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+            let namespaceConstructs = (module.constructs + module.packageSpaces.flatMap(\.constructs))
+                .filter(\.isNamespaceShaped)
+                .map(namespaceDeclaration(from:))
+            return module.namespaces + module.packageSpaces.flatMap(\.namespaces) + namespaceConstructs
+        case .construct(let declaration):
+            return declaration.isNamespaceShaped ? [namespaceDeclaration(from: declaration)] : []
+        case .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }
+    }
+
+    static func namespaceDeclaration(from construct: ConstructDeclaration) -> NamespaceDeclaration {
+        NamespaceDeclaration(
+            name: construct.name,
+            values: construct.values,
+            callables: construct.callables,
+            constructs: construct.constructs.filter { !$0.isNamespaceShaped },
+            namespaces: construct.constructs.filter(\.isNamespaceShaped).map(namespaceDeclaration(from:))
+        )
     }
 
     static func topLevelStates(in sourceFile: SourceFileNode) -> [StateDeclaration] {
@@ -1648,6 +1666,9 @@ private struct SemanticGraphCollector {
         addEntity(id: namespaceID, kind: .namespace, label: declaration.name)
         addRelation(from: parentID, to: namespaceID, kind: .contains)
 
+        for value in declaration.values {
+            addValue(value, parentID: namespaceID)
+        }
         for callable in declaration.callables {
             addCallable(callable, parentID: namespaceID)
         }

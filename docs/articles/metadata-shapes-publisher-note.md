@@ -34,8 +34,11 @@ let value: Optional<Int>
     let author: String("George")
 }
 
-#namespace(.locked)
-construct Math {}
+#namespace
+construct Language {
+    let defaultLocale: String("en")
+    let fallbackLocale: String("en-US")
+}
 
 construct Package {
     function publish()
@@ -55,7 +58,7 @@ Optional is still a type shape. `Optional<Int>` stays explicit because the sourc
 
 `@package { ... }` creates a package metadata space. It is not a namespace, but the graph can collect the package facts globally.
 
-`#namespace(.locked)` says the construct is namespace-shaped, and that outside code cannot reopen or modify it.
+`#namespace` says the construct is namespace-shaped. Its `let` declarations are namespace configuration, so the source gets the static-like shape without introducing a separate static variable model.
 
 Visibility gets quieter too. Public is the normal published shape. `private` marks the exception.
 

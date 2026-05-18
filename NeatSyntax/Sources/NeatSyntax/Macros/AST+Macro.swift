@@ -64,6 +64,10 @@ public struct MacroApplication {
     public let name: String
     public let genericArguments: [TypeReference]
     public let argumentClause: String?
+
+    public var isNamespace: Bool {
+        name == "namespace"
+    }
 }
 
 public enum MacroTarget {

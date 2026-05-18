@@ -521,6 +521,16 @@ struct CompilerFixtureTests {
         #expect(graph.syntaxResolver.declaration(named: "Construct.Application", conformsTo: "SyntaxReplaceable"))
     }
 
+    @Test("@syntax declarations are syntax-facing without Syntax conformance")
+    func syntaxDeclarationsAreSyntaxFacingWithoutSyntaxConformance() throws {
+        let program = try CompilerPipeline().build(inputs: neatCoreInputs())
+        let graph = program.declarationGraph
+
+        #expect(graph.protocolsByName["Expression"]?.isCore == true)
+        #expect(!graph.syntaxResolver.declaration(named: "Expression", conformsTo: "Syntax"))
+        #expect(graph.syntaxResolver.typeConformsToSyntax(.named("Expression")))
+    }
+
     @Test("Declaration graph carries source locations")
     func declarationGraphCarriesSourceLocations() throws {
         let source = """
@@ -633,6 +643,50 @@ struct CompilerFixtureTests {
 
         #expect(program.declarationGraph.callablesByName["System.Math.zero"] != nil)
         #expect(program.declarationGraph.constructsByName["System.Math.Box"] != nil)
+    }
+
+    @Test("#namespace construct declares namespace-shaped configuration")
+    func namespaceConstructDeclaresNamespaceShapedConfiguration() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/NamespaceConstruct.neat",
+                source: """
+                #namespace
+                construct Language {
+                    let defaultLocale: String("en")
+
+                    function identifier() -> String {
+                        return defaultLocale
+                    }
+
+                    construct Token {
+                        let raw: String
+                    }
+                }
+
+                @Language
+                construct Document {
+                    let title: String
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let graph = program.declarationGraph
+
+        #expect(graph.hasNamespace(named: "Language"))
+        #expect(graph.hasNamespaceAttribute(named: "Language"))
+        #expect(graph.constructsByName["Language"] == nil)
+        #expect(graph.constructsByName["Language.Token"] != nil)
+        #expect(graph.callablesByName["Language.identifier"] != nil)
+        #expect(
+            graph.programGraph.entities.contains {
+                $0.kind == .value && $0.label == "defaultLocale"
+            }
+        )
     }
 
     @Test("Core Math namespace is available")

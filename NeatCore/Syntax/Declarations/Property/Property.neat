@@ -1,12 +1,12 @@
-@language
-protocol Property: Syntax {
+@syntax
+protocol Property {
     let macros: [Macro.Application]
     let markers: [Marker.Application]
     let identifier: Identifier
     let type: TypeReference
 }
 
-@language
+@syntax
 protocol StoredProperty: Property {
     let value: Expression?
 }

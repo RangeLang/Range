@@ -1,9 +1,9 @@
-@language
-construct Parameter: Syntax {
+@syntax
+construct Parameter {
     let declaration: Declaration
     let application: Application
 
-    @language
+    @syntax
     construct Declaration {
         let externalName: String?
         let localName: String
@@ -11,7 +11,7 @@ construct Parameter: Syntax {
         let defaultValue: Expression?
     }
 
-    @language
+    @syntax
     construct Application {
         let label: String?
         let type: TypeReference

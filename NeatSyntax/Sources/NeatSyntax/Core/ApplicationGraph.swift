@@ -53,7 +53,16 @@ struct GraphCollector {
 
         switch parsedFile.sourceFile {
         case .construct(let declaration):
-            analyzeConstructDeclaration(declaration, parentID: fileID)
+            if declaration.isNamespaceShaped {
+                let namespace = DeclarationGraph.namespaceDeclaration(from: declaration)
+                analyzeNamespaceDeclaration(
+                    namespace,
+                    parentID: fileID,
+                    qualifiedPrefix: namespace.name
+                )
+            } else {
+                analyzeConstructDeclaration(declaration, parentID: fileID)
+            }
         case .namespace(let declaration):
             analyzeNamespaceDeclaration(
                 declaration,
@@ -76,10 +85,13 @@ struct GraphCollector {
             for state in topLevelStates {
                 analyzeStateDeclaration(state, parentID: fileID)
             }
-            for declaration in module.constructs {
+            for declaration in module.constructs where !declaration.isNamespaceShaped {
                 analyzeConstructDeclaration(declaration, parentID: fileID)
             }
-            for declaration in module.namespaces {
+            let namespaceConstructs = module.constructs
+                .filter(\.isNamespaceShaped)
+                .map(DeclarationGraph.namespaceDeclaration(from:))
+            for declaration in module.namespaces + namespaceConstructs {
                 analyzeNamespaceDeclaration(
                     declaration,
                     parentID: fileID,
@@ -120,7 +132,10 @@ struct GraphCollector {
         qualifiedPrefix: String
     ) {
         let namespaceID = "\(parentID)/namespace:\(declaration.name)"
-        let scope = MemoryScope(symbols: [:])
+        let valueSymbols = Dictionary(uniqueKeysWithValues: declaration.values.map { value in
+            (value.name, "\(namespaceID)/value:\(value.name)")
+        })
+        let scope = MemoryScope(symbols: valueSymbols)
 
         for callable in declaration.callables {
             analyzeCallableDeclaration(

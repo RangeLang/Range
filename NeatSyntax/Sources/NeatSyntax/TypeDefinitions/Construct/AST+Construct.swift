@@ -61,6 +61,10 @@ public struct ConstructDeclaration {
     public var isPackaging: Bool {
         attribute?.isPackaging == true
     }
+
+    public var isNamespaceShaped: Bool {
+        macros.contains(where: \.isNamespace)
+    }
 }
 
 public struct AttributeApplication {
@@ -73,7 +77,11 @@ public struct AttributeApplication {
     }
 
     public var isLanguageBoundary: Bool {
-        name == "language" || name == "core"
+        name == "language" || name == "core" || name == "syntax"
+    }
+
+    public var isSyntaxBoundary: Bool {
+        name == "syntax"
     }
 
     public var isPackaging: Bool {

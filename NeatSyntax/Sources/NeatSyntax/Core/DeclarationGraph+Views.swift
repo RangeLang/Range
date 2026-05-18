@@ -234,7 +234,11 @@ public struct DeclarationSyntaxResolver {
     }
 
     public func typeConformsToSyntax(_ typeReference: TypeReference?) -> Bool {
-        typeConforms(typeReference, to: "Syntax")
+        guard let typeName = nominalName(of: typeReference) else {
+            return false
+        }
+        return declarationIsSyntaxBoundary(named: typeName)
+            || declaration(named: typeName, conformsTo: "Syntax")
     }
 
     public func typeConforms(_ typeReference: TypeReference?, to targetProtocol: String) -> Bool {
@@ -298,6 +302,16 @@ public struct DeclarationSyntaxResolver {
             }
         }
 
+        return false
+    }
+
+    private func declarationIsSyntaxBoundary(named name: String) -> Bool {
+        if protocolsByName[name]?.attribute?.isSyntaxBoundary == true {
+            return true
+        }
+        if constructsByName[name]?.attribute?.isSyntaxBoundary == true {
+            return true
+        }
         return false
     }
 
