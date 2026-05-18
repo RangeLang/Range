@@ -29,10 +29,6 @@ jobs:
             artifact: neat-linux-x64
             archive: neat-linux-x64.tar.gz
             shell: bash
-          - os: windows-2022
-            artifact: neat-windows-x64
-            archive: neat-windows-x64.zip
-            shell: pwsh
 
     defaults:
       run:
@@ -102,14 +98,6 @@ jobs:
           cp .build/release/NeatCLI dist/${{ matrix.artifact }}/neat
           chmod 755 dist/${{ matrix.artifact }}/neat
           tar -C dist -czf ${{ matrix.archive }} ${{ matrix.artifact }}
-
-      - name: Package Windows binary
-        if: runner.os == 'Windows'
-        working-directory: NeatCLI
-        run: |
-          New-Item -ItemType Directory -Force -Path "dist/${{ matrix.artifact }}" | Out-Null
-          Copy-Item ".build/release/NeatCLI.exe" "dist/${{ matrix.artifact }}/neat.exe"
-          Compress-Archive -Path "dist/${{ matrix.artifact }}" -DestinationPath "${{ matrix.archive }}" -Force
 
       - uses: actions/upload-artifact@v4
         with:
