@@ -94,7 +94,7 @@ extension NeatCLI {
             guard status.latest != nil else {
                 return .warning
             }
-            return status.updateAvailable ? .waiting : .success
+            return .success
         }
 
         private func statusLine(

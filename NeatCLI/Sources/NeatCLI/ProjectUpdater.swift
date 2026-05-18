@@ -56,12 +56,84 @@ struct ProjectUpdater {
             throw ValidationError("Release archive is missing install.sh.")
         }
 
-        try runProcess(executable: installScript.path, arguments: [])
+        let installPrefix = selfUpdateInstallPrefix()
+        try runProcess(
+            executable: installScript.path,
+            arguments: [],
+            environment: ["NEAT_INSTALL_PREFIX": installPrefix.path]
+        )
         TerminalLog.out("Updated Neat CLI.", level: .success)
+    }
+
+    static func selfUpdateInstallPrefix() -> URL {
+        let environment = ProcessInfo.processInfo.environment
+        if let override = environment["NEAT_UPDATE_PREFIX"], !override.isEmpty {
+            return URL(fileURLWithPath: override, isDirectory: true).standardizedFileURL
+        }
+
+        let executablePrefix = installedExecutableURL()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        if isWritableInstallPrefix(executablePrefix) {
+            return executablePrefix
+        }
+
+        let homebrewPrefix = URL(fileURLWithPath: "/opt/homebrew", isDirectory: true)
+        if isWritableInstallPrefix(homebrewPrefix) {
+            return homebrewPrefix
+        }
+
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".local", isDirectory: true)
+            .standardizedFileURL
+    }
+
+    private static func isWritableInstallPrefix(_ prefix: URL) -> Bool {
+        let fileManager = FileManager.default
+        let binDirectory = prefix.appendingPathComponent("bin", isDirectory: true)
+        if fileManager.fileExists(atPath: binDirectory.path) {
+            return fileManager.isWritableFile(atPath: binDirectory.path)
+        }
+
+        return fileManager.isWritableFile(atPath: prefix.path)
     }
 
     static func releaseArchiveNameForCurrentPlatform() throws -> String {
         "neat-\(try releasePlatform()).lang.tar.gz"
+    }
+
+    private static func installedExecutableURL() -> URL {
+        let executable = CommandLine.arguments.first ?? "neat"
+        if executable.contains("/") {
+            return URL(fileURLWithPath: executable).standardizedFileURL
+        }
+
+        guard let lookupTool = Platform.defaultExecutableLookupTool else {
+            return URL(fileURLWithPath: executable).standardizedFileURL
+        }
+
+        let process = Process()
+        process.executableURL = lookupTool
+        process.arguments = ["which", executable]
+        let output = Pipe()
+        process.standardOutput = output
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                let data = output.fileHandleForReading.readDataToEndOfFile()
+                let path = String(data: data, encoding: .utf8)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let path, !path.isEmpty {
+                    return URL(fileURLWithPath: path).standardizedFileURL
+                }
+            }
+        } catch {
+            return URL(fileURLWithPath: executable).standardizedFileURL
+        }
+
+        return URL(fileURLWithPath: executable).standardizedFileURL
     }
 
     private static func releasePlatform() throws -> String {
@@ -283,10 +355,17 @@ struct ProjectUpdater {
         throw ValidationError("Could not infer GitHub owner/repo from origin '\(trimmed)'.")
     }
 
-    private static func runProcess(executable: String, arguments: [String]) throws {
+    private static func runProcess(
+        executable: String,
+        arguments: [String],
+        environment: [String: String] = [:]
+    ) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
+        process.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in
+            new
+        }
         process.standardOutput = FileHandle.standardOutput
         process.standardError = FileHandle.standardError
         try process.run()

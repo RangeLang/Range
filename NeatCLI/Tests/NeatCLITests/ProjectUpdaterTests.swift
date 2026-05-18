@@ -21,4 +21,9 @@ struct ProjectUpdaterTests {
         #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "neat-macos-x64.lang.tar.gz")
         #endif
     }
+
+    @Test("Self update prefix is absolute")
+    func selfUpdatePrefixIsAbsolute() {
+        #expect(ProjectUpdater.selfUpdateInstallPrefix().path.hasPrefix("/"))
+    }
 }
