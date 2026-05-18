@@ -19,11 +19,11 @@ jobs:
         include:
           - os: macos-15
             artifact: neat-macos-arm64
-            archive: neat-macos-arm64.tar.gz
+            archive: neat-macos-arm64.lang.tar.gz
             shell: bash
           - os: macos-13
             artifact: neat-macos-x64
-            archive: neat-macos-x64.tar.gz
+            archive: neat-macos-x64.lang.tar.gz
             shell: bash
           - os: ubuntu-24.04
             artifact: neat-linux-x64
@@ -49,8 +49,23 @@ jobs:
         working-directory: NeatCLI
         run: swift build -c release --product NeatCLI
 
-      - name: Package Unix binary
-        if: runner.os != 'Windows'
+      - name: Package macOS install folder
+        if: runner.os == 'macOS'
+        working-directory: NeatCLI
+        run: |
+          package="${{ matrix.artifact }}.lang"
+          release_version="${GITHUB_REF_NAME#v}"
+          mkdir -p dist
+          cp -R ../Packaging/macOS/Neat.lang "dist/${package}"
+          mkdir -p "dist/${package}/bin"
+          cp .build/release/NeatCLI "dist/${package}/bin/neat"
+          printf '%s\n' "$release_version" > "dist/${package}/VERSION"
+          chmod 755 "dist/${package}/bin/neat"
+          chmod 755 "dist/${package}/install.sh" "dist/${package}/uninstall.sh"
+          tar -C dist -czf ${{ matrix.archive }} "$package"
+
+      - name: Package Linux binary
+        if: runner.os == 'Linux'
         working-directory: NeatCLI
         run: |
           mkdir -p dist/${{ matrix.artifact }}
