@@ -1,4 +1,4 @@
-@main {
+#main {
     let sourceA = Channel<String>(storage: ChannelStorage<String>(capacity: 1))
     let sourceB = Channel<String>(storage: ChannelStorage<String>(capacity: 1))
     let merged = Channel<String>(storage: ChannelStorage<String>(capacity: 2))

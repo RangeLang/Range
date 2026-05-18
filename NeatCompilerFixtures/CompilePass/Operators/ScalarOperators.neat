@@ -1,4 +1,4 @@
-@main {
+#main {
     let intSum = 1 + 2
     let intDifference = 5 - 2
     let intProduct = 3 * 4

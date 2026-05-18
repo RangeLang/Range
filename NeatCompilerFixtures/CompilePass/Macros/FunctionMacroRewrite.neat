@@ -4,11 +4,11 @@ macro secondArgument(): Function { target, diagnostics in
     )
 }
 
-#secondArgument
+@secondArgument
 function select(text text: String, number number: Int) -> String {
     return text
 }
 
-@main {
+#main {
     let result: String = select(text: "Hello", number: 27)
 }

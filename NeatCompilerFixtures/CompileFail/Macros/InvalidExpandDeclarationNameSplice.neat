@@ -5,6 +5,6 @@ macro invalidDeclarationNameSplice(): Construct { target, diagnostics in
     }
 }
 
-#invalidDeclarationNameSplice
+@invalidDeclarationNameSplice
 construct InvalidDeclarationNameFixture {
 }

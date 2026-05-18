@@ -17,7 +17,7 @@ macro encodeBody(container: KeyedEncodingContainer, properties: [Let], strategy:
         }
         let key = codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
 
-        #encodeProperty(
+        @encodeProperty(
             container: container,
             value: property.identifier,
             key: key
@@ -44,7 +44,7 @@ macro decodeBody(container: KeyedDecodingContainer, properties: [Let], strategy:
         }
         let key = codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
 
-        #decodeProperty(
+        @decodeProperty(
             container: container,
             type: property.type,
             value: property.identifier,
@@ -58,7 +58,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
         extension #(target.declaration.self): Codable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
-                #encodeBody(
+                @encodeBody(
                     container: container,
                     properties: target.declaration.lets,
                     strategy: strategy
@@ -68,7 +68,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
 
             function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer = decoder.keyedContainer()
-                #decodeBody(
+                @decodeBody(
                     container: container,
                     properties: target.declaration.lets,
                     strategy: strategy

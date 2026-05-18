@@ -1,4 +1,4 @@
-@main {
+#main {
     state maybeCount: Int? = nil
 
     if maybeCount == nil {

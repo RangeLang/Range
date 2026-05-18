@@ -12,11 +12,11 @@ macro targetDeclarationExpand(): Construct { target, diagnostics in
     }
 }
 
-#targetDeclarationExpand
+@targetDeclarationExpand
 construct TargetDeclarationExpandFixture {
 }
 
-@main {
+#main {
     let value = TargetDeclarationExpandFixture()
     value.generatedByTargetDeclarationExpand()
 }

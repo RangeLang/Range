@@ -1,4 +1,4 @@
-@main {
+#main {
     let queue = Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
 
     @background {

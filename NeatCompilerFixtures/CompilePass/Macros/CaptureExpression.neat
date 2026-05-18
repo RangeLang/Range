@@ -2,6 +2,6 @@ macro captureText(_ value: capture Expression): Expression -> String { target, d
     target.replace(with: "captured: \(value)")
 }
 
-@main {
-    let text = #captureText(1 + 2)
+#main {
+    let text = @captureText(1 + 2)
 }

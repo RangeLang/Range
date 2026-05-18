@@ -16,7 +16,7 @@ macro codingKeyCases(): Construct { target, diagnostics in
     }
 }
 
-#codingKeyCases
+@codingKeyCases
 construct LetMacroApplicationsSurfaceFixture {
     #codingKey("user_id")
     let id: Int

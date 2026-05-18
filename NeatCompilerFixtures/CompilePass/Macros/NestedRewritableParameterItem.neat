@@ -4,10 +4,10 @@ macro nestedArgumentRewrite(): Parameter { target, diagnostics in
     )
 }
 
-function passthrough(#nestedArgumentRewrite value: Int) -> Int {
+function passthrough(@nestedArgumentRewrite value: Int) -> Int {
     return value
 }
 
-@main {
+#main {
     let output: Int = passthrough(42)
 }

@@ -22,7 +22,7 @@ macro exposeGenericCount(): Construct { target, diagnostics in
     }
 }
 
-#exposeGenericCount
+@exposeGenericCount
 construct GenericDeclarationSurfaceFixture<T, let count: Int, Scalar = Float> {}
 
-@main {}
+#main {}

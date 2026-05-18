@@ -2,6 +2,6 @@ macro badParameterRewrite(): Parameter { target, diagnostics in
     target.replace(with: target.declaration.type)
 }
 
-function invalid(#badParameterRewrite value: Int) {
+function invalid(@badParameterRewrite value: Int) {
     value
 }

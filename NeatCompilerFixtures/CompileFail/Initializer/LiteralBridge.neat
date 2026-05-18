@@ -6,6 +6,6 @@ construct FixtureInt: ExpressibleByIntLiteral {
     }
 }
 
-@main {
+#main {
     let number: FixtureInt = 1
 }

@@ -56,7 +56,7 @@ function decodeNestedUser() -> Result<NestedDecodedUser, DecodingError> {
     return NestedDecodedUser.decode(from: decoder)
 }
 
-@main {
+#main {
     switch decodeNestedUser() {
     case .success(let user):
         Logger.info(user.address.city)

@@ -11,5 +11,5 @@ function makeBase() -> BaseProtocol {
     return DerivedImplementation()
 }
 
-@main {
+#main {
 }

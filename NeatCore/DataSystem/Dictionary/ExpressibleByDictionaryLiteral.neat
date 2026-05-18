@@ -1,4 +1,4 @@
 protocol ExpressibleByDictionaryLiteral {
-    #literal<DictionaryLiteral>
+    @literal<DictionaryLiteral>
     function literal(literal: DictionaryLiteral) -> Self
 }

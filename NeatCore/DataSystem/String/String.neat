@@ -2,7 +2,7 @@
 construct String: ExpressibleByStringLiteral {
     let storage: StringStorage
 
-    #literal<StringLiteral>
+    @literal<StringLiteral>
     function literal(literal: StringLiteral) -> Self {
         return Self(storage: literal.storage())
     }

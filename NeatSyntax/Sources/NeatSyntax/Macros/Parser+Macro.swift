@@ -281,6 +281,11 @@ extension Parser {
                 advance()
                 let arguments = try parseInvocationArgumentsIfPresent()
                 parts.append(.syntaxMacroInvocation(name: name, arguments: arguments))
+            case .atAttribute(let name, _) where isMacroApplicationAttribute(name):
+                flushText()
+                advance()
+                let arguments = try parseInvocationArgumentsIfPresent()
+                parts.append(.syntaxMacroInvocation(name: name, arguments: arguments))
             default:
                 let consumed = advance()
                 emittedTokens.append(consumed)

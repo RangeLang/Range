@@ -31,7 +31,7 @@ function decodeExtensionUser() -> Result<ExtensionDecodedUser, DecodeProblem> {
     return ExtensionDecodedUser(input: .george)
 }
 
-@main {
+#main {
     switch decodeExtensionUser() {
     case .success(let user):
         Logger.info(user.name)

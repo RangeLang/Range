@@ -1,4 +1,4 @@
 protocol ExpressibleByFloatLiteral {
-    #literal<FloatLiteral>
+    @literal<FloatLiteral>
     function literal(literal: FloatLiteral) -> Self
 }

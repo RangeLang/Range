@@ -1,4 +1,4 @@
-@main {
+#main {
     let source = Channel<String>()
     let listenerA = Channel<String>()
     let listenerB = Channel<String>()

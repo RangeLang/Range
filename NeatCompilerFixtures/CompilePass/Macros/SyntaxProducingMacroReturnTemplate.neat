@@ -6,12 +6,12 @@ macro emitReturnTemplate(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
             function generated() -> Bool {
-                #returnTrueStatement()
+                @returnTrueStatement()
             }
         }
     }
 }
 
-#emitReturnTemplate
+@emitReturnTemplate
 construct SyntaxProducingMacroReturnTemplateFixture {
 }

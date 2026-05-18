@@ -19,7 +19,7 @@ function decodeUser() -> Result<DecodedUser, DecodeError> {
     return DecodedUser(name: "George")
 }
 
-@main {
+#main {
     switch decodeUser() {
     case .success(let user):
         Logger.info(user.name)

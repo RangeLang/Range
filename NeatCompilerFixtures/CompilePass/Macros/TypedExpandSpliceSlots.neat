@@ -11,11 +11,11 @@ macro typedExpandSpliceSlots(): Construct { target, diagnostics in
     }
 }
 
-#typedExpandSpliceSlots
+@typedExpandSpliceSlots
 construct TypedExpandSpliceFixture {
 }
 
-@main {
+#main {
     let value = TypedExpandSpliceFixture()
     value.generatedName()
 }

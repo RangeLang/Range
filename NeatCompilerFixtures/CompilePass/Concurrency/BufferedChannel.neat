@@ -7,7 +7,7 @@ function enqueueBufferedValues(queue: Channel<Int>) {
     }
 }
 
-@main {
+#main {
     let queue = Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
 
     enqueueBufferedValues(queue: queue)

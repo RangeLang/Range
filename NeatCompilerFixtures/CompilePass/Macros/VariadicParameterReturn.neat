@@ -1,7 +1,7 @@
-function takeMany(#variadic values: Int) -> [Int] {
+function takeMany(@variadic values: Int) -> [Int] {
     return values
 }
 
-@main {
+#main {
     let values = takeMany(1, 2, 3)
 }

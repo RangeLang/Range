@@ -7,7 +7,7 @@ macro incremented(by amount: Int): Derived<Int> { target, diagnostics in
 construct Reader {
     state age: Int = 10
 
-    #incremented(by: 1)
+    @incremented(by: 1)
     derived next: Int {
         age
     }

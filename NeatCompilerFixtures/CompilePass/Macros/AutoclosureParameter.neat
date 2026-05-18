@@ -1,7 +1,7 @@
-function acceptDeferred(#autoclosure value: Int) -> Int {
+function acceptDeferred(@autoclosure value: Int) -> Int {
     return value()
 }
 
-@main {
+#main {
     let result = acceptDeferred(1 + 2)
 }

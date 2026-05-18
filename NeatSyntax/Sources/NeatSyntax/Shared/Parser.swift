@@ -250,7 +250,7 @@ public struct Parser {
         while peek() != .eof {
             if isMainBlockStart() {
                 guard mainBlock == nil else {
-                    throw ParseError("Only one @main block is allowed per file.")
+                    throw ParseError("Only one #main block is allowed per file.")
                 }
                 mainBlock = try parseMainBlock(requiresEOF: false)
                 continue

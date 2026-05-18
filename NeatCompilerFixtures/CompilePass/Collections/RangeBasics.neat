@@ -23,5 +23,5 @@ function closedRangeAllowsSingleValue() -> Bool {
     return !range.isEmpty && range.contains(3)
 }
 
-@main {
+#main {
 }

@@ -4,7 +4,7 @@ macro hashProperty(hasher: Hasher, value: Identifier) -> Statement {
 
 macro hashableBody(hasher: Hasher, properties: [Let]) -> [Statement] {
     #(properties.map { property in
-        #hashProperty(hasher: hasher, value: property.identifier)
+        @hashProperty(hasher: hasher, value: property.identifier)
     })
 }
 
@@ -12,7 +12,7 @@ macro hashable(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Hashable {
             function ==(lhs: Self, rhs: Self) -> Bool {
-                #equatableBody(
+                @equatableBody(
                     lhs: lhs,
                     rhs: rhs,
                     properties: target.declaration.lets
@@ -20,7 +20,7 @@ macro hashable(): Construct { target, diagnostics in
             }
 
             function hash(into hasher: Hasher) {
-                #hashableBody(
+                @hashableBody(
                     hasher: hasher,
                     properties: target.declaration.lets
                 )

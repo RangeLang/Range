@@ -1,4 +1,4 @@
 protocol ExpressibleBySetLiteral {
-    #literal<SetLiteral>
+    @literal<SetLiteral>
     function literal(literal: SetLiteral) -> Self
 }

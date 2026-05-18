@@ -9,6 +9,6 @@ construct ChainInferenceBox {
     }
 }
 
-@main {
+#main {
     let box = ChainInferenceBox(values: [1, 2, 3])
 }

@@ -3,5 +3,5 @@ function encodeNumber(_ encoder: Encoder) -> Result<Void, EncodingError> {
     return value.encode(to: encoder)
 }
 
-@main {
+#main {
 }

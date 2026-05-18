@@ -1,10 +1,10 @@
-#caseIterable
+@caseIterable
 enum CaseIterableMacroFixture {
     case loading
     case ready
     case failed
 }
 
-#caseIterable
+@caseIterable
 enum EmptyCaseIterableMacroFixture {
 }

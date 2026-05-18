@@ -1,4 +1,4 @@
-@main {
+#main {
     @background {
         return 1
     }

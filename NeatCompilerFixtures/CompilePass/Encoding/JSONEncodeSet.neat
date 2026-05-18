@@ -4,7 +4,7 @@ function encodeSet() -> Result<String, EncodingError> {
     return encoder.encode(values)
 }
 
-@main {
+#main {
     switch encodeSet() {
     case .success(let json):
         Logger.info(json)

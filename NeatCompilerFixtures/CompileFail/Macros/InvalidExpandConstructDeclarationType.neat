@@ -5,6 +5,6 @@ macro invalidConstructDeclarationType(): Construct { target, diagnostics in
     }
 }
 
-#invalidConstructDeclarationType
+@invalidConstructDeclarationType
 construct InvalidConstructDeclarationTypeFixture {
 }

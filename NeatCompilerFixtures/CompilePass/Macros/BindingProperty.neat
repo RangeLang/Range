@@ -11,7 +11,7 @@ macro offset(by amount: Int): Binding<Int> { target, diagnostics in
 construct Box {
     state age: Int = 10
 
-    #offset(by: 1)
+    @offset(by: 1)
     binding score: Int {
         get {
             return age

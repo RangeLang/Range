@@ -31,11 +31,11 @@ macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
     }
 }
 
-#typedExpandAdditionalSlots
+@typedExpandAdditionalSlots
 construct AdditionalTypedExpandFixture {
 }
 
-@main {
+#main {
     let fixture = AdditionalTypedExpandFixture()
     fixture.typedTargetFunction(input: 1)
     GeneratedTypedExpandNamespace.message()

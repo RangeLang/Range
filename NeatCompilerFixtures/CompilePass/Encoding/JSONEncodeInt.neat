@@ -4,5 +4,5 @@ function encodeNumber() -> Result<String, EncodingError> {
     return encoder.encode(value)
 }
 
-@main {
+#main {
 }

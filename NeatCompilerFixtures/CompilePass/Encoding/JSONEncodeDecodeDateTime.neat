@@ -30,5 +30,5 @@ function decodeDateTime() -> Result<DateTime, DecodingError> {
     return DateTime.decode(from: decoder)
 }
 
-@main {
+#main {
 }

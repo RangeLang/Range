@@ -51,7 +51,7 @@ function encodeNested() -> Result<String, EncodingError> {
     return encoder.encode(user)
 }
 
-@main {
+#main {
     switch encodeNested() {
     case .success(let json):
         Logger.info(json)

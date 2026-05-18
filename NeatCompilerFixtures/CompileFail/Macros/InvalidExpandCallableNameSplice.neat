@@ -8,6 +8,6 @@ macro invalidCallableNameSplice(): Construct { target, diagnostics in
     }
 }
 
-#invalidCallableNameSplice
+@invalidCallableNameSplice
 construct InvalidCallableNameFixture {
 }

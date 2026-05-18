@@ -6,7 +6,7 @@ function fetchUserName(id: Int) -> String {
     return "george"
 }
 
-@main {
+#main {
     let output = Channel<String>()
 
     @background {

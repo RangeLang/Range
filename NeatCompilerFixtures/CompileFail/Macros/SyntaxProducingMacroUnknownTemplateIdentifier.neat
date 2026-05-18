@@ -12,7 +12,7 @@ macro emitInvalidEncodingSwitch(): Construct { target, diagnostics in
         extension #(target.declaration.self): Encodable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
-                #invalidEncodeSwitch(
+                @invalidEncodeSwitch(
                     value: Identifier(name: "id"),
                     key: "id"
                 )
@@ -22,7 +22,7 @@ macro emitInvalidEncodingSwitch(): Construct { target, diagnostics in
     }
 }
 
-#emitInvalidEncodingSwitch
+@emitInvalidEncodingSwitch
 construct InvalidSyntaxProducingMacroSwitchFixture {
     let id: Int
 }

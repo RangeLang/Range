@@ -30,7 +30,7 @@ macro enumCasesFromLets(): Construct { target, diagnostics in
     }
 }
 
-#enumCasesFromLets
+@enumCasesFromLets
 construct TargetDeclarationLetsMapFixture {
     let id: Int
     let name: String

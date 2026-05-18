@@ -28,12 +28,12 @@ macro extendConstructSurface(): Construct { target, diagnostics in
     }
 }
 
-#extendConstructSurface
+@extendConstructSurface
 construct ExtendableFixture {
     let number: Int
 }
 
-@main {
+#main {
     let result: ExtendableFixture = ExtendableFixture(number: 1)
 
     result.greet()

@@ -98,12 +98,23 @@ public struct CompilerPipeline {
         let discoveredCoreCallableReturnTypes = collectCallableReturnTypes(
             from: discoveredCoreDeclarationFiles
         )
+        let discoveredCoreMacrosByName = MacroExpander.collectMacros(
+            from: discoveredCoreDeclarationFiles
+        )
+        let discoveredCoreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
+            from: discoveredCoreDeclarationFiles
+        )
         let parsedCoreFiles = try parse(
             inputs: coreInputs,
             literalBridgeResolver: discoveredCoreViews.literalBridgeResolver,
             declarationMemberResolver: discoveredCoreViews.memberResolver,
             declarationOperatorResolver: discoveredCoreViews.operatorResolver,
-            discoveredCallableReturnTypes: discoveredCoreCallableReturnTypes
+            declarationMacroExpansionResolver: DeclarationMacroExpansionResolver(
+                macrosByName: discoveredCoreMacrosByName
+            ),
+            discoveredCallableReturnTypes: discoveredCoreCallableReturnTypes,
+            macroDeclarationsByName: discoveredCoreMacrosByName,
+            macroExpansionTypes: discoveredCoreMacroExpansionTypes
         )
 
         let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)

@@ -6,10 +6,10 @@ macro arrayifyParameter(): Parameter { target, diagnostics in
     )
 }
 
-function collect(#arrayifyParameter values: Int) -> [Int] {
+function collect(@arrayifyParameter values: Int) -> [Int] {
     return values
 }
 
-@main {
+#main {
     let output: [Int] = collect(1, 2, 3)
 }

@@ -2,7 +2,7 @@ function fallback() -> Int {
     return 42
 }
 
-@main {
+#main {
     state current: Int? = nil
     let resolved = current ?? fallback()
 }

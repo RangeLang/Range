@@ -1,12 +1,12 @@
 construct FixtureDirectInt {
     let storage: IntStorage
 
-    #literal<IntLiteral>
+    @literal<IntLiteral>
     init(literal: IntLiteral) {
         self.storage = literal.storage()
     }
 }
 
-@main {
+#main {
     let number: FixtureDirectInt = 1
 }

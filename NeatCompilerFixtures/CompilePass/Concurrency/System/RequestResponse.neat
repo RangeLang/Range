@@ -21,7 +21,7 @@ function server(requests: Channel<Request>) {
     }
 }
 
-@main {
+#main {
     let requests = Channel<Request>(storage: ChannelStorage<Request>(capacity: 2))
     let replyA = Channel<String>()
     let replyB = Channel<String>()

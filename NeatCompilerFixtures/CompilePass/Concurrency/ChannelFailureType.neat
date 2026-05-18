@@ -2,7 +2,7 @@ enum LoadError {
     case missing
 }
 
-@main {
+#main {
     let output = Channel<String>()
 
     @background {

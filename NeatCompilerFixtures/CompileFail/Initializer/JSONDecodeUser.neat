@@ -34,7 +34,7 @@ function decodeUser() -> Result<DecodedUser, DecodingError> {
     return DecodedUser.decode(from: decoder)
 }
 
-@main {
+#main {
     switch decodeUser() {
     case .success(let user):
         Logger.info(user.name)

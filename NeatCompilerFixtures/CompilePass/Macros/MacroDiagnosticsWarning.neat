@@ -12,7 +12,7 @@ macro warnOnConstruct(): Construct { target, diagnostics in
     }
 }
 
-#warnOnConstruct
+@warnOnConstruct
 construct MacroDiagnosticsWarningFixture {
     let value: Int
 }

@@ -10,7 +10,7 @@ macro compareOrderingProperty<T>(lhs: T, rhs: T, value: Identifier) -> [If] {
 
 macro comparableBody<T>(lhs: T, rhs: T, properties: [Let]) -> [Statement] {
     #(properties.map { property in
-        #compareOrderingProperty(lhs: lhs, rhs: rhs, value: property.identifier)
+        @compareOrderingProperty(lhs: lhs, rhs: rhs, value: property.identifier)
     })
 
     return false
@@ -20,7 +20,7 @@ macro comparable(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Comparable {
             function ==(lhs: Self, rhs: Self) -> Bool {
-                #equatableBody(
+                @equatableBody(
                     lhs: lhs,
                     rhs: rhs,
                     properties: target.declaration.lets
@@ -28,7 +28,7 @@ macro comparable(): Construct { target, diagnostics in
             }
 
             function <(lhs: Self, rhs: Self) -> Bool {
-                #comparableBody(
+                @comparableBody(
                     lhs: lhs,
                     rhs: rhs,
                     properties: target.declaration.lets

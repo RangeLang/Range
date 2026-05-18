@@ -2,6 +2,6 @@
     return "george"
 }
 
-@main {
+#main {
     let name = fetchUsername(id: 1)
 }

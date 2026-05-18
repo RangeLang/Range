@@ -5,54 +5,57 @@ extension Parser {
         if case .hashDirective = peek() {
             return true
         }
+        if case .atAttribute(let name, _) = peek(), isMacroApplicationAttribute(name) {
+            return true
+        }
         return false
     }
 
     func macroApplicationLookaheadLength() -> Int {
         var offset = 0
         while true {
-            if case .hashDirective = peek(offset: offset) {
-                offset += 1
-                if peek(offset: offset) == .less {
-                    var depth = 1
-                    offset += 1
-                    while depth > 0 {
-                        switch peek(offset: offset) {
-                        case .less:
-                            depth += 1
-                        case .greater:
-                            depth -= 1
-                        case .eof:
-                            return offset
-                        default:
-                            break
-                        }
-                        offset += 1
-                    }
-                }
-
-                if peek(offset: offset) == .leftParen {
-                    var depth = 1
-                    offset += 1
-                    while depth > 0 {
-                        switch peek(offset: offset) {
-                        case .leftParen:
-                            depth += 1
-                        case .rightParen:
-                            depth -= 1
-                        case .eof:
-                            return offset
-                        default:
-                            break
-                        }
-                        offset += 1
-                    }
-                }
-
-                continue
+            guard macroApplicationName(at: offset) != nil else {
+                break
             }
 
-            break
+            offset += 1
+            if peek(offset: offset) == .less {
+                var depth = 1
+                offset += 1
+                while depth > 0 {
+                    switch peek(offset: offset) {
+                    case .less:
+                        depth += 1
+                    case .greater:
+                        depth -= 1
+                    case .eof:
+                        return offset
+                    default:
+                        break
+                    }
+                    offset += 1
+                }
+            }
+
+            if peek(offset: offset) == .leftParen {
+                var depth = 1
+                offset += 1
+                while depth > 0 {
+                    switch peek(offset: offset) {
+                    case .leftParen:
+                        depth += 1
+                    case .rightParen:
+                        depth -= 1
+                    case .eof:
+                        return offset
+                    default:
+                        break
+                    }
+                    offset += 1
+                }
+            }
+
+            continue
         }
         return offset
     }
@@ -61,24 +64,49 @@ extension Parser {
         var macros: [MacroApplication] = []
 
         while true {
-            if case .hashDirective(let name) = peek() {
-                advance()
-                let genericArguments = try parseMacroGenericArgumentsIfPresent()
-                let argumentClause = try parseMacroArgumentClauseIfPresent()
-                macros.append(
-                    MacroApplication(
-                        name: name,
-                        genericArguments: genericArguments,
-                        argumentClause: argumentClause
-                    )
-                )
-                continue
+            guard let name = macroApplicationName(at: 0) else {
+                break
             }
 
-            break
+            advance()
+            let genericArguments = try parseMacroGenericArgumentsIfPresent()
+            let argumentClause = try parseMacroArgumentClauseIfPresent()
+            macros.append(
+                MacroApplication(
+                    name: name,
+                    genericArguments: genericArguments,
+                    argumentClause: argumentClause
+                )
+            )
         }
 
         return macros
+    }
+
+    func macroApplicationName(at offset: Int) -> String? {
+        switch peek(offset: offset) {
+        case .hashDirective(let name):
+            return name
+        case .atAttribute(let name, _) where isMacroApplicationAttribute(name, offset: offset):
+            return name
+        default:
+            return nil
+        }
+    }
+
+    func isMacroApplicationAttribute(_ name: String, offset: Int = 0) -> Bool {
+        if macroDeclarationsByName[name] != nil {
+            return true
+        }
+        guard !NeatSyntax.attributeIdentifiers.contains(name) else {
+            return false
+        }
+        switch peek(offset: offset + 1) {
+        case .less, .leftParen, .identifier:
+            return true
+        default:
+            return false
+        }
     }
 
     mutating func parseMacroGenericArgumentsIfPresent() throws -> [TypeReference] {

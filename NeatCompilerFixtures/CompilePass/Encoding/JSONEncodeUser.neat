@@ -17,7 +17,7 @@ function encodeUser() -> Result<String, EncodingError> {
     return encoder.encode(user)
 }
 
-@main {
+#main {
     switch encodeUser() {
     case .success(let json):
         Logger.info(json)

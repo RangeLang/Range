@@ -5,6 +5,6 @@ macro invalidSetter(): Let<Int> { target, diagnostics in
 }
 
 construct Holder {
-    #invalidSetter()
+    @invalidSetter()
     let count: Int = 10
 }

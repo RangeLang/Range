@@ -1,10 +1,10 @@
 macro inspectConstruct(): Construct { target, diagnostics in }
 
-#inspectConstruct
+@inspectConstruct
 construct FixtureConstruct {
     let number: Int
 }
 
-@main {
+#main {
     let result: FixtureConstruct = FixtureConstruct(number: 1)
 }

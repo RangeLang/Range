@@ -8,5 +8,5 @@ function decodeBoolValue() -> Result<Bool, DecodingError> {
     return Bool.decode(from: decoder)
 }
 
-@main {
+#main {
 }

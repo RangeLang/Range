@@ -3,5 +3,5 @@ function decodeNumber() -> Result<Int, DecodingError> {
     return Int.decode(from: decoder)
 }
 
-@main {
+#main {
 }

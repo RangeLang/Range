@@ -5,6 +5,6 @@ macro invalidTargetApplicationExpand(): Construct { target, diagnostics in
     }
 }
 
-#invalidTargetApplicationExpand
+@invalidTargetApplicationExpand
 construct InvalidTargetApplicationExpandFixture {
 }

@@ -619,7 +619,7 @@ struct NeatLanguageServer {
 
     private func attributeCompletions() -> [[String: Any]] {
         let builtinAttributes = [
-            "@main", "@background", "@language", "@package",
+            "#main", "@background", "@language", "@package",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
         let namespaceAttributes = documents.values
             .flatMap(\.symbols)
@@ -635,7 +635,7 @@ struct NeatLanguageServer {
                 .flatMap(\.symbols)
                 .filter { $0.kind == .macro }
                 .map { symbol in
-                    completionItem(label: symbol.name, kind: symbol.kind.completionKind, detail: symbol.detail)
+                    completionItem(label: "@\(symbol.name)", kind: symbol.kind.completionKind, detail: symbol.detail)
                 }
         )
     }
@@ -1342,9 +1342,9 @@ private struct DocumentIndex {
             #"\bmarker\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
-        let macroTokenPattern = #"(#[a-z_][A-Za-z0-9_]*)\b"#
-        let metadataTokenPattern = #"(#namespace)\b"#
-        let attributeKeywordPattern = #"@[A-Za-z_][A-Za-z0-9_]*\b"#
+        let macroTokenPattern = #"([@#][a-z_][A-Za-z0-9_]*)\b"#
+        let metadataTokenPattern = #"(#namespace|#main)\b"#
+        let attributeKeywordPattern = #"@(background|defer|language|package|[A-Z][A-Za-z0-9_]*)\b"#
         let enumCaseDeclarationPattern = #"^\s*case\s+([a-z_][A-Za-z0-9_]*)\b"#
         let argumentValuePattern = #"(?:\(\s*|,\s*|:\s*)([a-z_][A-Za-z0-9_]*)\s*(?=[,)])"#
         let argumentLabelPattern = #"(?:\(\s*|,\s*|^\s*)([a-z_][A-Za-z0-9_]*)\s*:"#
@@ -1595,7 +1595,7 @@ private struct DocumentIndex {
                         let previous = nsLine.substring(
                             with: NSRange(location: nameRange.location - 1, length: 1)
                         )
-                        if previous == "#" || previous == "." {
+                        if previous == "#" || previous == "@" || previous == "." {
                             continue
                         }
                     }
@@ -1798,7 +1798,7 @@ private struct DocumentIndex {
                         let previous = nsLine.substring(
                             with: NSRange(location: nameRange.location - 1, length: 1)
                         )
-                        if previous == "." || previous == "#" {
+                        if previous == "." || previous == "#" || previous == "@" {
                             continue
                         }
                     }
@@ -1922,7 +1922,7 @@ private struct DocumentIndex {
         guard !segment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
         guard let regex = try? NSRegularExpression(
-            pattern: #"(?:^|,)\s*(?:#[A-Za-z_][A-Za-z0-9_]*\s+)*(?:(_|[A-Za-z_][A-Za-z0-9_]*)\s+)?([a-z_][A-Za-z0-9_]*)\s*:"#
+            pattern: #"(?:^|,)\s*(?:[@#][A-Za-z_][A-Za-z0-9_]*\s+)*(?:(_|[A-Za-z_][A-Za-z0-9_]*)\s+)?([a-z_][A-Za-z0-9_]*)\s*:"#
         ) else { return }
 
         let matches = regex.matches(

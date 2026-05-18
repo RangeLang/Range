@@ -14,5 +14,5 @@ function decodeUUID() -> Result<UUID, DecodingError> {
     return UUID.decode(from: decoder)
 }
 
-@main {
+#main {
 }

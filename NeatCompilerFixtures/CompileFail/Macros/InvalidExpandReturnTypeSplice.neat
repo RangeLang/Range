@@ -8,6 +8,6 @@ macro invalidReturnTypeSplice(): Construct { target, diagnostics in
     }
 }
 
-#invalidReturnTypeSplice
+@invalidReturnTypeSplice
 construct InvalidReturnTypeFixture {
 }

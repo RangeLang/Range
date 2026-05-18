@@ -10,4 +10,4 @@ construct Parent {
     }
 }
 
-@main { }
+#main { }

@@ -2,7 +2,7 @@ function computeValue() -> Int {
     return 42
 }
 
-@main {
+#main {
     @background {
         let result = computeValue()
     }

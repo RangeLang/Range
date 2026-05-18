@@ -8,6 +8,6 @@ macro protocolDeclarationExpand(): Protocol { target, diagnostics in
     }
 }
 
-#protocolDeclarationExpand
+@protocolDeclarationExpand
 protocol ProtocolDeclarationExpandFixture {
 }

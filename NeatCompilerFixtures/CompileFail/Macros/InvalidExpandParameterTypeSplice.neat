@@ -8,6 +8,6 @@ macro invalidParameterTypeSplice(): Construct { target, diagnostics in
     }
 }
 
-#invalidParameterTypeSplice
+@invalidParameterTypeSplice
 construct InvalidParameterTypeFixture {
 }

@@ -11,14 +11,14 @@ struct NeatLanguageServerSemanticTokenTests {
             let number: Int
         }
 
-        @main {
+        #main {
             let item = Something()
         }
         """
 
         let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsExactToken(tokens, text: "@main", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "#main", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "Something", type: .type, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "Int", type: .type, modifiers: []))
         #expect(containsExactToken(tokens, text: "Something", type: .type, modifiers: []))
@@ -69,7 +69,7 @@ struct NeatLanguageServerSemanticTokenTests {
             let number: Int
         }
 
-        @main {
+        #main {
             let result: FixtureConstruct = FixtureConstruct(number: 1)
         }
         """
@@ -103,7 +103,7 @@ struct NeatLanguageServerSemanticTokenTests {
         let source = """
         function load<Value, Failure>(
             target target: binding Promise<Value, Failure>,
-            #autoclosure task: Result<Value, Failure>
+            @autoclosure task: Result<Value, Failure>
         ) {
             switch task() {
             case .success(let item):
@@ -207,7 +207,7 @@ struct NeatLanguageServerSemanticTokenTests {
     @Test("Definition resolves core types through graph")
     func definitionResolvesCoreTypesThroughGraph() {
         let source = """
-        @main {
+        #main {
             let enabled: Bool = true
         }
         """
@@ -279,19 +279,19 @@ struct NeatLanguageServerSemanticTokenTests {
     @Test("Macro applications, including parameter macros, emit semantic tokens")
     func macroApplicationsEmitSemanticTokens() {
         let source = """
-        function takeMany(#variadic values: Int) -> [Int] {
+        function takeMany(@variadic values: Int) -> [Int] {
             return values
         }
 
-        @main {
-            let text = #stringify(1 + 2)
+        #main {
+            let text = @stringify(1 + 2)
         }
         """
 
         let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsToken(tokens, text: "#variadic", type: .macro, modifiers: []))
-        #expect(containsToken(tokens, text: "#stringify", type: .macro, modifiers: []))
+        #expect(containsToken(tokens, text: "@variadic", type: .macro, modifiers: []))
+        #expect(containsToken(tokens, text: "@stringify", type: .macro, modifiers: []))
     }
 
     @Test("String interpolation contents stay plain text")
@@ -393,7 +393,7 @@ struct NeatLanguageServerSemanticTokenTests {
     @Test("Member call receivers do not emit plain variable read tokens")
     func memberCallReceiversDoNotEmitVariableReadTokens() {
         let source = """
-        @main {
+        #main {
             let output = Channel<String>()
             output.send("george")
             state received = output.receive()

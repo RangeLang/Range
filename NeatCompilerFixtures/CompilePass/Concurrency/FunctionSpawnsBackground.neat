@@ -10,6 +10,6 @@ function refreshCache() {
     Logger.info("refresh function returned immediately")
 }
 
-@main {
+#main {
     refreshCache()
 }

@@ -1,4 +1,4 @@
 protocol ExpressibleByIntLiteral {
-    #literal<IntLiteral>
+    @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self
 }

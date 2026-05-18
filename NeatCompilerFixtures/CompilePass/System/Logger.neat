@@ -1,4 +1,4 @@
-@main {
+#main {
     Logger.info("Neat logger fixture")
     Logger.debug("debug path reached")
     Logger.success("success path reached")

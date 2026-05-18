@@ -1,46 +1,87 @@
 ---
 name: neat-update-post
-description: Create very short Neat update posts that show a before example, an after example, and a brief explanation of what changed. Use when asked to turn Neat syntax, compiler, graph, editor, tooling, docs, or product-design changes into compact Markdown update notes instead of long articles.
+description: Create very short Neat update, addition, or feature posts with a concept title, compact example shape, and short design-oriented reason. Use when asked to turn Neat syntax, compiler, graph, editor, tooling, docs, or product-design changes into compact Markdown update notes instead of long articles.
 ---
 
 # Neat Update Post
 
 ## Workflow
 
-1. Identify the smallest visible change. Treat the old shape as `Before` and the new shape as `After`.
-2. Keep the post short. Prefer one title, one sentence of context, before/after examples, and a compact explanation.
-3. Write to `docs/posts/<kebab-title>.md` unless the user names another destination.
-4. Use the user's first-person Neat developer voice when a design opinion matters, but avoid long narrative setup.
-5. Explain what the before form made unclear, what the after form makes explicit, and what compiler/tooling behavior follows.
-6. Avoid speculative sections such as `Open Questions`, `Questions`, or `Unresolved`.
+1. Identify the post kind: `Update post`, `Addition post`, or `Feature post`.
+2. Choose a concept title, not an action title.
+3. Keep the post short. Prefer one title, one sentence of context, one compact example section, and a compact reason.
+4. Write to `docs/posts/<kebab-title>.md` unless the user names another destination.
+5. Use the user's first-person Neat developer voice only when needed, but avoid filler like "to me because".
+6. Explain what repetition, awkwardness, or unclear shape was removed, and what the new shape makes easier to see.
+7. Avoid speculative sections such as `Open Questions`, `Questions`, or `Unresolved`.
 
-## Default Shape
+## Post Shapes
 
-Use this structure by default:
+Use `Update post` when an existing shape changed:
 
 ````markdown
 # Title
 
-One short sentence saying what changed.
+Short intro sentence.
 
 ## Before
 
 ```neat
-old code or model
+old shape
 ```
 
 ## After
 
 ```neat
-new code or model
+new shape
 ```
 
-## Why
+## Reason
 
-Two to six short sentences explaining the update.
+One to three short sentences.
 ````
 
-Section names may change, but the post must still show before, after, and explanation in that order.
+Use `Addition post` when a new syntax shape, compiler behavior, tool, or docs convention was added without replacing an old one:
+
+````markdown
+# Title
+
+Short intro sentence.
+
+## Addition
+
+```neat
+new shape
+```
+
+## Reason
+
+One to three short sentences.
+````
+
+Use `Feature post` when introducing a larger user-facing capability:
+
+````markdown
+# Title
+
+Short intro sentence.
+
+## Feature
+
+Short description of the capability.
+
+## Example / Shape
+
+```neat
+example shape
+```
+
+## Reason
+
+One to three short sentences.
+````
+
+Section names may change only when the user asks for a different format. Keep the order for the chosen post kind.
 
 ## Voice
 
@@ -48,9 +89,15 @@ Write like a concise update note from the Neat developer:
 
 - short paragraphs
 - direct technical claims
+- design-oriented wording
+- concept titles, not action titles
 - concrete examples over abstract framing
 - no detached changelog boilerplate
 - no long academic argument
+- no "to me because" filler
+- highlight repetition, awkwardness, or improved shape
+- keep `Reason` short
+- use a quote block when the reason is a quote
 
 Good explanation lines sound like:
 
@@ -58,11 +105,14 @@ Good explanation lines sound like:
 - "The new form keeps the construction fact on the declaration."
 - "Lowering can still happen later."
 - "The graph now has the shape the editor needs."
+- "This removes one repeated edge from every declaration."
+- "The source now matches the thing the graph already knew."
 
 ## Constraints
 
 - Keep most posts under 500 words unless the user asks for more.
 - Use fenced `neat` blocks for Neat code.
 - Use plain text blocks for graph sketches.
+- Use Markdown quote blocks for quoted reasons.
 - Do not call a first-class language concept "sugar" unless the update is specifically about surface syntax.
 - Distinguish source intent, graph meaning, and backend lowering when that distinction matters.

@@ -14,7 +14,7 @@ function worker(jobs: Channel<Int>, results: Channel<Int>) {
     }
 }
 
-@main {
+#main {
     let jobs = Channel<Int>(storage: ChannelStorage<Int>(capacity: 4))
     let results = Channel<Int>(storage: ChannelStorage<Int>(capacity: 4))
 

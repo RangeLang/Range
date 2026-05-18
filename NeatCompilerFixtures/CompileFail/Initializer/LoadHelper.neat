@@ -18,7 +18,7 @@ function fetchUser(id: Int) -> Result<User, LoadError> {
 
 function load<Value, Failure>(
     _ target: binding Promise<Value, Failure>,
-    #autoclosure task: Result<Value, Failure>
+    @autoclosure task: Result<Value, Failure>
 ) {
     target = .loading
 
@@ -47,6 +47,6 @@ construct UserView {
     }
 }
 
-@main {
+#main {
     let view = UserView(id: 1)
 }

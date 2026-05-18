@@ -9,12 +9,12 @@ macro forwardOnlyArgument(): Init { target, diagnostics in
 construct SingleInitRewriteFixture {
     let number: Int
 
-    #forwardOnlyArgument
+    @forwardOnlyArgument
     init(_ number: Int) {
         self.number = number
     }
 }
 
-@main {
+#main {
     SingleInitRewriteFixture(1)
 }

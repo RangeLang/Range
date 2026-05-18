@@ -172,7 +172,7 @@ struct CompilerFixtureTests {
                     let name: String
                 }
 
-                @main {
+                #main {
                     let user = User(id: 1, name: "George")
                 }
                 """,
@@ -196,7 +196,7 @@ struct CompilerFixtureTests {
             state current: Int(5)?
         }
 
-        @main {
+        #main {
             let local: Int(5)?
         }
         """
@@ -259,7 +259,7 @@ struct CompilerFixtureTests {
     @Test("Local typed declarations replace assignment-shaped type construction")
     func localTypedDeclarationsReplaceAssignmentShapedTypeConstruction() throws {
         let validSource = """
-        @main {
+        #main {
             let input: Channel<Int>
         }
         """
@@ -280,7 +280,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: invalidPath,
                 source: """
-                @main {
+                #main {
                     let input = Channel<Int>
                 }
                 """,
@@ -310,7 +310,7 @@ struct CompilerFixtureTests {
                     let name: String
                 }
 
-                @main {
+                #main {
                     let user = User(identifier: 1, name: "George")
                 }
                 """,
@@ -431,8 +431,8 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ProjectMain.neat",
                 source: """
-                @main {
-                    let text = #captureText(1 + 2)
+                #main {
+                    let text = @captureText(1 + 2)
                 }
                 """,
                 role: .project
@@ -449,9 +449,9 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ForwardDeclarations.neat",
                 source: """
-                @main {
+                #main {
                     let messageText = message()
-                    let captured = #captureText(1 + 2)
+                    let captured = @captureText(1 + 2)
                 }
 
                 function message() -> String {
@@ -621,7 +621,7 @@ struct CompilerFixtureTests {
                     }
                 }
 
-                @main {
+                #main {
                     let result = System.Math.zero()
                 }
                 """,

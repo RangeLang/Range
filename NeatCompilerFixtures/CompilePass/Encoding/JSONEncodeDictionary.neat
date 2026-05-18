@@ -4,7 +4,7 @@ function encodeDictionary() -> Result<String, EncodingError> {
     return encoder.encode(values)
 }
 
-@main {
+#main {
     switch encodeDictionary() {
     case .success(let json):
         Logger.info(json)

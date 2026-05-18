@@ -128,6 +128,12 @@ extension Parser {
                 name: name,
                 arguments: try parseInvocationArgumentsIfPresent()
             )
+        case .atAttribute(let name, _) where isMacroApplicationAttribute(name):
+            advance()
+            return .macroInvocation(
+                name: name,
+                arguments: try parseInvocationArgumentsIfPresent()
+            )
         case .identifier(let name), .keyword(let name):
             advance()
             if name == "true" {

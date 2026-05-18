@@ -3,7 +3,7 @@ function decodeNumber() -> Result<Int, DecodingError> {
     return Int.decode(from: decoder)
 }
 
-@main {
+#main {
     switch decodeNumber() {
     case .success(let value):
         Logger.info(value)

@@ -21,7 +21,7 @@ function decodePair() -> Result<String, DecodingError> {
     }
 }
 
-@main {
+#main {
     switch decodePair() {
     case .success(let name):
         Logger.info(name)

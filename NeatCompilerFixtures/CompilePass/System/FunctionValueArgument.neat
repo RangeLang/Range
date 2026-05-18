@@ -6,6 +6,6 @@ function accept(_ task: () -> Int) -> Int {
     return task()
 }
 
-@main {
+#main {
     let result = accept(compute)
 }

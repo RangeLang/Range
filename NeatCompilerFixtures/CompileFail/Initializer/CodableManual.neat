@@ -40,7 +40,7 @@ function roundTripCodableManualUser() -> Result<CodableManualUser, DecodingError
     return CodableManualUser.decode(from: decoder)
 }
 
-@main {
+#main {
     switch roundTripCodableManualUser() {
     case .success(let user):
         Logger.info(user.name)

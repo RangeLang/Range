@@ -7,7 +7,7 @@ macro invalidInitializer(): Binding<Int> { target, diagnostics in
 construct Holder {
     state age: Int = 10
 
-    #invalidInitializer()
+    @invalidInitializer()
     binding score: Int {
         get {
             return age
