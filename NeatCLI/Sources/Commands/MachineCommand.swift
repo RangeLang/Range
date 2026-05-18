@@ -57,7 +57,7 @@ extension NeatCLI {
 
         struct Link: ParsableCommand {
             static let configuration = CommandConfiguration(
-                abstract: "Link the installed macOS Neat binary into a Package.neat project."
+                abstract: "Install the macOS Neat CLI into a Package.neat project."
             )
 
             @Argument(help: "Package.neat project root.")

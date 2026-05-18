@@ -17,23 +17,63 @@ struct ProjectBinaryLinker {
             throw ValidationError("Missing installed Neat binary at \(binaryURL.path).")
         }
 
-        let linkDirectory = projectRoot
+        let selectedVersion = "\(NeatVersion.current)"
+        let selectedInstallDirectory = projectRoot
+            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent("NeatCLI", isDirectory: true)
+            .appendingPathComponent(selectedVersion, isDirectory: true)
+            .appendingPathComponent("bin", isDirectory: true)
+        let shimDirectory = projectRoot
             .appendingPathComponent(".neat", isDirectory: true)
             .appendingPathComponent("bin", isDirectory: true)
-        try fileManager.createDirectory(at: linkDirectory, withIntermediateDirectories: true)
+        let linksDirectory = projectRoot
+            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent("Links", isDirectory: true)
+        try fileManager.createDirectory(at: selectedInstallDirectory, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: shimDirectory, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: linksDirectory, withIntermediateDirectories: true)
 
-        let linkURL = linkDirectory.appendingPathComponent("neat", isDirectory: false)
-        if fileManager.fileExists(atPath: linkURL.path) {
-            if try symlink(at: linkURL, pointsTo: binaryURL) {
-                return linkURL
-            }
+        let versionedBinaryURL = selectedInstallDirectory.appendingPathComponent(
+            "neat",
+            isDirectory: false
+        )
+        let packageBinaryURL = shimDirectory.appendingPathComponent("neat", isDirectory: false)
+        let receiptURL = linksDirectory.appendingPathComponent(
+            "neat.package-link.json",
+            isDirectory: false
+        )
+
+        if fileManager.fileExists(atPath: packageBinaryURL.path)
+            && !isReplaceablePackageShim(at: packageBinaryURL, receiptURL: receiptURL)
+        {
             throw ValidationError(
-                "Refusing to replace existing file at \(linkURL.path). Remove it and run link again."
+                "Refusing to replace existing file at \(packageBinaryURL.path). Remove it and run link again."
             )
         }
 
-        try fileManager.createSymbolicLink(at: linkURL, withDestinationURL: binaryURL)
-        return linkURL
+        if fileManager.fileExists(atPath: versionedBinaryURL.path) {
+            try fileManager.removeItem(at: versionedBinaryURL)
+        }
+        try fileManager.copyItem(at: binaryURL, to: versionedBinaryURL)
+        try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: versionedBinaryURL.path)
+
+        if fileManager.fileExists(atPath: packageBinaryURL.path) {
+            try fileManager.removeItem(at: packageBinaryURL)
+        }
+        try fileManager.createSymbolicLink(at: packageBinaryURL, withDestinationURL: versionedBinaryURL)
+
+        let receipt = PackageLinkReceipt(
+            kind: "neat.package-link",
+            version: 1,
+            selectedVersion: selectedVersion,
+            source: binaryURL.path,
+            packageBinary: packageBinaryURL.path,
+            versionedBinary: versionedBinaryURL.path
+        )
+        let data = try JSONEncoder.packageLink.encode(receipt)
+        try data.write(to: receiptURL, options: .atomic)
+
+        return packageBinaryURL
     }
 
     private func packageRoot(from rawPath: String) throws -> URL {
@@ -53,17 +93,27 @@ struct ProjectBinaryLinker {
         return root
     }
 
-    private func symlink(at linkURL: URL, pointsTo binaryURL: URL) throws -> Bool {
-        let destination = try FileManager.default.destinationOfSymbolicLink(atPath: linkURL.path)
-        let destinationURL: URL
-        if destination.hasPrefix("/") {
-            destinationURL = URL(fileURLWithPath: destination, isDirectory: false)
-        } else {
-            destinationURL = linkURL
-                .deletingLastPathComponent()
-                .appendingPathComponent(destination, isDirectory: false)
+    private func isReplaceablePackageShim(at packageBinaryURL: URL, receiptURL: URL) -> Bool {
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: packageBinaryURL.path)) != nil {
+            return true
         }
+        return FileManager.default.fileExists(atPath: receiptURL.path)
+    }
+}
 
-        return destinationURL.standardizedFileURL.path == binaryURL.path
+private struct PackageLinkReceipt: Codable {
+    let kind: String
+    let version: Int
+    let selectedVersion: String
+    let source: String
+    let packageBinary: String
+    let versionedBinary: String
+}
+
+private extension JSONEncoder {
+    static var packageLink: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        return encoder
     }
 }

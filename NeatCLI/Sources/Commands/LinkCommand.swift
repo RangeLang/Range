@@ -3,7 +3,7 @@ import ArgumentParser
 extension NeatCLI {
     struct Link: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Link the installed macOS Neat binary into a Package.neat project."
+            abstract: "Install the macOS Neat CLI into a Package.neat project."
         )
 
         @Argument(help: "Package.neat project root.")
@@ -18,8 +18,8 @@ extension NeatCLI {
                     projectPath: project,
                     binaryPath: binary
                 ).run()
-                TerminalLog.out("Linked Neat at \(link.path)", level: .success)
-                TerminalLog.subtleOut("Target: \(binary)")
+                TerminalLog.out("Installed project Neat at \(link.path)", level: .success)
+                TerminalLog.subtleOut("Source: \(binary)")
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure

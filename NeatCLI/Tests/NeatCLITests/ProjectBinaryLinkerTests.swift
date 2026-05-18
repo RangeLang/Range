@@ -4,8 +4,8 @@ import Testing
 
 @Suite("Project binary linking")
 struct ProjectBinaryLinkerTests {
-    @Test("Link installed binary into package root")
-    func linkInstalledBinaryIntoPackageRoot() throws {
+    @Test("Install versioned binary into package root")
+    func installVersionedBinaryIntoPackageRoot() throws {
         let fixture = try temporaryPackage()
         let link = try ProjectBinaryLinker(
             projectPath: fixture.root.path,
@@ -13,7 +13,17 @@ struct ProjectBinaryLinkerTests {
         ).run()
 
         #expect(link.path == fixture.root.appendingPathComponent(".neat/bin/neat").path)
-        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == fixture.binary.path)
+        let versionedBinary = fixture.root
+            .appendingPathComponent(".neat/NeatCLI/\(NeatVersion.current)/bin/neat")
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == versionedBinary.path)
+        #expect(try String(contentsOf: versionedBinary, encoding: .utf8) == "#!/usr/bin/env bash\nexit 0\n")
+
+        let receipt = fixture.root.appendingPathComponent(".neat/Links/neat.package-link.json")
+        let receiptSource = try String(contentsOf: receipt, encoding: .utf8)
+        #expect(receiptSource.contains(#""kind" : "neat.package-link""#))
+        #expect(receiptSource.contains(#""selectedVersion" : "\#(NeatVersion.current)""#))
+        #expect(receiptSource.contains(#""source" : "\#(fixture.binary.path)""#))
+        #expect(receiptSource.contains(#""versionedBinary" : "\#(versionedBinary.path)""#))
     }
 
     @Test("Package file path resolves to package root")
@@ -25,6 +35,28 @@ struct ProjectBinaryLinkerTests {
         ).run()
 
         #expect(link.path == fixture.root.appendingPathComponent(".neat/bin/neat").path)
+    }
+
+    @Test("Existing symlink upgrades to versioned package install")
+    func existingSymlinkUpgradesToVersionedPackageInstall() throws {
+        let fixture = try temporaryPackage()
+        let link = fixture.root.appendingPathComponent(".neat/bin/neat", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: link.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: fixture.binary)
+
+        let packaged = try ProjectBinaryLinker(
+            projectPath: fixture.root.path,
+            binaryPath: fixture.binary.path
+        ).run()
+
+        #expect(packaged.path == link.path)
+        let versionedBinary = fixture.root
+            .appendingPathComponent(".neat/NeatCLI/\(NeatVersion.current)/bin/neat")
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: packaged.path) == versionedBinary.path)
+        #expect(try String(contentsOf: versionedBinary, encoding: .utf8) == "#!/usr/bin/env bash\nexit 0\n")
     }
 
     private func temporaryPackage() throws -> (root: URL, binary: URL) {
