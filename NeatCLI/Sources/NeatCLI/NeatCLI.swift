@@ -14,6 +14,7 @@ struct NeatCLI: ParsableCommand {
             Graph.self,
             Artifacts.self,
             Update.self,
+            Scripts.self,
             Package.self,
             Machine.self,
             Version.self,

@@ -30,6 +30,7 @@ struct ProjectScaffolderTests {
         #expect(destination == machinePackages.path)
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent(".neat/Build").path))
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent(".neat/Artifacts").path))
+        #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent(".neat/.scripts").path))
         _ = try PackageSubscriptionManager(projectPath: root.path).installedPackages(in: root)
     }
 }

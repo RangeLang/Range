@@ -246,6 +246,8 @@ struct ProjectScaffolder {
             .appendingPathComponent("Build", isDirectory: true)
         let workspaceArtifacts = machineWorkspace
             .appendingPathComponent("Artifacts", isDirectory: true)
+        let workspaceScripts = machineWorkspace
+            .appendingPathComponent(".scripts", isDirectory: true)
 
         if !FileManager.default.fileExists(atPath: workspacePackages.path) {
             try FileManager.default.createSymbolicLink(
@@ -259,6 +261,10 @@ struct ProjectScaffolder {
         )
         try FileManager.default.createDirectory(
             at: workspaceArtifacts,
+            withIntermediateDirectories: true
+        )
+        try FileManager.default.createDirectory(
+            at: workspaceScripts,
             withIntermediateDirectories: true
         )
 
