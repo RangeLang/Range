@@ -17,9 +17,7 @@ The old shape made compiler work and metadata tags look the same.
 ## After
 
 ```neat
-marker namespace(): Construct -> Bool registers namespace {
-    true
-}
+marker namespace(): Namespace<Construct>
 
 @codable(.snakeCase)
 construct User {
@@ -40,9 +38,7 @@ construct Language {
 Markers can also register global concepts:
 
 ```neat
-marker namespace(): Construct -> Bool registers namespace {
-    true
-}
+marker namespace(): Namespace<Construct>
 ```
 
 That means `#namespace` is still metadata at the declaration site, but the marker declaration tells the graph that this metadata has a global effect. A construct tagged with `#namespace` becomes a namespace-shaped concept the rest of the compiler can discover.

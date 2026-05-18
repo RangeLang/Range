@@ -9,9 +9,7 @@ A namespace can be declared as an ordinary construct tagged with `#namespace`. T
 ## Example / Shape
 
 ```neat
-marker namespace(): Construct -> Bool registers namespace {
-    true
-}
+marker namespace(): Namespace<Construct>
 
 #namespace
 construct Math {

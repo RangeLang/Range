@@ -21,7 +21,7 @@ public struct MarkerDeclaration {
     public let body: [Statement]
 
     public var registersNamespace: Bool {
-        globalRegistrations.contains(.namespace)
+        globalRegistrations.contains(.namespace) || valueType.isNamespaceRegistration
     }
 }
 
@@ -89,4 +89,20 @@ public enum MacroTarget {
 public struct MacroBindings {
     public let target: String
     public let diagnostics: String
+}
+
+extension TypeReference {
+    var namespaceRegistrationTarget: TypeReference? {
+        guard case .generic(let base, let arguments) = self,
+            case .named("Namespace") = base,
+            arguments.count == 1
+        else {
+            return nil
+        }
+        return arguments[0]
+    }
+
+    var isNamespaceRegistration: Bool {
+        namespaceRegistrationTarget != nil
+    }
 }

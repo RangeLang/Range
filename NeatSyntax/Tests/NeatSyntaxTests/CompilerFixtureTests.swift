@@ -603,6 +603,174 @@ struct CompilerFixtureTests {
         #expect(function?.range.start.line == 10)
     }
 
+    @Test("Declaration graph registry snapshot covers current query facts")
+    func declarationGraphRegistrySnapshotCoversCurrentQueryFacts() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/DeclarationGraphRegistrySnapshot.neat",
+                source: """
+                @package {
+                    let packageName: String("Registry Snapshot")
+                    Module("acme/registry-snapshot")
+                }
+
+                namespace Styling {
+                    let defaultTitle: String("Untitled")
+                }
+
+                marker hostSpace(): Namespace<Construct>
+
+                macro decorate(): Construct { target, diagnostics in
+                }
+
+                protocol Renderable {
+                    function render(title: String) -> String
+                }
+
+                enum DisplayMode {
+                    case compact
+                    case expanded
+                }
+
+                state globalCount: Int = 0
+
+                construct Address {
+                    let street: String
+                }
+
+                @Styling
+                construct Panel: Renderable {
+                    state count: Int = 0
+                    environment theme: String
+                    binding selected: Bool {
+                        get {
+                            return true
+                        }
+
+                        set {
+                        }
+                    }
+                    derived label: String {
+                        return title
+                    }
+                    let title: String
+                    let address: Address
+
+                    function render(title: String) -> String {
+                        return title
+                    }
+
+                    function configure(_ value: Int, label name: String) -> String {
+                        return name
+                    }
+
+                    construct Nested {
+                        let value: Int
+                    }
+                }
+
+                extension Panel {
+                    function reset() {
+                    }
+
+                    enum ExtensionMode {
+                        case reset
+                    }
+                }
+
+                #hostSpace
+                construct Routes {
+                    function home() -> String {
+                        return "home"
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let graph = program.declarationGraph
+        let registry = graph.registryView
+
+        #expect(registry.construct(named: "Panel") != nil)
+        #expect(registry.construct(named: "Panel.Nested") != nil)
+        #expect(registry.construct(named: "Routes") == nil)
+        #expect(registry.hasProtocol(named: "Renderable"))
+        #expect(registry.hasEnumeration(named: "DisplayMode"))
+        #expect(registry.hasMacro(named: "decorate"))
+        #expect(graph.markersByName["hostSpace"]?.registersNamespace == true)
+        #expect(registry.hasExtensions(targeting: "Panel"))
+        #expect(graph.hasNamespace(named: "Styling"))
+        #expect(graph.hasNamespace(named: "Routes"))
+        #expect(graph.hasNamespaceAttribute(named: "Styling"))
+        #expect(graph.hasNamespaceAttribute(named: "Routes"))
+
+        #expect(graph.packageValues(named: "packageName").count == 1)
+        #expect(
+            graph.packageSpaces.contains {
+                $0.entries.contains {
+                    guard case .call(let name, let arguments) = $0 else {
+                        return false
+                    }
+                    guard case .string("acme/registry-snapshot")? = arguments.first?.value else {
+                        return false
+                    }
+                    return name == "Module"
+                }
+            }
+        )
+        #expect(graph.topLevelStates(inFilePath: "/tmp/DeclarationGraphRegistrySnapshot.neat")
+            .map(\.name) == ["globalCount"])
+
+        #expect(registry.states(onConstruct: "Panel").map(\.name) == ["count"])
+        #expect(registry.environments(onConstruct: "Panel").map(\.name) == ["theme"])
+        #expect(registry.bindings(onConstruct: "Panel").map(\.name) == ["selected"])
+        #expect(registry.deriveds(onConstruct: "Panel").map(\.name) == ["label"])
+        #expect(registry.values(onConstruct: "Panel").map(\.name) == ["title", "address"])
+        #expect(graph.callables(onConstruct: "Panel").map(\.name).sorted() == [
+            "configure",
+            "render",
+            "reset",
+        ])
+
+        let configure = try #require(graph.callable(named: "configure", onConstruct: "Panel"))
+        let configureParameters = registry.parameters(ofCallable: configure, ownerName: "Panel")
+        #expect(configureParameters.map(\.localName) == ["value", "name"])
+        #expect(configureParameters.map(\.externalLabel) == [nil, "label"])
+
+        #expect(graph.declaredMemberSurfaces(forConstruct: "Panel").map(\.name).sorted() == [
+            "address",
+            "count",
+            "label",
+            "selected",
+            "theme",
+            "title",
+        ])
+        #expect(graph.declaresMemberPath("Panel.address.street", onConstruct: "Panel"))
+        #expect(graph.initializerSurfaces(onConstruct: "Panel").first?.labels == [
+            "title",
+            "address",
+            "count",
+            "selected",
+        ])
+
+        let attachments = graph.namespaceAttributeAttachments(onDeclarationNamed: "Panel")
+        #expect(attachments.map(\.attribute.name) == ["Styling"])
+        #expect(graph.callablesByName["Routes.home"] != nil)
+        #expect(
+            graph.programGraph.entities.contains {
+                $0.kind == .macro && $0.label == "decorate"
+            }
+        )
+        #expect(
+            graph.programGraph.entities.contains {
+                $0.kind == .packageEntry && $0.label == #"Module("acme/registry-snapshot")"#
+            }
+        )
+    }
+
     @Test("Rewrite site decoding uses declaration-backed descriptors")
     func rewriteSiteDecodingUsesDeclarationBackedDescriptors() throws {
         let program = try CompilerPipeline().build(inputs: neatCoreInputs())
@@ -733,9 +901,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/RegisteredNamespaceMarker.neat",
                 source: """
-                marker hostSpace(): Construct -> Bool registers namespace {
-                    true
-                }
+                marker hostSpace(): Namespace<Construct>
 
                 #hostSpace
                 construct Client {

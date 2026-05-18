@@ -113,19 +113,45 @@ extension Parser {
         let parameters = try parseFunctionParameters(allowSyntaxCapture: false)
 
         try consume(.colon)
-        let target = try parseMacroTarget()
-        try consume(.arrow)
-        let valueType = try parseTypeReferenceNode()
+        let firstType = try parseTypeReferenceNode()
+        let target: MacroTarget
+        let valueType: TypeReference
+        if peek() == .arrow {
+            target = .syntax(firstType)
+            try consume(.arrow)
+            valueType = try parseTypeReferenceNode()
+        } else if let namespaceTarget = firstType.namespaceRegistrationTarget {
+            target = .syntax(namespaceTarget)
+            valueType = firstType
+        } else {
+            throw ParseError(
+                "Marker declarations without `->` must use an effect type such as Namespace<Construct>."
+            )
+        }
         let globalRegistrations = try parseMarkerGlobalRegistrationsIfPresent()
 
         let body: [Statement]
         if signatureOnly {
+            guard peek() == .leftBrace else {
+                body = []
+                return MarkerDeclaration(
+                    name: name,
+                    genericParameters: genericParameters,
+                    parameters: parameters,
+                    target: target,
+                    valueType: valueType,
+                    globalRegistrations: globalRegistrations,
+                    body: body
+                )
+            }
             try consume(.leftBrace)
             try skipUnknownBlockBody()
             try consume(.rightBrace)
             body = []
-        } else {
+        } else if peek() == .leftBrace {
             body = try parseMarkerBody(parameters: parameters)
+        } else {
+            body = []
         }
 
         return MarkerDeclaration(

@@ -1,97 +1,189 @@
-# Neat Unified Checklist
+# Neat Status And Working Checklist
 
-This is the high-level working checklist for active Neat cleanup.
+This is the current working checklist for aligning Neat's implementation with
+the direction captured in the docs, posts, and planning notes.
 
-The older notes remain useful as context, but this file should be the place to
-look first when deciding what to do next.
+The older notes remain useful context, but this file should be the first place
+to look when deciding what to do next.
 
-## Core Bootstrap Cleanup
+## Where We Stand
 
-- [ ] Keep Swift-side type knowledge named and treated as bootstrap machinery,
-      not true language builtins.
-- [ ] Push more literal compatibility through declaration graph facts and
-      NeatCore literal bridge protocols.
-- [ ] Reduce places where `BootstrapLiteralType` directly carries language
-      meaning.
-- [ ] Keep Swift bootstrap logic only for parsing, lowering, runtime hooks, and
-      source sugar that cannot yet live in Neat.
-- [ ] Decide whether a normal `construct` can store a `@language construct`
-      member as plain inline value data.
-- [ ] Replace parser-owned operator precedence defaults with explicit Neat
-      operator and precedence declarations.
-- [ ] Shrink Swift-side operator typing rules so operator meaning can migrate
-      toward Neat declarations.
+### Implemented Enough To Treat As Current Baseline
 
-## Declaration Graph Cleanup
+- [x] `CompiledProgram` is the compiler pipeline artifact, not the graph root.
+- [x] `ProgramGraph` is the canonical graph storage root.
+- [x] `DeclarationGraph` is built from expanded files and exposes `programGraph`.
+- [x] `ApplicationGraph` is derived downstream from `DeclarationGraph`.
+- [x] Validation is staged through `ProgramGraphValidator`,
+      `DeclarationGraphValidator`, and `ApplicationGraphValidator`.
+- [x] `DeclarationGraph` has first-class registries or query views for
+      constructs, protocols, enums, macros, markers, extensions, namespaces,
+      package spaces, top-level callables, operators, top-level states,
+      construct states, environments, bindings, deriveds, values,
+      initializers, and parameters.
+- [x] Namespace-backed attribute facts are graph-owned through
+      namespace attribute names and attachments.
+- [x] Namespace-shaped configuration can be declared through `#namespace`
+      constructs and through registered marker applications.
+- [x] Direct construct application surfaces are declaration-backed and tested.
+- [x] Project source cannot declare explicit `init`; construction is still
+      modeled from stored declarations and allowed core/bootstrap surfaces.
+- [x] Macro diagnostics feed the compiler diagnostic channel.
+- [x] Syntax-producing macros exist, including syntax templates, splices, and
+      macro-to-macro invocation.
+- [x] `#codable` uses string-keyed encode/decode generation and marker metadata.
+- [x] Protocol-carried initializer macro behavior exists for realized init
+      macro targets.
+- [x] LSP semantic tokens cover types, functions, variables, parameters,
+      members, macros, markers, nil, enum cases, package syntax, and namespace
+      syntax.
 
-- [ ] Add first-class `DeclarationGraph` registries or query views for enums,
-      macros, and extensions.
-- [ ] Add uniform declaration query surfaces for states, environments,
-      bindings, deriveds, values, initializers, and parameters.
-- [ ] Model declaration relations explicitly:
-      `facetOf`, `satisfiesRequirement`, and `carriesMacro`.
-- [ ] Strengthen declaration metadata so every declaration category can answer:
-      kind, core/project role, container, declared type, and signature shape.
-- [ ] Rebuild declaration-side resolvers/views on top of stronger graph facts
-      instead of ad hoc declaration-struct traversal.
-- [ ] Keep namespace-backed attribute facts graph-owned, not validator-local.
-- [ ] Keep declaration/application facets such as `Init.Declaration`,
-      `Init.Application`, `Function.Declaration`, and `Function.Application`
-      visible as graph facts.
+### Partially Implemented, Still Architectural Debt
 
-## Application Graph Cleanup
+- [ ] `ProgramGraph` has broad entity/relation storage, but declaration facts
+      are still partly duplicated as typed registries rather than uniformly
+      projected from one graph relation model.
+- [ ] Declaration metadata is not yet uniform across every category. The graph
+      can answer many category-specific questions, but there is no single
+      declaration descriptor surface for kind, core/project role, container,
+      declared type, signature, and source identity.
+- [ ] Requirement declarations and requirement satisfaction are validated, but
+      `satisfiesRequirement` is not yet an explicit graph relation.
+- [ ] Carried macro behavior exists, but `carriesMacro` is not yet an explicit
+      graph relation.
+- [ ] Declaration/application facets are documented and partially surfaced, but
+      `facetOf` is not yet an explicit graph relation.
+- [ ] Literal compatibility uses declaration-backed literal bridge facts in
+      important places, but `BootstrapLiteralType` still carries too much
+      expression/type meaning through parser and validator code.
+- [ ] Operators are declared in `NeatCore`, but precedence defaults and some
+      operator typing behavior still live in Swift-side compiler logic.
+- [ ] `ApplicationGraphValidator` uses declaration queries for many existence
+      checks, but it still carries substantial transient type-flow and
+      accessible-type state as `BootstrapLiteralType` maps.
+- [ ] The Swift backend still emits and ships runtime/support code with
+      Foundation-heavy and host-oriented behavior.
+- [ ] The CLI is intentionally host-bound, but the compiler/backend boundary is
+      not yet clean enough for a serious Embedded Swift build lane.
+- [ ] Memory graph and reactivity graph remain design documents, not concrete
+      compiler stages.
 
-- [ ] Keep `ApplicationGraph` downstream from `DeclarationGraph`.
-- [ ] Keep body traversal, use-site resolution, call-site flow, alias flow, and
-      mutation behavior out of declaration storage.
-- [ ] Build application/use-site facts from expanded files plus declaration
-      graph facts.
-- [ ] Use declaration graph queries for all “what exists?” checks before
-      application validation decides “is this use valid here?”.
-- [ ] Keep application-local transient state out of stable declaration views.
+## Working Checklist
 
-## Memory And Reactivity Boundary
+### 1. Lock The Current Baseline
 
-- [ ] Decide the first concrete `MemoryGraph` inputs from declaration facts and
-      application facts.
-- [ ] Define stable memory-domain relations before adding a new storage model.
-- [ ] Keep `MemoryGraph` derived from declaration + application meaning, not
+- [ ] Keep this checklist updated whenever a planned item is implemented.
+- [ ] Add focused tests for any existing graph behavior that is only covered
+      indirectly by broad compile fixtures.
+- [x] Add a small declaration graph snapshot test for current registry/query
+      coverage: enums, macros, markers, extensions, states, values,
+      initializers, parameters, namespace attributes, and package spaces.
+- [ ] Add an application graph snapshot test that proves declaration projection
+      plus application edges stay downstream from the declaration graph.
+
+### 2. Make Declaration Metadata Uniform
+
+- [ ] Introduce one declaration descriptor/query surface that can represent:
+      kind, name, core/project role, container, source location, declared type,
+      signature shape, and relevant attributes/markers/macros.
+- [ ] Back the descriptor with existing `DeclarationGraph` registries first,
+      without redesigning storage.
+- [ ] Replace category-specific source-location and kind lookups with the new
+      descriptor where it reduces duplication.
+- [ ] Add tests proving the descriptor works for constructs, enums, protocols,
+      macros, markers, extensions, callables, initializers, parameters, and
+      properties.
+
+### 3. Promote Missing Relations To Graph Facts
+
+- [ ] Add explicit `facetOf` relation support.
+- [ ] Model declaration/application facet links for `Init`, `Function`, and
+      `Parameter` surfaces.
+- [ ] Add explicit `satisfiesRequirement` relation support.
+- [ ] Record protocol requirement satisfaction during declaration validation or
+      declaration graph enrichment.
+- [ ] Add explicit `carriesMacro` relation support.
+- [ ] Record carried macro facts for protocol conformance and initializer macro
+      carry.
+- [ ] Rebuild the relevant macro/requirement query views on top of those
+      relations once the facts are present.
+
+### 4. Shrink Bootstrap Literal Meaning
+
+- [ ] Inventory every remaining `BootstrapLiteralType` use by role:
+      parse-time literal category, default destination choice, expression type,
+      local accessible type, operator compatibility, return compatibility, and
+      backend lowering.
+- [ ] Pick one narrow path, preferably return compatibility or argument
+      compatibility, and route it through declaration graph facts plus
+      `NeatCore` literal bridge protocols.
+- [ ] Keep Swift-side literal logic only for literal categories, parser sugar,
+      lowering/runtime hooks, and transitional diagnostics.
+- [ ] Repeat for operator compatibility after declaration-backed literal
+      compatibility is proven.
+
+### 5. Move Operator Meaning Toward NeatCore
+
+- [ ] Replace parser-owned precedence defaults with explicit Neat operator and
+      precedence declarations.
+- [ ] Ensure operator lookup and precedence resolution read declaration graph
+      facts.
+- [ ] Shrink Swift-side scalar/operator typing rules after literal bridge
+      compatibility is less bootstrap-driven.
+- [ ] Add fixtures for custom precedence, overload selection, and failure
+      diagnostics.
+
+### 6. Define The First Memory Graph Slice
+
+- [ ] Define the minimal first `MemoryGraph` node and relation vocabulary from
+      current declaration and application graph facts.
+- [ ] Start with storage identity and mutation facts for `state`, `binding`,
+      `derived`, `let`, and local mutation.
+- [ ] Keep `MemoryGraph` derived from declaration plus application meaning, not
       raw parser structures.
-- [ ] Derive future reactivity facts from memory facts.
-- [ ] Avoid coupling reactivity directly to AST-shaped or parser-shaped data.
+- [ ] Add one compiler pass that produces a memory projection without changing
+      diagnostics yet.
+- [ ] Add proof/snapshot fixtures before using memory facts for rejection rules.
 
-## Macro And Metadata Cleanup
+### 7. Keep Macro And Metadata Work Honest
 
-- [ ] Harden generic marker access without introducing one-off fields like
+- [ ] Harden generic marker access without adding one-off fields like
       `property.codingKey`.
 - [ ] Expand syntax-producing macro coverage for function bodies, initializer
       bodies, blocks, switches, assignments, and declaration lists.
 - [ ] Decide the syntax block story around future `# { ... }` blocks.
-- [ ] Keep `#codable` generation boring: sequential `switch` over `Result`,
-      no hidden throwing control flow.
-- [ ] Keep macro-authored diagnostics and compiler diagnostics flowing through
-      the same severity/channel model.
 - [ ] Move marker value handling beyond primitive-only checks when rich marker
-      values are needed.
-- [ ] Replace renderer/parser-loop syntax production with more uniform
-      structural syntax builders where that becomes worth the complexity.
+      values become necessary.
+- [ ] Replace renderer/parser-loop syntax production with structural syntax
+      builders only when the current approach becomes a real blocker.
 - [ ] Complete the `SyntaxOmittable` story for conditional redaction,
       region-style macros, or compiler-macro style conditional syntax.
 
-## NeatCore Surface Cleanup
+### 8. Grow NeatCore Deliberately
 
-- [ ] Add `Sequence` and `Collection` protocols before expanding collection-like
-      APIs across storage types.
+- [ ] Add `Sequence` and `Collection` protocols before broadening
+      collection-like APIs across storage types.
 - [ ] Revisit `ComponentStorage` and `Vector<let dimensionality, Scalar>` after
       value-generic application support is less transitional.
 - [ ] Keep namespace-shaped domain surfaces as `#namespace construct ...` when
       they carry namespace behavior or configuration.
-- [ ] Keep representation/storage constructs as ordinary constructs unless they
-      are actually namespace-shaped.
-- [ ] Continue moving foundational language-visible surfaces into NeatCore
+- [ ] Keep representation/storage constructs ordinary unless they are actually
+      namespace-shaped.
+- [ ] Continue moving foundational language-visible surfaces into `NeatCore`
       instead of Swift-only mirrors.
 
-## Tooling And Editor Cleanup
+### 9. Embedded Swift And Backend Boundary
+
+- [ ] Split pure backend lowering/emission from host file/project operations.
+- [ ] Isolate generated runtime support that depends on Foundation, classes,
+      locks, file/process APIs, or other host-only behavior.
+- [ ] Audit `NeatSyntax` Foundation usage and replace easy cases where the
+      standard library is enough.
+- [ ] Add an Embedded Swift feasibility build lane when the local toolchain and
+      SDK setup can support it.
+- [ ] Keep CLI host adapters outside the compiler core boundary.
+
+### 10. Tooling And Editor Parity
 
 - [ ] Add semantic origin modifiers for project vs core/external symbols.
 - [ ] Map origin-aware semantic token rules such as `type.neat.project` and
@@ -104,7 +196,7 @@ look first when deciding what to do next.
 - [ ] Add documentation comment and documentation markup token categories once
       doc comments are formalized.
 
-## Product And Publishing
+### 11. Product And Publishing
 
 - [ ] Decide whether NeatCloud is a real product direction for packages,
       articles, examples, and language-design notes.
@@ -113,12 +205,23 @@ look first when deciding what to do next.
 
 ## Immediate Next Slice
 
-1. Add enum/macro/extension query surfaces to `DeclarationGraph`.
-2. Use that pattern to add query surfaces for values, states, parameters, and
-   initializers.
-3. Push one literal compatibility path through declaration graph facts instead
-   of direct `BootstrapLiteralType` checks.
-4. Add `Sequence` and `Collection` core protocols before growing vector and
-   component APIs further.
-5. Decide the first memory-domain relations from existing declaration and
-   application graph facts.
+1. Introduce the uniform declaration descriptor surface on top of the existing
+   registries.
+2. Promote one missing relation to a first-class graph fact, starting with
+   `facetOf` because it clarifies macro target surfaces without changing
+   runtime behavior.
+3. Route one literal compatibility path through declaration graph facts and
+   `NeatCore` bridge protocols.
+4. Define the smallest non-diagnostic `MemoryGraph` projection pass.
+
+## Verification Snapshot
+
+Last reviewed on 2026-05-18.
+
+- `NeatSyntax`: `swift test` passed with 41 tests.
+- `NeatCLI`: `swift test` passed.
+- `NeatBackendSwift`: `swift test` builds, but exits with `no tests found`
+  because the package has no test target.
+- Fixture inventory at review time:
+  - `CompilePass`: 94 fixtures.
+  - `CompileFail`: 46 fixtures.

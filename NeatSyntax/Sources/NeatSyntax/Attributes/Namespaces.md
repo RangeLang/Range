@@ -22,9 +22,7 @@ construct Panel {
 Namespace-shaped configuration can use `#namespace` on a construct:
 
 ```neat
-marker namespace(): Construct -> Bool registers namespace {
-    true
-}
+marker namespace(): Namespace<Construct>
 
 #namespace
 construct Language {
@@ -32,7 +30,7 @@ construct Language {
 }
 ```
 
-The marker's `registers namespace` effect declares a namespace named `Language`. The `let` entries are namespace configuration, not instance fields.
+The marker's `Namespace<Construct>` effect declares a namespace named `Language`. The `let` entries are namespace configuration, not instance fields.
 
 ## Validation
 
