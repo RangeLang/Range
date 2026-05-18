@@ -408,7 +408,10 @@ struct SwiftBackendEmitter {
                 ],
                 targets: [
                     .executableTarget(
-                        name: "NeatGenerated"
+                        name: "NeatGenerated",
+                        swiftSettings: [
+                            .enableExperimentalFeature("Embedded")
+                        ]
                     )
                 ]
             )

@@ -11,6 +11,7 @@ DerivedData/
 
 .swiftpm/
 .build-local/
+NeatCLI/dist/
 .zed/
 .neat/
 Zed/Neat/
