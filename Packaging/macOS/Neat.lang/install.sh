@@ -4,11 +4,13 @@ set -euo pipefail
 package_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 binary="$package_root/bin/neat"
 core_sources="$package_root/share/neat/NeatCore"
+skill_sources="$package_root/share/neat/Skills"
 prefix="${NEAT_INSTALL_PREFIX:-/usr/local}"
 install_dir="$prefix/bin"
 target="$install_dir/neat"
 share_dir="$prefix/share/neat"
 core_target="$share_dir/NeatCore"
+skill_target="$share_dir/Skills"
 version_file="$package_root/VERSION"
 version="unknown"
 
@@ -28,6 +30,7 @@ echo "Will install Neat $version"
 echo "to:"
 echo "  $target"
 echo "  $core_target"
+echo "  $skill_target"
 echo
 
 if [[ "${NEAT_INSTALL_ASSUME_YES:-false}" != "true" ]]; then
@@ -43,6 +46,11 @@ fi
 
 if [[ ! -d "$core_sources" ]]; then
   echo "Missing NeatCore sources: $core_sources" >&2
+  exit 1
+fi
+
+if [[ ! -d "$skill_sources" ]]; then
+  echo "Missing Neat skills: $skill_sources" >&2
   exit 1
 fi
 
@@ -74,6 +82,8 @@ fi
 install -m 755 "$binary" "$target"
 rm -rf "$core_target"
 cp -R "$core_sources" "$core_target"
+rm -rf "$skill_target"
+cp -R "$skill_sources" "$skill_target"
 
 echo
 echo "Installed $target"

@@ -4,15 +4,17 @@ set -euo pipefail
 prefix="${NEAT_INSTALL_PREFIX:-/usr/local}"
 target="$prefix/bin/neat"
 core_target="$prefix/share/neat/NeatCore"
+skill_target="$prefix/share/neat/Skills"
 
 echo "Neat CLI uninstaller"
 echo
 echo "Will remove:"
 echo "  $target"
 echo "  $core_target"
+echo "  $skill_target"
 echo
 
-if [[ ! -e "$target" && ! -e "$core_target" ]]; then
+if [[ ! -e "$target" && ! -e "$core_target" && ! -e "$skill_target" ]]; then
   echo "Nothing to remove."
   exit 0
 fi
@@ -27,6 +29,12 @@ if [[ -e "$core_target" && -w "$(dirname "$core_target")" ]]; then
   rm -rf "$core_target"
 elif [[ -e "$core_target" ]]; then
   sudo rm -rf "$core_target"
+fi
+
+if [[ -e "$skill_target" && -w "$(dirname "$skill_target")" ]]; then
+  rm -rf "$skill_target"
+elif [[ -e "$skill_target" ]]; then
+  sudo rm -rf "$skill_target"
 fi
 
 echo "Removed Neat CLI."
