@@ -17,13 +17,7 @@ construct Construct {
     let comments: [Comment]
 }
 
-marker namespace(): Construct -> Namespace {
-    Namespace(
-        name: target.name,
-        functions: target.functions,
-        description: target.comments.description
-    )
-}
+marker namespace(): Namespace<Construct>
 
 #namespace
 // Basic numeric helpers exposed through Math.
@@ -36,9 +30,9 @@ The comment is source.
 
 The construct is source.
 
-The marker receives a compiler view of that source.
+The marker declares a namespace projection over that source.
 
-The returned `Namespace` is graph data.
+The `Namespace<Construct>` effect is graph data.
 
 ```text
 source

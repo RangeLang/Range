@@ -4,19 +4,12 @@ Macros and markers should receive typed compiler views, not scrape raw source.
 
 ## Feature
 
-Neat can expose core compiler concepts as ordinary typed values. Macros use those values to transform syntax, and markers use them to project metadata and graph concepts.
+Neat can expose core compiler concepts as ordinary typed values. Macros use those values to transform syntax, and markers use abstract effect types to project metadata and graph concepts.
 
 ## Example
 
 ```neat
-marker namespace(): Construct -> Namespace {
-    Namespace(
-        name: target.name,
-        functions: target.functions,
-        values: target.lets,
-        description: target.comments.description
-    )
-}
+marker namespace(): Namespace<Construct>
 
 #namespace
 // Basic numeric helpers exposed through the Math namespace.
