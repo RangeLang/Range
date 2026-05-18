@@ -556,6 +556,9 @@ struct CompilerFixtureTests {
         #expect(graph.constructsByName["Construct"] != nil)
         #expect(graph.constructsByName["Construct.Application"] != nil)
         #expect(graph.syntaxResolver.declaration(named: "Construct.Application", conformsTo: "SyntaxReplaceable"))
+        #expect(graph.constructsByName["Namespace"]?.isCore == true)
+        #expect(graph.constructsByName["Namespace.Declaration"]?.isCore == true)
+        #expect(graph.constructsByName["Namespace.Application"]?.isCore == true)
     }
 
     @Test("@syntax declarations are syntax-facing without Syntax conformance")

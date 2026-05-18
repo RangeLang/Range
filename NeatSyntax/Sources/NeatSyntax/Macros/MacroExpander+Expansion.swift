@@ -666,7 +666,7 @@ extension MacroExpander {
                         for: marker,
                         argumentClause: application.argumentClause
                     )
-                    if marker.valueType.isNamespaceRegistration {
+                    if marker.valueType.isMarkerEffect {
                         continue
                     }
                     _ = try MacroTargetValueBuilder.evaluateMarkerValue(

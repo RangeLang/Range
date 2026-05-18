@@ -23,6 +23,10 @@ public struct MarkerDeclaration {
     public var registersNamespace: Bool {
         globalRegistrations.contains(.namespace) || valueType.isNamespaceRegistration
     }
+
+    public var registersLanguageBoundary: Bool {
+        valueType.isLanguageRegistration
+    }
 }
 
 public enum MarkerGlobalRegistration: String, Equatable {
@@ -92,9 +96,8 @@ public struct MacroBindings {
 }
 
 extension TypeReference {
-    var namespaceRegistrationTarget: TypeReference? {
-        guard case .generic(let base, let arguments) = self,
-            case .named("Namespace") = base,
+    var markerEffectTarget: TypeReference? {
+        guard case .generic(_, let arguments) = self,
             arguments.count == 1
         else {
             return nil
@@ -102,7 +105,38 @@ extension TypeReference {
         return arguments[0]
     }
 
+    var markerEffectName: String? {
+        guard case .generic(let base, _) = self,
+            case .named(let name) = base
+        else {
+            return nil
+        }
+        return name
+    }
+
+    var isMarkerEffect: Bool {
+        markerEffectTarget != nil
+    }
+
+    var namespaceRegistrationTarget: TypeReference? {
+        guard markerEffectName == "Namespace" else {
+            return nil
+        }
+        return markerEffectTarget
+    }
+
     var isNamespaceRegistration: Bool {
         namespaceRegistrationTarget != nil
+    }
+
+    var languageRegistrationTarget: TypeReference? {
+        guard markerEffectName == "Language" else {
+            return nil
+        }
+        return markerEffectTarget
+    }
+
+    var isLanguageRegistration: Bool {
+        languageRegistrationTarget != nil
     }
 }

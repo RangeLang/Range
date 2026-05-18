@@ -120,12 +120,12 @@ extension Parser {
             target = .syntax(firstType)
             try consume(.arrow)
             valueType = try parseTypeReferenceNode()
-        } else if let namespaceTarget = firstType.namespaceRegistrationTarget {
-            target = .syntax(namespaceTarget)
+        } else if let effectTarget = firstType.markerEffectTarget {
+            target = .syntax(effectTarget)
             valueType = firstType
         } else {
             throw ParseError(
-                "Marker declarations without `->` must use an effect type such as Namespace<Construct>."
+                "Marker declarations without `->` must use an effect type such as Namespace<Construct> or Language<Construct>."
             )
         }
         let globalRegistrations = try parseMarkerGlobalRegistrationsIfPresent()
