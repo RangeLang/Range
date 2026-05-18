@@ -159,31 +159,40 @@ struct MacroTargetValueBuilder {
 
     static func evaluateMarkerValue(
         for application: MacroApplication,
-        marker: MarkerDeclaration
+        marker: MarkerDeclaration,
+        targetValue: CompileTimeValue = .object(typeName: "Marker.Target", fields: [:]),
+        context: MacroExpansionContext? = nil
     ) throws -> CompileTimeValue {
         let bindings = try MacroExpander.parseMarkerArgumentBindings(
             for: marker,
             argumentClause: application.argumentClause
         )
+        let markerBindings = marker.bindings
 
         let evaluator = CompileTimeValueEvaluator(
-            targetBinding: "__marker_target__",
-            targetValue: .object(typeName: "Marker.Target", fields: [:]),
-            localBindings: bindings
+            targetBinding: markerBindings?.target ?? "__marker_target__",
+            targetValue: targetValue,
+            graphBinding: markerBindings?.graph,
+            localBindings: bindings,
+            context: context
         )
 
-        guard marker.body.count == 1 else {
-            throw ParseError("Marker #\(marker.name) body must evaluate to one compile-time value.")
-        }
-
-        let value: CompileTimeValue?
-        switch marker.body[0] {
-        case .return(let expression?):
-            value = evaluator.evaluate(expression)
-        case .expression(let expression):
-            value = evaluator.evaluate(expression)
-        default:
-            value = nil
+        var localBindings = bindings
+        var value: CompileTimeValue?
+        for statement in marker.body {
+            switch statement {
+            case .localBinding(let declaration):
+                localBindings[declaration.name] = declaration.expression
+            case .return(let expression?):
+                value = evaluator.evaluate(expression, with: localBindings)
+            case .expression(let expression):
+                value = evaluator.evaluate(expression, with: localBindings)
+            default:
+                value = nil
+            }
+            if value != nil {
+                break
+            }
         }
 
         guard let value else {

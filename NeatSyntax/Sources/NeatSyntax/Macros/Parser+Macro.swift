@@ -138,6 +138,7 @@ extension Parser {
         }
         let globalRegistrations = try parseMarkerGlobalRegistrationsIfPresent()
 
+        let bindings: MacroBindings?
         let body: [Statement]
         if signatureOnly {
             guard peek() == .leftBrace else {
@@ -149,16 +150,20 @@ extension Parser {
                     target: target,
                     valueType: valueType,
                     globalRegistrations: globalRegistrations,
+                    bindings: nil,
                     body: body
                 )
             }
             try consume(.leftBrace)
+            _ = try parseMarkerBodyBindingsIfPresent()
             try skipUnknownBlockBody()
             try consume(.rightBrace)
+            bindings = nil
             body = []
         } else if peek() == .leftBrace {
-            body = try parseMarkerBody(parameters: parameters)
+            (bindings, body) = try parseMarkerBody(parameters: parameters)
         } else {
+            bindings = nil
             body = []
         }
 
@@ -169,6 +174,7 @@ extension Parser {
             target: target,
             valueType: valueType,
             globalRegistrations: globalRegistrations,
+            bindings: bindings,
             body: body
         )
     }
@@ -223,8 +229,12 @@ extension Parser {
         return statements
     }
 
-    mutating func parseMarkerBody(parameters: [NeatFunctionParameter]) throws -> [Statement] {
+    mutating func parseMarkerBody(parameters: [NeatFunctionParameter]) throws -> (
+        bindings: MacroBindings?,
+        body: [Statement]
+    ) {
         try consume(.leftBrace)
+        let bindings = try parseMarkerBodyBindingsIfPresent()
         var localBindings = Dictionary(
             uniqueKeysWithValues: parameters.map {
                 (
@@ -233,12 +243,46 @@ extension Parser {
                 )
             }
         )
+        if let bindings {
+            localBindings[bindings.target] = .init(kind: .constant, type: .named("MacroTarget"))
+            localBindings[bindings.diagnostics] = .init(kind: .constant, type: .named("MacroDiagnostics"))
+            if let graph = bindings.graph {
+                localBindings[graph] = .init(kind: .constant, type: .named("GraphContext"))
+            }
+        }
         var statements: [Statement] = []
         while peek() != .rightBrace {
             statements.append(try parseStatement(localBindings: &localBindings))
         }
         try consume(.rightBrace)
-        return statements
+        return (bindings, statements)
+    }
+
+    mutating func parseMarkerBodyBindingsIfPresent() throws -> MacroBindings? {
+        guard case .identifier = peek(),
+            peek(offset: 1) == .comma,
+            case .identifier = peek(offset: 2)
+        else {
+            return nil
+        }
+
+        let targetBinding = try consumeIdentifier()
+        try consume(.comma)
+        let diagnosticsBinding = try consumeIdentifier()
+        let graphBinding: String?
+        if peek() == .comma {
+            try consume(.comma)
+            graphBinding = try consumeIdentifier()
+        } else {
+            graphBinding = nil
+        }
+        try consumeKeyword(.inKeyword)
+
+        return MacroBindings(
+            target: targetBinding,
+            diagnostics: diagnosticsBinding,
+            graph: graphBinding
+        )
     }
 
     mutating func parseMacroBody() throws -> (bindings: MacroBindings, body: [Statement]) {

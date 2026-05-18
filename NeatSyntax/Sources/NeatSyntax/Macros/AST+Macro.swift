@@ -18,6 +18,7 @@ public struct MarkerDeclaration {
     public let target: MacroTarget
     public let valueType: TypeReference
     public let globalRegistrations: [MarkerGlobalRegistration]
+    public let bindings: MacroBindings?
     public let body: [Statement]
 
     public var registersNamespace: Bool {

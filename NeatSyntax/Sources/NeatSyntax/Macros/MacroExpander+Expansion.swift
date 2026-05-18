@@ -231,6 +231,7 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws -> ConstructDeclaration {
         try validateConstructMacros(
+            construct: construct,
             applications: construct.macros,
             macros: macros,
             context: context
@@ -670,7 +671,12 @@ extension MacroExpander {
                     }
                     _ = try MacroTargetValueBuilder.evaluateMarkerValue(
                         for: application,
-                        marker: marker
+                        marker: marker,
+                        targetValue: markerTargetValue(
+                            kind: propertyKindDescription(propertyKind),
+                            name: name
+                        ),
+                        context: context
                     )
                     continue
                 }
@@ -822,6 +828,15 @@ extension MacroExpander {
         case .derived:
             return "derived"
         }
+    }
+
+    static func markerTargetValue(kind: String, name: String) -> CompileTimeValue {
+        .object(
+            typeName: "Marker.Target",
+            fields: [
+                "identity": MacroTargetValueBuilder().graphIdentity(kind: kind, name: name)
+            ]
+        )
     }
 
     static func propertyHookName(_ hook: PropertyTransformHook) -> String {

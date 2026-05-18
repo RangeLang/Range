@@ -427,6 +427,7 @@ extension MacroExpander {
     }
 
     static func validateConstructMacros(
+        construct: ConstructDeclaration,
         applications: [MacroApplication],
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
@@ -448,7 +449,9 @@ extension MacroExpander {
                     }
                     _ = try MacroTargetValueBuilder.evaluateMarkerValue(
                         for: application,
-                        marker: marker
+                        marker: marker,
+                        targetValue: MacroTargetValueBuilder().targetValue(for: construct),
+                        context: context
                     )
                     continue
                 }

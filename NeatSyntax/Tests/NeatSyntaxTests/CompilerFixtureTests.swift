@@ -102,42 +102,129 @@ struct CompilerFixtureTests {
 
     @Test("Macros query graph through identities")
     func macrosQueryGraphThroughIdentities() throws {
+        let source = """
+        construct User {
+            let name: String
+            let age: Int
+
+            construct Nested {
+                let value: Int
+            }
+        }
+        """
+        var parser = try Parser(source: source)
+        let sourceFile = try parser.parseSourceFile()
+        guard case .construct(let construct) = sourceFile else {
+            Issue.record("Expected construct.")
+            return
+        }
+        let graph = DeclarationGraph(
+            files: [
+                ParsedSourceFile(
+                    path: "/tmp/MacroGraphIdentity.neat",
+                    source: source,
+                    sourceFile: sourceFile
+                )
+            ]
+        )
+        let context = graph.macroExpansionContext(macrosByName: [:])
+        let target = MacroTargetValueBuilder().targetValue(for: construct)
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "target",
+            targetValue: target,
+            graphBinding: "graph",
+            localBindings: [:],
+            context: context
+        )
+
+        guard case .string("User")? = evaluator.evaluate(
+            Expression.identifier("target.identity.name")
+        ) else {
+            Issue.record("Expected target.identity.name to resolve.")
+            return
+        }
+
+        let members = try #require(
+            evaluator.evaluate(
+                Expression.call(
+                    name: "graph.members",
+                    arguments: [
+                        CallArgument(label: "of", value: .identifier("target.identity"))
+                    ]
+                )
+            )
+        )
+        guard case .array(let memberIdentities) = members else {
+            Issue.record("Expected graph.members(of:) to return identity array.")
+            return
+        }
+        #expect(memberIdentities.count == 3)
+
+        let declaration = try #require(
+            evaluator.evaluate(
+                Expression.call(
+                    name: "graph.declaration",
+                    arguments: [CallArgument(label: nil, value: memberIdentities[0].expression!)]
+                )
+            )
+        )
+        #expect(declaration.field("identifier") != nil)
+
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/MacroGraphIdentity.neat",
+                path: "/tmp/MacroGraphExpansion.neat",
                 source: """
-                macro graphProbe(): Construct { target, diagnostics, graph in
-                    let declaration = graph.declaration(target.identity)
-                    let members = graph.members(of: target.identity)
-                    diagnostics.warning("graph \\(declaration.identity.name) members \\(members.count)")
+                macro graphNamed(): Construct { target, diagnostics, graph in
+                    let declaration: Construct.Declaration = graph.declaration(target.identity)
+                    target.declaration.expand {
+                        extension #(declaration.self) {
+                            function graphName() -> String {
+                                return "User"
+                            }
+                        }
+                    }
                 }
 
-                #graphProbe
+                #graphNamed
                 construct User {
                     let name: String
-                    let age: Int
-
-                    construct Nested {
-                        let value: Int
-                    }
                 }
                 """,
                 role: .project
             )
         )
 
-        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
-
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
         #expect(
-            diagnostics.contains {
-                $0.severity == .warning
-                    && $0.source == "neat-macro"
-                    && $0.code == "macro.diagnostic.warning"
-                    && $0.message == "graph User members 3"
-                    && $0.path == "/tmp/MacroGraphIdentity.neat"
-            }
+            program.declarationGraph.extensionsByTargetName["User"]?.contains {
+                $0.callables.contains { $0.name == "graphName" }
+            } == true
         )
+    }
+
+    @Test("Markers query graph through identities")
+    func markersQueryGraphThroughIdentities() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MarkerGraphIdentity.neat",
+                source: """
+                marker graphName(): Construct -> String { target, diagnostics, graph in
+                    let declaration: Construct.Declaration = graph.declaration(target.identity)
+                    return declaration.self.name
+                }
+
+                #graphName
+                construct User {
+                    let name: String
+                }
+                """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
     @Test("Parser diagnostics point at invalid hash syntax")
