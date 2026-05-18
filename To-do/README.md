@@ -6,6 +6,10 @@ the direction captured in the docs, posts, and planning notes.
 The older notes remain useful context, but this file should be the first place
 to look when deciding what to do next.
 
+The design-language map lives in `docs/design-language.md`. Posts in
+`docs/posts` are the primary source for language direction; this checklist is
+the implementation tracking surface.
+
 ## Where We Stand
 
 ### Implemented Enough To Treat As Current Baseline
@@ -29,6 +33,10 @@ to look when deciding what to do next.
 - [x] Project source cannot declare explicit `init`; construction is still
       modeled from stored declarations and allowed core/bootstrap surfaces.
 - [x] Macro diagnostics feed the compiler diagnostic channel.
+- [x] Macros and construct-applied markers can receive graph access through
+      `target`, `diagnostics`, and `graph` bindings.
+- [x] Macro graph access uses `Graph.Identity` for nested members, avoiding
+      recursive declaration expansion by default.
 - [x] Syntax-producing macros exist, including syntax templates, splices, and
       macro-to-macro invocation.
 - [x] `#codable` uses string-keyed encode/decode generation and marker metadata.
@@ -149,6 +157,14 @@ to look when deciding what to do next.
 
 - [ ] Harden generic marker access without adding one-off fields like
       `property.codingKey`.
+- [ ] Make property marker targets owner-qualified in graph identity, so
+      `let`, `state`, `binding`, and `derived` marker graph access has the same
+      fidelity as construct marker graph access.
+- [ ] Decide and implement the operational `@macro` vs descriptive `#marker`
+      surface. Current implementation still accepts macro applications through
+      the older `#` path in several places.
+- [ ] Prototype `@provided` as a property macro and `#secret` as marker metadata
+      to replace environment-style config and secret loading.
 - [ ] Expand syntax-producing macro coverage for function bodies, initializer
       bodies, blocks, switches, assignments, and declaration lists.
 - [ ] Decide the syntax block story around future `# { ... }` blocks.
@@ -201,25 +217,28 @@ to look when deciding what to do next.
 - [ ] Decide whether NeatCloud is a real product direction for packages,
       articles, examples, and language-design notes.
 - [ ] Keep X publishing scripts separate from docs source generation.
-- [ ] Keep credentials in `.env` only.
+- [ ] Treat `.env` as only one local provider for typed config/secret
+      declarations. The source of truth should be graph-visible declarations
+      such as `#secret @provided(...) let stripeKey: Key`.
 
 ## Immediate Next Slice
 
-1. Introduce the uniform declaration descriptor surface on top of the existing
+1. Make property marker targets owner-qualified in graph identity.
+2. Introduce the uniform declaration descriptor surface on top of the existing
    registries.
-2. Promote one missing relation to a first-class graph fact, starting with
+3. Promote one missing relation to a first-class graph fact, starting with
    `facetOf` because it clarifies macro target surfaces without changing
    runtime behavior.
-3. Route one literal compatibility path through declaration graph facts and
+4. Route one literal compatibility path through declaration graph facts and
    `NeatCore` bridge protocols.
-4. Define the smallest non-diagnostic `MemoryGraph` projection pass.
+5. Define the smallest non-diagnostic `MemoryGraph` projection pass.
 
 ## Verification Snapshot
 
-Last reviewed on 2026-05-18.
+Last reviewed on 2026-05-19.
 
-- `NeatSyntax`: `swift test` passed with 41 tests.
-- `NeatCLI`: `swift test` passed.
+- `NeatSyntax`: `swift test` passed with 43 tests.
+- `NeatCLI`: `swift test` passed with 36 tests.
 - `NeatBackendSwift`: `swift test` builds, but exits with `no tests found`
   because the package has no test target.
 - Fixture inventory at review time:

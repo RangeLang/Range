@@ -874,7 +874,6 @@ struct CompilerFixtureTests {
             "count",
             "label",
             "selected",
-            "theme",
             "title",
         ])
         #expect(graph.declaresMemberPath("Panel.address.street", onConstruct: "Panel"))

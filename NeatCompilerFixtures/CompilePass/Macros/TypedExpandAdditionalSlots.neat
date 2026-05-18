@@ -20,7 +20,7 @@ macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
         construct #("GeneratedTypedExpandConstruct")<Wrapped: #(AdditionalTypedExpandProtocol), let count: #(Int)>: #(AdditionalTypedExpandProtocol) {
             let label: #(String)
             binding amount: #(Int)
-            environment externalText: #(String)
+            let externalText: #(String)
         }
 
         extension #(target.declaration.self) {
