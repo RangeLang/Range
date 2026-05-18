@@ -13,7 +13,7 @@ struct PackagePublisherTests {
         #expect(published.name == "Fixture")
         #expect(published.version == "0.1.1")
         #expect(published.git == .skipped("not a git repository"))
-        #expect(source.contains(#"let version: Version = Version(0.1.1)"#))
+        #expect(source.contains(#"let version: Version(0.1.1)"#))
     }
 
     @Test("Minor and major publish reset lower version components")
@@ -51,11 +51,10 @@ struct PackagePublisherTests {
             .appendingPathComponent("neat-package-publish-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            #package
-            construct Project {
-                let name: Title = Title("Fixture")
-                let version: Version = Version(\(version))
-                let author: String = "Test Author"
+            @package {
+                let name: Title("Fixture")
+                let version: Version(\(version))
+                let author: String("Test Author")
             }
             """.write(to: root.appendingPathComponent("Package.neat"), atomically: true, encoding: .utf8)
         return root

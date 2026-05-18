@@ -1,67 +1,51 @@
-# Packaging Attribute
+# Package Space
 
 ## Definition
 
-`@packaging` marks declarations that define Neat package manager metadata.
+`@package { ... }` opens a package metadata space.
 
 ## Role
 
-Packaging declarations are ordinary language declarations with a semantic tag. The tag makes package infrastructure easy to discover without giving the declaration privileged lowering behavior.
+Package spaces collect package facts in the declaration graph without making package metadata a namespace. Declarations inside the space still register normally, so metadata types such as `Package`, `Title`, `Version`, and `Remote` are available by name.
 
 ## Examples
 
 ```neat
-@packaging
-protocol Package {
-    let name: Title
-    let version: Version
-    let author: String
-    let remotes: [Remote]
+@package {
+    protocol Package {
+        let name: Title
+        let version: Version
+        let author: String
+        let remotes: [Remote]
+    }
+
+    construct Title {
+        let raw: String
+    }
+
+    construct Version {
+        let raw: String
+    }
+
+    construct Remote {
+        let url: String
+    }
 }
 ```
 
-```neat
-@packaging
-construct Title {
-    let raw: String
-}
-```
+Package manifests can write metadata directly in the package space:
 
 ```neat
-@packaging
-construct Version {
-    let raw: String
-}
-```
-
-```neat
-@packaging
-construct Remote {
-    let url: String
-}
-```
-
-Package manifests can write versions directly:
-
-```neat
-let version: Version(0.1.8)
-```
-
-The CLI also recognizes `#package` as a manifest macro. When `remotes` is omitted,
-the CLI resolves package remotes from git:
-
-```neat
-#package
-construct Project {
+@package {
     let name: Title("Neat")
     let version: Version(0.1.8)
-    let author: String = "George"
+    let author: String("George")
 }
 ```
 
 ## Notes
 
-- `@packaging` is not a replacement for `@language`.
-- `@packaging` does not make a construct non-identity-bearing.
-- Package manifests can either conform to `Package` directly or use the CLI `#package` macro.
-- Package manifests are not themselves marked `@packaging`.
+- `@package` is not a replacement for `@language`.
+- `@package` does not make declarations non-identity-bearing.
+- `@package` is not a namespace declaration. It is a package metadata space collected by the graph.
+- When package remotes are omitted, the CLI can resolve package remotes from git.

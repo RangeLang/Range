@@ -12,12 +12,11 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
-            #package
-            construct Project {
-                let name: Title = Title("Fixture")
-                let version: Version = Version(1.2.3)
-                let author: String = "Test Author"
-                let remote: String = "https://github.com/acme/fixture.git"
+            @package {
+                let name: Title("Fixture")
+                let version: Version(1.2.3)
+                let author: String("Test Author")
+                let remote: String("https://github.com/acme/fixture.git")
                 let remotes: [Remote] = [
                     Remote(url: "https://github.com/acme/fixture.git"),
                     Remote(url: "git@github.com:acme/fixture.git"),
@@ -45,11 +44,10 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
-            #package
-            construct Project {
-                let name: Title = Title("Fixture")
-                let version: Int = 1
-                let author: String = "Test Author"
+            @package {
+                let name: Title("Fixture")
+                let version: Int(1)
+                let author: String("Test Author")
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 
@@ -61,8 +59,8 @@ struct PackageManifestTests {
         }
     }
 
-    @Test("Package macro resolves git remotes")
-    func packageMacroResolvesGitRemotes() throws {
+    @Test("Package space resolves git remotes")
+    func packageSpaceResolvesGitRemotes() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("neat-package-manifest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -71,11 +69,10 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
-            #package
-            construct Project {
-                let name: Title = Title("Fixture")
-                let version: Version = Version(1.2.3)
-                let author: String = "Test Author"
+            @package {
+                let name: Title("Fixture")
+                let version: Version(1.2.3)
+                let author: String("Test Author")
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 

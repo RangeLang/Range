@@ -21,7 +21,7 @@ construct Panel {
 
 ## Validation
 
-Built-in attributes such as `@main`, `@background`, `@language`, and `@packaging` are always available.
+Built-in attributes such as `@main`, `@background`, `@language`, and `@package` are always available.
 
 Any other attribute must match a visible namespace name:
 

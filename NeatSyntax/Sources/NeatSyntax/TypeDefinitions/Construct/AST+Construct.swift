@@ -77,6 +77,6 @@ public struct AttributeApplication {
     }
 
     public var isPackaging: Bool {
-        name == "package" || name == "packaging"
+        name == "package"
     }
 }

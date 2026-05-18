@@ -54,7 +54,7 @@ enum PackageManifestLoader {
             let usesPackageMacro = declaration.macros.contains { $0.name == "package" }
             guard usesPackageMacro || declaration.conformances == [.named("Package")] else {
                 throw ValidationError(
-                    "Package.neat must declare construct Name: Package or #package construct Name.")
+                    "Package.neat must declare @package { ... } or construct Name: Package.")
             }
 
             let name =
@@ -96,7 +96,7 @@ enum PackageManifestLoader {
     ) throws -> String {
         let value = try requireValue(named: name, typeName: "String", in: values)
         guard case .string(let string)? = value.value else {
-            throw ValidationError("Package.neat requires let \(name): String = \"...\".")
+            throw ValidationError("Package.neat requires let \(name): String(\"...\").")
         }
         return string
     }
@@ -106,7 +106,7 @@ enum PackageManifestLoader {
         in values: [ValueDeclaration]
     ) throws -> String {
         guard let title = try titleValue(named: name, in: values) else {
-            throw ValidationError("Package.neat requires let \(name): Title = Title(\"...\").")
+            throw ValidationError("Package.neat requires let \(name): Title(\"...\").")
         }
         return title
     }
@@ -124,7 +124,7 @@ enum PackageManifestLoader {
             )
         }
         guard case .call(let callName, let arguments)? = value.value, callName == "Title" else {
-            throw ValidationError("Package.neat requires let \(name): Title = Title(\"...\").")
+            throw ValidationError("Package.neat requires let \(name): Title(\"...\").")
         }
         guard arguments.count == 1, arguments[0].label == nil,
             case .string(let title) = arguments[0].value
@@ -141,13 +141,13 @@ enum PackageManifestLoader {
         let value = try requireValue(named: name, typeNames: ["Version", "String"], in: values)
         if value.typeName == "String" {
             guard case .string(let string)? = value.value else {
-                throw ValidationError("Package.neat requires let \(name): String = \"...\".")
+                throw ValidationError("Package.neat requires let \(name): String(\"...\").")
             }
             return string
         }
 
         guard case .call(let callName, let arguments)? = value.value, callName == "Version" else {
-            throw ValidationError("Package.neat requires let \(name): Version = Version(0.1.0).")
+            throw ValidationError("Package.neat requires let \(name): Version(0.1.0).")
         }
         guard arguments.count == 1, arguments[0].label == nil else {
             throw ValidationError("Package.neat Version requires one unlabeled semantic version.")

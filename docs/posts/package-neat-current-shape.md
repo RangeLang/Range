@@ -22,21 +22,20 @@ neat create Example ./Example
 That writes a manifest with the current shape:
 
 ```neat
-#package
-construct Project {
+@package {
     let name: Title("Example")
     let version: Version(0.1.0)
-    let author: "George"
+    let author: String("George")
 }
 ```
 
-A published package can also conform to the package protocol directly:
+Remotes can be declared in the same package space:
 
 ```neat
-construct Example: Package {
+@package {
     let name: Title("Example")
     let version: Version(0.1.0)
-    let author: "George"
+    let author: String("George")
     let remotes: [Remote] = [
         Remote(url: "https://github.com/example/example.git")
     ]
@@ -47,8 +46,6 @@ construct Example: Package {
 
 The old form hid which facts were package fields and which values had domain meaning.
 
-The current form keeps the package body as a normal construct. `name` is born as a `Title`, `version` is born as a `Version`, and `author` is declared directly from its literal value.
+The current form keeps package facts in a package space. `name` is born as a `Title`, `version` is born as a `Version`, and `author` is declared directly from its string value.
 
-`#package` is the CLI-friendly form. It can infer remotes from git when the manifest does not list them.
-
-Direct `construct Name: Package` is the explicit package shape. It must include the package protocol fields, including `remotes`, so publishing and search can read the metadata without guessing.
+`@package` is not a namespace, but it gives the graph one place to collect package metadata. When the manifest does not list remotes, the CLI can infer them from git.
