@@ -355,6 +355,41 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(containsExactToken(tokens, text: "failed", type: .enumMember, modifiers: [.declaration]))
     }
 
+    @Test("Documented package and namespace syntax emits semantic tokens")
+    func documentedPackageAndNamespaceSyntaxEmitsSemanticTokens() {
+        let source = """
+        namespace Styling {
+        }
+
+        @package {
+            let name: Title("Example")
+            let version: Version(0.1.0)
+        }
+
+        #namespace(.locked)
+        construct Math {
+        }
+
+        @Styling
+        construct Panel {
+            let count: Int(5)?
+            let value: Optional<Int>
+        }
+        """
+
+        let tokens = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+
+        #expect(containsExactToken(tokens, text: "namespace", type: .keyword, modifiers: []))
+        #expect(containsToken(tokens, text: "Styling", type: .type, modifiers: [.declaration]))
+        #expect(containsExactToken(tokens, text: "@package", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "#namespace", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@Styling", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "Title", type: .type, modifiers: []))
+        #expect(containsExactToken(tokens, text: "Version", type: .type, modifiers: []))
+        #expect(containsExactToken(tokens, text: "Optional", type: .type, modifiers: []))
+        #expect(containsExactToken(tokens, text: "Int", type: .type, modifiers: []))
+    }
+
     @Test("Member call receivers do not emit plain variable read tokens")
     func memberCallReceiversDoNotEmitVariableReadTokens() {
         let source = """
@@ -370,6 +405,35 @@ struct NeatLanguageServerSemanticTokenTests {
         #expect(containsExactToken(tokens, text: "send", type: .method, modifiers: []))
         #expect(containsExactToken(tokens, text: "receive", type: .method, modifiers: []))
         #expect(!containsExactToken(tokens, text: "output", type: .variable, modifiers: []))
+    }
+
+    @Test("Formatting indents documented metadata syntax without counting string braces")
+    func formattingIndentsDocumentedMetadataSyntaxWithoutCountingStringBraces() {
+        let source = """
+        @package {
+        let name: Title("Example {")
+        let version: Version(0.1.0) // )
+        }
+        namespace Styling {
+        construct Panel {
+        let title: String
+        }
+        }
+        """
+
+        let formatted = NeatLanguageServer.debugFormattedDocument(source)
+
+        #expect(formatted == """
+        @package {
+          let name: Title("Example {")
+          let version: Version(0.1.0) // )
+        }
+        namespace Styling {
+          construct Panel {
+            let title: String
+          }
+        }
+        """)
     }
 }
 

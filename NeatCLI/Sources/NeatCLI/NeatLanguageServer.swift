@@ -316,7 +316,7 @@ struct NeatLanguageServer {
             return []
         }
 
-        let formatted = formatDocument(request.state.text)
+        let formatted = Self.formatDocument(request.state.text)
         guard formatted != request.state.text else {
             return []
         }
@@ -613,14 +613,20 @@ struct NeatLanguageServer {
     private func keywordCompletions() -> [[String: Any]] {
         [
             "case", "construct", "derived", "enum", "environment", "extension", "macro",
-            "protocol", "state", "switch", "let",
+            "namespace", "protocol", "state", "switch", "let",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
 
     private func attributeCompletions() -> [[String: Any]] {
-        [
+        let builtinAttributes = [
             "@main", "@background", "@language", "@package",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
+        let namespaceAttributes = documents.values
+            .flatMap(\.symbols)
+            .filter { $0.kind == .declaration && $0.detail == "namespace" }
+            .map { completionItem(label: "@\($0.name)", kind: 14, detail: "namespace attribute") }
+
+        return uniqueCompletionItems(builtinAttributes + namespaceAttributes)
     }
 
     private func macroCompletions() -> [[String: Any]] {
@@ -663,7 +669,7 @@ struct NeatLanguageServer {
         return result.sorted { ($0["label"] as? String ?? "") < ($1["label"] as? String ?? "") }
     }
 
-    private func formatDocument(_ text: String) -> String {
+    private static func formatDocument(_ text: String) -> String {
         let lines = text.components(separatedBy: .newlines)
         var depth = 0
         var formatted: [String] = []
@@ -682,12 +688,58 @@ struct NeatLanguageServer {
 
             formatted.append(String(repeating: "  ", count: depth) + trimmed)
 
-            let opens = trimmed.filter { "({[".contains($0) }.count
-            let closes = trimmed.filter { ")}]".contains($0) }.count
+            let delimiterBalance = formattingDelimiterBalance(in: trimmed)
+            let opens = delimiterBalance.opens
+            let closes = delimiterBalance.closes
             depth = max(0, depth + opens - closes)
         }
 
         return formatted.joined(separator: "\n")
+    }
+
+    private static func formattingDelimiterBalance(in line: String) -> (opens: Int, closes: Int) {
+        var opens = 0
+        var closes = 0
+        var inString = false
+        var escaped = false
+        var index = line.startIndex
+
+        while index < line.endIndex {
+            let character = line[index]
+            let next = line.index(after: index)
+
+            if !inString,
+                character == "/",
+                next < line.endIndex,
+                line[next] == "/"
+            {
+                break
+            }
+
+            if inString {
+                if escaped {
+                    escaped = false
+                } else if character == "\\" {
+                    escaped = true
+                } else if character == "\"" {
+                    inString = false
+                }
+                index = next
+                continue
+            }
+
+            if character == "\"" {
+                inString = true
+            } else if "({[".contains(character) {
+                opens += 1
+            } else if ")}]".contains(character) {
+                closes += 1
+            }
+
+            index = next
+        }
+
+        return (opens, closes)
     }
 
     private func isIdentifier(_ value: String) -> Bool {
@@ -1108,6 +1160,22 @@ private struct DocumentIndex {
                 continue
             }
 
+            if let match = firstMatch(in: line, pattern: #"\bnamespace\s+([A-Z][A-Za-z0-9_]*)\s*\{"#) {
+                let name = match[1]
+                let symbolRange = range(in: line, line: lineIndex, value: name)
+                symbols.append(
+                    Symbol(
+                        name: name,
+                        kind: .declaration,
+                        detail: "namespace",
+                        uri: uri,
+                        range: symbolRange,
+                        selectionRange: symbolRange
+                    )
+                )
+                continue
+            }
+
             if let match = firstMatch(
                 in: line,
                 pattern: #"\blet\s+([a-z_][A-Za-z0-9_]*)\s*:\s*([A-Z][A-Za-z0-9_.]*)\s*\{"#
@@ -1258,6 +1326,7 @@ private struct DocumentIndex {
 
         let declarationPatterns: [String] = [
             #"\bconstruct\s+([A-Z][A-Za-z0-9_]*)"#,
+            #"\bnamespace\s+([A-Z][A-Za-z0-9_]*)"#,
             #"\bprotocol\s+([A-Z][A-Za-z0-9_]*)"#,
             #"\benum\s+([A-Z][A-Za-z0-9_]*)"#,
             #"\*builder\s+([A-Z][A-Za-z0-9_]*)"#,
@@ -1274,6 +1343,7 @@ private struct DocumentIndex {
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
         let macroTokenPattern = #"(#[a-z_][A-Za-z0-9_]*)\b"#
+        let metadataTokenPattern = #"(#namespace)\b"#
         let attributeKeywordPattern = #"@[A-Za-z_][A-Za-z0-9_]*\b"#
         let enumCaseDeclarationPattern = #"^\s*case\s+([a-z_][A-Za-z0-9_]*)\b"#
         let argumentValuePattern = #"(?:\(\s*|,\s*|:\s*)([a-z_][A-Za-z0-9_]*)\s*(?=[,)])"#
@@ -1297,7 +1367,7 @@ private struct DocumentIndex {
             "background", "binding", "break", "builder", "capture", "case", "construct",
             "continue", "core", "default", "derived", "else", "enum", "environment",
             "extension", "for", "function", "get", "if", "in", "infix", "init",
-            "macro", "main", "marker", "nil", "on", "operator", "postfix", "precedencegroup",
+            "macro", "main", "marker", "namespace", "nil", "on", "operator", "postfix", "precedencegroup",
             "prefix", "protocol", "return", "self", "set", "state", "switch", "let", "var",
             "while",
         ]
@@ -1306,7 +1376,7 @@ private struct DocumentIndex {
         )
         let identifierKeywordExclusions: Set<String> = [
             "if", "for", "while", "switch", "return", "macro", "marker", "function", "init",
-            "construct", "enum", "protocol", "extension", "background", "state",
+            "construct", "namespace", "enum", "protocol", "extension", "background", "state",
             "environment", "binding", "derived", "let", "var", "case", "default", "break",
             "continue", "true", "false", "nil", "self",
         ]
@@ -1669,6 +1739,18 @@ private struct DocumentIndex {
                 )
             }
 
+            if let metadataTokenRegex = try? NSRegularExpression(pattern: metadataTokenPattern) {
+                let metadataMatches = metadataTokenRegex.matches(
+                    in: line,
+                    range: NSRange(location: 0, length: nsLine.length)
+                )
+                for match in metadataMatches {
+                    guard match.numberOfRanges > 1 else { continue }
+                    let nameRange = match.range(at: 1)
+                    record(line: lineIndex, range: nameRange, type: .keyword, modifiers: [])
+                }
+            }
+
             guard let macroTokenRegex = try? NSRegularExpression(pattern: macroTokenPattern) else {
                 continue
             }
@@ -1679,6 +1761,13 @@ private struct DocumentIndex {
             for match in macroMatches {
                 guard match.numberOfRanges > 1 else { continue }
                 let nameRange = match.range(at: 1)
+                if overlapsExisting(
+                    line: lineIndex,
+                    start: nameRange.location,
+                    length: nameRange.length
+                ) {
+                    continue
+                }
                 record(line: lineIndex, range: nameRange, type: .macro, modifiers: [])
             }
 
@@ -2159,6 +2248,10 @@ struct DefinitionSnapshot: Equatable {
 }
 
 extension NeatLanguageServer {
+    static func debugFormattedDocument(_ text: String) -> String {
+        formatDocument(text)
+    }
+
     static func debugSemanticTokenSnapshots(in text: String) -> [SemanticTokenSnapshot] {
         let lines = text.components(separatedBy: .newlines)
         return DocumentIndex.collectSemanticTokenOccurrences(in: lines).map { occurrence in
