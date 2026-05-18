@@ -10,7 +10,7 @@ description: Create very short Neat update, addition, or feature posts with a co
 1. Identify the post kind: `Update post`, `Addition post`, or `Feature post`.
 2. Choose a concept title, not an action title.
 3. Keep the post short. Prefer one title, one sentence of context, one compact example section, and a compact reason.
-4. Write to `docs/posts/<kebab-title>.md` unless the user names another destination.
+4. Write to a user-named destination; if none is given, return the Markdown draft in the response.
 5. Use the user's first-person Neat developer voice only when needed, but avoid filler like "to me because".
 6. Explain what repetition, awkwardness, or unclear shape was removed, and what the new shape makes easier to see.
 7. Avoid speculative sections such as `Open Questions`, `Questions`, or `Unresolved`.

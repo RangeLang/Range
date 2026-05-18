@@ -216,7 +216,6 @@ implementation tracking surface.
 
 - [ ] Decide whether NeatCloud is a real product direction for packages,
       articles, examples, and language-design notes.
-- [ ] Keep X publishing scripts separate from docs source generation.
 - [ ] Treat `.env` as only one local provider for typed config/secret
       declarations. The source of truth should be graph-visible declarations
       with property metadata and behavior attached through markers/macros.
