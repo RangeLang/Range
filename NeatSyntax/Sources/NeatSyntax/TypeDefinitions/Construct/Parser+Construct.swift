@@ -113,7 +113,7 @@ extension Parser {
         try validateInitializerDeclarations(
             initializers,
             availableDeriveds: deriveds,
-            allowBodylessInitializers: declarationIsCore(attribute)
+            allowBodylessInitializers: declarationIsCore(attribute, macros: macros)
         )
 
         return ConstructDeclaration(
@@ -188,8 +188,12 @@ extension Parser {
         return .declaration
     }
 
-    private func declarationIsCore(_ attribute: AttributeApplication?) -> Bool {
+    private func declarationIsCore(
+        _ attribute: AttributeApplication?,
+        macros: [MacroApplication]
+    ) -> Bool {
         attribute?.isLanguageBoundary == true
+            || macros.contains { $0.name == "language" || $0.name == "syntax" }
     }
 
     mutating func parseConstructHeader() throws

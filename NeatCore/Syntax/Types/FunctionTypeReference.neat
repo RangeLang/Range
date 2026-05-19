@@ -1,4 +1,4 @@
-@syntax
+#syntax
 construct FunctionTypeReference: StructuralTypeReference {
     let parameters: [TypeReference]
     let returnType: TypeReference

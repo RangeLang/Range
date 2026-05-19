@@ -178,7 +178,7 @@ struct PackageSubscriptionManager {
         try updatedSource.write(to: packageFile, atomically: true, encoding: .utf8)
 
         TerminalLog.out("Subscribed to \(package.reference).", level: .success)
-        TerminalLog.subtleOut("Package.neat: Module(\"\(package.reference)\")")
+        TerminalLog.subtleOut("Package.neat: modules += \"\(package.reference)\"")
         return .subscribed
     }
 
@@ -216,12 +216,22 @@ struct PackageSubscriptionManager {
     }
 
     private func parseModules(from source: String) -> Set<String> {
-        guard let regex = try? NSRegularExpression(pattern: #"Module\("([^"]+)"\)"#) else {
+        guard
+            let modulesRegex = try? NSRegularExpression(
+                pattern: #"\blet\s+modules\s*:\s*\[String\]\s*=\s*\[(.*?)\]"#,
+                options: [.dotMatchesLineSeparators]
+            ),
+            let stringRegex = try? NSRegularExpression(pattern: #""([^"]+)""#)
+        else {
             return []
         }
 
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
-        let matches = regex.matches(in: source, range: range)
+        let moduleRanges = modulesRegex.matches(in: source, range: range)
+            .compactMap { Range($0.range(at: 1), in: source) }
+        let matches = moduleRanges.flatMap { moduleRange in
+            stringRegex.matches(in: source, range: NSRange(moduleRange, in: source))
+        }
         return Set(
             matches.compactMap { match in
                 guard let groupRange = Range(match.range(at: 1), in: source) else {
@@ -242,8 +252,33 @@ struct PackageSubscriptionManager {
             lines.remove(at: closingBraceIndex - 1)
         }
 
+        if let modulesLineIndex = lines.firstIndex(where: {
+            $0.trimmingCharacters(in: .whitespaces).hasPrefix("let modules: [String] = [")
+        }) {
+            let line = lines[modulesLineIndex]
+            if let bracketIndex = line.lastIndex(of: "]") {
+                let prefix = String(line[..<bracketIndex])
+                let separator = prefix.trimmingCharacters(in: .whitespaces).hasSuffix("[") ? "" : ", "
+                lines[modulesLineIndex] =
+                    prefix + separator + "\"\(package)\"]"
+                    + String(line[line.index(after: bracketIndex)...])
+                return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")
+            }
+
+            guard
+                let closingArrayIndex = lines[modulesLineIndex...].firstIndex(where: {
+                    $0.trimmingCharacters(in: .whitespaces) == "]"
+                })
+            else {
+                throw ValidationError("Package.neat modules declaration must end with ].")
+            }
+
+            lines.insert("        \"\(package)\",", at: closingArrayIndex)
+            return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")
+        }
+
         let insertionIndex = lines.lastIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "}" })!
-        lines.insert("    Module(\"\(package)\")", at: insertionIndex)
+        lines.insert("    let modules: [String] = [\"\(package)\"]", at: insertionIndex)
         return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")
     }
 }

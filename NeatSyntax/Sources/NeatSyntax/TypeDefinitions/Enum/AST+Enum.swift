@@ -9,7 +9,8 @@ public struct EnumDeclaration {
     public let cases: [EnumCaseDeclaration]
 
     public var isCore: Bool {
-        attribute?.isLanguageBoundary == true || macros.contains { $0.name == "language" }
+        attribute?.isLanguageBoundary == true
+            || macros.contains { $0.name == "language" || $0.name == "syntax" }
     }
 
     public var isPackaging: Bool {

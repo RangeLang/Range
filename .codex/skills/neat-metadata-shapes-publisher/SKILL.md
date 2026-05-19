@@ -16,7 +16,7 @@ description: Use when changing Neat package publishing, metadata extraction, dec
 ## Current Shape Bias
 
 - `let version: Version(0.1.8)` means typed construction metadata on the declaration.
-- `@package { ... }` is the package metadata space collected by the graph; it is not a namespace.
+- `#package` marks the package manifest construct; do not use the old `@package { ... }` block shape.
 - `Optional<Int>` remains a type shape, not a `#optional` declaration flag.
 - `#namespace(.locked)` is publisher-facing namespace metadata.
 - Public is the normal published shape; `private` marks the exception.

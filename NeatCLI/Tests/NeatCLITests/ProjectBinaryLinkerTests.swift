@@ -64,9 +64,11 @@ struct ProjectBinaryLinkerTests {
             .appendingPathComponent("neat-binary-link-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            @package {
+            #package
+            construct Project {
                 let name: Title("Linked")
                 let version: Version(0.1.0)
+                let author: String("Test Author")
             }
             """.write(to: root.appendingPathComponent("Package.neat"), atomically: true, encoding: .utf8)
 

@@ -1,4 +1,4 @@
-@syntax
+#syntax
 construct NamedTypeReference: NominalTypeReference {
     let name: String
 

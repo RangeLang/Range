@@ -64,7 +64,8 @@ def prepare_neat_project() -> Path:
     project = BUILD / "NeatSpeed"
     project.mkdir(parents=True, exist_ok=True)
     (project / "Package.neat").write_text(
-        """@package {
+        """#package
+construct Project {
     let name: Title("NeatSpeed")
     let version: Version(0.1.0)
     let author: String("George")

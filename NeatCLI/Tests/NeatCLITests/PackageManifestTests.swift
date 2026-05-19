@@ -12,7 +12,8 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
-            @package {
+            #package
+            construct Fixture {
                 let name: Title("Fixture")
                 let version: Version(1.2.3)
                 let author: String("Test Author")
@@ -44,7 +45,8 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
-            @package {
+            #package
+            construct Fixture {
                 let name: Title("Fixture")
                 let version: Int(1)
                 let author: String("Test Author")
@@ -59,8 +61,8 @@ struct PackageManifestTests {
         }
     }
 
-    @Test("Package space resolves git remotes")
-    func packageSpaceResolvesGitRemotes() throws {
+    @Test("Package manifest resolves git remotes")
+    func packageManifestResolvesGitRemotes() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("neat-package-manifest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -69,7 +71,8 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
         try """
-            @package {
+            #package
+            construct Fixture {
                 let name: Title("Fixture")
                 let version: Version(1.2.3)
                 let author: String("Test Author")

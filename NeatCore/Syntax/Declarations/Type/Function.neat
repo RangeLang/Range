@@ -1,9 +1,9 @@
-@syntax
+#syntax
 construct Function {
     let declaration: Declaration
     let application: Application
 
-    @syntax
+    #syntax
     construct Declaration: SyntaxEmittable {
         let identifier: Identifier
         let generics: [Generic]
@@ -12,7 +12,7 @@ construct Function {
         let body: Block
     }
 
-    @syntax
+    #syntax
     construct Application: SyntaxEmittable, SyntaxReplaceable<Expression> {
         let identifier: Identifier
         let arguments: [Parameter.Application]

@@ -211,11 +211,21 @@ struct ProjectUpdater {
     }
 
     private func parseModules(from source: String) -> [String] {
-        guard let regex = try? NSRegularExpression(pattern: #"Module\("([^"]+)"\)"#) else {
+        guard
+            let modulesRegex = try? NSRegularExpression(
+                pattern: #"\blet\s+modules\s*:\s*\[String\]\s*=\s*\[(.*?)\]"#,
+                options: [.dotMatchesLineSeparators]
+            ),
+            let stringRegex = try? NSRegularExpression(pattern: #""([^"]+)""#)
+        else {
             return []
         }
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
-        let matches: [NSTextCheckingResult] = regex.matches(in: source, range: range)
+        let moduleRanges = modulesRegex.matches(in: source, range: range)
+            .compactMap { Range($0.range(at: 1), in: source) }
+        let matches = moduleRanges.flatMap { moduleRange in
+            stringRegex.matches(in: source, range: NSRange(moduleRange, in: source))
+        }
         let values: [String] = matches.compactMap { match in
             guard let groupRange = Range(match.range(at: 1), in: source) else { return nil }
             return String(source[groupRange]).trimmingCharacters(in: .whitespacesAndNewlines)

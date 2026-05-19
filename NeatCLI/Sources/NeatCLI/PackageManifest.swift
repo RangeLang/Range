@@ -25,26 +25,8 @@ enum PackageManifestLoader {
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .extensions:
             throw ValidationError("Package.neat must declare construct Name: Package.")
-        case .module(let module):
-            guard let packageSpace = module.packageSpaces.first else {
-                throw ValidationError("Package.neat must declare @package { ... } or construct Name: Package.")
-            }
-            let name = try requiredTitleValue(named: "name", in: packageSpace.values)
-            let version = try requiredVersionValue(named: "version", in: packageSpace.values)
-            let author = try requiredStringValue(named: "author", in: packageSpace.values)
-            let remote = stringValue(named: "remote", in: packageSpace.values)
-            let remoteURLs = remoteURLs(remote: remote, in: packageSpace.values)
-            let resolvedRemoteURLs = remoteURLs.isEmpty
-                ? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
-                : remoteURLs
-            return PackageManifest(
-                name: name,
-                version: version,
-                author: author,
-                remote: remote,
-                remoteURLs: resolvedRemoteURLs,
-                declaration: nil
-            )
+        case .module:
+            throw ValidationError("Package.neat must declare #package construct Name { ... } or construct Name: Package.")
         case .namespace:
             throw ValidationError("Package.neat must declare construct Name: Package.")
         case .construct(let declaration):
@@ -54,7 +36,7 @@ enum PackageManifestLoader {
             let usesPackageMacro = declaration.macros.contains { $0.name == "package" }
             guard usesPackageMacro || declaration.conformances == [.named("Package")] else {
                 throw ValidationError(
-                    "Package.neat must declare @package { ... } or construct Name: Package.")
+                    "Package.neat must declare #package construct Name { ... } or construct Name: Package.")
             }
 
             let name =

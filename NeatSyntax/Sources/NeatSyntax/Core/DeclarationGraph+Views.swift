@@ -295,10 +295,10 @@ public struct DeclarationSyntaxResolver {
     }
 
     private func declarationIsSyntaxBoundary(named name: String) -> Bool {
-        if protocolsByName[name]?.attribute?.isSyntaxBoundary == true {
+        if protocolsByName[name]?.macros.contains(where: { $0.name == "syntax" }) == true {
             return true
         }
-        if constructsByName[name]?.attribute?.isSyntaxBoundary == true {
+        if constructsByName[name]?.macros.contains(where: { $0.name == "syntax" }) == true {
             return true
         }
         return false

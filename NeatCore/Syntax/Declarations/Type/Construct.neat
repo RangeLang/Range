@@ -1,9 +1,9 @@
-@syntax
+#syntax
 construct Construct {
     let declaration: Declaration
     let application: Application
 
-    @syntax
+    #syntax
     construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType>, SyntaxEmittable {
         let self: SelfType
         let generics: [Generic]
@@ -19,7 +19,7 @@ construct Construct {
         function expand(_ expansion: () -> [Syntax])
     }
 
-    @syntax
+    #syntax
     construct Application: SyntaxReplaceable<Expression> {
         let type: TypeReference
         let arguments: [Parameter.Application]

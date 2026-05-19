@@ -570,22 +570,19 @@ struct CompilerFixtureTests {
         #expect(profile.macros.first?.argumentClause == #""settings""#)
     }
 
-    @Test("Package spaces collect package metadata")
-    func packageSpacesCollectPackageMetadata() throws {
+    @Test("Package manifests collect package metadata")
+    func packageManifestsCollectPackageMetadata() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/PackageSpace.neat",
                 source: """
-                @package {
+                #package
+                construct Project {
                     let name: Title("Example")
                     let version: Version(0.1.0)
                     let author: String("George")
-                    Module("acme/logger")
-
-                    construct PackageMarker {
-                        let raw: String
-                    }
+                    let modules: [String] = ["acme/logger"]
                 }
                 """,
                 role: .project
@@ -593,21 +590,9 @@ struct CompilerFixtureTests {
         )
 
         let program = try CompilerPipeline().build(inputs: inputs)
-        #expect(program.declarationGraph.packageSpaces.contains { $0.values.count == 3 })
         #expect(program.declarationGraph.packageValues(named: "name").count == 1)
         #expect(program.declarationGraph.packageValues(named: "version").count == 1)
         #expect(program.declarationGraph.packageValues(named: "author").count == 1)
-        #expect(program.declarationGraph.hasConstruct(named: "PackageMarker"))
-        #expect(
-            program.declarationGraph.programGraph.entities.contains {
-                $0.kind == .packageEntry && $0.label == #"Module("acme/logger")"#
-            }
-        )
-        #expect(
-            program.declarationGraph.programGraph.entities.contains {
-                $0.kind == .packageSpace && $0.label == "@package"
-            }
-        )
     }
 
     @Test("Unknown attributes reject non-macro spelling")
@@ -745,7 +730,7 @@ struct CompilerFixtureTests {
         #expect(graph.constructsByName["Namespace.Application"]?.isCore == true)
     }
 
-    @Test("@syntax declarations are syntax-facing without Syntax conformance")
+    @Test("#syntax declarations are syntax-facing without Syntax conformance")
     func syntaxDeclarationsAreSyntaxFacingWithoutSyntaxConformance() throws {
         let program = try CompilerPipeline().build(inputs: neatCoreInputs())
         let graph = program.declarationGraph
@@ -797,9 +782,10 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/DeclarationGraphRegistrySnapshot.neat",
                 source: """
-                @package {
+                #package
+                construct Project {
                     let packageName: String("Registry Snapshot")
-                    Module("acme/registry-snapshot")
+                    let modules: [String] = ["acme/registry-snapshot"]
                 }
 
                 marker styling(): Namespace<Construct>
@@ -892,19 +878,6 @@ struct CompilerFixtureTests {
         #expect(graph.hasNamespaceAttribute(named: "Routes") == false)
 
         #expect(graph.packageValues(named: "packageName").count == 1)
-        #expect(
-            graph.packageSpaces.contains {
-                $0.entries.contains {
-                    guard case .call(let name, let arguments) = $0 else {
-                        return false
-                    }
-                    guard case .string("acme/registry-snapshot")? = arguments.first?.value else {
-                        return false
-                    }
-                    return name == "Module"
-                }
-            }
-        )
         #expect(graph.topLevelStates(inFilePath: "/tmp/DeclarationGraphRegistrySnapshot.neat")
             .map(\.name) == ["globalCount"])
 
@@ -943,11 +916,6 @@ struct CompilerFixtureTests {
         #expect(
             graph.programGraph.entities.contains {
                 $0.kind == .macro && $0.label == "decorate"
-            }
-        )
-        #expect(
-            graph.programGraph.entities.contains {
-                $0.kind == .packageEntry && $0.label == #"Module("acme/registry-snapshot")"#
             }
         )
     }

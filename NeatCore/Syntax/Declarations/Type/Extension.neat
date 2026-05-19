@@ -1,4 +1,4 @@
-@syntax
+#syntax
 construct Extension<Target: NominalTypeReference>: SyntaxEmittable {
     let target: Target
     let conformances: [NominalTypeReference]

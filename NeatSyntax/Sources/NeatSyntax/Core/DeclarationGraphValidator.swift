@@ -470,6 +470,11 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     filePath: parsedFile.path,
                     declarationGraph: declarationGraph
                 )
+                try validateBuiltinMarkerUsage(
+                    declaration.macros,
+                    declarationName: declaration.name,
+                    filePath: parsedFile.path
+                )
             }
             for callable in callables(in: parsedFile.sourceFile) {
                 try validateAttribute(
@@ -477,6 +482,11 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     declarationName: callable.name,
                     filePath: parsedFile.path,
                     declarationGraph: declarationGraph
+                )
+                try validateBuiltinMarkerUsage(
+                    callable.macros,
+                    declarationName: callable.name,
+                    filePath: parsedFile.path
                 )
             }
             for declaration in protocols(in: parsedFile.sourceFile) {
@@ -486,6 +496,11 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     filePath: parsedFile.path,
                     declarationGraph: declarationGraph
                 )
+                try validateBuiltinMarkerUsage(
+                    declaration.macros,
+                    declarationName: declaration.name,
+                    filePath: parsedFile.path
+                )
             }
             for declaration in enumerations(in: parsedFile.sourceFile) {
                 try validateAttribute(
@@ -493,6 +508,11 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     declarationName: declaration.name,
                     filePath: parsedFile.path,
                     declarationGraph: declarationGraph
+                )
+                try validateBuiltinMarkerUsage(
+                    declaration.macros,
+                    declarationName: declaration.name,
+                    filePath: parsedFile.path
                 )
             }
         }
@@ -519,6 +539,18 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         else {
             throw SemanticValidationError(
                 "Unknown attribute @\(attribute.name) in \(lastPathComponent(of: filePath)). Use @ for macros and built-in attribute surfaces; use # for semantic markers."
+            )
+        }
+    }
+
+    private func validateBuiltinMarkerUsage(
+        _ macros: [MacroApplication],
+        declarationName: String,
+        filePath: String
+    ) throws {
+        if macros.contains(where: { $0.name == "syntax" }) {
+            throw SemanticValidationError(
+                "#syntax can only be used in NeatCore. Remove #syntax from \(declarationName) in \(lastPathComponent(of: filePath))."
             )
         }
     }

@@ -1,5 +1,3 @@
-@package {
-    construct Title {
-        let raw: String
-    }
+construct Title {
+    let raw: String
 }

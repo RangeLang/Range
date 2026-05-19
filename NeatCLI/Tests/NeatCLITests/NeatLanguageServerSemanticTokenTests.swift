@@ -361,7 +361,8 @@ struct NeatLanguageServerSemanticTokenTests {
         namespace Styling {
         }
 
-        @package {
+        #package
+        construct Project {
             let name: Title("Example")
             let version: Version(0.1.0)
         }
@@ -382,7 +383,7 @@ struct NeatLanguageServerSemanticTokenTests {
 
         #expect(containsExactToken(tokens, text: "namespace", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "Styling", type: .type, modifiers: [.declaration]))
-        #expect(containsExactToken(tokens, text: "@package", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "#package", type: .keyword, modifiers: []))
         #expect(containsExactToken(tokens, text: "#namespace", type: .keyword, modifiers: []))
         #expect(containsExactToken(tokens, text: "@Styling", type: .keyword, modifiers: []))
         #expect(containsExactToken(tokens, text: "Title", type: .type, modifiers: []))
@@ -411,7 +412,8 @@ struct NeatLanguageServerSemanticTokenTests {
     @Test("Formatting indents documented metadata syntax without counting string braces")
     func formattingIndentsDocumentedMetadataSyntaxWithoutCountingStringBraces() {
         let source = """
-        @package {
+        #package
+        construct Project {
         let name: Title("Example {")
         let version: Version(0.1.0) // )
         }
@@ -425,7 +427,8 @@ struct NeatLanguageServerSemanticTokenTests {
         let formatted = NeatLanguageServer.debugFormattedDocument(source)
 
         #expect(formatted == """
-        @package {
+        #package
+        construct Project {
           let name: Title("Example {")
           let version: Version(0.1.0) // )
         }

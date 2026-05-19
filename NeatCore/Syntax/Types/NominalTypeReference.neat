@@ -1,2 +1,2 @@
-@syntax
+#syntax
 protocol NominalTypeReference: TypeReference {}

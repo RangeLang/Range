@@ -52,7 +52,8 @@ public struct ConstructDeclaration {
     }
 
     public var isCore: Bool {
-        attribute?.isLanguageBoundary == true || macros.contains { $0.name == "language" }
+        attribute?.isLanguageBoundary == true
+            || macros.contains { $0.name == "language" || $0.name == "syntax" }
     }
 
     public var isPackaging: Bool {
@@ -70,11 +71,11 @@ public struct AttributeApplication {
     }
 
     public var isLanguageBoundary: Bool {
-        name == "core" || name == "syntax"
+        name == "core"
     }
 
     public var isSyntaxBoundary: Bool {
-        name == "syntax"
+        false
     }
 
     public var isPackaging: Bool {

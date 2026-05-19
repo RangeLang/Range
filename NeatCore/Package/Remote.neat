@@ -1,5 +1,3 @@
-@package {
-    construct Remote {
-        let url: String
-    }
+construct Remote {
+    let url: String
 }

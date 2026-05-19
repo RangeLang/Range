@@ -1,4 +1,4 @@
-@syntax
+#syntax
 construct Let<T>: StoredProperty, SyntaxEmittable {
   let macros: [Macro.Application]
   let markers: [Marker.Application]

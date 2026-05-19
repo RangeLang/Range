@@ -53,9 +53,11 @@ struct ProjectScriptStoreTests {
             .appendingPathComponent("neat-script-store-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            @package {
+            #package
+            construct Project {
                 let name: Title("Scripts")
                 let version: Version(0.1.0)
+                let author: String("Test Author")
             }
             """.write(to: root.appendingPathComponent("Package.neat"), atomically: true, encoding: .utf8)
         return root

@@ -1,5 +1,3 @@
-@package {
-    construct Version {
-        let raw: String
-    }
+construct Version {
+    let raw: String
 }

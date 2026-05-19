@@ -1,4 +1,4 @@
-@syntax
+#syntax
 construct Assignment: Statement {
     let target: Expression
     let expression: Expression

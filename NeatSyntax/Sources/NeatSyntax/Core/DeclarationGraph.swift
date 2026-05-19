@@ -57,6 +57,7 @@ public struct DeclarationGraph {
     public init(files: [ParsedSourceFile]) {
         let packageSpaces = Self.collectPackageSpaces(from: files)
         let packageValues = packageSpaces.flatMap(\.values)
+            + Self.collectPackageManifestValues(from: files)
         let protocols = Self.collectProtocols(from: files)
         let markers = Self.collectMarkers(from: files)
         let metadataSlotMarkers = Self.metadataSlotMarkerNames(in: markers)
@@ -545,6 +546,14 @@ public struct DeclarationGraph {
 
     static func collectPackageSpaces(from files: [ParsedSourceFile]) -> [PackageSpaceDeclaration] {
         files.flatMap { packageSpaces(in: $0.sourceFile) }
+    }
+
+    static func collectPackageManifestValues(from files: [ParsedSourceFile]) -> [ValueDeclaration] {
+        files.flatMap { parsedFile in
+            constructs(in: parsedFile.sourceFile, metadataSlotMarkers: [])
+                .filter { $0.macros.contains { $0.name == "package" } }
+                .flatMap(\.values)
+        }
     }
 
     static func collectConstructs(
@@ -1989,7 +1998,7 @@ private struct SemanticGraphCollector {
         index: Int
     ) {
         let packageID = "\(parentID)/package:\(index)"
-        addEntity(id: packageID, kind: .packageSpace, label: "@package")
+        addEntity(id: packageID, kind: .packageSpace, label: "#package")
         addRelation(from: parentID, to: packageID, kind: .contains)
 
         for value in declaration.values {

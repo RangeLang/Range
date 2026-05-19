@@ -29,7 +29,7 @@ Current bootstrap rules:
 - Expression macros may declare an expansion result type with `-> T`. Generic
   result types are resolved from macro argument types where possible.
 - Macro parameters can use `capture T` to request call-site syntax capture for
-  `@syntax` surfaces such as `Expression`. Plain `Expression` is not
+  `#syntax` surfaces such as `Expression`. Plain `Expression` is not
   syntax capture.
 - Parameter-targeted macros operate through explicit declaration/application facets on `Parameter`, for example `target.declaration.type.rewrite(...)` and nested application-side expression rewrite paths such as `target.application.expression.rewrite(...)`.
 - Function-targeted macros are graph-driven declaration macros. Concrete literal bridge functions carry `@literal<T>` directly.

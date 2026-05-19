@@ -1,9 +1,9 @@
-@syntax
+#syntax
 construct Protocol {
     let declaration: Declaration
     let application: Application
 
-    @syntax
+    #syntax
     construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
         let self: NominalTypeReference
         let generics: [Generic]
@@ -12,7 +12,7 @@ construct Protocol {
         function expand(_ expansion: () -> [Syntax])
     }
 
-    @syntax
+    #syntax
     construct Application<Conformer> {
         let self: NominalTypeReference
         let conformer: Conformer

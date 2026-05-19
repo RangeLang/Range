@@ -41,7 +41,7 @@ struct PackageSubscriptionManagerTests {
             encoding: .utf8
         )
         #expect(action == .subscribed)
-        #expect(source.contains(#"Module("acme/logger")"#))
+        #expect(source.contains(#"let modules: [String] = ["acme/logger"]"#))
         _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.neat"))
     }
 
@@ -77,7 +77,8 @@ struct PackageSubscriptionManagerTests {
             withIntermediateDirectories: true
         )
         try """
-            @package {
+            #package
+            construct Project {
                 let name: Title("\(name)")
                 let version: Version(0.1.0)
                 let author: String("Test Author")

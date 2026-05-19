@@ -2,15 +2,12 @@ import Foundation
 
 extension Parser {
     func isPackageSpaceStart() -> Bool {
-        guard case .atAttribute(let name, _) = peek(), name == "package" else {
-            return false
-        }
-        return peek(offset: 1) == .leftBrace
+        false
     }
 
     mutating func parsePackageSpace() throws -> PackageSpaceDeclaration {
         guard case .atAttribute(let name, _) = peek(), name == "package" else {
-            throw ParseError("Expected @package block.")
+            throw ParseError("Expected package block.")
         }
         advance()
 
@@ -75,7 +72,7 @@ extension Parser {
 
     mutating func parsePackageSpaceForDeclarationDiscovery() throws -> PackageSpaceDeclaration {
         guard case .atAttribute(let name, _) = peek(), name == "package" else {
-            throw ParseError("Expected @package block.")
+            throw ParseError("Expected package block.")
         }
         advance()
 

@@ -142,7 +142,7 @@ extension NeatCLI.Package {
                 }
 
                 print("    " + TerminalLog.subtleStdout(result.url.absoluteString))
-                print("    " + TerminalLog.subtleStdout("Package.neat: Module(\"\(result.package)\")"))
+                print("    " + TerminalLog.subtleStdout("Package.neat: let modules: [String] = [\"\(result.package)\"]"))
             }
         }
 
