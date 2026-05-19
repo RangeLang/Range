@@ -2,7 +2,7 @@
 construct Float<let width: FloatingPointWidth> {
     let storage: FloatStorage
 
-    #literal<FloatLiteral>
+    @literal<FloatLiteral>
     function literal(literal: FloatLiteral) -> Self {
         return Self(storage: literal.storage())
     }

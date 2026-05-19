@@ -14,12 +14,12 @@ The same base rule applies to literal bridge functions:
 
 ```neat
 construct Int {
-    #literal<IntLiteral>
+    @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self { }
 }
 ```
 
-Here `#literal<IntLiteral>` belongs to that concrete function directly.
+Here `@literal<IntLiteral>` belongs to that concrete function directly.
 
 For `literal`, the generic argument must be a compiler-recognized literal carrier type such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, or `SetLiteral`.
 
@@ -40,10 +40,10 @@ Macros attached to protocol requirements or protocols themselves are part of tha
 
 For literal bridging specifically:
 
-- `#literal<T>` is the canonical form.
+- `@literal<T>` is the canonical form.
 - `T` is a literal carrier type recognized by the compiler.
 - The compiler recognizes literal categories and carrier types.
-- A concrete literal function carries `#literal<T>` directly.
+- A concrete literal function carries `@literal<T>` directly.
 - The macro model rewrites concrete use sites through the realized literal function.
 - This rewrite is part of Neat semantic correctness, not backend adaptation.
 - A semantic rewrite such as `5 -> Int.literal(literal: 5)` is the correct Neat result even if a backend later chooses a different target-specific representation.

@@ -32,8 +32,8 @@ Current bootstrap rules:
   `@syntax` surfaces such as `Expression`. Plain `Expression` is not
   syntax capture.
 - Parameter-targeted macros operate through explicit declaration/application facets on `Parameter`, for example `target.declaration.type.rewrite(...)` and nested application-side expression rewrite paths such as `target.application.expression.rewrite(...)`.
-- Function-targeted macros are graph-driven declaration macros. Concrete literal bridge functions carry `#literal<T>` directly.
-- For literal bridging, the base form is `#literal<T>` on `function literal(literal: T) -> Self`, where `T` is a compiler-recognized literal carrier type.
+- Function-targeted macros are graph-driven declaration macros. Concrete literal bridge functions carry `@literal<T>` directly.
+- For literal bridging, the base form is `@literal<T>` on `function literal(literal: T) -> Self`, where `T` is a compiler-recognized literal carrier type.
 - The compiler recognizes carrier types and literal categories; the macro model defines how the bridge is realized on concrete literal functions.
 - Macro closures currently use only `target` and `diagnostics`; bootstrap work should not add extra bindings.
 - Local bindings inside macro bodies are syntactically valid, for example
@@ -41,25 +41,25 @@ Current bootstrap rules:
   currently path-driven and expects direct `target...rewrite(...)` paths for
   reliable behavior.
 - Parameter now uses explicit declaration/application facet values on its macro surface.
-- `Init` literal lowering now also executes through explicit declaration/application facet semantics.
-- Init-side attached rewrites should read from the application argument surface, for example `target.application.arguments[0].expression`, with an enclosing emptiness check when needed.
+- Function literal lowering now executes through explicit declaration/application facet semantics.
+- Function-side attached rewrites should read from the application argument surface, for example `target.application.arguments[0].expression`, with an enclosing emptiness check when needed.
 - Rewrite, expansion, and future omission capability are modeled explicitly with macro-surface protocols such as `SyntaxReplaceable<T>`, `SyntaxExpandable<Target>`, and `SyntaxOmittable`.
 - Preferred target-surface design uses declaration/application facet values on
   target kinds such as `Init`, with nested `Declaration` and `Application`
   constructs defining those facet types.
 - Callable and array type shapes now use concrete type-reference constructs, for example `FunctionTypeReference(...)` and `ArrayTypeReference(...)`; `Closure` remains the expression/value form.
 
-Current `Init`-targeted status:
+Current function-targeted literal status:
 
-- Concrete `#literal<T>` attachment already participates in graph-backed literal bridge realization.
+- Concrete `@literal<T>` attachment already participates in graph-backed literal bridge realization.
 - Protocol init requirements are parsed and keep their carried macros.
 - Conforming initializers inherit carried init macros through conformance matching.
-- The `Init` surface now models `target.declaration` and `target.application`,
+- The `Function` surface models `target.declaration` and `target.application`,
   and `literal` is written in that shape in NeatCore.
-- Literal bridge lowering now executes through the authoritative `Init`
+- Literal bridge lowering now executes through the authoritative `Function`
   declaration/application rewrite path for `literal`, with an explicit
   diagnostic if that rewrite cannot be interpreted.
 - Full generalized `Init` macro execution for arbitrary init-targeted macros is
-  still a remaining step beyond `literal`.
+  separate from the function-targeted literal bridge.
 
 This is a temporary bootstrap shape. The surface is being promoted out of `Exploration` only when the model is settled enough to support real compiler behavior.

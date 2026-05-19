@@ -4,7 +4,7 @@ macro literal<T>(): Init { target, diagnostics in
 construct FixtureInt {
     let storage: IntStorage
 
-    #literal<IntLiteral>
+    @literal<IntLiteral>
     init(literal: IntLiteral) {
         self.storage = literal.storage()
     }

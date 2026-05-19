@@ -57,7 +57,7 @@ It also precedes backend adaptation:
 
 ```neat
 construct Int {
-    #literal<IntLiteral>
+    @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self
 }
 
@@ -68,7 +68,7 @@ macro literal<T>(): Function { target, diagnostics in }
 
 ```neat
 construct Int {
-    #literal<IntLiteral>
+    @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self
 }
 ```
@@ -79,7 +79,7 @@ The graph records that `Int.literal(literal:)` accepts `IntLiteral`.
 
 ```neat
 construct Int {
-    #literal<IntLiteral>
+    @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self { }
 }
 ```
@@ -106,7 +106,7 @@ The compiler should know that `Int` is a valid declaration-level type before it 
 
 ```neat
 construct String {
-    #literal<StringLiteral>
+    @literal<StringLiteral>
     function literal(literal: StringLiteral) -> Self { }
 }
 ```
@@ -114,7 +114,7 @@ construct String {
 The relevant graph facts are:
 
 - `String` declares a concrete literal bridge function
-- that function carries `#literal<StringLiteral>`
+- that function carries `<StringLiteral>`
 - therefore `String` accepts `StringLiteral`
 
 If source contains:

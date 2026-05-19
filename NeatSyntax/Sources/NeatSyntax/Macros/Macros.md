@@ -8,7 +8,7 @@ They declare the syntax target they apply to directly, for example `: Expression
 
 ## Properties
 
-- Use `#` as the macro marker at the use site
+- Use `#` for call-style macro use sites
 
 ```neat
 #lock {
@@ -19,7 +19,7 @@ They declare the syntax target they apply to directly, for example `: Expression
 - Run entirely at compile time
 
 ```neat
-#literal("hello")
+#stringify("hello")
 ```
 
 Macros rewrite compiler structures before code generation. They do not add runtime overhead.
@@ -37,7 +37,7 @@ macro lock(): Block { }
 macro codable(): Construct { }
 macro clamped(min: Int, max: Int): State { }
 macro lock(): Block { }
-macro literal<T>(): Init { }
+macro literal<T>(): Function { }
 macro stringify(value _: capture Expression): Expression -> String { }
 ```
 

@@ -221,7 +221,7 @@ macro clamped(min: Int, max: Int): Property { target, diagnostics in
   facets rather than one flat bag of members
 
 ```neat
-macro literal<T>(): Init { target, diagnostics in
+macro literal<T>(): Function { target, diagnostics in
     let declaration = target.declaration
     let application = target.application
 }
@@ -261,6 +261,6 @@ Function
   `Expression` and `Block` are effectively syntax/application-first;
   `Parameter` now uses declaration plus application facets in the active
   bootstrap surface;
-  `Init` now uses declaration plus application facets authoritatively for
-  `literal`, even though generalized init macro execution is still incomplete.
-- `#literal<T>` is the canonical init-targeted literal bridge form, with `T` constrained to compiler-recognized literal carrier types.
+  `Function` now uses declaration plus application facets authoritatively for
+  `literal`.
+- `@literal<T>` is the canonical literal bridge macro annotation form, with `T` constrained to compiler-recognized literal carrier types.

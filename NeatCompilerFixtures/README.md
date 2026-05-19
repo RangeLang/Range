@@ -57,7 +57,7 @@ library. These fixtures are for host-side compiler regression tests.
 
 The current macro fixtures cover only the supported bootstrap surface:
 
-- direct literal bridge attachment through `#literal<T>` on a concrete literal function
+- direct literal bridge attachment through `@literal<T>` on a concrete literal function
 - init-targeted call-site rewrite from attached init macros
 - function-targeted macro attachment and rewrite-site validation
 - function nested argument-slot rewrite shape (`target.application.arguments[i].expression.rewrite(...)`)

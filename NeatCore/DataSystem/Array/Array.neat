@@ -2,7 +2,7 @@
 construct Array<Element> {
     state storage: ArrayStorage<Element> = ArrayStorage<Element>()
 
-    #literal<ArrayLiteral>
+    @literal<ArrayLiteral>
     function literal(literal: ArrayLiteral) -> Self {
         return Self(storage: literal.storage())
     }

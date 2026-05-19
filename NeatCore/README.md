@@ -54,11 +54,11 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 - `#language protocol` declarations define compiler-recognized semantic categories. `#language` does not cascade through protocol conformance; each language declaration must be explicitly marked.
 - The memory graph is foundational and always generated.
 - Reactivity is an optional exposed layer derived from the memory graph, not a separate base system.
-- Literal bridging is defined by `#literal<T>` on a concrete `literal(literal: T)` function, where `T` is a compiler-recognized literal carrier type.
+- Literal bridging is defined by `@literal<T>` on a concrete `literal(literal: T)` function, where `T` is a compiler-recognized literal carrier type.
 - The compiler recognizes the literal carrier types themselves, such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, and `SetLiteral`.
 - Everything beyond carrier recognition is modeled as literal bridge macro behavior on concrete literal functions.
 - Language-facing wrapper types increasingly use dedicated `...Storage` members as the semantic representation boundary. This keeps wrapper semantics in `NeatCore` while leaving backend/runtime realization free to evolve behind those storage types.
-- Type sugar and literal sugar are still separate concerns. For example, `#literal<NilLiteral>` is part of the core surface, while `T? -> Optional<T>` remains compiler type sugar.
+- Type sugar and literal sugar are still separate concerns. For example, `@literal<NilLiteral>` is part of the core surface, while `T? -> Optional<T>` remains compiler type sugar.
 - Literal meaning is settled on the Neat side before any target backend runs. A semantic result such as `Int(literal: 5)` belongs to Neat correctness even if a backend later lowers it to a target-native form.
 
 ## Current Limits

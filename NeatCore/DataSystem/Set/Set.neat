@@ -2,7 +2,7 @@
 construct Set<Element: Hashable> {
     state storage: SetStorage<Element> = SetStorage<Element>()
 
-    #literal<SetLiteral>
+    @literal<SetLiteral>
     function literal(literal: SetLiteral) -> Self {
         return Self(storage: literal.storage())
     }
