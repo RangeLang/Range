@@ -26,4 +26,16 @@ struct ProjectUpdaterTests {
     func selfUpdatePrefixIsAbsolute() {
         #expect(ProjectUpdater.selfUpdateInstallPrefix().path.hasPrefix("/"))
     }
+
+    @Test("Release repository URL normalizes owner repo references")
+    func releaseRepositoryURLNormalizesOwnerRepoReferences() {
+        #expect(
+            ProjectUpdater.releaseRepositoryURL(for: "georgetchelidze/Neat")
+                == "https://github.com/georgetchelidze/Neat.git"
+        )
+        #expect(
+            ProjectUpdater.releaseRepositoryURL(for: "https://github.com/georgetchelidze/Neat.git")
+                == "https://github.com/georgetchelidze/Neat.git"
+        )
+    }
 }

@@ -17,6 +17,14 @@ struct ProjectUpdater {
         repository: String = releaseRepository,
         version: String = "latest"
     ) throws {
+        if version == "latest" {
+            let status = try VersionChecker(repository: releaseRepositoryURL(for: repository)).check()
+            guard status.updateAvailable else {
+                TerminalLog.out("Neat CLI is already up to date.", level: .success)
+                return
+            }
+        }
+
         let platform = try releasePlatform()
         let archive = try releaseArchiveNameForCurrentPlatform()
         let urlString: String
@@ -60,9 +68,20 @@ struct ProjectUpdater {
         try runProcess(
             executable: installScript.path,
             arguments: [],
-            environment: ["NEAT_INSTALL_PREFIX": installPrefix.path]
+            environment: [
+                "NEAT_INSTALL_ASSUME_YES": "true",
+                "NEAT_INSTALL_PREFIX": installPrefix.path,
+            ]
         )
         TerminalLog.out("Updated Neat CLI.", level: .success)
+    }
+
+    static func releaseRepositoryURL(for repository: String) -> String {
+        if repository.contains("://") || repository.hasPrefix("git@") {
+            return repository
+        }
+
+        return "https://github.com/\(repository).git"
     }
 
     static func selfUpdateInstallPrefix() -> URL {
