@@ -1,4 +1,0 @@
-protocol ExpressibleByBoolLiteral {
-    @literal<BoolLiteral>
-    function literal(literal: BoolLiteral) -> Self
-}

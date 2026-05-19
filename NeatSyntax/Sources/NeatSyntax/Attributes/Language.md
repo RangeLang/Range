@@ -41,7 +41,7 @@
 
 ```neat
 #language
-construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral {
+construct Int<let bits: IntLiteral, let signedness: Signedness = .signed> {
     let storage: IntStorage
 }
 ```

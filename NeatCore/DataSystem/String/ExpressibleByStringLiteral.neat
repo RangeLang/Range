@@ -1,4 +1,0 @@
-protocol ExpressibleByStringLiteral {
-    @literal<StringLiteral>
-    function literal(literal: StringLiteral) -> Self
-}

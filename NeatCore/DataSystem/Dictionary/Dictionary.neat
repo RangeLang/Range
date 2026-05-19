@@ -1,8 +1,8 @@
 #language
-construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
+construct Dictionary<Key: Hashable, Value> {
     state storage: DictionaryStorage<Key, Value> = DictionaryStorage<Key, Value>()
 
-    @literal<DictionaryLiteral>
+    #literal<DictionaryLiteral>
     function literal(literal: DictionaryLiteral) -> Self {
         return Self(storage: literal.storage())
     }

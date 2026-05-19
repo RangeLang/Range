@@ -1,4 +1,0 @@
-protocol ExpressibleByNilLiteral {
-    @literal<NilLiteral>
-    function literal(literal: NilLiteral) -> Self
-}

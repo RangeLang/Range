@@ -39,7 +39,7 @@ extension MacroExpander {
             )
         else {
             throw ParseError(
-                "Literal macro @literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/application rewrite semantics."
+                "Literal macro #literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/application rewrite semantics."
             )
         }
 

@@ -1,4 +1,0 @@
-protocol ExpressibleByIntLiteral {
-    @literal<IntLiteral>
-    function literal(literal: IntLiteral) -> Self
-}

@@ -1,8 +1,8 @@
 #language
-construct Int<let bits: IntLiteral, let signedness: Signedness = .signed>: ExpressibleByIntLiteral {
+construct Int<let bits: IntLiteral, let signedness: Signedness = .signed> {
     let storage: IntStorage
 
-    @literal<IntLiteral>
+    #literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self {
         return Self(storage: literal.storage())
     }

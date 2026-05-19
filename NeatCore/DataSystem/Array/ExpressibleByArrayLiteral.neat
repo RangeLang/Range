@@ -1,4 +1,0 @@
-protocol ExpressibleByArrayLiteral {
-    @literal<ArrayLiteral>
-    function literal(literal: ArrayLiteral) -> Self
-}

@@ -1,4 +1,0 @@
-protocol ExpressibleByFloatLiteral {
-    @literal<FloatLiteral>
-    function literal(literal: FloatLiteral) -> Self
-}

@@ -1,8 +1,8 @@
 #language
-construct String: ExpressibleByStringLiteral {
+construct String {
     let storage: StringStorage
 
-    @literal<StringLiteral>
+    #literal<StringLiteral>
     function literal(literal: StringLiteral) -> Self {
         return Self(storage: literal.storage())
     }

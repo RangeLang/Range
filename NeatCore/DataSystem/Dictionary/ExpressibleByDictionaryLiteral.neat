@@ -1,4 +1,0 @@
-protocol ExpressibleByDictionaryLiteral {
-    @literal<DictionaryLiteral>
-    function literal(literal: DictionaryLiteral) -> Self
-}

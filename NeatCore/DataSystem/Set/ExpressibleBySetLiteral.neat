@@ -1,4 +1,0 @@
-protocol ExpressibleBySetLiteral {
-    @literal<SetLiteral>
-    function literal(literal: SetLiteral) -> Self
-}
