@@ -1145,7 +1145,7 @@ struct SwiftBackendEmitter {
                 genericParameterNames: genericParameterNames
             )
         }.joined(separator: "\n")
-        let storedValues = try declaration.values.map {
+        let storedValues = try storedValueEmissionOrder(for: declaration).map {
             try emitStoredValue($0, genericParameterNames: genericParameterNames)
         }.joined(separator: "\n")
         let storedStates = try declaration.states.map {
@@ -1440,6 +1440,10 @@ struct SwiftBackendEmitter {
         _ name: String,
         genericParameterNames: Set<String> = []
     ) -> String {
+        if let specializedTypeName = emitSpecializedScalarTypeName(name) {
+            return specializedTypeName
+        }
+
         if name.hasPrefix("["),
             name.hasSuffix("]"),
             name.count > 2
@@ -1456,6 +1460,94 @@ struct SwiftBackendEmitter {
         }
 
         return emitTypeName(.named(name), genericParameterNames: genericParameterNames)
+    }
+
+    private struct SwiftLayoutEstimate {
+        let size: Int
+        let alignment: Int
+    }
+
+    private func swiftLayoutEstimate(forDeclaredTypeName name: String) -> SwiftLayoutEstimate? {
+        if name.hasPrefix("["),
+            name.hasSuffix("]"),
+            name.count > 2
+        {
+            return SwiftLayoutEstimate(size: 8, alignment: 8)
+        }
+
+        if name.hasSuffix("?"),
+            name.count > 1
+        {
+            return SwiftLayoutEstimate(size: 8, alignment: 8)
+        }
+
+        let swiftTypeName = emitSpecializedScalarTypeName(name) ?? name
+        switch swiftTypeName {
+        case "Bool", "BoolStorage", "Int8", "UInt8":
+            return SwiftLayoutEstimate(size: 1, alignment: 1)
+        case "Int16", "UInt16":
+            return SwiftLayoutEstimate(size: 2, alignment: 2)
+        case "Int32", "UInt32", "Float", "FloatStorage":
+            return SwiftLayoutEstimate(size: 4, alignment: 4)
+        case "Int", "IntStorage", "UInt", "Int64", "UInt64", "Double":
+            return SwiftLayoutEstimate(size: 8, alignment: 8)
+        case "String", "StringStorage":
+            return SwiftLayoutEstimate(size: 16, alignment: 8)
+        case "Data", "Date", "DateStorage", "DateTime", "DateTimeStorage", "UUID", "UUIDStorage":
+            return SwiftLayoutEstimate(size: 16, alignment: 8)
+        default:
+            return nil
+        }
+    }
+
+    private func emitSpecializedScalarTypeName(_ name: String) -> String? {
+        guard let genericStart = name.firstIndex(of: "<"),
+            name.hasSuffix(">")
+        else {
+            return nil
+        }
+
+        let baseName = String(name[..<genericStart])
+        let argumentText = String(
+            name[name.index(after: genericStart)..<name.index(before: name.endIndex)]
+        )
+        let arguments = argumentText.split(separator: ",").map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        switch baseName {
+        case "Int":
+            guard let bits = arguments.first else {
+                return nil
+            }
+            let isUnsigned = arguments.dropFirst().contains {
+                $0 == ".unsigned" || $0.hasSuffix(".unsigned")
+            }
+            switch (bits, isUnsigned) {
+            case ("8", false): return "Int8"
+            case ("8", true): return "UInt8"
+            case ("16", false): return "Int16"
+            case ("16", true): return "UInt16"
+            case ("32", false): return "Int32"
+            case ("32", true): return "UInt32"
+            case ("64", false): return "Int64"
+            case ("64", true): return "UInt64"
+            default: return nil
+            }
+        case "Float":
+            guard let width = arguments.first else {
+                return nil
+            }
+            if width == ".f32" || width == "32" || width.hasSuffix(".f32") {
+                return "Float"
+            }
+            if width == ".f64" || width == "64" || width.hasSuffix(".f64") {
+                return "Double"
+            }
+            return nil
+        default:
+            return nil
+        }
     }
 
     private func emitGenericClause(
@@ -1616,6 +1708,43 @@ struct SwiftBackendEmitter {
             return "let \(value.name): \(emitDeclaredTypeName(value.typeName, genericParameterNames: genericParameterNames)) = \(try emitExpression(expression))"
         }
         return "let \(value.name): \(emitDeclaredTypeName(value.typeName, genericParameterNames: genericParameterNames))"
+    }
+
+    private func storedValueEmissionOrder(for declaration: ConstructDeclaration) -> [ValueDeclaration] {
+        guard declaration.states.isEmpty,
+            declaration.bindings.isEmpty,
+            declaration.values.count > 1
+        else {
+            return declaration.values
+        }
+
+        let rankedValues = declaration.values.enumerated().map { index, value in
+            (
+                index: index,
+                value: value,
+                layout: swiftLayoutEstimate(forDeclaredTypeName: value.typeName)
+            )
+        }
+
+        guard rankedValues.allSatisfy({ $0.layout != nil }) else {
+            return declaration.values
+        }
+
+        return rankedValues.sorted { lhs, rhs in
+            guard let lhsLayout = lhs.layout,
+                let rhsLayout = rhs.layout
+            else {
+                return lhs.index < rhs.index
+            }
+
+            if lhsLayout.alignment != rhsLayout.alignment {
+                return lhsLayout.alignment > rhsLayout.alignment
+            }
+            if lhsLayout.size != rhsLayout.size {
+                return lhsLayout.size > rhsLayout.size
+            }
+            return lhs.index < rhs.index
+        }.map(\.value)
     }
 
     private func emitStoredState(

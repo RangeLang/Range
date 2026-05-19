@@ -26,6 +26,11 @@ let package = Package(
             swiftSettings: [
                 .treatWarning("EmbeddedRestrictions", as: .warning),
             ]
+        ),
+        .testTarget(
+            name: "NeatBackendSwiftTests",
+            dependencies: ["NeatBackendSwift"],
+            path: "Tests"
         )
     ]
 )
