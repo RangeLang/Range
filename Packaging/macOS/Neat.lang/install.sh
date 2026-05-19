@@ -43,7 +43,6 @@ echo "to:"
 echo "  $target"
 echo "  $core_target"
 echo "  $skill_target"
-echo "  $packages_dir"
 echo
 
 if [[ "${NEAT_INSTALL_ASSUME_YES:-false}" != "true" ]]; then
