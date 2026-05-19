@@ -21,9 +21,7 @@ extension RangeCLI {
             do {
                 let project = try ProjectLoader.load(
                     at: input ?? ".",
-                    options: .init(
-                        excludedPathFragments: ["/Zed/Range/grammars/_stale_range_checkout/"]
-                    )
+                    options: .init()
                 )
                 let outputRoot =
                     output.map {

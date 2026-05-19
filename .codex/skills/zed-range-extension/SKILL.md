@@ -1,12 +1,12 @@
 ---
 name: zed-range-extension
-description: Use when working on the Range Zed extension, Range semantic highlighting, Zed integration issues, or the local range-lsp workflow. Covers the split between the main Range repo and the nested Zed/Range repo, when to change RangeCLI vs the extension, how to sync the extension, and which logs and commands to use for debugging.
+description: Use when working on the Range Zed extension, Range semantic highlighting, Zed integration issues, or the local range-lsp workflow. Covers the split between the main Range repo and the sibling RangeZed repo, when to change RangeCLI vs the extension, how to sync the extension, and which logs and commands to use for debugging.
 ---
 
 # Zed Range Extension
 
 Use this skill when the task touches:
-- `Zed/Range`
+- `/Users/george/Documents/RangeZed`
 - `RangeCLI` language-server behavior
 - semantic highlighting in `.range` files
 - Zed extension install/sync/debugging
@@ -15,7 +15,7 @@ Use this skill when the task touches:
 
 There are two repos:
 - main repo: `/Users/george/Documents/Range`
-- nested Zed extension repo: `/Users/george/Documents/Range/Zed/Range`
+- Zed extension repo: `/Users/george/Documents/RangeZed`
 
 Treat them separately when checking git status or making commits.
 
@@ -24,7 +24,7 @@ Treat them separately when checking git status or making commits.
 Use this rule first:
 
 - semantic meaning belongs in `RangeCLI/Sources/RangeCLI/RangeLanguageServer.swift`
-- extension packaging, grammar, fallback queries, and Zed integration belong in `Zed/Range`
+- extension packaging, grammar, fallback queries, and Zed integration belong in `/Users/george/Documents/RangeZed`
 
 Examples:
 - token kind/coloring issue in `.range` files:
@@ -32,9 +32,9 @@ Examples:
 - autocomplete/completion issue:
   start in `RangeLanguageServer.swift`
 - grammar parse/query issue:
-  start in `Zed/Range/grammars/tree-sitter-range` or `Zed/Range/languages/range`
+  start in `/Users/george/Documents/RangeZed/grammars/tree-sitter-range` or `/Users/george/Documents/RangeZed/languages/range`
 - extension install/launcher/sync issue:
-  start in `Zed/Range/src/lib.rs` and `Zed/Range/scripts`
+  start in `/Users/george/Documents/RangeZed/src/lib.rs` and `/Users/george/Documents/RangeZed/scripts`
 
 ## Current architecture
 
@@ -80,7 +80,7 @@ Examples:
 Do:
 
 ```sh
-cd /Users/george/Documents/Range/Zed/Range
+cd /Users/george/Documents/RangeZed
 ./scripts/sync-zed-extension.sh
 ```
 
@@ -120,14 +120,14 @@ If the token stream is correct, then inspect Zed integration:
 
 ### Nested repo
 
-- `Zed/Range/extension.toml`
-- `Zed/Range/src/lib.rs`
-- `Zed/Range/languages/range/config.toml`
-- `Zed/Range/languages/range/semantic_token_rules.json`
-- `Zed/Range/languages/range/highlights.scm`
-- `Zed/Range/grammars/tree-sitter-range/grammar.js`
-- `Zed/Range/scripts/sync-zed-extension.sh`
-- `Zed/Range/scripts/smoke-check.sh`
+- `/Users/george/Documents/RangeZed/extension.toml`
+- `/Users/george/Documents/RangeZed/src/lib.rs`
+- `/Users/george/Documents/RangeZed/languages/range/config.toml`
+- `/Users/george/Documents/RangeZed/languages/range/semantic_token_rules.json`
+- `/Users/george/Documents/RangeZed/languages/range/highlights.scm`
+- `/Users/george/Documents/RangeZed/grammars/tree-sitter-range/grammar.js`
+- `/Users/george/Documents/RangeZed/scripts/sync-zed-extension.sh`
+- `/Users/george/Documents/RangeZed/scripts/smoke-check.sh`
 
 ## Logs
 
@@ -174,7 +174,7 @@ swift test --filter compilePassFixturesValidate
 For extension-side work:
 
 ```sh
-cd /Users/george/Documents/Range/Zed/Range
+cd /Users/george/Documents/RangeZed
 ./scripts/smoke-check.sh
 ./scripts/sync-zed-extension.sh
 ```
@@ -188,4 +188,4 @@ cd /Users/george/Documents/Range/Zed/Range
 - extension installed but language not loading:
   `Zed.log`, grammar/query compatibility, `extension.toml`
 - wrong binary launched:
-  `/tmp/range-zed-launch.log`, `Zed/Range/src/lib.rs`
+  `/tmp/range-zed-launch.log`, `/Users/george/Documents/RangeZed/src/lib.rs`

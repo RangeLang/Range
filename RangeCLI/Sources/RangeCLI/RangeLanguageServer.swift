@@ -2186,7 +2186,7 @@ private struct DocumentIndex {
 // Semantic highlighting in Range should stay semantic-first and editor-agnostic.
 // Keep this taxonomy intentionally small and prefer standard LSP token types
 // plus modifiers before adding custom distinctions. See:
-// Zed/Range/docs/SemanticHighlightingPlan.md
+// See the sibling RangeZed repo's docs/SemanticHighlightingPlan.md.
 enum SemanticTokenType: String, CaseIterable {
     case type
     case function

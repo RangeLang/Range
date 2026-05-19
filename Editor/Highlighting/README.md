@@ -30,10 +30,10 @@ theme or palette files.
 To build the Zed theme from the palette:
 
 ```sh
-Zed/Range/scripts/build-zed-theme.sh
+../RangeZed/scripts/build-zed-theme.sh
 ```
 
-This writes `Zed/Range/themes/range-xcode.json`. Native Zed syntax scopes are
+This writes `../RangeZed/themes/range-xcode.json`. Native Zed syntax scopes are
 styled directly from `ZedStyle`; Range-specific LSP aliases from
 `semantic_token_rules.zed.json`, such as `macro.range` or
 `type.range.declaration`, are enriched with the nearest palette style. The
@@ -43,7 +43,7 @@ generator inherits the full UI/editor/terminal styling from
 
 The current Zed adapter reads `semantic_token_rules.zed.json` and copies it to:
 
-`Zed/Range/languages/range/semantic_token_rules.json`
+`../RangeZed/languages/range/semantic_token_rules.json`
 
 Keep richer distinctions, such as declaration/application and future project/core origin, in the semantic token stream rather than tree-sitter queries.
 

@@ -10,7 +10,7 @@ ROOT = File.expand_path("../../..", __dir__)
 DEFAULT_PALETTE = File.join(ROOT, "Editor/Highlighting/xcode-style-palette.yaml")
 DEFAULT_SEMANTIC_RULES = File.join(ROOT, "Editor/Highlighting/semantic_token_rules.zed.json")
 DEFAULT_BASE_THEME = File.join(ROOT, "Editor/Highlighting/zed-one-base.json")
-DEFAULT_OUTPUT = File.join(ROOT, "Zed/Range/themes/range-xcode.json")
+DEFAULT_OUTPUT = File.expand_path("../RangeZed/themes/range-xcode.json", ROOT)
 
 THEME_NAMES = {
   "dark" => "Range Xcode Dark",
