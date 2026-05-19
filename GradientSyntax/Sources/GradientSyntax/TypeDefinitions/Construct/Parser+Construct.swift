@@ -4,10 +4,10 @@ extension Parser {
     func isConstructDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
         switch peek(offset: offset) {
-        case .keyword(NeatSyntax.Keyword.construct.rawValue):
+        case .keyword(GradientSyntax.Keyword.construct.rawValue):
             return true
         case .atAttribute:
-            return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.construct.rawValue)
+            return peek(offset: offset + 1) == .keyword(GradientSyntax.Keyword.construct.rawValue)
         default:
             return false
         }
@@ -91,7 +91,7 @@ extension Parser {
 
             if peek() != .rightBrace {
                 throw ParseError(
-                    "Construct render bodies are no longer supported in NeatSyntax. Use declarations only."
+                    "Construct render bodies are no longer supported in GradientSyntax. Use declarations only."
                 )
             }
 

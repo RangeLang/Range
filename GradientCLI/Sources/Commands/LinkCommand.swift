@@ -1,15 +1,15 @@
 import ArgumentParser
 
-extension NeatCLI {
+extension GradientCLI {
     struct Link: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Install the macOS Neat CLI into a Package.neat project."
+            abstract: "Install the macOS Gradient CLI into a Package.gradient project."
         )
 
-        @Argument(help: "Package.neat project root.")
+        @Argument(help: "Package.gradient project root.")
         var project: String = "."
 
-        @Option(help: "Installed Neat binary to link.")
+        @Option(help: "Installed Gradient binary to link.")
         var binary: String = ProjectBinaryLinker.defaultMacOSBinaryPath
 
         mutating func run() throws {
@@ -18,7 +18,7 @@ extension NeatCLI {
                     projectPath: project,
                     binaryPath: binary
                 ).run()
-                TerminalLog.out("Installed project Neat at \(link.path)", level: .success)
+                TerminalLog.out("Installed project Gradient at \(link.path)", level: .success)
                 TerminalLog.subtleOut("Source: \(binary)")
             } catch {
                 ErrorPresenter.printError(error)

@@ -511,7 +511,7 @@ struct MacroExpansionContext {
     let graphContext: MacroGraphContext
     let macroDeclarationsByName: [String: MacroDeclaration]
     let markerDeclarationsByName: [String: MarkerDeclaration]
-    let diagnosticEngine: NeatDiagnosticEngine?
+    let diagnosticEngine: GradientDiagnosticEngine?
     let currentPath: String?
 
     func withCurrentPath(_ path: String) -> MacroExpansionContext {

@@ -20,19 +20,19 @@ For constructs, this means member mutation through the `let` root is also invali
 
 - Declares immutable owned data
 
-```neat
+```gradient
 let name: String
 ```
 
 - Can be initialized directly
 
-```neat
+```gradient
 let name: String = "Ava"
 ```
 
 - Can participate in memberwise initialization
 
-```neat
+```gradient
 construct User {
     let name: String
     let age: Int
@@ -43,7 +43,7 @@ let user: User(name: "Ava", age: 20)
 
 - Cannot be reassigned after initialization
 
-```neat
+```gradient
 let name: String
 ```
 
@@ -51,7 +51,7 @@ let name: String
 
 - Cannot be used to mutate member paths
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int
@@ -64,7 +64,7 @@ let person: Person(name: "George", age: 26)
 
 - Copying a `let` binding into owned mutable storage creates a new independent logical value
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int
@@ -78,11 +78,11 @@ state editablePerson: Person = person
 
 - Implementations may use copy-on-write for some values and constructs
 
-```neat
+```gradient
 let a: [Int] = [1, 2, 3]
 state b: [Int] = a
 
 b.append(4)
 ```
 
-Neat still treats `a` and `b` as independent logical values. Copy-on-write is an allowed optimization that can defer physical copying until mutation, but it does not change the language semantics or turn the two values into aliases.
+Gradient still treats `a` and `b` as independent logical values. Copy-on-write is an allowed optimization that can defer physical copying until mutation, but it does not change the language semantics or turn the two values into aliases.

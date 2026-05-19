@@ -3,7 +3,7 @@ import Foundation
 extension Parser {
     func isStateDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        return peek(offset: offset) == .keyword(NeatSyntax.Keyword.state.rawValue)
+        return peek(offset: offset) == .keyword(GradientSyntax.Keyword.state.rawValue)
     }
 
     mutating func parseState(allowDeclaredStorage: Bool = false) throws -> StateDeclaration {

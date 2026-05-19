@@ -58,7 +58,7 @@ struct PackageSearcher {
     func makeRequest(query: String, limit: Int) throws -> URLRequest {
         var request = URLRequest(url: try Self.makeSearchURL(endpoint: endpoint, query: query, limit: limit))
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        request.setValue("neat-cli", forHTTPHeaderField: "User-Agent")
+        request.setValue("gradient-cli", forHTTPHeaderField: "User-Agent")
         return request
     }
 
@@ -72,7 +72,7 @@ struct PackageSearcher {
         components?.queryItems = [
             URLQueryItem(
                 name: "q",
-                value: "\(trimmedQuery) neat package in:name,description,readme"
+                value: "\(trimmedQuery) gradient package in:name,description,readme"
             ),
             URLQueryItem(name: "sort", value: "stars"),
             URLQueryItem(name: "order", value: "desc"),
@@ -103,7 +103,7 @@ struct PackageSearcher {
     private func hasManifest(at url: URL) throws -> Bool {
         var request = URLRequest(url: url)
         request.httpMethod = "HEAD"
-        request.setValue("neat-cli", forHTTPHeaderField: "User-Agent")
+        request.setValue("gradient-cli", forHTTPHeaderField: "User-Agent")
 
         let (_, response) = try run(request)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -200,7 +200,7 @@ private struct GitHubRepository: Decodable {
     let pushedAt: String?
 
     var manifestURL: URL {
-        URL(string: "https://raw.githubusercontent.com/\(fullName)/\(defaultBranch)/Package.neat")!
+        URL(string: "https://raw.githubusercontent.com/\(fullName)/\(defaultBranch)/Package.gradient")!
     }
 
     enum CodingKeys: String, CodingKey {

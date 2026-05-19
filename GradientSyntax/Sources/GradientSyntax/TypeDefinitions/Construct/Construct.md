@@ -2,7 +2,7 @@
 
 ## Definition
 
-A construct is Neat's concrete identity-bearing type.
+A construct is Gradient's concrete identity-bearing type.
 
 ## Role
 
@@ -22,7 +22,7 @@ Plain foundational and compiler-structural values such as `Int` and `Closure` be
 
 - Declared as a concrete, identity-bearing type
 
-```neat
+```gradient
 construct Person {
     let name: String
 }
@@ -30,7 +30,7 @@ construct Person {
 
 - Instantiable
 
-```neat
+```gradient
 let user: Person(name: "George")
 ```
 
@@ -40,7 +40,7 @@ let user: Person(name: "George")
 
 - Can conform to protocols
 
-```neat
+```gradient
 protocol Named {
     function displayName() -> String
 }
@@ -56,7 +56,7 @@ construct Person: Named {
 
 - References to other constructs preserve construct identity rather than forcing inline structural containment
 
-```neat
+```gradient
 construct Author {
     let name: String
 }

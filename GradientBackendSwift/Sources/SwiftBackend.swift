@@ -1,5 +1,5 @@
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
 public struct SwiftBackendError: LocalizedError {
     public let message: String
@@ -54,7 +54,7 @@ public struct SwiftBackend {
     public func run(workspaceRoot: URL) throws {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["swift", "run", "NeatGenerated"]
+        process.arguments = ["swift", "run", "GradientGenerated"]
         process.currentDirectoryURL = workspaceRoot
         process.standardInput = FileHandle.standardInput
         process.standardOutput = FileHandle.standardOutput

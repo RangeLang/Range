@@ -1,6 +1,6 @@
-# Neat Concurrency
+# Gradient Concurrency
 
-This document describes the current intended direction for Neat concurrency.
+This document describes the current intended direction for Gradient concurrency.
 
 The model is intentionally moving toward a simpler, more Go-like shape:
 
@@ -23,14 +23,14 @@ The goal is to keep concurrency understandable at the source level and avoid hid
 
 ## Core Direction
 
-Neat concurrency centers on two ideas:
+Gradient concurrency centers on two ideas:
 
 1. `@background { ... }` starts concurrent work
 2. `Channel<T>` is used to communicate between concurrent parts of the program
 
 This means the language does **not** treat Promise-like result types as the core concurrency abstraction.
 
-Instead of returning live async handles and implicitly settling them later, Neat prefers:
+Instead of returning live async handles and implicitly settling them later, Gradient prefers:
 
 - spawn work explicitly
 - send values explicitly
@@ -43,7 +43,7 @@ Anonymous background blocks remain the spawn primitive.
 
 Example:
 
-```neat
+```gradient
 @background {
     doSomething()
 }
@@ -70,7 +70,7 @@ Anonymous background blocks do not produce a direct return value.
 
 So this is allowed:
 
-```neat
+```gradient
 @background {
     if shouldStop {
         return
@@ -82,7 +82,7 @@ So this is allowed:
 
 And this is not part of the model:
 
-```neat
+```gradient
 @background {
     return 42
 }
@@ -96,7 +96,7 @@ Functions do not become special just because they may be used from concurrent co
 
 Example:
 
-```neat
+```gradient
 function fetchUserName(id: Int) -> String {
     if id == 0 {
         return "system"
@@ -110,7 +110,7 @@ This is just a normal function.
 
 If you want to run it concurrently, you do that at the use site:
 
-```neat
+```gradient
 let names: Channel<String>
 
 @background {
@@ -135,7 +135,7 @@ The function itself does not need Promise-returning syntax or a special async de
 
 Current surface shape:
 
-```neat
+```gradient
 construct Channel<Element> {
     init()
     init(capacity: Int)
@@ -161,7 +161,7 @@ The intended style is explicit communication through channel operations.
 
 Example:
 
-```neat
+```gradient
 function loadUser(id: Int) {
     let output: Channel<String>
 
@@ -194,7 +194,7 @@ Most importantly:
 
 This is preferred over designs where something like:
 
-```neat
+```gradient
 let result = worker()
 ```
 
@@ -227,7 +227,7 @@ Channels support `close()`.
 
 Close exists so channel-based coordination can model completion and shutdown, not just single-value handoff.
 
-The exact source-level closed-channel behavior should remain clearly specified by Neat itself, not inferred from backend runtime conventions.
+The exact source-level closed-channel behavior should remain clearly specified by Gradient itself, not inferred from backend runtime conventions.
 
 That means any final semantics around:
 
@@ -235,7 +235,7 @@ That means any final semantics around:
 - sending after close
 - draining buffered values after close
 
-must be defined as Neat behavior.
+must be defined as Gradient behavior.
 
 ## Result as a Normal Data Type
 
@@ -243,7 +243,7 @@ must be defined as Neat behavior.
 
 Example:
 
-```neat
+```gradient
 enum LoadError {
     case missing
     case denied
@@ -274,7 +274,7 @@ The concurrency model should avoid centering around:
 - hidden synchronization points
 - backend-shaped async concepts leaking into source semantics
 
-Neat may still have useful general-purpose types for success/failure or streaming data in the future, but those should not define the core concurrency story.
+Gradient may still have useful general-purpose types for success/failure or streaming data in the future, but those should not define the core concurrency story.
 
 ## Why This Direction
 
@@ -318,13 +318,13 @@ Those details are implementation choices.
 
 They must not redefine the language model.
 
-Neat source semantics should stay stable even if different backends realize the runtime differently.
+Gradient source semantics should stay stable even if different backends realize the runtime differently.
 
 ## Example Shapes
 
 ### Fire-and-forget work
 
-```neat
+```gradient
 function refreshCache() {
     @background {
         Logger.info("refresh started")
@@ -338,7 +338,7 @@ function refreshCache() {
 
 ### Single result handoff
 
-```neat
+```gradient
 function loadName(id: Int) {
     let output: Channel<String>
 
@@ -353,7 +353,7 @@ function loadName(id: Int) {
 
 ### Producer / consumer shape
 
-```neat
+```gradient
 function processJobs() {
     let jobs: Channel<Int>(capacity: 8)
 
@@ -384,7 +384,7 @@ This document exists to keep the intended language direction clear as implementa
 
 ## Summary
 
-Neat concurrency is moving toward:
+Gradient concurrency is moving toward:
 
 - anonymous `@background { ... }` for explicit spawning
 - `Channel<T>` for communication

@@ -1,5 +1,5 @@
 import Foundation
-@testable import NeatCLI
+@testable import GradientCLI
 import Testing
 
 @Suite("Package manifests")
@@ -7,10 +7,10 @@ struct PackageManifestTests {
     @Test("Package manifest includes remote metadata")
     func packageManifestIncludesRemoteMetadata() throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("neat-package-manifest-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("gradient-package-manifest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
-        let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Package.gradient", isDirectory: false)
         try """
             #package
             construct Fixture {
@@ -40,10 +40,10 @@ struct PackageManifestTests {
     @Test("Package manifest requires typed package protocol fields")
     func packageManifestRequiresTypedPackageProtocolFields() throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("neat-package-manifest-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("gradient-package-manifest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
 
-        let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Package.gradient", isDirectory: false)
         try """
             #package
             construct Fixture {
@@ -55,7 +55,7 @@ struct PackageManifestTests {
 
         do {
             _ = try PackageManifestLoader.load(from: packageFile)
-            Issue.record("Expected Package.neat validation to reject an untyped package version.")
+            Issue.record("Expected Package.gradient validation to reject an untyped package version.")
         } catch {
             #expect(String(describing: error).contains("requires let version: Version"))
         }
@@ -64,12 +64,12 @@ struct PackageManifestTests {
     @Test("Package manifest resolves git remotes")
     func packageManifestResolvesGitRemotes() throws {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("neat-package-manifest-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("gradient-package-manifest-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try run("git", "init", in: root)
         try run("git", "remote", "add", "origin", "https://github.com/acme/fixture.git", in: root)
 
-        let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Package.gradient", isDirectory: false)
         try """
             #package
             construct Fixture {

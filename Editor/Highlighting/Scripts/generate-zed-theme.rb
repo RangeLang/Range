@@ -10,11 +10,11 @@ ROOT = File.expand_path("../../..", __dir__)
 DEFAULT_PALETTE = File.join(ROOT, "Editor/Highlighting/xcode-style-palette.yaml")
 DEFAULT_SEMANTIC_RULES = File.join(ROOT, "Editor/Highlighting/semantic_token_rules.zed.json")
 DEFAULT_BASE_THEME = File.join(ROOT, "Editor/Highlighting/zed-one-base.json")
-DEFAULT_OUTPUT = File.join(ROOT, "Zed/Neat/themes/neat-xcode.json")
+DEFAULT_OUTPUT = File.join(ROOT, "Zed/Gradient/themes/gradient-xcode.json")
 
 THEME_NAMES = {
-  "dark" => "Neat Xcode Dark",
-  "light" => "Neat Xcode Light"
+  "dark" => "Gradient Xcode Dark",
+  "light" => "Gradient Xcode Light"
 }.freeze
 
 FONT_WEIGHTS = {
@@ -126,8 +126,8 @@ end
 
 theme = {
   "$schema" => "https://zed.dev/schema/themes/v0.2.0.json",
-  "name" => "Neat Xcode",
-  "author" => "Neat Team",
+  "name" => "Gradient Xcode",
+  "author" => "Gradient Team",
   "themes" => themes
 }
 

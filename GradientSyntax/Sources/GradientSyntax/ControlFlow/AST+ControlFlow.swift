@@ -50,7 +50,7 @@ public struct LocalCallableDeclaration {
     public let name: String
     public let genericParameters: [GenericParameter]
     public let hasExplicitParameterClause: Bool
-    public let parameters: [NeatFunctionParameter]
+    public let parameters: [GradientFunctionParameter]
     public let returnType: TypeReference?
     public let body: [Statement]
 
@@ -60,7 +60,7 @@ public struct LocalCallableDeclaration {
         name: String,
         genericParameters: [GenericParameter],
         hasExplicitParameterClause: Bool,
-        parameters: [NeatFunctionParameter],
+        parameters: [GradientFunctionParameter],
         returnType: TypeReference?,
         body: [Statement]
     ) {

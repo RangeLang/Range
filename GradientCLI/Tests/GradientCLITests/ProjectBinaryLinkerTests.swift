@@ -1,5 +1,5 @@
 import Foundation
-@testable import NeatCLI
+@testable import GradientCLI
 import Testing
 
 @Suite("Project binary linking")
@@ -12,16 +12,16 @@ struct ProjectBinaryLinkerTests {
             binaryPath: fixture.binary.path
         ).run()
 
-        #expect(link.path == fixture.root.appendingPathComponent(".neat/bin/neat").path)
+        #expect(link.path == fixture.root.appendingPathComponent(".gradient/bin/gradient").path)
         let versionedBinary = fixture.root
-            .appendingPathComponent(".neat/NeatCLI/\(NeatVersion.current)/bin/neat")
+            .appendingPathComponent(".gradient/GradientCLI/\(GradientVersion.current)/bin/gradient")
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == versionedBinary.path)
         #expect(try String(contentsOf: versionedBinary, encoding: .utf8) == "#!/usr/bin/env bash\nexit 0\n")
 
-        let receipt = fixture.root.appendingPathComponent(".neat/Links/neat.package-link.json")
+        let receipt = fixture.root.appendingPathComponent(".gradient/Links/gradient.package-link.json")
         let receiptSource = try String(contentsOf: receipt, encoding: .utf8)
-        #expect(receiptSource.contains(#""kind" : "neat.package-link""#))
-        #expect(receiptSource.contains(#""selectedVersion" : "\#(NeatVersion.current)""#))
+        #expect(receiptSource.contains(#""kind" : "gradient.package-link""#))
+        #expect(receiptSource.contains(#""selectedVersion" : "\#(GradientVersion.current)""#))
         #expect(receiptSource.contains(#""source" : "\#(fixture.binary.path)""#))
         #expect(receiptSource.contains(#""versionedBinary" : "\#(versionedBinary.path)""#))
     }
@@ -30,17 +30,17 @@ struct ProjectBinaryLinkerTests {
     func packageFilePathResolvesToPackageRoot() throws {
         let fixture = try temporaryPackage()
         let link = try ProjectBinaryLinker(
-            projectPath: fixture.root.appendingPathComponent("Package.neat").path,
+            projectPath: fixture.root.appendingPathComponent("Package.gradient").path,
             binaryPath: fixture.binary.path
         ).run()
 
-        #expect(link.path == fixture.root.appendingPathComponent(".neat/bin/neat").path)
+        #expect(link.path == fixture.root.appendingPathComponent(".gradient/bin/gradient").path)
     }
 
     @Test("Existing symlink upgrades to versioned package install")
     func existingSymlinkUpgradesToVersionedPackageInstall() throws {
         let fixture = try temporaryPackage()
-        let link = fixture.root.appendingPathComponent(".neat/bin/neat", isDirectory: false)
+        let link = fixture.root.appendingPathComponent(".gradient/bin/gradient", isDirectory: false)
         try FileManager.default.createDirectory(
             at: link.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -54,14 +54,14 @@ struct ProjectBinaryLinkerTests {
 
         #expect(packaged.path == link.path)
         let versionedBinary = fixture.root
-            .appendingPathComponent(".neat/NeatCLI/\(NeatVersion.current)/bin/neat")
+            .appendingPathComponent(".gradient/GradientCLI/\(GradientVersion.current)/bin/gradient")
         #expect(try FileManager.default.destinationOfSymbolicLink(atPath: packaged.path) == versionedBinary.path)
         #expect(try String(contentsOf: versionedBinary, encoding: .utf8) == "#!/usr/bin/env bash\nexit 0\n")
     }
 
     private func temporaryPackage() throws -> (root: URL, binary: URL) {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("neat-binary-link-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("gradient-binary-link-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
             #package
@@ -70,9 +70,9 @@ struct ProjectBinaryLinkerTests {
                 let version: Version(0.1.0)
                 let author: String("Test Author")
             }
-            """.write(to: root.appendingPathComponent("Package.neat"), atomically: true, encoding: .utf8)
+            """.write(to: root.appendingPathComponent("Package.gradient"), atomically: true, encoding: .utf8)
 
-        let binary = root.appendingPathComponent("installed-neat", isDirectory: false)
+        let binary = root.appendingPathComponent("installed-gradient", isDirectory: false)
         try "#!/usr/bin/env bash\nexit 0\n".write(to: binary, atomically: true, encoding: .utf8)
         try FileManager.default.setAttributes(
             [.posixPermissions: 0o755],

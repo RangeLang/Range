@@ -1,10 +1,10 @@
 import ArgumentParser
 import Foundation
 
-extension NeatCLI {
+extension GradientCLI {
     struct Scripts: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Manage scripts saved under .neat/.scripts.",
+            abstract: "Manage scripts saved under .gradient/.scripts.",
             subcommands: [
                 Create.self,
                 Save.self,
@@ -14,13 +14,13 @@ extension NeatCLI {
 
         struct Create: ParsableCommand {
             static let configuration = CommandConfiguration(
-                abstract: "Create a starter script in .neat/.scripts."
+                abstract: "Create a starter script in .gradient/.scripts."
             )
 
-            @Argument(help: "Script name. Adds .neat when omitted.")
+            @Argument(help: "Script name. Adds .gradient when omitted.")
             var name: String
 
-            @Option(name: .shortAndLong, help: "Package.neat project root.")
+            @Option(name: .shortAndLong, help: "Package.gradient project root.")
             var project: String = "."
 
             @Flag(help: "Replace an existing script.")
@@ -39,13 +39,13 @@ extension NeatCLI {
 
         struct Save: ParsableCommand {
             static let configuration = CommandConfiguration(
-                abstract: "Save text or a file into .neat/.scripts."
+                abstract: "Save text or a file into .gradient/.scripts."
             )
 
-            @Argument(help: "Script name. Adds .neat when omitted.")
+            @Argument(help: "Script name. Adds .gradient when omitted.")
             var name: String
 
-            @Option(name: .shortAndLong, help: "Package.neat project root.")
+            @Option(name: .shortAndLong, help: "Package.gradient project root.")
             var project: String = "."
 
             @Option(help: "Script content to save.")
@@ -91,10 +91,10 @@ extension NeatCLI {
 
         struct List: ParsableCommand {
             static let configuration = CommandConfiguration(
-                abstract: "List scripts saved under .neat/.scripts."
+                abstract: "List scripts saved under .gradient/.scripts."
             )
 
-            @Option(name: .shortAndLong, help: "Package.neat project root.")
+            @Option(name: .shortAndLong, help: "Package.gradient project root.")
             var project: String = "."
 
             mutating func run() throws {

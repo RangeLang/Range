@@ -3,24 +3,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "NeatBackendSwift",
+    name: "GradientBackendSwift",
     platforms: [
         .macOS(.v13)
     ],
     products: [
         .library(
-            name: "NeatBackendSwift",
-            targets: ["NeatBackendSwift"]
+            name: "GradientBackendSwift",
+            targets: ["GradientBackendSwift"]
         )
     ],
     dependencies: [
-        .package(path: "../NeatSyntax")
+        .package(path: "../GradientSyntax")
     ],
     targets: [
         .target(
-            name: "NeatBackendSwift",
+            name: "GradientBackendSwift",
             dependencies: [
-                .product(name: "NeatSyntax", package: "NeatSyntax")
+                .product(name: "GradientSyntax", package: "GradientSyntax")
             ],
             path: "Sources",
             swiftSettings: [
@@ -28,8 +28,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "NeatBackendSwiftTests",
-            dependencies: ["NeatBackendSwift"],
+            name: "GradientBackendSwiftTests",
+            dependencies: ["GradientBackendSwift"],
             path: "Tests"
         )
     ]

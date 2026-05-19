@@ -1,19 +1,19 @@
 import ArgumentParser
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
-extension NeatCLI {
+extension GradientCLI {
     struct Artifacts: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Write lexer, parser, and graph artifacts for a Neat file or project."
+            abstract: "Write lexer, parser, and graph artifacts for a Gradient file or project."
         )
 
-        @Argument(help: "Project directory or source .neat file to inspect.")
+        @Argument(help: "Project directory or source .gradient file to inspect.")
         var input: String?
 
         @Option(
             name: .shortAndLong,
-            help: "Output directory. Defaults to .neat/Artifacts inside the input root."
+            help: "Output directory. Defaults to .gradient/Artifacts inside the input root."
         )
         var output: String?
 
@@ -22,7 +22,7 @@ extension NeatCLI {
                 let project = try ProjectLoader.load(
                     at: input ?? ".",
                     options: .init(
-                        excludedPathFragments: ["/Zed/Neat/grammars/_stale_neat_checkout/"]
+                        excludedPathFragments: ["/Zed/Gradient/grammars/_stale_gradient_checkout/"]
                     )
                 )
                 let outputRoot =
@@ -93,7 +93,7 @@ extension NeatCLI {
                 )
                 let graphHTML = renderer.renderGraphHTML(
                     files: compiledProgram.expandedFiles,
-                    title: "Neat Playground Application Graph"
+                    title: "Gradient Playground Application Graph"
                 )
                 try graphHTML.write(
                     to: outputRoot.appendingPathComponent("04-graph.html"),

@@ -97,7 +97,7 @@ public struct DeclaredCallableSurface {
     public let name: String
     public let labels: [String?]
     public let parameterTypeNames: [String?]
-    public let parameters: [NeatFunctionParameter]
+    public let parameters: [GradientFunctionParameter]
     public let returnTypeName: String?
 
     public init(
@@ -105,7 +105,7 @@ public struct DeclaredCallableSurface {
         name: String,
         labels: [String?],
         parameterTypeNames: [String?],
-        parameters: [NeatFunctionParameter],
+        parameters: [GradientFunctionParameter],
         returnTypeName: String?
     ) {
         self.ownerConstructName = ownerConstructName
@@ -126,14 +126,14 @@ public struct DeclaredInitializerSurface {
     public let ownerConstructName: String
     public let labels: [String?]
     public let parameterTypeNames: [String?]
-    public let parameters: [NeatFunctionParameter]
+    public let parameters: [GradientFunctionParameter]
     public let returnTypeName: String?
 
     public init(
         ownerConstructName: String,
         labels: [String?],
         parameterTypeNames: [String?],
-        parameters: [NeatFunctionParameter],
+        parameters: [GradientFunctionParameter],
         returnTypeName: String?
     ) {
         self.ownerConstructName = ownerConstructName

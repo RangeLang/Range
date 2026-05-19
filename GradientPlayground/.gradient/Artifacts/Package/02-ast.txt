@@ -1,13 +1,13 @@
 AST:
-  ▿ NeatSyntax.SourceFileNode.construct
-    ▿ construct: NeatSyntax.ConstructDeclaration
+  ▿ GradientSyntax.SourceFileNode.construct
+    ▿ construct: GradientSyntax.ConstructDeclaration
       - macros: 0 elements
-      - kind: NeatSyntax.ConstructKind.declaration
+      - kind: GradientSyntax.ConstructKind.declaration
       - attribute: nil
-      - name: "NeatPlayground"
+      - name: "GradientPlayground"
       - genericParameters: 0 elements
       ▿ conformances: 1 element
-        ▿ NeatSyntax.TypeReference.named
+        ▿ GradientSyntax.TypeReference.named
           - named: "Package"
       - states: 0 elements
       - environments: 0 elements

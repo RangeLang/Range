@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY="${NEAT_REPOSITORY:-georgeneat/Neat}"
-INSTALL_DIR="${NEAT_INSTALL_DIR:-${HOME}/.local/bin}"
+REPOSITORY="${GRADIENT_REPOSITORY:-georgegradient/Gradient}"
+INSTALL_DIR="${GRADIENT_INSTALL_DIR:-${HOME}/.local/bin}"
 VERSION="${1:-latest}"
-TARGET_NAME="neat"
+TARGET_NAME="gradient"
 
 usage() {
   echo "Usage: $0 [latest|vX.Y.Z]"
-  echo "Environment: NEAT_REPOSITORY=owner/repo NEAT_INSTALL_DIR=/path/to/bin"
+  echo "Environment: GRADIENT_REPOSITORY=owner/repo GRADIENT_INSTALL_DIR=/path/to/bin"
 }
 
 case "${VERSION}" in
@@ -44,7 +44,7 @@ detect_platform() {
 }
 
 platform="$(detect_platform)"
-archive="neat-${platform}.tar.gz"
+archive="gradient-${platform}.tar.gz"
 
 if [[ "${VERSION}" == "latest" ]]; then
   url="https://github.com/${REPOSITORY}/releases/latest/download/${archive}"
@@ -60,7 +60,7 @@ curl -fsSL "${url}" -o "${tmp_dir}/${archive}"
 tar -xzf "${tmp_dir}/${archive}" -C "${tmp_dir}"
 
 mkdir -p "${INSTALL_DIR}"
-install -m 755 "${tmp_dir}/neat-${platform}/${TARGET_NAME}" "${INSTALL_DIR}/${TARGET_NAME}"
+install -m 755 "${tmp_dir}/gradient-${platform}/${TARGET_NAME}" "${INSTALL_DIR}/${TARGET_NAME}"
 
 echo "Installed ${TARGET_NAME} to ${INSTALL_DIR}/${TARGET_NAME}"
 if [[ ":${PATH}:" != *":${INSTALL_DIR}:"* ]]; then

@@ -1,10 +1,10 @@
 import ArgumentParser
 import Foundation
 
-extension NeatCLI {
+extension GradientCLI {
     struct Version: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Print the installed Neat version and available updates."
+            abstract: "Print the installed Gradient version and available updates."
         )
 
         @Flag(help: "Skip checking the remote repository for updates.")
@@ -12,9 +12,9 @@ extension NeatCLI {
 
         mutating func run() throws {
             print(
-                TerminalLog.style("Neat", level: .change, bold: true)
+                TerminalLog.style("Gradient", level: .change, bold: true)
                     + " "
-                    + TerminalLog.subtleStdout("\(NeatVersion.current)")
+                    + TerminalLog.subtleStdout("\(GradientVersion.current)")
             )
             print(statusLine(label: "Installed", value: installedExecutablePath()))
 
@@ -132,7 +132,7 @@ extension NeatCLI {
         }
 
         private func installedExecutablePath() -> String {
-            let executable = CommandLine.arguments.first ?? "neat"
+            let executable = CommandLine.arguments.first ?? "gradient"
             if executable.contains("/") {
                 return URL(fileURLWithPath: executable).standardizedFileURL.path
             }

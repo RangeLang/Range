@@ -6,7 +6,7 @@ This document defines the invariants the compiler must enforce to treat the memo
 
 ## Role
 
-The rules here are the contract for memory safety in Neat's storage model. If any invariant is violated, compilation fails.
+The rules here are the contract for memory safety in Gradient's storage model. If any invariant is violated, compilation fails.
 
 ## Mental Model
 
@@ -18,48 +18,48 @@ The rules here are the contract for memory safety in Neat's storage model. If an
 
 - Every mutable write target must resolve to mutable storage.
 
-```neat
+```gradient
 state count: Int = 0
 count += 1
 ```
 
 - `let` is immutable after initialization.
 
-```neat
+```gradient
 let name: String = "George"
 name = "Ava" // invalid
 ```
 
 - Mutation through a `let` root is always invalid, including member-path mutation.
 
-```neat
+```gradient
 let person: Person(name: "George", age: 26)
 person.age = 27 // invalid
 ```
 
 - `derived` owns no mutable storage and cannot be assignment targets.
 
-```neat
+```gradient
 derived title: String { name }
 title = "x" // invalid
 ```
 
 - `binding` must alias existing storage; it cannot create ownership.
 
-```neat
+```gradient
 state person: Person = Person(name: "George", age: 26)
 state user: User = User(person: $person)
 ```
 
 - `let` cannot store a construct type that declares `binding` members.
 
-```neat
+```gradient
 let user: User(person: $person) // invalid if User contains binding members
 ```
 
 - Assigning a construct from `let` into `state` performs an owned copy, not aliasing.
 
-```neat
+```gradient
 let person: Person(name: "George", age: 26)
 state statefulPerson: Person = person
 ```
@@ -68,7 +68,7 @@ state statefulPerson: Person = person
 
 - Construct references are identity references, not nested ownership.
 
-```neat
+```gradient
 construct Book {
     let author: Author
 }
@@ -76,7 +76,7 @@ construct Book {
 
 - `construct` member `state` may be declared without a default, but must be initialized by construction unless a default exists.
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int
@@ -85,13 +85,13 @@ construct Person {
 
 - Top-level `state` must have an initializer.
 
-```neat
+```gradient
 state counter: Int = 1
 ```
 
 - Local block `state` must have an initializer.
 
-```neat
+```gradient
 @main {
     state counter: Int = 1
 }
@@ -99,7 +99,7 @@ state counter: Int = 1
 
 - Function call effects must be represented as graph reads/writes/aliases on reachable storage paths.
 
-```neat
+```gradient
 function incrementAge() {
     person.age += 1
 }
@@ -120,7 +120,7 @@ function incrementAge() {
 
 Valid:
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int
@@ -134,7 +134,7 @@ construct Person {
 
 Invalid:
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int
@@ -147,7 +147,7 @@ construct Person {
 
 Valid:
 
-```neat
+```gradient
 @main {
     let person: Person(name: "George", age: 26)
     state statefulPerson: Person = person
@@ -157,7 +157,7 @@ Valid:
 
 Invalid:
 
-```neat
+```gradient
 @main {
     let person: Person(name: "George", age: 26)
     person.age = 27
@@ -166,7 +166,7 @@ Invalid:
 
 Invalid:
 
-```neat
+```gradient
 @main {
     state person: Person = Person(name: "George", age: 26)
     let user: User(person: $person) // User has binding members
@@ -175,7 +175,7 @@ Invalid:
 
 Invalid:
 
-```neat
+```gradient
 @main {
     state counter: Int // invalid local state without initializer
 }
@@ -183,13 +183,13 @@ Invalid:
 
 Invalid:
 
-```neat
+```gradient
 state counter: Int // invalid top-level state without initializer
 ```
 
 Valid:
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int

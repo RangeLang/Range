@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "NeatGenerated",
+    name: "GradientGenerated",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .executableTarget(
-            name: "NeatGenerated"
+            name: "GradientGenerated"
         )
     ]
 )

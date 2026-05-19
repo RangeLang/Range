@@ -1,8 +1,8 @@
 import ArgumentParser
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
-enum NeatCoreLoader {
+enum GradientCoreLoader {
     static func coreRoot() throws -> URL {
         let candidates = coreRootCandidates()
         for candidate in candidates {
@@ -15,13 +15,13 @@ enum NeatCoreLoader {
         }
 
         throw ValidationError(
-            "Missing NeatCore sources. Checked: \(candidates.map(\.path).joined(separator: ", "))"
+            "Missing GradientCore sources. Checked: \(candidates.map(\.path).joined(separator: ", "))"
         )
     }
 
     private static func coreRootCandidates() -> [URL] {
         let environment = ProcessInfo.processInfo.environment
-        let explicitPath = environment["NEAT_CORE_PATH"].map {
+        let explicitPath = environment["GRADIENT_CORE_PATH"].map {
             URL(fileURLWithPath: $0, isDirectory: true)
         }
 
@@ -29,20 +29,20 @@ enum NeatCoreLoader {
         let executableDirectory = executableURL.deletingLastPathComponent()
         let installShareRoot = executableDirectory
             .deletingLastPathComponent()
-            .appendingPathComponent("share/neat/NeatCore", isDirectory: true)
+            .appendingPathComponent("share/gradient/GradientCore", isDirectory: true)
 
         let sourceRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("NeatCore", isDirectory: true)
+            .appendingPathComponent("GradientCore", isDirectory: true)
 
         return [explicitPath, installShareRoot, sourceRoot].compactMap(\.self)
     }
 
     private static func installedExecutableURL() -> URL {
-        let executable = CommandLine.arguments.first ?? "neat"
+        let executable = CommandLine.arguments.first ?? "gradient"
         if executable.contains("/") {
             return URL(fileURLWithPath: executable).standardizedFileURL
         }
@@ -91,7 +91,7 @@ enum NeatCoreLoader {
                 options: [.skipsHiddenFiles]
             )
         else {
-            throw ValidationError("Could not inspect NeatCore sources at \(coreRoot.path)")
+            throw ValidationError("Could not inspect GradientCore sources at \(coreRoot.path)")
         }
 
         var files: [URL] = []
@@ -99,12 +99,12 @@ enum NeatCoreLoader {
             let isDirectory =
                 (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             if isDirectory, fileURL.lastPathComponent == "Exploration",
-                fileURL.path.contains("/NeatCore/")
+                fileURL.path.contains("/GradientCore/")
             {
                 enumerator.skipDescendants()
                 continue
             }
-            guard !isDirectory, fileURL.pathExtension.lowercased() == "neat" else {
+            guard !isDirectory, fileURL.pathExtension.lowercased() == "gradient" else {
                 continue
             }
             files.append(fileURL)
@@ -123,7 +123,7 @@ enum NeatCoreLoader {
                 )
             } catch {
                 throw ValidationError(
-                    "Failed to read NeatCore file \(fileURL.lastPathComponent): \(ErrorDescription.message(for: error))"
+                    "Failed to read GradientCore file \(fileURL.lastPathComponent): \(ErrorDescription.message(for: error))"
                 )
             }
         }

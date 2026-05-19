@@ -8,7 +8,7 @@ Constructs support automatic memberwise initialization by default.
 
 - A construct gets a memberwise initializer automatically
 
-```neat
+```gradient
 construct User {
     let name: String
     let age: Int
@@ -19,7 +19,7 @@ let user: User(name: "Ava", age: 20)
 
 - Default values reduce the required initializer surface
 
-```neat
+```gradient
 construct User {
     let name: String
     let age: Int = 20
@@ -30,7 +30,7 @@ let user: User(name: "Ava")
 
 - A construct may declare custom initializers
 
-```neat
+```gradient
 construct User {
     let name: String
     let age: Int
@@ -44,7 +44,7 @@ construct User {
 
 - A construct may declare multiple initializers as long as their signatures do not clash
 
-```neat
+```gradient
 construct User {
     let name: String
     let age: Int
@@ -63,7 +63,7 @@ construct User {
 
 - Every `let` and `state` must be initialized unless it has a default value
 
-```neat
+```gradient
 construct User {
     let name: String
     state visits: Int = 0

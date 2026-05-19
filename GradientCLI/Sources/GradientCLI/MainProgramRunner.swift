@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
 struct MainProgramRunner {
     private let project: LoadedProject
@@ -402,7 +402,7 @@ private struct MainProgramInterpreter {
         }
     }
 
-    private mutating func executeExpressionStatement(_ expression: NeatSyntax.Expression) throws {
+    private mutating func executeExpressionStatement(_ expression: GradientSyntax.Expression) throws {
         guard case .call(let name, let arguments) = expression else {
             throw ValidationError("Standalone expression statements must be callable.")
         }
@@ -444,7 +444,7 @@ private struct MainProgramInterpreter {
         }
     }
 
-    private mutating func evaluate(_ expression: NeatSyntax.Expression) throws -> RuntimeValue {
+    private mutating func evaluate(_ expression: GradientSyntax.Expression) throws -> RuntimeValue {
         switch expression {
         case .integer(let value):
             return .int(value)
@@ -589,7 +589,7 @@ private struct MainProgramInterpreter {
         }.joined()
     }
 
-    private func evaluateForInterpolation(_ expression: NeatSyntax.Expression) throws
+    private func evaluateForInterpolation(_ expression: GradientSyntax.Expression) throws
         -> RuntimeValue
     {
         var copy = self

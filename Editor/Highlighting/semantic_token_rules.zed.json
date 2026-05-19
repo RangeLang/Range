@@ -18,92 +18,92 @@
   {
     "token_type": "type",
     "token_modifiers": ["declaration"],
-    "style": ["constructor", "type.neat.declaration"]
+    "style": ["constructor", "type.gradient.declaration"]
   },
   {
     "token_type": "type",
     "token_modifiers": ["application"],
-    "style": ["type.application", "type", "type.neat.application"]
+    "style": ["type.application", "type", "type.gradient.application"]
   },
   {
     "token_type": "type",
-    "style": ["type", "type.neat"]
+    "style": ["type", "type.gradient"]
   },
   {
     "token_type": "function",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "function.neat.declaration"]
+    "style": ["declaration", "function.gradient.declaration"]
   },
   {
     "token_type": "function",
-    "style": ["function", "function.neat"]
+    "style": ["function", "function.gradient"]
   },
   {
     "token_type": "method",
-    "style": ["function.method", "function", "function.neat.method"]
+    "style": ["function.method", "function", "function.gradient.method"]
   },
   {
     "token_type": "variable",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "variable.neat.declaration"]
+    "style": ["declaration", "variable.gradient.declaration"]
   },
   {
     "token_type": "variable",
     "token_modifiers": ["argument"],
-    "style": ["variable.parameter", "variable", "variable.neat.argument"]
+    "style": ["variable.parameter", "variable", "variable.gradient.argument"]
   },
   {
     "token_type": "variable",
-    "style": ["variable", "variable.neat"]
+    "style": ["variable", "variable.gradient"]
   },
   {
     "token_type": "property",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "property.neat.declaration"]
+    "style": ["declaration", "property.gradient.declaration"]
   },
   {
     "token_type": "property",
-    "style": ["property", "variable", "property.neat"]
+    "style": ["property", "variable", "property.gradient"]
   },
   {
     "token_type": "parameter",
     "token_modifiers": ["argument"],
-    "style": ["variable.parameter", "parameter.neat.argument"]
+    "style": ["variable.parameter", "parameter.gradient.argument"]
   },
   {
     "token_type": "parameter",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "parameter.neat.declaration"]
+    "style": ["declaration", "parameter.gradient.declaration"]
   },
   {
     "token_type": "parameter",
-    "style": ["variable.parameter", "parameter.neat"]
+    "style": ["variable.parameter", "parameter.gradient"]
   },
   {
     "token_type": "enumMember",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "enumMember.neat.declaration"]
+    "style": ["declaration", "enumMember.gradient.declaration"]
   },
   {
     "token_type": "enumMember",
-    "style": ["text", "enumMember.neat"]
+    "style": ["text", "enumMember.gradient"]
   },
   {
     "token_type": "label",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "label.neat.declaration"]
+    "style": ["declaration", "label.gradient.declaration"]
   },
   {
     "token_type": "label",
-    "style": ["text", "label.neat"]
+    "style": ["text", "label.gradient"]
   },
   {
     "token_type": "macro",
     "token_modifiers": ["declaration"],
-    "style": ["macro.neat.declaration", "function.neat.declaration", "declaration"]
+    "style": ["macro.gradient.declaration", "function.gradient.declaration", "declaration"]
   },
   {
     "token_type": "macro",
-    "style": ["macro.neat", "function.neat", "function"]
+    "style": ["macro.gradient", "function.gradient", "function"]
   }
 ]

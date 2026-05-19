@@ -60,7 +60,7 @@ surface is for the target kind to expose:
 
 Current preferred `Init` shape:
 
-```neat
+```gradient
 #language
 construct Init: Syntax {
     let declaration: Declaration
@@ -89,7 +89,7 @@ This keeps the model clean:
 
 Current aligned `Parameter` shape:
 
-```neat
+```gradient
 #language
 construct Parameter: Syntax {
     let declaration: Declaration
@@ -112,7 +112,7 @@ construct Parameter: Syntax {
 
 Current preferred `Function` shape:
 
-```neat
+```gradient
 #language
 construct Function: Syntax {
     let declaration: Declaration
@@ -136,13 +136,13 @@ construct Function: Syntax {
 
 - Expression-targeted macros receive expression syntax directly
 
-```neat
+```gradient
 macro stringify(value _: capture Expression): Expression -> String { target, diagnostics in
     target.rewrite("\(value)")
 }
 ```
 
-```neat
+```gradient
 macro lock(): Block { target, diagnostics in
     target.rewrite({
         target()
@@ -152,7 +152,7 @@ macro lock(): Block { target, diagnostics in
 
 - Declaration-targeted macros receive the declared compiler structure directly
 
-```neat
+```gradient
 macro codable(): Construct { target, diagnostics in
     target.declaration.self
     target.declaration.inits
@@ -160,14 +160,14 @@ macro codable(): Construct { target, diagnostics in
 }
 ```
 
-```neat
+```gradient
 macro iterable(): Enum { target, diagnostics in
     target.declaration.self
     target.declaration.cases
 }
 ```
 
-```neat
+```gradient
 macro equatable(): Protocol { target, diagnostics in
     target.declaration.self
     target.declaration.inits
@@ -175,7 +175,7 @@ macro equatable(): Protocol { target, diagnostics in
 }
 ```
 
-```neat
+```gradient
 macro tracedExtension(): Extension { target, diagnostics in
     target.target
     target.protocols
@@ -185,7 +185,7 @@ macro tracedExtension(): Extension { target, diagnostics in
 
 - The macro surface should expose language concepts rather than hidden compiler handles
 
-```neat
+```gradient
 construct
 property
 parameter
@@ -197,7 +197,7 @@ block
 
 - Block and expression targets are syntax-first
 
-```neat
+```gradient
 macro lock(): Block { target, diagnostics in
     target.rewrite({
         acquire()
@@ -209,7 +209,7 @@ macro lock(): Block { target, diagnostics in
 
 - Declaration targets are declaration-aware
 
-```neat
+```gradient
 macro clamped(min: Int, max: Int): Property { target, diagnostics in
     target.bindingKind
     target.declaration.type
@@ -220,14 +220,14 @@ macro clamped(min: Int, max: Int): Property { target, diagnostics in
 - Callable and initializer targets should prefer declaration and application
   facets rather than one flat bag of members
 
-```neat
+```gradient
 macro literal<T>(): Function { target, diagnostics in
     let declaration = target.declaration
     let application = target.application
 }
 ```
 
-```neat
+```gradient
 macro traced(): Function { target, diagnostics in
     let declaration = target.declaration
     let application = target.application
@@ -236,7 +236,7 @@ macro traced(): Function { target, diagnostics in
 
 - Attachment targets are compiler-known language concepts
 
-```neat
+```gradient
 Expression
 Block
 Construct

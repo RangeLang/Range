@@ -4,27 +4,27 @@
 import PackageDescription
 
 let package = Package(
-    name: "NeatCLI",
+    name: "GradientCLI",
     platforms: [
         .macOS(.v13)
     ],
     dependencies: [
-        .package(path: "../NeatSyntax"),
-        .package(path: "../NeatBackendSwift"),
+        .package(path: "../GradientSyntax"),
+        .package(path: "../GradientBackendSwift"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
     ],
     targets: [
         .executableTarget(
-            name: "NeatCLI",
+            name: "GradientCLI",
             dependencies: [
-                .product(name: "NeatSyntax", package: "NeatSyntax"),
-                .product(name: "NeatBackendSwift", package: "NeatBackendSwift"),
+                .product(name: "GradientSyntax", package: "GradientSyntax"),
+                .product(name: "GradientBackendSwift", package: "GradientBackendSwift"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Sources",
             sources: [
                 "Commands",
-                "NeatCLI",
+                "GradientCLI",
                 "Terminal",
             ],
             swiftSettings: [
@@ -32,9 +32,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "NeatCLITests",
-            dependencies: ["NeatCLI"],
-            path: "Tests/NeatCLITests"
+            name: "GradientCLITests",
+            dependencies: ["GradientCLI"],
+            path: "Tests/GradientCLITests"
         )
     ]
 )

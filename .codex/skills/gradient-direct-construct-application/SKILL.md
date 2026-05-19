@@ -1,9 +1,9 @@
 ---
-name: neat-direct-construct-application
+name: gradient-direct-construct-application
 description: Use when changing construct calls, initializer inference, direct construct application, constructor diagnostics, fixture cleanup, generated Swift initializers, or docs about constructs carrying data shape without explicit init declarations. Use the embedded direction in this skill to catch old initializer assumptions.
 ---
 
-# Neat Direct Construct Application
+# Gradient Direct Construct Application
 
 ## Workflow
 
@@ -15,7 +15,7 @@ description: Use when changing construct calls, initializer inference, direct co
 
 ## Shape Bias
 
-```neat
+```gradient
 construct User {
     let id: Int
     let name: String

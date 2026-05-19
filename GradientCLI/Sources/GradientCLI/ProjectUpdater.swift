@@ -1,9 +1,9 @@
 import ArgumentParser
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
 struct ProjectUpdater {
-    private static let releaseRepository = "georgetchelidze/Neat"
+    private static let releaseRepository = "georgetchelidze/Gradient"
 
     private let path: String
     private let updateCLI: Bool
@@ -20,7 +20,7 @@ struct ProjectUpdater {
         if version == "latest" {
             let status = try VersionChecker(repository: releaseRepositoryURL(for: repository)).check()
             guard status.updateAvailable else {
-                TerminalLog.out("Neat CLI is already up to date.", level: .success)
+                TerminalLog.out("Gradient CLI is already up to date.", level: .success)
                 return
             }
         }
@@ -40,14 +40,14 @@ struct ProjectUpdater {
 
         let fileManager = FileManager.default
         let temporaryRoot = fileManager.temporaryDirectory
-            .appendingPathComponent("neat-update-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("gradient-update-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
         defer {
             try? fileManager.removeItem(at: temporaryRoot)
         }
 
         let archiveURL = temporaryRoot.appendingPathComponent(archive, isDirectory: false)
-        TerminalLog.out("Downloading Neat from \(url.absoluteString)", level: .change)
+        TerminalLog.out("Downloading Gradient from \(url.absoluteString)", level: .change)
         try download(url: url, to: archiveURL)
 
         try runProcess(
@@ -56,7 +56,7 @@ struct ProjectUpdater {
         )
 
         let packageRoot = temporaryRoot.appendingPathComponent(
-            "neat-\(platform).lang",
+            "gradient-\(platform).lang",
             isDirectory: true
         )
         let installScript = packageRoot.appendingPathComponent("install.sh", isDirectory: false)
@@ -69,11 +69,11 @@ struct ProjectUpdater {
             executable: installScript.path,
             arguments: [],
             environment: [
-                "NEAT_INSTALL_ASSUME_YES": "true",
-                "NEAT_INSTALL_PREFIX": installPrefix.path,
+                "GRADIENT_INSTALL_ASSUME_YES": "true",
+                "GRADIENT_INSTALL_PREFIX": installPrefix.path,
             ]
         )
-        TerminalLog.out("Updated Neat CLI.", level: .success)
+        TerminalLog.out("Updated Gradient CLI.", level: .success)
     }
 
     static func releaseRepositoryURL(for repository: String) -> String {
@@ -86,26 +86,26 @@ struct ProjectUpdater {
 
     static func selfUpdateInstallPrefix() -> URL {
         let environment = ProcessInfo.processInfo.environment
-        if let override = environment["NEAT_UPDATE_PREFIX"], !override.isEmpty {
+        if let override = environment["GRADIENT_UPDATE_PREFIX"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true).standardizedFileURL
         }
 
         let executablePrefix = installedExecutableURL()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        if isNeatUserPrefix(executablePrefix), isWritableInstallPrefix(executablePrefix) {
+        if isGradientUserPrefix(executablePrefix), isWritableInstallPrefix(executablePrefix) {
             return executablePrefix
         }
 
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .standardizedFileURL
     }
 
-    private static func isNeatUserPrefix(_ prefix: URL) -> Bool {
+    private static func isGradientUserPrefix(_ prefix: URL) -> Bool {
         prefix.standardizedFileURL.path
             == FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .standardizedFileURL
             .path
     }
@@ -121,11 +121,11 @@ struct ProjectUpdater {
     }
 
     static func releaseArchiveNameForCurrentPlatform() throws -> String {
-        "neat-\(try releasePlatform()).lang.tar.gz"
+        "gradient-\(try releasePlatform()).lang.tar.gz"
     }
 
     private static func installedExecutableURL() -> URL {
-        let executable = CommandLine.arguments.first ?? "neat"
+        let executable = CommandLine.arguments.first ?? "gradient"
         if executable.contains("/") {
             return URL(fileURLWithPath: executable).standardizedFileURL
         }
@@ -164,7 +164,7 @@ struct ProjectUpdater {
         #elseif os(Linux)
         let os = "linux"
         #else
-        throw ValidationError("Neat release updates are not supported on this operating system yet.")
+        throw ValidationError("Gradient release updates are not supported on this operating system yet.")
         #endif
 
         #if arch(arm64)
@@ -172,7 +172,7 @@ struct ProjectUpdater {
         #elseif arch(x86_64)
         let arch = "x64"
         #else
-        throw ValidationError("Neat release updates are not supported on this architecture yet.")
+        throw ValidationError("Gradient release updates are not supported on this architecture yet.")
         #endif
 
         return "\(os)-\(arch)"
@@ -187,24 +187,24 @@ struct ProjectUpdater {
 
     func run() throws {
         let root = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-        let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Package.gradient", isDirectory: false)
 
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.neat in \(root.path)")
+            throw ValidationError("Missing Package.gradient in \(root.path)")
         }
 
         let source = try String(contentsOf: packageFile, encoding: .utf8)
         let manifest = try PackageManifestLoader.load(from: packageFile)
-        let isNeatPackage = manifest.name == "Neat"
+        let isGradientPackage = manifest.name == "Gradient"
         let modules = parseModules(from: source)
-        try updateModules(modules, projectRoot: root, reportEmpty: !isNeatPackage)
+        try updateModules(modules, projectRoot: root, reportEmpty: !isGradientPackage)
 
         if updateCLI {
-            try updateNeatCLIIfAvailable(from: root)
+            try updateGradientCLIIfAvailable(from: root)
         }
 
-        if isNeatPackage {
-            try publishAndDownloadNeat(from: root, manifest: manifest)
+        if isGradientPackage {
+            try publishAndDownloadGradient(from: root, manifest: manifest)
         }
 
         TerminalLog.out("Update complete.", level: .success)
@@ -243,7 +243,7 @@ struct ProjectUpdater {
 
         let modulesRoot =
             projectRoot
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .appendingPathComponent("Packages", isDirectory: true)
         try FileManager.default.createDirectory(at: modulesRoot, withIntermediateDirectories: true)
 
@@ -291,22 +291,22 @@ struct ProjectUpdater {
         }
     }
 
-    private func updateNeatCLIIfAvailable(from root: URL) throws {
-        let script = root.appendingPathComponent("scripts/install-neat.sh", isDirectory: false)
+    private func updateGradientCLIIfAvailable(from root: URL) throws {
+        let script = root.appendingPathComponent("scripts/install-gradient.sh", isDirectory: false)
         if !FileManager.default.fileExists(atPath: script.path) {
             TerminalLog.out(
-                "Skipping CLI self-update: scripts/install-neat.sh not found in \(root.path)",
+                "Skipping CLI self-update: scripts/install-gradient.sh not found in \(root.path)",
                 level: .warning
             )
             return
         }
 
         try Self.runProcess(executable: script.path, arguments: [])
-        TerminalLog.out("Updated Neat CLI", level: .success)
+        TerminalLog.out("Updated Gradient CLI", level: .success)
     }
 
-    private func publishAndDownloadNeat(from root: URL, manifest: PackageManifest) throws {
-        TerminalLog.out("Publishing Neat", level: .change)
+    private func publishAndDownloadGradient(from root: URL, manifest: PackageManifest) throws {
+        TerminalLog.out("Publishing Gradient", level: .change)
         let published = try PackagePublisher(projectPath: root.path).publish(.patch)
         TerminalLog.out("Published \(published.name) \(published.version).", level: .success)
         switch published.git {
@@ -338,7 +338,7 @@ struct ProjectUpdater {
 
         let packageRoot =
             FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .appendingPathComponent("Packages", isDirectory: true)
             .appendingPathComponent(parts[0], isDirectory: true)
             .appendingPathComponent(parts[1], isDirectory: true)

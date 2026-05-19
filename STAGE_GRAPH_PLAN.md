@@ -28,7 +28,7 @@ The key rule is:
 
 - the compiler should progressively read the program into more settled meaning
 - later stages should enrich earlier graph facts, not rebuild parallel models
-- `NeatCore` should remain the language-visible source of truth for declaration
+- `GradientCore` should remain the language-visible source of truth for declaration
   and application surfaces such as `Init`, `Init.Declaration`, and
   `Init.Application`
 
@@ -38,24 +38,24 @@ The key rule is:
 
 Core files:
 
-- [ProgramGraph.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ProgramGraph.swift)
-- [DeclarationGraph.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraph.swift)
-- [ApplicationGraph.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ApplicationGraph.swift)
-- [CompiledProgram.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgram.swift)
-- [CompiledProgramValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/CompiledProgramValidator.swift)
-- [ProgramGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ProgramGraphValidator.swift)
-- [DeclarationGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraphValidator.swift)
-- [ApplicationGraphValidator.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/ApplicationGraphValidator.swift)
+- [ProgramGraph.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/ProgramGraph.swift)
+- [DeclarationGraph.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/DeclarationGraph.swift)
+- [ApplicationGraph.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/ApplicationGraph.swift)
+- [CompiledProgram.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/CompiledProgram.swift)
+- [CompiledProgramValidator.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/CompiledProgramValidator.swift)
+- [ProgramGraphValidator.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/ProgramGraphValidator.swift)
+- [DeclarationGraphValidator.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/DeclarationGraphValidator.swift)
+- [ApplicationGraphValidator.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/ApplicationGraphValidator.swift)
 
 Macro graph view files:
 
-- [DeclarationGraph+MacroViewModels.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraph+MacroViewModels.swift)
-- [DeclarationGraph+MacroViews.swift](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Core/DeclarationGraph+MacroViews.swift)
+- [DeclarationGraph+MacroViewModels.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/DeclarationGraph+MacroViewModels.swift)
+- [DeclarationGraph+MacroViews.swift](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Core/DeclarationGraph+MacroViews.swift)
 
 Supporting docs:
 
-- [Macros.Context.md](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/Macros/Macros.Context.md)
-- [DeclarationGraph.md](/Users/george/Documents/Neat/NeatSyntax/Sources/NeatSyntax/GraphBindings/MemoryGraph/DeclarationGraph.md)
+- [Macros.Context.md](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/Macros/Macros.Context.md)
+- [DeclarationGraph.md](/Users/george/Documents/Gradient/GradientSyntax/Sources/GradientSyntax/GraphBindings/MemoryGraph/DeclarationGraph.md)
 
 ### Current Roles
 
@@ -112,7 +112,7 @@ The live question is how future graph domains such as `MemoryGraph` and
 
 The current pipeline already behaves like staged graph enrichment:
 
-1. parse `NeatCore`
+1. parse `GradientCore`
 2. discover project declarations with a lighter parse
 3. build an early declaration graph
 4. parse project files with declaration-backed help
@@ -654,7 +654,7 @@ This stage should answer:
 Input:
 
 - structural graph
-- `NeatCore` declaration surfaces
+- `GradientCore` declaration surfaces
 
 Purpose:
 
@@ -823,10 +823,10 @@ And the non-graph container is:
 
 That distinction should remain explicit.
 
-## Alignment With NeatCore
+## Alignment With GradientCore
 
 The compiler graph should mirror the same declaration/application surfaces that
-`NeatCore` exposes.
+`GradientCore` exposes.
 
 Examples:
 
@@ -844,7 +844,7 @@ relationships, not as hidden compiler conventions.
 This matters for:
 
 - macro surface correctness
-- reduced semantic drift between compiler internals and `NeatCore`
+- reduced semantic drift between compiler internals and `GradientCore`
 - easier self-hosting
 - smaller expander and resolver code
 
@@ -965,4 +965,4 @@ Do not reintroduce:
 - graph-independent resolver mini-models where graph-backed views will do
 
 That duplication is what causes drift, unnecessary compiler code, and weaker
-alignment with `NeatCore`.
+alignment with `GradientCore`.

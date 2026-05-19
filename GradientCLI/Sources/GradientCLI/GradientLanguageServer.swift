@@ -1,7 +1,7 @@
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
-struct NeatLanguageServer {
+struct GradientLanguageServer {
     private var documents: [String: DocumentState] = [:]
     private var navigationIndexesByDocumentURI: [String: NavigationIndexCacheEntry] = [:]
     private var navigationIndexGeneration = 0
@@ -57,7 +57,7 @@ struct NeatLanguageServer {
                         ],
                     ],
                     "serverInfo": [
-                        "name": "neat-lsp",
+                        "name": "gradient-lsp",
                         "version": "0.2.0",
                     ],
                 ]
@@ -342,27 +342,27 @@ struct NeatLanguageServer {
     private func hoverDescription(for symbol: Symbol) -> String {
         switch symbol.kind {
         case .attribute:
-            return "Neat callable sigil"
+            return "Gradient callable sigil"
         case .macro:
-            return "Neat macro"
+            return "Gradient macro"
         case .declaration:
-            return "Neat declaration"
+            return "Gradient declaration"
         case .callable:
-            return "Neat callable"
+            return "Gradient callable"
         case .variable:
-            return "Neat variable"
+            return "Gradient variable"
         case .state:
-            return "Neat state property"
+            return "Gradient state property"
         case .styleModifier:
-            return "Neat style modifier"
+            return "Gradient style modifier"
         case .typeExtension:
-            return "Neat type extension"
+            return "Gradient type extension"
         case .view:
-            return "Neat built-in view"
+            return "Gradient built-in view"
         case .modifier:
-            return "Neat modifier"
+            return "Gradient modifier"
         case .keyword:
-            return "Neat language keyword"
+            return "Gradient language keyword"
         }
     }
 
@@ -399,7 +399,7 @@ struct NeatLanguageServer {
         } catch {
             return [
                 lspDiagnostic(
-                    from: NeatDiagnosticConverter.diagnostic(from: error),
+                    from: GradientDiagnosticConverter.diagnostic(from: error),
                     index: index
                 )
             ]
@@ -420,7 +420,7 @@ struct NeatLanguageServer {
         return fileURL.standardizedFileURL.path
     }
 
-    private func diagnosticAppliesToDocument(_ diagnostic: NeatDiagnostic, uri: String) -> Bool {
+    private func diagnosticAppliesToDocument(_ diagnostic: GradientDiagnostic, uri: String) -> Bool {
         guard let path = diagnostic.path,
             let fileURL = URL(string: uri),
             fileURL.isFileURL
@@ -432,7 +432,7 @@ struct NeatLanguageServer {
     }
 
     private func lspDiagnostic(
-        from diagnostic: NeatDiagnostic,
+        from diagnostic: GradientDiagnostic,
         index: DocumentIndex
     ) -> [String: Any] {
         let range = lspRange(for: diagnostic, fallback: index.firstNonWhitespaceRange ?? index.fullDocumentRange)
@@ -448,7 +448,7 @@ struct NeatLanguageServer {
         return payload
     }
 
-    private func lspRange(for diagnostic: NeatDiagnostic, fallback: RangePosition) -> RangePosition {
+    private func lspRange(for diagnostic: GradientDiagnostic, fallback: RangePosition) -> RangePosition {
         guard let range = diagnostic.range else {
             return fallback
         }
@@ -458,7 +458,7 @@ struct NeatLanguageServer {
         )
     }
 
-    private func lspSeverity(for severity: NeatDiagnosticSeverity) -> Int {
+    private func lspSeverity(for severity: GradientDiagnosticSeverity) -> Int {
         switch severity {
         case .error:
             return 1
@@ -526,19 +526,19 @@ struct NeatLanguageServer {
             let fileURL = URL(string: uri),
             fileURL.isFileURL
         else {
-            return uniqueSourceInputs(try NeatCoreLoader.sourceInputs() + [
+            return uniqueSourceInputs(try GradientCoreLoader.sourceInputs() + [
                 SourceInput(path: uri, source: text, role: .project)
             ])
         }
 
         let standardizedFileURL = fileURL.standardizedFileURL
         let openedFileRole: SourceInputRole =
-            (try? NeatCoreLoader.isCoreFile(standardizedFileURL)) == true ? .core : .project
+            (try? GradientCoreLoader.isCoreFile(standardizedFileURL)) == true ? .core : .project
         let loadedProject: LoadedProject
         do {
             loadedProject = try ProjectLoader.load(at: standardizedFileURL.path)
         } catch {
-            return uniqueSourceInputs(try NeatCoreLoader.sourceInputs() + [
+            return uniqueSourceInputs(try GradientCoreLoader.sourceInputs() + [
                 SourceInput(path: standardizedFileURL.path, source: text, role: openedFileRole)
             ])
         }
@@ -839,7 +839,7 @@ struct NeatLanguageServer {
     }
 
     private func debugLog(_ message: String) {
-        let path = "/tmp/neat-lsp-debug.log"
+        let path = "/tmp/gradient-lsp-debug.log"
         let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
         if let data = line.data(using: .utf8) {
             if FileManager.default.fileExists(atPath: path) {
@@ -2183,10 +2183,10 @@ private struct DocumentIndex {
     }
 }
 
-// Semantic highlighting in Neat should stay semantic-first and editor-agnostic.
+// Semantic highlighting in Gradient should stay semantic-first and editor-agnostic.
 // Keep this taxonomy intentionally small and prefer standard LSP token types
 // plus modifiers before adding custom distinctions. See:
-// Zed/Neat/docs/SemanticHighlightingPlan.md
+// Zed/Gradient/docs/SemanticHighlightingPlan.md
 enum SemanticTokenType: String, CaseIterable {
     case type
     case function
@@ -2247,7 +2247,7 @@ struct DefinitionSnapshot: Equatable {
     let name: String
 }
 
-extension NeatLanguageServer {
+extension GradientLanguageServer {
     static func debugFormattedDocument(_ text: String) -> String {
         formatDocument(text)
     }
@@ -2278,16 +2278,16 @@ extension NeatLanguageServer {
         supportDocuments: [(uri: String, text: String)] = []
     ) -> DefinitionSnapshot? {
         let primary = DocumentState(
-            uri: "file:///Primary.neat",
+            uri: "file:///Primary.gradient",
             text: text,
-            index: DocumentIndex(text: text, uri: "file:///Primary.neat"),
+            index: DocumentIndex(text: text, uri: "file:///Primary.gradient"),
             diagnostics: []
         )
         let position = Position(line: line, character: character)
         let inputs = supportDocuments.map { document in
             SourceInput(path: URL(string: document.uri)?.path ?? document.uri, source: document.text, role: .core)
         } + [
-            SourceInput(path: "/Primary.neat", source: text, role: .project)
+            SourceInput(path: "/Primary.gradient", source: text, role: .project)
         ]
 
         guard
@@ -2341,7 +2341,7 @@ private enum DefaultLibrarySymbols {
         patterns: [String],
         transform: (([String]) -> String)? = nil
     ) -> Set<String> {
-        guard let inputs = try? NeatCoreLoader.sourceInputs() else { return [] }
+        guard let inputs = try? GradientCoreLoader.sourceInputs() else { return [] }
 
         var result: Set<String> = []
         for input in inputs where input.role == .core {

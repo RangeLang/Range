@@ -3,17 +3,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "NeatSyntax",
+    name: "GradientSyntax",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .library(name: "NeatSyntax", targets: ["NeatSyntax"])
+        .library(name: "GradientSyntax", targets: ["GradientSyntax"])
     ],
     targets: [
         .target(
-            name: "NeatSyntax",
-            path: "Sources/NeatSyntax",
+            name: "GradientSyntax",
+            path: "Sources/GradientSyntax",
             exclude: [
                 "TypeDefinitions/Construct/Construct.Identity.md",
                 "TypeDefinitions/Construct/Construct.Initialization.md",
@@ -44,9 +44,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "NeatSyntaxTests",
-            dependencies: ["NeatSyntax"],
-            path: "Tests/NeatSyntaxTests"
+            name: "GradientSyntaxTests",
+            dependencies: ["GradientSyntax"],
+            path: "Tests/GradientSyntaxTests"
         )
     ]
 )

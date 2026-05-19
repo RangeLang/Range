@@ -1,9 +1,9 @@
 import ArgumentParser
 import Foundation
 
-enum NeatVersion {
+enum GradientVersion {
     static let current = SemanticVersion(major: 0, minor: 1, patch: 26)
-    static let updateRepository = "https://github.com/georgetchelidze/Neat.git"
+    static let updateRepository = "https://github.com/georgetchelidze/Gradient.git"
 }
 
 struct SemanticVersion: CustomStringConvertible, Equatable, Comparable {

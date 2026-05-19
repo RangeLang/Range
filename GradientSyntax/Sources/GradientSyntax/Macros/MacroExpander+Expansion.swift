@@ -1309,10 +1309,10 @@ extension MacroExpander {
     }
 
     static func expand(
-        parameters: [NeatFunctionParameter],
+        parameters: [GradientFunctionParameter],
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
-    ) throws -> [NeatFunctionParameter] {
+    ) throws -> [GradientFunctionParameter] {
         try parameters.map { parameter in
             let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
                 macroApplication in
@@ -1335,7 +1335,7 @@ extension MacroExpander {
                 try applyAttachedParameterTypeRewrite(macro: macro, to: currentType, context: context)
             }
 
-            return NeatFunctionParameter(
+            return GradientFunctionParameter(
                 macros: parameter.macros,
                 localName: parameter.localName,
                 externalLabel: parameter.externalLabel,
@@ -1874,8 +1874,8 @@ extension MacroExpander {
         graphBinding: String?,
         context: MacroExpansionContext,
         localBindings: [String: Expression]
-    ) throws -> [NeatDiagnostic] {
-        var diagnostics: [NeatDiagnostic] = []
+    ) throws -> [GradientDiagnostic] {
+        var diagnostics: [GradientDiagnostic] = []
         var locals = localBindings
 
         for statement in statements {
@@ -2009,7 +2009,7 @@ extension MacroExpander {
         graphBinding: String?,
         context: MacroExpansionContext,
         localBindings: [String: Expression]
-    ) throws -> NeatDiagnostic? {
+    ) throws -> GradientDiagnostic? {
         guard case .call(let name, let arguments) = expression,
             isMacroDiagnosticsCall(expression, diagnosticsBinding: diagnosticsBinding)
         else {
@@ -2034,31 +2034,31 @@ extension MacroExpander {
 
         switch name {
         case "\(diagnosticsBinding).error":
-            return NeatDiagnostic(
+            return GradientDiagnostic(
                 severity: .error,
                 message: message,
-                source: "neat-macro",
+                source: "gradient-macro",
                 code: "macro.diagnostic.error"
             )
         case "\(diagnosticsBinding).warning":
-            return NeatDiagnostic(
+            return GradientDiagnostic(
                 severity: .warning,
                 message: message,
-                source: "neat-macro",
+                source: "gradient-macro",
                 code: "macro.diagnostic.warning"
             )
         case "\(diagnosticsBinding).information", "\(diagnosticsBinding).note":
-            return NeatDiagnostic(
+            return GradientDiagnostic(
                 severity: .information,
                 message: message,
-                source: "neat-macro",
+                source: "gradient-macro",
                 code: "macro.diagnostic.information"
             )
         case "\(diagnosticsBinding).hint":
-            return NeatDiagnostic(
+            return GradientDiagnostic(
                 severity: .hint,
                 message: message,
-                source: "neat-macro",
+                source: "gradient-macro",
                 code: "macro.diagnostic.hint"
             )
         default:
@@ -2378,7 +2378,7 @@ extension MacroExpander {
         }
         context.diagnosticEngine?.warning(
             "Spliced Identifier is used as a member-access base. This chain is checked after macro expansion.",
-            source: "neat-macro-expander",
+            source: "gradient-macro-expander",
             code: "macro.identifier-member-splice",
             path: context.currentPath
         )

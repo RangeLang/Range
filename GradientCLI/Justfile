@@ -4,20 +4,20 @@ default:
   @just --list
 
 build:
-  swift build -c release --product NeatCLI
+  swift build -c release --product GradientCLI
 
 install:
-  ./scripts/install-neat.sh
+  ./scripts/install-gradient.sh
 
 install-local:
-  ./scripts/install-neat.sh --local
+  ./scripts/install-gradient.sh --local
 
 uninstall:
-  ./scripts/install-neat.sh --uninstall
+  ./scripts/install-gradient.sh --uninstall
 
 reinstall *args:
-  bash ./scripts/reinstall-neat.sh {{args}}
+  bash ./scripts/reinstall-gradient.sh {{args}}
 
 preview:
-  bash ./scripts/reinstall-neat.sh ../NeatExample --yes
-  neat run ../NeatExample
+  bash ./scripts/reinstall-gradient.sh ../GradientExample --yes
+  gradient run ../GradientExample

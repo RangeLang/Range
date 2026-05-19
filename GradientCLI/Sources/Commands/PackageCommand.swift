@@ -1,10 +1,10 @@
 import ArgumentParser
 import Foundation
 
-extension NeatCLI {
+extension GradientCLI {
     struct Package: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Manage installed Neat packages.",
+            abstract: "Manage installed Gradient packages.",
             subcommands: [
                 Patch.self,
                 Minor.self,
@@ -26,7 +26,7 @@ extension NeatCLI {
             do {
                 let packageFile = URL(fileURLWithPath: path, isDirectory: true)
                     .standardizedFileURL
-                    .appendingPathComponent("Package.neat", isDirectory: false)
+                    .appendingPathComponent("Package.gradient", isDirectory: false)
                 let manifest = try PackageManifestLoader.load(from: packageFile)
 
                 print(TerminalLog.style(manifest.name, level: .change, bold: true))
@@ -65,7 +65,7 @@ extension NeatCLI {
             if !published.author.isEmpty {
                 TerminalLog.subtleOut("Author: \(published.author)")
             }
-            TerminalLog.subtleOut("Package.neat: \(published.packageFile.path)")
+            TerminalLog.subtleOut("Package.gradient: \(published.packageFile.path)")
             switch published.git {
             case .published(let commit, let tag, let pushed):
                 TerminalLog.subtleOut("Git: \(commit), \(tag)\(pushed ? ", pushed" : ", not pushed")")
@@ -82,7 +82,7 @@ extension NeatCLI {
             @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
             var projectPath: String = "."
 
-            @Flag(help: "Only bump Package.neat; do not commit or tag.")
+            @Flag(help: "Only bump Package.gradient; do not commit or tag.")
             var noGit: Bool = false
 
             @Flag(help: "Commit and tag locally, but do not push to origin.")
@@ -111,7 +111,7 @@ extension NeatCLI {
             @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
             var projectPath: String = "."
 
-            @Flag(help: "Only bump Package.neat; do not commit or tag.")
+            @Flag(help: "Only bump Package.gradient; do not commit or tag.")
             var noGit: Bool = false
 
             @Flag(help: "Commit and tag locally, but do not push to origin.")
@@ -140,7 +140,7 @@ extension NeatCLI {
             @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
             var projectPath: String = "."
 
-            @Flag(help: "Only bump Package.neat; do not commit or tag.")
+            @Flag(help: "Only bump Package.gradient; do not commit or tag.")
             var noGit: Bool = false
 
             @Flag(help: "Commit and tag locally, but do not push to origin.")
@@ -175,7 +175,7 @@ extension NeatCLI {
             )
             var projectPath: String = "."
 
-            @Flag(help: "Only bump Package.neat; do not commit or tag.")
+            @Flag(help: "Only bump Package.gradient; do not commit or tag.")
             var noGit: Bool = false
 
             @Flag(help: "Commit and tag locally, but do not push to origin.")
@@ -233,7 +233,7 @@ extension NeatCLI {
 
             @Argument(
                 parsing: .remaining,
-                help: "Search terms for packages under .neat/Packages."
+                help: "Search terms for packages under .gradient/Packages."
             )
             var terms: [String] = []
 
@@ -259,7 +259,7 @@ extension NeatCLI {
                         let cloudResults =
                             cloudLimit > 0
                             ? (try? PackageSearcher().search(
-                                query: query.isEmpty ? "neat" : query,
+                                query: query.isEmpty ? "gradient" : query,
                                 limit: cloudLimit
                             )) ?? []
                             : []

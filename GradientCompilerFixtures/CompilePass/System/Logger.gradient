@@ -1,5 +1,5 @@
 #main {
-    Logger.info("Neat logger fixture")
+    Logger.info("Gradient logger fixture")
     Logger.debug("debug path reached")
     Logger.success("success path reached")
     Logger.warning("warning path reached")

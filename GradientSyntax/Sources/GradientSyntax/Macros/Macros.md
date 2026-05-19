@@ -10,7 +10,7 @@ They declare the syntax target they apply to directly, for example `: Expression
 
 - Use `#` for call-style macro use sites
 
-```neat
+```gradient
 #lock {
     work()
 }
@@ -18,22 +18,22 @@ They declare the syntax target they apply to directly, for example `: Expression
 
 - Run entirely at compile time
 
-```neat
+```gradient
 #stringify("hello")
 ```
 
 Macros rewrite compiler structures before code generation. They do not add runtime overhead.
 
-- Are declared through ordinary Neat syntax
+- Are declared through ordinary Gradient syntax
 
-```neat
+```gradient
 macro codable(): Construct { }
 macro lock(): Block { }
 ```
 
 - Are typed by direct target syntax kinds
 
-```neat
+```gradient
 macro codable(): Construct { }
 macro clamped(min: Int, max: Int): State { }
 macro lock(): Block { }
@@ -43,7 +43,7 @@ macro stringify(value _: capture Expression): Expression -> String { }
 
 - Support composition through the existing type system
 
-```neat
+```gradient
 macro observable(): Property { }
 ```
 
@@ -59,7 +59,7 @@ Code generation
 
 - Expose the compiler structure appropriate to their phase
 
-```neat
+```gradient
 macro lock(): Block { target, diagnostics in
     target.rewrite({
         acquire()
@@ -69,7 +69,7 @@ macro lock(): Block { target, diagnostics in
 }
 ```
 
-```neat
+```gradient
 macro codable(): Construct { target, diagnostics in
     target.values
     target.states
@@ -86,7 +86,7 @@ result builders
 property wrappers
 ```
 
-Neat treats these as macro-system problems rather than separate baked-in language features.
+Gradient treats these as macro-system problems rather than separate baked-in language features.
 
 ## Notes
 

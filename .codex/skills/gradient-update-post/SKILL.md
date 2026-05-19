@@ -1,9 +1,9 @@
 ---
-name: neat-update-post
-description: Create very short Neat update, addition, or feature posts with a concept title, compact example shape, and short design-oriented reason. Use when asked to turn Neat syntax, compiler, graph, editor, tooling, docs, or product-design changes into compact Markdown update notes instead of long articles.
+name: gradient-update-post
+description: Create very short Gradient update, addition, or feature posts with a concept title, compact example shape, and short design-oriented reason. Use when asked to turn Gradient syntax, compiler, graph, editor, tooling, docs, or product-design changes into compact Markdown update notes instead of long articles.
 ---
 
-# Neat Update Post
+# Gradient Update Post
 
 ## Workflow
 
@@ -11,7 +11,7 @@ description: Create very short Neat update, addition, or feature posts with a co
 2. Choose a concept title, not an action title.
 3. Keep the post short. Prefer one title, one sentence of context, one compact example section, and a compact reason.
 4. Write to a user-named destination; if none is given, return the Markdown draft in the response.
-5. Use the user's first-person Neat developer voice only when needed, but avoid filler like "to me because".
+5. Use the user's first-person Gradient developer voice only when needed, but avoid filler like "to me because".
 6. Explain what repetition, awkwardness, or unclear shape was removed, and what the new shape makes easier to see.
 7. Avoid speculative sections such as `Open Questions`, `Questions`, or `Unresolved`.
 
@@ -26,13 +26,13 @@ Short intro sentence.
 
 ## Before
 
-```neat
+```gradient
 old shape
 ```
 
 ## After
 
-```neat
+```gradient
 new shape
 ```
 
@@ -50,7 +50,7 @@ Short intro sentence.
 
 ## Addition
 
-```neat
+```gradient
 new shape
 ```
 
@@ -72,7 +72,7 @@ Short description of the capability.
 
 ## Example
 
-```neat
+```gradient
 example shape
 ```
 
@@ -85,7 +85,7 @@ Section names may change only when the user asks for a different format. Keep th
 
 ## Voice
 
-Write like a concise update note from the Neat developer:
+Write like a concise update note from the Gradient developer:
 
 - short paragraphs
 - direct technical claims
@@ -111,7 +111,7 @@ Good explanation lines sound like:
 ## Constraints
 
 - Keep most posts under 500 words unless the user asks for more.
-- Use fenced `neat` blocks for Neat code.
+- Use fenced `gradient` blocks for Gradient code.
 - Use plain text blocks for graph sketches.
 - Use Markdown quote blocks for quoted reasons.
 - Do not call a first-class language concept "sugar" unless the update is specifically about surface syntax.

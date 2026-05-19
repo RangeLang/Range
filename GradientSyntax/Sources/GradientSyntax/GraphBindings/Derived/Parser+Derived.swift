@@ -175,7 +175,7 @@ extension Parser {
             return true
         }
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        guard peek(offset: offset) == .keyword(NeatSyntax.Keyword.derived.rawValue) else {
+        guard peek(offset: offset) == .keyword(GradientSyntax.Keyword.derived.rawValue) else {
             return false
         }
         guard case .identifier = peek(offset: offset + 1) else { return false }

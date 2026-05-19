@@ -17,7 +17,7 @@ extension Parser {
     }
 
     mutating func parseGenericParameter() throws -> GenericParameter {
-        if peek() == .keyword(NeatSyntax.Keyword.let.rawValue) {
+        if peek() == .keyword(GradientSyntax.Keyword.let.rawValue) {
             try consumeKeyword(.let)
             let name = try consumeIdentifier()
             try consume(.colon)
@@ -97,7 +97,7 @@ extension Parser {
         return (firstName, firstName)
     }
 
-    mutating func parseAttributeIfPresent(before keyword: NeatSyntax.Keyword)
+    mutating func parseAttributeIfPresent(before keyword: GradientSyntax.Keyword)
         -> AttributeApplication?
     {
         guard case .atAttribute = peek() else {
@@ -108,7 +108,7 @@ extension Parser {
             return nil
         }
 
-        let attribute = NeatSyntax.attributeApplication(for: peek())
+        let attribute = GradientSyntax.attributeApplication(for: peek())
         advance()
         return attribute
     }

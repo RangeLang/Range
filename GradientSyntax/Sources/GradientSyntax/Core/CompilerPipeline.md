@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`NeatSyntax` should own Neat's compiler pipeline. `NeatCLI` should supply files, load `NeatCore`, choose commands and backends, and report results, but it should not assemble semantic compiler stages ad hoc.
+`GradientSyntax` should own Gradient's compiler pipeline. `GradientCLI` should supply files, load `GradientCore`, choose commands and backends, and report results, but it should not assemble semantic compiler stages ad hoc.
 
 ## Pipeline
 
@@ -44,22 +44,22 @@ The intended pipeline is:
   derives invalidation and recomputation dependencies from the earlier semantic and memory layers
 
 - `BackendLowering`
-  adapts settled Neat meaning to a target such as Swift, C, or a future native backend
+  adapts settled Gradient meaning to a target such as Swift, C, or a future native backend
 
 - `Emission`
   prints or writes target output
 
-## Boundary Between NeatSyntax And NeatCLI
+## Boundary Between GradientSyntax And GradientCLI
 
 The split should be:
 
-- `NeatSyntax`
+- `GradientSyntax`
   owns lexing, parsing, AST construction, declaration-graph construction, semantic resolution, and later graph derivation
 
-- `NeatCLI`
-  discovers project files, loads `NeatCore`, chooses commands, invokes backends, reports diagnostics, and writes output
+- `GradientCLI`
+  discovers project files, loads `GradientCore`, chooses commands, invokes backends, reports diagnostics, and writes output
 
-That means `NeatCLI` should request a semantic artifact from `NeatSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.
+That means `GradientCLI` should request a semantic artifact from `GradientSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.
 
 ## Minimal First SemanticProgram
 
@@ -77,8 +77,8 @@ public struct SemanticProgram {
 
 This is enough to:
 
-- centralize parsing and macro expansion in `NeatSyntax`
-- centralize declaration-graph construction in `NeatSyntax`
+- centralize parsing and macro expansion in `GradientSyntax`
+- centralize declaration-graph construction in `GradientSyntax`
 - let backends consume one semantic entry point instead of raw file collection
 
 ## Backend Rule

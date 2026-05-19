@@ -37,8 +37,8 @@ public struct DeclarationRegistryView {
     private let derivedsByConstructName: [String: [DerivedDeclaration]]
     private let valuesByConstructName: [String: [ValueDeclaration]]
     private let initializersByConstructName: [String: [InitializerDeclaration]]
-    private let parametersByCallableIdentity: [String: [NeatFunctionParameter]]
-    private let parametersByInitializerIdentity: [String: [NeatFunctionParameter]]
+    private let parametersByCallableIdentity: [String: [GradientFunctionParameter]]
+    private let parametersByInitializerIdentity: [String: [GradientFunctionParameter]]
     private let callablesByName: [String: [CallableDeclaration]]
 
     public init(
@@ -53,8 +53,8 @@ public struct DeclarationRegistryView {
         derivedsByConstructName: [String: [DerivedDeclaration]],
         valuesByConstructName: [String: [ValueDeclaration]],
         initializersByConstructName: [String: [InitializerDeclaration]],
-        parametersByCallableIdentity: [String: [NeatFunctionParameter]],
-        parametersByInitializerIdentity: [String: [NeatFunctionParameter]],
+        parametersByCallableIdentity: [String: [GradientFunctionParameter]],
+        parametersByInitializerIdentity: [String: [GradientFunctionParameter]],
         callablesByName: [String: [CallableDeclaration]]
     ) {
         self.protocolsByName = protocolsByName
@@ -145,7 +145,7 @@ public struct DeclarationRegistryView {
     public func parameters(
         ofCallable declaration: CallableDeclaration,
         ownerName: String?
-    ) -> [NeatFunctionParameter] {
+    ) -> [GradientFunctionParameter] {
         parametersByCallableIdentity[
             callableIdentity(ownerName: ownerName, declaration: declaration),
             default: []
@@ -155,7 +155,7 @@ public struct DeclarationRegistryView {
     public func parameters(
         ofInitializer declaration: InitializerDeclaration,
         constructName: String
-    ) -> [NeatFunctionParameter] {
+    ) -> [GradientFunctionParameter] {
         parametersByInitializerIdentity[
             initializerIdentity(constructName: constructName, declaration: declaration),
             default: []

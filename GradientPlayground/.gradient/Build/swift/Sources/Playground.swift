@@ -15,7 +15,7 @@ struct User {
 }
 
 @main
-struct NeatMain {
+struct GradientMain {
     static func main() throws {
         var person: Person = Person(name: "George", age: 26)
         person.age += 1

@@ -417,7 +417,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         return "\(declaration.name)(\(parameters))"
     }
 
-    private func renderParameterRequirement(_ parameter: NeatFunctionParameter) -> String {
+    private func renderParameterRequirement(_ parameter: GradientFunctionParameter) -> String {
         let label = parameter.externalLabel ?? "_"
         let typeName = parameter.typeReference?.displayName ?? "_"
         return "\(label): \(typeName)"
@@ -530,11 +530,11 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
         if attribute.isLanguageBoundary {
             throw SemanticValidationError(
-                "@\(attribute.name) can only be used in NeatCore. Remove @\(attribute.name) from \(declarationName) in \(lastPathComponent(of: filePath))."
+                "@\(attribute.name) can only be used in GradientCore. Remove @\(attribute.name) from \(declarationName) in \(lastPathComponent(of: filePath))."
             )
         }
 
-        guard NeatSyntax.attributeIdentifiers.contains(attribute.name)
+        guard GradientSyntax.attributeIdentifiers.contains(attribute.name)
             || declarationGraph.hasNamespaceAttribute(named: attribute.name)
         else {
             throw SemanticValidationError(
@@ -550,7 +550,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     ) throws {
         if macros.contains(where: { $0.name == "syntax" }) {
             throw SemanticValidationError(
-                "#syntax can only be used in NeatCore. Remove #syntax from \(declarationName) in \(lastPathComponent(of: filePath))."
+                "#syntax can only be used in GradientCore. Remove #syntax from \(declarationName) in \(lastPathComponent(of: filePath))."
             )
         }
     }
@@ -781,9 +781,9 @@ private extension CallableDeclaration {
     }
 }
 
-private extension NeatFunctionParameter {
-    func substituted(using bindings: [String: TypeReference]) -> NeatFunctionParameter {
-        NeatFunctionParameter(
+private extension GradientFunctionParameter {
+    func substituted(using bindings: [String: TypeReference]) -> GradientFunctionParameter {
+        GradientFunctionParameter(
             macros: macros,
             localName: localName,
             externalLabel: externalLabel,

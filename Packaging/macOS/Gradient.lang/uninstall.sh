@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-default_prefix="$HOME/.neat"
-prefix="${NEAT_INSTALL_PREFIX:-$default_prefix}"
-target="$prefix/bin/neat"
-core_target="$prefix/share/neat/NeatCore"
-skill_target="$prefix/share/neat/Skills"
+default_prefix="$HOME/.gradient"
+prefix="${GRADIENT_INSTALL_PREFIX:-$default_prefix}"
+target="$prefix/bin/gradient"
+core_target="$prefix/share/gradient/GradientCore"
+skill_target="$prefix/share/gradient/Skills"
 
-echo "Neat CLI uninstaller"
+echo "Gradient CLI uninstaller"
 echo
 echo "Will remove:"
 echo "  $target"
@@ -44,4 +44,4 @@ elif [[ -e "$skill_target" ]]; then
   sudo rm -rf "$skill_target"
 fi
 
-echo "Removed Neat CLI."
+echo "Removed Gradient CLI."

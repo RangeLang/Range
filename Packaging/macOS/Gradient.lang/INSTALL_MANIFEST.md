@@ -1,45 +1,45 @@
 # Install Manifest
 
-Package: Neat CLI
+Package: Gradient CLI
 
-This package stores one executable, the bundled NeatCore sources required
-by the CLI, and bundled Codex skills in a versioned Neat-owned directory:
+This package stores one executable, the bundled GradientCore sources required
+by the CLI, and bundled Codex skills in a versioned Gradient-owned directory:
 
 ```text
-$HOME/.neat/NeatCLI/<version>
+$HOME/.gradient/GradientCLI/<version>
 ```
 
 The selected prefix exposes symlinks:
 
 ```text
-$HOME/.neat/bin/neat -> $HOME/.neat/NeatCLI/<version>/bin/neat
-$HOME/.neat/share/neat/NeatCore -> $HOME/.neat/NeatCLI/<version>/share/neat/NeatCore
-$HOME/.neat/share/neat/Skills -> $HOME/.neat/NeatCLI/<version>/share/neat/Skills
+$HOME/.gradient/bin/gradient -> $HOME/.gradient/GradientCLI/<version>/bin/gradient
+$HOME/.gradient/share/gradient/GradientCore -> $HOME/.gradient/GradientCLI/<version>/share/gradient/GradientCore
+$HOME/.gradient/share/gradient/Skills -> $HOME/.gradient/GradientCLI/<version>/share/gradient/Skills
 ```
 
 The installer also creates the machine package store:
 
 ```text
-$HOME/.neat/Packages
+$HOME/.gradient/Packages
 ```
 
-The install location can be changed with `NEAT_INSTALL_PREFIX`:
+The install location can be changed with `GRADIENT_INSTALL_PREFIX`:
 
 ```sh
-NEAT_INSTALL_PREFIX="$HOME/.neat" ./install.sh
+GRADIENT_INSTALL_PREFIX="$HOME/.gradient" ./install.sh
 ```
 
 With that setting, the visible symlinks are:
 
 ```text
-$HOME/.neat/bin/neat
-$HOME/.neat/share/neat/NeatCore
-$HOME/.neat/share/neat/Skills
-$HOME/.neat/Packages
+$HOME/.gradient/bin/gradient
+$HOME/.gradient/share/gradient/GradientCore
+$HOME/.gradient/share/gradient/Skills
+$HOME/.gradient/Packages
 ```
 
 The installer does not add login items, background services, launch agents, shell profile changes, or system extensions.
 
-The uninstall script removes only the installed `neat` executable and bundled
-shared Neat resources from the selected prefix. It does not remove
-`$HOME/.neat/Packages`.
+The uninstall script removes only the installed `gradient` executable and bundled
+shared Gradient resources from the selected prefix. It does not remove
+`$HOME/.gradient/Packages`.

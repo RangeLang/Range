@@ -379,7 +379,7 @@ struct MacroTargetValueBuilder {
         }
     }
 
-    func value(for declaration: NeatFunctionParameter) -> CompileTimeValue {
+    func value(for declaration: GradientFunctionParameter) -> CompileTimeValue {
         .object(
             typeName: "Parameter.Declaration",
             fields: [

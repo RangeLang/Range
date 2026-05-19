@@ -1,14 +1,14 @@
 import ArgumentParser
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
-extension NeatCLI {
+extension GradientCLI {
     struct Graph: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Build and print the application graph for a Neat file or project."
+            abstract: "Build and print the application graph for a Gradient file or project."
         )
 
-        @Argument(help: "Project directory or source .neat file to inspect.")
+        @Argument(help: "Project directory or source .gradient file to inspect.")
         var input: String?
 
         mutating func run() throws {

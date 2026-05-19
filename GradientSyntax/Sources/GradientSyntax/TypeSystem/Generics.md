@@ -8,29 +8,29 @@ Generics let declarations abstract over types and compile-time values.
 
 - Type generics are declared inline
 
-```neat
+```gradient
 protocol Container<Item>
 ```
 
-- Neat does not use a separate `associatedtype` keyword
+- Gradient does not use a separate `associatedtype` keyword
 
-```neat
+```gradient
 protocol Mapping<Input, Output>
 ```
 
 - Constraints are written inline on the generic parameter
 
-```neat
+```gradient
 protocol Sortable<Element: Comparable>
 ```
 
 - `where` is used only for relational constraints between existing generic parameters
 
-```neat
+```gradient
 where A.Item == B.Item
 ```
 
-```neat
+```gradient
 where T: Comparable
 ```
 
@@ -38,32 +38,32 @@ The second form is not needed. That constraint should be written inline.
 
 - Value generics declare compile-time values rather than types
 
-```neat
+```gradient
 construct Int<let bits: RawInt>
 ```
 
 - Type and value generics can be mixed
 
-```neat
+```gradient
 construct Array<let capacity: RawInt, Element>
 ```
 
 - Generic parameters can have default arguments
 
-```neat
+```gradient
 construct Int<let bits: RawInt, let signedness: Signedness = .signed>
 ```
 
 - Generic arguments can be partially supplied when defaults exist
 
-```neat
+```gradient
 let x: Int<8>
 let y: Int<8, .unsigned>
 ```
 
 - Variadic generics are supported
 
-```neat
+```gradient
 construct Group<each Child: View> {
     let children: (repeat each Child)
 }
@@ -71,7 +71,7 @@ construct Group<each Child: View> {
 
 - Protocol composition can be used in generic constraints
 
-```neat
+```gradient
 Property & Parameter
 ```
 

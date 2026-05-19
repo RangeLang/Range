@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
 struct LoadedProject {
     enum Kind {
@@ -22,11 +22,11 @@ struct LoadedProject {
     }
 
     var defaultBuildRoot: URL {
-        projectRoot.appendingPathComponent(".neat/Build/swift", isDirectory: true)
+        projectRoot.appendingPathComponent(".gradient/Build/swift", isDirectory: true)
     }
 
     var defaultArtifactsRoot: URL {
-        projectRoot.appendingPathComponent(".neat/Artifacts", isDirectory: true)
+        projectRoot.appendingPathComponent(".gradient/Artifacts", isDirectory: true)
     }
 
     func relativeOutputPath(for fileURL: URL) -> String {
@@ -38,7 +38,7 @@ struct LoadedProject {
         let fullPath = fileURL.path
         if fullPath.hasPrefix(rootPath) {
             let relative = String(fullPath.dropFirst(rootPath.count))
-            return relative.replacingOccurrences(of: ".neat", with: "")
+            return relative.replacingOccurrences(of: ".gradient", with: "")
         }
 
         return fileURL.deletingPathExtension().lastPathComponent
@@ -49,7 +49,7 @@ enum ProjectLoader {
     struct Options {
         var includeCore: Bool = true
         var requireManifestForDirectory: Bool = false
-        var excludedDirectoryNames: Set<String> = [".git", ".build", ".neat", "Examples"]
+        var excludedDirectoryNames: Set<String> = [".git", ".build", ".gradient", "Examples"]
         var excludedFileNames: Set<String> = []
         var excludedPathFragments: [String] = []
     }
@@ -76,12 +76,12 @@ enum ProjectLoader {
         at fileURL: URL,
         options: Options
     ) throws -> LoadedProject {
-        guard fileURL.pathExtension.lowercased() == "neat" else {
-            throw ValidationError("Expected a .neat file or project directory.")
+        guard fileURL.pathExtension.lowercased() == "gradient" else {
+            throw ValidationError("Expected a .gradient file or project directory.")
         }
-        if fileURL.lastPathComponent == "Package.neat" {
+        if fileURL.lastPathComponent == "Package.gradient" {
             throw ValidationError(
-                "Package.neat cannot be used directly. Use a source file or project directory."
+                "Package.gradient cannot be used directly. Use a source file or project directory."
             )
         }
 
@@ -102,7 +102,7 @@ enum ProjectLoader {
         at rootURL: URL,
         options: Options
     ) throws -> LoadedProject {
-        let packageFile = rootURL.appendingPathComponent("Package.neat", isDirectory: false)
+        let packageFile = rootURL.appendingPathComponent("Package.gradient", isDirectory: false)
         let packageManifest: PackageManifest?
         let packageManifestURL: URL?
 
@@ -110,19 +110,19 @@ enum ProjectLoader {
             packageManifest = try PackageManifestLoader.load(from: packageFile)
             packageManifestURL = packageFile
         } else if options.requireManifestForDirectory {
-            throw ValidationError("Missing Package.neat in \(rootURL.path)")
+            throw ValidationError("Missing Package.gradient in \(rootURL.path)")
         } else {
             packageManifest = nil
             packageManifestURL = nil
         }
 
-        let projectFiles = try neatFiles(
+        let projectFiles = try gradientFiles(
             in: rootURL,
             packageManifestURL: packageManifestURL,
             options: options
         )
         guard !projectFiles.isEmpty else {
-            throw ValidationError("No .neat source files found in \(rootURL.path)")
+            throw ValidationError("No .gradient source files found in \(rootURL.path)")
         }
 
         let sourceInputs = try sourceInputs(for: projectFiles, includeCore: options.includeCore)
@@ -138,7 +138,7 @@ enum ProjectLoader {
         )
     }
 
-    private static func neatFiles(
+    private static func gradientFiles(
         in root: URL,
         packageManifestURL: URL?,
         options: Options
@@ -173,7 +173,7 @@ enum ProjectLoader {
                 continue
             }
 
-            guard fileURL.pathExtension.lowercased() == "neat" else {
+            guard fileURL.pathExtension.lowercased() == "gradient" else {
                 continue
             }
             if let packageManifestURL,
@@ -194,9 +194,9 @@ enum ProjectLoader {
         for files: [URL],
         includeCore: Bool
     ) throws -> [SourceInput] {
-        let coreInputs = includeCore ? try NeatCoreLoader.sourceInputs() : []
+        let coreInputs = includeCore ? try GradientCoreLoader.sourceInputs() : []
         let projectInputs = try files.compactMap { fileURL -> SourceInput? in
-            let isCoreFile = try NeatCoreLoader.isCoreFile(fileURL)
+            let isCoreFile = try GradientCoreLoader.isCoreFile(fileURL)
             if includeCore, isCoreFile {
                 return nil
             }

@@ -965,7 +965,7 @@ struct GraphCollector {
         return scope
     }
 
-    private func renderParameterList(_ parameters: [NeatFunctionParameter]) -> String {
+    private func renderParameterList(_ parameters: [GradientFunctionParameter]) -> String {
         parameters.map { parameter in
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName

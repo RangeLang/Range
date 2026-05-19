@@ -4,10 +4,10 @@ extension Parser {
     func isEnumDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
         switch peek(offset: offset) {
-        case .keyword(NeatSyntax.Keyword.enumeration.rawValue):
+        case .keyword(GradientSyntax.Keyword.enumeration.rawValue):
             return true
         case .atAttribute:
-            return peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.enumeration.rawValue)
+            return peek(offset: offset + 1) == .keyword(GradientSyntax.Keyword.enumeration.rawValue)
         default:
             return false
         }
@@ -68,7 +68,7 @@ extension Parser {
     }
 
     func isCaseDeclarationStart() -> Bool {
-        peek() == .keyword(NeatSyntax.Keyword.caseBranch.rawValue)
+        peek() == .keyword(GradientSyntax.Keyword.caseBranch.rawValue)
     }
 
     mutating func parseAssociatedValuesIfPresent() throws -> [AssociatedValueDeclaration] {

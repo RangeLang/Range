@@ -1,39 +1,39 @@
 ---
-name: neat-onboarding
-description: Use when helping a user get started with an installed Neat macOS package, explain where Neat installs shared resources, set up a Package.neat project, link or install project-local Neat CLI versions, create .neat/.scripts entries, update Neat from GitHub releases, or troubleshoot first-run Neat CLI usage.
+name: gradient-onboarding
+description: Use when helping a user get started with an installed Gradient macOS package, explain where Gradient installs shared resources, set up a Package.gradient project, link or install project-local Gradient CLI versions, create .gradient/.scripts entries, update Gradient from GitHub releases, or troubleshoot first-run Gradient CLI usage.
 ---
 
-# Neat Onboarding
+# Gradient Onboarding
 
-Use this skill for first-run setup, package installation questions, and project-local workflow questions after Neat is installed.
+Use this skill for first-run setup, package installation questions, and project-local workflow questions after Gradient is installed.
 
 ## Installed Layout
 
-The macOS package installs shared Neat resources under the selected prefix:
+The macOS package installs shared Gradient resources under the selected prefix:
 
 ```text
-<prefix>/bin/neat
-<prefix>/share/neat/NeatCore
-<prefix>/share/neat/Skills
+<prefix>/bin/gradient
+<prefix>/share/gradient/GradientCore
+<prefix>/share/gradient/Skills
 ```
 
-The shell installer default prefix is `~/.neat`, so the CLI is normally:
+The shell installer default prefix is `~/.gradient`, so the CLI is normally:
 
 ```text
-$HOME/.neat/bin/neat
-$HOME/.neat/Packages
+$HOME/.gradient/bin/gradient
+$HOME/.gradient/Packages
 ```
 
 Downloaded machine packages live under:
 
 ```text
-$HOME/.neat/Packages
+$HOME/.gradient/Packages
 ```
 
 The `.lang.tar.gz` installer can use another writable prefix:
 
 ```sh
-NEAT_INSTALL_PREFIX="$HOME/.neat" ./install.sh
+GRADIENT_INSTALL_PREFIX="$HOME/.gradient" ./install.sh
 ```
 
 ## First Checks
@@ -41,55 +41,55 @@ NEAT_INSTALL_PREFIX="$HOME/.neat" ./install.sh
 Run:
 
 ```sh
-neat version
-neat --help
+gradient version
+gradient --help
 ```
 
-If `neat` is not found, check whether the install prefix's `bin` directory is on `PATH`.
+If `gradient` is not found, check whether the install prefix's `bin` directory is on `PATH`.
 
 ## Project Setup
 
 Create a project:
 
 ```sh
-neat create MyProject
+gradient create MyProject
 ```
 
-Existing projects are recognized by `Package.neat` at the project root.
+Existing projects are recognized by `Package.gradient` at the project root.
 
 ## Project-Local CLI
 
-Install the current macOS Neat CLI into a package root:
+Install the current macOS Gradient CLI into a package root:
 
 ```sh
-neat link .
+gradient link .
 ```
 
 This stores versioned CLI copies inside the project workspace:
 
 ```text
-.neat/NeatCLI/<version>/bin/neat
-.neat/bin/neat
-.neat/Links/neat.package-link.json
+.gradient/GradientCLI/<version>/bin/gradient
+.gradient/bin/gradient
+.gradient/Links/gradient.package-link.json
 ```
 
-Different CLI versions can coexist under `.neat/NeatCLI`. The `.neat/bin/neat` path points to the selected project-local version.
+Different CLI versions can coexist under `.gradient/GradientCLI`. The `.gradient/bin/gradient` path points to the selected project-local version.
 
 ## Project Scripts
 
 Project scripts live under:
 
 ```text
-.neat/.scripts
+.gradient/.scripts
 ```
 
 Use:
 
 ```sh
-neat scripts create build
-neat scripts save deploy --content '#main { Logger.info("deploy") }'
-neat scripts save deploy --from ./deploy.neat --force
-neat scripts list
+gradient scripts create build
+gradient scripts save deploy --content '#main { Logger.info("deploy") }'
+gradient scripts save deploy --from ./deploy.gradient --force
+gradient scripts list
 ```
 
 ## Updates
@@ -97,20 +97,20 @@ neat scripts list
 Update the installed CLI from the latest GitHub release:
 
 ```sh
-neat update
+gradient update
 ```
 
 Update project modules:
 
 ```sh
-neat update .
+gradient update .
 ```
 
-Use `neat version` to see the installed version and whether an update is available.
+Use `gradient version` to see the installed version and whether an update is available.
 
 ## Troubleshooting
 
-- If `neat update` prompts for a destination, prefer a writable prefix rather than adding random privilege prompts.
-- If `NeatCore` is missing, inspect `<prefix>/share/neat/NeatCore`.
-- If bundled skills are missing, inspect `<prefix>/share/neat/Skills`.
-- If project-local commands feel stale, rerun `neat link .` from the project root after updating Neat.
+- If `gradient update` prompts for a destination, prefer a writable prefix rather than adding random privilege prompts.
+- If `GradientCore` is missing, inspect `<prefix>/share/gradient/GradientCore`.
+- If bundled skills are missing, inspect `<prefix>/share/gradient/Skills`.
+- If project-local commands feel stale, rerun `gradient link .` from the project root after updating Gradient.

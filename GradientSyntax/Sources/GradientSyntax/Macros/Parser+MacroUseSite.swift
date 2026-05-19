@@ -108,7 +108,7 @@ extension Parser {
         if macroDeclarationsByName[name] != nil {
             return true
         }
-        guard !NeatSyntax.attributeIdentifiers.contains(name) else {
+        guard !GradientSyntax.attributeIdentifiers.contains(name) else {
             return false
         }
         switch peek(offset: offset + 1) {

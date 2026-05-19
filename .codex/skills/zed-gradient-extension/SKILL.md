@@ -1,21 +1,21 @@
 ---
-name: zed-neat-extension
-description: Use when working on the Neat Zed extension, Neat semantic highlighting, Zed integration issues, or the local neat-lsp workflow. Covers the split between the main Neat repo and the nested Zed/Neat repo, when to change NeatCLI vs the extension, how to sync the extension, and which logs and commands to use for debugging.
+name: zed-gradient-extension
+description: Use when working on the Gradient Zed extension, Gradient semantic highlighting, Zed integration issues, or the local gradient-lsp workflow. Covers the split between the main Gradient repo and the nested Zed/Gradient repo, when to change GradientCLI vs the extension, how to sync the extension, and which logs and commands to use for debugging.
 ---
 
-# Zed Neat Extension
+# Zed Gradient Extension
 
 Use this skill when the task touches:
-- `Zed/Neat`
-- `NeatCLI` language-server behavior
-- semantic highlighting in `.neat` files
+- `Zed/Gradient`
+- `GradientCLI` language-server behavior
+- semantic highlighting in `.gradient` files
 - Zed extension install/sync/debugging
 
 ## Repo split
 
 There are two repos:
-- main repo: `/Users/george/Documents/Neat`
-- nested Zed extension repo: `/Users/george/Documents/Neat/Zed/Neat`
+- main repo: `/Users/george/Documents/Gradient`
+- nested Zed extension repo: `/Users/george/Documents/Gradient/Zed/Gradient`
 
 Treat them separately when checking git status or making commits.
 
@@ -23,27 +23,27 @@ Treat them separately when checking git status or making commits.
 
 Use this rule first:
 
-- semantic meaning belongs in `NeatCLI/Sources/NeatCLI/NeatLanguageServer.swift`
-- extension packaging, grammar, fallback queries, and Zed integration belong in `Zed/Neat`
+- semantic meaning belongs in `GradientCLI/Sources/GradientCLI/GradientLanguageServer.swift`
+- extension packaging, grammar, fallback queries, and Zed integration belong in `Zed/Gradient`
 
 Examples:
-- token kind/coloring issue in `.neat` files:
-  start in `NeatLanguageServer.swift`
+- token kind/coloring issue in `.gradient` files:
+  start in `GradientLanguageServer.swift`
 - autocomplete/completion issue:
-  start in `NeatLanguageServer.swift`
+  start in `GradientLanguageServer.swift`
 - grammar parse/query issue:
-  start in `Zed/Neat/grammars/tree-sitter-neat` or `Zed/Neat/languages/neat`
+  start in `Zed/Gradient/grammars/tree-sitter-gradient` or `Zed/Gradient/languages/gradient`
 - extension install/launcher/sync issue:
-  start in `Zed/Neat/src/lib.rs` and `Zed/Neat/scripts`
+  start in `Zed/Gradient/src/lib.rs` and `Zed/Gradient/scripts`
 
 ## Current architecture
 
-Neat in Zed is semantic-first.
+Gradient in Zed is semantic-first.
 
 - Zed launches the local binary:
-  - `/Users/george/Documents/Neat/NeatCLI/.build/arm64-apple-macosx/debug/NeatCLI`
+  - `/Users/george/Documents/Gradient/GradientCLI/.build/arm64-apple-macosx/debug/GradientCLI`
 - the extension should not fall back to Homebrew or PATH binaries
-- semantic tokens should drive Neat colors
+- semantic tokens should drive Gradient colors
 - Tree-sitter queries are fallback only
 
 ## Normal workflows
@@ -59,14 +59,14 @@ Examples:
 Do:
 
 ```sh
-cd /Users/george/Documents/Neat/NeatCLI
+cd /Users/george/Documents/Gradient/GradientCLI
 swift test
 ```
 
 Then tell the user:
 - `zed: restart language servers`
 
-Do not reinstall the extension for pure `NeatCLI` changes.
+Do not reinstall the extension for pure `GradientCLI` changes.
 
 ### 2. Extension-side change
 
@@ -80,7 +80,7 @@ Examples:
 Do:
 
 ```sh
-cd /Users/george/Documents/Neat/Zed/Neat
+cd /Users/george/Documents/Gradient/Zed/Gradient
 ./scripts/sync-zed-extension.sh
 ```
 
@@ -98,10 +98,10 @@ Before patching, identify which layer is wrong.
 Use:
 
 ```sh
-./NeatCLI/.build/arm64-apple-macosx/debug/NeatCLI semantic-tokens <file>
+./GradientCLI/.build/arm64-apple-macosx/debug/GradientCLI semantic-tokens <file>
 ```
 
-If the token stream is wrong, fix `NeatLanguageServer.swift`.
+If the token stream is wrong, fix `GradientLanguageServer.swift`.
 
 If the token stream is correct, then inspect Zed integration:
 - `semantic_token_rules.json`
@@ -113,21 +113,21 @@ If the token stream is correct, then inspect Zed integration:
 
 ### Main repo
 
-- `NeatCLI/Sources/NeatCLI/NeatLanguageServer.swift`
-- `NeatCLI/Tests/NeatCLITests/NeatLanguageServerSemanticTokenTests.swift`
-- `NeatSyntax/Sources/NeatSyntax/...`
-- `NeatCompilerFixtures/...`
+- `GradientCLI/Sources/GradientCLI/GradientLanguageServer.swift`
+- `GradientCLI/Tests/GradientCLITests/GradientLanguageServerSemanticTokenTests.swift`
+- `GradientSyntax/Sources/GradientSyntax/...`
+- `GradientCompilerFixtures/...`
 
 ### Nested repo
 
-- `Zed/Neat/extension.toml`
-- `Zed/Neat/src/lib.rs`
-- `Zed/Neat/languages/neat/config.toml`
-- `Zed/Neat/languages/neat/semantic_token_rules.json`
-- `Zed/Neat/languages/neat/highlights.scm`
-- `Zed/Neat/grammars/tree-sitter-neat/grammar.js`
-- `Zed/Neat/scripts/sync-zed-extension.sh`
-- `Zed/Neat/scripts/smoke-check.sh`
+- `Zed/Gradient/extension.toml`
+- `Zed/Gradient/src/lib.rs`
+- `Zed/Gradient/languages/gradient/config.toml`
+- `Zed/Gradient/languages/gradient/semantic_token_rules.json`
+- `Zed/Gradient/languages/gradient/highlights.scm`
+- `Zed/Gradient/grammars/tree-sitter-gradient/grammar.js`
+- `Zed/Gradient/scripts/sync-zed-extension.sh`
+- `Zed/Gradient/scripts/smoke-check.sh`
 
 ## Logs
 
@@ -136,12 +136,12 @@ Check these when Zed behavior disagrees with local CLI behavior:
 - Zed log:
   - `~/Library/Logs/Zed/Zed.log`
 - LSP debug log:
-  - `/tmp/neat-lsp-debug.log`
+  - `/tmp/gradient-lsp-debug.log`
 - extension launcher log:
-  - `/tmp/neat-zed-launch.log`
+  - `/tmp/gradient-zed-launch.log`
 
 Use them to answer:
-- Did Zed launch the local `NeatCLI` binary?
+- Did Zed launch the local `GradientCLI` binary?
 - Is Zed requesting `textDocument/semanticTokens/full`?
 - Is the server crashing or resetting?
 - Is the extension query/grammar load failing?
@@ -159,14 +159,14 @@ Use them to answer:
 For LSP work:
 
 ```sh
-cd /Users/george/Documents/Neat/NeatCLI
+cd /Users/george/Documents/Gradient/GradientCLI
 swift test
 ```
 
 For syntax/compiler changes:
 
 ```sh
-cd /Users/george/Documents/Neat/NeatSyntax
+cd /Users/george/Documents/Gradient/GradientSyntax
 swift test --filter compileFailFixturesFail
 swift test --filter compilePassFixturesValidate
 ```
@@ -174,7 +174,7 @@ swift test --filter compilePassFixturesValidate
 For extension-side work:
 
 ```sh
-cd /Users/george/Documents/Neat/Zed/Neat
+cd /Users/george/Documents/Gradient/Zed/Gradient
 ./scripts/smoke-check.sh
 ./scripts/sync-zed-extension.sh
 ```
@@ -182,10 +182,10 @@ cd /Users/george/Documents/Neat/Zed/Neat
 ## Quick diagnosis map
 
 - wrong token meaning or autocomplete:
-  `NeatLanguageServer.swift`
+  `GradientLanguageServer.swift`
 - right token stream locally, wrong color in Zed:
   `semantic_token_rules.json`, Zed settings, logs
 - extension installed but language not loading:
   `Zed.log`, grammar/query compatibility, `extension.toml`
 - wrong binary launched:
-  `/tmp/neat-zed-launch.log`, `Zed/Neat/src/lib.rs`
+  `/tmp/gradient-zed-launch.log`, `Zed/Gradient/src/lib.rs`

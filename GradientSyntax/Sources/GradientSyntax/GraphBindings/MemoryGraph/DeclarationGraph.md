@@ -2,7 +2,7 @@
 
 ## Compiler Pipeline
 
-Neat's compiler pipeline should be understood in this order:
+Gradient's compiler pipeline should be understood in this order:
 
 1. `Lexer`
 2. `Parser`
@@ -20,13 +20,13 @@ This ordering matters:
 - the declaration graph resolves declaration meaning
 - semantic resolution derives settled language facts from that graph
 - the memory graph and reactivity graph build on already-resolved semantics
-- backends adapt settled Neat meaning to a target representation
+- backends adapt settled Gradient meaning to a target representation
 
 The declaration graph is therefore in front of backend lowering. A backend may still need AST structure for bodies and source layout, but it should not treat raw AST as the final semantic source of truth.
 
 ## Definition
 
-The declaration graph is Neat's static semantic graph of declarations and declaration-to-declaration relationships. It records what declarations exist, what they mean, and how they are connected before storage, ownership, or mutation reasoning begins.
+The declaration graph is Gradient's static semantic graph of declarations and declaration-to-declaration relationships. It records what declarations exist, what they mean, and how they are connected before storage, ownership, or mutation reasoning begins.
 
 ## Role
 
@@ -40,7 +40,7 @@ It exists between syntax and the memory graph:
 
 It also precedes backend adaptation:
 
-- the declaration graph resolves what a program means in Neat
+- the declaration graph resolves what a program means in Gradient
 - a backend later adapts that semantic result to a target representation
 
 ## Mental Model
@@ -55,7 +55,7 @@ It also precedes backend adaptation:
 
 - Declarations appear as graph nodes.
 
-```neat
+```gradient
 construct Int {
     @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self
@@ -66,7 +66,7 @@ macro literal<T>(): Function { target, diagnostics in }
 
 - Literal bridge macros are first-class declaration facts.
 
-```neat
+```gradient
 construct Int {
     @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self
@@ -77,7 +77,7 @@ The graph records that `Int.literal(literal:)` accepts `IntLiteral`.
 
 - Literal acceptance should be derived from graph facts rather than destination tables.
 
-```neat
+```gradient
 construct Int {
     @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self { }
@@ -88,11 +88,11 @@ From the declaration graph, the compiler can derive that `Int` accepts `IntLiter
 
 - Default literal resolution should also be derived after declaration-graph realization.
 
-If a literal has no contextual type, the semantic phase may choose a preferred destination such as an `#language` bridge. That is still part of Neat semantics, not backend behavior.
+If a literal has no contextual type, the semantic phase may choose a preferred destination such as an `#language` bridge. That is still part of Gradient semantics, not backend behavior.
 
 - The declaration graph precedes the memory graph.
 
-```neat
+```gradient
 construct User {
     state count: Int = 0
 }
@@ -104,7 +104,7 @@ The compiler should know that `Int` is a valid declaration-level type before it 
 
 - Literal bridge realization belongs in the declaration graph.
 
-```neat
+```gradient
 construct String {
     @literal<StringLiteral>
     function literal(literal: StringLiteral) -> Self { }
@@ -119,13 +119,13 @@ The relevant graph facts are:
 
 If source contains:
 
-```neat
+```gradient
 state title = "hello"
 ```
 
 then the declaration graph and literal-resolution rules may derive a semantic result such as:
 
-```neat
+```gradient
 String(literal: "hello")
 ```
 
@@ -133,7 +133,7 @@ That semantic result is settled before any backend runs.
 
 - Derived protocol semantics also belong in the declaration graph.
 
-```neat
+```gradient
 #equatable
 protocol Equatable {
     function ==(lhs: Self, rhs: Self) -> Bool

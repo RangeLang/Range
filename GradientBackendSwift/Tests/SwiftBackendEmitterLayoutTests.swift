@@ -1,6 +1,6 @@
-import NeatSyntax
+import GradientSyntax
 import Testing
-@testable import NeatBackendSwift
+@testable import GradientBackendSwift
 
 @Suite("Swift backend layout emission")
 struct SwiftBackendEmitterLayoutTests {

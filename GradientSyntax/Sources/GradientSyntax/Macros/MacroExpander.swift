@@ -5,7 +5,7 @@ public enum MacroExpander {
 
     public static func expand(
         files: [ParsedSourceFile],
-        diagnosticEngine: NeatDiagnosticEngine? = nil
+        diagnosticEngine: GradientDiagnosticEngine? = nil
     ) throws -> [ParsedSourceFile] {
         expansionLock.lock()
         defer { expansionLock.unlock() }

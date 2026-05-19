@@ -1,18 +1,18 @@
 import ArgumentParser
-import NeatSyntax
+import GradientSyntax
 
-extension NeatCLI {
+extension GradientCLI {
     struct Update: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Update the Neat CLI or project modules."
+            abstract: "Update the Gradient CLI or project modules."
         )
 
-        @Argument(help: "Project directory. When omitted, updates the Neat CLI.")
+        @Argument(help: "Project directory. When omitted, updates the Gradient CLI.")
         var path: String?
 
         @Flag(
             name: .customLong("self"),
-            help: "Also update the Neat CLI after updating project modules."
+            help: "Also update the Gradient CLI after updating project modules."
         )
         var updateSelf: Bool = false
 

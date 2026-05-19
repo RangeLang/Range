@@ -2,9 +2,9 @@
 
 ## Objective
 
-Align the Swift-hosted compiler with Neat's `@core` model without blocking progress on bootstrapping.
+Align the Swift-hosted compiler with Gradient's `@core` model without blocking progress on bootstrapping.
 
-The compiler should recognize literals and `@core` declarations, while `NeatCore` remains the language-visible source of truth for foundational types and protocols.
+The compiler should recognize literals and `@core` declarations, while `GradientCore` remains the language-visible source of truth for foundational types and protocols.
 
 ## Phase 1: Name The Boundary Correctly
 
@@ -20,14 +20,14 @@ The compiler should recognize literals and `@core` declarations, while `NeatCore
 
 ## Phase 3: Resolve Against `@core`
 
-- Make type checking resolve literal and return compatibility against `@core` declarations and literal bridge protocols in `NeatCore`.
+- Make type checking resolve literal and return compatibility against `@core` declarations and literal bridge protocols in `GradientCore`.
 - Treat `@core` as the semantic marker for compiler-recognized structural constructs.
 - Reduce ad hoc scalar-name checks in parser validation.
 
 ## Phase 4: Shrink Compiler Special Cases
 
 - Keep only parsing, lowering, runtime, and sugar hooks in Swift.
-- Move more language meaning into Neat declarations and protocols.
+- Move more language meaning into Gradient declarations and protocols.
 - Remove bootstrap mirrors when source-driven semantic resolution can replace them.
 
 ## Current Status

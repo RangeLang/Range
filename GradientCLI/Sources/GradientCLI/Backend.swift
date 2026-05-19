@@ -1,6 +1,6 @@
 import Foundation
-import NeatBackendSwift
-import NeatSyntax
+import GradientBackendSwift
+import GradientSyntax
 
 struct EmittedWorkspace {
     let root: URL

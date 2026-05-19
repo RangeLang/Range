@@ -4,7 +4,7 @@ A namespace is metadata attached to a declaration shape, not just a named block.
 
 ## Addition
 
-```neat
+```gradient
 #namespace
 construct Host {
   marker cpu(): Construct -> Host {

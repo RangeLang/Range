@@ -52,5 +52,5 @@ enum Token: Equatable {
 
 struct LexedToken {
     let token: Token
-    let range: NeatSourceRange
+    let range: GradientSourceRange
 }

@@ -2,7 +2,7 @@
 
 ## Definition
 
-The memory graph is Neat's static model of ownership, storage, borrowing, identity, mutation, and dependency. It is a compiler graph, not a runtime system.
+The memory graph is Gradient's static model of ownership, storage, borrowing, identity, mutation, and dependency. It is a compiler graph, not a runtime system.
 
 ## Role
 
@@ -28,16 +28,16 @@ This means the memory graph consumes already-settled declaration semantics. It s
 
 ## Mental Model
 
-- Neat does not bolt reactivity on top of an unrelated ownership system. The storage declaration keywords define both ownership intent and dependency shape.
+- Gradient does not bolt reactivity on top of an unrelated ownership system. The storage declaration keywords define both ownership intent and dependency shape.
 - The memory graph is not a dynamic runtime trace. It is a static semantic graph produced by the compiler.
 - The reactivity graph is not a separate foundation. It is an exposed view derived from the same underlying graph once dependency and invalidation rules are applied.
-- Neat aims for compile-time memory reasoning like Rust, but derives ownership from surface declarations instead of requiring explicit borrow and lifetime syntax everywhere.
+- Gradient aims for compile-time memory reasoning like Rust, but derives ownership from surface declarations instead of requiring explicit borrow and lifetime syntax everywhere.
 
 ## Properties
 
 - The storage declaration keywords define ownership semantics.
 
-```neat
+```gradient
 let title: String
 state person: Person
 derived personString: String
@@ -46,15 +46,15 @@ binding selectedPerson: Person
 
 - `let` is immutable owned data declared here.
 
-```neat
-let title: String = "Neat"
+```gradient
+let title: String = "Gradient"
 ```
 
 The compiler does not need to track mutation for `let`.
 
 - `state` is mutable owned storage with a single source of truth.
 
-```neat
+```gradient
 state count: Int = 0
 count += 1
 ```
@@ -63,7 +63,7 @@ count += 1
 
 - `derived` owns no storage and is always reconstructed from dependencies.
 
-```neat
+```gradient
 derived fullName: String {
     firstName + " " + lastName
 }
@@ -73,7 +73,7 @@ derived fullName: String {
 
 - `binding` is borrowed storage whose owner lives elsewhere.
 
-```neat
+```gradient
 construct Editor {
     binding person: Person
 }
@@ -83,7 +83,7 @@ construct Editor {
 
 - Ordinary assignment is value-semantic, not implicit shared reference.
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int
@@ -97,7 +97,7 @@ The memory graph treats `editablePerson` as a new owned value, not as an alias t
 
 - Copy-on-write is an implementation optimization, not a semantic aliasing rule.
 
-```neat
+```gradient
 let values: [Int] = [1, 2, 3]
 state editableValues: [Int] = values
 
@@ -108,7 +108,7 @@ The graph still treats `values` and `editableValues` as independent logical valu
 
 - Shared mutable access is explicit through `binding`.
 
-```neat
+```gradient
 state person: Person = Person(name: "George", age: 26)
 binding selectedPerson: Person = $person
 ```
@@ -117,7 +117,7 @@ The graph records `selectedPerson` as borrowed access to the storage owned by `p
 
 - Ownership intent is declared by keyword rather than by extra borrow syntax.
 
-```neat
+```gradient
 state person: Person
 binding selectedPerson: Person
 ```
@@ -126,7 +126,7 @@ The difference between owned mutable storage and borrowed access is part of the 
 
 - Construct references are identity references in the memory graph.
 
-```neat
+```gradient
 construct Author {
     let name: String
     let books: [Book]
@@ -142,7 +142,7 @@ construct Book {
 
 - `#language construct` references stay plain type composition in the graph.
 
-```neat
+```gradient
 #language
 construct IntLiteral { }
 
@@ -161,7 +161,7 @@ construct Int {
 
 - Wrapper types may delegate representation to dedicated storage primitives.
 
-```neat
+```gradient
 #language
 construct ArrayStorage<Element> { }
 
@@ -179,7 +179,7 @@ This keeps wrapper semantics and representation semantics separate:
 
 - Every construct is identity-bearing even when identity is not written explicitly.
 
-```neat
+```gradient
 construct User {
     let name: String
 }
@@ -189,7 +189,7 @@ The graph can refer to `User` instances by intrinsic identity without requiring 
 
 - Cycles between constructs are graph-safe because construct references are identity references.
 
-```neat
+```gradient
 construct User {
     let manager: User
 }
@@ -199,7 +199,7 @@ This does not imply infinitely nested storage.
 
 - The memory graph models mutation paths, not just declarations.
 
-```neat
+```gradient
 state person: Person = Person(name: "George", age: 26)
 person.age += 1
 ```
@@ -208,7 +208,7 @@ The graph must represent that `person` owns mutable storage and that `person.age
 
 - The memory graph models aliasing through bindings.
 
-```neat
+```gradient
 state person: Person = Person(name: "George", age: 26)
 state user: User = User(person: $person)
 ```
@@ -217,7 +217,7 @@ If `User.person` is a binding, the graph records that `user.person` aliases exis
 
 - Mutation through a `let` root is invalid even when the construct contains internal `state`.
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int
@@ -230,7 +230,7 @@ let person: Person(name: "George", age: 26)
 
 - The memory graph records derived dependencies.
 
-```neat
+```gradient
 derived personString: String {
     "Person: \(person.name), Age: \(person.age)"
 }
@@ -240,7 +240,7 @@ derived personString: String {
 
 - Function bodies can contribute mutation and dependency edges to the graph.
 
-```neat
+```gradient
 construct User {
     binding person: Person
 
@@ -254,11 +254,11 @@ The graph records that `incrementAge` mutates storage reachable through the `per
 
 - The memory graph is always generated.
 
-The memory graph is the default compiler model for ownership, storage, identity, mutation, and dependency. Neat does not provide a graph-free escape hatch for ordinary memory management.
+The memory graph is the default compiler model for ownership, storage, identity, mutation, and dependency. Gradient does not provide a graph-free escape hatch for ordinary memory management.
 
 - Reactivity is an additional exposed layer built on top of the memory graph.
 
-```neat
+```gradient
 @reactive
 package UI
 ```
@@ -267,7 +267,7 @@ Reactive invalidation and update behavior are opt-in views over the existing mem
 
 - Memory graph information composes across modules.
 
-```neat
+```gradient
 package UI
 package Domain
 ```
@@ -276,7 +276,7 @@ When packages interact, the compiler merges the relevant graph information at bu
 
 ## Examples
 
-```neat
+```gradient
 @main {
     state person: Person = Person(name: "George", age: 26)
     person.age += 1
@@ -316,7 +316,7 @@ The memory graph for this code includes:
 ## Notes
 
 - The memory graph is the semantic foundation for later exposed reactivity behavior, but reactivity rules are documented separately.
-- The graph is intended to be solvable from Neat's constrained storage model without general-purpose borrow annotations.
+- The graph is intended to be solvable from Gradient's constrained storage model without general-purpose borrow annotations.
 - This document defines the memory-side model only. It does not yet specify the separate reactive invalidation view in detail.
-- `binding` is the explicit shared-reference mechanism in Neat. It is pointer-like in role, but compiler-tracked and constrained by the storage system.
+- `binding` is the explicit shared-reference mechanism in Gradient. It is pointer-like in role, but compiler-tracked and constrained by the storage system.
 - Copy-on-write may be used by `#language` collections and other suitable implementations to preserve value semantics without eager copying.

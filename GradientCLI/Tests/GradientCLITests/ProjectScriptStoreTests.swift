@@ -1,5 +1,5 @@
 import Foundation
-@testable import NeatCLI
+@testable import GradientCLI
 import Testing
 
 @Suite("Project scripts")
@@ -9,7 +9,7 @@ struct ProjectScriptStoreTests {
         let root = try temporaryPackage()
         let script = try ProjectScriptStore(projectPath: root.path).create("build")
 
-        #expect(script.path == root.appendingPathComponent(".neat/.scripts/build.neat").path)
+        #expect(script.path == root.appendingPathComponent(".gradient/.scripts/build.gradient").path)
         let source = try String(contentsOf: script, encoding: .utf8)
         #expect(source.contains(#"Logger.info("Running build")"#))
     }
@@ -18,11 +18,11 @@ struct ProjectScriptStoreTests {
     func saveNormalizesScriptExtensionAndContent() throws {
         let root = try temporaryPackage()
         let script = try ProjectScriptStore(projectPath: root.path).save(
-            "deploy.neat",
+            "deploy.gradient",
             content: "#main {}"
         )
 
-        #expect(script.lastPathComponent == "deploy.neat")
+        #expect(script.lastPathComponent == "deploy.gradient")
         #expect(try String(contentsOf: script, encoding: .utf8) == "#main {}\n")
     }
 
@@ -33,7 +33,7 @@ struct ProjectScriptStoreTests {
         _ = try store.save("deploy", content: "#main {}")
         _ = try store.save("build", content: "#main {}")
 
-        #expect(try store.list().map(\.lastPathComponent) == ["build.neat", "deploy.neat"])
+        #expect(try store.list().map(\.lastPathComponent) == ["build.gradient", "deploy.gradient"])
     }
 
     @Test("Rejects path script names")
@@ -50,7 +50,7 @@ struct ProjectScriptStoreTests {
 
     private func temporaryPackage() throws -> URL {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("neat-script-store-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("gradient-script-store-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
             #package
@@ -59,7 +59,7 @@ struct ProjectScriptStoreTests {
                 let version: Version(0.1.0)
                 let author: String("Test Author")
             }
-            """.write(to: root.appendingPathComponent("Package.neat"), atomically: true, encoding: .utf8)
+            """.write(to: root.appendingPathComponent("Package.gradient"), atomically: true, encoding: .utf8)
         return root
     }
 }

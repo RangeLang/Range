@@ -187,7 +187,7 @@ extension ApplicationGraphValidator {
         mutableNames: Set<String>,
         selfAvailable: Bool,
         currentConstructName: String?,
-        parameters: [NeatFunctionParameter]
+        parameters: [GradientFunctionParameter]
     ) -> BindingReferenceContext {
         let parameterMutableNames = Set(parameters.filter(\.isBinding).map(\.localName))
         return BindingReferenceContext(

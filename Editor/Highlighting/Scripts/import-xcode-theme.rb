@@ -66,21 +66,21 @@ FIELD_ORDER = %w[
 ].freeze
 
 HEADER = <<~YAML
-  # Human-editable Xcode-style palette for Neat.
+  # Human-editable Xcode-style palette for Gradient.
   #
   # This file is intentionally human-editable. The importer can refresh Xcode-
-  # derived color/font fields while preserving Neat support metadata.
+  # derived color/font fields while preserving Gradient support metadata.
   #
   # Style field notes:
   # - XcodeSyntax is the source plist key in Xcode's .xccolortheme files.
   # - ZedStyle is the closest Zed syntax style key we currently emit or want to map to.
-  # - Supported means current end-to-end support in the Neat editor pipeline:
+  # - Supported means current end-to-end support in the Gradient editor pipeline:
   #   true = Tree-sitter/LSP can emit it today and Zed can style it.
   #   partial = some path exists, but it is incomplete or not 1:1 with Xcode.
   #   false = this is design intent only until the listed work is done.
   # - ZedNative means whether Zed has a direct style key/category we can target
-  #   without custom Neat semantic token work.
-  # - Needs lists the missing Neat-side pieces. Use [] when no known work remains.
+  #   without custom Gradient semantic token work.
+  # - Needs lists the missing Gradient-side pieces. Use [] when no known work remains.
   # - FontWeight values to use: normal, medium, semibold, bold.
   # - FontStyle values to use: normal, italic.
   # - TextDecoration values to use: none, underline, strikethrough.

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct NeatFunctionParameter {
+public struct GradientFunctionParameter {
     public let macros: [MacroApplication]
     public let localName: String
     public let externalLabel: String?
@@ -61,7 +61,7 @@ public struct CallableDeclaration {
     public let name: String
     public let genericParameters: [GenericParameter]
     public let hasExplicitParameterClause: Bool
-    public let parameters: [NeatFunctionParameter]
+    public let parameters: [GradientFunctionParameter]
     public let returnType: TypeReference?
     public let body: [Statement]?
 
@@ -73,7 +73,7 @@ public struct CallableDeclaration {
         name: String,
         genericParameters: [GenericParameter],
         hasExplicitParameterClause: Bool,
-        parameters: [NeatFunctionParameter],
+        parameters: [GradientFunctionParameter],
         returnType: TypeReference?,
         body: [Statement]?
     ) {
@@ -101,13 +101,13 @@ public struct CallableDeclaration {
 
 public struct InitializerDeclaration {
     public let macros: [MacroApplication]
-    public let parameters: [NeatFunctionParameter]
+    public let parameters: [GradientFunctionParameter]
     public let returnType: TypeReference?
     public let body: [Statement]?
 
     public init(
         macros: [MacroApplication],
-        parameters: [NeatFunctionParameter],
+        parameters: [GradientFunctionParameter],
         returnType: TypeReference? = nil,
         body: [Statement]?
     ) {

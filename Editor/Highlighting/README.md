@@ -1,20 +1,20 @@
-# Neat Highlighting
+# Gradient Highlighting
 
-This directory owns editor-agnostic highlighting policy for Neat.
+This directory owns editor-agnostic highlighting policy for Gradient.
 
 The split is:
 
 - `xcode-style-palette.yaml` defines the intended color taxonomy and editable
   Xcode-style palette.
-- `NeatCLI` emits semantic token meaning through the language server.
+- `GradientCLI` emits semantic token meaning through the language server.
 - `Editor/Highlighting` defines how those semantic categories should map to editor style names.
 - Editor extensions generate their local configuration from these files.
 - Tree-sitter query files remain fallback syntax highlighting for files without semantic token support.
 
-In `xcode-style-palette.yaml`, `Supported` means the current end-to-end Neat
+In `xcode-style-palette.yaml`, `Supported` means the current end-to-end Gradient
 editor pipeline can emit and style that category. `ZedNative` is separate: it
 tracks whether Zed already has a direct style category we can target, or whether
-Neat needs extra semantic token work, parser work, or adapter mapping first.
+Gradient needs extra semantic token work, parser work, or adapter mapping first.
 
 To refresh the palette from Xcode's exported default themes:
 
@@ -22,7 +22,7 @@ To refresh the palette from Xcode's exported default themes:
 ruby Editor/Highlighting/Scripts/import-xcode-theme.rb
 ```
 
-The importer updates Xcode-derived color/font fields and leaves Neat-specific
+The importer updates Xcode-derived color/font fields and leaves Gradient-specific
 support fields such as `Supported`, `ZedNative`, `Needs`, `ZedStyle`, and `Notes`
 in the palette. Use `--dark`, `--light`, and `--palette` to point it at custom
 theme or palette files.
@@ -30,24 +30,24 @@ theme or palette files.
 To build the Zed theme from the palette:
 
 ```sh
-Zed/Neat/scripts/build-zed-theme.sh
+Zed/Gradient/scripts/build-zed-theme.sh
 ```
 
-This writes `Zed/Neat/themes/neat-xcode.json`. Native Zed syntax scopes are
-styled directly from `ZedStyle`; Neat-specific LSP aliases from
-`semantic_token_rules.zed.json`, such as `macro.neat` or
-`type.neat.declaration`, are enriched with the nearest palette style. The
+This writes `Zed/Gradient/themes/gradient-xcode.json`. Native Zed syntax scopes are
+styled directly from `ZedStyle`; Gradient-specific LSP aliases from
+`semantic_token_rules.zed.json`, such as `macro.gradient` or
+`type.gradient.declaration`, are enriched with the nearest palette style. The
 generator inherits the full UI/editor/terminal styling from
 `zed-one-base.json`, which is a vendored copy of Zed's default
 `assets/themes/one/one.json`, and only replaces/enriches `style.syntax`.
 
 The current Zed adapter reads `semantic_token_rules.zed.json` and copies it to:
 
-`Zed/Neat/languages/neat/semantic_token_rules.json`
+`Zed/Gradient/languages/gradient/semantic_token_rules.json`
 
 Keep richer distinctions, such as declaration/application and future project/core origin, in the semantic token stream rather than tree-sitter queries.
 
 In Zed style arrays, put the generic Tree-sitter-compatible scope first and the
-Neat-specific scope after it. That keeps first-paint syntax highlighting aligned
+Gradient-specific scope after it. That keeps first-paint syntax highlighting aligned
 with semantic highlighting, so tokens do not flash between colors when the LSP
 semantic-token response arrives.

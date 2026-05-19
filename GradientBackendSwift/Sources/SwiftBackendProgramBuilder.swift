@@ -1,5 +1,5 @@
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
 struct SwiftBackendProgramBuilder {
     func build(
@@ -270,13 +270,13 @@ struct SwiftBackendProgramBuilder {
     private func coreSupportUnits(in compiledProgram: CompiledProgram) -> [LoweredSourceUnit] {
         let encodingUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
             guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
-                parsedFile.path.contains("/NeatCore/Encoding/")
+                parsedFile.path.contains("/GradientCore/Encoding/")
             else {
                 return nil
             }
 
             let fileURL = URL(fileURLWithPath: parsedFile.path)
-            let outputFileName = "NeatCore_\(fileURL.deletingPathExtension().lastPathComponent).swift"
+            let outputFileName = "GradientCore_\(fileURL.deletingPathExtension().lastPathComponent).swift"
 
             switch parsedFile.sourceFile {
             case .construct(let declaration):
@@ -343,7 +343,7 @@ struct SwiftBackendProgramBuilder {
 
         return [
             .init(
-                outputFileName: "NeatCoreSupport.swift",
+                outputFileName: "GradientCoreSupport.swift",
                 protocols: [],
                 enumerations: [],
                 declarations: channelDeclarations,

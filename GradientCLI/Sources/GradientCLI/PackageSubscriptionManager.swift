@@ -98,7 +98,7 @@ struct PackageSubscriptionManager {
     func installedPackages(in projectRoot: URL) throws -> [InstalledPackage] {
         let packagesRoot =
             projectRoot
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .appendingPathComponent("Packages", isDirectory: true)
             .standardizedFileURL
             .resolvingSymlinksInPath()
@@ -126,7 +126,7 @@ struct PackageSubscriptionManager {
             )
 
             for repoURL in repos where isDirectory(repoURL) {
-                let url = repoURL.appendingPathComponent("Package.neat", isDirectory: false)
+                let url = repoURL.appendingPathComponent("Package.gradient", isDirectory: false)
                 guard FileManager.default.fileExists(atPath: url.path) else {
                     continue
                 }
@@ -178,16 +178,16 @@ struct PackageSubscriptionManager {
         try updatedSource.write(to: packageFile, atomically: true, encoding: .utf8)
 
         TerminalLog.out("Subscribed to \(package.reference).", level: .success)
-        TerminalLog.subtleOut("Package.neat: modules += \"\(package.reference)\"")
+        TerminalLog.subtleOut("Package.gradient: modules += \"\(package.reference)\"")
         return .subscribed
     }
 
     private func loadProjectContext() throws -> ProjectContext {
         let projectRoot = URL(fileURLWithPath: projectPath, isDirectory: true).standardizedFileURL
-        let packageFile = projectRoot.appendingPathComponent("Package.neat", isDirectory: false)
+        let packageFile = projectRoot.appendingPathComponent("Package.gradient", isDirectory: false)
 
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.neat in \(projectRoot.path)")
+            throw ValidationError("Missing Package.gradient in \(projectRoot.path)")
         }
 
         _ = try PackageManifestLoader.load(from: packageFile)
@@ -245,7 +245,7 @@ struct PackageSubscriptionManager {
     private func addingModule(_ package: String, to source: String) throws -> String {
         var lines = source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         guard let closingBraceIndex = lines.lastIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "}" }) else {
-            throw ValidationError("Package.neat must end with a package body closing brace.")
+            throw ValidationError("Package.gradient must end with a package body closing brace.")
         }
 
         if closingBraceIndex > 0 && lines[closingBraceIndex - 1].trimmingCharacters(in: .whitespaces).isEmpty {
@@ -270,7 +270,7 @@ struct PackageSubscriptionManager {
                     $0.trimmingCharacters(in: .whitespaces) == "]"
                 })
             else {
-                throw ValidationError("Package.neat modules declaration must end with ].")
+                throw ValidationError("Package.gradient modules declaration must end with ].")
             }
 
             lines.insert("        \"\(package)\",", at: closingArrayIndex)

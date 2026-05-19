@@ -1,6 +1,6 @@
 import Foundation
 
-enum NeatSyntax {
+enum GradientSyntax {
     enum Attribute: String, CaseIterable {
         case main = "main"
         case background = "background"
@@ -62,4 +62,4 @@ enum NeatSyntax {
     }
 }
 
-extension NeatSyntax.Keyword: CaseIterable {}
+extension GradientSyntax.Keyword: CaseIterable {}

@@ -3,7 +3,7 @@ import Foundation
 public struct MacroDeclaration {
     public let name: String
     public let genericParameters: [GenericParameter]
-    public let parameters: [NeatFunctionParameter]
+    public let parameters: [GradientFunctionParameter]
     public let target: MacroTarget?
     public let expansionType: TypeReference?
     public let bindings: MacroBindings?
@@ -14,7 +14,7 @@ public struct MacroDeclaration {
 public struct MarkerDeclaration {
     public let name: String
     public let genericParameters: [GenericParameter]
-    public let parameters: [NeatFunctionParameter]
+    public let parameters: [GradientFunctionParameter]
     public let target: MacroTarget
     public let valueType: TypeReference
     public let bindings: MacroBindings?

@@ -208,7 +208,7 @@ extension Parser {
                 case .comma:
                     offset += 1
                     continue
-                case .keyword(NeatSyntax.Keyword.inKeyword.rawValue):
+                case .keyword(GradientSyntax.Keyword.inKeyword.rawValue):
                     return true
                 default:
                     return false

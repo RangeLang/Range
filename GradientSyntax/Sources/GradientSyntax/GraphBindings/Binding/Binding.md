@@ -6,7 +6,7 @@ A binding is a borrowed reference to existing storage.
 
 ## Role
 
-`binding` is how Neat expresses shared access explicitly instead of making aliasing implicit through ordinary assignment.
+`binding` is how Gradient expresses shared access explicitly instead of making aliasing implicit through ordinary assignment.
 
 ## Mental Model
 
@@ -18,19 +18,19 @@ It does not introduce new owned storage. It gives access to storage owned elsewh
 
 - Declares a borrowed binding rather than owned storage
 
-```neat
+```gradient
 binding name: String
 ```
 
 - Can be plain
 
-```neat
+```gradient
 binding name: String
 ```
 
 - Can be derived through explicit get and set behavior
 
-```neat
+```gradient
 binding displayName: String {
     get {
         return name
@@ -44,7 +44,7 @@ binding displayName: String {
 
 - Is not the source of truth
 
-```neat
+```gradient
 binding name: String
 ```
 
@@ -52,7 +52,7 @@ binding name: String
 
 - Can be passed from owned state through binding projection syntax
 
-```neat
+```gradient
 construct Person {
     binding name: String
 }
@@ -66,7 +66,7 @@ Here `Person.name` is bound to the surrounding `state name`. The construct does 
 
 - Shared mutation flows through the binding in both directions
 
-```neat
+```gradient
 construct Person {
     let name: String
     state age: Int
@@ -82,5 +82,5 @@ b.age = 28
 
 ## Notes
 
-- `binding` is the Neat mechanism closest to class-like shared access, but it is explicit rather than implicit.
+- `binding` is the Gradient mechanism closest to class-like shared access, but it is explicit rather than implicit.
 - Ordinary assignment copies semantically. `binding` is the tool for shared live connection.

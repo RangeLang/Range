@@ -1,7 +1,7 @@
 import Foundation
 
 @main
-struct NeatMain {
+struct GradientMain {
     static func main() throws {
         let intSum = 1 + 2
         let intDifference = 5 - 2

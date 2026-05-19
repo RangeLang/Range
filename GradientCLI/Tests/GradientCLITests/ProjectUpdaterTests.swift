@@ -1,5 +1,5 @@
 import Foundation
-@testable import NeatCLI
+@testable import GradientCLI
 import Testing
 
 @Suite("Project updating")
@@ -8,17 +8,17 @@ struct ProjectUpdaterTests {
     func gitHubOriginURLsProducePackageReferences() throws {
         let updater = ProjectUpdater(path: ".", updateCLI: false)
 
-        #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Neat") == "georgetchelidze/Neat")
-        #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Neat.git") == "georgetchelidze/Neat")
-        #expect(try updater.gitHubReference(from: "git@github.com:georgetchelidze/Neat.git") == "georgetchelidze/Neat")
+        #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Gradient") == "georgetchelidze/Gradient")
+        #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Gradient.git") == "georgetchelidze/Gradient")
+        #expect(try updater.gitHubReference(from: "git@github.com:georgetchelidze/Gradient.git") == "georgetchelidze/Gradient")
     }
 
     @Test("Release update archive name matches current platform")
     func releaseUpdateArchiveNameMatchesCurrentPlatform() throws {
         #if os(macOS) && arch(arm64)
-        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "neat-macos-arm64.lang.tar.gz")
+        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "gradient-macos-arm64.lang.tar.gz")
         #elseif os(macOS) && arch(x86_64)
-        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "neat-macos-x64.lang.tar.gz")
+        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "gradient-macos-x64.lang.tar.gz")
         #endif
     }
 
@@ -30,12 +30,12 @@ struct ProjectUpdaterTests {
     @Test("Release repository URL normalizes owner repo references")
     func releaseRepositoryURLNormalizesOwnerRepoReferences() {
         #expect(
-            ProjectUpdater.releaseRepositoryURL(for: "georgetchelidze/Neat")
-                == "https://github.com/georgetchelidze/Neat.git"
+            ProjectUpdater.releaseRepositoryURL(for: "georgetchelidze/Gradient")
+                == "https://github.com/georgetchelidze/Gradient.git"
         )
         #expect(
-            ProjectUpdater.releaseRepositoryURL(for: "https://github.com/georgetchelidze/Neat.git")
-                == "https://github.com/georgetchelidze/Neat.git"
+            ProjectUpdater.releaseRepositoryURL(for: "https://github.com/georgetchelidze/Gradient.git")
+                == "https://github.com/georgetchelidze/Gradient.git"
         )
     }
 }

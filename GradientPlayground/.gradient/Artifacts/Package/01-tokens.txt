@@ -1,6 +1,6 @@
 Tokens:
   keyword(construct)
-  identifier(NeatPlayground)
+  identifier(GradientPlayground)
   colon
   identifier(Package)
   leftBrace

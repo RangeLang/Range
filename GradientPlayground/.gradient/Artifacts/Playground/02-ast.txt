@@ -1,101 +1,101 @@
 AST:
-  ▿ NeatSyntax.SourceFileNode.module
-    ▿ module: NeatSyntax.ModuleFileNode
-      ▿ mainBlock: Optional(NeatSyntax.MainBlockNode(body: [NeatSyntax.Statement.declaration(kind: NeatSyntax.LocalBindingKind.mutable, name: "person", typeName: Optional("Person"), expression: NeatSyntax.Expression.call(name: "Person", arguments: [NeatSyntax.CallArgument(label: Optional("name"), value: NeatSyntax.Expression.string("George")), NeatSyntax.CallArgument(label: Optional("age"), value: NeatSyntax.Expression.integer(26))])), NeatSyntax.Statement.compoundAssignment(target: NeatSyntax.AssignmentTarget.member(base: NeatSyntax.AssignmentTarget.local("person"), name: "age"), operatorSymbol: NeatSyntax.CompoundOperator.plusEquals, expression: NeatSyntax.Expression.integer(1)), NeatSyntax.Statement.derived(name: "personString", typeName: "String", body: [NeatSyntax.Statement.expression(NeatSyntax.Expression.interpolatedString(NeatSyntax.InterpolatedString(segments: [NeatSyntax.StringSegment.text("Person: "), NeatSyntax.StringSegment.expression(NeatSyntax.Expression.identifier("person.name")), NeatSyntax.StringSegment.text(", Age: "), NeatSyntax.StringSegment.expression(NeatSyntax.Expression.identifier("person.age"))])))]), NeatSyntax.Statement.declaration(kind: NeatSyntax.LocalBindingKind.mutable, name: "user", typeName: Optional("User"), expression: NeatSyntax.Expression.call(name: "User", arguments: [NeatSyntax.CallArgument(label: Optional("person"), value: NeatSyntax.Expression.bindingReference("person"))])), NeatSyntax.Statement.expression(NeatSyntax.Expression.call(name: "user.incrementAge", arguments: []))]))
-        ▿ some: NeatSyntax.MainBlockNode
+  ▿ GradientSyntax.SourceFileNode.module
+    ▿ module: GradientSyntax.ModuleFileNode
+      ▿ mainBlock: Optional(GradientSyntax.MainBlockNode(body: [GradientSyntax.Statement.declaration(kind: GradientSyntax.LocalBindingKind.mutable, name: "person", typeName: Optional("Person"), expression: GradientSyntax.Expression.call(name: "Person", arguments: [GradientSyntax.CallArgument(label: Optional("name"), value: GradientSyntax.Expression.string("George")), GradientSyntax.CallArgument(label: Optional("age"), value: GradientSyntax.Expression.integer(26))])), GradientSyntax.Statement.compoundAssignment(target: GradientSyntax.AssignmentTarget.member(base: GradientSyntax.AssignmentTarget.local("person"), name: "age"), operatorSymbol: GradientSyntax.CompoundOperator.plusEquals, expression: GradientSyntax.Expression.integer(1)), GradientSyntax.Statement.derived(name: "personString", typeName: "String", body: [GradientSyntax.Statement.expression(GradientSyntax.Expression.interpolatedString(GradientSyntax.InterpolatedString(segments: [GradientSyntax.StringSegment.text("Person: "), GradientSyntax.StringSegment.expression(GradientSyntax.Expression.identifier("person.name")), GradientSyntax.StringSegment.text(", Age: "), GradientSyntax.StringSegment.expression(GradientSyntax.Expression.identifier("person.age"))])))]), GradientSyntax.Statement.declaration(kind: GradientSyntax.LocalBindingKind.mutable, name: "user", typeName: Optional("User"), expression: GradientSyntax.Expression.call(name: "User", arguments: [GradientSyntax.CallArgument(label: Optional("person"), value: GradientSyntax.Expression.bindingReference("person"))])), GradientSyntax.Statement.expression(GradientSyntax.Expression.call(name: "user.incrementAge", arguments: []))]))
+        ▿ some: GradientSyntax.MainBlockNode
           ▿ body: 5 elements
-            ▿ NeatSyntax.Statement.declaration
+            ▿ GradientSyntax.Statement.declaration
               ▿ declaration: (4 elements)
-                - kind: NeatSyntax.LocalBindingKind.mutable
+                - kind: GradientSyntax.LocalBindingKind.mutable
                 - name: "person"
                 ▿ typeName: Optional("Person")
                   - some: "Person"
-                ▿ expression: NeatSyntax.Expression.call
+                ▿ expression: GradientSyntax.Expression.call
                   ▿ call: (2 elements)
                     - name: "Person"
                     ▿ arguments: 2 elements
-                      ▿ NeatSyntax.CallArgument
+                      ▿ GradientSyntax.CallArgument
                         ▿ label: Optional("name")
                           - some: "name"
-                        ▿ value: NeatSyntax.Expression.string
+                        ▿ value: GradientSyntax.Expression.string
                           - string: "George"
-                      ▿ NeatSyntax.CallArgument
+                      ▿ GradientSyntax.CallArgument
                         ▿ label: Optional("age")
                           - some: "age"
-                        ▿ value: NeatSyntax.Expression.integer
+                        ▿ value: GradientSyntax.Expression.integer
                           - integer: 26
-            ▿ NeatSyntax.Statement.compoundAssignment
+            ▿ GradientSyntax.Statement.compoundAssignment
               ▿ compoundAssignment: (3 elements)
-                ▿ target: NeatSyntax.AssignmentTarget.member
+                ▿ target: GradientSyntax.AssignmentTarget.member
                   ▿ member: (2 elements)
-                    ▿ base: NeatSyntax.AssignmentTarget.local
+                    ▿ base: GradientSyntax.AssignmentTarget.local
                       - local: "person"
                     - name: "age"
-                - operatorSymbol: NeatSyntax.CompoundOperator.plusEquals
-                ▿ expression: NeatSyntax.Expression.integer
+                - operatorSymbol: GradientSyntax.CompoundOperator.plusEquals
+                ▿ expression: GradientSyntax.Expression.integer
                   - integer: 1
-            ▿ NeatSyntax.Statement.derived
+            ▿ GradientSyntax.Statement.derived
               ▿ derived: (3 elements)
                 - name: "personString"
                 - typeName: "String"
                 ▿ body: 1 element
-                  ▿ NeatSyntax.Statement.expression
-                    ▿ expression: NeatSyntax.Expression.interpolatedString
-                      ▿ interpolatedString: NeatSyntax.InterpolatedString
+                  ▿ GradientSyntax.Statement.expression
+                    ▿ expression: GradientSyntax.Expression.interpolatedString
+                      ▿ interpolatedString: GradientSyntax.InterpolatedString
                         ▿ segments: 4 elements
-                          ▿ NeatSyntax.StringSegment.text
+                          ▿ GradientSyntax.StringSegment.text
                             - text: "Person: "
-                          ▿ NeatSyntax.StringSegment.expression
-                            ▿ expression: NeatSyntax.Expression.identifier
+                          ▿ GradientSyntax.StringSegment.expression
+                            ▿ expression: GradientSyntax.Expression.identifier
                               - identifier: "person.name"
-                          ▿ NeatSyntax.StringSegment.text
+                          ▿ GradientSyntax.StringSegment.text
                             - text: ", Age: "
-                          ▿ NeatSyntax.StringSegment.expression
-                            ▿ expression: NeatSyntax.Expression.identifier
+                          ▿ GradientSyntax.StringSegment.expression
+                            ▿ expression: GradientSyntax.Expression.identifier
                               - identifier: "person.age"
-            ▿ NeatSyntax.Statement.declaration
+            ▿ GradientSyntax.Statement.declaration
               ▿ declaration: (4 elements)
-                - kind: NeatSyntax.LocalBindingKind.mutable
+                - kind: GradientSyntax.LocalBindingKind.mutable
                 - name: "user"
                 ▿ typeName: Optional("User")
                   - some: "User"
-                ▿ expression: NeatSyntax.Expression.call
+                ▿ expression: GradientSyntax.Expression.call
                   ▿ call: (2 elements)
                     - name: "User"
                     ▿ arguments: 1 element
-                      ▿ NeatSyntax.CallArgument
+                      ▿ GradientSyntax.CallArgument
                         ▿ label: Optional("person")
                           - some: "person"
-                        ▿ value: NeatSyntax.Expression.bindingReference
+                        ▿ value: GradientSyntax.Expression.bindingReference
                           - bindingReference: "person"
-            ▿ NeatSyntax.Statement.expression
-              ▿ expression: NeatSyntax.Expression.call
+            ▿ GradientSyntax.Statement.expression
+              ▿ expression: GradientSyntax.Expression.call
                 ▿ call: (2 elements)
                   - name: "user.incrementAge"
                   - arguments: 0 elements
       - states: 0 elements
       - callables: 0 elements
       ▿ constructs: 2 elements
-        ▿ NeatSyntax.ConstructDeclaration
+        ▿ GradientSyntax.ConstructDeclaration
           - macros: 0 elements
-          - kind: NeatSyntax.ConstructKind.declaration
+          - kind: GradientSyntax.ConstructKind.declaration
           - attribute: nil
           - name: "Person"
           - genericParameters: 0 elements
           - conformances: 0 elements
           ▿ states: 1 element
-            ▿ NeatSyntax.StateDeclaration
+            ▿ GradientSyntax.StateDeclaration
               - macros: 0 elements
               - name: "age"
               - hasExplicitTypeAnnotation: true
-              ▿ type: NeatSyntax.TypeReference.named
+              ▿ type: GradientSyntax.TypeReference.named
                 - named: "Int"
-              - storage: NeatSyntax.StateStorage.declared
+              - storage: GradientSyntax.StateStorage.declared
           - environments: 0 elements
           - bindings: 0 elements
           - deriveds: 0 elements
           ▿ values: 1 element
-            ▿ NeatSyntax.ValueDeclaration
+            ▿ GradientSyntax.ValueDeclaration
               - macros: 0 elements
               - localName: "name"
               ▿ externalLabel: Optional("name")
@@ -104,9 +104,9 @@ AST:
               - value: nil
           - initializers: 0 elements
           - callables: 0 elements
-        ▿ NeatSyntax.ConstructDeclaration
+        ▿ GradientSyntax.ConstructDeclaration
           - macros: 0 elements
-          - kind: NeatSyntax.ConstructKind.declaration
+          - kind: GradientSyntax.ConstructKind.declaration
           - attribute: nil
           - name: "User"
           - genericParameters: 0 elements
@@ -114,18 +114,18 @@ AST:
           - states: 0 elements
           - environments: 0 elements
           ▿ bindings: 1 element
-            ▿ NeatSyntax.BindingDeclaration
+            ▿ GradientSyntax.BindingDeclaration
               - macros: 0 elements
               - localName: "person"
               ▿ externalLabel: Optional("person")
                 - some: "person"
               - typeName: "Person"
-              - storage: NeatSyntax.BindingStorage.plain
+              - storage: GradientSyntax.BindingStorage.plain
           - deriveds: 0 elements
           - values: 0 elements
           - initializers: 0 elements
           ▿ callables: 1 element
-            ▿ NeatSyntax.CallableDeclaration
+            ▿ GradientSyntax.CallableDeclaration
               - macros: 0 elements
               - targetType: nil
               - name: "incrementAge"
@@ -133,17 +133,17 @@ AST:
               - hasExplicitParameterClause: true
               - parameters: 0 elements
               - returnType: nil
-              ▿ body: Optional([NeatSyntax.Statement.compoundAssignment(target: NeatSyntax.AssignmentTarget.member(base: NeatSyntax.AssignmentTarget.binding("person"), name: "age"), operatorSymbol: NeatSyntax.CompoundOperator.plusEquals, expression: NeatSyntax.Expression.integer(1))])
+              ▿ body: Optional([GradientSyntax.Statement.compoundAssignment(target: GradientSyntax.AssignmentTarget.member(base: GradientSyntax.AssignmentTarget.binding("person"), name: "age"), operatorSymbol: GradientSyntax.CompoundOperator.plusEquals, expression: GradientSyntax.Expression.integer(1))])
                 ▿ some: 1 element
-                  ▿ NeatSyntax.Statement.compoundAssignment
+                  ▿ GradientSyntax.Statement.compoundAssignment
                     ▿ compoundAssignment: (3 elements)
-                      ▿ target: NeatSyntax.AssignmentTarget.member
+                      ▿ target: GradientSyntax.AssignmentTarget.member
                         ▿ member: (2 elements)
-                          ▿ base: NeatSyntax.AssignmentTarget.binding
+                          ▿ base: GradientSyntax.AssignmentTarget.binding
                             - binding: "person"
                           - name: "age"
-                      - operatorSymbol: NeatSyntax.CompoundOperator.plusEquals
-                      ▿ expression: NeatSyntax.Expression.integer
+                      - operatorSymbol: GradientSyntax.CompoundOperator.plusEquals
+                      ▿ expression: GradientSyntax.Expression.integer
                         - integer: 1
       - enumerations: 0 elements
       - protocols: 0 elements

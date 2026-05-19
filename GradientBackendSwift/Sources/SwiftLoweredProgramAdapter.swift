@@ -1,9 +1,9 @@
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
 struct SwiftLoweredProgramAdapter {
-    private typealias NeatExpression = NeatSyntax.Expression
-    private typealias NeatStatement = NeatSyntax.Statement
+    private typealias GradientExpression = GradientSyntax.Expression
+    private typealias GradientStatement = GradientSyntax.Statement
 
     func adapt(program: LoweredProgram) -> LoweredProgram {
         .init(
@@ -100,11 +100,11 @@ struct SwiftLoweredProgramAdapter {
         )
     }
 
-    private func lower(statements: [NeatStatement]) -> [NeatStatement] {
+    private func lower(statements: [GradientStatement]) -> [GradientStatement] {
         statements.map(lower(statement:))
     }
 
-    private func lower(statement: NeatStatement) -> NeatStatement {
+    private func lower(statement: GradientStatement) -> GradientStatement {
         switch statement {
         case .macroInvocation(let name, let argumentClause, let body):
             return .macroInvocation(
@@ -198,8 +198,8 @@ struct SwiftLoweredProgramAdapter {
         }
     }
 
-    private func lower(expression: NeatExpression) -> NeatExpression {
-        let lowered: NeatExpression
+    private func lower(expression: GradientExpression) -> GradientExpression {
+        let lowered: GradientExpression
 
         switch expression {
         case .macroInvocation:
@@ -264,7 +264,7 @@ struct SwiftLoweredProgramAdapter {
         return lowered
     }
 
-    private func lowerCoreScalarLiteralBridge(_ expression: NeatExpression) -> NeatExpression? {
+    private func lowerCoreScalarLiteralBridge(_ expression: GradientExpression) -> GradientExpression? {
         guard case .call(let name, let arguments) = expression,
             arguments.count == 1,
             arguments[0].label == "literal"

@@ -1,15 +1,15 @@
 import ArgumentParser
-import NeatSyntax
+import GradientSyntax
 
-extension NeatCLI {
+extension GradientCLI {
     struct LSP: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Run the Neat language server over stdio."
+            abstract: "Run the Gradient language server over stdio."
         )
 
         mutating func run() throws {
             do {
-                var server = NeatLanguageServer()
+                var server = GradientLanguageServer()
                 try server.run()
             } catch {
                 ErrorPresenter.printError(error)

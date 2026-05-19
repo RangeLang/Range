@@ -1,5 +1,5 @@
 import Foundation
-@testable import NeatCLI
+@testable import GradientCLI
 import Testing
 
 @Suite("Package subscription")
@@ -8,11 +8,11 @@ struct PackageSubscriptionManagerTests {
     func installedPackagesAreSearchable() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".neat/Packages/acme/logger/Package.neat"),
+            at: root.appendingPathComponent(".gradient/Packages/acme/logger/Package.gradient"),
             name: "LoggingTools"
         )
         try writePackage(
-            at: root.appendingPathComponent(".neat/Packages/acme/ui/Package.neat"),
+            at: root.appendingPathComponent(".gradient/Packages/acme/ui/Package.gradient"),
             name: "InterfaceKit"
         )
 
@@ -25,11 +25,11 @@ struct PackageSubscriptionManagerTests {
         #expect(manager.matchingPackages(packages, search: "acme ui").map(\.reference) == ["acme/ui"])
     }
 
-    @Test("Subscribe adds the selected installed module to Package.neat")
+    @Test("Subscribe adds the selected installed module to Package.gradient")
     func subscribeAddsSelectedInstalledModule() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".neat/Packages/acme/logger/Package.neat"),
+            at: root.appendingPathComponent(".gradient/Packages/acme/logger/Package.gradient"),
             name: "LoggingTools"
         )
 
@@ -37,23 +37,23 @@ struct PackageSubscriptionManagerTests {
         let action = try manager.subscribe(search: "logger")
 
         let source = try String(
-            contentsOf: root.appendingPathComponent("Package.neat"),
+            contentsOf: root.appendingPathComponent("Package.gradient"),
             encoding: .utf8
         )
         #expect(action == .subscribed)
         #expect(source.contains(#"let modules: [String] = ["acme/logger"]"#))
-        _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.neat"))
+        _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.gradient"))
     }
 
     @Test("Subscribe browses when search is empty or ambiguous")
     func subscribeBrowsesWhenSearchIsEmptyOrAmbiguous() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".neat/Packages/acme/logger/Package.neat"),
+            at: root.appendingPathComponent(".gradient/Packages/acme/logger/Package.gradient"),
             name: "LoggingTools"
         )
         try writePackage(
-            at: root.appendingPathComponent(".neat/Packages/acme/log-viewer/Package.neat"),
+            at: root.appendingPathComponent(".gradient/Packages/acme/log-viewer/Package.gradient"),
             name: "LogViewer"
         )
 
@@ -65,9 +65,9 @@ struct PackageSubscriptionManagerTests {
 
     private func temporaryProject() throws -> URL {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("neat-package-subscribe-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("gradient-package-subscribe-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try writePackage(at: root.appendingPathComponent("Package.neat"), name: "Fixture")
+        try writePackage(at: root.appendingPathComponent("Package.gradient"), name: "Fixture")
         return root
     }
 

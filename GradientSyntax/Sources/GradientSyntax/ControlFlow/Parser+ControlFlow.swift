@@ -31,36 +31,36 @@ extension Parser {
             return try parseDeferStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(NeatSyntax.Keyword.ifStatement.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.ifStatement.rawValue) = peek() {
             return try parseIfStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(NeatSyntax.Keyword.whileLoop.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.whileLoop.rawValue) = peek() {
             return try parseWhileStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(NeatSyntax.Keyword.forLoop.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.forLoop.rawValue) = peek() {
             return try parseForStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(NeatSyntax.Keyword.switchStatement.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.switchStatement.rawValue) = peek() {
             return try parseSwitchStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(NeatSyntax.Keyword.let.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.let.rawValue) = peek() {
             advance()
             return try parseLocalDeclaration(kind: .constant, localBindings: &localBindings)
         }
-        if case .keyword(NeatSyntax.Keyword.state.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.state.rawValue) = peek() {
             advance()
             return try parseLocalDeclaration(kind: .mutable, localBindings: &localBindings)
         }
-        if case .keyword(NeatSyntax.Keyword.derived.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.derived.rawValue) = peek() {
             advance()
             return try parseLocalDerived(localBindings: &localBindings)
         }
 
-        if case .keyword(NeatSyntax.Keyword.returnStatement.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.returnStatement.rawValue) = peek() {
             advance()
             if peek() == .rightBrace {
                 return .return(nil)
@@ -68,12 +68,12 @@ extension Parser {
             return .return(try parseExpression())
         }
 
-        if case .keyword(NeatSyntax.Keyword.breakStatement.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.breakStatement.rawValue) = peek() {
             advance()
             return .break
         }
 
-        if case .keyword(NeatSyntax.Keyword.continueStatement.rawValue) = peek() {
+        if case .keyword(GradientSyntax.Keyword.continueStatement.rawValue) = peek() {
             advance()
             return .continue
         }
@@ -433,7 +433,7 @@ extension Parser {
         var defaultBody: [Statement]?
 
         while peek() != .rightBrace {
-            if case .keyword(NeatSyntax.Keyword.caseBranch.rawValue) = peek() {
+            if case .keyword(GradientSyntax.Keyword.caseBranch.rawValue) = peek() {
                 try consumeKeyword(.caseBranch)
                 let patterns = try parseSwitchCasePatterns()
                 if patterns.count > 1,
@@ -452,7 +452,7 @@ extension Parser {
                 continue
             }
 
-            if case .keyword(NeatSyntax.Keyword.defaultBranch.rawValue) = peek() {
+            if case .keyword(GradientSyntax.Keyword.defaultBranch.rawValue) = peek() {
                 try consumeKeyword(.defaultBranch)
                 if defaultBody != nil {
                     throw ParseError("Switch can only contain one default block.")
@@ -481,10 +481,10 @@ extension Parser {
         let body = try parseStatementBlock(baseLocalBindings: localBindings)
         branches.append(StatementConditionalBranch(condition: condition, body: body))
 
-        while peek() == .keyword(NeatSyntax.Keyword.elseBranch.rawValue) {
+        while peek() == .keyword(GradientSyntax.Keyword.elseBranch.rawValue) {
             try consumeKeyword(.elseBranch)
 
-            if peek() == .keyword(NeatSyntax.Keyword.ifStatement.rawValue) {
+            if peek() == .keyword(GradientSyntax.Keyword.ifStatement.rawValue) {
                 try consumeKeyword(.ifStatement)
                 let elseIfCondition = try parseExpression()
                 let elseIfBody = try parseStatementBlock(baseLocalBindings: localBindings)
@@ -545,10 +545,10 @@ extension Parser {
                 try consume(.leftParen)
                 let bindingKind: LocalBindingKind
                 switch peek() {
-                case .keyword(NeatSyntax.Keyword.let.rawValue):
+                case .keyword(GradientSyntax.Keyword.let.rawValue):
                     bindingKind = .constant
                     advance()
-                case .keyword(NeatSyntax.Keyword.state.rawValue):
+                case .keyword(GradientSyntax.Keyword.state.rawValue):
                     bindingKind = .mutable
                     advance()
                 default:
@@ -600,8 +600,8 @@ extension Parser {
                 break
             }
             if case .keyword(let keyword) = peek(),
-                keyword == NeatSyntax.Keyword.caseBranch.rawValue
-                    || keyword == NeatSyntax.Keyword.defaultBranch.rawValue
+                keyword == GradientSyntax.Keyword.caseBranch.rawValue
+                    || keyword == GradientSyntax.Keyword.defaultBranch.rawValue
             {
                 break
             }
@@ -639,30 +639,30 @@ extension Parser {
         if isBackgroundStatementStart() {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.ifStatement.rawValue) {
+        if peek() == .keyword(GradientSyntax.Keyword.ifStatement.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.whileLoop.rawValue) {
+        if peek() == .keyword(GradientSyntax.Keyword.whileLoop.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.forLoop.rawValue) {
+        if peek() == .keyword(GradientSyntax.Keyword.forLoop.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.switchStatement.rawValue) {
+        if peek() == .keyword(GradientSyntax.Keyword.switchStatement.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.returnStatement.rawValue) {
+        if peek() == .keyword(GradientSyntax.Keyword.returnStatement.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.breakStatement.rawValue) {
+        if peek() == .keyword(GradientSyntax.Keyword.breakStatement.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.continueStatement.rawValue) {
+        if peek() == .keyword(GradientSyntax.Keyword.continueStatement.rawValue) {
             return true
         }
-        if peek() == .keyword(NeatSyntax.Keyword.let.rawValue)
-            || peek() == .keyword(NeatSyntax.Keyword.state.rawValue)
-            || peek() == .keyword(NeatSyntax.Keyword.derived.rawValue)
+        if peek() == .keyword(GradientSyntax.Keyword.let.rawValue)
+            || peek() == .keyword(GradientSyntax.Keyword.state.rawValue)
+            || peek() == .keyword(GradientSyntax.Keyword.derived.rawValue)
         {
             return true
         }

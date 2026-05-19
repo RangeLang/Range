@@ -1,9 +1,9 @@
 import ArgumentParser
 
-extension NeatCLI {
+extension GradientCLI {
     struct Create: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Create a new Neat project."
+            abstract: "Create a new Gradient project."
         )
 
         @Argument(help: "Project name.")

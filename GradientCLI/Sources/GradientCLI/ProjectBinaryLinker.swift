@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 struct ProjectBinaryLinker {
-    static let defaultMacOSBinaryPath = "/usr/local/bin/neat"
+    static let defaultMacOSBinaryPath = "/usr/local/bin/gradient"
 
     let projectPath: String
     let binaryPath: String
@@ -14,32 +14,32 @@ struct ProjectBinaryLinker {
         let binaryURL = URL(fileURLWithPath: binaryPath, isDirectory: false).standardizedFileURL
 
         guard fileManager.fileExists(atPath: binaryURL.path) else {
-            throw ValidationError("Missing installed Neat binary at \(binaryURL.path).")
+            throw ValidationError("Missing installed Gradient binary at \(binaryURL.path).")
         }
 
-        let selectedVersion = "\(NeatVersion.current)"
+        let selectedVersion = "\(GradientVersion.current)"
         let selectedInstallDirectory = projectRoot
-            .appendingPathComponent(".neat", isDirectory: true)
-            .appendingPathComponent("NeatCLI", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
+            .appendingPathComponent("GradientCLI", isDirectory: true)
             .appendingPathComponent(selectedVersion, isDirectory: true)
             .appendingPathComponent("bin", isDirectory: true)
         let shimDirectory = projectRoot
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .appendingPathComponent("bin", isDirectory: true)
         let linksDirectory = projectRoot
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .appendingPathComponent("Links", isDirectory: true)
         try fileManager.createDirectory(at: selectedInstallDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: shimDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: linksDirectory, withIntermediateDirectories: true)
 
         let versionedBinaryURL = selectedInstallDirectory.appendingPathComponent(
-            "neat",
+            "gradient",
             isDirectory: false
         )
-        let packageBinaryURL = shimDirectory.appendingPathComponent("neat", isDirectory: false)
+        let packageBinaryURL = shimDirectory.appendingPathComponent("gradient", isDirectory: false)
         let receiptURL = linksDirectory.appendingPathComponent(
-            "neat.package-link.json",
+            "gradient.package-link.json",
             isDirectory: false
         )
 
@@ -63,7 +63,7 @@ struct ProjectBinaryLinker {
         try fileManager.createSymbolicLink(at: packageBinaryURL, withDestinationURL: versionedBinaryURL)
 
         let receipt = PackageLinkReceipt(
-            kind: "neat.package-link",
+            kind: "gradient.package-link",
             version: 1,
             selectedVersion: selectedVersion,
             source: binaryURL.path,
@@ -79,15 +79,15 @@ struct ProjectBinaryLinker {
     private func packageRoot(from rawPath: String) throws -> URL {
         let url = URL(fileURLWithPath: rawPath, isDirectory: true).standardizedFileURL
         let root: URL
-        if url.lastPathComponent == "Package.neat" {
+        if url.lastPathComponent == "Package.gradient" {
             root = url.deletingLastPathComponent()
         } else {
             root = url
         }
 
-        let packageFile = root.appendingPathComponent("Package.neat", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Package.gradient", isDirectory: false)
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.neat in \(root.path).")
+            throw ValidationError("Missing Package.gradient in \(root.path).")
         }
 
         return root

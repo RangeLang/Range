@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PRODUCT_NAME="NeatCLI"
-TARGET_NAME="neat"
+PRODUCT_NAME="GradientCLI"
+TARGET_NAME="gradient"
 
 MODE="auto"
 ACTION="install"
@@ -130,7 +130,7 @@ fi
 INSTALL_DIR="$(choose_install_dir)"
 
 if [[ -d "${INSTALL_DIR}" ]]; then
-  if [[ "${FULLY}" -ne 1 && ( -f "${INSTALL_DIR}/Package.neat" || -f "${INSTALL_DIR}/App.neat" || -d "${INSTALL_DIR}/.neat" ) ]]; then
+  if [[ "${FULLY}" -ne 1 && ( -f "${INSTALL_DIR}/Package.gradient" || -f "${INSTALL_DIR}/App.gradient" || -d "${INSTALL_DIR}/.gradient" ) ]]; then
     echo "Refusing to install '${TARGET_NAME}' into project directory: ${INSTALL_DIR}"
     echo "Choose a bin directory like /opt/homebrew/bin, /usr/local/bin, or ${LOCAL_BIN}."
     echo "Pass --fully to override."

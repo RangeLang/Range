@@ -1,9 +1,9 @@
 ---
-name: neat-metadata-shapes-publisher
-description: Use when changing Neat package publishing, metadata extraction, declaration metadata, visibility defaults, namespace locking, typed construction syntax, or docs around publisher-facing declaration shapes. Use the embedded direction in this skill to catch stale examples or implementation drift.
+name: gradient-metadata-shapes-publisher
+description: Use when changing Gradient package publishing, metadata extraction, declaration metadata, visibility defaults, namespace locking, typed construction syntax, or docs around publisher-facing declaration shapes. Use the embedded direction in this skill to catch stale examples or implementation drift.
 ---
 
-# Neat Metadata Shapes Publisher
+# Gradient Metadata Shapes Publisher
 
 ## Workflow
 

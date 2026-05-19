@@ -1,4 +1,4 @@
-@testable import NeatCLI
+@testable import GradientCLI
 import Testing
 
 @Suite("Version checking")
@@ -26,15 +26,15 @@ struct VersionCheckerTests {
     func githubReleaseURLIsDerivedFromUpdateRepository() throws {
         #expect(
             VersionChecker.githubLatestReleaseAPIURL(
-                for: "https://github.com/georgetchelidze/Neat.git"
+                for: "https://github.com/georgetchelidze/Gradient.git"
             )?.absoluteString
-                == "https://api.github.com/repos/georgetchelidze/Neat/releases/latest"
+                == "https://api.github.com/repos/georgetchelidze/Gradient/releases/latest"
         )
         #expect(
             VersionChecker.githubLatestReleaseAPIURL(
-                for: "git@github.com:georgetchelidze/Neat.git"
+                for: "git@github.com:georgetchelidze/Gradient.git"
             )?.absoluteString
-                == "https://api.github.com/repos/georgetchelidze/Neat/releases/latest"
+                == "https://api.github.com/repos/georgetchelidze/Gradient/releases/latest"
         )
     }
 

@@ -27,7 +27,7 @@ struct ProjectScaffolder {
         try createProject(name: projectName, targetDirectory: targetDirectory)
 
         TerminalLog.out(
-            "Created Neat project \(projectName) at \(targetDirectory.path)",
+            "Created Gradient project \(projectName) at \(targetDirectory.path)",
             level: .success
         )
     }
@@ -51,7 +51,7 @@ struct ProjectScaffolder {
                 if exists && isDirectory.boolValue && !pathLooksLikeContainerDirectory(trimmedPath)
                     && directoryHasVisibleEntries(pathURL)
                 {
-                    let suggested = inferredProjectName(from: trimmedPath) ?? "NeatProject"
+                    let suggested = inferredProjectName(from: trimmedPath) ?? "GradientProject"
                     let response = prompt(
                         "Project Name",
                         placeholder: suggested,
@@ -75,7 +75,7 @@ struct ProjectScaffolder {
 
         let response = prompt(
             "Project Name",
-            placeholder: currentDirectoryName.isEmpty ? "NeatProject" : currentDirectoryName,
+            placeholder: currentDirectoryName.isEmpty ? "GradientProject" : currentDirectoryName,
             note: "(enter for ./)"
         )
         let trimmed = response.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -201,9 +201,9 @@ struct ProjectScaffolder {
     }
 
     private func createProject(name: String, targetDirectory: URL) throws {
-        let packagePath = targetDirectory.appendingPathComponent("Package.neat", isDirectory: false)
+        let packagePath = targetDirectory.appendingPathComponent("Package.gradient", isDirectory: false)
         let playgroundPath = targetDirectory.appendingPathComponent(
-            "Playground.neat",
+            "Playground.gradient",
             isDirectory: false
         )
 
@@ -211,7 +211,7 @@ struct ProjectScaffolder {
         if fileManager.fileExists(atPath: packagePath.path)
             || fileManager.fileExists(atPath: playgroundPath.path)
         {
-            throw ValidationError("Target already contains Package.neat or Playground.neat.")
+            throw ValidationError("Target already contains Package.gradient or Playground.gradient.")
         }
 
         try renderProgramPackage(name: name).write(
@@ -268,22 +268,22 @@ struct ProjectScaffolder {
             withIntermediateDirectories: true
         )
 
-        let projectNeatDirectory = targetDirectory
-            .appendingPathComponent(".neat", isDirectory: true)
+        let projectGradientDirectory = targetDirectory
+            .appendingPathComponent(".gradient", isDirectory: true)
 
-        guard !FileManager.default.fileExists(atPath: projectNeatDirectory.path) else {
-            throw ValidationError("Target already contains .neat.")
+        guard !FileManager.default.fileExists(atPath: projectGradientDirectory.path) else {
+            throw ValidationError("Target already contains .gradient.")
         }
 
         try FileManager.default.createSymbolicLink(
-            at: projectNeatDirectory,
+            at: projectGradientDirectory,
             withDestinationURL: machineWorkspace
         )
     }
 
     private func machinePackageStore() -> URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .appendingPathComponent("Packages", isDirectory: true)
             .standardizedFileURL
     }
@@ -291,7 +291,7 @@ struct ProjectScaffolder {
     private func machineProjectWorkspace(name: String, projectDirectory: URL) -> URL {
         let workspaceName = "\(sanitizedFileName(from: name))-\(stablePathHash(projectDirectory.path))"
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".neat", isDirectory: true)
+            .appendingPathComponent(".gradient", isDirectory: true)
             .appendingPathComponent("Projects", isDirectory: true)
             .appendingPathComponent(workspaceName, isDirectory: true)
             .standardizedFileURL
@@ -311,7 +311,7 @@ struct ProjectScaffolder {
     private func renderProgramPlayground(name: String) -> String {
         return """
             #main {
-              Logger.info("Neat program playground")
+              Logger.info("Gradient program playground")
 
               let values = [1, 2, 3]
               state total = 0
@@ -340,10 +340,10 @@ struct ProjectScaffolder {
             }
         let joined = pieces.joined()
         if joined.isEmpty {
-            return "Neat"
+            return "Gradient"
         }
         if let first = joined.first, first.isNumber {
-            return "Neat\(joined)"
+            return "Gradient\(joined)"
         }
         return joined
     }
@@ -354,7 +354,7 @@ struct ProjectScaffolder {
             .split { !$0.isLetter && !$0.isNumber }
             .filter { !$0.isEmpty }
         let name = pieces.joined(separator: "-")
-        return name.isEmpty ? "neat-project" : name
+        return name.isEmpty ? "gradient-project" : name
     }
 
     private func stablePathHash(_ path: String) -> String {
@@ -517,7 +517,7 @@ private struct RawTerminalMode {
 #else
 private struct RawTerminalMode {
     init() throws {
-        throw NSError(domain: "NeatTerminal", code: 1)
+        throw NSError(domain: "GradientTerminal", code: 1)
     }
 
     func restore() {}

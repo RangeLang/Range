@@ -1,10 +1,10 @@
 import ArgumentParser
-import NeatBackendSwift
-import NeatSyntax
+import GradientBackendSwift
+import GradientSyntax
 
 enum ErrorDescription {
     static func message(for error: Error) -> String {
-        if let diagnostic = error as? NeatDiagnostic {
+        if let diagnostic = error as? GradientDiagnostic {
             return diagnostic.description
         }
         if let parse = error as? ParseError {

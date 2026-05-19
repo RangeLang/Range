@@ -18,7 +18,7 @@ extension ApplicationGraph {
             """
     }
 
-    public func renderHTML(title: String = "Neat Application Graph") -> String {
+    public func renderHTML(title: String = "Gradient Application Graph") -> String {
         let payload = makeHTMLPayload()
 
         return """

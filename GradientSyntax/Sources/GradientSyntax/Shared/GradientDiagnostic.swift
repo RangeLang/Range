@@ -1,13 +1,13 @@
 import Foundation
 
-public enum NeatDiagnosticSeverity: Sendable {
+public enum GradientDiagnosticSeverity: Sendable {
     case error
     case warning
     case information
     case hint
 }
 
-public struct NeatSourceLocation: Sendable {
+public struct GradientSourceLocation: Sendable {
     public let path: String?
     public let line: Int
     public let character: Int
@@ -19,43 +19,43 @@ public struct NeatSourceLocation: Sendable {
     }
 }
 
-public struct NeatSourceRange: Sendable {
-    public let start: NeatSourceLocation
-    public let end: NeatSourceLocation
+public struct GradientSourceRange: Sendable {
+    public let start: GradientSourceLocation
+    public let end: GradientSourceLocation
 
-    public init(start: NeatSourceLocation, end: NeatSourceLocation) {
+    public init(start: GradientSourceLocation, end: GradientSourceLocation) {
         self.start = start
         self.end = end
     }
 }
 
-public struct NeatDiagnosticNote: Sendable {
+public struct GradientDiagnosticNote: Sendable {
     public let message: String
-    public let range: NeatSourceRange?
+    public let range: GradientSourceRange?
 
-    public init(message: String, range: NeatSourceRange? = nil) {
+    public init(message: String, range: GradientSourceRange? = nil) {
         self.message = message
         self.range = range
     }
 }
 
-public struct NeatDiagnostic: Error, CustomStringConvertible, Sendable {
-    public let severity: NeatDiagnosticSeverity
+public struct GradientDiagnostic: Error, CustomStringConvertible, Sendable {
+    public let severity: GradientDiagnosticSeverity
     public let message: String
     public let source: String
     public let code: String?
     public let path: String?
-    public let range: NeatSourceRange?
-    public let notes: [NeatDiagnosticNote]
+    public let range: GradientSourceRange?
+    public let notes: [GradientDiagnosticNote]
 
     public init(
-        severity: NeatDiagnosticSeverity,
+        severity: GradientDiagnosticSeverity,
         message: String,
-        source: String = "neat",
+        source: String = "gradient",
         code: String? = nil,
         path: String? = nil,
-        range: NeatSourceRange? = nil,
-        notes: [NeatDiagnosticNote] = []
+        range: GradientSourceRange? = nil,
+        notes: [GradientDiagnosticNote] = []
     ) {
         self.severity = severity
         self.message = message
@@ -68,11 +68,11 @@ public struct NeatDiagnostic: Error, CustomStringConvertible, Sendable {
 
     public var description: String { message }
 
-    public func withPath(_ path: String?) -> NeatDiagnostic {
+    public func withPath(_ path: String?) -> GradientDiagnostic {
         guard self.path == nil, let path else {
             return self
         }
-        return NeatDiagnostic(
+        return GradientDiagnostic(
             severity: severity,
             message: message,
             source: source,
@@ -84,24 +84,24 @@ public struct NeatDiagnostic: Error, CustomStringConvertible, Sendable {
     }
 }
 
-public final class NeatDiagnosticEngine {
-    public private(set) var diagnostics: [NeatDiagnostic] = []
+public final class GradientDiagnosticEngine {
+    public private(set) var diagnostics: [GradientDiagnostic] = []
 
     public init() {}
 
-    public func emit(_ diagnostic: NeatDiagnostic) {
+    public func emit(_ diagnostic: GradientDiagnostic) {
         diagnostics.append(diagnostic)
     }
 
     public func warning(
         _ message: String,
-        source: String = "neat",
+        source: String = "gradient",
         code: String? = nil,
         path: String? = nil,
-        range: NeatSourceRange? = nil
+        range: GradientSourceRange? = nil
     ) {
         emit(
-            NeatDiagnostic(
+            GradientDiagnostic(
                 severity: .warning,
                 message: message,
                 source: source,
@@ -114,13 +114,13 @@ public final class NeatDiagnosticEngine {
 
     public func error(
         _ message: String,
-        source: String = "neat",
+        source: String = "gradient",
         code: String? = nil,
         path: String? = nil,
-        range: NeatSourceRange? = nil
+        range: GradientSourceRange? = nil
     ) {
         emit(
-            NeatDiagnostic(
+            GradientDiagnostic(
                 severity: .error,
                 message: message,
                 source: source,
@@ -133,13 +133,13 @@ public final class NeatDiagnosticEngine {
 
     public func information(
         _ message: String,
-        source: String = "neat",
+        source: String = "gradient",
         code: String? = nil,
         path: String? = nil,
-        range: NeatSourceRange? = nil
+        range: GradientSourceRange? = nil
     ) {
         emit(
-            NeatDiagnostic(
+            GradientDiagnostic(
                 severity: .information,
                 message: message,
                 source: source,
@@ -151,32 +151,32 @@ public final class NeatDiagnosticEngine {
     }
 }
 
-public enum NeatDiagnosticConverter {
-    public static func diagnostic(from error: Error, path: String? = nil) -> NeatDiagnostic {
-        if let diagnostic = error as? NeatDiagnostic {
+public enum GradientDiagnosticConverter {
+    public static func diagnostic(from error: Error, path: String? = nil) -> GradientDiagnostic {
+        if let diagnostic = error as? GradientDiagnostic {
             return diagnostic
         }
         if let parse = error as? ParseError {
-            return NeatDiagnostic(
+            return GradientDiagnostic(
                 severity: .error,
                 message: parse.description,
-                source: "neat-parser",
+                source: "gradient-parser",
                 path: path,
                 range: parse.range
             )
         }
         if let semantic = error as? SemanticValidationError {
-            return NeatDiagnostic(
+            return GradientDiagnostic(
                 severity: .error,
                 message: semantic.description,
-                source: "neat-semantics",
+                source: "gradient-semantics",
                 path: path
             )
         }
-        return NeatDiagnostic(
+        return GradientDiagnostic(
             severity: .error,
             message: "Unknown error",
-            source: "neat",
+            source: "gradient",
             path: path
         )
     }

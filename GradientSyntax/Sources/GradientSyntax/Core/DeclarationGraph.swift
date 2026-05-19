@@ -11,13 +11,13 @@ public enum DeclarationSourceKind: Hashable {
 public struct DeclarationSourceLocation {
     public let name: String
     public let path: String
-    public let range: NeatSourceRange
+    public let range: GradientSourceRange
     public let kind: DeclarationSourceKind
 
     public init(
         name: String,
         path: String,
-        range: NeatSourceRange,
+        range: GradientSourceRange,
         kind: DeclarationSourceKind
     ) {
         self.name = name
@@ -45,8 +45,8 @@ public struct DeclarationGraph {
     public let derivedsByConstructName: [String: [DerivedDeclaration]]
     public let valuesByConstructName: [String: [ValueDeclaration]]
     public let initializersByConstructName: [String: [InitializerDeclaration]]
-    public let parametersByCallableIdentity: [String: [NeatFunctionParameter]]
-    public let parametersByInitializerIdentity: [String: [NeatFunctionParameter]]
+    public let parametersByCallableIdentity: [String: [GradientFunctionParameter]]
+    public let parametersByInitializerIdentity: [String: [GradientFunctionParameter]]
     public let callablesByName: [String: [CallableDeclaration]]
     public let operatorCallablesByName: [String: [CallableDeclaration]]
     public let sourceLocations: [DeclarationSourceLocation]
@@ -487,10 +487,10 @@ public struct DeclarationGraph {
 
     static func directConstructApplicationParameters(
         for construct: ConstructDeclaration
-    ) -> [NeatFunctionParameter] {
+    ) -> [GradientFunctionParameter] {
         let values = construct.values.map { value in
             let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
-            return NeatFunctionParameter(
+            return GradientFunctionParameter(
                 macros: [],
                 localName: value.localName,
                 externalLabel: value.externalLabel ?? value.localName,
@@ -509,7 +509,7 @@ public struct DeclarationGraph {
             case .declared:
                 defaultValue = nil
             }
-            return NeatFunctionParameter(
+            return GradientFunctionParameter(
                 macros: [],
                 localName: state.name,
                 externalLabel: state.name,
@@ -521,7 +521,7 @@ public struct DeclarationGraph {
             )
         }
         let bindings = construct.bindings.map { binding in
-            NeatFunctionParameter(
+            GradientFunctionParameter(
                 macros: [],
                 localName: binding.name,
                 externalLabel: binding.externalLabel ?? binding.name,
@@ -777,13 +777,13 @@ public struct DeclarationGraph {
                 return DeclarationSourceLocation(
                     name: name,
                     path: path,
-                    range: NeatSourceRange(
-                        start: NeatSourceLocation(
+                    range: GradientSourceRange(
+                        start: GradientSourceLocation(
                             path: path,
                             line: lineIndex,
                             character: nameRange.location
                         ),
-                        end: NeatSourceLocation(
+                        end: GradientSourceLocation(
                             path: path,
                             line: lineIndex,
                             character: nameRange.location + nameRange.length
@@ -871,8 +871,8 @@ public struct DeclarationGraph {
 
     static func collectParametersByCallableIdentity(
         from files: [ParsedSourceFile]
-    ) -> [String: [NeatFunctionParameter]] {
-        var registry: [String: [NeatFunctionParameter]] = [:]
+    ) -> [String: [GradientFunctionParameter]] {
+        var registry: [String: [GradientFunctionParameter]] = [:]
         let metadataSlotMarkers = metadataSlotMarkerNames(
             in: collectMarkers(from: files)
         )
@@ -972,8 +972,8 @@ public struct DeclarationGraph {
     static func collectParametersByInitializerIdentity(
         from constructs: [String: ConstructDeclaration],
         extensions: [String: [ExtensionDeclaration]]
-    ) -> [String: [NeatFunctionParameter]] {
-        var registry: [String: [NeatFunctionParameter]] = [:]
+    ) -> [String: [GradientFunctionParameter]] {
+        var registry: [String: [GradientFunctionParameter]] = [:]
         for (constructName, declaration) in constructs {
             for initializer in declaration.initializers {
                 registry[initializerIdentity(
@@ -1389,7 +1389,7 @@ public struct DeclarationGraph {
     ) -> NamespaceAttributeAttachment? {
         guard
             let attribute,
-            !NeatSyntax.attributeIdentifiers.contains(attribute.name),
+            !GradientSyntax.attributeIdentifiers.contains(attribute.name),
             let namespace = namespacesByName[attribute.name]
         else {
             return nil
@@ -1492,7 +1492,7 @@ public struct DeclarationGraph {
 
     private static func collectNamespaceCallableParameters(
         in namespace: NamespaceDeclaration,
-        registry: inout [String: [NeatFunctionParameter]],
+        registry: inout [String: [GradientFunctionParameter]],
         qualifiedPrefix: String
     ) {
         for callable in namespace.callables {
@@ -1558,7 +1558,7 @@ public struct DeclarationGraph {
 
     private static func collectNamespaceExtensionCallableParameters(
         from declaration: ExtensionDeclaration,
-        registry: inout [String: [NeatFunctionParameter]],
+        registry: inout [String: [GradientFunctionParameter]],
         qualifiedPrefix: String
     ) {
         for callable in declaration.callables {
@@ -1804,7 +1804,7 @@ public struct DeclarationGraph {
 
     private static func collectCallableParameters(
         in construct: ConstructDeclaration,
-        registry: inout [String: [NeatFunctionParameter]],
+        registry: inout [String: [GradientFunctionParameter]],
         ownerName: String
     ) {
         for callable in construct.callables {
@@ -1837,7 +1837,7 @@ public struct DeclarationGraph {
         "\(constructName)::init(\(renderParameterList(declaration.parameters)))"
     }
 
-    static func renderParameterList(_ parameters: [NeatFunctionParameter]) -> String {
+    static func renderParameterList(_ parameters: [GradientFunctionParameter]) -> String {
         parameters.map { parameter in
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
@@ -2207,7 +2207,7 @@ private struct SemanticGraphCollector {
         }
     }
 
-    private mutating func addParameter(_ parameter: NeatFunctionParameter, parentID: String) {
+    private mutating func addParameter(_ parameter: GradientFunctionParameter, parentID: String) {
         let label = parameter.externalLabel ?? "_"
         let parameterID = "\(parentID)/parameter:\(label):\(parameter.localName)"
         addEntity(id: parameterID, kind: .parameter, label: parameter.localName)
@@ -2266,7 +2266,7 @@ private struct SemanticGraphCollector {
         relations.insert(SemanticGraphRelation(sourceID: sourceID, targetID: targetID, kind: kind))
     }
 
-    private func renderParameterList(_ parameters: [NeatFunctionParameter]) -> String {
+    private func renderParameterList(_ parameters: [GradientFunctionParameter]) -> String {
         parameters.map { parameter in
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName

@@ -17,11 +17,11 @@ struct VersionUpdateStatus {
 struct VersionChecker {
     private let repository: String
 
-    init(repository: String = NeatVersion.updateRepository) {
+    init(repository: String = GradientVersion.updateRepository) {
         self.repository = repository
     }
 
-    func check(current: SemanticVersion = NeatVersion.current) throws -> VersionUpdateStatus {
+    func check(current: SemanticVersion = GradientVersion.current) throws -> VersionUpdateStatus {
         if let releaseAPIURL = Self.githubLatestReleaseAPIURL(for: repository) {
             let latest = try latestGitHubReleaseVersion(from: releaseAPIURL)
             return VersionUpdateStatus(
@@ -109,7 +109,7 @@ struct VersionChecker {
         guard process.terminationStatus == 0 else {
             let message = String(data: error.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw ValidationError(message?.isEmpty == false ? message! : "Could not check for Neat releases.")
+            throw ValidationError(message?.isEmpty == false ? message! : "Could not check for Gradient releases.")
         }
 
         return output.fileHandleForReading.readDataToEndOfFile()
@@ -135,7 +135,7 @@ struct VersionChecker {
         guard process.terminationStatus == 0 else {
             let message = String(data: error.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw ValidationError(message?.isEmpty == false ? message! : "Could not check for Neat updates.")
+            throw ValidationError(message?.isEmpty == false ? message! : "Could not check for Gradient updates.")
         }
 
         let data = output.fileHandleForReading.readDataToEndOfFile()

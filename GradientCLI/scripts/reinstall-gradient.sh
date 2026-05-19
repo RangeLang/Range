@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_SCRIPT="${SCRIPT_DIR}/install-neat.sh"
+INSTALL_SCRIPT="${SCRIPT_DIR}/install-gradient.sh"
 TARGET_INPUT="${1:-}"
 EXTRA_FLAG="${2:-}"
 AUTO_YES=0
@@ -37,15 +37,15 @@ confirm_wipe() {
 }
 
 if [[ -z "${TARGET_INPUT}" ]]; then
-  confirm_wipe "installed neat binaries" || exit 1
+  confirm_wipe "installed gradient binaries" || exit 1
   "${INSTALL_SCRIPT}" --uninstall
   "${INSTALL_SCRIPT}"
   exit 0
 fi
 
 PROJECT_DIR="${TARGET_INPUT}"
-if [[ "${PROJECT_DIR}" == */neat ]]; then
-  PROJECT_DIR="${PROJECT_DIR%/neat}"
+if [[ "${PROJECT_DIR}" == */gradient ]]; then
+  PROJECT_DIR="${PROJECT_DIR%/gradient}"
 fi
 
 PROJECT_DIR="$(cd "$(dirname "${PROJECT_DIR}")" && pwd)/$(basename "${PROJECT_DIR}")"
@@ -66,4 +66,4 @@ else
 fi
 
 "${INSTALL_SCRIPT}"
-"${SCRIPT_DIR}/../.build/release/NeatCLI" create "${PROJECT_DIR}"
+"${SCRIPT_DIR}/../.build/release/GradientCLI" create "${PROJECT_DIR}"

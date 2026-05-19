@@ -1,19 +1,19 @@
 import ArgumentParser
 import Foundation
 
-extension NeatCLI {
+extension GradientCLI {
     struct SemanticTokens: ParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "semantic-tokens",
-            abstract: "Dump Neat semantic tokens for a source file."
+            abstract: "Dump Gradient semantic tokens for a source file."
         )
 
-        @Argument(help: "Path to the .neat source file.")
+        @Argument(help: "Path to the .gradient source file.")
         var path: String
 
         mutating func run() throws {
             let source = try String(contentsOfFile: path, encoding: .utf8)
-            let snapshots = NeatLanguageServer.debugSemanticTokenSnapshots(in: source)
+            let snapshots = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
             let output = snapshots.map { snapshot in
                 SemanticTokenDumpRow(
                     text: snapshot.text,

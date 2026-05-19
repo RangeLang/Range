@@ -1,26 +1,26 @@
-# Neat
+# Gradient
 
-Neat is a language project with a Swift-hosted compiler, CLI, core library, and editor tooling.
+Gradient is a language project with a Swift-hosted compiler, CLI, core library, and editor tooling.
 
 ## Download
 
-Install the `neat` command line tool from the latest GitHub release:
+Install the `gradient` command line tool from the latest GitHub release:
 
-https://github.com/georgetchelidze/Neat/releases/latest
+https://github.com/georgetchelidze/Gradient/releases/latest
 
-After installing, make sure `neat` is available on your `PATH`:
+After installing, make sure `gradient` is available on your `PATH`:
 
 ```sh
-neat version
+gradient version
 ```
 
 ## Create a Project
 
-Create a new Neat project with:
+Create a new Gradient project with:
 
 ```sh
-neat create MyProject
+gradient create MyProject
 cd MyProject
 ```
 
-A Neat project is recognized by the `Package.neat` file at its root.
+A Gradient project is recognized by the `Package.gradient` file at its root.

@@ -1,4 +1,4 @@
 interface:
-  display_name: "Neat Onboarding"
-  short_description: "Help users install Neat, inspect shared resources, and set up project-local CLI/scripts."
-  default_prompt: "Help me get started with Neat after installing the macOS package."
+  display_name: "Gradient Onboarding"
+  short_description: "Help users install Gradient, inspect shared resources, and set up project-local CLI/scripts."
+  default_prompt: "Help me get started with Gradient after installing the macOS package."

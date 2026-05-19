@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
-import NeatBackendSwift
-import NeatSyntax
+import GradientBackendSwift
+import GradientSyntax
 
 enum ErrorPresenter {
     static func printError(_ error: Error) {

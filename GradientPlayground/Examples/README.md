@@ -1,9 +1,9 @@
-# Neat Examples
+# Gradient Examples
 
-This folder holds small feature-focused `.neat` examples.
+This folder holds small feature-focused `.gradient` examples.
 
 These files are intentionally excluded from normal project loading, so
-`NeatPlayground` can keep a single runnable entry point while this folder grows
+`GradientPlayground` can keep a single runnable entry point while this folder grows
 into a language corpus.
 
 Use these files to document and probe language features such as:

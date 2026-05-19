@@ -1,10 +1,10 @@
 import ArgumentParser
 import Foundation
 
-extension NeatCLI.Package {
+extension GradientCLI.Package {
     struct Search: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Search the network for Neat packages."
+            abstract: "Search the network for Gradient packages."
         )
 
         @Argument(
@@ -142,7 +142,7 @@ extension NeatCLI.Package {
                 }
 
                 print("    " + TerminalLog.subtleStdout(result.url.absoluteString))
-                print("    " + TerminalLog.subtleStdout("Package.neat: let modules: [String] = [\"\(result.package)\"]"))
+                print("    " + TerminalLog.subtleStdout("Package.gradient: let modules: [String] = [\"\(result.package)\"]"))
             }
         }
 

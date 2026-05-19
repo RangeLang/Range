@@ -60,20 +60,20 @@ def require_tool(name: str) -> None:
         raise SystemExit(f"Missing required tool: {name}")
 
 
-def prepare_neat_project() -> Path:
-    project = BUILD / "NeatSpeed"
+def prepare_gradient_project() -> Path:
+    project = BUILD / "GradientSpeed"
     project.mkdir(parents=True, exist_ok=True)
-    (project / "Package.neat").write_text(
+    (project / "Package.gradient").write_text(
         """#package
 construct Project {
-    let name: Title("NeatSpeed")
+    let name: Title("GradientSpeed")
     let version: Version(0.1.0)
     let author: String("George")
 }
 """,
         encoding="utf-8",
     )
-    (project / "Playground.neat").write_text(
+    (project / "Playground.gradient").write_text(
         f"""#main {{
     let n: Int = {ITERATIONS}
 
@@ -102,9 +102,9 @@ def build_targets() -> list[BenchTarget]:
 
     c_binary = BUILD / "speed-c"
     rust_binary = BUILD / "speed-rust"
-    neat_project = prepare_neat_project()
-    neat_cli = ROOT / "NeatCLI" / ".build" / "release" / "NeatCLI"
-    neat_binary = neat_project / ".neat" / "Build" / "swift" / ".build" / "release" / "NeatGenerated"
+    gradient_project = prepare_gradient_project()
+    gradient_cli = ROOT / "GradientCLI" / ".build" / "release" / "GradientCLI"
+    gradient_binary = gradient_project / ".gradient" / "Build" / "swift" / ".build" / "release" / "GradientGenerated"
 
     if not timed_setup(
         "C",
@@ -117,19 +117,19 @@ def build_targets() -> list[BenchTarget]:
     ):
         raise SystemExit("Rust setup failed")
     if not timed_setup(
-        "Neat CLI",
-        ["swift", "build", "-c", "release", "--package-path", "NeatCLI", "--product", "NeatCLI"],
+        "Gradient CLI",
+        ["swift", "build", "-c", "release", "--package-path", "GradientCLI", "--product", "GradientCLI"],
     ):
-        raise SystemExit("Neat CLI setup failed")
+        raise SystemExit("Gradient CLI setup failed")
     if not timed_setup(
-        "Neat emit",
-        [str(neat_cli), "compile", str(neat_project)],
+        "Gradient emit",
+        [str(gradient_cli), "compile", str(gradient_project)],
     ):
-        raise SystemExit("Neat emit failed")
-    neat_runtime_available = timed_setup(
-        "Neat generated Swift",
+        raise SystemExit("Gradient emit failed")
+    gradient_runtime_available = timed_setup(
+        "Gradient generated Swift",
         ["swift", "build", "-c", "release"],
-        cwd=neat_project / ".neat" / "Build" / "swift",
+        cwd=gradient_project / ".gradient" / "Build" / "swift",
     )
 
     targets = [
@@ -138,10 +138,10 @@ def build_targets() -> list[BenchTarget]:
         BenchTarget("Python", ["python3", str(BENCH / "python" / "main.py"), str(ITERATIONS)]),
     ]
 
-    if neat_runtime_available:
-        targets.append(BenchTarget("Neat", [str(neat_binary)]))
+    if gradient_runtime_available:
+        targets.append(BenchTarget("Gradient", [str(gradient_binary)]))
     else:
-        print("Neat runtime: skipped because generated Swift did not build")
+        print("Gradient runtime: skipped because generated Swift did not build")
 
     return targets
 

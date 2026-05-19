@@ -1,5 +1,5 @@
 import Foundation
-@testable import NeatCLI
+@testable import GradientCLI
 import Testing
 
 @Suite("Package publishing")
@@ -8,7 +8,7 @@ struct PackagePublisherTests {
     func patchPublishBumpsPackageVersion() throws {
         let root = try temporaryProject(version: "0.1.0")
         let published = try PackagePublisher(projectPath: root.path).publish(.patch)
-        let source = try String(contentsOf: root.appendingPathComponent("Package.neat"), encoding: .utf8)
+        let source = try String(contentsOf: root.appendingPathComponent("Package.gradient"), encoding: .utf8)
 
         #expect(published.name == "Fixture")
         #expect(published.version == "0.1.1")
@@ -31,7 +31,7 @@ struct PackagePublisherTests {
         try run("git", "init", in: root)
         try run("git", "config", "user.email", "test@example.com", in: root)
         try run("git", "config", "user.name", "Test User", in: root)
-        try run("git", "add", "Package.neat", in: root)
+        try run("git", "add", "Package.gradient", in: root)
         try run("git", "commit", "-m", "Initial package", in: root)
 
         let published = try PackagePublisher(projectPath: root.path).publish(.patch, push: false)
@@ -48,7 +48,7 @@ struct PackagePublisherTests {
 
     private func temporaryProject(version: String) throws -> URL {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("neat-package-publish-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("gradient-package-publish-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
             #package
@@ -57,7 +57,7 @@ struct PackagePublisherTests {
                 let version: Version(\(version))
                 let author: String("Test Author")
             }
-            """.write(to: root.appendingPathComponent("Package.neat"), atomically: true, encoding: .utf8)
+            """.write(to: root.appendingPathComponent("Package.gradient"), atomically: true, encoding: .utf8)
         return root
     }
 

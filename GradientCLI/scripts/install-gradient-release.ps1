@@ -1,13 +1,13 @@
 param(
     [string]$Version = "latest",
-    [string]$Repository = $(if ($env:NEAT_REPOSITORY) { $env:NEAT_REPOSITORY } else { "georgeneat/Neat" }),
-    [string]$InstallDir = $(if ($env:NEAT_INSTALL_DIR) { $env:NEAT_INSTALL_DIR } else { Join-Path $HOME ".neat\bin" })
+    [string]$Repository = $(if ($env:GRADIENT_REPOSITORY) { $env:GRADIENT_REPOSITORY } else { "georgegradient/Gradient" }),
+    [string]$InstallDir = $(if ($env:GRADIENT_INSTALL_DIR) { $env:GRADIENT_INSTALL_DIR } else { Join-Path $HOME ".gradient\bin" })
 )
 
 $ErrorActionPreference = "Stop"
 
 if ($Version -eq "-h" -or $Version -eq "--help") {
-    Write-Host "Usage: ./install-neat-release.ps1 [-Version latest|vX.Y.Z] [-Repository owner/repo] [-InstallDir path]"
+    Write-Host "Usage: ./install-gradient-release.ps1 [-Version latest|vX.Y.Z] [-Repository owner/repo] [-InstallDir path]"
     exit 0
 }
 
@@ -21,7 +21,7 @@ if ($arch -ne "x64") {
     throw "No Windows $arch release artifact is published yet."
 }
 
-$artifact = "neat-windows-$arch"
+$artifact = "gradient-windows-$arch"
 $archive = "$artifact.zip"
 if ($Version -eq "latest") {
     $url = "https://github.com/$Repository/releases/latest/download/$archive"
@@ -39,9 +39,9 @@ try {
     Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Copy-Item -Path (Join-Path $tmp "$artifact\neat.exe") -Destination (Join-Path $InstallDir "neat.exe") -Force
+    Copy-Item -Path (Join-Path $tmp "$artifact\gradient.exe") -Destination (Join-Path $InstallDir "gradient.exe") -Force
 
-    Write-Host "Installed neat to $(Join-Path $InstallDir "neat.exe")"
+    Write-Host "Installed gradient to $(Join-Path $InstallDir "gradient.exe")"
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if (($userPath -split ";") -notcontains $InstallDir) {
         Write-Host "Add this directory to your user PATH:"

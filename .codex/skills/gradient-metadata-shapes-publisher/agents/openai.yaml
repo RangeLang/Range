@@ -1,4 +1,4 @@
 interface:
-  display_name: "Neat Metadata Shapes Publisher"
+  display_name: "Gradient Metadata Shapes Publisher"
   short_description: "Keep publisher-facing metadata shapes current."
   default_prompt: "Check this publisher or metadata change against the metadata shapes note."

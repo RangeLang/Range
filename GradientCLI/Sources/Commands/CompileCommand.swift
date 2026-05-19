@@ -1,14 +1,14 @@
 import ArgumentParser
 import Foundation
-import NeatSyntax
+import GradientSyntax
 
-extension NeatCLI {
+extension GradientCLI {
     struct Compile: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Validate Neat source files and projects."
+            abstract: "Validate Gradient source files and projects."
         )
 
-        @Argument(help: "Project directory or source .neat file to validate.")
+        @Argument(help: "Project directory or source .gradient file to validate.")
         var input: String?
 
         @Argument(help: "Reserved for future target output.")

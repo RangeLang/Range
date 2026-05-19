@@ -1,11 +1,11 @@
 import ArgumentParser
-import NeatSyntax
+import GradientSyntax
 
 @main
-struct NeatCLI: ParsableCommand {
+struct GradientCLI: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "neat",
-        abstract: "Create and validate Neat language projects.",
+        commandName: "gradient",
+        abstract: "Create and validate Gradient language projects.",
         subcommands: [
             Create.self,
             Link.self,

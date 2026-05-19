@@ -4,7 +4,7 @@ extension DeclarationGraph {
     func macroExpansionContext(
         macrosByName: [String: MacroDeclaration],
         markersByName: [String: MarkerDeclaration] = [:],
-        diagnosticEngine: NeatDiagnosticEngine? = nil
+        diagnosticEngine: GradientDiagnosticEngine? = nil
     ) -> MacroExpansionContext {
         MacroExpansionContext(
             macroRealizationView: macroRealizationView(macrosByName: macrosByName),

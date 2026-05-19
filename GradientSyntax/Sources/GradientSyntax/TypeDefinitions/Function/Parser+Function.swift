@@ -1,7 +1,7 @@
 import Foundation
 
 extension Parser {
-    func localBindings(for parameters: [NeatFunctionParameter]) -> [String: LocalBindingSymbol] {
+    func localBindings(for parameters: [GradientFunctionParameter]) -> [String: LocalBindingSymbol] {
         Dictionary(
             uniqueKeysWithValues: parameters.compactMap { parameter in
                 guard let typeReference = parameter.typeReference else {
@@ -33,7 +33,7 @@ extension Parser {
 
         if case .atAttribute(let name, _) = peek(),
             name == "background",
-            peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+            peek(offset: 1) == .keyword(GradientSyntax.Keyword.function.rawValue)
         {
             throw ParseError(
                 "Named @background callables are not supported."
@@ -43,13 +43,13 @@ extension Parser {
         let attribute = parseAttributeIfPresent(before: .function)
         var targetType: TypeReference?
         if case .identifier(let target) = peek(),
-            peek(offset: 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+            peek(offset: 1) == .keyword(GradientSyntax.Keyword.function.rawValue)
         {
             targetType = .named(target)
             advance()
         }
 
-        guard peek() == .keyword(NeatSyntax.Keyword.function.rawValue) else {
+        guard peek() == .keyword(GradientSyntax.Keyword.function.rawValue) else {
             throw ParseError("Expected callable declaration starting with function.")
         }
         advance()
@@ -212,11 +212,11 @@ extension Parser {
         allowSyntaxCapture: Bool = false,
         allowOmittedLocalName: Bool = false
     ) throws
-        -> [NeatFunctionParameter]
+        -> [GradientFunctionParameter]
     {
         try consume(.leftParen)
 
-        var parameters: [NeatFunctionParameter] = []
+        var parameters: [GradientFunctionParameter] = []
         if peek() != .rightParen {
             while true {
                 let macros = try parseMacroApplicationsIfPresent()
@@ -235,7 +235,7 @@ extension Parser {
                         advance()
                         slotName = slot
                     } else {
-                        if case .keyword(NeatSyntax.Keyword.binding.rawValue) = peek() {
+                        if case .keyword(GradientSyntax.Keyword.binding.rawValue) = peek() {
                             advance()
                             isBinding = true
                         }
@@ -266,7 +266,7 @@ extension Parser {
                 }
 
                 parameters.append(
-                    NeatFunctionParameter(
+                    GradientFunctionParameter(
                         macros: macros,
                         localName: localName,
                         externalLabel: externalLabel,
@@ -375,17 +375,17 @@ extension Parser {
         }
         let attributeOffset: Int
         if case .atAttribute = peek(offset: offset),
-            peek(offset: offset + 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+            peek(offset: offset + 1) == .keyword(GradientSyntax.Keyword.function.rawValue)
         {
             attributeOffset = offset + 1
         } else {
             attributeOffset = offset
         }
-        if peek(offset: attributeOffset) == .keyword(NeatSyntax.Keyword.function.rawValue) {
+        if peek(offset: attributeOffset) == .keyword(GradientSyntax.Keyword.function.rawValue) {
             return true
         }
         if case .identifier = peek(offset: attributeOffset),
-            peek(offset: attributeOffset + 1) == .keyword(NeatSyntax.Keyword.function.rawValue)
+            peek(offset: attributeOffset + 1) == .keyword(GradientSyntax.Keyword.function.rawValue)
         {
             return true
         }
@@ -675,7 +675,7 @@ extension Parser {
         }
     }
 
-    func matches(_ lhs: [NeatFunctionParameter], _ rhs: [NeatFunctionParameter]) -> Bool {
+    func matches(_ lhs: [GradientFunctionParameter], _ rhs: [GradientFunctionParameter]) -> Bool {
         guard lhs.count == rhs.count else {
             return false
         }
@@ -691,7 +691,7 @@ extension Parser {
     func callableSignatureKeys(
         targetType: TypeReference?,
         name: String,
-        parameters: [NeatFunctionParameter]
+        parameters: [GradientFunctionParameter]
     ) -> [String] {
         signatureParameterVariants(parameters).map { variant in
             let rendered = variant.map(parameterSignatureKey).joined(separator: ",")
@@ -702,7 +702,7 @@ extension Parser {
     func renderCallableSignature(
         targetType: TypeReference?,
         name: String,
-        parameters: [NeatFunctionParameter]
+        parameters: [GradientFunctionParameter]
     ) -> String {
         let rendered = parameters.map(renderParameterSignature).joined(separator: ", ")
         if let targetType {
@@ -711,18 +711,18 @@ extension Parser {
         return "@\(name)(\(rendered))"
     }
 
-    func initializerSignatureKeys(parameters: [NeatFunctionParameter]) -> [String] {
+    func initializerSignatureKeys(parameters: [GradientFunctionParameter]) -> [String] {
         signatureParameterVariants(parameters).map { variant in
             variant.map(parameterSignatureKey).joined(separator: ",")
         }
     }
 
-    func renderInitializerSignature(parameters: [NeatFunctionParameter]) -> String {
+    func renderInitializerSignature(parameters: [GradientFunctionParameter]) -> String {
         let rendered = parameters.map(renderParameterSignature).joined(separator: ", ")
         return "init(\(rendered))"
     }
 
-    func parameterSignatureKey(_ parameter: NeatFunctionParameter) -> String {
+    func parameterSignatureKey(_ parameter: GradientFunctionParameter) -> String {
         let label = parameter.externalLabel ?? "_"
         let typeName =
             parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
@@ -730,7 +730,7 @@ extension Parser {
         return "\(label):\(typeName)"
     }
 
-    func renderParameterSignature(_ parameter: NeatFunctionParameter) -> String {
+    func renderParameterSignature(_ parameter: GradientFunctionParameter) -> String {
         let typeName =
             parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
             ?? "_"
@@ -743,12 +743,12 @@ extension Parser {
         return "_ \(parameter.localName): \(typeName)"
     }
 
-    func signatureParameterVariants(_ parameters: [NeatFunctionParameter])
-        -> [[NeatFunctionParameter]]
+    func signatureParameterVariants(_ parameters: [GradientFunctionParameter])
+        -> [[GradientFunctionParameter]]
     {
-        var variants: [[NeatFunctionParameter]] = []
+        var variants: [[GradientFunctionParameter]] = []
 
-        func build(index: Int, current: [NeatFunctionParameter]) {
+        func build(index: Int, current: [GradientFunctionParameter]) {
             if index == parameters.count {
                 variants.append(current)
                 return

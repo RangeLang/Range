@@ -5,7 +5,7 @@ Current macro surface is split into:
 - `CoreMacro`
 - `Implementations`
 
-Compiler-owned syntax surfaces now live in `NeatCore/Syntax`:
+Compiler-owned syntax surfaces now live in `GradientCore/Syntax`:
 
 - `Bodies`
 - `Statements`
@@ -16,7 +16,7 @@ Compiler-owned syntax surfaces now live in `NeatCore/Syntax`:
 `Implementations/README.md` is the index of active bootstrap macro coverage and
 the current implementation status of each macro target kind.
 
-`NeatSyntax/Sources/NeatSyntax/Macros/Macros.Context.md` documents the current
+`GradientSyntax/Sources/GradientSyntax/Macros/Macros.Context.md` documents the current
 target-surface model, including declaration-side and application-side macro
 access where needed.
 
@@ -55,7 +55,7 @@ Current function-targeted literal status:
 - Protocol init requirements are parsed and keep their carried macros.
 - Conforming initializers inherit carried init macros through conformance matching.
 - The `Function` surface models `target.declaration` and `target.application`,
-  and `literal` is written in that shape in NeatCore.
+  and `literal` is written in that shape in GradientCore.
 - Literal bridge lowering now executes through the authoritative `Function`
   declaration/application rewrite path for `literal`, with an explicit
   diagnostic if that rewrite cannot be interpreted.

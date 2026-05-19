@@ -3,7 +3,7 @@
 ## Immediate Declaration Macros
 An immediate declaration-targeted macro expands on the declaration it is directly attached to.
 
-```neat
+```gradient
 #clamped(min: 0, max: 10)
 state count: Int = 0
 ```
@@ -12,7 +12,7 @@ state count: Int = 0
 
 The same base rule applies to literal bridge functions:
 
-```neat
+```gradient
 construct Int {
     @literal<IntLiteral>
     function literal(literal: IntLiteral) -> Self { }
@@ -26,7 +26,7 @@ For `literal`, the generic argument must be a compiler-recognized literal carrie
 ## Deferred Conformance Macros
 A protocol can also carry macros targeted at declaration kinds that conform to it, such as constructs or enums.
 
-```neat
+```gradient
 #equatable
 protocol Equatable {
     function ==(lhs: Self, rhs: Self) -> Bool
@@ -45,14 +45,14 @@ For literal bridging specifically:
 - The compiler recognizes literal categories and carrier types.
 - A concrete literal function carries `@literal<T>` directly.
 - The macro model rewrites concrete use sites through the realized literal function.
-- This rewrite is part of Neat semantic correctness, not backend adaptation.
-- A semantic rewrite such as `5 -> Int.literal(literal: 5)` is the correct Neat result even if a backend later chooses a different target-specific representation.
+- This rewrite is part of Gradient semantic correctness, not backend adaptation.
+- A semantic rewrite such as `5 -> Int.literal(literal: 5)` is the correct Gradient result even if a backend later chooses a different target-specific representation.
 
 ## Backend Boundary
 
-Literal bridge realization belongs to the Neat semantic phase.
+Literal bridge realization belongs to the Gradient semantic phase.
 
-- The semantic phase decides what a literal means in Neat.
+- The semantic phase decides what a literal means in Gradient.
 - A backend phase decides how to represent that meaning in a target language such as Swift or C.
 - Backend adaptation must not replace declaration-graph literal resolution as the source of truth.
 

@@ -29,10 +29,10 @@ struct PackagePublisher {
     ) throws -> PublishedPackage {
         let packageFile = URL(fileURLWithPath: projectPath, isDirectory: true)
             .standardizedFileURL
-            .appendingPathComponent("Package.neat", isDirectory: false)
+            .appendingPathComponent("Package.gradient", isDirectory: false)
 
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.neat in \(packageFile.deletingLastPathComponent().path)")
+            throw ValidationError("Missing Package.gradient in \(packageFile.deletingLastPathComponent().path)")
         }
 
         let manifest = try PackageManifestLoader.load(from: packageFile)
@@ -80,7 +80,7 @@ struct PackagePublisher {
 
         var lines = source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         guard let openingIndex = lines.firstIndex(where: { $0.contains("{") }) else {
-            throw ValidationError("Package.neat must declare a package body.")
+            throw ValidationError("Package.gradient must declare a package body.")
         }
         lines.insert(#"    let version: Version(\#(version))"#, at: openingIndex + 1)
         return lines.joined(separator: "\n") + (source.hasSuffix("\n") ? "\n" : "")

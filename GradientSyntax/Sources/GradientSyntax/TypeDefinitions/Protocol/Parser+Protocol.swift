@@ -4,11 +4,11 @@ extension Parser {
     func isProtocolDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
         switch peek(offset: offset) {
-        case .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue):
+        case .keyword(GradientSyntax.Keyword.protocolDefinition.rawValue):
             return true
         case .atAttribute:
             return peek(offset: offset + 1)
-                == .keyword(NeatSyntax.Keyword.protocolDefinition.rawValue)
+                == .keyword(GradientSyntax.Keyword.protocolDefinition.rawValue)
         default:
             return false
         }
