@@ -18,6 +18,8 @@ construct String: ExpressibleByStringLiteral {
     function snakeCase() -> String {
         return storage.snakeCase()
     }
+
+    function apiKeyDecodedData() -> Result<Data, DecodingError>
 }
 
 extension String: Equatable {

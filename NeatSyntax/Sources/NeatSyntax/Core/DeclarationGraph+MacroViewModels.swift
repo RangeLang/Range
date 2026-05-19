@@ -25,6 +25,7 @@ enum MacroTargetKind: Hashable {
     case construct
     case enumeration
     case protocolDefinition
+    case typeExtension
     case other(String)
 }
 
@@ -73,6 +74,8 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
         return .enumeration
     case "Protocol":
         return .protocolDefinition
+    case "Extension":
+        return .typeExtension
     default:
         return .other(name)
     }
@@ -767,6 +770,13 @@ struct MacroGraphContext {
             membersByID[constructID] = members
         }
 
+        for extensionDeclaration in declarationGraph.extensionsByTargetName.values.flatMap({ $0 }) {
+            let extensionID = "extension:\(extensionDeclaration.targetType.displayName)"
+            let extensionValue = builder.value(for: extensionDeclaration)
+            declarationsByID[extensionID] = extensionValue
+            markersByID[extensionID] = Self.markerValues(from: extensionValue)
+        }
+
         self.declarationsByID = declarationsByID
         self.membersByID = membersByID
         self.markersByID = markersByID
@@ -1035,7 +1045,7 @@ extension RewriteSurfaceView {
                 return nil
             }
         case .expression, .state, .immutable, .binding, .derived, .property, .construct,
-            .enumeration, .protocolDefinition, .other:
+            .enumeration, .protocolDefinition, .typeExtension, .other:
             return nil
         }
     }

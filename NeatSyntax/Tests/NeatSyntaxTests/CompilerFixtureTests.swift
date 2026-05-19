@@ -227,6 +227,73 @@ struct CompilerFixtureTests {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
+    @Test("Extension markers evaluate against extension target")
+    func extensionMarkersEvaluateAgainstExtensionTarget() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/ExtensionMarker.neat",
+                source: """
+                marker extensionTargetName(): Extension -> String { target, diagnostics in
+                    return target.target.name
+                }
+
+                construct User {
+                    let name: String
+                }
+
+                #extensionTargetName
+                extension User {
+                    function displayName() -> String {
+                        return name
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let extensionDeclaration = try #require(
+            program.declarationGraph.extensionsByTargetName["User"]?.first
+        )
+        #expect(extensionDeclaration.macros.map(\.name) == ["extensionTargetName"])
+    }
+
+    @Test("Extension markers reject non-extension targets")
+    func extensionMarkersRejectNonExtensionTargets() throws {
+        var inputs = try neatCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/InvalidExtensionMarker.neat",
+                source: """
+                marker constructOnly(): Construct -> String { target, diagnostics in
+                    return target.declaration.self.name
+                }
+
+                construct User {
+                    let name: String
+                }
+
+                #constructOnly
+                extension User {
+                    function displayName() -> String {
+                        return name
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected construct marker on extension to fail validation.")
+        } catch {
+            #expect(String(describing: error).contains("used on an extension but targets Construct"))
+        }
+    }
+
     @Test("Parser diagnostics point at invalid hash syntax")
     func parserDiagnosticsPointAtInvalidHashSyntax() throws {
         let projectPath = "/tmp/InvalidHashMacro.neat"

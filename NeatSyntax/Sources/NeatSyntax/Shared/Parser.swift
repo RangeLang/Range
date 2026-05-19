@@ -277,7 +277,7 @@ public struct Parser {
                 continue
             }
 
-            if peek() == .keyword(NeatSyntax.Keyword.typeExtension.rawValue) {
+            if isExtensionDeclarationStart() {
                 extensions.append(try parseExtensionDeclaration())
                 continue
             }
@@ -545,7 +545,7 @@ public struct Parser {
                 continue
             }
 
-            if peek() == .keyword(NeatSyntax.Keyword.typeExtension.rawValue) {
+            if isExtensionDeclarationStart() {
                 extensions.append(try parseExtensionDeclarationForDeclarationDiscovery())
                 continue
             }

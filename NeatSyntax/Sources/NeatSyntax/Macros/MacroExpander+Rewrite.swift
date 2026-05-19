@@ -470,6 +470,52 @@ extension MacroExpander {
         }
     }
 
+    static func validateExtensionMacros(
+        extensionDeclaration: ExtensionDeclaration,
+        applications: [MacroApplication],
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) throws {
+        for application in applications {
+            guard let macro = macros[application.name] else {
+                if let marker = context.markerDeclarationsByName[application.name] {
+                    guard macroTargetKind(for: marker.target.typeReference) == .typeExtension else {
+                        throw ParseError(
+                            "Marker #\(application.name) is used on an extension but targets \(marker.target.typeReference.displayName)."
+                        )
+                    }
+                    _ = try parseMarkerArgumentBindings(
+                        for: marker,
+                        argumentClause: application.argumentClause,
+                        rawBody: application.rawBody
+                    )
+                    if marker.valueType.isMarkerEffect {
+                        continue
+                    }
+                    _ = try MacroTargetValueBuilder.evaluateMarkerValue(
+                        for: application,
+                        marker: marker,
+                        targetValue: MacroTargetValueBuilder(
+                            markerDeclarationsByName: context.markerDeclarationsByName
+                        ).targetValue(for: extensionDeclaration),
+                        context: context
+                    )
+                    continue
+                }
+                throw ParseError("Unknown attached macro @\(application.name).")
+            }
+            guard macroTargetKind(for: macro) == .typeExtension else {
+                throw ParseError(
+                    "Macro #\(application.name) is used on an extension but targets \(macro.target!.typeReference.displayName)."
+                )
+            }
+            try emitMacroDiagnostics(from: macro.body, macro: macro, context: context)
+            if !macroOperationExpressions(in: macro.body).isEmpty {
+                _ = try resolvedRewriteCalls(for: macro, context: context)
+            }
+        }
+    }
+
     static func applyAttachedParameterTypeRewrite(
         macro: MacroDeclaration,
         to typeReference: TypeReference,

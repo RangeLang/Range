@@ -79,6 +79,9 @@ extension MacroExpander {
                 + module.protocols.map {
                     try emittedDeclarations(from: $0, macros: macros, context: context)
                 }
+            let expandedExtensions = try module.extensions.map {
+                try expand(extensionDeclaration: $0, macros: macros, context: context)
+            }
             return .module(
                 ModuleFileNode(
                     mainBlock: try module.mainBlock.map {
@@ -123,7 +126,7 @@ extension MacroExpander {
                     markers: module.markers,
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
-                    extensions: module.extensions + emittedDeclarationBundles.flatMap(\.extensions)
+                    extensions: expandedExtensions + emittedDeclarationBundles.flatMap(\.extensions)
                 )
             )
         case .construct(let declaration):
@@ -217,9 +220,30 @@ extension MacroExpander {
                     extensions: emittedBundle.extensions
                 )
             )
-        case .namespace, .macro, .marker, .extensions:
+        case .extensions(let declarations):
+            return .extensions(
+                try declarations.map {
+                    try expand(extensionDeclaration: $0, macros: macros, context: context)
+                }
+            )
+        case .namespace, .macro, .marker:
             return sourceFile
         }
+    }
+
+    static func expand(
+        extensionDeclaration: ExtensionDeclaration,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) throws -> ExtensionDeclaration {
+        try validateExtensionMacros(
+            extensionDeclaration: extensionDeclaration,
+            applications: extensionDeclaration.macros,
+            macros: macros,
+            context: context
+        )
+
+        return extensionDeclaration
     }
 
     static func expand(

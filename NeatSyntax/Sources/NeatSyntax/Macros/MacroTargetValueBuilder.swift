@@ -8,7 +8,7 @@ struct MacroTargetValueBuilder {
     }
 
     func targetValue(for construct: ConstructDeclaration) -> CompileTimeValue {
-        .object(
+        return .object(
             typeName: "Construct",
             fields: [
                 "identity": graphIdentity(kind: "construct", name: construct.name),
@@ -18,7 +18,7 @@ struct MacroTargetValueBuilder {
     }
 
     func targetValue(for enumeration: EnumDeclaration) -> CompileTimeValue {
-        .object(
+        return .object(
             typeName: "Enum",
             fields: [
                 "identity": graphIdentity(kind: "enum", name: enumeration.name),
@@ -36,7 +36,7 @@ struct MacroTargetValueBuilder {
     }
 
     func targetValue(for protocolDeclaration: ProtocolDeclaration) -> CompileTimeValue {
-        .object(
+        return .object(
             typeName: "Protocol",
             fields: [
                 "identity": graphIdentity(kind: "protocol", name: protocolDeclaration.name),
@@ -50,6 +50,74 @@ struct MacroTargetValueBuilder {
                         "functions": .array(protocolDeclaration.callables.map(value(for:))),
                     ]
                 )
+            ]
+        )
+    }
+
+    func targetValue(for extensionDeclaration: ExtensionDeclaration) -> CompileTimeValue {
+        let target = typeReferenceValue(extensionDeclaration.targetType)
+        let declaration = value(for: extensionDeclaration)
+        let protocols = extensionDeclaration.protocols.map {
+            graphIdentity(kind: "protocol", name: $0.name)
+        }
+        let initializers = extensionDeclaration.initializers.map { value(for: $0) }
+        let functions = extensionDeclaration.callables.map { value(for: $0) }
+        let constructs = extensionDeclaration.constructs.map {
+            graphIdentity(kind: "construct", name: $0.name)
+        }
+        let enumerations = extensionDeclaration.enumerations.map {
+            graphIdentity(kind: "enum", name: $0.name)
+        }
+
+        return .object(
+            typeName: "Extension",
+            fields: [
+                "identity": graphIdentity(
+                    kind: "extension",
+                    name: extensionDeclaration.targetType.displayName
+                ),
+                "target": target,
+                "declaration": declaration,
+                "markers": .array(markerValues(for: extensionDeclaration.macros)),
+                "protocols": .array(protocols),
+                "inits": .array(initializers),
+                "functions": .array(functions),
+                "constructs": .array(constructs),
+                "enums": .array(enumerations),
+            ]
+        )
+    }
+
+    func value(for declaration: ExtensionDeclaration) -> CompileTimeValue {
+        let target = typeReferenceValue(declaration.targetType)
+        let conformances = declaration.conformances.map(typeReferenceValue)
+        let protocols = declaration.protocols.map {
+            graphIdentity(kind: "protocol", name: $0.name)
+        }
+        let initializers = declaration.initializers.map { value(for: $0) }
+        let functions = declaration.callables.map { value(for: $0) }
+        let constructs = declaration.constructs.map {
+            graphIdentity(kind: "construct", name: $0.name)
+        }
+        let enumerations = declaration.enumerations.map {
+            graphIdentity(kind: "enum", name: $0.name)
+        }
+
+        return .object(
+            typeName: "Extension.Declaration",
+            fields: [
+                "identity": graphIdentity(
+                    kind: "extension",
+                    name: declaration.targetType.displayName
+                ),
+                "target": target,
+                "conformances": .array(conformances),
+                "markers": .array(markerValues(for: declaration.macros)),
+                "protocols": .array(protocols),
+                "inits": .array(initializers),
+                "functions": .array(functions),
+                "constructs": .array(constructs),
+                "enums": .array(enumerations),
             ]
         )
     }

@@ -1,6 +1,11 @@
 import Foundation
 
 extension Parser {
+    func isExtensionDeclarationStart() -> Bool {
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        return peek(offset: offset) == .keyword(NeatSyntax.Keyword.typeExtension.rawValue)
+    }
+
     mutating func parseExtensionDeclaration() throws -> ExtensionDeclaration {
         let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.typeExtension)

@@ -577,6 +577,30 @@ struct SwiftBackendEmitter {
                     return result
                 }
 
+                func __neatAPIKeyDecodedData() -> Neat_Result<Data, Neat_DecodingError> {
+                    var value = self
+                        .replacingOccurrences(of: "-", with: "+")
+                        .replacingOccurrences(of: "_", with: "/")
+                    let padding = (4 - value.count % 4) % 4
+                    if padding > 0 {
+                        value += String(repeating: "=", count: padding)
+                    }
+
+                    guard let data = Data(base64Encoded: value) else {
+                        return .failure(cause: .failed)
+                    }
+
+                    return .success(result: data)
+                }
+            }
+
+            extension Data {
+                func __neatAPIKeyEncodedString() -> String {
+                    base64EncodedString()
+                        .replacingOccurrences(of: "+", with: "-")
+                        .replacingOccurrences(of: "/", with: "_")
+                        .replacingOccurrences(of: "=", with: "")
+                }
             }
 
             struct __NeatDateOnly: Hashable, Comparable, CustomStringConvertible, Sendable {
@@ -2764,6 +2788,12 @@ struct SwiftBackendEmitter {
         case "snakeCase":
             guard arguments.isEmpty else { return nil }
             return "\(base).__neatSnakeCase()"
+        case "apiKeyDecodedData":
+            guard arguments.isEmpty else { return nil }
+            return "\(base).__neatAPIKeyDecodedData()"
+        case "apiKeyEncodedString":
+            guard arguments.isEmpty else { return nil }
+            return "\(base).__neatAPIKeyEncodedString()"
         case "map", "compactMap", "flatMap", "forEach":
             guard let transform = unlabeledArgument() else { return nil }
             return "\(base).\(member)(\(try emitExpression(transform, scope: scope)))"
