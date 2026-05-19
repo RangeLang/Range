@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-PRODUCT_NAME="GradientCLI"
-TARGET_NAME="gradient"
+PRODUCT_NAME="RangeCLI"
+TARGET_NAME="range"
 
 MODE="auto"
 ACTION="install"
@@ -130,7 +130,7 @@ fi
 INSTALL_DIR="$(choose_install_dir)"
 
 if [[ -d "${INSTALL_DIR}" ]]; then
-  if [[ "${FULLY}" -ne 1 && ( -f "${INSTALL_DIR}/Package.gradient" || -f "${INSTALL_DIR}/App.gradient" || -d "${INSTALL_DIR}/.gradient" ) ]]; then
+  if [[ "${FULLY}" -ne 1 && ( -f "${INSTALL_DIR}/Package.range" || -f "${INSTALL_DIR}/App.range" || -d "${INSTALL_DIR}/.range" ) ]]; then
     echo "Refusing to install '${TARGET_NAME}' into project directory: ${INSTALL_DIR}"
     echo "Choose a bin directory like /opt/homebrew/bin, /usr/local/bin, or ${LOCAL_BIN}."
     echo "Pass --fully to override."

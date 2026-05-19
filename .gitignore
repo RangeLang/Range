@@ -11,7 +11,7 @@ DerivedData/
 
 .swiftpm/
 .build-local/
-GradientCLI/dist/
+RangeCLI/dist/
 .zed/
-.gradient/
-Zed/Gradient/
+.range/
+Zed/Range/

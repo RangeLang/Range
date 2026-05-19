@@ -1,8 +1,8 @@
 import ArgumentParser
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
-enum GradientCoreLoader {
+enum RangeCoreLoader {
     static func coreRoot() throws -> URL {
         let candidates = coreRootCandidates()
         for candidate in candidates {
@@ -15,13 +15,13 @@ enum GradientCoreLoader {
         }
 
         throw ValidationError(
-            "Missing GradientCore sources. Checked: \(candidates.map(\.path).joined(separator: ", "))"
+            "Missing RangeCore sources. Checked: \(candidates.map(\.path).joined(separator: ", "))"
         )
     }
 
     private static func coreRootCandidates() -> [URL] {
         let environment = ProcessInfo.processInfo.environment
-        let explicitPath = environment["GRADIENT_CORE_PATH"].map {
+        let explicitPath = environment["RANGE_CORE_PATH"].map {
             URL(fileURLWithPath: $0, isDirectory: true)
         }
 
@@ -29,20 +29,20 @@ enum GradientCoreLoader {
         let executableDirectory = executableURL.deletingLastPathComponent()
         let installShareRoot = executableDirectory
             .deletingLastPathComponent()
-            .appendingPathComponent("share/gradient/GradientCore", isDirectory: true)
+            .appendingPathComponent("share/range/RangeCore", isDirectory: true)
 
         let sourceRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("GradientCore", isDirectory: true)
+            .appendingPathComponent("RangeCore", isDirectory: true)
 
         return [explicitPath, installShareRoot, sourceRoot].compactMap(\.self)
     }
 
     private static func installedExecutableURL() -> URL {
-        let executable = CommandLine.arguments.first ?? "gradient"
+        let executable = CommandLine.arguments.first ?? "range"
         if executable.contains("/") {
             return URL(fileURLWithPath: executable).standardizedFileURL
         }
@@ -91,7 +91,7 @@ enum GradientCoreLoader {
                 options: [.skipsHiddenFiles]
             )
         else {
-            throw ValidationError("Could not inspect GradientCore sources at \(coreRoot.path)")
+            throw ValidationError("Could not inspect RangeCore sources at \(coreRoot.path)")
         }
 
         var files: [URL] = []
@@ -99,12 +99,12 @@ enum GradientCoreLoader {
             let isDirectory =
                 (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             if isDirectory, fileURL.lastPathComponent == "Exploration",
-                fileURL.path.contains("/GradientCore/")
+                fileURL.path.contains("/RangeCore/")
             {
                 enumerator.skipDescendants()
                 continue
             }
-            guard !isDirectory, fileURL.pathExtension.lowercased() == "gradient" else {
+            guard !isDirectory, fileURL.pathExtension.lowercased() == "range" else {
                 continue
             }
             files.append(fileURL)
@@ -123,7 +123,7 @@ enum GradientCoreLoader {
                 )
             } catch {
                 throw ValidationError(
-                    "Failed to read GradientCore file \(fileURL.lastPathComponent): \(ErrorDescription.message(for: error))"
+                    "Failed to read RangeCore file \(fileURL.lastPathComponent): \(ErrorDescription.message(for: error))"
                 )
             }
         }

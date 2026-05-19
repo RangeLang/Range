@@ -1,18 +1,18 @@
 import ArgumentParser
-import GradientSyntax
+import RangeSyntax
 
-extension GradientCLI {
+extension RangeCLI {
     struct Update: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Update the Gradient CLI or project modules."
+            abstract: "Update the Range CLI or project modules."
         )
 
-        @Argument(help: "Project directory. When omitted, updates the Gradient CLI.")
+        @Argument(help: "Project directory. When omitted, updates the Range CLI.")
         var path: String?
 
         @Flag(
             name: .customLong("self"),
-            help: "Also update the Gradient CLI after updating project modules."
+            help: "Also update the Range CLI after updating project modules."
         )
         var updateSelf: Bool = false
 

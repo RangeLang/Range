@@ -1,7 +1,7 @@
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
-struct GradientLanguageServer {
+struct RangeLanguageServer {
     private var documents: [String: DocumentState] = [:]
     private var navigationIndexesByDocumentURI: [String: NavigationIndexCacheEntry] = [:]
     private var navigationIndexGeneration = 0
@@ -57,7 +57,7 @@ struct GradientLanguageServer {
                         ],
                     ],
                     "serverInfo": [
-                        "name": "gradient-lsp",
+                        "name": "range-lsp",
                         "version": "0.2.0",
                     ],
                 ]
@@ -342,27 +342,27 @@ struct GradientLanguageServer {
     private func hoverDescription(for symbol: Symbol) -> String {
         switch symbol.kind {
         case .attribute:
-            return "Gradient callable sigil"
+            return "Range callable sigil"
         case .macro:
-            return "Gradient macro"
+            return "Range macro"
         case .declaration:
-            return "Gradient declaration"
+            return "Range declaration"
         case .callable:
-            return "Gradient callable"
+            return "Range callable"
         case .variable:
-            return "Gradient variable"
+            return "Range variable"
         case .state:
-            return "Gradient state property"
+            return "Range state property"
         case .styleModifier:
-            return "Gradient style modifier"
+            return "Range style modifier"
         case .typeExtension:
-            return "Gradient type extension"
+            return "Range type extension"
         case .view:
-            return "Gradient built-in view"
+            return "Range built-in view"
         case .modifier:
-            return "Gradient modifier"
+            return "Range modifier"
         case .keyword:
-            return "Gradient language keyword"
+            return "Range language keyword"
         }
     }
 
@@ -399,7 +399,7 @@ struct GradientLanguageServer {
         } catch {
             return [
                 lspDiagnostic(
-                    from: GradientDiagnosticConverter.diagnostic(from: error),
+                    from: RangeDiagnosticConverter.diagnostic(from: error),
                     index: index
                 )
             ]
@@ -420,7 +420,7 @@ struct GradientLanguageServer {
         return fileURL.standardizedFileURL.path
     }
 
-    private func diagnosticAppliesToDocument(_ diagnostic: GradientDiagnostic, uri: String) -> Bool {
+    private func diagnosticAppliesToDocument(_ diagnostic: RangeDiagnostic, uri: String) -> Bool {
         guard let path = diagnostic.path,
             let fileURL = URL(string: uri),
             fileURL.isFileURL
@@ -432,7 +432,7 @@ struct GradientLanguageServer {
     }
 
     private func lspDiagnostic(
-        from diagnostic: GradientDiagnostic,
+        from diagnostic: RangeDiagnostic,
         index: DocumentIndex
     ) -> [String: Any] {
         let range = lspRange(for: diagnostic, fallback: index.firstNonWhitespaceRange ?? index.fullDocumentRange)
@@ -448,7 +448,7 @@ struct GradientLanguageServer {
         return payload
     }
 
-    private func lspRange(for diagnostic: GradientDiagnostic, fallback: RangePosition) -> RangePosition {
+    private func lspRange(for diagnostic: RangeDiagnostic, fallback: RangePosition) -> RangePosition {
         guard let range = diagnostic.range else {
             return fallback
         }
@@ -458,7 +458,7 @@ struct GradientLanguageServer {
         )
     }
 
-    private func lspSeverity(for severity: GradientDiagnosticSeverity) -> Int {
+    private func lspSeverity(for severity: RangeDiagnosticSeverity) -> Int {
         switch severity {
         case .error:
             return 1
@@ -526,19 +526,19 @@ struct GradientLanguageServer {
             let fileURL = URL(string: uri),
             fileURL.isFileURL
         else {
-            return uniqueSourceInputs(try GradientCoreLoader.sourceInputs() + [
+            return uniqueSourceInputs(try RangeCoreLoader.sourceInputs() + [
                 SourceInput(path: uri, source: text, role: .project)
             ])
         }
 
         let standardizedFileURL = fileURL.standardizedFileURL
         let openedFileRole: SourceInputRole =
-            (try? GradientCoreLoader.isCoreFile(standardizedFileURL)) == true ? .core : .project
+            (try? RangeCoreLoader.isCoreFile(standardizedFileURL)) == true ? .core : .project
         let loadedProject: LoadedProject
         do {
             loadedProject = try ProjectLoader.load(at: standardizedFileURL.path)
         } catch {
-            return uniqueSourceInputs(try GradientCoreLoader.sourceInputs() + [
+            return uniqueSourceInputs(try RangeCoreLoader.sourceInputs() + [
                 SourceInput(path: standardizedFileURL.path, source: text, role: openedFileRole)
             ])
         }
@@ -839,7 +839,7 @@ struct GradientLanguageServer {
     }
 
     private func debugLog(_ message: String) {
-        let path = "/tmp/gradient-lsp-debug.log"
+        let path = "/tmp/range-lsp-debug.log"
         let line = "[\(ISO8601DateFormatter().string(from: Date()))] \(message)\n"
         if let data = line.data(using: .utf8) {
             if FileManager.default.fileExists(atPath: path) {
@@ -2183,10 +2183,10 @@ private struct DocumentIndex {
     }
 }
 
-// Semantic highlighting in Gradient should stay semantic-first and editor-agnostic.
+// Semantic highlighting in Range should stay semantic-first and editor-agnostic.
 // Keep this taxonomy intentionally small and prefer standard LSP token types
 // plus modifiers before adding custom distinctions. See:
-// Zed/Gradient/docs/SemanticHighlightingPlan.md
+// Zed/Range/docs/SemanticHighlightingPlan.md
 enum SemanticTokenType: String, CaseIterable {
     case type
     case function
@@ -2247,7 +2247,7 @@ struct DefinitionSnapshot: Equatable {
     let name: String
 }
 
-extension GradientLanguageServer {
+extension RangeLanguageServer {
     static func debugFormattedDocument(_ text: String) -> String {
         formatDocument(text)
     }
@@ -2278,16 +2278,16 @@ extension GradientLanguageServer {
         supportDocuments: [(uri: String, text: String)] = []
     ) -> DefinitionSnapshot? {
         let primary = DocumentState(
-            uri: "file:///Primary.gradient",
+            uri: "file:///Primary.range",
             text: text,
-            index: DocumentIndex(text: text, uri: "file:///Primary.gradient"),
+            index: DocumentIndex(text: text, uri: "file:///Primary.range"),
             diagnostics: []
         )
         let position = Position(line: line, character: character)
         let inputs = supportDocuments.map { document in
             SourceInput(path: URL(string: document.uri)?.path ?? document.uri, source: document.text, role: .core)
         } + [
-            SourceInput(path: "/Primary.gradient", source: text, role: .project)
+            SourceInput(path: "/Primary.range", source: text, role: .project)
         ]
 
         guard
@@ -2341,7 +2341,7 @@ private enum DefaultLibrarySymbols {
         patterns: [String],
         transform: (([String]) -> String)? = nil
     ) -> Set<String> {
-        guard let inputs = try? GradientCoreLoader.sourceInputs() else { return [] }
+        guard let inputs = try? RangeCoreLoader.sourceInputs() else { return [] }
 
         var result: Set<String> = []
         for input in inputs where input.role == .core {

@@ -37,8 +37,8 @@ public struct DeclarationRegistryView {
     private let derivedsByConstructName: [String: [DerivedDeclaration]]
     private let valuesByConstructName: [String: [ValueDeclaration]]
     private let initializersByConstructName: [String: [InitializerDeclaration]]
-    private let parametersByCallableIdentity: [String: [GradientFunctionParameter]]
-    private let parametersByInitializerIdentity: [String: [GradientFunctionParameter]]
+    private let parametersByCallableIdentity: [String: [RangeFunctionParameter]]
+    private let parametersByInitializerIdentity: [String: [RangeFunctionParameter]]
     private let callablesByName: [String: [CallableDeclaration]]
 
     public init(
@@ -53,8 +53,8 @@ public struct DeclarationRegistryView {
         derivedsByConstructName: [String: [DerivedDeclaration]],
         valuesByConstructName: [String: [ValueDeclaration]],
         initializersByConstructName: [String: [InitializerDeclaration]],
-        parametersByCallableIdentity: [String: [GradientFunctionParameter]],
-        parametersByInitializerIdentity: [String: [GradientFunctionParameter]],
+        parametersByCallableIdentity: [String: [RangeFunctionParameter]],
+        parametersByInitializerIdentity: [String: [RangeFunctionParameter]],
         callablesByName: [String: [CallableDeclaration]]
     ) {
         self.protocolsByName = protocolsByName
@@ -145,7 +145,7 @@ public struct DeclarationRegistryView {
     public func parameters(
         ofCallable declaration: CallableDeclaration,
         ownerName: String?
-    ) -> [GradientFunctionParameter] {
+    ) -> [RangeFunctionParameter] {
         parametersByCallableIdentity[
             callableIdentity(ownerName: ownerName, declaration: declaration),
             default: []
@@ -155,7 +155,7 @@ public struct DeclarationRegistryView {
     public func parameters(
         ofInitializer declaration: InitializerDeclaration,
         constructName: String
-    ) -> [GradientFunctionParameter] {
+    ) -> [RangeFunctionParameter] {
         parametersByInitializerIdentity[
             initializerIdentity(constructName: constructName, declaration: declaration),
             default: []

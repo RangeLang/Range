@@ -1309,10 +1309,10 @@ extension MacroExpander {
     }
 
     static func expand(
-        parameters: [GradientFunctionParameter],
+        parameters: [RangeFunctionParameter],
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
-    ) throws -> [GradientFunctionParameter] {
+    ) throws -> [RangeFunctionParameter] {
         try parameters.map { parameter in
             let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
                 macroApplication in
@@ -1335,7 +1335,7 @@ extension MacroExpander {
                 try applyAttachedParameterTypeRewrite(macro: macro, to: currentType, context: context)
             }
 
-            return GradientFunctionParameter(
+            return RangeFunctionParameter(
                 macros: parameter.macros,
                 localName: parameter.localName,
                 externalLabel: parameter.externalLabel,
@@ -1874,8 +1874,8 @@ extension MacroExpander {
         graphBinding: String?,
         context: MacroExpansionContext,
         localBindings: [String: Expression]
-    ) throws -> [GradientDiagnostic] {
-        var diagnostics: [GradientDiagnostic] = []
+    ) throws -> [RangeDiagnostic] {
+        var diagnostics: [RangeDiagnostic] = []
         var locals = localBindings
 
         for statement in statements {
@@ -2009,7 +2009,7 @@ extension MacroExpander {
         graphBinding: String?,
         context: MacroExpansionContext,
         localBindings: [String: Expression]
-    ) throws -> GradientDiagnostic? {
+    ) throws -> RangeDiagnostic? {
         guard case .call(let name, let arguments) = expression,
             isMacroDiagnosticsCall(expression, diagnosticsBinding: diagnosticsBinding)
         else {
@@ -2034,31 +2034,31 @@ extension MacroExpander {
 
         switch name {
         case "\(diagnosticsBinding).error":
-            return GradientDiagnostic(
+            return RangeDiagnostic(
                 severity: .error,
                 message: message,
-                source: "gradient-macro",
+                source: "range-macro",
                 code: "macro.diagnostic.error"
             )
         case "\(diagnosticsBinding).warning":
-            return GradientDiagnostic(
+            return RangeDiagnostic(
                 severity: .warning,
                 message: message,
-                source: "gradient-macro",
+                source: "range-macro",
                 code: "macro.diagnostic.warning"
             )
         case "\(diagnosticsBinding).information", "\(diagnosticsBinding).note":
-            return GradientDiagnostic(
+            return RangeDiagnostic(
                 severity: .information,
                 message: message,
-                source: "gradient-macro",
+                source: "range-macro",
                 code: "macro.diagnostic.information"
             )
         case "\(diagnosticsBinding).hint":
-            return GradientDiagnostic(
+            return RangeDiagnostic(
                 severity: .hint,
                 message: message,
-                source: "gradient-macro",
+                source: "range-macro",
                 code: "macro.diagnostic.hint"
             )
         default:
@@ -2378,7 +2378,7 @@ extension MacroExpander {
         }
         context.diagnosticEngine?.warning(
             "Spliced Identifier is used as a member-access base. This chain is checked after macro expansion.",
-            source: "gradient-macro-expander",
+            source: "range-macro-expander",
             code: "macro.identifier-member-splice",
             path: context.currentPath
         )

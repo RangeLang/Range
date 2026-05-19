@@ -1,11 +1,11 @@
 import ArgumentParser
-import GradientSyntax
+import RangeSyntax
 
 @main
-struct GradientCLI: ParsableCommand {
+struct RangeCLI: ParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "gradient",
-        abstract: "Create and validate Gradient language projects.",
+        commandName: "range",
+        abstract: "Create and validate Range language projects.",
         subcommands: [
             Create.self,
             Link.self,

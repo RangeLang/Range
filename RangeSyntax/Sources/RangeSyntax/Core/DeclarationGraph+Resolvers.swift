@@ -1089,7 +1089,7 @@ public struct DeclarationMemberResolver: Sendable {
     }
 
     private static func memberCallableParameters(
-        _ parameters: [GradientFunctionParameter],
+        _ parameters: [RangeFunctionParameter],
         using nestedTypeMap: [String: TypeReference]
     ) -> [MemberCallableParameter] {
         parameters.map { parameter in

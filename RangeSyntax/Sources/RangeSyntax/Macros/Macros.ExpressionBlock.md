@@ -8,24 +8,24 @@ Expression-targeted and block-targeted macros are syntax rewrites invoked direct
 
 - Come in expression and block forms
 
-```gradient
+```range
 macro stringify(value _: capture Expression): Expression -> String { }
 macro lock(): Block { }
 ```
 
 - Are declared by direct target type
 
-```gradient
+```range
 macro stringify(value _: capture Expression): Expression -> String { }
 ```
 
-```gradient
+```range
 macro lock(): Block { }
 ```
 
 - Use `#` at the call site
 
-```gradient
+```range
 #lock {
     work()
 }
@@ -33,7 +33,7 @@ macro lock(): Block { }
 
 - Can rewrite expressions
 
-```gradient
+```range
 macro stringify(value _: capture Expression): Expression -> String { }
 
 #stringify(1 + 2)
@@ -41,7 +41,7 @@ macro stringify(value _: capture Expression): Expression -> String { }
 
 - Can rewrite blocks
 
-```gradient
+```range
 macro lock(): Block { }
 
 #lock {
@@ -51,7 +51,7 @@ macro lock(): Block { }
 
 - Operate on syntax rather than resolved types
 
-```gradient
+```range
 macro stringify(value _: capture Expression): Expression -> String { target, diagnostics in
     target.rewrite("\(value)")
 }
@@ -59,7 +59,7 @@ macro stringify(value _: capture Expression): Expression -> String { target, dia
 
 - Receive syntax context
 
-```gradient
+```range
 macro lock(): Block { target, diagnostics in
     target.rewrite({
         target()
@@ -67,7 +67,7 @@ macro lock(): Block { target, diagnostics in
 }
 ```
 
-```gradient
+```range
 macro stringify(value _: capture Expression): Expression -> String { target, diagnostics in
     target.rewrite("\(value)")
 }
@@ -75,14 +75,14 @@ macro stringify(value _: capture Expression): Expression -> String { target, dia
 
 - Produce the same kind of syntax they rewrite
 
-```gradient
+```range
 Expression -> expression
 Block      -> block
 ```
 
 - Do not depend on graph or type information
 
-```gradient
+```range
 macro lock(): Block { target, diagnostics in
     target.rewrite({
         target()

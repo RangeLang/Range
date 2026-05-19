@@ -1,9 +1,9 @@
 ---
-name: gradient-typed-construction-metadata
+name: range-typed-construction-metadata
 description: Use when changing typed construction syntax such as `let version: Version(0.1.8)`, binding/property initialization, graph initializer shape, assignment vs declaration metadata, parser diagnostics, backend lowering, or docs about construction metadata. Use the embedded direction in this skill to catch stale syntax or model drift.
 ---
 
-# Gradient Typed Construction Metadata
+# Range Typed Construction Metadata
 
 ## Workflow
 
@@ -15,7 +15,7 @@ description: Use when changing typed construction syntax such as `let version: V
 
 ## Shape Bias
 
-```gradient
+```range
 let version: Version(0.1.8)
 ```
 

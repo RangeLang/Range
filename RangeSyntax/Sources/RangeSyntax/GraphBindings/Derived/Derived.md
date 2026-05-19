@@ -8,13 +8,13 @@ A derived is a computed graph binding.
 
 - Declares computed, non-stored data
 
-```gradient
+```range
 derived fullName: String
 ```
 
 - Can be defined from other graph bindings
 
-```gradient
+```range
 derived fullName: String {
     return firstName + " " + lastName
 }
@@ -22,7 +22,7 @@ derived fullName: String {
 
 - Does not own storage
 
-```gradient
+```range
 derived isEmpty: Bool {
     return count == 0
 }
@@ -32,7 +32,7 @@ derived isEmpty: Bool {
 
 - Changes when its inputs change
 
-```gradient
+```range
 construct Counter {
     state count: Int = 0
 

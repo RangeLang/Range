@@ -3,17 +3,17 @@
 import PackageDescription
 
 let package = Package(
-    name: "GradientSyntax",
+    name: "RangeSyntax",
     platforms: [
         .macOS(.v13)
     ],
     products: [
-        .library(name: "GradientSyntax", targets: ["GradientSyntax"])
+        .library(name: "RangeSyntax", targets: ["RangeSyntax"])
     ],
     targets: [
         .target(
-            name: "GradientSyntax",
-            path: "Sources/GradientSyntax",
+            name: "RangeSyntax",
+            path: "Sources/RangeSyntax",
             exclude: [
                 "TypeDefinitions/Construct/Construct.Identity.md",
                 "TypeDefinitions/Construct/Construct.Initialization.md",
@@ -44,9 +44,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "GradientSyntaxTests",
-            dependencies: ["GradientSyntax"],
-            path: "Tests/GradientSyntaxTests"
+            name: "RangeSyntaxTests",
+            dependencies: ["RangeSyntax"],
+            path: "Tests/RangeSyntaxTests"
         )
     ]
 )

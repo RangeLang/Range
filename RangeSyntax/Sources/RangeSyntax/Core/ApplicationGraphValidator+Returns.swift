@@ -647,7 +647,7 @@ extension ApplicationGraphValidator {
         return "@\(callable.name)(\(rendered))"
     }
 
-    func renderParameterSignature(_ parameter: GradientFunctionParameter) -> String {
+    func renderParameterSignature(_ parameter: RangeFunctionParameter) -> String {
         let typeName =
             parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
             ?? "_"

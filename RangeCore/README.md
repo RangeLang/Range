@@ -1,19 +1,19 @@
-# GradientCore
+# RangeCore
 
-`GradientCore` is Gradient's bootstrap foundation.
+`RangeCore` is Range's bootstrap foundation.
 
-The language implementation is currently hosted by Swift, but Gradient's foundational data types and protocols are defined here as ordinary `.gradient` source instead of being baked into the compiler as ad hoc builtins.
+The language implementation is currently hosted by Swift, but Range's foundational data types and protocols are defined here as ordinary `.range` source instead of being baked into the compiler as ad hoc builtins.
 
 This keeps the boundary clear:
 
 - The compiler owns parsing, semantic analysis, lowering, runtime machinery, and a small set of bootstrap hooks.
-- `GradientCore` owns the everyday foundational surface that Gradient programs should see as language-native library definitions.
+- `RangeCore` owns the everyday foundational surface that Range programs should see as language-native library definitions.
 
 ## Purpose
 
-`GradientCore` exists so the compiler does not have to hardcode Gradient's basic data model.
+`RangeCore` exists so the compiler does not have to hardcode Range's basic data model.
 
-That means types such as `Int`, `String`, `Bool`, `Optional`, `Array`, `Dictionary`, and `Set`, along with foundational protocols such as `Equatable`, `Hashable`, and `Comparable`, live in Gradient source and are loaded through the normal compiler pipeline.
+That means types such as `Int`, `String`, `Bool`, `Optional`, `Array`, `Dictionary`, and `Set`, along with foundational protocols such as `Equatable`, `Hashable`, and `Comparable`, live in Range source and are loaded through the normal compiler pipeline.
 
 If the compiler has special knowledge of one of these types, that knowledge should be treated as bootstrap or lowering behavior, not as evidence that the type is intrinsically built into the language.
 
@@ -37,7 +37,7 @@ These definitions are intentionally minimal. They describe the language-facing m
 
 The intended language-owned home for explicit operator and precedence declarations.
 
-This is where Gradient's operator model is being documented as it moves out of compiler bootstrap logic and toward source-defined language rules.
+This is where Range's operator model is being documented as it moves out of compiler bootstrap logic and toward source-defined language rules.
 
 ### `Macros/Exploration`
 
@@ -49,21 +49,21 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 
 - `construct` is the normal identity-bearing modeling form.
 - `#language construct` is compiler-recognized, non-identity-bearing, and intended for plain structural/bootstrap data.
-- Members inside a `#language construct` may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how semantic boundary types such as `ArrayStorage`, `DictionaryStorage`, `SetStorage`, and scalar storage types describe operations whose implementation is not written in Gradient yet.
-- Top-level `#language function` declarations may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how primitive operator signatures can live in `GradientCore` without recursively implementing themselves in Gradient.
+- Members inside a `#language construct` may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how semantic boundary types such as `ArrayStorage`, `DictionaryStorage`, `SetStorage`, and scalar storage types describe operations whose implementation is not written in Range yet.
+- Top-level `#language function` declarations may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how primitive operator signatures can live in `RangeCore` without recursively implementing themselves in Range.
 - `#language protocol` declarations define compiler-recognized semantic categories. `#language` does not cascade through protocol conformance; each language declaration must be explicitly marked.
 - The memory graph is foundational and always generated.
 - Reactivity is an optional exposed layer derived from the memory graph, not a separate base system.
 - Literal bridging is defined by `@literal<T>` on a concrete `literal(literal: T)` function, where `T` is a compiler-recognized literal carrier type.
 - The compiler recognizes the literal carrier types themselves, such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, and `SetLiteral`.
 - Everything beyond carrier recognition is modeled as literal bridge macro behavior on concrete literal functions.
-- Language-facing wrapper types increasingly use dedicated `...Storage` members as the semantic representation boundary. This keeps wrapper semantics in `GradientCore` while leaving backend/runtime realization free to evolve behind those storage types.
+- Language-facing wrapper types increasingly use dedicated `...Storage` members as the semantic representation boundary. This keeps wrapper semantics in `RangeCore` while leaving backend/runtime realization free to evolve behind those storage types.
 - Type sugar and literal sugar are still separate concerns. For example, `@literal<NilLiteral>` is part of the core surface, while `T? -> Optional<T>` remains compiler type sugar.
-- Literal meaning is settled on the Gradient side before any target backend runs. A semantic result such as `Int(literal: 5)` belongs to Gradient correctness even if a backend later lowers it to a target-native form.
+- Literal meaning is settled on the Range side before any target backend runs. A semantic result such as `Int(literal: 5)` belongs to Range correctness even if a backend later lowers it to a target-native form.
 
 ## Current Limits
 
-`GradientCore` is still an early foundation layer. In particular:
+`RangeCore` is still an early foundation layer. In particular:
 
 - Collection storage/lowering is not complete yet.
 - Scalar and collection `...Storage` types are still semantic boundary types rather than fully realized runtime/storage implementations.
@@ -74,21 +74,21 @@ This directory is intentionally excluded from normal core loading. It is a stagi
 
 ## Loading Model
 
-`GradientCore` is loaded by `GradientCLI` through the same Swift-based compiler pipeline used for other Gradient source. The point is not to eliminate the compiler's bootstrap role, but to keep that role narrow and explicit.
+`RangeCore` is loaded by `RangeCLI` through the same Swift-based compiler pipeline used for other Range source. The point is not to eliminate the compiler's bootstrap role, but to keep that role narrow and explicit.
 
-In short: Swift hosts the compiler today, but Gradient's basic world should increasingly be described in Gradient.
+In short: Swift hosts the compiler today, but Range's basic world should increasingly be described in Range.
 
 ## Boundary Note
 
 Swift may define compiler implementation types such as parser enums, lowering state, backend structures, and other internal machinery.
 
-Gradient should define the language-visible type world.
+Range should define the language-visible type world.
 
 More precisely:
 
-- Gradient and `GradientCore` define language semantics.
+- Range and `RangeCore` define language semantics.
 - A backend such as Swift may adapt those settled semantics to a target representation.
 - Target adaptation must not become the source of truth for language meaning.
 - Wrapper types such as `Int`, `String`, `Array`, `Dictionary`, and `Set` may delegate representation concerns to `...Storage` types without giving up their role as the semantic source of truth.
 
-That means foundational language types and protocols such as `Int`, `String`, `Bool`, `Float`, `Data`, `Optional`, `Array`, `Dictionary`, `Set`, `Equatable`, `Hashable`, and `Comparable` belong in `GradientCore`, not as the real source of truth inside Swift compiler enums.
+That means foundational language types and protocols such as `Int`, `String`, `Bool`, `Float`, `Data`, `Optional`, `Array`, `Dictionary`, `Set`, `Equatable`, `Hashable`, and `Comparable` belong in `RangeCore`, not as the real source of truth inside Swift compiler enums.

@@ -1,9 +1,9 @@
 import Foundation
-@testable import GradientCLI
+@testable import RangeCLI
 import Testing
 
-@Suite("Gradient LSP semantic tokens")
-struct GradientLanguageServerSemanticTokenTests {
+@Suite("Range LSP semantic tokens")
+struct RangeLanguageServerSemanticTokenTests {
     @Test("Type declarations and usages are split semantically")
     func typeDeclarationsAndUsagesSplit() {
         let source = """
@@ -16,7 +16,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "#main", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "Something", type: .type, modifiers: [.declaration]))
@@ -51,7 +51,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsToken(tokens, text: "identity", type: .function, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "number", type: .variable, modifiers: [.declaration]))
@@ -74,7 +74,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "number", type: .method, modifiers: []))
         #expect(!containsToken(tokens, text: "number", type: .parameter, modifiers: [.declaration]))
@@ -92,7 +92,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "ArrayTypeReference", type: .type, modifiers: []))
         #expect(containsExactToken(tokens, text: "element", type: .type, modifiers: [.application]))
@@ -112,7 +112,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsToken(tokens, text: "load", type: .function, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "task", type: .parameter, modifiers: [.declaration]))
@@ -127,7 +127,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "function", type: .keyword, modifiers: []))
         #expect(containsExactToken(tokens, text: "<", type: .function, modifiers: [.declaration]))
@@ -150,7 +150,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: [.declaration]))
         #expect(!containsExactToken(tokens, text: "error", type: .variable, modifiers: [.argument]))
@@ -167,7 +167,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
         let highlightedParameterReferences = tokens.filter { token in
             token.line == 2
                 && (token.text == "min" || token.text == "max")
@@ -194,11 +194,11 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let definition = GradientLanguageServer.debugDefinitionSnapshot(
+        let definition = RangeLanguageServer.debugDefinitionSnapshot(
             in: source,
             line: 2,
             character: 20,
-            supportDocuments: [(uri: "file:///Let.gradient", text: support)]
+            supportDocuments: [(uri: "file:///Let.range", text: support)]
         )
 
         #expect(definition == nil)
@@ -216,14 +216,14 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let definition = GradientLanguageServer.debugDefinitionSnapshot(
+        let definition = RangeLanguageServer.debugDefinitionSnapshot(
             in: source,
             line: 1,
             character: 17,
-            supportDocuments: [(uri: "file:///Bool.gradient", text: support)]
+            supportDocuments: [(uri: "file:///Bool.range", text: support)]
         )
 
-        #expect(definition?.uri == "file:///Bool.gradient")
+        #expect(definition?.uri == "file:///Bool.range")
         #expect(definition?.name == "Bool")
     }
 
@@ -235,7 +235,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "forKey", type: .label, modifiers: [.declaration]))
         #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
@@ -255,7 +255,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "to", type: .label, modifiers: [.declaration]))
         #expect(!containsExactToken(tokens, text: "encoder", type: .parameter, modifiers: [.declaration]))
@@ -270,7 +270,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
         #expect(!containsExactToken(tokens, text: "strategy", type: .parameter, modifiers: [.declaration]))
@@ -288,7 +288,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsToken(tokens, text: "@variadic", type: .macro, modifiers: []))
         #expect(containsToken(tokens, text: "@stringify", type: .macro, modifiers: []))
@@ -302,7 +302,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """#
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
         let interpolationIdentifierHasSemanticToken = tokens.contains(where: { token in
             token.line == 1
                 && token.text == "value"
@@ -321,7 +321,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "marker", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "codingKey", type: .macro, modifiers: [.declaration]))
@@ -337,7 +337,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "nil", type: .keyword, modifiers: []))
     }
@@ -350,7 +350,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "failed", type: .enumMember, modifiers: [.declaration]))
     }
@@ -379,7 +379,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "namespace", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "Styling", type: .type, modifiers: [.declaration]))
@@ -402,7 +402,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let tokens = GradientLanguageServer.debugSemanticTokenSnapshots(in: source)
+        let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
         #expect(containsExactToken(tokens, text: "send", type: .method, modifiers: []))
         #expect(containsExactToken(tokens, text: "receive", type: .method, modifiers: []))
@@ -424,7 +424,7 @@ struct GradientLanguageServerSemanticTokenTests {
         }
         """
 
-        let formatted = GradientLanguageServer.debugFormattedDocument(source)
+        let formatted = RangeLanguageServer.debugFormattedDocument(source)
 
         #expect(formatted == """
         #package

@@ -18,7 +18,7 @@ struct Lexer {
     mutating func tokenize() throws -> [LexedToken] {
         var tokens: [LexedToken] = []
 
-        func emit(_ token: Token, start: GradientSourceLocation) {
+        func emit(_ token: Token, start: RangeSourceLocation) {
             tokens.append(LexedToken(token: token, range: range(from: start)))
         }
 
@@ -34,7 +34,7 @@ struct Lexer {
                 advance()
                 if match("/") {
                     throw ParseError(
-                        "Line comments are not Gradient syntax. Use a marker such as #description { ... } for source notes.",
+                        "Line comments are not Range syntax. Use a marker such as #description { ... } for source notes.",
                         range: range(from: start)
                     )
                 } else {
@@ -183,7 +183,7 @@ struct Lexer {
                     emit(try readNumberLiteral(start: start), start: start)
                 } else if character.isLetter || character == "_" {
                     let identifier = readIdentifier()
-                    if GradientSyntax.keywordIdentifiers.contains(identifier) {
+                    if RangeSyntax.keywordIdentifiers.contains(identifier) {
                         emit(.keyword(identifier), start: start)
                     } else {
                         emit(.identifier(identifier), start: start)
@@ -195,7 +195,7 @@ struct Lexer {
         }
 
         let eof = currentLocation()
-        tokens.append(LexedToken(token: .eof, range: GradientSourceRange(start: eof, end: eof)))
+        tokens.append(LexedToken(token: .eof, range: RangeSourceRange(start: eof, end: eof)))
         return tokens
     }
 
@@ -218,12 +218,12 @@ struct Lexer {
         return value
     }
 
-    private func currentLocation() -> GradientSourceLocation {
-        GradientSourceLocation(line: line, character: character)
+    private func currentLocation() -> RangeSourceLocation {
+        RangeSourceLocation(line: line, character: character)
     }
 
-    private func range(from start: GradientSourceLocation) -> GradientSourceRange {
-        GradientSourceRange(start: start, end: currentLocation())
+    private func range(from start: RangeSourceLocation) -> RangeSourceRange {
+        RangeSourceRange(start: start, end: currentLocation())
     }
 
     private mutating func match(_ expected: Character) -> Bool {
@@ -246,7 +246,7 @@ struct Lexer {
         return String(characters[start..<index])
     }
 
-    private mutating func readEscapedIdentifier(start: GradientSourceLocation) throws -> String {
+    private mutating func readEscapedIdentifier(start: RangeSourceLocation) throws -> String {
         advance()
         guard let next = peek(), next.isLetter || next == "_" else {
             throw ParseError("Expected identifier after `.", range: range(from: start))
@@ -261,7 +261,7 @@ struct Lexer {
         return identifier
     }
 
-    private mutating func readSigilIdentifier(start: GradientSourceLocation) throws -> String {
+    private mutating func readSigilIdentifier(start: RangeSourceLocation) throws -> String {
         advance()
         guard let next = peek() else {
             throw ParseError("Expected identifier after @.", range: range(from: start))
@@ -275,7 +275,7 @@ struct Lexer {
         return readIdentifier()
     }
 
-    private mutating func readHashIdentifier(start: GradientSourceLocation) throws -> String {
+    private mutating func readHashIdentifier(start: RangeSourceLocation) throws -> String {
         advance()
         guard let next = peek() else {
             throw ParseError("Expected identifier after #.", range: range(from: start))
@@ -289,7 +289,7 @@ struct Lexer {
         return readIdentifier()
     }
 
-    private mutating func readInteger(start: GradientSourceLocation) throws -> Int {
+    private mutating func readInteger(start: RangeSourceLocation) throws -> Int {
         let digitStart = index
         while let character = peek(), character.isNumber {
             advance()
@@ -301,7 +301,7 @@ struct Lexer {
         return integer
     }
 
-    private mutating func readNumberLiteral(start: GradientSourceLocation) throws -> Token {
+    private mutating func readNumberLiteral(start: RangeSourceLocation) throws -> Token {
         let integerPart = try readInteger(start: start)
 
         guard let character = peek(), character == ".", let next = peek(offset: 1), next.isNumber
@@ -340,7 +340,7 @@ struct Lexer {
         return characters[position]
     }
 
-    private mutating func readString(start: GradientSourceLocation) throws -> String {
+    private mutating func readString(start: RangeSourceLocation) throws -> String {
         advance()
         var result = ""
         var interpolationDepth = 0
@@ -384,7 +384,7 @@ struct Lexer {
         throw ParseError("Unterminated string literal.", range: range(from: start))
     }
 
-    private mutating func readInterpolatedStringLiteral(start: GradientSourceLocation) throws -> String {
+    private mutating func readInterpolatedStringLiteral(start: RangeSourceLocation) throws -> String {
         var result = "\""
         advance()
 
@@ -408,7 +408,7 @@ struct Lexer {
         throw ParseError("Unterminated string literal inside interpolation.", range: range(from: start))
     }
 
-    private mutating func readForeignBodyBlock(language: String, start: GradientSourceLocation) throws -> String {
+    private mutating func readForeignBodyBlock(language: String, start: RangeSourceLocation) throws -> String {
         var result = ""
 
         if peek() == "\n" {

@@ -19,7 +19,7 @@ The current model is:
 
 The core protocol shape is now non-generic:
 
-```gradient
+```range
 protocol Encoder {
     function keyedContainer() -> KeyedEncodingContainer
     function unkeyedContainer() -> UnkeyedEncodingContainer
@@ -46,7 +46,7 @@ protocol Codable: Encodable, Decodable {
 
 Keyed containers use string keys:
 
-```gradient
+```range
 protocol KeyedEncodingContainer {
     function encode<T: Encodable>(_ value: T, forKey key: String) -> Result<Void, EncodingError>
 }
@@ -62,7 +62,7 @@ There is no remaining runtime/protocol dependency on `CodingKey`, `CodingKeys`, 
 
 Markers are now a first-class declaration kind:
 
-```gradient
+```range
 marker codingKey<T>(_ value: String): Let<T> -> String {
     return value
 }
@@ -70,7 +70,7 @@ marker codingKey<T>(_ value: String): Let<T> -> String {
 
 The important shape is:
 
-```gradient
+```range
 construct Marker: Syntax {
     construct Declaration: Syntax {
         let identifier: Identifier
@@ -88,7 +88,7 @@ construct Marker: Syntax {
 
 Marker applications are exposed generically through syntax target values. For stored lets:
 
-```gradient
+```range
 construct Let<T>: Property, SyntaxEmittable {
     let macros: [Macro.Application]
     let markers: [Marker.Application]
@@ -100,7 +100,7 @@ construct Let<T>: Property, SyntaxEmittable {
 
 That means parent macros inspect metadata in a normal collection-oriented way:
 
-```gradient
+```range
 let codingKeyMarkers: [Marker.Application] = property.markers.filter { application in
     application.identifier.name == "codingKey"
 }
@@ -122,7 +122,7 @@ Marker #badKey evaluated value does not match String.
 
 Property names moved from raw `String` use toward explicit syntax values:
 
-```gradient
+```range
 construct Identifier: SyntaxEmittable {
     let name: String
 }
@@ -130,7 +130,7 @@ construct Identifier: SyntaxEmittable {
 
 Stored properties now expose `property.identifier`, and macros use:
 
-```gradient
+```range
 property.identifier
 property.identifier.name
 ```
@@ -142,12 +142,12 @@ This distinguishes a name-as-syntax from a string value. It also lets syntax-pro
 The current Codable implementation is in:
 
 ```text
-GradientCore/Macros/Implementations/Codable.gradient
+RangeCore/Macros/Implementations/Codable.range
 ```
 
 The user-facing shape is:
 
-```gradient
+```range
 #codable(.snakeCase)
 construct User {
     let userId: Int
@@ -157,7 +157,7 @@ construct User {
 
 or:
 
-```gradient
+```range
 #codable(.snakeCase)
 construct User {
     #codingKey("id")
@@ -167,7 +167,7 @@ construct User {
 
 `#codable` currently accepts an unlabeled strategy parameter:
 
-```gradient
+```range
 macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
     ...
 }
@@ -175,7 +175,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
 
 Supported strategy enum:
 
-```gradient
+```range
 enum CodingKeyStrategy {
     case identity
     case snakeCase
@@ -194,7 +194,7 @@ The macro emits an extension with `encode(to:)` and `init(from:)`, using sequent
 
 Freestanding macros can now produce syntax values directly:
 
-```gradient
+```range
 macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: String) -> Switch {
     switch container.encode(#(value), forKey: key) {
     case .success:
@@ -207,7 +207,7 @@ macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: 
 
 And are invoked from another macro expansion:
 
-```gradient
+```range
 #(target.declaration.lets.map { property in
     #encodeProperty(
         container: container,
@@ -217,7 +217,7 @@ And are invoked from another macro expansion:
 })
 ```
 
-This is the current answer to the repeated-statement problem. Instead of hand-building `Switch(...)` trees everywhere, a macro can write normal Gradient switch syntax and return `Switch`.
+This is the current answer to the repeated-statement problem. Instead of hand-building `Switch(...)` trees everywhere, a macro can write normal Range switch syntax and return `Switch`.
 
 Important behavior:
 
@@ -237,7 +237,7 @@ Syntax-producing macros validate that identifiers in the template come from:
 
 This intentionally catches cases like:
 
-```gradient
+```range
 macro invalidEncodeSwitch(value: Identifier, key: String) -> Switch {
     switch container.encode(#(value), forKey: #(key)) {
     ...
@@ -247,7 +247,7 @@ macro invalidEncodeSwitch(value: Identifier, key: String) -> Switch {
 
 because `container` is not a parameter or local binding. The accepted shape is:
 
-```gradient
+```range
 macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: String) -> Switch {
     switch container.encode(#(value), forKey: key) {
     ...
@@ -267,7 +267,7 @@ This warning is emitted by the compiler diagnostics channel, not by user macro `
 
 Macro diagnostics now mirror language diagnostic severities:
 
-```gradient
+```range
 construct MacroDiagnostics {
     function error(_ message: String)
     function warning(_ message: String)
@@ -282,7 +282,7 @@ These are for user-authored macro diagnostics. Compiler/system warnings, such as
 
 `SyntaxOmittable` was added as the planned surface for macros that remove syntax:
 
-```gradient
+```range
 protocol SyntaxOmittable {
     function omit()
 }
@@ -295,7 +295,7 @@ This is present as core surface, but the larger conditional-compilation / `#if` 
 The compiler now has structured diagnostic severity:
 
 ```swift
-public enum GradientDiagnosticSeverity: Sendable {
+public enum RangeDiagnosticSeverity: Sendable {
     case error
     case warning
     case information
@@ -309,25 +309,25 @@ The goal is for compiler diagnostics, macro diagnostics, LSP diagnostics, and fi
 
 Important pass fixtures:
 
-- `GradientCompilerFixtures/CompilePass/Macros/CodableMacroSynthesis.gradient`
-- `GradientCompilerFixtures/CompilePass/Macros/SyntaxProducingMacroSwitch.gradient`
-- `GradientCompilerFixtures/CompilePass/Macros/SyntaxProducingMacroIdentifierMemberAccess.gradient`
-- `GradientCompilerFixtures/CompilePass/Macros/LetMacroApplicationsSurface.gradient`
-- `GradientCompilerFixtures/CompilePass/Macros/MacroDiagnosticsWarning.gradient`
+- `RangeCompilerFixtures/CompilePass/Macros/CodableMacroSynthesis.range`
+- `RangeCompilerFixtures/CompilePass/Macros/SyntaxProducingMacroSwitch.range`
+- `RangeCompilerFixtures/CompilePass/Macros/SyntaxProducingMacroIdentifierMemberAccess.range`
+- `RangeCompilerFixtures/CompilePass/Macros/LetMacroApplicationsSurface.range`
+- `RangeCompilerFixtures/CompilePass/Macros/MacroDiagnosticsWarning.range`
 
 Important fail fixtures:
 
-- `GradientCompilerFixtures/CompileFail/Macros/MarkerValueTypeMismatch.gradient`
-- `GradientCompilerFixtures/CompileFail/Macros/SyntaxProducingMacroUnknownTemplateIdentifier.gradient`
-- `GradientCompilerFixtures/CompileFail/Macros/MacroRequiresArgumentLabel.gradient`
-- `GradientCompilerFixtures/CompileFail/Macros/CaptureRequiresSyntaxType.gradient`
-- `GradientCompilerFixtures/CompileFail/Macros/SyntaxParameterRequiresCapture.gradient`
+- `RangeCompilerFixtures/CompileFail/Macros/MarkerValueTypeMismatch.range`
+- `RangeCompilerFixtures/CompileFail/Macros/SyntaxProducingMacroUnknownTemplateIdentifier.range`
+- `RangeCompilerFixtures/CompileFail/Macros/MacroRequiresArgumentLabel.range`
+- `RangeCompilerFixtures/CompileFail/Macros/CaptureRequiresSyntaxType.range`
+- `RangeCompilerFixtures/CompileFail/Macros/SyntaxParameterRequiresCapture.range`
 
 There is also an absence assertion in the compiler fixture tests to ensure `#codable` no longer emits `CodingKeys`.
 
 ## Remaining Rough Edges
 
-- `Marker.Application` is generic in the Gradient surface, but the macro target builder currently stores marker application values in a compile-time object. Parent macros usually filter by `application.identifier.name` and then assume the expected value type.
+- `Marker.Application` is generic in the Range surface, but the macro target builder currently stores marker application values in a compile-time object. Parent macros usually filter by `application.identifier.name` and then assume the expected value type.
 - Marker value checking is primitive-type based today. Rich marker values can be designed later.
 - Syntax-producing macro rendering is still a renderer/parser loop, not a fully uniform structural syntax builder for every declaration/statement/expression kind.
 - `#(...)` splicing is supported, but the more ambitious `# { ... }` syntax block shape has not been implemented.

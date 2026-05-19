@@ -1,9 +1,9 @@
 ---
-name: gradient-update-post
-description: Create very short Gradient update, addition, or feature posts with a concept title, compact example shape, and short design-oriented reason. Use when asked to turn Gradient syntax, compiler, graph, editor, tooling, docs, or product-design changes into compact Markdown update notes instead of long articles.
+name: range-update-post
+description: Create very short Range update, addition, or feature posts with a concept title, compact example shape, and short design-oriented reason. Use when asked to turn Range syntax, compiler, graph, editor, tooling, docs, or product-design changes into compact Markdown update notes instead of long articles.
 ---
 
-# Gradient Update Post
+# Range Update Post
 
 ## Workflow
 
@@ -11,7 +11,7 @@ description: Create very short Gradient update, addition, or feature posts with 
 2. Choose a concept title, not an action title.
 3. Keep the post short. Prefer one title, one sentence of context, one compact example section, and a compact reason.
 4. Write to a user-named destination; if none is given, return the Markdown draft in the response.
-5. Use the user's first-person Gradient developer voice only when needed, but avoid filler like "to me because".
+5. Use the user's first-person Range developer voice only when needed, but avoid filler like "to me because".
 6. Explain what repetition, awkwardness, or unclear shape was removed, and what the new shape makes easier to see.
 7. Avoid speculative sections such as `Open Questions`, `Questions`, or `Unresolved`.
 
@@ -26,13 +26,13 @@ Short intro sentence.
 
 ## Before
 
-```gradient
+```range
 old shape
 ```
 
 ## After
 
-```gradient
+```range
 new shape
 ```
 
@@ -50,7 +50,7 @@ Short intro sentence.
 
 ## Addition
 
-```gradient
+```range
 new shape
 ```
 
@@ -72,7 +72,7 @@ Short description of the capability.
 
 ## Example
 
-```gradient
+```range
 example shape
 ```
 
@@ -85,7 +85,7 @@ Section names may change only when the user asks for a different format. Keep th
 
 ## Voice
 
-Write like a concise update note from the Gradient developer:
+Write like a concise update note from the Range developer:
 
 - short paragraphs
 - direct technical claims
@@ -111,7 +111,7 @@ Good explanation lines sound like:
 ## Constraints
 
 - Keep most posts under 500 words unless the user asks for more.
-- Use fenced `gradient` blocks for Gradient code.
+- Use fenced `range` blocks for Range code.
 - Use plain text blocks for graph sketches.
 - Use Markdown quote blocks for quoted reasons.
 - Do not call a first-class language concept "sugar" unless the update is specifically about surface syntax.

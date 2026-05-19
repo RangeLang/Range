@@ -1,5 +1,5 @@
 import Foundation
-@testable import GradientCLI
+@testable import RangeCLI
 import Testing
 
 @Suite("Package search")
@@ -18,7 +18,7 @@ struct PackageSearcherTests {
             uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") }
         )
 
-        #expect(items["q"] == "ui components gradient package in:name,description,readme")
+        #expect(items["q"] == "ui components range package in:name,description,readme")
         #expect(items["sort"] == "stars")
         #expect(items["order"] == "desc")
         #expect(items["per_page"] == "50")
@@ -30,10 +30,10 @@ struct PackageSearcherTests {
         {
           "items": [
             {
-              "full_name": "gradient/example-package",
-              "description": "Example Gradient package",
+              "full_name": "range/example-package",
+              "description": "Example Range package",
               "stargazers_count": 42,
-              "html_url": "https://github.com/gradient/example-package",
+              "html_url": "https://github.com/range/example-package",
               "default_branch": "main",
               "pushed_at": "2026-05-01T00:00:00Z"
             }
@@ -45,11 +45,11 @@ struct PackageSearcherTests {
 
         #expect(results == [
             PackageSearchResult(
-                package: "gradient/example-package",
-                description: "Example Gradient package",
+                package: "range/example-package",
+                description: "Example Range package",
                 stars: 42,
-                url: URL(string: "https://github.com/gradient/example-package")!,
-                manifestURL: URL(string: "https://raw.githubusercontent.com/gradient/example-package/main/Package.gradient")!,
+                url: URL(string: "https://github.com/range/example-package")!,
+                manifestURL: URL(string: "https://raw.githubusercontent.com/range/example-package/main/Package.range")!,
                 pushedAt: "2026-05-01T00:00:00Z"
             )
         ])

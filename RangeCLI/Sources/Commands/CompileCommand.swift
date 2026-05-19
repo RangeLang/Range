@@ -1,14 +1,14 @@
 import ArgumentParser
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
-extension GradientCLI {
+extension RangeCLI {
     struct Compile: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Validate Gradient source files and projects."
+            abstract: "Validate Range source files and projects."
         )
 
-        @Argument(help: "Project directory or source .gradient file to validate.")
+        @Argument(help: "Project directory or source .range file to validate.")
         var input: String?
 
         @Argument(help: "Reserved for future target output.")

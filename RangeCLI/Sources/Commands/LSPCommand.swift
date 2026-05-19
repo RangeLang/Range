@@ -1,15 +1,15 @@
 import ArgumentParser
-import GradientSyntax
+import RangeSyntax
 
-extension GradientCLI {
+extension RangeCLI {
     struct LSP: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Run the Gradient language server over stdio."
+            abstract: "Run the Range language server over stdio."
         )
 
         mutating func run() throws {
             do {
-                var server = GradientLanguageServer()
+                var server = RangeLanguageServer()
                 try server.run()
             } catch {
                 ErrorPresenter.printError(error)

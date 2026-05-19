@@ -28,7 +28,7 @@ extension Parser {
 
     func isValueDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        guard peek(offset: offset) == .keyword(GradientSyntax.Keyword.let.rawValue) else {
+        guard peek(offset: offset) == .keyword(RangeSyntax.Keyword.let.rawValue) else {
             return false
         }
         guard tokenCanStartDeclarationName(peek(offset: offset + 1)) else { return false }

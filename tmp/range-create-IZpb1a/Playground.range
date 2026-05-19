@@ -1,6 +1,6 @@
 @main
 {
-  print("Gradient program playground")
+  print("Range program playground")
 
   let values = [1, 2, 3]
   var total = 0

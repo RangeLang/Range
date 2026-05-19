@@ -78,7 +78,7 @@ public struct CompilerPipeline {
 
     public func build(
         inputs: [SourceInput],
-        diagnosticEngine: GradientDiagnosticEngine? = nil
+        diagnosticEngine: RangeDiagnosticEngine? = nil
     ) throws -> CompiledProgram {
         let orderedInputs = inputs.sorted { lhs, rhs in
             if lhs.role != rhs.role {
@@ -183,20 +183,20 @@ public struct CompilerPipeline {
 
     public func buildValidated(
         inputs: [SourceInput],
-        diagnosticEngine: GradientDiagnosticEngine? = nil
+        diagnosticEngine: RangeDiagnosticEngine? = nil
     ) throws -> CompiledProgram {
         let program = try build(inputs: inputs, diagnosticEngine: diagnosticEngine)
         try CompiledProgramValidator().validate(program)
         return program
     }
 
-    public func diagnostics(inputs: [SourceInput], fallbackPath: String? = nil) -> [GradientDiagnostic] {
-        let diagnosticEngine = GradientDiagnosticEngine()
+    public func diagnostics(inputs: [SourceInput], fallbackPath: String? = nil) -> [RangeDiagnostic] {
+        let diagnosticEngine = RangeDiagnosticEngine()
         do {
             _ = try buildValidated(inputs: inputs, diagnosticEngine: diagnosticEngine)
         } catch {
             diagnosticEngine.emit(
-                GradientDiagnosticConverter.diagnostic(
+                RangeDiagnosticConverter.diagnostic(
                     from: error,
                     path: fallbackPath ?? inputs.first(where: { $0.role == .project })?.path
                 )

@@ -1,39 +1,39 @@
 ---
-name: gradient-onboarding
-description: Use when helping a user get started with an installed Gradient macOS package, explain where Gradient installs shared resources, set up a Package.gradient project, link or install project-local Gradient CLI versions, create .gradient/.scripts entries, update Gradient from GitHub releases, or troubleshoot first-run Gradient CLI usage.
+name: range-onboarding
+description: Use when helping a user get started with an installed Range macOS package, explain where Range installs shared resources, set up a Package.range project, link or install project-local Range CLI versions, create .range/.scripts entries, update Range from GitHub releases, or troubleshoot first-run Range CLI usage.
 ---
 
-# Gradient Onboarding
+# Range Onboarding
 
-Use this skill for first-run setup, package installation questions, and project-local workflow questions after Gradient is installed.
+Use this skill for first-run setup, package installation questions, and project-local workflow questions after Range is installed.
 
 ## Installed Layout
 
-The macOS package installs shared Gradient resources under the selected prefix:
+The macOS package installs shared Range resources under the selected prefix:
 
 ```text
-<prefix>/bin/gradient
-<prefix>/share/gradient/GradientCore
-<prefix>/share/gradient/Skills
+<prefix>/bin/range
+<prefix>/share/range/RangeCore
+<prefix>/share/range/Skills
 ```
 
-The shell installer default prefix is `~/.gradient`, so the CLI is normally:
+The shell installer default prefix is `~/.range`, so the CLI is normally:
 
 ```text
-$HOME/.gradient/bin/gradient
-$HOME/.gradient/Packages
+$HOME/.range/bin/range
+$HOME/.range/Packages
 ```
 
 Downloaded machine packages live under:
 
 ```text
-$HOME/.gradient/Packages
+$HOME/.range/Packages
 ```
 
 The `.lang.tar.gz` installer can use another writable prefix:
 
 ```sh
-GRADIENT_INSTALL_PREFIX="$HOME/.gradient" ./install.sh
+RANGE_INSTALL_PREFIX="$HOME/.range" ./install.sh
 ```
 
 ## First Checks
@@ -41,55 +41,55 @@ GRADIENT_INSTALL_PREFIX="$HOME/.gradient" ./install.sh
 Run:
 
 ```sh
-gradient version
-gradient --help
+range version
+range --help
 ```
 
-If `gradient` is not found, check whether the install prefix's `bin` directory is on `PATH`.
+If `range` is not found, check whether the install prefix's `bin` directory is on `PATH`.
 
 ## Project Setup
 
 Create a project:
 
 ```sh
-gradient create MyProject
+range create MyProject
 ```
 
-Existing projects are recognized by `Package.gradient` at the project root.
+Existing projects are recognized by `Package.range` at the project root.
 
 ## Project-Local CLI
 
-Install the current macOS Gradient CLI into a package root:
+Install the current macOS Range CLI into a package root:
 
 ```sh
-gradient link .
+range link .
 ```
 
 This stores versioned CLI copies inside the project workspace:
 
 ```text
-.gradient/GradientCLI/<version>/bin/gradient
-.gradient/bin/gradient
-.gradient/Links/gradient.package-link.json
+.range/RangeCLI/<version>/bin/range
+.range/bin/range
+.range/Links/range.package-link.json
 ```
 
-Different CLI versions can coexist under `.gradient/GradientCLI`. The `.gradient/bin/gradient` path points to the selected project-local version.
+Different CLI versions can coexist under `.range/RangeCLI`. The `.range/bin/range` path points to the selected project-local version.
 
 ## Project Scripts
 
 Project scripts live under:
 
 ```text
-.gradient/.scripts
+.range/.scripts
 ```
 
 Use:
 
 ```sh
-gradient scripts create build
-gradient scripts save deploy --content '#main { Logger.info("deploy") }'
-gradient scripts save deploy --from ./deploy.gradient --force
-gradient scripts list
+range scripts create build
+range scripts save deploy --content '#main { Logger.info("deploy") }'
+range scripts save deploy --from ./deploy.range --force
+range scripts list
 ```
 
 ## Updates
@@ -97,20 +97,20 @@ gradient scripts list
 Update the installed CLI from the latest GitHub release:
 
 ```sh
-gradient update
+range update
 ```
 
 Update project modules:
 
 ```sh
-gradient update .
+range update .
 ```
 
-Use `gradient version` to see the installed version and whether an update is available.
+Use `range version` to see the installed version and whether an update is available.
 
 ## Troubleshooting
 
-- If `gradient update` prompts for a destination, prefer a writable prefix rather than adding random privilege prompts.
-- If `GradientCore` is missing, inspect `<prefix>/share/gradient/GradientCore`.
-- If bundled skills are missing, inspect `<prefix>/share/gradient/Skills`.
-- If project-local commands feel stale, rerun `gradient link .` from the project root after updating Gradient.
+- If `range update` prompts for a destination, prefer a writable prefix rather than adding random privilege prompts.
+- If `RangeCore` is missing, inspect `<prefix>/share/range/RangeCore`.
+- If bundled skills are missing, inspect `<prefix>/share/range/Skills`.
+- If project-local commands feel stale, rerun `range link .` from the project root after updating Range.

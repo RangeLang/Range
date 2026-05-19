@@ -2,15 +2,15 @@ import Foundation
 
 extension Parser {
     func isPrecedenceGroupDeclarationStart() -> Bool {
-        peek() == .keyword(GradientSyntax.Keyword.precedencegroup.rawValue)
+        peek() == .keyword(RangeSyntax.Keyword.precedencegroup.rawValue)
     }
 
     func isOperatorDeclarationStart() -> Bool {
         switch peek() {
-        case .keyword(GradientSyntax.Keyword.infix.rawValue),
-            .keyword(GradientSyntax.Keyword.prefix.rawValue),
-            .keyword(GradientSyntax.Keyword.postfix.rawValue):
-            return peek(offset: 1) == .keyword(GradientSyntax.Keyword.operatorKeyword.rawValue)
+        case .keyword(RangeSyntax.Keyword.infix.rawValue),
+            .keyword(RangeSyntax.Keyword.prefix.rawValue),
+            .keyword(RangeSyntax.Keyword.postfix.rawValue):
+            return peek(offset: 1) == .keyword(RangeSyntax.Keyword.operatorKeyword.rawValue)
         default:
             return false
         }
@@ -90,11 +90,11 @@ extension Parser {
     mutating func parseOperatorDeclaration(requiresEOF: Bool = true) throws -> OperatorDeclaration {
         let fixity: OperatorFixity
         switch peek() {
-        case .keyword(GradientSyntax.Keyword.prefix.rawValue):
+        case .keyword(RangeSyntax.Keyword.prefix.rawValue):
             fixity = .prefix
-        case .keyword(GradientSyntax.Keyword.infix.rawValue):
+        case .keyword(RangeSyntax.Keyword.infix.rawValue):
             fixity = .infix
-        case .keyword(GradientSyntax.Keyword.postfix.rawValue):
+        case .keyword(RangeSyntax.Keyword.postfix.rawValue):
             fixity = .postfix
         default:
             throw ParseError("Expected operator declaration.")

@@ -1,101 +1,101 @@
 AST:
-  ▿ GradientSyntax.SourceFileNode.module
-    ▿ module: GradientSyntax.ModuleFileNode
-      ▿ mainBlock: Optional(GradientSyntax.MainBlockNode(body: [GradientSyntax.Statement.declaration(kind: GradientSyntax.LocalBindingKind.mutable, name: "person", typeName: Optional("Person"), expression: GradientSyntax.Expression.call(name: "Person", arguments: [GradientSyntax.CallArgument(label: Optional("name"), value: GradientSyntax.Expression.string("George")), GradientSyntax.CallArgument(label: Optional("age"), value: GradientSyntax.Expression.integer(26))])), GradientSyntax.Statement.compoundAssignment(target: GradientSyntax.AssignmentTarget.member(base: GradientSyntax.AssignmentTarget.local("person"), name: "age"), operatorSymbol: GradientSyntax.CompoundOperator.plusEquals, expression: GradientSyntax.Expression.integer(1)), GradientSyntax.Statement.derived(name: "personString", typeName: "String", body: [GradientSyntax.Statement.expression(GradientSyntax.Expression.interpolatedString(GradientSyntax.InterpolatedString(segments: [GradientSyntax.StringSegment.text("Person: "), GradientSyntax.StringSegment.expression(GradientSyntax.Expression.identifier("person.name")), GradientSyntax.StringSegment.text(", Age: "), GradientSyntax.StringSegment.expression(GradientSyntax.Expression.identifier("person.age"))])))]), GradientSyntax.Statement.declaration(kind: GradientSyntax.LocalBindingKind.mutable, name: "user", typeName: Optional("User"), expression: GradientSyntax.Expression.call(name: "User", arguments: [GradientSyntax.CallArgument(label: Optional("person"), value: GradientSyntax.Expression.bindingReference("person"))])), GradientSyntax.Statement.expression(GradientSyntax.Expression.call(name: "user.incrementAge", arguments: []))]))
-        ▿ some: GradientSyntax.MainBlockNode
+  ▿ RangeSyntax.SourceFileNode.module
+    ▿ module: RangeSyntax.ModuleFileNode
+      ▿ mainBlock: Optional(RangeSyntax.MainBlockNode(body: [RangeSyntax.Statement.declaration(kind: RangeSyntax.LocalBindingKind.mutable, name: "person", typeName: Optional("Person"), expression: RangeSyntax.Expression.call(name: "Person", arguments: [RangeSyntax.CallArgument(label: Optional("name"), value: RangeSyntax.Expression.string("George")), RangeSyntax.CallArgument(label: Optional("age"), value: RangeSyntax.Expression.integer(26))])), RangeSyntax.Statement.compoundAssignment(target: RangeSyntax.AssignmentTarget.member(base: RangeSyntax.AssignmentTarget.local("person"), name: "age"), operatorSymbol: RangeSyntax.CompoundOperator.plusEquals, expression: RangeSyntax.Expression.integer(1)), RangeSyntax.Statement.derived(name: "personString", typeName: "String", body: [RangeSyntax.Statement.expression(RangeSyntax.Expression.interpolatedString(RangeSyntax.InterpolatedString(segments: [RangeSyntax.StringSegment.text("Person: "), RangeSyntax.StringSegment.expression(RangeSyntax.Expression.identifier("person.name")), RangeSyntax.StringSegment.text(", Age: "), RangeSyntax.StringSegment.expression(RangeSyntax.Expression.identifier("person.age"))])))]), RangeSyntax.Statement.declaration(kind: RangeSyntax.LocalBindingKind.mutable, name: "user", typeName: Optional("User"), expression: RangeSyntax.Expression.call(name: "User", arguments: [RangeSyntax.CallArgument(label: Optional("person"), value: RangeSyntax.Expression.bindingReference("person"))])), RangeSyntax.Statement.expression(RangeSyntax.Expression.call(name: "user.incrementAge", arguments: []))]))
+        ▿ some: RangeSyntax.MainBlockNode
           ▿ body: 5 elements
-            ▿ GradientSyntax.Statement.declaration
+            ▿ RangeSyntax.Statement.declaration
               ▿ declaration: (4 elements)
-                - kind: GradientSyntax.LocalBindingKind.mutable
+                - kind: RangeSyntax.LocalBindingKind.mutable
                 - name: "person"
                 ▿ typeName: Optional("Person")
                   - some: "Person"
-                ▿ expression: GradientSyntax.Expression.call
+                ▿ expression: RangeSyntax.Expression.call
                   ▿ call: (2 elements)
                     - name: "Person"
                     ▿ arguments: 2 elements
-                      ▿ GradientSyntax.CallArgument
+                      ▿ RangeSyntax.CallArgument
                         ▿ label: Optional("name")
                           - some: "name"
-                        ▿ value: GradientSyntax.Expression.string
+                        ▿ value: RangeSyntax.Expression.string
                           - string: "George"
-                      ▿ GradientSyntax.CallArgument
+                      ▿ RangeSyntax.CallArgument
                         ▿ label: Optional("age")
                           - some: "age"
-                        ▿ value: GradientSyntax.Expression.integer
+                        ▿ value: RangeSyntax.Expression.integer
                           - integer: 26
-            ▿ GradientSyntax.Statement.compoundAssignment
+            ▿ RangeSyntax.Statement.compoundAssignment
               ▿ compoundAssignment: (3 elements)
-                ▿ target: GradientSyntax.AssignmentTarget.member
+                ▿ target: RangeSyntax.AssignmentTarget.member
                   ▿ member: (2 elements)
-                    ▿ base: GradientSyntax.AssignmentTarget.local
+                    ▿ base: RangeSyntax.AssignmentTarget.local
                       - local: "person"
                     - name: "age"
-                - operatorSymbol: GradientSyntax.CompoundOperator.plusEquals
-                ▿ expression: GradientSyntax.Expression.integer
+                - operatorSymbol: RangeSyntax.CompoundOperator.plusEquals
+                ▿ expression: RangeSyntax.Expression.integer
                   - integer: 1
-            ▿ GradientSyntax.Statement.derived
+            ▿ RangeSyntax.Statement.derived
               ▿ derived: (3 elements)
                 - name: "personString"
                 - typeName: "String"
                 ▿ body: 1 element
-                  ▿ GradientSyntax.Statement.expression
-                    ▿ expression: GradientSyntax.Expression.interpolatedString
-                      ▿ interpolatedString: GradientSyntax.InterpolatedString
+                  ▿ RangeSyntax.Statement.expression
+                    ▿ expression: RangeSyntax.Expression.interpolatedString
+                      ▿ interpolatedString: RangeSyntax.InterpolatedString
                         ▿ segments: 4 elements
-                          ▿ GradientSyntax.StringSegment.text
+                          ▿ RangeSyntax.StringSegment.text
                             - text: "Person: "
-                          ▿ GradientSyntax.StringSegment.expression
-                            ▿ expression: GradientSyntax.Expression.identifier
+                          ▿ RangeSyntax.StringSegment.expression
+                            ▿ expression: RangeSyntax.Expression.identifier
                               - identifier: "person.name"
-                          ▿ GradientSyntax.StringSegment.text
+                          ▿ RangeSyntax.StringSegment.text
                             - text: ", Age: "
-                          ▿ GradientSyntax.StringSegment.expression
-                            ▿ expression: GradientSyntax.Expression.identifier
+                          ▿ RangeSyntax.StringSegment.expression
+                            ▿ expression: RangeSyntax.Expression.identifier
                               - identifier: "person.age"
-            ▿ GradientSyntax.Statement.declaration
+            ▿ RangeSyntax.Statement.declaration
               ▿ declaration: (4 elements)
-                - kind: GradientSyntax.LocalBindingKind.mutable
+                - kind: RangeSyntax.LocalBindingKind.mutable
                 - name: "user"
                 ▿ typeName: Optional("User")
                   - some: "User"
-                ▿ expression: GradientSyntax.Expression.call
+                ▿ expression: RangeSyntax.Expression.call
                   ▿ call: (2 elements)
                     - name: "User"
                     ▿ arguments: 1 element
-                      ▿ GradientSyntax.CallArgument
+                      ▿ RangeSyntax.CallArgument
                         ▿ label: Optional("person")
                           - some: "person"
-                        ▿ value: GradientSyntax.Expression.bindingReference
+                        ▿ value: RangeSyntax.Expression.bindingReference
                           - bindingReference: "person"
-            ▿ GradientSyntax.Statement.expression
-              ▿ expression: GradientSyntax.Expression.call
+            ▿ RangeSyntax.Statement.expression
+              ▿ expression: RangeSyntax.Expression.call
                 ▿ call: (2 elements)
                   - name: "user.incrementAge"
                   - arguments: 0 elements
       - states: 0 elements
       - callables: 0 elements
       ▿ constructs: 2 elements
-        ▿ GradientSyntax.ConstructDeclaration
+        ▿ RangeSyntax.ConstructDeclaration
           - macros: 0 elements
-          - kind: GradientSyntax.ConstructKind.declaration
+          - kind: RangeSyntax.ConstructKind.declaration
           - attribute: nil
           - name: "Person"
           - genericParameters: 0 elements
           - conformances: 0 elements
           ▿ states: 1 element
-            ▿ GradientSyntax.StateDeclaration
+            ▿ RangeSyntax.StateDeclaration
               - macros: 0 elements
               - name: "age"
               - hasExplicitTypeAnnotation: true
-              ▿ type: GradientSyntax.TypeReference.named
+              ▿ type: RangeSyntax.TypeReference.named
                 - named: "Int"
-              - storage: GradientSyntax.StateStorage.declared
+              - storage: RangeSyntax.StateStorage.declared
           - environments: 0 elements
           - bindings: 0 elements
           - deriveds: 0 elements
           ▿ values: 1 element
-            ▿ GradientSyntax.ValueDeclaration
+            ▿ RangeSyntax.ValueDeclaration
               - macros: 0 elements
               - localName: "name"
               ▿ externalLabel: Optional("name")
@@ -104,9 +104,9 @@ AST:
               - value: nil
           - initializers: 0 elements
           - callables: 0 elements
-        ▿ GradientSyntax.ConstructDeclaration
+        ▿ RangeSyntax.ConstructDeclaration
           - macros: 0 elements
-          - kind: GradientSyntax.ConstructKind.declaration
+          - kind: RangeSyntax.ConstructKind.declaration
           - attribute: nil
           - name: "User"
           - genericParameters: 0 elements
@@ -114,18 +114,18 @@ AST:
           - states: 0 elements
           - environments: 0 elements
           ▿ bindings: 1 element
-            ▿ GradientSyntax.BindingDeclaration
+            ▿ RangeSyntax.BindingDeclaration
               - macros: 0 elements
               - localName: "person"
               ▿ externalLabel: Optional("person")
                 - some: "person"
               - typeName: "Person"
-              - storage: GradientSyntax.BindingStorage.plain
+              - storage: RangeSyntax.BindingStorage.plain
           - deriveds: 0 elements
           - values: 0 elements
           - initializers: 0 elements
           ▿ callables: 1 element
-            ▿ GradientSyntax.CallableDeclaration
+            ▿ RangeSyntax.CallableDeclaration
               - macros: 0 elements
               - targetType: nil
               - name: "incrementAge"
@@ -133,17 +133,17 @@ AST:
               - hasExplicitParameterClause: true
               - parameters: 0 elements
               - returnType: nil
-              ▿ body: Optional([GradientSyntax.Statement.compoundAssignment(target: GradientSyntax.AssignmentTarget.member(base: GradientSyntax.AssignmentTarget.binding("person"), name: "age"), operatorSymbol: GradientSyntax.CompoundOperator.plusEquals, expression: GradientSyntax.Expression.integer(1))])
+              ▿ body: Optional([RangeSyntax.Statement.compoundAssignment(target: RangeSyntax.AssignmentTarget.member(base: RangeSyntax.AssignmentTarget.binding("person"), name: "age"), operatorSymbol: RangeSyntax.CompoundOperator.plusEquals, expression: RangeSyntax.Expression.integer(1))])
                 ▿ some: 1 element
-                  ▿ GradientSyntax.Statement.compoundAssignment
+                  ▿ RangeSyntax.Statement.compoundAssignment
                     ▿ compoundAssignment: (3 elements)
-                      ▿ target: GradientSyntax.AssignmentTarget.member
+                      ▿ target: RangeSyntax.AssignmentTarget.member
                         ▿ member: (2 elements)
-                          ▿ base: GradientSyntax.AssignmentTarget.binding
+                          ▿ base: RangeSyntax.AssignmentTarget.binding
                             - binding: "person"
                           - name: "age"
-                      - operatorSymbol: GradientSyntax.CompoundOperator.plusEquals
-                      ▿ expression: GradientSyntax.Expression.integer
+                      - operatorSymbol: RangeSyntax.CompoundOperator.plusEquals
+                      ▿ expression: RangeSyntax.Expression.integer
                         - integer: 1
       - enumerations: 0 elements
       - protocols: 0 elements

@@ -99,7 +99,7 @@ extension MacroExpander {
     private static func argumentBindings(
         kind: String,
         name: String,
-        parameters: [GradientFunctionParameter],
+        parameters: [RangeFunctionParameter],
         arguments: [CallArgument]
     ) throws -> [String: Expression] {
         guard arguments.count <= parameters.count else {
@@ -143,7 +143,7 @@ extension MacroExpander {
         return bindings
     }
 
-    static func macroArgumentLabel(for parameter: GradientFunctionParameter) -> String? {
+    static func macroArgumentLabel(for parameter: RangeFunctionParameter) -> String? {
         parameter.externalLabel
     }
 }

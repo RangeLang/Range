@@ -1,6 +1,6 @@
-# Gradient Concurrency
+# Range Concurrency
 
-This document describes the current intended direction for Gradient concurrency.
+This document describes the current intended direction for Range concurrency.
 
 The model is intentionally moving toward a simpler, more Go-like shape:
 
@@ -23,14 +23,14 @@ The goal is to keep concurrency understandable at the source level and avoid hid
 
 ## Core Direction
 
-Gradient concurrency centers on two ideas:
+Range concurrency centers on two ideas:
 
 1. `@background { ... }` starts concurrent work
 2. `Channel<T>` is used to communicate between concurrent parts of the program
 
 This means the language does **not** treat Promise-like result types as the core concurrency abstraction.
 
-Instead of returning live async handles and implicitly settling them later, Gradient prefers:
+Instead of returning live async handles and implicitly settling them later, Range prefers:
 
 - spawn work explicitly
 - send values explicitly
@@ -43,7 +43,7 @@ Anonymous background blocks remain the spawn primitive.
 
 Example:
 
-```gradient
+```range
 @background {
     doSomething()
 }
@@ -70,7 +70,7 @@ Anonymous background blocks do not produce a direct return value.
 
 So this is allowed:
 
-```gradient
+```range
 @background {
     if shouldStop {
         return
@@ -82,7 +82,7 @@ So this is allowed:
 
 And this is not part of the model:
 
-```gradient
+```range
 @background {
     return 42
 }
@@ -96,7 +96,7 @@ Functions do not become special just because they may be used from concurrent co
 
 Example:
 
-```gradient
+```range
 function fetchUserName(id: Int) -> String {
     if id == 0 {
         return "system"
@@ -110,7 +110,7 @@ This is just a normal function.
 
 If you want to run it concurrently, you do that at the use site:
 
-```gradient
+```range
 let names: Channel<String>
 
 @background {
@@ -135,7 +135,7 @@ The function itself does not need Promise-returning syntax or a special async de
 
 Current surface shape:
 
-```gradient
+```range
 construct Channel<Element> {
     init()
     init(capacity: Int)
@@ -161,7 +161,7 @@ The intended style is explicit communication through channel operations.
 
 Example:
 
-```gradient
+```range
 function loadUser(id: Int) {
     let output: Channel<String>
 
@@ -194,7 +194,7 @@ Most importantly:
 
 This is preferred over designs where something like:
 
-```gradient
+```range
 let result = worker()
 ```
 
@@ -227,7 +227,7 @@ Channels support `close()`.
 
 Close exists so channel-based coordination can model completion and shutdown, not just single-value handoff.
 
-The exact source-level closed-channel behavior should remain clearly specified by Gradient itself, not inferred from backend runtime conventions.
+The exact source-level closed-channel behavior should remain clearly specified by Range itself, not inferred from backend runtime conventions.
 
 That means any final semantics around:
 
@@ -235,7 +235,7 @@ That means any final semantics around:
 - sending after close
 - draining buffered values after close
 
-must be defined as Gradient behavior.
+must be defined as Range behavior.
 
 ## Result as a Normal Data Type
 
@@ -243,7 +243,7 @@ must be defined as Gradient behavior.
 
 Example:
 
-```gradient
+```range
 enum LoadError {
     case missing
     case denied
@@ -274,7 +274,7 @@ The concurrency model should avoid centering around:
 - hidden synchronization points
 - backend-shaped async concepts leaking into source semantics
 
-Gradient may still have useful general-purpose types for success/failure or streaming data in the future, but those should not define the core concurrency story.
+Range may still have useful general-purpose types for success/failure or streaming data in the future, but those should not define the core concurrency story.
 
 ## Why This Direction
 
@@ -318,13 +318,13 @@ Those details are implementation choices.
 
 They must not redefine the language model.
 
-Gradient source semantics should stay stable even if different backends realize the runtime differently.
+Range source semantics should stay stable even if different backends realize the runtime differently.
 
 ## Example Shapes
 
 ### Fire-and-forget work
 
-```gradient
+```range
 function refreshCache() {
     @background {
         Logger.info("refresh started")
@@ -338,7 +338,7 @@ function refreshCache() {
 
 ### Single result handoff
 
-```gradient
+```range
 function loadName(id: Int) {
     let output: Channel<String>
 
@@ -353,7 +353,7 @@ function loadName(id: Int) {
 
 ### Producer / consumer shape
 
-```gradient
+```range
 function processJobs() {
     let jobs: Channel<Int>(capacity: 8)
 
@@ -384,7 +384,7 @@ This document exists to keep the intended language direction clear as implementa
 
 ## Summary
 
-Gradient concurrency is moving toward:
+Range concurrency is moving toward:
 
 - anonymous `@background { ... }` for explicit spawning
 - `Channel<T>` for communication

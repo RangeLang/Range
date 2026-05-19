@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
-import GradientBackendSwift
-import GradientSyntax
+import RangeBackendSwift
+import RangeSyntax
 
 enum ErrorPresenter {
     static func printError(_ error: Error) {

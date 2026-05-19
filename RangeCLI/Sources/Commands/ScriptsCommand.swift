@@ -1,10 +1,10 @@
 import ArgumentParser
 import Foundation
 
-extension GradientCLI {
+extension RangeCLI {
     struct Scripts: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Manage scripts saved under .gradient/.scripts.",
+            abstract: "Manage scripts saved under .range/.scripts.",
             subcommands: [
                 Create.self,
                 Save.self,
@@ -14,13 +14,13 @@ extension GradientCLI {
 
         struct Create: ParsableCommand {
             static let configuration = CommandConfiguration(
-                abstract: "Create a starter script in .gradient/.scripts."
+                abstract: "Create a starter script in .range/.scripts."
             )
 
-            @Argument(help: "Script name. Adds .gradient when omitted.")
+            @Argument(help: "Script name. Adds .range when omitted.")
             var name: String
 
-            @Option(name: .shortAndLong, help: "Package.gradient project root.")
+            @Option(name: .shortAndLong, help: "Package.range project root.")
             var project: String = "."
 
             @Flag(help: "Replace an existing script.")
@@ -39,13 +39,13 @@ extension GradientCLI {
 
         struct Save: ParsableCommand {
             static let configuration = CommandConfiguration(
-                abstract: "Save text or a file into .gradient/.scripts."
+                abstract: "Save text or a file into .range/.scripts."
             )
 
-            @Argument(help: "Script name. Adds .gradient when omitted.")
+            @Argument(help: "Script name. Adds .range when omitted.")
             var name: String
 
-            @Option(name: .shortAndLong, help: "Package.gradient project root.")
+            @Option(name: .shortAndLong, help: "Package.range project root.")
             var project: String = "."
 
             @Option(help: "Script content to save.")
@@ -91,10 +91,10 @@ extension GradientCLI {
 
         struct List: ParsableCommand {
             static let configuration = CommandConfiguration(
-                abstract: "List scripts saved under .gradient/.scripts."
+                abstract: "List scripts saved under .range/.scripts."
             )
 
-            @Option(name: .shortAndLong, help: "Package.gradient project root.")
+            @Option(name: .shortAndLong, help: "Package.range project root.")
             var project: String = "."
 
             mutating func run() throws {

@@ -1,13 +1,13 @@
 param(
     [string]$Version = "latest",
-    [string]$Repository = $(if ($env:GRADIENT_REPOSITORY) { $env:GRADIENT_REPOSITORY } else { "georgegradient/Gradient" }),
-    [string]$InstallDir = $(if ($env:GRADIENT_INSTALL_DIR) { $env:GRADIENT_INSTALL_DIR } else { Join-Path $HOME ".gradient\bin" })
+    [string]$Repository = $(if ($env:RANGE_REPOSITORY) { $env:RANGE_REPOSITORY } else { "georgerange/Range" }),
+    [string]$InstallDir = $(if ($env:RANGE_INSTALL_DIR) { $env:RANGE_INSTALL_DIR } else { Join-Path $HOME ".range\bin" })
 )
 
 $ErrorActionPreference = "Stop"
 
 if ($Version -eq "-h" -or $Version -eq "--help") {
-    Write-Host "Usage: ./install-gradient-release.ps1 [-Version latest|vX.Y.Z] [-Repository owner/repo] [-InstallDir path]"
+    Write-Host "Usage: ./install-range-release.ps1 [-Version latest|vX.Y.Z] [-Repository owner/repo] [-InstallDir path]"
     exit 0
 }
 
@@ -21,7 +21,7 @@ if ($arch -ne "x64") {
     throw "No Windows $arch release artifact is published yet."
 }
 
-$artifact = "gradient-windows-$arch"
+$artifact = "range-windows-$arch"
 $archive = "$artifact.zip"
 if ($Version -eq "latest") {
     $url = "https://github.com/$Repository/releases/latest/download/$archive"
@@ -39,9 +39,9 @@ try {
     Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
 
     New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Copy-Item -Path (Join-Path $tmp "$artifact\gradient.exe") -Destination (Join-Path $InstallDir "gradient.exe") -Force
+    Copy-Item -Path (Join-Path $tmp "$artifact\range.exe") -Destination (Join-Path $InstallDir "range.exe") -Force
 
-    Write-Host "Installed gradient to $(Join-Path $InstallDir "gradient.exe")"
+    Write-Host "Installed range to $(Join-Path $InstallDir "range.exe")"
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if (($userPath -split ";") -notcontains $InstallDir) {
         Write-Host "Add this directory to your user PATH:"

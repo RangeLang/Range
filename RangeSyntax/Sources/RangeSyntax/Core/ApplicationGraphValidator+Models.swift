@@ -50,7 +50,7 @@ extension ApplicationGraphValidator {
 
     struct CallLabelCandidate {
         let name: String
-        let parameters: [GradientFunctionParameter]
+        let parameters: [RangeFunctionParameter]
     }
 
     struct BindingReferenceContext {

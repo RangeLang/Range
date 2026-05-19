@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "GradientGenerated",
+    name: "RangeGenerated",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .executableTarget(
-            name: "GradientGenerated"
+            name: "RangeGenerated"
         )
     ]
 )

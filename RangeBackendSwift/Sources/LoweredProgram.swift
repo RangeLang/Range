@@ -1,5 +1,5 @@
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
 struct LoweredSourceUnit {
     let outputFileName: String

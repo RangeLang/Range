@@ -27,7 +27,7 @@ extension Parser {
         return tokens[position].token
     }
 
-    func currentRange() -> GradientSourceRange? {
+    func currentRange() -> RangeSourceRange? {
         guard index < tokens.count else {
             return tokens.last?.range
         }
@@ -41,7 +41,7 @@ extension Parser {
         advance()
     }
 
-    mutating func consumeKeyword(_ keyword: GradientSyntax.Keyword) throws {
+    mutating func consumeKeyword(_ keyword: RangeSyntax.Keyword) throws {
         guard peek() == .keyword(keyword.rawValue) else {
             throw ParseError("Expected keyword \(keyword.rawValue).", range: currentRange())
         }

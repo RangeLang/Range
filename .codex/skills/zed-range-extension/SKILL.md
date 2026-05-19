@@ -1,21 +1,21 @@
 ---
-name: zed-gradient-extension
-description: Use when working on the Gradient Zed extension, Gradient semantic highlighting, Zed integration issues, or the local gradient-lsp workflow. Covers the split between the main Gradient repo and the nested Zed/Gradient repo, when to change GradientCLI vs the extension, how to sync the extension, and which logs and commands to use for debugging.
+name: zed-range-extension
+description: Use when working on the Range Zed extension, Range semantic highlighting, Zed integration issues, or the local range-lsp workflow. Covers the split between the main Range repo and the nested Zed/Range repo, when to change RangeCLI vs the extension, how to sync the extension, and which logs and commands to use for debugging.
 ---
 
-# Zed Gradient Extension
+# Zed Range Extension
 
 Use this skill when the task touches:
-- `Zed/Gradient`
-- `GradientCLI` language-server behavior
-- semantic highlighting in `.gradient` files
+- `Zed/Range`
+- `RangeCLI` language-server behavior
+- semantic highlighting in `.range` files
 - Zed extension install/sync/debugging
 
 ## Repo split
 
 There are two repos:
-- main repo: `/Users/george/Documents/Gradient`
-- nested Zed extension repo: `/Users/george/Documents/Gradient/Zed/Gradient`
+- main repo: `/Users/george/Documents/Range`
+- nested Zed extension repo: `/Users/george/Documents/Range/Zed/Range`
 
 Treat them separately when checking git status or making commits.
 
@@ -23,27 +23,27 @@ Treat them separately when checking git status or making commits.
 
 Use this rule first:
 
-- semantic meaning belongs in `GradientCLI/Sources/GradientCLI/GradientLanguageServer.swift`
-- extension packaging, grammar, fallback queries, and Zed integration belong in `Zed/Gradient`
+- semantic meaning belongs in `RangeCLI/Sources/RangeCLI/RangeLanguageServer.swift`
+- extension packaging, grammar, fallback queries, and Zed integration belong in `Zed/Range`
 
 Examples:
-- token kind/coloring issue in `.gradient` files:
-  start in `GradientLanguageServer.swift`
+- token kind/coloring issue in `.range` files:
+  start in `RangeLanguageServer.swift`
 - autocomplete/completion issue:
-  start in `GradientLanguageServer.swift`
+  start in `RangeLanguageServer.swift`
 - grammar parse/query issue:
-  start in `Zed/Gradient/grammars/tree-sitter-gradient` or `Zed/Gradient/languages/gradient`
+  start in `Zed/Range/grammars/tree-sitter-range` or `Zed/Range/languages/range`
 - extension install/launcher/sync issue:
-  start in `Zed/Gradient/src/lib.rs` and `Zed/Gradient/scripts`
+  start in `Zed/Range/src/lib.rs` and `Zed/Range/scripts`
 
 ## Current architecture
 
-Gradient in Zed is semantic-first.
+Range in Zed is semantic-first.
 
 - Zed launches the local binary:
-  - `/Users/george/Documents/Gradient/GradientCLI/.build/arm64-apple-macosx/debug/GradientCLI`
+  - `/Users/george/Documents/Range/RangeCLI/.build/arm64-apple-macosx/debug/RangeCLI`
 - the extension should not fall back to Homebrew or PATH binaries
-- semantic tokens should drive Gradient colors
+- semantic tokens should drive Range colors
 - Tree-sitter queries are fallback only
 
 ## Normal workflows
@@ -59,14 +59,14 @@ Examples:
 Do:
 
 ```sh
-cd /Users/george/Documents/Gradient/GradientCLI
+cd /Users/george/Documents/Range/RangeCLI
 swift test
 ```
 
 Then tell the user:
 - `zed: restart language servers`
 
-Do not reinstall the extension for pure `GradientCLI` changes.
+Do not reinstall the extension for pure `RangeCLI` changes.
 
 ### 2. Extension-side change
 
@@ -80,7 +80,7 @@ Examples:
 Do:
 
 ```sh
-cd /Users/george/Documents/Gradient/Zed/Gradient
+cd /Users/george/Documents/Range/Zed/Range
 ./scripts/sync-zed-extension.sh
 ```
 
@@ -98,10 +98,10 @@ Before patching, identify which layer is wrong.
 Use:
 
 ```sh
-./GradientCLI/.build/arm64-apple-macosx/debug/GradientCLI semantic-tokens <file>
+./RangeCLI/.build/arm64-apple-macosx/debug/RangeCLI semantic-tokens <file>
 ```
 
-If the token stream is wrong, fix `GradientLanguageServer.swift`.
+If the token stream is wrong, fix `RangeLanguageServer.swift`.
 
 If the token stream is correct, then inspect Zed integration:
 - `semantic_token_rules.json`
@@ -113,21 +113,21 @@ If the token stream is correct, then inspect Zed integration:
 
 ### Main repo
 
-- `GradientCLI/Sources/GradientCLI/GradientLanguageServer.swift`
-- `GradientCLI/Tests/GradientCLITests/GradientLanguageServerSemanticTokenTests.swift`
-- `GradientSyntax/Sources/GradientSyntax/...`
-- `GradientCompilerFixtures/...`
+- `RangeCLI/Sources/RangeCLI/RangeLanguageServer.swift`
+- `RangeCLI/Tests/RangeCLITests/RangeLanguageServerSemanticTokenTests.swift`
+- `RangeSyntax/Sources/RangeSyntax/...`
+- `RangeCompilerFixtures/...`
 
 ### Nested repo
 
-- `Zed/Gradient/extension.toml`
-- `Zed/Gradient/src/lib.rs`
-- `Zed/Gradient/languages/gradient/config.toml`
-- `Zed/Gradient/languages/gradient/semantic_token_rules.json`
-- `Zed/Gradient/languages/gradient/highlights.scm`
-- `Zed/Gradient/grammars/tree-sitter-gradient/grammar.js`
-- `Zed/Gradient/scripts/sync-zed-extension.sh`
-- `Zed/Gradient/scripts/smoke-check.sh`
+- `Zed/Range/extension.toml`
+- `Zed/Range/src/lib.rs`
+- `Zed/Range/languages/range/config.toml`
+- `Zed/Range/languages/range/semantic_token_rules.json`
+- `Zed/Range/languages/range/highlights.scm`
+- `Zed/Range/grammars/tree-sitter-range/grammar.js`
+- `Zed/Range/scripts/sync-zed-extension.sh`
+- `Zed/Range/scripts/smoke-check.sh`
 
 ## Logs
 
@@ -136,12 +136,12 @@ Check these when Zed behavior disagrees with local CLI behavior:
 - Zed log:
   - `~/Library/Logs/Zed/Zed.log`
 - LSP debug log:
-  - `/tmp/gradient-lsp-debug.log`
+  - `/tmp/range-lsp-debug.log`
 - extension launcher log:
-  - `/tmp/gradient-zed-launch.log`
+  - `/tmp/range-zed-launch.log`
 
 Use them to answer:
-- Did Zed launch the local `GradientCLI` binary?
+- Did Zed launch the local `RangeCLI` binary?
 - Is Zed requesting `textDocument/semanticTokens/full`?
 - Is the server crashing or resetting?
 - Is the extension query/grammar load failing?
@@ -159,14 +159,14 @@ Use them to answer:
 For LSP work:
 
 ```sh
-cd /Users/george/Documents/Gradient/GradientCLI
+cd /Users/george/Documents/Range/RangeCLI
 swift test
 ```
 
 For syntax/compiler changes:
 
 ```sh
-cd /Users/george/Documents/Gradient/GradientSyntax
+cd /Users/george/Documents/Range/RangeSyntax
 swift test --filter compileFailFixturesFail
 swift test --filter compilePassFixturesValidate
 ```
@@ -174,7 +174,7 @@ swift test --filter compilePassFixturesValidate
 For extension-side work:
 
 ```sh
-cd /Users/george/Documents/Gradient/Zed/Gradient
+cd /Users/george/Documents/Range/Zed/Range
 ./scripts/smoke-check.sh
 ./scripts/sync-zed-extension.sh
 ```
@@ -182,10 +182,10 @@ cd /Users/george/Documents/Gradient/Zed/Gradient
 ## Quick diagnosis map
 
 - wrong token meaning or autocomplete:
-  `GradientLanguageServer.swift`
+  `RangeLanguageServer.swift`
 - right token stream locally, wrong color in Zed:
   `semantic_token_rules.json`, Zed settings, logs
 - extension installed but language not loading:
   `Zed.log`, grammar/query compatibility, `extension.toml`
 - wrong binary launched:
-  `/tmp/gradient-zed-launch.log`, `Zed/Gradient/src/lib.rs`
+  `/tmp/range-zed-launch.log`, `Zed/Range/src/lib.rs`

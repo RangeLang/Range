@@ -1,10 +1,10 @@
 import ArgumentParser
 import Foundation
 
-extension GradientCLI {
+extension RangeCLI {
     struct Version: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Print the installed Gradient version and available updates."
+            abstract: "Print the installed Range version and available updates."
         )
 
         @Flag(help: "Skip checking the remote repository for updates.")
@@ -12,9 +12,9 @@ extension GradientCLI {
 
         mutating func run() throws {
             print(
-                TerminalLog.style("Gradient", level: .change, bold: true)
+                TerminalLog.style("Range", level: .change, bold: true)
                     + " "
-                    + TerminalLog.subtleStdout("\(GradientVersion.current)")
+                    + TerminalLog.subtleStdout("\(RangeVersion.current)")
             )
             print(statusLine(label: "Installed", value: installedExecutablePath()))
 
@@ -132,7 +132,7 @@ extension GradientCLI {
         }
 
         private func installedExecutablePath() -> String {
-            let executable = CommandLine.arguments.first ?? "gradient"
+            let executable = CommandLine.arguments.first ?? "range"
             if executable.contains("/") {
                 return URL(fileURLWithPath: executable).standardizedFileURL.path
             }

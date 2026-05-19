@@ -1,5 +1,5 @@
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
 struct SwiftBackendProgramBuilder {
     func build(
@@ -270,13 +270,13 @@ struct SwiftBackendProgramBuilder {
     private func coreSupportUnits(in compiledProgram: CompiledProgram) -> [LoweredSourceUnit] {
         let encodingUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
             guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
-                parsedFile.path.contains("/GradientCore/Encoding/")
+                parsedFile.path.contains("/RangeCore/Encoding/")
             else {
                 return nil
             }
 
             let fileURL = URL(fileURLWithPath: parsedFile.path)
-            let outputFileName = "GradientCore_\(fileURL.deletingPathExtension().lastPathComponent).swift"
+            let outputFileName = "RangeCore_\(fileURL.deletingPathExtension().lastPathComponent).swift"
 
             switch parsedFile.sourceFile {
             case .construct(let declaration):
@@ -343,7 +343,7 @@ struct SwiftBackendProgramBuilder {
 
         return [
             .init(
-                outputFileName: "GradientCoreSupport.swift",
+                outputFileName: "RangeCoreSupport.swift",
                 protocols: [],
                 enumerations: [],
                 declarations: channelDeclarations,

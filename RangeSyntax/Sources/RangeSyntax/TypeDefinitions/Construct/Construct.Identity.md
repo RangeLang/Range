@@ -6,7 +6,7 @@ Every construct is identity-bearing by default.
 
 ## Role
 
-Construct identity lets Gradient model real relationships without making users choose between separate class and struct worlds.
+Construct identity lets Range model real relationships without making users choose between separate class and struct worlds.
 
 ## Mental Model
 
@@ -18,7 +18,7 @@ Construct-to-construct members preserve construct identity in the graph, which k
 
 - Constructs have value semantics by default
 
-```gradient
+```range
 construct User {
     let name: String
 }
@@ -26,7 +26,7 @@ construct User {
 
 - Every construct has an implicit compiler-synthesized `ID`
 
-```gradient
+```range
 construct User {
     let name: String
 }
@@ -36,7 +36,7 @@ let userID: User.ID
 
 - The identity used by the graph is distinct from ordinary user-defined fields
 
-```gradient
+```range
 construct User {
     let id: UUID
     let name: String
@@ -47,7 +47,7 @@ let userID: User.ID
 
 - References to other constructs are identity references
 
-```gradient
+```range
 construct Author {
     let name: String
 }
@@ -62,7 +62,7 @@ construct Book {
 
 - Construct relationships do not imply literal inline containment
 
-```gradient
+```range
 construct Author {
     let name: String
 }
@@ -77,7 +77,7 @@ construct Book {
 
 - Recursive construct references are legal
 
-```gradient
+```range
 construct FileNode {
     let name: String
     let parent: FileNode
@@ -88,7 +88,7 @@ Recursive construct references are legal because construct members preserve cons
 
 - Cycles between constructs are safe
 
-```gradient
+```range
 construct User {
     let manager: User
 }

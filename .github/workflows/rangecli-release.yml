@@ -1,4 +1,4 @@
-name: GradientCLI Release
+name: RangeCLI Release
 
 on:
   push:
@@ -18,8 +18,8 @@ jobs:
       matrix:
         include:
           - os: macos-15
-            artifact: gradient-macos-arm64
-            archive: gradient-macos-arm64.lang.tar.gz
+            artifact: range-macos-arm64
+            archive: range-macos-arm64.lang.tar.gz
             shell: bash
 
     defaults:
@@ -34,58 +34,58 @@ jobs:
           swift-version: "6.2"
 
       - name: Build release binary
-        working-directory: GradientCLI
-        run: swift build -c release --product GradientCLI
+        working-directory: RangeCLI
+        run: swift build -c release --product RangeCLI
 
       - name: Package macOS install folder
         if: runner.os == 'macOS'
-        working-directory: GradientCLI
+        working-directory: RangeCLI
         run: |
           package="${{ matrix.artifact }}.lang"
           release_version="${GITHUB_REF_NAME#v}"
           if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             release_version="$(
               sed -nE 's/.*SemanticVersion\(major: ([0-9]+), minor: ([0-9]+), patch: ([0-9]+)\).*/\1.\2.\3/p' \
-                Sources/GradientCLI/GradientVersion.swift \
+                Sources/RangeCLI/RangeVersion.swift \
                 | head -n 1
             )"
           fi
           mkdir -p dist
-          cp -R ../Packaging/macOS/Gradient.lang "dist/${package}"
+          cp -R ../Packaging/macOS/Range.lang "dist/${package}"
           mkdir -p "dist/${package}/bin"
-          mkdir -p "dist/${package}/share/gradient"
-          cp .build/release/GradientCLI "dist/${package}/bin/gradient"
-          cp -R ../GradientCore "dist/${package}/share/gradient/GradientCore"
-          mkdir -p "dist/${package}/share/gradient/Skills"
-          cp -R ../.codex/skills/gradient-onboarding "dist/${package}/share/gradient/Skills/gradient-onboarding"
+          mkdir -p "dist/${package}/share/range"
+          cp .build/release/RangeCLI "dist/${package}/bin/range"
+          cp -R ../RangeCore "dist/${package}/share/range/RangeCore"
+          mkdir -p "dist/${package}/share/range/Skills"
+          cp -R ../.codex/skills/range-onboarding "dist/${package}/share/range/Skills/range-onboarding"
           printf '%s\n' "$release_version" > "dist/${package}/VERSION"
-          chmod 755 "dist/${package}/bin/gradient"
+          chmod 755 "dist/${package}/bin/range"
           chmod 755 "dist/${package}/install.sh" "dist/${package}/uninstall.sh"
           tar -C dist -czf ${{ matrix.archive }} "$package"
 
       - name: Package macOS installer package
         if: runner.os == 'macOS'
-        working-directory: GradientCLI
+        working-directory: RangeCLI
         run: |
           release_version="${GITHUB_REF_NAME#v}"
           if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             release_version="$(
               sed -nE 's/.*SemanticVersion\(major: ([0-9]+), minor: ([0-9]+), patch: ([0-9]+)\).*/\1.\2.\3/p' \
-                Sources/GradientCLI/GradientVersion.swift \
+                Sources/RangeCLI/RangeVersion.swift \
                 | head -n 1
             )"
           fi
           package_root="dist/${{ matrix.artifact }}.pkgroot"
           mkdir -p "${package_root}/usr/local/bin"
-          mkdir -p "${package_root}/usr/local/share/gradient"
-          cp .build/release/GradientCLI "${package_root}/usr/local/bin/gradient"
-          cp -R ../GradientCore "${package_root}/usr/local/share/gradient/GradientCore"
-          mkdir -p "${package_root}/usr/local/share/gradient/Skills"
-          cp -R ../.codex/skills/gradient-onboarding "${package_root}/usr/local/share/gradient/Skills/gradient-onboarding"
-          chmod 755 "${package_root}/usr/local/bin/gradient"
+          mkdir -p "${package_root}/usr/local/share/range"
+          cp .build/release/RangeCLI "${package_root}/usr/local/bin/range"
+          cp -R ../RangeCore "${package_root}/usr/local/share/range/RangeCore"
+          mkdir -p "${package_root}/usr/local/share/range/Skills"
+          cp -R ../.codex/skills/range-onboarding "${package_root}/usr/local/share/range/Skills/range-onboarding"
+          chmod 755 "${package_root}/usr/local/bin/range"
           pkgbuild \
             --root "${package_root}" \
-            --identifier "com.georgetchelidze.gradient.cli" \
+            --identifier "com.georgetchelidze.range.cli" \
             --version "${release_version}" \
             --install-location "/" \
             "${{ matrix.artifact }}.pkg"
@@ -93,13 +93,13 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.archive }}
-          path: GradientCLI/${{ matrix.archive }}
+          path: RangeCLI/${{ matrix.archive }}
 
       - uses: actions/upload-artifact@v4
         if: runner.os == 'macOS'
         with:
           name: ${{ matrix.artifact }}.pkg
-          path: GradientCLI/${{ matrix.artifact }}.pkg
+          path: RangeCLI/${{ matrix.artifact }}.pkg
 
   publish:
     name: Publish GitHub release

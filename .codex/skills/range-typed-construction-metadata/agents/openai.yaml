@@ -1,4 +1,4 @@
 interface:
-  display_name: "Gradient Typed Construction Metadata"
+  display_name: "Range Typed Construction Metadata"
   short_description: "Keep typed construction modeled as declaration metadata."
   default_prompt: "Review this typed construction change against the metadata model."

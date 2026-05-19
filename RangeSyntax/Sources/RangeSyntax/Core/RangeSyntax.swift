@@ -1,6 +1,6 @@
 import Foundation
 
-enum GradientSyntax {
+enum RangeSyntax {
     enum Attribute: String, CaseIterable {
         case main = "main"
         case background = "background"
@@ -62,4 +62,4 @@ enum GradientSyntax {
     }
 }
 
-extension GradientSyntax.Keyword: CaseIterable {}
+extension RangeSyntax.Keyword: CaseIterable {}

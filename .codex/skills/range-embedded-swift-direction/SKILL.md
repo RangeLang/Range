@@ -1,9 +1,9 @@
 ---
-name: gradient-embedded-swift-direction
-description: Use when changing Gradient Swift implementation, Package.swift settings, compiler targets, CLI code, Swift backend output, runtime assumptions, reflection, dynamic dispatch, generated Swift, or build settings that may affect Embedded Swift compatibility. Use the embedded direction in this skill to catch implementation drift.
+name: range-embedded-swift-direction
+description: Use when changing Range Swift implementation, Package.swift settings, compiler targets, CLI code, Swift backend output, runtime assumptions, reflection, dynamic dispatch, generated Swift, or build settings that may affect Embedded Swift compatibility. Use the embedded direction in this skill to catch implementation drift.
 ---
 
-# Gradient Embedded Swift Direction
+# Range Embedded Swift Direction
 
 ## Workflow
 

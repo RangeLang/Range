@@ -1,9 +1,9 @@
 import ArgumentParser
 import Foundation
 
-enum GradientVersion {
+enum RangeVersion {
     static let current = SemanticVersion(major: 0, minor: 1, patch: 26)
-    static let updateRepository = "https://github.com/georgetchelidze/Gradient.git"
+    static let updateRepository = "https://github.com/georgetchelidze/Range.git"
 }
 
 struct SemanticVersion: CustomStringConvertible, Equatable, Comparable {

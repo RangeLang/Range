@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
 struct PackageManifest {
     let name: String
@@ -16,27 +16,27 @@ enum PackageManifestLoader {
         let source = try String(contentsOf: fileURL, encoding: .utf8)
         var parser = try Parser(
             source: source,
-            literalBridgeResolver: try GradientCoreLoader.literalBridgeResolver()
+            literalBridgeResolver: try RangeCoreLoader.literalBridgeResolver()
         )
 
         let sourceFile = try parser.parseSourceFile()
         switch sourceFile {
         case .mainBlock:
-            throw ValidationError("Package.gradient must declare construct Name: Package.")
+            throw ValidationError("Package.range must declare construct Name: Package.")
         case .extensions:
-            throw ValidationError("Package.gradient must declare construct Name: Package.")
+            throw ValidationError("Package.range must declare construct Name: Package.")
         case .module:
-            throw ValidationError("Package.gradient must declare #package construct Name { ... } or construct Name: Package.")
+            throw ValidationError("Package.range must declare #package construct Name { ... } or construct Name: Package.")
         case .namespace:
-            throw ValidationError("Package.gradient must declare construct Name: Package.")
+            throw ValidationError("Package.range must declare construct Name: Package.")
         case .construct(let declaration):
             guard declaration.attribute == nil else {
-                throw ValidationError("Package.gradient cannot use declaration attributes.")
+                throw ValidationError("Package.range cannot use declaration attributes.")
             }
             let usesPackageMacro = declaration.macros.contains { $0.name == "package" }
             guard usesPackageMacro || declaration.conformances == [.named("Package")] else {
                 throw ValidationError(
-                    "Package.gradient must declare #package construct Name { ... } or construct Name: Package.")
+                    "Package.range must declare #package construct Name { ... } or construct Name: Package.")
             }
 
             let name =
@@ -64,11 +64,11 @@ enum PackageManifestLoader {
                 declaration: declaration
             )
         case .enumeration:
-            throw ValidationError("Package.gradient must declare construct Name: Package.")
+            throw ValidationError("Package.range must declare construct Name: Package.")
         case .protocolDefinition:
-            throw ValidationError("Package.gradient must declare construct Name: Package.")
+            throw ValidationError("Package.range must declare construct Name: Package.")
         case .macro, .marker:
-            throw ValidationError("Package.gradient must declare construct Name: Package.")
+            throw ValidationError("Package.range must declare construct Name: Package.")
         }
     }
 
@@ -78,7 +78,7 @@ enum PackageManifestLoader {
     ) throws -> String {
         let value = try requireValue(named: name, typeName: "String", in: values)
         guard case .string(let string)? = value.value else {
-            throw ValidationError("Package.gradient requires let \(name): String(\"...\").")
+            throw ValidationError("Package.range requires let \(name): String(\"...\").")
         }
         return string
     }
@@ -88,7 +88,7 @@ enum PackageManifestLoader {
         in values: [ValueDeclaration]
     ) throws -> String {
         guard let title = try titleValue(named: name, in: values) else {
-            throw ValidationError("Package.gradient requires let \(name): Title(\"...\").")
+            throw ValidationError("Package.range requires let \(name): Title(\"...\").")
         }
         return title
     }
@@ -102,16 +102,16 @@ enum PackageManifestLoader {
         }
         guard value.typeName == "Title" else {
             throw ValidationError(
-                "Package.gradient requires let \(name): Title, got \(value.typeName)."
+                "Package.range requires let \(name): Title, got \(value.typeName)."
             )
         }
         guard case .call(let callName, let arguments)? = value.value, callName == "Title" else {
-            throw ValidationError("Package.gradient requires let \(name): Title(\"...\").")
+            throw ValidationError("Package.range requires let \(name): Title(\"...\").")
         }
         guard arguments.count == 1, arguments[0].label == nil,
             case .string(let title) = arguments[0].value
         else {
-            throw ValidationError("Package.gradient Title requires one string value.")
+            throw ValidationError("Package.range Title requires one string value.")
         }
         return title
     }
@@ -123,19 +123,19 @@ enum PackageManifestLoader {
         let value = try requireValue(named: name, typeNames: ["Version", "String"], in: values)
         if value.typeName == "String" {
             guard case .string(let string)? = value.value else {
-                throw ValidationError("Package.gradient requires let \(name): String(\"...\").")
+                throw ValidationError("Package.range requires let \(name): String(\"...\").")
             }
             return string
         }
 
         guard case .call(let callName, let arguments)? = value.value, callName == "Version" else {
-            throw ValidationError("Package.gradient requires let \(name): Version(0.1.0).")
+            throw ValidationError("Package.range requires let \(name): Version(0.1.0).")
         }
         guard arguments.count == 1, arguments[0].label == nil else {
-            throw ValidationError("Package.gradient Version requires one unlabeled semantic version.")
+            throw ValidationError("Package.range Version requires one unlabeled semantic version.")
         }
         guard case .string(let raw) = arguments[0].value else {
-            throw ValidationError("Package.gradient Version requires a semantic version like Version(0.1.0).")
+            throw ValidationError("Package.range Version requires a semantic version like Version(0.1.0).")
         }
         _ = try SemanticVersion.parse(raw)
         return raw
@@ -155,11 +155,11 @@ enum PackageManifestLoader {
         in values: [ValueDeclaration]
     ) throws -> ValueDeclaration {
         guard let value = values.first(where: { $0.name == name }) else {
-            throw ValidationError("Package.gradient requires let \(name): \(typeNames[0]).")
+            throw ValidationError("Package.range requires let \(name): \(typeNames[0]).")
         }
         guard typeNames.contains(value.typeName) else {
             throw ValidationError(
-                "Package.gradient requires let \(name): \(typeNames.joined(separator: " or ")), got \(value.typeName)."
+                "Package.range requires let \(name): \(typeNames.joined(separator: " or ")), got \(value.typeName)."
             )
         }
         return value
@@ -199,7 +199,7 @@ enum PackageManifestLoader {
         }
     }
 
-    private static func remoteURL(from expression: GradientSyntax.Expression) -> String? {
+    private static func remoteURL(from expression: RangeSyntax.Expression) -> String? {
         switch expression {
         case .string(let string):
             return string

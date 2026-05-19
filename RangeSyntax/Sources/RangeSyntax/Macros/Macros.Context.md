@@ -60,7 +60,7 @@ surface is for the target kind to expose:
 
 Current preferred `Init` shape:
 
-```gradient
+```range
 #language
 construct Init: Syntax {
     let declaration: Declaration
@@ -89,7 +89,7 @@ This keeps the model clean:
 
 Current aligned `Parameter` shape:
 
-```gradient
+```range
 #language
 construct Parameter: Syntax {
     let declaration: Declaration
@@ -112,7 +112,7 @@ construct Parameter: Syntax {
 
 Current preferred `Function` shape:
 
-```gradient
+```range
 #language
 construct Function: Syntax {
     let declaration: Declaration
@@ -136,13 +136,13 @@ construct Function: Syntax {
 
 - Expression-targeted macros receive expression syntax directly
 
-```gradient
+```range
 macro stringify(value _: capture Expression): Expression -> String { target, diagnostics in
     target.rewrite("\(value)")
 }
 ```
 
-```gradient
+```range
 macro lock(): Block { target, diagnostics in
     target.rewrite({
         target()
@@ -152,7 +152,7 @@ macro lock(): Block { target, diagnostics in
 
 - Declaration-targeted macros receive the declared compiler structure directly
 
-```gradient
+```range
 macro codable(): Construct { target, diagnostics in
     target.declaration.self
     target.declaration.inits
@@ -160,14 +160,14 @@ macro codable(): Construct { target, diagnostics in
 }
 ```
 
-```gradient
+```range
 macro iterable(): Enum { target, diagnostics in
     target.declaration.self
     target.declaration.cases
 }
 ```
 
-```gradient
+```range
 macro equatable(): Protocol { target, diagnostics in
     target.declaration.self
     target.declaration.inits
@@ -175,7 +175,7 @@ macro equatable(): Protocol { target, diagnostics in
 }
 ```
 
-```gradient
+```range
 macro tracedExtension(): Extension { target, diagnostics in
     target.target
     target.protocols
@@ -185,7 +185,7 @@ macro tracedExtension(): Extension { target, diagnostics in
 
 - The macro surface should expose language concepts rather than hidden compiler handles
 
-```gradient
+```range
 construct
 property
 parameter
@@ -197,7 +197,7 @@ block
 
 - Block and expression targets are syntax-first
 
-```gradient
+```range
 macro lock(): Block { target, diagnostics in
     target.rewrite({
         acquire()
@@ -209,7 +209,7 @@ macro lock(): Block { target, diagnostics in
 
 - Declaration targets are declaration-aware
 
-```gradient
+```range
 macro clamped(min: Int, max: Int): Property { target, diagnostics in
     target.bindingKind
     target.declaration.type
@@ -220,14 +220,14 @@ macro clamped(min: Int, max: Int): Property { target, diagnostics in
 - Callable and initializer targets should prefer declaration and application
   facets rather than one flat bag of members
 
-```gradient
+```range
 macro literal<T>(): Function { target, diagnostics in
     let declaration = target.declaration
     let application = target.application
 }
 ```
 
-```gradient
+```range
 macro traced(): Function { target, diagnostics in
     let declaration = target.declaration
     let application = target.application
@@ -236,7 +236,7 @@ macro traced(): Function { target, diagnostics in
 
 - Attachment targets are compiler-known language concepts
 
-```gradient
+```range
 Expression
 Block
 Construct

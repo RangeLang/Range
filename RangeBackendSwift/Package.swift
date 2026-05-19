@@ -3,24 +3,24 @@
 import PackageDescription
 
 let package = Package(
-    name: "GradientBackendSwift",
+    name: "RangeBackendSwift",
     platforms: [
         .macOS(.v13)
     ],
     products: [
         .library(
-            name: "GradientBackendSwift",
-            targets: ["GradientBackendSwift"]
+            name: "RangeBackendSwift",
+            targets: ["RangeBackendSwift"]
         )
     ],
     dependencies: [
-        .package(path: "../GradientSyntax")
+        .package(path: "../RangeSyntax")
     ],
     targets: [
         .target(
-            name: "GradientBackendSwift",
+            name: "RangeBackendSwift",
             dependencies: [
-                .product(name: "GradientSyntax", package: "GradientSyntax")
+                .product(name: "RangeSyntax", package: "RangeSyntax")
             ],
             path: "Sources",
             swiftSettings: [
@@ -28,8 +28,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "GradientBackendSwiftTests",
-            dependencies: ["GradientBackendSwift"],
+            name: "RangeBackendSwiftTests",
+            dependencies: ["RangeBackendSwift"],
             path: "Tests"
         )
     ]

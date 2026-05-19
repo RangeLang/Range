@@ -17,7 +17,7 @@ A protocol is a non-instantiable contract.
 
 - Non-instantiable
 
-```gradient
+```range
 protocol Named {
     let name: String
 }
@@ -25,7 +25,7 @@ protocol Named {
 
 - Can be inherited by constructs
 
-```gradient
+```range
 protocol Named {
     let name: String
 }
@@ -37,7 +37,7 @@ construct User: Named {
 
 - Can inherit from other protocols
 
-```gradient
+```range
 protocol Named {
     let name: String
 }
@@ -49,7 +49,7 @@ protocol Person: Named {
 
 - Can declare graph-binding requirements
 
-```gradient
+```range
 protocol Paginated {
     state page: Int
 }
@@ -57,7 +57,7 @@ protocol Paginated {
 
 - The graph-binding kind is part of the contract
 
-```gradient
+```range
 protocol Paginated {
     state page: Int
 }
@@ -71,7 +71,7 @@ construct UserList: Paginated {
 
 - Constructs own the storage that satisfies protocol requirements
 
-```gradient
+```range
 protocol Identifiable {
     let id: UUID
 }
@@ -85,7 +85,7 @@ The protocol requires the member, but the storage lives in the construct.
 
 - Protocols can require functions
 
-```gradient
+```range
 protocol Named {
     function displayName() -> String
 }
@@ -93,7 +93,7 @@ protocol Named {
 
 - Protocols can require initializers
 
-```gradient
+```range
 protocol Loadable {
     init(path: String)
 }
@@ -101,7 +101,7 @@ protocol Loadable {
 
 - Default behavior lives in protocol extensions, not in protocol storage
 
-```gradient
+```range
 protocol Paginated {
     state page: Int
 }
@@ -115,7 +115,7 @@ extension Paginated {
 
 - Protocols can be generic
 
-```gradient
+```range
 protocol Container<Item>
 
 protocol Mapping<Input: Comparable, Output>

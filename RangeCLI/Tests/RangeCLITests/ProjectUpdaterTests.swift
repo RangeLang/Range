@@ -1,5 +1,5 @@
 import Foundation
-@testable import GradientCLI
+@testable import RangeCLI
 import Testing
 
 @Suite("Project updating")
@@ -8,17 +8,17 @@ struct ProjectUpdaterTests {
     func gitHubOriginURLsProducePackageReferences() throws {
         let updater = ProjectUpdater(path: ".", updateCLI: false)
 
-        #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Gradient") == "georgetchelidze/Gradient")
-        #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Gradient.git") == "georgetchelidze/Gradient")
-        #expect(try updater.gitHubReference(from: "git@github.com:georgetchelidze/Gradient.git") == "georgetchelidze/Gradient")
+        #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Range") == "georgetchelidze/Range")
+        #expect(try updater.gitHubReference(from: "https://github.com/georgetchelidze/Range.git") == "georgetchelidze/Range")
+        #expect(try updater.gitHubReference(from: "git@github.com:georgetchelidze/Range.git") == "georgetchelidze/Range")
     }
 
     @Test("Release update archive name matches current platform")
     func releaseUpdateArchiveNameMatchesCurrentPlatform() throws {
         #if os(macOS) && arch(arm64)
-        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "gradient-macos-arm64.lang.tar.gz")
+        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "range-macos-arm64.lang.tar.gz")
         #elseif os(macOS) && arch(x86_64)
-        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "gradient-macos-x64.lang.tar.gz")
+        #expect(try ProjectUpdater.releaseArchiveNameForCurrentPlatform() == "range-macos-x64.lang.tar.gz")
         #endif
     }
 
@@ -30,12 +30,12 @@ struct ProjectUpdaterTests {
     @Test("Release repository URL normalizes owner repo references")
     func releaseRepositoryURLNormalizesOwnerRepoReferences() {
         #expect(
-            ProjectUpdater.releaseRepositoryURL(for: "georgetchelidze/Gradient")
-                == "https://github.com/georgetchelidze/Gradient.git"
+            ProjectUpdater.releaseRepositoryURL(for: "georgetchelidze/Range")
+                == "https://github.com/georgetchelidze/Range.git"
         )
         #expect(
-            ProjectUpdater.releaseRepositoryURL(for: "https://github.com/georgetchelidze/Gradient.git")
-                == "https://github.com/georgetchelidze/Gradient.git"
+            ProjectUpdater.releaseRepositoryURL(for: "https://github.com/georgetchelidze/Range.git")
+                == "https://github.com/georgetchelidze/Range.git"
         )
     }
 }

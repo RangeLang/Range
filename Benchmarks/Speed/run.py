@@ -60,20 +60,20 @@ def require_tool(name: str) -> None:
         raise SystemExit(f"Missing required tool: {name}")
 
 
-def prepare_gradient_project() -> Path:
-    project = BUILD / "GradientSpeed"
+def prepare_range_project() -> Path:
+    project = BUILD / "RangeSpeed"
     project.mkdir(parents=True, exist_ok=True)
-    (project / "Package.gradient").write_text(
+    (project / "Package.range").write_text(
         """#package
 construct Project {
-    let name: Title("GradientSpeed")
+    let name: Title("RangeSpeed")
     let version: Version(0.1.0)
     let author: String("George")
 }
 """,
         encoding="utf-8",
     )
-    (project / "Playground.gradient").write_text(
+    (project / "Playground.range").write_text(
         f"""#main {{
     let n: Int = {ITERATIONS}
 
@@ -102,9 +102,9 @@ def build_targets() -> list[BenchTarget]:
 
     c_binary = BUILD / "speed-c"
     rust_binary = BUILD / "speed-rust"
-    gradient_project = prepare_gradient_project()
-    gradient_cli = ROOT / "GradientCLI" / ".build" / "release" / "GradientCLI"
-    gradient_binary = gradient_project / ".gradient" / "Build" / "swift" / ".build" / "release" / "GradientGenerated"
+    range_project = prepare_range_project()
+    range_cli = ROOT / "RangeCLI" / ".build" / "release" / "RangeCLI"
+    range_binary = range_project / ".range" / "Build" / "swift" / ".build" / "release" / "RangeGenerated"
 
     if not timed_setup(
         "C",
@@ -117,19 +117,19 @@ def build_targets() -> list[BenchTarget]:
     ):
         raise SystemExit("Rust setup failed")
     if not timed_setup(
-        "Gradient CLI",
-        ["swift", "build", "-c", "release", "--package-path", "GradientCLI", "--product", "GradientCLI"],
+        "Range CLI",
+        ["swift", "build", "-c", "release", "--package-path", "RangeCLI", "--product", "RangeCLI"],
     ):
-        raise SystemExit("Gradient CLI setup failed")
+        raise SystemExit("Range CLI setup failed")
     if not timed_setup(
-        "Gradient emit",
-        [str(gradient_cli), "compile", str(gradient_project)],
+        "Range emit",
+        [str(range_cli), "compile", str(range_project)],
     ):
-        raise SystemExit("Gradient emit failed")
-    gradient_runtime_available = timed_setup(
-        "Gradient generated Swift",
+        raise SystemExit("Range emit failed")
+    range_runtime_available = timed_setup(
+        "Range generated Swift",
         ["swift", "build", "-c", "release"],
-        cwd=gradient_project / ".gradient" / "Build" / "swift",
+        cwd=range_project / ".range" / "Build" / "swift",
     )
 
     targets = [
@@ -138,10 +138,10 @@ def build_targets() -> list[BenchTarget]:
         BenchTarget("Python", ["python3", str(BENCH / "python" / "main.py"), str(ITERATIONS)]),
     ]
 
-    if gradient_runtime_available:
-        targets.append(BenchTarget("Gradient", [str(gradient_binary)]))
+    if range_runtime_available:
+        targets.append(BenchTarget("Range", [str(range_binary)]))
     else:
-        print("Gradient runtime: skipped because generated Swift did not build")
+        print("Range runtime: skipped because generated Swift did not build")
 
     return targets
 

@@ -18,7 +18,7 @@ extension ApplicationGraph {
             """
     }
 
-    public func renderHTML(title: String = "Gradient Application Graph") -> String {
+    public func renderHTML(title: String = "Range Application Graph") -> String {
         let payload = makeHTMLPayload()
 
         return """
@@ -42,9 +42,9 @@ extension ApplicationGraph {
                   font-family: "Iowan Old Style", "Palatino Linotype", serif;
                   color: var(--ink);
                   background:
-                    radial-gradient(circle at top left, rgba(193, 168, 135, 0.18), transparent 30%),
-                    radial-gradient(circle at bottom right, rgba(112, 139, 159, 0.16), transparent 28%),
-                    linear-gradient(180deg, #f8f4ed 0%, var(--bg) 100%);
+                    radial-range(circle at top left, rgba(193, 168, 135, 0.18), transparent 30%),
+                    radial-range(circle at bottom right, rgba(112, 139, 159, 0.16), transparent 28%),
+                    linear-range(180deg, #f8f4ed 0%, var(--bg) 100%);
                 }
                 .layout {
                   display: grid;

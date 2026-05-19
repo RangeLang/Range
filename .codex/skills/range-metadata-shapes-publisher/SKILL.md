@@ -1,9 +1,9 @@
 ---
-name: gradient-metadata-shapes-publisher
-description: Use when changing Gradient package publishing, metadata extraction, declaration metadata, visibility defaults, namespace locking, typed construction syntax, or docs around publisher-facing declaration shapes. Use the embedded direction in this skill to catch stale examples or implementation drift.
+name: range-metadata-shapes-publisher
+description: Use when changing Range package publishing, metadata extraction, declaration metadata, visibility defaults, namespace locking, typed construction syntax, or docs around publisher-facing declaration shapes. Use the embedded direction in this skill to catch stale examples or implementation drift.
 ---
 
-# Gradient Metadata Shapes Publisher
+# Range Metadata Shapes Publisher
 
 ## Workflow
 

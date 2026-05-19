@@ -34,7 +34,7 @@ extension Parser {
         var setterBody: [Statement]?
 
         while peek() != .rightBrace {
-            if peek() == .keyword(GradientSyntax.Keyword.getter.rawValue) {
+            if peek() == .keyword(RangeSyntax.Keyword.getter.rawValue) {
                 guard getterBody == nil else {
                     throw ParseError("binding '\(name)' can only define one get block.")
                 }
@@ -43,7 +43,7 @@ extension Parser {
                 continue
             }
 
-            if peek() == .keyword(GradientSyntax.Keyword.setter.rawValue) {
+            if peek() == .keyword(RangeSyntax.Keyword.setter.rawValue) {
                 guard setterBody == nil else {
                     throw ParseError("binding '\(name)' can only define one set block.")
                 }
@@ -73,7 +73,7 @@ extension Parser {
 
     func isBindingDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        guard peek(offset: offset) == .keyword(GradientSyntax.Keyword.binding.rawValue) else {
+        guard peek(offset: offset) == .keyword(RangeSyntax.Keyword.binding.rawValue) else {
             return false
         }
         guard case .identifier = peek(offset: offset + 1) else { return false }

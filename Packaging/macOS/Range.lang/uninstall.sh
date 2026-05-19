@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-default_prefix="$HOME/.gradient"
-prefix="${GRADIENT_INSTALL_PREFIX:-$default_prefix}"
-target="$prefix/bin/gradient"
-core_target="$prefix/share/gradient/GradientCore"
-skill_target="$prefix/share/gradient/Skills"
+default_prefix="$HOME/.range"
+prefix="${RANGE_INSTALL_PREFIX:-$default_prefix}"
+target="$prefix/bin/range"
+core_target="$prefix/share/range/RangeCore"
+skill_target="$prefix/share/range/Skills"
 
-echo "Gradient CLI uninstaller"
+echo "Range CLI uninstaller"
 echo
 echo "Will remove:"
 echo "  $target"
@@ -44,4 +44,4 @@ elif [[ -e "$skill_target" ]]; then
   sudo rm -rf "$skill_target"
 fi
 
-echo "Removed Gradient CLI."
+echo "Removed Range CLI."

@@ -18,92 +18,92 @@
   {
     "token_type": "type",
     "token_modifiers": ["declaration"],
-    "style": ["constructor", "type.gradient.declaration"]
+    "style": ["constructor", "type.range.declaration"]
   },
   {
     "token_type": "type",
     "token_modifiers": ["application"],
-    "style": ["type.application", "type", "type.gradient.application"]
+    "style": ["type.application", "type", "type.range.application"]
   },
   {
     "token_type": "type",
-    "style": ["type", "type.gradient"]
+    "style": ["type", "type.range"]
   },
   {
     "token_type": "function",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "function.gradient.declaration"]
+    "style": ["declaration", "function.range.declaration"]
   },
   {
     "token_type": "function",
-    "style": ["function", "function.gradient"]
+    "style": ["function", "function.range"]
   },
   {
     "token_type": "method",
-    "style": ["function.method", "function", "function.gradient.method"]
+    "style": ["function.method", "function", "function.range.method"]
   },
   {
     "token_type": "variable",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "variable.gradient.declaration"]
+    "style": ["declaration", "variable.range.declaration"]
   },
   {
     "token_type": "variable",
     "token_modifiers": ["argument"],
-    "style": ["variable.parameter", "variable", "variable.gradient.argument"]
+    "style": ["variable.parameter", "variable", "variable.range.argument"]
   },
   {
     "token_type": "variable",
-    "style": ["variable", "variable.gradient"]
+    "style": ["variable", "variable.range"]
   },
   {
     "token_type": "property",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "property.gradient.declaration"]
+    "style": ["declaration", "property.range.declaration"]
   },
   {
     "token_type": "property",
-    "style": ["property", "variable", "property.gradient"]
+    "style": ["property", "variable", "property.range"]
   },
   {
     "token_type": "parameter",
     "token_modifiers": ["argument"],
-    "style": ["variable.parameter", "parameter.gradient.argument"]
+    "style": ["variable.parameter", "parameter.range.argument"]
   },
   {
     "token_type": "parameter",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "parameter.gradient.declaration"]
+    "style": ["declaration", "parameter.range.declaration"]
   },
   {
     "token_type": "parameter",
-    "style": ["variable.parameter", "parameter.gradient"]
+    "style": ["variable.parameter", "parameter.range"]
   },
   {
     "token_type": "enumMember",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "enumMember.gradient.declaration"]
+    "style": ["declaration", "enumMember.range.declaration"]
   },
   {
     "token_type": "enumMember",
-    "style": ["text", "enumMember.gradient"]
+    "style": ["text", "enumMember.range"]
   },
   {
     "token_type": "label",
     "token_modifiers": ["declaration"],
-    "style": ["declaration", "label.gradient.declaration"]
+    "style": ["declaration", "label.range.declaration"]
   },
   {
     "token_type": "label",
-    "style": ["text", "label.gradient"]
+    "style": ["text", "label.range"]
   },
   {
     "token_type": "macro",
     "token_modifiers": ["declaration"],
-    "style": ["macro.gradient.declaration", "function.gradient.declaration", "declaration"]
+    "style": ["macro.range.declaration", "function.range.declaration", "declaration"]
   },
   {
     "token_type": "macro",
-    "style": ["macro.gradient", "function.gradient", "function"]
+    "style": ["macro.range", "function.range", "function"]
   }
 ]

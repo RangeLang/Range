@@ -2,11 +2,11 @@ import Foundation
 
 extension Parser {
     func isMacroDeclarationStart() -> Bool {
-        peek() == .keyword(GradientSyntax.Keyword.macro.rawValue)
+        peek() == .keyword(RangeSyntax.Keyword.macro.rawValue)
     }
 
     func isMarkerDeclarationStart() -> Bool {
-        peek() == .keyword(GradientSyntax.Keyword.marker.rawValue)
+        peek() == .keyword(RangeSyntax.Keyword.marker.rawValue)
     }
 
     mutating func parseMacroDeclaration(signatureOnly: Bool = false) throws -> MacroDeclaration {
@@ -175,7 +175,7 @@ extension Parser {
         )
     }
 
-    mutating func parseFreestandingMacroValueBody(parameters: [GradientFunctionParameter]) throws
+    mutating func parseFreestandingMacroValueBody(parameters: [RangeFunctionParameter]) throws
         -> [Statement]
     {
         var localBindings = Dictionary(
@@ -194,7 +194,7 @@ extension Parser {
         return statements
     }
 
-    mutating func parseMarkerBody(parameters: [GradientFunctionParameter]) throws -> (
+    mutating func parseMarkerBody(parameters: [RangeFunctionParameter]) throws -> (
         bindings: MacroBindings?,
         body: [Statement]
     ) {
@@ -398,17 +398,17 @@ extension Parser {
         }
 
         switch previous {
-        case .keyword(GradientSyntax.Keyword.construct.rawValue),
-            .keyword(GradientSyntax.Keyword.enumeration.rawValue),
-            .keyword(GradientSyntax.Keyword.protocolDefinition.rawValue),
-            .keyword(GradientSyntax.Keyword.namespace.rawValue),
-            .keyword(GradientSyntax.Keyword.caseBranch.rawValue):
+        case .keyword(RangeSyntax.Keyword.construct.rawValue),
+            .keyword(RangeSyntax.Keyword.enumeration.rawValue),
+            .keyword(RangeSyntax.Keyword.protocolDefinition.rawValue),
+            .keyword(RangeSyntax.Keyword.namespace.rawValue),
+            .keyword(RangeSyntax.Keyword.caseBranch.rawValue):
             return .declaration
-        case .keyword(GradientSyntax.Keyword.typeExtension.rawValue):
+        case .keyword(RangeSyntax.Keyword.typeExtension.rawValue):
             return .nominalTypeReference
-        case .keyword(GradientSyntax.Keyword.function.rawValue):
+        case .keyword(RangeSyntax.Keyword.function.rawValue):
             return .callableName
-        case .keyword(GradientSyntax.Keyword.binding.rawValue):
+        case .keyword(RangeSyntax.Keyword.binding.rawValue):
             return .typeReference
         case .arrow:
             return .typeReference

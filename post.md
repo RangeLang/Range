@@ -6,11 +6,11 @@ Now neural engines, NPUs, DSPs, custom SoC blocks, and whatever comes next are d
 
 A language should not pretend there is one host anymore.
 
-Gradient needs package-level parameters for the execution world it is describing.
+Range needs package-level parameters for the execution world it is describing.
 
 One package may want heavy quantized defaults:
 
-```gradient
+```range
 #package.defaults
 construct NeuralRuntime {
   Float<.8>
@@ -23,7 +23,7 @@ construct NeuralRuntime {
 
 Another package may be a rendering framework:
 
-```gradient
+```range
 #package.defaults
 construct RenderRuntime {
   Float<.32>

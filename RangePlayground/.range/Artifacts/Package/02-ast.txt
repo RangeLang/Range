@@ -1,13 +1,13 @@
 AST:
-  ▿ GradientSyntax.SourceFileNode.construct
-    ▿ construct: GradientSyntax.ConstructDeclaration
+  ▿ RangeSyntax.SourceFileNode.construct
+    ▿ construct: RangeSyntax.ConstructDeclaration
       - macros: 0 elements
-      - kind: GradientSyntax.ConstructKind.declaration
+      - kind: RangeSyntax.ConstructKind.declaration
       - attribute: nil
-      - name: "GradientPlayground"
+      - name: "RangePlayground"
       - genericParameters: 0 elements
       ▿ conformances: 1 element
-        ▿ GradientSyntax.TypeReference.named
+        ▿ RangeSyntax.TypeReference.named
           - named: "Package"
       - states: 0 elements
       - environments: 0 elements

@@ -1,15 +1,15 @@
 import ArgumentParser
 
-extension GradientCLI {
+extension RangeCLI {
     struct Link: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Install the macOS Gradient CLI into a Package.gradient project."
+            abstract: "Install the macOS Range CLI into a Package.range project."
         )
 
-        @Argument(help: "Package.gradient project root.")
+        @Argument(help: "Package.range project root.")
         var project: String = "."
 
-        @Option(help: "Installed Gradient binary to link.")
+        @Option(help: "Installed Range binary to link.")
         var binary: String = ProjectBinaryLinker.defaultMacOSBinaryPath
 
         mutating func run() throws {
@@ -18,7 +18,7 @@ extension GradientCLI {
                     projectPath: project,
                     binaryPath: binary
                 ).run()
-                TerminalLog.out("Installed project Gradient at \(link.path)", level: .success)
+                TerminalLog.out("Installed project Range at \(link.path)", level: .success)
                 TerminalLog.subtleOut("Source: \(binary)")
             } catch {
                 ErrorPresenter.printError(error)

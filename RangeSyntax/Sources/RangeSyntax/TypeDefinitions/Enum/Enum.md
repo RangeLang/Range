@@ -24,7 +24,7 @@ An enum is a sum type with a fixed set of cases.
 
 ## Examples
 
-```gradient
+```range
 enum Direction {
     case north
     case south
@@ -33,14 +33,14 @@ enum Direction {
 }
 ```
 
-```gradient
+```range
 enum Result {
     case success(String)
     case failure(Error)
 }
 ```
 
-```gradient
+```range
 enum Planet: Int
 ```
 
@@ -49,7 +49,7 @@ enum Planet: Int
 - Enums are not identity-bearing.
 - Enums are not inherited from.
 - Enums are not instantiated like ordinary objects.
-- Gradient enums are intended to behave as compiler-checked tagged unions.
+- Range enums are intended to behave as compiler-checked tagged unions.
 
 ## Composition
 

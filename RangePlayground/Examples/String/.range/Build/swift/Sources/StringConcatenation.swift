@@ -1,7 +1,7 @@
 import Foundation
 
 @main
-struct GradientMain {
+struct RangeMain {
     static func main() throws {
         let greeting = "Hello" + " World"
         let text = "Hello"

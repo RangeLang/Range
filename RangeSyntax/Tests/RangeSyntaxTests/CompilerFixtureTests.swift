@@ -1,5 +1,5 @@
 import Foundation
-@testable import GradientSyntax
+@testable import RangeSyntax
 import Testing
 
 @Suite("Compiler fixtures")
@@ -31,9 +31,9 @@ struct CompilerFixtureTests {
     func compilerDiagnosticsIncludeMacroWarnings() throws {
         let fixture = try fixtureFile(
             in: "CompilePass",
-            path: "Macros/SyntaxProducingMacroIdentifierMemberAccess.gradient"
+            path: "Macros/SyntaxProducingMacroIdentifierMemberAccess.range"
         )
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: fixture.path,
@@ -58,9 +58,9 @@ struct CompilerFixtureTests {
     func userMacroDiagnosticsFeedCompilerDiagnostics() throws {
         let fixture = try fixtureFile(
             in: "CompilePass",
-            path: "Macros/MacroDiagnosticsWarning.gradient"
+            path: "Macros/MacroDiagnosticsWarning.range"
         )
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: fixture.path,
@@ -74,7 +74,7 @@ struct CompilerFixtureTests {
         #expect(
             diagnostics.contains {
                 $0.severity == .warning
-                    && $0.source == "gradient-macro"
+                    && $0.source == "range-macro"
                     && $0.code == "macro.diagnostic.warning"
                     && $0.message == "custom macro warning"
                     && $0.path == fixture.path
@@ -83,7 +83,7 @@ struct CompilerFixtureTests {
         #expect(
             diagnostics.contains {
                 $0.severity == .information
-                    && $0.source == "gradient-macro"
+                    && $0.source == "range-macro"
                     && $0.code == "macro.diagnostic.information"
                     && $0.message == "custom macro information"
                     && $0.path == fixture.path
@@ -92,7 +92,7 @@ struct CompilerFixtureTests {
         #expect(
             diagnostics.contains {
                 $0.severity == .hint
-                    && $0.source == "gradient-macro"
+                    && $0.source == "range-macro"
                     && $0.code == "macro.diagnostic.hint"
                     && $0.message == "custom macro hint"
                     && $0.path == fixture.path
@@ -121,7 +121,7 @@ struct CompilerFixtureTests {
         let graph = DeclarationGraph(
             files: [
                 ParsedSourceFile(
-                    path: "/tmp/MacroGraphIdentity.gradient",
+                    path: "/tmp/MacroGraphIdentity.range",
                     source: source,
                     sourceFile: sourceFile
                 )
@@ -170,10 +170,10 @@ struct CompilerFixtureTests {
         )
         #expect(declaration.field("identifier") != nil)
 
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/MacroGraphExpansion.gradient",
+                path: "/tmp/MacroGraphExpansion.range",
                 source: """
                 macro graphNamed(): Construct { target, diagnostics, graph in
                     let declaration: Construct.Declaration = graph.declaration(target.identity)
@@ -205,10 +205,10 @@ struct CompilerFixtureTests {
 
     @Test("Markers query graph through identities")
     func markersQueryGraphThroughIdentities() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/MarkerGraphIdentity.gradient",
+                path: "/tmp/MarkerGraphIdentity.range",
                 source: """
                 marker graphName(): Construct -> String { target, diagnostics, graph in
                     let declaration: Construct.Declaration = graph.declaration(target.identity)
@@ -229,10 +229,10 @@ struct CompilerFixtureTests {
 
     @Test("Extension markers evaluate against extension target")
     func extensionMarkersEvaluateAgainstExtensionTarget() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/ExtensionMarker.gradient",
+                path: "/tmp/ExtensionMarker.range",
                 source: """
                 marker extensionTargetName(): Extension -> String { target, diagnostics in
                     return target.target.name
@@ -262,10 +262,10 @@ struct CompilerFixtureTests {
 
     @Test("Extension markers reject non-extension targets")
     func extensionMarkersRejectNonExtensionTargets() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/InvalidExtensionMarker.gradient",
+                path: "/tmp/InvalidExtensionMarker.range",
                 source: """
                 marker constructOnly(): Construct -> String { target, diagnostics in
                     return target.declaration.self.name
@@ -296,8 +296,8 @@ struct CompilerFixtureTests {
 
     @Test("Parser diagnostics point at invalid hash syntax")
     func parserDiagnosticsPointAtInvalidHashSyntax() throws {
-        let projectPath = "/tmp/InvalidHashMacro.gradient"
-        var inputs = try gradientCoreInputs()
+        let projectPath = "/tmp/InvalidHashMacro.range"
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: projectPath,
@@ -314,7 +314,7 @@ struct CompilerFixtureTests {
         let diagnostic = try #require(
             diagnostics.first {
                 $0.message == "Expected identifier after #."
-                    && $0.source == "gradient-parser"
+                    && $0.source == "range-parser"
                     && $0.path == projectPath
             }
         )
@@ -327,8 +327,8 @@ struct CompilerFixtureTests {
 
     @Test("Project source cannot declare initializers")
     func projectSourceCannotDeclareInitializers() throws {
-        let projectPath = "/tmp/InitializerSyntax.gradient"
-        var inputs = try gradientCoreInputs()
+        let projectPath = "/tmp/InitializerSyntax.range"
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: projectPath,
@@ -348,7 +348,7 @@ struct CompilerFixtureTests {
         let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
         #expect(
             diagnostics.contains {
-                $0.source == "gradient-parser"
+                $0.source == "range-parser"
                     && $0.path == projectPath
                     && $0.message.contains("Initializer declarations are no longer source syntax")
             }
@@ -357,10 +357,10 @@ struct CompilerFixtureTests {
 
     @Test("Construct applications bind directly to stored declarations")
     func constructApplicationsBindDirectlyToStoredDeclarations() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/DirectConstructApplication.gradient",
+                path: "/tmp/DirectConstructApplication.range",
                 source: """
                 construct User {
                     let id: Int
@@ -405,10 +405,10 @@ struct CompilerFixtureTests {
         }
         let counter = try #require(module.constructs.first(where: { $0.name == "Counter" }))
 
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/TypedConstructionOptional.gradient",
+                path: "/tmp/TypedConstructionOptional.range",
                 source: source,
                 role: .project
             )
@@ -459,18 +459,18 @@ struct CompilerFixtureTests {
         }
         """
 
-        var validInputs = try gradientCoreInputs()
+        var validInputs = try rangeCoreInputs()
         validInputs.append(
             SourceInput(
-                path: "/tmp/TypedChannelDeclaration.gradient",
+                path: "/tmp/TypedChannelDeclaration.range",
                 source: validSource,
                 role: .project
             )
         )
         _ = try CompilerPipeline().buildValidated(inputs: validInputs)
 
-        let invalidPath = "/tmp/AssignmentShapedTypeConstruction.gradient"
-        var invalidInputs = try gradientCoreInputs()
+        let invalidPath = "/tmp/AssignmentShapedTypeConstruction.range"
+        var invalidInputs = try rangeCoreInputs()
         invalidInputs.append(
             SourceInput(
                 path: invalidPath,
@@ -494,8 +494,8 @@ struct CompilerFixtureTests {
 
     @Test("Construct applications reject labels with no stored declaration")
     func constructApplicationsRejectLabelsWithNoStoredDeclaration() throws {
-        let projectPath = "/tmp/DirectConstructApplicationBadLabel.gradient"
-        var inputs = try gradientCoreInputs()
+        let projectPath = "/tmp/DirectConstructApplicationBadLabel.range"
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: projectPath,
@@ -524,10 +524,10 @@ struct CompilerFixtureTests {
 
     @Test("Metadata slot markers declare semantic slots")
     func metadataSlotMarkersDeclareSemanticSlots() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/MetadataSlot.gradient",
+                path: "/tmp/MetadataSlot.range",
                 source: """
                 marker styling(): Namespace<Construct>
 
@@ -548,10 +548,10 @@ struct CompilerFixtureTests {
 
     @Test("Metadata slot markers keep targets as declarations")
     func metadataSlotMarkersKeepTargetsAsDeclarations() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/MetadataSlotTarget.gradient",
+                path: "/tmp/MetadataSlotTarget.range",
                 source: """
                 marker persisted(_ prefix: String): Namespace<Construct>
 
@@ -572,10 +572,10 @@ struct CompilerFixtureTests {
 
     @Test("Package manifests collect package metadata")
     func packageManifestsCollectPackageMetadata() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/PackageSpace.gradient",
+                path: "/tmp/PackageSpace.range",
                 source: """
                 #package
                 construct Project {
@@ -597,10 +597,10 @@ struct CompilerFixtureTests {
 
     @Test("Unknown attributes reject non-macro spelling")
     func unknownAttributesRequireMatchingNamespaces() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/UnknownAttribute.gradient",
+                path: "/tmp/UnknownAttribute.range",
                 source: """
                 @Missing
                 construct Panel {
@@ -621,10 +621,10 @@ struct CompilerFixtureTests {
 
     @Test("Project macros infer across project files")
     func projectMacrosInferAcrossProjectFiles() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/ProjectMacros.gradient",
+                path: "/tmp/ProjectMacros.range",
                 source: """
                 macro captureText(_ value: capture Expression): Expression -> String { target, diagnostics in
                     target.replace(with: "captured: \\(value)")
@@ -635,7 +635,7 @@ struct CompilerFixtureTests {
         )
         inputs.append(
             SourceInput(
-                path: "/tmp/ProjectMain.gradient",
+                path: "/tmp/ProjectMain.range",
                 source: """
                 #main {
                     let text = @captureText(1 + 2)
@@ -650,10 +650,10 @@ struct CompilerFixtureTests {
 
     @Test("Project callables and macros infer before later declarations")
     func projectDeclarationsInferBeforeLaterDeclarations() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/ForwardDeclarations.gradient",
+                path: "/tmp/ForwardDeclarations.range",
                 source: """
                 #main {
                     let messageText = message()
@@ -719,7 +719,7 @@ struct CompilerFixtureTests {
 
     @Test("Construct application surface is present in declaration graph")
     func constructApplicationSurfaceIsPresentInDeclarationGraph() throws {
-        let program = try CompilerPipeline().build(inputs: gradientCoreInputs())
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
         let graph = program.declarationGraph
 
         #expect(graph.constructsByName["Construct"] != nil)
@@ -732,7 +732,7 @@ struct CompilerFixtureTests {
 
     @Test("#syntax declarations are syntax-facing without Syntax conformance")
     func syntaxDeclarationsAreSyntaxFacingWithoutSyntaxConformance() throws {
-        let program = try CompilerPipeline().build(inputs: gradientCoreInputs())
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
         let graph = program.declarationGraph
 
         #expect(graph.protocolsByName["Expression"]?.isCore == true)
@@ -758,7 +758,7 @@ struct CompilerFixtureTests {
         }
         """
         let program = try CompilerPipeline().build(inputs: [
-            SourceInput(path: "/tmp/GraphLocations.gradient", source: source, role: .project)
+            SourceInput(path: "/tmp/GraphLocations.range", source: source, role: .project)
         ])
         let graph = program.declarationGraph
 
@@ -767,7 +767,7 @@ struct CompilerFixtureTests {
         let marker = graph.sourceLocation(named: "codingKey", kinds: [.marker])
         let function = graph.sourceLocation(named: "makeUser", kinds: [.function])
 
-        #expect(construct?.path == "/tmp/GraphLocations.gradient")
+        #expect(construct?.path == "/tmp/GraphLocations.range")
         #expect(construct?.range.start.line == 7)
         #expect(construct?.range.start.character == 10)
         #expect(macro?.range.start.line == 0)
@@ -777,10 +777,10 @@ struct CompilerFixtureTests {
 
     @Test("Declaration graph registry snapshot covers current query facts")
     func declarationGraphRegistrySnapshotCoversCurrentQueryFacts() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/DeclarationGraphRegistrySnapshot.gradient",
+                path: "/tmp/DeclarationGraphRegistrySnapshot.range",
                 source: """
                 #package
                 construct Project {
@@ -878,7 +878,7 @@ struct CompilerFixtureTests {
         #expect(graph.hasNamespaceAttribute(named: "Routes") == false)
 
         #expect(graph.packageValues(named: "packageName").count == 1)
-        #expect(graph.topLevelStates(inFilePath: "/tmp/DeclarationGraphRegistrySnapshot.gradient")
+        #expect(graph.topLevelStates(inFilePath: "/tmp/DeclarationGraphRegistrySnapshot.range")
             .map(\.name) == ["globalCount"])
 
         #expect(registry.states(onConstruct: "Panel").map(\.name) == ["count"])
@@ -922,7 +922,7 @@ struct CompilerFixtureTests {
 
     @Test("Rewrite site decoding uses declaration-backed descriptors")
     func rewriteSiteDecodingUsesDeclarationBackedDescriptors() throws {
-        let program = try CompilerPipeline().build(inputs: gradientCoreInputs())
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
         let context = program.declarationGraph.macroExpansionContext(macrosByName: [:])
 
         let direct = context.resolvedRewriteCall(
@@ -968,10 +968,10 @@ struct CompilerFixtureTests {
 
     @Test("Nested constructs qualify nested callables and constructs")
     func nestedConstructsQualifyNestedCallablesAndConstructs() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/Namespaces.gradient",
+                path: "/tmp/Namespaces.range",
                 source: """
                 construct System {
                     construct Math {
@@ -997,10 +997,10 @@ struct CompilerFixtureTests {
 
     @Test("Metadata slot marker keeps target as construct")
     func metadataSlotMarkerKeepsTargetAsConstruct() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/NamespaceConstruct.gradient",
+                path: "/tmp/NamespaceConstruct.range",
                 source: """
                 marker semantic(): Namespace<Construct>
 
@@ -1039,10 +1039,10 @@ struct CompilerFixtureTests {
 
     @Test("Namespace<Construct> marker declares construct metadata slot")
     func metadataSlotMarkerDeclaresConstructMetadataSlot() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/RegisteredNamespaceMarker.gradient",
+                path: "/tmp/RegisteredNamespaceMarker.range",
                 source: """
                 marker hostSpace(): Namespace<Construct>
 
@@ -1069,7 +1069,7 @@ struct CompilerFixtureTests {
 
     @Test("Core Math construct is available")
     func coreMathConstructIsAvailable() throws {
-        let program = try CompilerPipeline().buildValidated(inputs: gradientCoreInputs())
+        let program = try CompilerPipeline().buildValidated(inputs: rangeCoreInputs())
 
         #expect(program.declarationGraph.constructsByName["Math"]?.callables.map(\.name) == [
             "abs",
@@ -1082,10 +1082,10 @@ struct CompilerFixtureTests {
 
     @Test("Construct extensions reopen static member surface")
     func constructExtensionsReopenStaticMemberSurface() throws {
-        var inputs = try gradientCoreInputs()
+        var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/NamespaceExtension.gradient",
+                path: "/tmp/NamespaceExtension.range",
                 source: """
                 extension Math {
                     function twice(value: Int) -> Int {
@@ -1140,7 +1140,7 @@ struct CompilerFixtureTests {
 
     @Test("Clamped state macro rewrites initializer and assignments")
     func clampedStateMacroRewritesInitializerAndAssignments() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ClampedState.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ClampedState.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1203,7 +1203,7 @@ struct CompilerFixtureTests {
 
     @Test("State getter macro rewrites reads in expressions")
     func stateGetterMacroRewritesReadsInExpressions() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/GetterState.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/GetterState.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1254,7 +1254,7 @@ struct CompilerFixtureTests {
 
     @Test("Let property macro rewrites initializer and reads")
     func letPropertyMacroRewritesInitializerAndReads() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/LetProperty.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/LetProperty.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1300,7 +1300,7 @@ struct CompilerFixtureTests {
 
     @Test("Binding property macro rewrites reads and assignments")
     func bindingPropertyMacroRewritesReadsAndAssignments() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/BindingProperty.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/BindingProperty.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1359,7 +1359,7 @@ struct CompilerFixtureTests {
 
     @Test("Construct macro expand emits extension declarations")
     func constructMacroExpandEmitsExtensionDeclarations() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ConstructAddExtensionSurface.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ConstructAddExtensionSurface.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1387,7 +1387,7 @@ struct CompilerFixtureTests {
 
     @Test("Codable macro synthesizes string keyed encode and decode")
     func codableMacroSynthesizesStringKeyedEncodeAndDecode() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CodableMacroSynthesis.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CodableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1431,7 +1431,7 @@ struct CompilerFixtureTests {
 
     @Test("Equatable macro synthesizes field comparisons")
     func equatableMacroSynthesizesFieldComparisons() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/EquatableMacroSynthesis.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/EquatableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1462,7 +1462,7 @@ struct CompilerFixtureTests {
 
     @Test("Hashable macro synthesizes field combines")
     func hashableMacroSynthesizesFieldCombines() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/HashableMacroSynthesis.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/HashableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1491,7 +1491,7 @@ struct CompilerFixtureTests {
 
     @Test("Comparable macro synthesizes lexicographic ordering")
     func comparableMacroSynthesizesLexicographicOrdering() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ComparableMacroSynthesis.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ComparableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1530,7 +1530,7 @@ struct CompilerFixtureTests {
 
     @Test("CaseIterable macro synthesizes allCases function")
     func caseIterableMacroSynthesizesAllCasesFunction() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CaseIterableMacroSynthesis.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CaseIterableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1559,7 +1559,7 @@ struct CompilerFixtureTests {
 
     @Test("Derived property macro rewrites reads")
     func derivedPropertyMacroRewritesReads() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedProperty.gradient")
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedProperty.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1852,7 +1852,7 @@ private func allCasesReturnValues(in extensionDeclaration: ExtensionDeclaration)
 }
 
 private func compile(fixture: URL, expectedRole: FixtureRole) throws -> CompiledProgram {
-    var inputs = try gradientCoreInputs()
+    var inputs = try rangeCoreInputs()
     inputs.append(
         SourceInput(
             path: fixture.path,
@@ -1865,21 +1865,21 @@ private func compile(fixture: URL, expectedRole: FixtureRole) throws -> Compiled
 
 private func fixtureFiles(in suite: String) throws -> [URL] {
     let root = try repositoryRoot()
-        .appendingPathComponent("GradientCompilerFixtures", isDirectory: true)
+        .appendingPathComponent("RangeCompilerFixtures", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
-    return try gradientFiles(in: root, excludingExploration: false)
+    return try rangeFiles(in: root, excludingExploration: false)
 }
 
 private func fixtureFile(in suite: String, path: String) throws -> URL {
     try repositoryRoot()
-        .appendingPathComponent("GradientCompilerFixtures", isDirectory: true)
+        .appendingPathComponent("RangeCompilerFixtures", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
         .appendingPathComponent(path)
 }
 
-private func gradientCoreInputs() throws -> [SourceInput] {
-    try gradientFiles(
-        in: try repositoryRoot().appendingPathComponent("GradientCore", isDirectory: true),
+private func rangeCoreInputs() throws -> [SourceInput] {
+    try rangeFiles(
+        in: try repositoryRoot().appendingPathComponent("RangeCore", isDirectory: true),
         excludingExploration: true
     )
     .map { file in
@@ -1891,7 +1891,7 @@ private func gradientCoreInputs() throws -> [SourceInput] {
     }
 }
 
-private func gradientFiles(in root: URL, excludingExploration: Bool) throws -> [URL] {
+private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL] {
     guard
         let enumerator = FileManager.default.enumerator(
             at: root,
@@ -1909,13 +1909,13 @@ private func gradientFiles(in root: URL, excludingExploration: Bool) throws -> [
         if excludingExploration,
             isDirectory,
             url.lastPathComponent == "Exploration",
-            url.path.contains("/GradientCore/")
+            url.path.contains("/RangeCore/")
         {
             enumerator.skipDescendants()
             continue
         }
 
-        guard !isDirectory, url.pathExtension.lowercased() == "gradient" else {
+        guard !isDirectory, url.pathExtension.lowercased() == "range" else {
             continue
         }
         files.append(url)
@@ -1927,9 +1927,9 @@ private func gradientFiles(in root: URL, excludingExploration: Bool) throws -> [
 private func repositoryRoot() throws -> URL {
     var current = URL(fileURLWithPath: #filePath)
     while current.path != "/" {
-        let candidateCore = current.appendingPathComponent("GradientCore", isDirectory: true)
+        let candidateCore = current.appendingPathComponent("RangeCore", isDirectory: true)
         let candidateFixtures = current.appendingPathComponent(
-            "GradientCompilerFixtures",
+            "RangeCompilerFixtures",
             isDirectory: true
         )
         var isCoreDirectory: ObjCBool = false

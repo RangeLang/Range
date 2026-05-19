@@ -1,28 +1,28 @@
-# Gradient Compiler Fixtures
+# Range Compiler Fixtures
 
-This folder holds `.gradient` source files used by compiler regression tests.
+This folder holds `.range` source files used by compiler regression tests.
 
 - `CompilePass`: files that must parse, build a semantic graph, and validate.
 - `CompileFail`: files that must fail validation or compilation.
 
-These are compiler fixtures, not the future Gradient-native testing library.
+These are compiler fixtures, not the future Range-native testing library.
 
 ## Adding Fixtures
 
 Create new compiler fixtures in this folder, not inline inside Swift test files.
 
-- Put validating examples in `CompilePass/<Category>/Name.gradient`.
-- Put expected-failure examples in `CompileFail/<Category>/Name.gradient`.
+- Put validating examples in `CompilePass/<Category>/Name.range`.
+- Put expected-failure examples in `CompileFail/<Category>/Name.range`.
 - Reuse an existing category when possible. Add a new category only when it
   reflects a real compiler surface that is starting to accumulate coverage.
 - Name fixtures after the behavior being protected, not after the test method.
-  Good examples: `ClampedState.gradient`, `InitMacroRewrite.gradient`,
-  `UnknownAttribute.gradient`.
+  Good examples: `ClampedState.range`, `InitMacroRewrite.range`,
+  `UnknownAttribute.range`.
 - Keep each fixture focused. Prefer one behavior per file unless the behaviors
   are inseparable.
 - If a Swift test needs to inspect expanded AST or graph details for one
-  specific fixture, load the fixture file by path from `GradientCompilerFixtures`
-  rather than embedding the `.gradient` source directly in the test.
+  specific fixture, load the fixture file by path from `RangeCompilerFixtures`
+  rather than embedding the `.range` source directly in the test.
 
 Current top-level layout:
 
@@ -32,7 +32,7 @@ Current top-level layout:
 - `CompileFail/...`: negative fixtures grouped by the same surface areas
 
 The default rule is simple: if it is compiler input worth keeping around, it
-belongs in `GradientCompilerFixtures`.
+belongs in `RangeCompilerFixtures`.
 
 ## Roadmap
 
@@ -50,7 +50,7 @@ they protect real compiler behavior.
 - `ParsePass` / `ParseFail`: add parser-only fixtures if syntax work starts
   changing faster than semantic validation.
 
-Keep `GradientTesting` or `Testing` reserved for a future Gradient-native user testing
+Keep `RangeTesting` or `Testing` reserved for a future Range-native user testing
 library. These fixtures are for host-side compiler regression tests.
 
 ## Macro Fixtures

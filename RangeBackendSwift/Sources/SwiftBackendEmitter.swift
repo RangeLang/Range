@@ -1,5 +1,5 @@
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
 struct SwiftBackendEmitter {
     private struct SwiftEmissionContext {
@@ -328,18 +328,18 @@ struct SwiftBackendEmitter {
     private let swiftNativeStorageTypeNames: [String: String] = [
         "BoolStorage": "Bool",
         "DataStorage": "Data",
-        "Date": "__GradientDateOnly",
-        "DateStorage": "__GradientDateOnly",
-        "DateTime": "__GradientDateTime",
-        "DateTimeStorage": "__GradientDateTime",
+        "Date": "__RangeDateOnly",
+        "DateStorage": "__RangeDateOnly",
+        "DateTime": "__RangeDateTime",
+        "DateTimeStorage": "__RangeDateTime",
         "FloatStorage": "Float",
         "IntStorage": "Int",
         "StringStorage": "String",
         "UUIDStorage": "UUID",
     ]
 
-    private typealias GradientExpression = GradientSyntax.Expression
-    private typealias GradientStatement = GradientSyntax.Statement
+    private typealias RangeExpression = RangeSyntax.Expression
+    private typealias RangeStatement = RangeSyntax.Statement
     private let context: SwiftEmissionContext
 
     init() {
@@ -402,13 +402,13 @@ struct SwiftBackendEmitter {
             import PackageDescription
 
             let package = Package(
-                name: "GradientGenerated",
+                name: "RangeGenerated",
                 platforms: [
                     .macOS(.v13)
                 ],
                 targets: [
                     .executableTarget(
-                        name: "GradientGenerated",
+                        name: "RangeGenerated",
                         swiftSettings: [
                             .enableExperimentalFeature("Embedded")
                         ]
@@ -443,20 +443,20 @@ struct SwiftBackendEmitter {
 
     private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
         let support = """
-            // Backend implementation for GradientCore's Promise, Result, ChannelStorage, and Logger surface.
-            // GradientCore declares the language-visible API; Swift runtime support lives here.
-            enum Gradient_Promise<Success, Failure> {
+            // Backend implementation for RangeCore's Promise, Result, ChannelStorage, and Logger surface.
+            // RangeCore declares the language-visible API; Swift runtime support lives here.
+            enum Range_Promise<Success, Failure> {
                 case loading
                 case success(result: Success)
                 case failure(cause: Failure)
             }
 
-            enum Gradient_Result<Success, Failure> {
+            enum Range_Result<Success, Failure> {
                 case success(result: Success)
                 case failure(cause: Failure)
             }
 
-            final class Gradient_ChannelStorage<Element>: @unchecked Sendable {
+            final class Range_ChannelStorage<Element>: @unchecked Sendable {
                 private let condition = NSCondition()
                 private var buffer: [Element] = []
                 private let capacity: Int
@@ -528,7 +528,7 @@ struct SwiftBackendEmitter {
                 }
             }
 
-            enum Gradient_Logger {
+            enum Range_Logger {
                 static func log(_ value: Any) {
                     print(String(describing: value))
                 }
@@ -555,7 +555,7 @@ struct SwiftBackendEmitter {
             }
 
             extension String {
-                func __gradientSnakeCase() -> String {
+                func __rangeSnakeCase() -> String {
                     var result = ""
                     var previousWasLowercaseOrDigit = false
 
@@ -577,7 +577,7 @@ struct SwiftBackendEmitter {
                     return result
                 }
 
-                func __gradientAPIKeyDecodedData() -> Gradient_Result<Data, Gradient_DecodingError> {
+                func __rangeAPIKeyDecodedData() -> Range_Result<Data, Range_DecodingError> {
                     var value = self
                         .replacingOccurrences(of: "-", with: "+")
                         .replacingOccurrences(of: "_", with: "/")
@@ -595,7 +595,7 @@ struct SwiftBackendEmitter {
             }
 
             extension Data {
-                func __gradientAPIKeyEncodedString() -> String {
+                func __rangeAPIKeyEncodedString() -> String {
                     base64EncodedString()
                         .replacingOccurrences(of: "+", with: "-")
                         .replacingOccurrences(of: "/", with: "_")
@@ -603,7 +603,7 @@ struct SwiftBackendEmitter {
                 }
             }
 
-            struct __GradientDateOnly: Hashable, Comparable, CustomStringConvertible, Sendable {
+            struct __RangeDateOnly: Hashable, Comparable, CustomStringConvertible, Sendable {
                 let year: Int
                 let month: Int
                 let day: Int
@@ -626,7 +626,7 @@ struct SwiftBackendEmitter {
                     guard let date = formatter.date(from: iso8601String),
                         formatter.string(from: date) == iso8601String
                     else {
-                        throw __GradientThrownFailure<Gradient_DecodingError>(failure: .failed)
+                        throw __RangeThrownFailure<Range_DecodingError>(failure: .failed)
                     }
 
                     let components = formatter.calendar.dateComponents([.year, .month, .day], from: date)
@@ -643,7 +643,7 @@ struct SwiftBackendEmitter {
                     (lhs.year, lhs.month, lhs.day) < (rhs.year, rhs.month, rhs.day)
                 }
 
-                static func parse(iso8601String: String) -> Gradient_Result<Self, Gradient_DecodingError> {
+                static func parse(iso8601String: String) -> Range_Result<Self, Range_DecodingError> {
                     do {
                         return .success(result: try Self(iso8601String: iso8601String))
                     } catch {
@@ -652,7 +652,7 @@ struct SwiftBackendEmitter {
                 }
             }
 
-            struct __GradientDateTime: Hashable, Comparable, CustomStringConvertible, Sendable {
+            struct __RangeDateTime: Hashable, Comparable, CustomStringConvertible, Sendable {
                 let storage: Foundation.Date
 
                 init() {
@@ -670,7 +670,7 @@ struct SwiftBackendEmitter {
                         return
                     }
 
-                    throw __GradientThrownFailure<Gradient_DecodingError>(failure: .failed)
+                    throw __RangeThrownFailure<Range_DecodingError>(failure: .failed)
                 }
 
                 var description: String {
@@ -681,7 +681,7 @@ struct SwiftBackendEmitter {
                     lhs.storage < rhs.storage
                 }
 
-                static func parse(iso8601String: String) -> Gradient_Result<Self, Gradient_DecodingError> {
+                static func parse(iso8601String: String) -> Range_Result<Self, Range_DecodingError> {
                     do {
                         return .success(result: try Self(iso8601String: iso8601String))
                     } catch {
@@ -699,7 +699,7 @@ struct SwiftBackendEmitter {
                 }
             }
 
-            final class __GradientBinding<Value> {
+            final class __RangeBinding<Value> {
                 private let getter: () -> Value
                 private let setter: (Value) -> Void
 
@@ -714,28 +714,28 @@ struct SwiftBackendEmitter {
                 }
             }
 
-            struct __GradientThrownFailure<Failure>: Error, @unchecked Sendable {
+            struct __RangeThrownFailure<Failure>: Error, @unchecked Sendable {
                 let failure: Failure
             }
 
-            func __gradientUUID(uuidString: String) throws -> UUID {
+            func __rangeUUID(uuidString: String) throws -> UUID {
                 guard let value = UUID(uuidString: uuidString) else {
-                    throw __GradientThrownFailure<Gradient_DecodingError>(failure: .failed)
+                    throw __RangeThrownFailure<Range_DecodingError>(failure: .failed)
                 }
 
                 return value
             }
 
-            func __gradientDate(iso8601String: String) throws -> __GradientDateOnly {
-                try __GradientDateOnly(iso8601String: iso8601String)
+            func __rangeDate(iso8601String: String) throws -> __RangeDateOnly {
+                try __RangeDateOnly(iso8601String: iso8601String)
             }
 
-            func __gradientDateTime(iso8601String: String) throws -> __GradientDateTime {
-                try __GradientDateTime(iso8601String: iso8601String)
+            func __rangeDateTime(iso8601String: String) throws -> __RangeDateTime {
+                try __RangeDateTime(iso8601String: iso8601String)
             }
 
             extension UUID {
-                static func parse(uuidString: String) -> Gradient_Result<UUID, Gradient_DecodingError> {
+                static func parse(uuidString: String) -> Range_Result<UUID, Range_DecodingError> {
                     guard let value = UUID(uuidString: uuidString) else {
                         return .failure(cause: .failed)
                     }
@@ -743,7 +743,7 @@ struct SwiftBackendEmitter {
                 }
             }
 
-            enum __GradientDeferredControlFlow: Error {
+            enum __RangeDeferredControlFlow: Error {
                 case returnValue(Any)
                 case returnVoid
                 case breakLoop
@@ -807,64 +807,64 @@ struct SwiftBackendEmitter {
 
     private func emitNativeEncodingConformances() -> String {
         """
-        extension Bool: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension Bool: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
-        extension Data: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension Data: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
-        extension __GradientDateOnly: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension __RangeDateOnly: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
-        extension __GradientDateTime: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension __RangeDateTime: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
-        extension Float: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension Float: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
-        extension Int: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension Int: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
-        extension String: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension String: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
-        extension UUID: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension UUID: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.singleValueContainer()
                 return container.encode(self)
             }
         }
 
-        extension Array: Gradient_Encodable where Element: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension Array: Range_Encodable where Element: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.unkeyedContainer()
 
                 for element in self {
@@ -880,8 +880,8 @@ struct SwiftBackendEmitter {
             }
         }
 
-        extension Optional: Gradient_Encodable where Wrapped: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension Optional: Range_Encodable where Wrapped: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 switch self {
                 case .some(let value):
                     return value.encode(to: encoder)
@@ -892,8 +892,8 @@ struct SwiftBackendEmitter {
             }
         }
 
-        extension Dictionary: Gradient_Encodable where Key == String, Value: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension Dictionary: Range_Encodable where Key == String, Value: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.keyedContainer()
 
                 for key in keys.sorted() {
@@ -913,8 +913,8 @@ struct SwiftBackendEmitter {
             }
         }
 
-        extension Set: Gradient_Encodable where Element: Gradient_Encodable {
-            func encode(to encoder: Gradient_Encoder) -> Gradient_Result<Void, Gradient_EncodingError> {
+        extension Set: Range_Encodable where Element: Range_Encodable {
+            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
                 var container = encoder.unkeyedContainer()
 
                 for element in self {
@@ -934,50 +934,50 @@ struct SwiftBackendEmitter {
 
     private func emitNativeDecodingConformances() -> String {
         """
-        extension Bool: Gradient_Decodable {
-            static func decode(from decoder: Gradient_Decoder) -> Gradient_Result<Bool, Gradient_DecodingError> {
+        extension Bool: Range_Decodable {
+            static func decode(from decoder: Range_Decoder) -> Range_Result<Bool, Range_DecodingError> {
                 let container = decoder.singleValueContainer()
                 return container.decode(Bool.self)
             }
         }
 
-        extension __GradientDateOnly: Gradient_Decodable {
-            static func decode(from decoder: Gradient_Decoder) -> Gradient_Result<__GradientDateOnly, Gradient_DecodingError> {
+        extension __RangeDateOnly: Range_Decodable {
+            static func decode(from decoder: Range_Decoder) -> Range_Result<__RangeDateOnly, Range_DecodingError> {
                 let container = decoder.singleValueContainer()
-                return container.decode(__GradientDateOnly.self)
+                return container.decode(__RangeDateOnly.self)
             }
         }
 
-        extension __GradientDateTime: Gradient_Decodable {
-            static func decode(from decoder: Gradient_Decoder) -> Gradient_Result<__GradientDateTime, Gradient_DecodingError> {
+        extension __RangeDateTime: Range_Decodable {
+            static func decode(from decoder: Range_Decoder) -> Range_Result<__RangeDateTime, Range_DecodingError> {
                 let container = decoder.singleValueContainer()
-                return container.decode(__GradientDateTime.self)
+                return container.decode(__RangeDateTime.self)
             }
         }
 
-        extension Float: Gradient_Decodable {
-            static func decode(from decoder: Gradient_Decoder) -> Gradient_Result<Float, Gradient_DecodingError> {
+        extension Float: Range_Decodable {
+            static func decode(from decoder: Range_Decoder) -> Range_Result<Float, Range_DecodingError> {
                 let container = decoder.singleValueContainer()
                 return container.decode(Float.self)
             }
         }
 
-        extension Int: Gradient_Decodable {
-            static func decode(from decoder: Gradient_Decoder) -> Gradient_Result<Int, Gradient_DecodingError> {
+        extension Int: Range_Decodable {
+            static func decode(from decoder: Range_Decoder) -> Range_Result<Int, Range_DecodingError> {
                 let container = decoder.singleValueContainer()
                 return container.decode(Int.self)
             }
         }
 
-        extension String: Gradient_Decodable {
-            static func decode(from decoder: Gradient_Decoder) -> Gradient_Result<String, Gradient_DecodingError> {
+        extension String: Range_Decodable {
+            static func decode(from decoder: Range_Decoder) -> Range_Result<String, Range_DecodingError> {
                 let container = decoder.singleValueContainer()
                 return container.decode(String.self)
             }
         }
 
-        extension UUID: Gradient_Decodable {
-            static func decode(from decoder: Gradient_Decoder) -> Gradient_Result<UUID, Gradient_DecodingError> {
+        extension UUID: Range_Decodable {
+            static func decode(from decoder: Range_Decoder) -> Range_Result<UUID, Range_DecodingError> {
                 let container = decoder.singleValueContainer()
                 return container.decode(UUID.self)
             }
@@ -990,7 +990,7 @@ struct SwiftBackendEmitter {
 
         return """
             @main
-            struct GradientMain {
+            struct RangeMain {
                 static func main() throws {
             \(body)
                 }
@@ -1238,7 +1238,7 @@ struct SwiftBackendEmitter {
                 binding.typeName,
                 genericParameterNames: genericParameterNames
             )
-            parameters.append("\(binding.name): __GradientBinding<\(typeName)>")
+            parameters.append("\(binding.name): __RangeBinding<\(typeName)>")
             assignments.append("self.__binding_\(binding.name) = \(binding.name)")
         }
 
@@ -1359,7 +1359,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitParameter(
-        _ parameter: GradientFunctionParameter,
+        _ parameter: RangeFunctionParameter,
         genericParameterNames: Set<String> = []
     ) throws -> String {
         guard let typeReference = parameter.typeReference else {
@@ -1371,11 +1371,11 @@ struct SwiftBackendEmitter {
         if parameter.isBinding {
             switch parameter.externalLabel {
             case .none:
-                return "_ \(local): __GradientBinding<\(renderedType)>"
+                return "_ \(local): __RangeBinding<\(renderedType)>"
             case .some(let external) where external == local:
-                return "\(local): __GradientBinding<\(renderedType)>"
+                return "\(local): __RangeBinding<\(renderedType)>"
             case .some(let external):
-                return "\(external) \(local): __GradientBinding<\(renderedType)>"
+                return "\(external) \(local): __RangeBinding<\(renderedType)>"
             }
         }
 
@@ -1771,7 +1771,7 @@ struct SwiftBackendEmitter {
                 genericParameterNames: genericParameterNames
             )
             return """
-                private let __binding_\(binding.name): __GradientBinding<\(typeName)>
+                private let __binding_\(binding.name): __RangeBinding<\(typeName)>
                 var \(binding.name): \(typeName) {
                     get { __binding_\(binding.name).value }
                     set { __binding_\(binding.name).value = newValue }
@@ -1942,11 +1942,11 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func statementsReferenceInstanceSelf(_ statements: [GradientStatement]) -> Bool {
+    private func statementsReferenceInstanceSelf(_ statements: [RangeStatement]) -> Bool {
         statements.contains(where: statementReferencesInstanceSelf)
     }
 
-    private func statementReferencesInstanceSelf(_ statement: GradientStatement) -> Bool {
+    private func statementReferencesInstanceSelf(_ statement: RangeStatement) -> Bool {
         switch statement {
         case .localBinding(let declaration):
             return expressionReferencesInstanceSelf(declaration.expression)
@@ -1990,7 +1990,7 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func expressionReferencesInstanceSelf(_ expression: GradientExpression) -> Bool {
+    private func expressionReferencesInstanceSelf(_ expression: RangeExpression) -> Bool {
         switch expression {
         case .identifier("self"):
             return true
@@ -2044,7 +2044,7 @@ struct SwiftBackendEmitter {
         return statementsContainMutation(body) || statementsCallKnownMutatingMember(body)
     }
 
-    private func statementsContainMutation(_ statements: [GradientStatement]) -> Bool {
+    private func statementsContainMutation(_ statements: [RangeStatement]) -> Bool {
         for statement in statements {
             switch statement {
             case .assignment, .compoundAssignment:
@@ -2085,7 +2085,7 @@ struct SwiftBackendEmitter {
         return false
     }
 
-    private func statementsCallKnownMutatingMember(_ statements: [GradientStatement]) -> Bool {
+    private func statementsCallKnownMutatingMember(_ statements: [RangeStatement]) -> Bool {
         for statement in statements {
             switch statement {
             case .expression(let expression), .return(let expression?):
@@ -2146,7 +2146,7 @@ struct SwiftBackendEmitter {
         return false
     }
 
-    private func expressionCallsKnownMutatingMember(_ expression: GradientExpression) -> Bool {
+    private func expressionCallsKnownMutatingMember(_ expression: RangeExpression) -> Bool {
         switch expression {
         case .call(let name, let arguments):
             if name == "appendField" || name.hasSuffix(".appendField") {
@@ -2187,7 +2187,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitStatements(
-        _ statements: [GradientStatement],
+        _ statements: [RangeStatement],
         indent: Int,
         enclosingReturnType: TypeReference? = nil,
         scope: EmissionScope = .empty
@@ -2205,7 +2205,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitInitializerStatements(
-        _ statements: [GradientStatement],
+        _ statements: [RangeStatement],
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
@@ -2227,7 +2227,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitInitializerStatement(
-        _ statement: GradientStatement,
+        _ statement: RangeStatement,
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
@@ -2343,9 +2343,9 @@ struct SwiftBackendEmitter {
     }
 
     private func emitInitializerSwitch(
-        subject: GradientExpression,
+        subject: RangeExpression,
         cases: [SwitchCase],
-        defaultBody: [GradientStatement]?,
+        defaultBody: [RangeStatement]?,
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
@@ -2383,7 +2383,7 @@ struct SwiftBackendEmitter {
             )
         } else {
             lines.append("\(prefix)default:")
-            lines.append("\(prefix)    fatalError(\"Non-exhaustive Gradient switch reached at runtime.\")")
+            lines.append("\(prefix)    fatalError(\"Non-exhaustive Range switch reached at runtime.\")")
         }
 
         lines.append("\(prefix)}")
@@ -2391,7 +2391,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitFailableInitializerReturn(
-        _ expression: GradientExpression?,
+        _ expression: RangeExpression?,
         initializerReturnType: TypeReference?,
         indent: Int,
         scope: EmissionScope = .empty
@@ -2408,7 +2408,7 @@ struct SwiftBackendEmitter {
                 )
             }
 
-            return "\(prefix)throw __GradientThrownFailure<\(emitTypeName(failureType))>(failure: \(try emitExpression(failureExpression, scope: scope)))"
+            return "\(prefix)throw __RangeThrownFailure<\(emitTypeName(failureType))>(failure: \(try emitExpression(failureExpression, scope: scope)))"
         }
 
         if isResultSuccessExpression(expression) {
@@ -2434,7 +2434,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitStatement(
-        _ statement: GradientStatement,
+        _ statement: RangeStatement,
         indent: Int,
         enclosingReturnType: TypeReference? = nil,
         scope: EmissionScope = .empty
@@ -2570,9 +2570,9 @@ struct SwiftBackendEmitter {
     }
 
     private func emitSwitch(
-        subject: GradientExpression,
+        subject: RangeExpression,
         cases: [SwitchCase],
-        defaultBody: [GradientStatement]?,
+        defaultBody: [RangeStatement]?,
         indent: Int,
         enclosingReturnType: TypeReference? = nil,
         scope: EmissionScope = .empty
@@ -2604,7 +2604,7 @@ struct SwiftBackendEmitter {
             )
         } else {
             lines.append("\(prefix)default:")
-            lines.append("\(prefix)    fatalError(\"Non-exhaustive Gradient switch reached at runtime.\")")
+            lines.append("\(prefix)    fatalError(\"Non-exhaustive Range switch reached at runtime.\")")
         }
 
         lines.append("\(prefix)}")
@@ -2639,14 +2639,14 @@ struct SwiftBackendEmitter {
     }
 
     private func emitExpression(
-        _ expression: GradientExpression,
+        _ expression: RangeExpression,
         scope: EmissionScope = .empty
     ) throws -> String {
         return try emitRawExpression(expression, scope: scope)
     }
 
     private func emitRawExpression(
-        _ expression: GradientExpression,
+        _ expression: RangeExpression,
         scope: EmissionScope = .empty
     ) throws -> String {
         switch expression {
@@ -2694,7 +2694,7 @@ struct SwiftBackendEmitter {
             }
             return try emitRawCall(name: name, arguments: arguments, scope: scope)
         case .bindingReference(let name):
-            return "__GradientBinding(get: { \(name) }, set: { \(name) = $0 })"
+            return "__RangeBinding(get: { \(name) }, set: { \(name) = $0 })"
         case .array(let elements):
             let rendered = try elements.map { try emitExpression($0, scope: scope) }.joined(separator: ", ")
             return "[\(rendered)]"
@@ -2747,10 +2747,10 @@ struct SwiftBackendEmitter {
         if swiftNativeTypeNames.contains(name) {
             return name
         }
-        if name.hasPrefix("Gradient_") || name.hasPrefix("__Gradient") {
+        if name.hasPrefix("Range_") || name.hasPrefix("__Range") {
             return name
         }
-        return "Gradient_\(name.replacingOccurrences(of: ".", with: "_"))"
+        return "Range_\(name.replacingOccurrences(of: ".", with: "_"))"
     }
 
     private func emitSwiftReferenceName(
@@ -2859,11 +2859,11 @@ struct SwiftBackendEmitter {
         let base = String(name[..<dot])
         let member = String(name[name.index(after: dot)...])
 
-        func argument(_ label: String) -> GradientSyntax.Expression? {
+        func argument(_ label: String) -> RangeSyntax.Expression? {
             arguments.first(where: { $0.label == label })?.value
         }
 
-        func unlabeledArgument() -> GradientSyntax.Expression? {
+        func unlabeledArgument() -> RangeSyntax.Expression? {
             guard arguments.count == 1, arguments[0].label == nil else {
                 return nil
             }
@@ -2916,13 +2916,13 @@ struct SwiftBackendEmitter {
             return "\(base).filter(\(try emitExpression(include, scope: scope)))"
         case "snakeCase":
             guard arguments.isEmpty else { return nil }
-            return "\(base).__gradientSnakeCase()"
+            return "\(base).__rangeSnakeCase()"
         case "apiKeyDecodedData":
             guard arguments.isEmpty else { return nil }
-            return "\(base).__gradientAPIKeyDecodedData()"
+            return "\(base).__rangeAPIKeyDecodedData()"
         case "apiKeyEncodedString":
             guard arguments.isEmpty else { return nil }
-            return "\(base).__gradientAPIKeyEncodedString()"
+            return "\(base).__rangeAPIKeyEncodedString()"
         case "map", "compactMap", "flatMap", "forEach":
             guard let transform = unlabeledArgument() else { return nil }
             return "\(base).\(member)(\(try emitExpression(transform, scope: scope)))"
@@ -2948,7 +2948,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitClosureExpression(
-        _ body: [GradientStatement],
+        _ body: [RangeStatement],
         scope: EmissionScope = .empty
     ) throws -> String {
         if body.count == 1, case .expression(let expression) = body[0] {
@@ -2965,7 +2965,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitDeferredBlock(
-        _ statements: [GradientStatement],
+        _ statements: [RangeStatement],
         indent: Int,
         enclosingReturnType: TypeReference?
     ) throws -> String {
@@ -2973,7 +2973,7 @@ struct SwiftBackendEmitter {
         let bodyPrefix = String(repeating: "    ", count: indent + 1)
         var lines: [String] = [
             "\(prefix)do {",
-            "\(bodyPrefix)var __gradientDeferredControlFlow: __GradientDeferredControlFlow?",
+            "\(bodyPrefix)var __rangeDeferredControlFlow: __RangeDeferredControlFlow?",
         ]
 
         for statement in statements {
@@ -2997,7 +2997,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitDeferredProtectedStatement(
-        _ statement: GradientStatement,
+        _ statement: RangeStatement,
         indent: Int,
         enclosingReturnType: TypeReference?
     ) throws -> String {
@@ -3013,16 +3013,16 @@ struct SwiftBackendEmitter {
             \(prefix)    try ({ () throws in
             \(bodyText)
             \(prefix)    })()
-            \(prefix)} catch let flow as __GradientDeferredControlFlow {
-            \(prefix)    if __gradientDeferredControlFlow == nil {
-            \(prefix)        __gradientDeferredControlFlow = flow
+            \(prefix)} catch let flow as __RangeDeferredControlFlow {
+            \(prefix)    if __rangeDeferredControlFlow == nil {
+            \(prefix)        __rangeDeferredControlFlow = flow
             \(prefix)    }
             \(prefix)}
             """
     }
 
     private func emitDeferredInnerStatement(
-        _ statement: GradientStatement,
+        _ statement: RangeStatement,
         indent: Int,
         enclosingReturnType: TypeReference?
     ) throws -> String {
@@ -3079,9 +3079,9 @@ struct SwiftBackendEmitter {
             return "\(prefix)\(try emitExpression(expression))"
         case .return(let expression):
             if let expression {
-                return "\(prefix)throw __GradientDeferredControlFlow.returnValue(\(try emitExpression(expression)))"
+                return "\(prefix)throw __RangeDeferredControlFlow.returnValue(\(try emitExpression(expression)))"
             }
-            return "\(prefix)throw __GradientDeferredControlFlow.returnVoid"
+            return "\(prefix)throw __RangeDeferredControlFlow.returnVoid"
         case .conditional(let branches):
             return try emitDeferredConditional(
                 branches,
@@ -3105,9 +3105,9 @@ struct SwiftBackendEmitter {
             )
             return "\(header)\n\(bodyText)\n\(prefix)}"
         case .break:
-            return "\(prefix)throw __GradientDeferredControlFlow.breakLoop"
+            return "\(prefix)throw __RangeDeferredControlFlow.breakLoop"
         case .continue:
-            return "\(prefix)throw __GradientDeferredControlFlow.continueLoop"
+            return "\(prefix)throw __RangeDeferredControlFlow.continueLoop"
         case .switchStatement(let expression, let cases, let defaultBody):
             return try emitDeferredSwitch(
                 subject: expression,
@@ -3120,7 +3120,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitDeferredInnerStatements(
-        _ statements: [GradientStatement],
+        _ statements: [RangeStatement],
         indent: Int,
         enclosingReturnType: TypeReference?
     ) throws -> String {
@@ -3157,9 +3157,9 @@ struct SwiftBackendEmitter {
     }
 
     private func emitDeferredSwitch(
-        subject: GradientExpression,
+        subject: RangeExpression,
         cases: [SwitchCase],
-        defaultBody: [GradientStatement]?,
+        defaultBody: [RangeStatement]?,
         indent: Int,
         enclosingReturnType: TypeReference?
     ) throws -> String {
@@ -3198,8 +3198,8 @@ struct SwiftBackendEmitter {
     ) throws -> String {
         let prefix = String(repeating: "    ", count: indent)
         var lines: [String] = [
-            "\(prefix)if let __gradientDeferredControlFlow {",
-            "\(prefix)    switch __gradientDeferredControlFlow {",
+            "\(prefix)if let __rangeDeferredControlFlow {",
+            "\(prefix)    switch __rangeDeferredControlFlow {",
         ]
 
         if let enclosingReturnType, emitTypeName(enclosingReturnType) != "Void" {
@@ -3268,7 +3268,7 @@ struct SwiftBackendEmitter {
     ) throws -> String? {
         let baseName = name.split(separator: "<", maxSplits: 1).first.map(String.init) ?? name
 
-        func singleArgument(label: String?) -> GradientSyntax.Expression? {
+        func singleArgument(label: String?) -> RangeSyntax.Expression? {
             guard arguments.count == 1, arguments[0].label == label else {
                 return nil
             }
@@ -3298,40 +3298,40 @@ struct SwiftBackendEmitter {
                 "\(try emitExpression(lowerBound, scope: scope)) ... \(try emitExpression(upperBound, scope: scope))"
         case "DateStorage":
             if arguments.isEmpty {
-                return "__GradientDateOnly()"
+                return "__RangeDateOnly()"
             }
             guard let string = singleArgument(label: "iso8601String") else { return nil }
-            return "__gradientDate(iso8601String: \(try emitExpression(string, scope: scope)))"
+            return "__rangeDate(iso8601String: \(try emitExpression(string, scope: scope)))"
         case "Date":
             if let storage = singleArgument(label: "storage") {
                 return try emitExpression(storage, scope: scope)
             }
             guard let string = singleArgument(label: "iso8601String") else { return nil }
-            return "__gradientDate(iso8601String: \(try emitExpression(string, scope: scope)))"
+            return "__rangeDate(iso8601String: \(try emitExpression(string, scope: scope)))"
         case "DateTimeStorage":
             if arguments.isEmpty {
-                return "__GradientDateTime()"
+                return "__RangeDateTime()"
             }
             guard let string = singleArgument(label: "iso8601String") else { return nil }
-            return "__gradientDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
+            return "__rangeDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
         case "DateTime":
             if let storage = singleArgument(label: "storage") {
                 return try emitExpression(storage, scope: scope)
             }
             guard let string = singleArgument(label: "iso8601String") else { return nil }
-            return "__gradientDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
+            return "__rangeDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
         case "UUIDStorage":
             if arguments.isEmpty {
                 return "UUID()"
             }
             guard let string = singleArgument(label: "uuidString") else { return nil }
-            return "__gradientUUID(uuidString: \(try emitExpression(string, scope: scope)))"
+            return "__rangeUUID(uuidString: \(try emitExpression(string, scope: scope)))"
         case "UUID":
             if let storage = singleArgument(label: "storage") {
                 return try emitExpression(storage, scope: scope)
             }
             guard let string = singleArgument(label: "uuidString") else { return nil }
-            return "__gradientUUID(uuidString: \(try emitExpression(string, scope: scope)))"
+            return "__rangeUUID(uuidString: \(try emitExpression(string, scope: scope)))"
         default:
             return nil
         }
@@ -3348,13 +3348,13 @@ struct SwiftBackendEmitter {
         let call = try emitRawCall(name: name, arguments: arguments, scope: scope)
 
         return """
-            ({ () -> Gradient_Result<\(constructedType), \(failureType)> in
+            ({ () -> Range_Result<\(constructedType), \(failureType)> in
                 do {
                     return .success(result: try \(call))
-                } catch let failure as __GradientThrownFailure<\(failureType)> {
+                } catch let failure as __RangeThrownFailure<\(failureType)> {
                     return .failure(cause: failure.failure)
                 } catch {
-                    fatalError("Unexpected Swift error thrown from Gradient failable initializer: \\(error)")
+                    fatalError("Unexpected Swift error thrown from Range failable initializer: \\(error)")
                 }
             })()
             """
@@ -3463,7 +3463,7 @@ struct SwiftBackendEmitter {
         return arguments[1]
     }
 
-    private func resultFailurePayloadExpression(_ expression: GradientExpression) -> GradientExpression? {
+    private func resultFailurePayloadExpression(_ expression: RangeExpression) -> RangeExpression? {
         guard case .call(let name, let arguments) = expression,
             enumCaseTail(name) == "failure"
         else {
@@ -3481,7 +3481,7 @@ struct SwiftBackendEmitter {
         return arguments[0].value
     }
 
-    private func isResultSuccessExpression(_ expression: GradientExpression) -> Bool {
+    private func isResultSuccessExpression(_ expression: RangeExpression) -> Bool {
         guard case .call(let name, _) = expression else {
             return false
         }

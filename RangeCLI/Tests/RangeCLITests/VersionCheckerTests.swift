@@ -1,4 +1,4 @@
-@testable import GradientCLI
+@testable import RangeCLI
 import Testing
 
 @Suite("Version checking")
@@ -26,15 +26,15 @@ struct VersionCheckerTests {
     func githubReleaseURLIsDerivedFromUpdateRepository() throws {
         #expect(
             VersionChecker.githubLatestReleaseAPIURL(
-                for: "https://github.com/georgetchelidze/Gradient.git"
+                for: "https://github.com/georgetchelidze/Range.git"
             )?.absoluteString
-                == "https://api.github.com/repos/georgetchelidze/Gradient/releases/latest"
+                == "https://api.github.com/repos/georgetchelidze/Range/releases/latest"
         )
         #expect(
             VersionChecker.githubLatestReleaseAPIURL(
-                for: "git@github.com:georgetchelidze/Gradient.git"
+                for: "git@github.com:georgetchelidze/Range.git"
             )?.absoluteString
-                == "https://api.github.com/repos/georgetchelidze/Gradient/releases/latest"
+                == "https://api.github.com/repos/georgetchelidze/Range/releases/latest"
         )
     }
 

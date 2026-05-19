@@ -1,14 +1,14 @@
 import ArgumentParser
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
-extension GradientCLI {
+extension RangeCLI {
     struct Run: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Run a Gradient main program."
+            abstract: "Run a Range main program."
         )
 
-        @Argument(help: "Project directory or source .gradient file to run.")
+        @Argument(help: "Project directory or source .range file to run.")
         var input: String?
 
         mutating func run() throws {

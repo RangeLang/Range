@@ -1,19 +1,19 @@
 import ArgumentParser
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
-extension GradientCLI {
+extension RangeCLI {
     struct Artifacts: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Write lexer, parser, and graph artifacts for a Gradient file or project."
+            abstract: "Write lexer, parser, and graph artifacts for a Range file or project."
         )
 
-        @Argument(help: "Project directory or source .gradient file to inspect.")
+        @Argument(help: "Project directory or source .range file to inspect.")
         var input: String?
 
         @Option(
             name: .shortAndLong,
-            help: "Output directory. Defaults to .gradient/Artifacts inside the input root."
+            help: "Output directory. Defaults to .range/Artifacts inside the input root."
         )
         var output: String?
 
@@ -22,7 +22,7 @@ extension GradientCLI {
                 let project = try ProjectLoader.load(
                     at: input ?? ".",
                     options: .init(
-                        excludedPathFragments: ["/Zed/Gradient/grammars/_stale_gradient_checkout/"]
+                        excludedPathFragments: ["/Zed/Range/grammars/_stale_range_checkout/"]
                     )
                 )
                 let outputRoot =
@@ -93,7 +93,7 @@ extension GradientCLI {
                 )
                 let graphHTML = renderer.renderGraphHTML(
                     files: compiledProgram.expandedFiles,
-                    title: "Gradient Playground Application Graph"
+                    title: "Range Playground Application Graph"
                 )
                 try graphHTML.write(
                     to: outputRoot.appendingPathComponent("04-graph.html"),

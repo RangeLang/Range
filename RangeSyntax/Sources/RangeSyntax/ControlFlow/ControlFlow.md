@@ -2,13 +2,13 @@
 
 ## Definition
 
-Gradient uses direct Swift-style control flow.
+Range uses direct Swift-style control flow.
 
 ## Properties
 
 - Supports `if` / `else if` / `else`
 
-```gradient
+```range
 if score > 90 {
     print("A")
 } else if score > 80 {
@@ -20,7 +20,7 @@ if score > 90 {
 
 - Supports optional binding in `if let`
 
-```gradient
+```range
 if let user = getUser() {
     print(user.name)
 } else {
@@ -30,7 +30,7 @@ if let user = getUser() {
 
 - Supports exhaustive `switch` with no fallthrough by default
 
-```gradient
+```range
 switch direction {
     case .north: print("north")
     case .south: print("south")
@@ -40,7 +40,7 @@ switch direction {
 
 - Supports let binding in `switch`
 
-```gradient
+```range
 switch result {
     case .success(let value): print(value)
     case .failure(let err): print(err)
@@ -49,7 +49,7 @@ switch result {
 
 - Supports `where` in `switch` cases
 
-```gradient
+```range
 switch score {
     case let x where x > 90: print("A")
     case let x where x > 80: print("B")
@@ -59,19 +59,19 @@ switch score {
 
 - Supports `for`
 
-```gradient
+```range
 for item in items {
     print(item)
 }
 ```
 
-```gradient
+```range
 for i in 0..<10 {
     print(i)
 }
 ```
 
-```gradient
+```range
 for (index, value) in items.enumerated() {
     print(index, value)
 }
@@ -79,7 +79,7 @@ for (index, value) in items.enumerated() {
 
 - Supports `while`
 
-```gradient
+```range
 while condition {
     doSomething()
 }
@@ -87,7 +87,7 @@ while condition {
 
 - Supports `repeat` / `while`
 
-```gradient
+```range
 repeat {
     doSomething()
 } while condition
@@ -95,7 +95,7 @@ repeat {
 
 - Supports `guard`
 
-```gradient
+```range
 guard let user = getUser() else { return }
 ```
 
@@ -103,14 +103,14 @@ guard let user = getUser() else { return }
 
 - Supports optional binding in `guard let`
 
-```gradient
+```range
 guard let user = getUser() else { return }
 print(user.name)
 ```
 
 - Supports `break` and `continue`
 
-```gradient
+```range
 for item in items {
     if item == target { break }
     if item.isSkippable { continue }
@@ -120,7 +120,7 @@ for item in items {
 
 - Supports labeled statements
 
-```gradient
+```range
 outerLoop: for i in 0..<10 {
     for j in 0..<10 {
         if i == j { break outerLoop }

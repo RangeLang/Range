@@ -1,26 +1,26 @@
-# Gradient
+# Range
 
-Gradient is a language project with a Swift-hosted compiler, CLI, core library, and editor tooling.
+Range is a language project with a Swift-hosted compiler, CLI, core library, and editor tooling.
 
 ## Download
 
-Install the `gradient` command line tool from the latest GitHub release:
+Install the `range` command line tool from the latest GitHub release:
 
-https://github.com/georgetchelidze/Gradient/releases/latest
+https://github.com/georgetchelidze/Range/releases/latest
 
-After installing, make sure `gradient` is available on your `PATH`:
+After installing, make sure `range` is available on your `PATH`:
 
 ```sh
-gradient version
+range version
 ```
 
 ## Create a Project
 
-Create a new Gradient project with:
+Create a new Range project with:
 
 ```sh
-gradient create MyProject
+range create MyProject
 cd MyProject
 ```
 
-A Gradient project is recognized by the `Package.gradient` file at its root.
+A Range project is recognized by the `Package.range` file at its root.

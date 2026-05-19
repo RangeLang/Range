@@ -2,9 +2,9 @@ import Foundation
 
 public struct ParseError: Error, CustomStringConvertible {
     public let message: String
-    public let range: GradientSourceRange?
+    public let range: RangeSourceRange?
 
-    public init(_ message: String, range: GradientSourceRange? = nil) {
+    public init(_ message: String, range: RangeSourceRange? = nil) {
         self.message = message
         self.range = range
     }

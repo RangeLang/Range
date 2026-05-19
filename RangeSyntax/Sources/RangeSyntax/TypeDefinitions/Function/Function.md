@@ -8,25 +8,25 @@ A function declares callable behavior.
 
 - Uses an explicit parameter clause
 
-```gradient
+```range
 function greet(name: String)
 ```
 
 - Supports Swift-style external and internal labels
 
-```gradient
+```range
 function greet(person name: String)
 ```
 
 - Can declare a return type
 
-```gradient
+```range
 function greet(name: String) -> String
 ```
 
 - Can omit the return type when it can be inferred from the body
 
-```gradient
+```range
 function greet(name: String) {
     return "Hello " + name
 }
@@ -34,7 +34,7 @@ function greet(name: String) {
 
 - Can appear at the top level
 
-```gradient
+```range
 function add(left: Int, right: Int) -> Int {
     return left + right
 }
@@ -42,14 +42,14 @@ function add(left: Int, right: Int) -> Int {
 
 - May be marked `#language` at the top level and omit a body when the operation is supplied by compiler, runtime, or backend behavior
 
-```gradient
+```range
 #language
 function +(lhs: Int, rhs: Int) -> Int
 ```
 
 - Can appear inside a construct
 
-```gradient
+```range
 construct User {
     let name: String
 
@@ -61,7 +61,7 @@ construct User {
 
 - Can appear inside a protocol as a requirement
 
-```gradient
+```range
 protocol Named {
     function displayName() -> String
 }
@@ -69,7 +69,7 @@ protocol Named {
 
 - Can appear inside an extension as an implementation
 
-```gradient
+```range
 extension Named {
     function displayName() -> String {
         return name
@@ -79,7 +79,7 @@ extension Named {
 
 - Requires a body in constructs
 
-```gradient
+```range
 construct User {
     let name: String
 
@@ -91,7 +91,7 @@ construct User {
 
 - May omit a body inside `#language construct` declarations when the operation is supplied by compiler, runtime, or backend behavior
 
-```gradient
+```range
 #language
 construct ArrayStorage<Element> {
     function append(element: Element)
@@ -101,7 +101,7 @@ construct ArrayStorage<Element> {
 
 - May omit a body in protocol declarations
 
-```gradient
+```range
 protocol Named {
     function displayName() -> String
 }
@@ -109,7 +109,7 @@ protocol Named {
 
 - Requires a body in extensions
 
-```gradient
+```range
 extension Named {
     function displayName() -> String {
         return name
@@ -119,7 +119,7 @@ extension Named {
 
 - Uses static dispatch by default
 
-```gradient
+```range
 function greet(name: String) -> String {
     return "Hello " + name
 }
@@ -129,7 +129,7 @@ Calls are resolved through the graph at compile time unless the language explici
 
 - Can mutate `state`
 
-```gradient
+```range
 construct Counter {
     state count: Int = 0
 
@@ -141,7 +141,7 @@ construct Counter {
 
 - Can write through `binding`
 
-```gradient
+```range
 construct NameEditor {
     binding name: String
 
@@ -153,7 +153,7 @@ construct NameEditor {
 
 - Cannot assign to `let`
 
-```gradient
+```range
 construct User {
     let name: String
 

@@ -1,4 +1,4 @@
 interface:
-  display_name: "Gradient Embedded Swift Direction"
-  short_description: "Use Embedded Swift constraints to catch Gradient implementation drift."
-  default_prompt: "Review this Gradient Swift change against the Embedded Swift direction."
+  display_name: "Range Embedded Swift Direction"
+  short_description: "Use Embedded Swift constraints to catch Range implementation drift."
+  default_prompt: "Review this Range Swift change against the Embedded Swift direction."

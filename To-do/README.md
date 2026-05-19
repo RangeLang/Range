@@ -1,6 +1,6 @@
-# Gradient Status And Working Checklist
+# Range Status And Working Checklist
 
-This is the current working checklist for aligning Gradient's implementation with
+This is the current working checklist for aligning Range's implementation with
 the current compiler, editor, and packaging direction.
 
 The older notes remain useful context, but this file should be the first place
@@ -63,7 +63,7 @@ implementation tracking surface.
 - [ ] Literal compatibility uses declaration-backed literal bridge facts in
       important places, but `BootstrapLiteralType` still carries too much
       expression/type meaning through parser and validator code.
-- [ ] Operators are declared in `GradientCore`, but precedence defaults and some
+- [ ] Operators are declared in `RangeCore`, but precedence defaults and some
       operator typing behavior still live in Swift-side compiler logic.
 - [ ] `ApplicationGraphValidator` uses declaration queries for many existence
       checks, but it still carries substantial transient type-flow and
@@ -123,15 +123,15 @@ implementation tracking surface.
       backend lowering.
 - [ ] Pick one narrow path, preferably return compatibility or argument
       compatibility, and route it through declaration graph facts plus
-      `GradientCore` literal bridge protocols.
+      `RangeCore` literal bridge protocols.
 - [ ] Keep Swift-side literal logic only for literal categories, parser sugar,
       lowering/runtime hooks, and transitional diagnostics.
 - [ ] Repeat for operator compatibility after declaration-backed literal
       compatibility is proven.
 
-### 5. Move Operator Meaning Toward GradientCore
+### 5. Move Operator Meaning Toward RangeCore
 
-- [ ] Replace parser-owned precedence defaults with explicit Gradient operator and
+- [ ] Replace parser-owned precedence defaults with explicit Range operator and
       precedence declarations.
 - [ ] Ensure operator lookup and precedence resolution read declaration graph
       facts.
@@ -175,7 +175,7 @@ implementation tracking surface.
 - [ ] Complete the `SyntaxOmittable` story for conditional redaction,
       region-style macros, or compiler-macro style conditional syntax.
 
-### 8. Grow GradientCore Deliberately
+### 8. Grow RangeCore Deliberately
 
 - [ ] Add `Sequence` and `Collection` protocols before broadening
       collection-like APIs across storage types.
@@ -185,7 +185,7 @@ implementation tracking surface.
       they carry namespace behavior or configuration.
 - [ ] Keep representation/storage constructs ordinary unless they are actually
       namespace-shaped.
-- [ ] Continue moving foundational language-visible surfaces into `GradientCore`
+- [ ] Continue moving foundational language-visible surfaces into `RangeCore`
       instead of Swift-only mirrors.
 
 ### 9. Embedded Swift And Backend Boundary
@@ -193,7 +193,7 @@ implementation tracking surface.
 - [ ] Split pure backend lowering/emission from host file/project operations.
 - [ ] Isolate generated runtime support that depends on Foundation, classes,
       locks, file/process APIs, or other host-only behavior.
-- [ ] Audit `GradientSyntax` Foundation usage and replace easy cases where the
+- [ ] Audit `RangeSyntax` Foundation usage and replace easy cases where the
       standard library is enough.
 - [ ] Add an Embedded Swift feasibility build lane when the local toolchain and
       SDK setup can support it.
@@ -202,8 +202,8 @@ implementation tracking surface.
 ### 10. Tooling And Editor Parity
 
 - [ ] Add semantic origin modifiers for project vs core/external symbols.
-- [ ] Map origin-aware semantic token rules such as `type.gradient.project` and
-      `type.gradient.other`.
+- [ ] Map origin-aware semantic token rules such as `type.range.project` and
+      `type.range.other`.
 - [ ] Split constants from mutable variables where declaration graph facts know
       immutability.
 - [ ] Split globals, locals, and properties where symbol scope is known.
@@ -214,7 +214,7 @@ implementation tracking surface.
 
 ### 11. Product And Publishing
 
-- [ ] Decide whether GradientCloud is a real product direction for packages,
+- [ ] Decide whether RangeCloud is a real product direction for packages,
       articles, examples, and language-design notes.
 - [ ] Treat `.env` as only one local provider for typed config/secret
       declarations. The source of truth should be graph-visible declarations
@@ -229,16 +229,16 @@ implementation tracking surface.
    `facetOf` because it clarifies macro target surfaces without changing
    runtime behavior.
 4. Route one literal compatibility path through declaration graph facts and
-   `GradientCore` bridge protocols.
+   `RangeCore` bridge protocols.
 5. Define the smallest non-diagnostic `MemoryGraph` projection pass.
 
 ## Verification Snapshot
 
 Last reviewed on 2026-05-19.
 
-- `GradientSyntax`: `swift test` passed with 43 tests.
-- `GradientCLI`: `swift test` passed with 36 tests.
-- `GradientBackendSwift`: `swift test` builds, but exits with `no tests found`
+- `RangeSyntax`: `swift test` passed with 43 tests.
+- `RangeCLI`: `swift test` passed with 36 tests.
+- `RangeBackendSwift`: `swift test` builds, but exits with `no tests found`
   because the package has no test target.
 - Fixture inventory at review time:
   - `CompilePass`: 94 fixtures.

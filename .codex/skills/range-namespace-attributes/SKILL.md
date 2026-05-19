@@ -1,9 +1,9 @@
 ---
-name: gradient-namespace-attributes
+name: range-namespace-attributes
 description: Use when changing namespace declarations, namespace-backed attributes, attribute validation, declaration graph collection, diagnostics for unknown attributes, or docs involving @Namespace behavior. Use the embedded direction in this skill to avoid validator side tables and stale attribute docs.
 ---
 
-# Gradient Namespace Attributes
+# Range Namespace Attributes
 
 ## Workflow
 

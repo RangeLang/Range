@@ -1,9 +1,9 @@
 import ArgumentParser
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
 struct ProjectUpdater {
-    private static let releaseRepository = "georgetchelidze/Gradient"
+    private static let releaseRepository = "georgetchelidze/Range"
 
     private let path: String
     private let updateCLI: Bool
@@ -20,7 +20,7 @@ struct ProjectUpdater {
         if version == "latest" {
             let status = try VersionChecker(repository: releaseRepositoryURL(for: repository)).check()
             guard status.updateAvailable else {
-                TerminalLog.out("Gradient CLI is already up to date.", level: .success)
+                TerminalLog.out("Range CLI is already up to date.", level: .success)
                 return
             }
         }
@@ -40,14 +40,14 @@ struct ProjectUpdater {
 
         let fileManager = FileManager.default
         let temporaryRoot = fileManager.temporaryDirectory
-            .appendingPathComponent("gradient-update-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("range-update-\(UUID().uuidString)", isDirectory: true)
         try fileManager.createDirectory(at: temporaryRoot, withIntermediateDirectories: true)
         defer {
             try? fileManager.removeItem(at: temporaryRoot)
         }
 
         let archiveURL = temporaryRoot.appendingPathComponent(archive, isDirectory: false)
-        TerminalLog.out("Downloading Gradient from \(url.absoluteString)", level: .change)
+        TerminalLog.out("Downloading Range from \(url.absoluteString)", level: .change)
         try download(url: url, to: archiveURL)
 
         try runProcess(
@@ -56,7 +56,7 @@ struct ProjectUpdater {
         )
 
         let packageRoot = temporaryRoot.appendingPathComponent(
-            "gradient-\(platform).lang",
+            "range-\(platform).lang",
             isDirectory: true
         )
         let installScript = packageRoot.appendingPathComponent("install.sh", isDirectory: false)
@@ -69,11 +69,11 @@ struct ProjectUpdater {
             executable: installScript.path,
             arguments: [],
             environment: [
-                "GRADIENT_INSTALL_ASSUME_YES": "true",
-                "GRADIENT_INSTALL_PREFIX": installPrefix.path,
+                "RANGE_INSTALL_ASSUME_YES": "true",
+                "RANGE_INSTALL_PREFIX": installPrefix.path,
             ]
         )
-        TerminalLog.out("Updated Gradient CLI.", level: .success)
+        TerminalLog.out("Updated Range CLI.", level: .success)
     }
 
     static func releaseRepositoryURL(for repository: String) -> String {
@@ -86,26 +86,26 @@ struct ProjectUpdater {
 
     static func selfUpdateInstallPrefix() -> URL {
         let environment = ProcessInfo.processInfo.environment
-        if let override = environment["GRADIENT_UPDATE_PREFIX"], !override.isEmpty {
+        if let override = environment["RANGE_UPDATE_PREFIX"], !override.isEmpty {
             return URL(fileURLWithPath: override, isDirectory: true).standardizedFileURL
         }
 
         let executablePrefix = installedExecutableURL()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-        if isGradientUserPrefix(executablePrefix), isWritableInstallPrefix(executablePrefix) {
+        if isRangeUserPrefix(executablePrefix), isWritableInstallPrefix(executablePrefix) {
             return executablePrefix
         }
 
         return FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".gradient", isDirectory: true)
+            .appendingPathComponent(".range", isDirectory: true)
             .standardizedFileURL
     }
 
-    private static func isGradientUserPrefix(_ prefix: URL) -> Bool {
+    private static func isRangeUserPrefix(_ prefix: URL) -> Bool {
         prefix.standardizedFileURL.path
             == FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".gradient", isDirectory: true)
+            .appendingPathComponent(".range", isDirectory: true)
             .standardizedFileURL
             .path
     }
@@ -121,11 +121,11 @@ struct ProjectUpdater {
     }
 
     static func releaseArchiveNameForCurrentPlatform() throws -> String {
-        "gradient-\(try releasePlatform()).lang.tar.gz"
+        "range-\(try releasePlatform()).lang.tar.gz"
     }
 
     private static func installedExecutableURL() -> URL {
-        let executable = CommandLine.arguments.first ?? "gradient"
+        let executable = CommandLine.arguments.first ?? "range"
         if executable.contains("/") {
             return URL(fileURLWithPath: executable).standardizedFileURL
         }
@@ -164,7 +164,7 @@ struct ProjectUpdater {
         #elseif os(Linux)
         let os = "linux"
         #else
-        throw ValidationError("Gradient release updates are not supported on this operating system yet.")
+        throw ValidationError("Range release updates are not supported on this operating system yet.")
         #endif
 
         #if arch(arm64)
@@ -172,7 +172,7 @@ struct ProjectUpdater {
         #elseif arch(x86_64)
         let arch = "x64"
         #else
-        throw ValidationError("Gradient release updates are not supported on this architecture yet.")
+        throw ValidationError("Range release updates are not supported on this architecture yet.")
         #endif
 
         return "\(os)-\(arch)"
@@ -187,24 +187,24 @@ struct ProjectUpdater {
 
     func run() throws {
         let root = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-        let packageFile = root.appendingPathComponent("Package.gradient", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
 
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.gradient in \(root.path)")
+            throw ValidationError("Missing Package.range in \(root.path)")
         }
 
         let source = try String(contentsOf: packageFile, encoding: .utf8)
         let manifest = try PackageManifestLoader.load(from: packageFile)
-        let isGradientPackage = manifest.name == "Gradient"
+        let isRangePackage = manifest.name == "Range"
         let modules = parseModules(from: source)
-        try updateModules(modules, projectRoot: root, reportEmpty: !isGradientPackage)
+        try updateModules(modules, projectRoot: root, reportEmpty: !isRangePackage)
 
         if updateCLI {
-            try updateGradientCLIIfAvailable(from: root)
+            try updateRangeCLIIfAvailable(from: root)
         }
 
-        if isGradientPackage {
-            try publishAndDownloadGradient(from: root, manifest: manifest)
+        if isRangePackage {
+            try publishAndDownloadRange(from: root, manifest: manifest)
         }
 
         TerminalLog.out("Update complete.", level: .success)
@@ -243,7 +243,7 @@ struct ProjectUpdater {
 
         let modulesRoot =
             projectRoot
-            .appendingPathComponent(".gradient", isDirectory: true)
+            .appendingPathComponent(".range", isDirectory: true)
             .appendingPathComponent("Packages", isDirectory: true)
         try FileManager.default.createDirectory(at: modulesRoot, withIntermediateDirectories: true)
 
@@ -291,22 +291,22 @@ struct ProjectUpdater {
         }
     }
 
-    private func updateGradientCLIIfAvailable(from root: URL) throws {
-        let script = root.appendingPathComponent("scripts/install-gradient.sh", isDirectory: false)
+    private func updateRangeCLIIfAvailable(from root: URL) throws {
+        let script = root.appendingPathComponent("scripts/install-range.sh", isDirectory: false)
         if !FileManager.default.fileExists(atPath: script.path) {
             TerminalLog.out(
-                "Skipping CLI self-update: scripts/install-gradient.sh not found in \(root.path)",
+                "Skipping CLI self-update: scripts/install-range.sh not found in \(root.path)",
                 level: .warning
             )
             return
         }
 
         try Self.runProcess(executable: script.path, arguments: [])
-        TerminalLog.out("Updated Gradient CLI", level: .success)
+        TerminalLog.out("Updated Range CLI", level: .success)
     }
 
-    private func publishAndDownloadGradient(from root: URL, manifest: PackageManifest) throws {
-        TerminalLog.out("Publishing Gradient", level: .change)
+    private func publishAndDownloadRange(from root: URL, manifest: PackageManifest) throws {
+        TerminalLog.out("Publishing Range", level: .change)
         let published = try PackagePublisher(projectPath: root.path).publish(.patch)
         TerminalLog.out("Published \(published.name) \(published.version).", level: .success)
         switch published.git {
@@ -338,7 +338,7 @@ struct ProjectUpdater {
 
         let packageRoot =
             FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".gradient", isDirectory: true)
+            .appendingPathComponent(".range", isDirectory: true)
             .appendingPathComponent("Packages", isDirectory: true)
             .appendingPathComponent(parts[0], isDirectory: true)
             .appendingPathComponent(parts[1], isDirectory: true)

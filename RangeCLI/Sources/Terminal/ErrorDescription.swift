@@ -1,10 +1,10 @@
 import ArgumentParser
-import GradientBackendSwift
-import GradientSyntax
+import RangeBackendSwift
+import RangeSyntax
 
 enum ErrorDescription {
     static func message(for error: Error) -> String {
-        if let diagnostic = error as? GradientDiagnostic {
+        if let diagnostic = error as? RangeDiagnostic {
             return diagnostic.description
         }
         if let parse = error as? ParseError {

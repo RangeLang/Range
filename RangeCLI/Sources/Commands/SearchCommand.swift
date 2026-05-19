@@ -1,10 +1,10 @@
 import ArgumentParser
 import Foundation
 
-extension GradientCLI.Package {
+extension RangeCLI.Package {
     struct Search: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Search the network for Gradient packages."
+            abstract: "Search the network for Range packages."
         )
 
         @Argument(
@@ -142,7 +142,7 @@ extension GradientCLI.Package {
                 }
 
                 print("    " + TerminalLog.subtleStdout(result.url.absoluteString))
-                print("    " + TerminalLog.subtleStdout("Package.gradient: let modules: [String] = [\"\(result.package)\"]"))
+                print("    " + TerminalLog.subtleStdout("Package.range: let modules: [String] = [\"\(result.package)\"]"))
             }
         }
 

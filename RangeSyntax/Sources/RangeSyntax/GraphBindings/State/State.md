@@ -6,7 +6,7 @@ State is a mutable owned graph binding.
 
 ## Role
 
-`state` is Gradient's mutable source of truth.
+`state` is Range's mutable source of truth.
 
 ## Mental Model
 
@@ -18,13 +18,13 @@ If other code needs shared access to that storage, it does so through `binding`.
 
 - Declares mutable owned data
 
-```gradient
+```range
 state page: Int
 ```
 
 - Can be initialized directly
 
-```gradient
+```range
 state page: Int = 0
 ```
 
@@ -32,7 +32,7 @@ Outside construct member storage, `state` requires an initializer.
 
 - Can participate in memberwise initialization
 
-```gradient
+```range
 construct Counter {
     state count: Int
 }
@@ -44,7 +44,7 @@ Inside construct member storage, `state` may be declared without a default and m
 
 - Can be mutated after initialization
 
-```gradient
+```range
 state page: Int = 0
 
 page = 1
@@ -53,7 +53,7 @@ page += 1
 
 - Acts as a source of truth for derived values and behavior
 
-```gradient
+```range
 construct Counter {
     state count: Int = 0
 
@@ -65,7 +65,7 @@ construct Counter {
 
 - Shared mutation is exposed through binding projection
 
-```gradient
+```range
 construct User {
     binding person: Person
 }

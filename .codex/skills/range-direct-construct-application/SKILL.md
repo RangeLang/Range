@@ -1,9 +1,9 @@
 ---
-name: gradient-direct-construct-application
+name: range-direct-construct-application
 description: Use when changing construct calls, initializer inference, direct construct application, constructor diagnostics, fixture cleanup, generated Swift initializers, or docs about constructs carrying data shape without explicit init declarations. Use the embedded direction in this skill to catch old initializer assumptions.
 ---
 
-# Gradient Direct Construct Application
+# Range Direct Construct Application
 
 ## Workflow
 
@@ -15,7 +15,7 @@ description: Use when changing construct calls, initializer inference, direct co
 
 ## Shape Bias
 
-```gradient
+```range
 construct User {
     let id: Int
     let name: String

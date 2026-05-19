@@ -17,7 +17,7 @@ An extension adds declarations to an existing type definition.
 
 - Can extend an existing construct
 
-```gradient
+```range
 construct User {
     let name: String
 }
@@ -31,7 +31,7 @@ extension User {
 
 - Can extend an existing enum
 
-```gradient
+```range
 enum Direction {
     case north
     case south
@@ -46,7 +46,7 @@ extension Direction {
 
 - Can extend an existing protocol
 
-```gradient
+```range
 protocol Paginated {
     state page: Int
 }
@@ -60,7 +60,7 @@ extension Paginated {
 
 - Extends an existing type rather than declaring a new one
 
-```gradient
+```range
 extension User
 ```
 

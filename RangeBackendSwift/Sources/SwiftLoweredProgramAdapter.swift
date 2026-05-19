@@ -1,9 +1,9 @@
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
 struct SwiftLoweredProgramAdapter {
-    private typealias GradientExpression = GradientSyntax.Expression
-    private typealias GradientStatement = GradientSyntax.Statement
+    private typealias RangeExpression = RangeSyntax.Expression
+    private typealias RangeStatement = RangeSyntax.Statement
 
     func adapt(program: LoweredProgram) -> LoweredProgram {
         .init(
@@ -100,11 +100,11 @@ struct SwiftLoweredProgramAdapter {
         )
     }
 
-    private func lower(statements: [GradientStatement]) -> [GradientStatement] {
+    private func lower(statements: [RangeStatement]) -> [RangeStatement] {
         statements.map(lower(statement:))
     }
 
-    private func lower(statement: GradientStatement) -> GradientStatement {
+    private func lower(statement: RangeStatement) -> RangeStatement {
         switch statement {
         case .macroInvocation(let name, let argumentClause, let body):
             return .macroInvocation(
@@ -198,8 +198,8 @@ struct SwiftLoweredProgramAdapter {
         }
     }
 
-    private func lower(expression: GradientExpression) -> GradientExpression {
-        let lowered: GradientExpression
+    private func lower(expression: RangeExpression) -> RangeExpression {
+        let lowered: RangeExpression
 
         switch expression {
         case .macroInvocation:
@@ -264,7 +264,7 @@ struct SwiftLoweredProgramAdapter {
         return lowered
     }
 
-    private func lowerCoreScalarLiteralBridge(_ expression: GradientExpression) -> GradientExpression? {
+    private func lowerCoreScalarLiteralBridge(_ expression: RangeExpression) -> RangeExpression? {
         guard case .call(let name, let arguments) = expression,
             arguments.count == 1,
             arguments[0].label == "literal"

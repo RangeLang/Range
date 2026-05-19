@@ -2,7 +2,7 @@ import Foundation
 
 extension Parser {
     func isNamespaceDeclarationStart() -> Bool {
-        peek() == .keyword(GradientSyntax.Keyword.namespace.rawValue)
+        peek() == .keyword(RangeSyntax.Keyword.namespace.rawValue)
     }
 
     mutating func parseNamespaceDeclaration(requiresEOF: Bool = true) throws -> NamespaceDeclaration {

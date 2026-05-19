@@ -27,7 +27,7 @@ becoming its own syntax construct.
 
 For example:
 
-```gradient
+```range
 return [.loading, .ready]
 ```
 
@@ -57,7 +57,7 @@ matches the semantic graph.
 
 Prefer:
 
-```gradient
+```range
 Array.Expression
 Array.TypeReference
 Enum.Case.Declaration
@@ -71,7 +71,7 @@ Protocol.Application<Construct.Declaration>
 
 over a flat namespace such as:
 
-```gradient
+```range
 ArrayExpression
 ArrayTypeReference
 EnumCaseExpression
@@ -107,7 +107,7 @@ Protocol conformance is one of those relationships. Source syntax may write a
 nominal conformance reference, but the declaration graph resolves that edge
 into a protocol application value:
 
-```gradient
+```range
 Protocol.Application<Construct.Declaration>
 Protocol.Application<Enum.Declaration>
 Protocol.Application<Protocol.Declaration>

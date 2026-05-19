@@ -1,5 +1,5 @@
 import Foundation
-@testable import GradientCLI
+@testable import RangeCLI
 import Testing
 
 @Suite("Package subscription")
@@ -8,11 +8,11 @@ struct PackageSubscriptionManagerTests {
     func installedPackagesAreSearchable() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".gradient/Packages/acme/logger/Package.gradient"),
+            at: root.appendingPathComponent(".range/Packages/acme/logger/Package.range"),
             name: "LoggingTools"
         )
         try writePackage(
-            at: root.appendingPathComponent(".gradient/Packages/acme/ui/Package.gradient"),
+            at: root.appendingPathComponent(".range/Packages/acme/ui/Package.range"),
             name: "InterfaceKit"
         )
 
@@ -25,11 +25,11 @@ struct PackageSubscriptionManagerTests {
         #expect(manager.matchingPackages(packages, search: "acme ui").map(\.reference) == ["acme/ui"])
     }
 
-    @Test("Subscribe adds the selected installed module to Package.gradient")
+    @Test("Subscribe adds the selected installed module to Package.range")
     func subscribeAddsSelectedInstalledModule() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".gradient/Packages/acme/logger/Package.gradient"),
+            at: root.appendingPathComponent(".range/Packages/acme/logger/Package.range"),
             name: "LoggingTools"
         )
 
@@ -37,23 +37,23 @@ struct PackageSubscriptionManagerTests {
         let action = try manager.subscribe(search: "logger")
 
         let source = try String(
-            contentsOf: root.appendingPathComponent("Package.gradient"),
+            contentsOf: root.appendingPathComponent("Package.range"),
             encoding: .utf8
         )
         #expect(action == .subscribed)
         #expect(source.contains(#"let modules: [String] = ["acme/logger"]"#))
-        _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.gradient"))
+        _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.range"))
     }
 
     @Test("Subscribe browses when search is empty or ambiguous")
     func subscribeBrowsesWhenSearchIsEmptyOrAmbiguous() throws {
         let root = try temporaryProject()
         try writePackage(
-            at: root.appendingPathComponent(".gradient/Packages/acme/logger/Package.gradient"),
+            at: root.appendingPathComponent(".range/Packages/acme/logger/Package.range"),
             name: "LoggingTools"
         )
         try writePackage(
-            at: root.appendingPathComponent(".gradient/Packages/acme/log-viewer/Package.gradient"),
+            at: root.appendingPathComponent(".range/Packages/acme/log-viewer/Package.range"),
             name: "LogViewer"
         )
 
@@ -65,9 +65,9 @@ struct PackageSubscriptionManagerTests {
 
     private func temporaryProject() throws -> URL {
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("gradient-package-subscribe-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("range-package-subscribe-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try writePackage(at: root.appendingPathComponent("Package.gradient"), name: "Fixture")
+        try writePackage(at: root.appendingPathComponent("Package.range"), name: "Fixture")
         return root
     }
 

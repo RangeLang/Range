@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`GradientSyntax` should own Gradient's compiler pipeline. `GradientCLI` should supply files, load `GradientCore`, choose commands and backends, and report results, but it should not assemble semantic compiler stages ad hoc.
+`RangeSyntax` should own Range's compiler pipeline. `RangeCLI` should supply files, load `RangeCore`, choose commands and backends, and report results, but it should not assemble semantic compiler stages ad hoc.
 
 ## Pipeline
 
@@ -44,22 +44,22 @@ The intended pipeline is:
   derives invalidation and recomputation dependencies from the earlier semantic and memory layers
 
 - `BackendLowering`
-  adapts settled Gradient meaning to a target such as Swift, C, or a future native backend
+  adapts settled Range meaning to a target such as Swift, C, or a future native backend
 
 - `Emission`
   prints or writes target output
 
-## Boundary Between GradientSyntax And GradientCLI
+## Boundary Between RangeSyntax And RangeCLI
 
 The split should be:
 
-- `GradientSyntax`
+- `RangeSyntax`
   owns lexing, parsing, AST construction, declaration-graph construction, semantic resolution, and later graph derivation
 
-- `GradientCLI`
-  discovers project files, loads `GradientCore`, chooses commands, invokes backends, reports diagnostics, and writes output
+- `RangeCLI`
+  discovers project files, loads `RangeCore`, chooses commands, invokes backends, reports diagnostics, and writes output
 
-That means `GradientCLI` should request a semantic artifact from `GradientSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.
+That means `RangeCLI` should request a semantic artifact from `RangeSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.
 
 ## Minimal First SemanticProgram
 
@@ -77,8 +77,8 @@ public struct SemanticProgram {
 
 This is enough to:
 
-- centralize parsing and macro expansion in `GradientSyntax`
-- centralize declaration-graph construction in `GradientSyntax`
+- centralize parsing and macro expansion in `RangeSyntax`
+- centralize declaration-graph construction in `RangeSyntax`
 - let backends consume one semantic entry point instead of raw file collection
 
 ## Backend Rule

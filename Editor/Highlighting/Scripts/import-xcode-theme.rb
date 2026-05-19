@@ -66,21 +66,21 @@ FIELD_ORDER = %w[
 ].freeze
 
 HEADER = <<~YAML
-  # Human-editable Xcode-style palette for Gradient.
+  # Human-editable Xcode-style palette for Range.
   #
   # This file is intentionally human-editable. The importer can refresh Xcode-
-  # derived color/font fields while preserving Gradient support metadata.
+  # derived color/font fields while preserving Range support metadata.
   #
   # Style field notes:
   # - XcodeSyntax is the source plist key in Xcode's .xccolortheme files.
   # - ZedStyle is the closest Zed syntax style key we currently emit or want to map to.
-  # - Supported means current end-to-end support in the Gradient editor pipeline:
+  # - Supported means current end-to-end support in the Range editor pipeline:
   #   true = Tree-sitter/LSP can emit it today and Zed can style it.
   #   partial = some path exists, but it is incomplete or not 1:1 with Xcode.
   #   false = this is design intent only until the listed work is done.
   # - ZedNative means whether Zed has a direct style key/category we can target
-  #   without custom Gradient semantic token work.
-  # - Needs lists the missing Gradient-side pieces. Use [] when no known work remains.
+  #   without custom Range semantic token work.
+  # - Needs lists the missing Range-side pieces. Use [] when no known work remains.
   # - FontWeight values to use: normal, medium, semibold, bold.
   # - FontStyle values to use: normal, italic.
   # - TextDecoration values to use: none, underline, strikethrough.

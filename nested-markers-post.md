@@ -4,7 +4,7 @@ Markers can carry smaller marker scopes inside them.
 
 ## Addition
 
-```gradient
+```range
 #package.defaults
 construct RuntimeDefaults {
   #host.cpu
@@ -34,11 +34,11 @@ construct RuntimeDefaults {
 
 The outer marker says these declarations are package defaults. The nested markers say which execution world each default belongs to.
 
-This keeps the graph shaped like the source: package policy first, then host-specific defaults undergradienth it.
+This keeps the graph shaped like the source: package policy first, then host-specific defaults underrangeh it.
 
 ## Implementation Shape
 
-```gradient
+```range
 marker host(): Namespace<Construct> {
   marker cpu(): Construct -> Host {
     return Host.cpu
@@ -58,9 +58,9 @@ The nested declarations make `#host.gpu` a scoped marker, not a global spelling 
 
 ## Types In Multiple Dimensions
 
-Gradient types are not locked to one machine shape. Nested markers let a package announce host, architecture, memory, availability, and lowering facts at the same time.
+Range types are not locked to one machine shape. Nested markers let a package announce host, architecture, memory, availability, and lowering facts at the same time.
 
-```gradient
+```range
 #package.defaults
 construct RuntimeDefaults {
   #host.cpu.microcontroller
@@ -93,7 +93,7 @@ CPU is not one target. A microcontroller, an ARM device, and an x86 workstation 
 
 ## GPU Hosts
 
-```gradient
+```range
 #package.defaults
 construct GraphicsDefaults {
   #host.gpu.apple
@@ -119,11 +119,11 @@ construct GraphicsDefaults {
 }
 ```
 
-GPU is not one target either. Gradient can name the host family directly, so rendering, compute, tensor, texture, and buffer defaults do not have to collapse into one generic graphics setting.
+GPU is not one target either. Range can name the host family directly, so rendering, compute, tensor, texture, and buffer defaults do not have to collapse into one generic graphics setting.
 
 ## Server And Client Availability
 
-```gradient
+```range
 #availability.server
 construct TrainingJob {
   TensorLayout<.blocked>

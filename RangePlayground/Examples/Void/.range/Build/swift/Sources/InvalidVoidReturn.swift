@@ -5,7 +5,7 @@ func invalid() -> Void {
 }
 
 @main
-struct GradientMain {
+struct RangeMain {
     static func main() throws {
         invalid()
     }

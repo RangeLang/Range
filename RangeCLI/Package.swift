@@ -4,27 +4,27 @@
 import PackageDescription
 
 let package = Package(
-    name: "GradientCLI",
+    name: "RangeCLI",
     platforms: [
         .macOS(.v13)
     ],
     dependencies: [
-        .package(path: "../GradientSyntax"),
-        .package(path: "../GradientBackendSwift"),
+        .package(path: "../RangeSyntax"),
+        .package(path: "../RangeBackendSwift"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
     ],
     targets: [
         .executableTarget(
-            name: "GradientCLI",
+            name: "RangeCLI",
             dependencies: [
-                .product(name: "GradientSyntax", package: "GradientSyntax"),
-                .product(name: "GradientBackendSwift", package: "GradientBackendSwift"),
+                .product(name: "RangeSyntax", package: "RangeSyntax"),
+                .product(name: "RangeBackendSwift", package: "RangeBackendSwift"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Sources",
             sources: [
                 "Commands",
-                "GradientCLI",
+                "RangeCLI",
                 "Terminal",
             ],
             swiftSettings: [
@@ -32,9 +32,9 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "GradientCLITests",
-            dependencies: ["GradientCLI"],
-            path: "Tests/GradientCLITests"
+            name: "RangeCLITests",
+            dependencies: ["RangeCLI"],
+            path: "Tests/RangeCLITests"
         )
     ]
 )

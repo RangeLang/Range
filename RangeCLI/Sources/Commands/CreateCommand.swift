@@ -1,9 +1,9 @@
 import ArgumentParser
 
-extension GradientCLI {
+extension RangeCLI {
     struct Create: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Create a new Gradient project."
+            abstract: "Create a new Range project."
         )
 
         @Argument(help: "Project name.")

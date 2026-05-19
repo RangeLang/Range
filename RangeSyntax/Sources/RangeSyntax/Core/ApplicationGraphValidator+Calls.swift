@@ -595,7 +595,7 @@ extension ApplicationGraphValidator {
         return nil
     }
 
-    func callArguments(_ arguments: [CallArgument], match parameters: [GradientFunctionParameter])
+    func callArguments(_ arguments: [CallArgument], match parameters: [RangeFunctionParameter])
         -> Bool
     {
         if parameters.contains(where: { !$0.macros.isEmpty }),
@@ -611,7 +611,7 @@ extension ApplicationGraphValidator {
             return false
         }
 
-        let parameterSequence: [GradientFunctionParameter]
+        let parameterSequence: [RangeFunctionParameter]
 
         if let variadicIndex = parameters.firstIndex(where: { parameter in
             if case .variadic = parameter.typeReference {
@@ -650,9 +650,9 @@ extension ApplicationGraphValidator {
 
     func matchArguments(
         _ arguments: [CallArgument],
-        to parameters: [GradientFunctionParameter]
-    ) -> [GradientFunctionParameter]? {
-        var matched: [GradientFunctionParameter] = []
+        to parameters: [RangeFunctionParameter]
+    ) -> [RangeFunctionParameter]? {
+        var matched: [RangeFunctionParameter] = []
         var parameterIndex = 0
 
         for argument in arguments {
@@ -775,7 +775,7 @@ extension ApplicationGraphValidator {
     }
 
     func parameterConstructTypes(
-        _ parameters: [GradientFunctionParameter],
+        _ parameters: [RangeFunctionParameter],
         declarationGraph: DeclarationGraph
     ) -> [String: String] {
         Dictionary(

@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import GradientSyntax
+import RangeSyntax
 
 enum ProjectSourceValidator {
     static func compiledProgram(for project: LoadedProject) throws -> CompiledProgram {

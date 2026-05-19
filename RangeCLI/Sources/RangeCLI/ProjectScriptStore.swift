@@ -6,7 +6,7 @@ struct ProjectScriptStore {
 
     func scriptsDirectory(create: Bool = true) throws -> URL {
         let directory = try packageRoot(from: projectPath)
-            .appendingPathComponent(".gradient", isDirectory: true)
+            .appendingPathComponent(".range", isDirectory: true)
             .appendingPathComponent(".scripts", isDirectory: true)
         if create {
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -61,17 +61,17 @@ struct ProjectScriptStore {
             throw ValidationError("Script name must be a file name, not a path.")
         }
 
-        let fileName = trimmed.hasSuffix(".gradient") ? trimmed : "\(trimmed).gradient"
+        let fileName = trimmed.hasSuffix(".range") ? trimmed : "\(trimmed).range"
         return try scriptsDirectory(create: createDirectory)
             .appendingPathComponent(fileName, isDirectory: false)
     }
 
     private func packageRoot(from rawPath: String) throws -> URL {
         let url = URL(fileURLWithPath: rawPath, isDirectory: true).standardizedFileURL
-        let root = url.lastPathComponent == "Package.gradient" ? url.deletingLastPathComponent() : url
-        let packageFile = root.appendingPathComponent("Package.gradient", isDirectory: false)
+        let root = url.lastPathComponent == "Package.range" ? url.deletingLastPathComponent() : url
+        let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.gradient in \(root.path).")
+            throw ValidationError("Missing Package.range in \(root.path).")
         }
         return root
     }
