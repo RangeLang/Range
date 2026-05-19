@@ -1,6 +1,6 @@
 param(
     [string]$Version = "latest",
-    [string]$Repository = $(if ($env:RANGE_REPOSITORY) { $env:RANGE_REPOSITORY } else { "georgerange/Range" }),
+    [string]$Repository = $(if ($env:RANGE_REPOSITORY) { $env:RANGE_REPOSITORY } else { "georgetchelidze/Range" }),
     [string]$InstallDir = $(if ($env:RANGE_INSTALL_DIR) { $env:RANGE_INSTALL_DIR } else { Join-Path $HOME ".range\bin" })
 )
 

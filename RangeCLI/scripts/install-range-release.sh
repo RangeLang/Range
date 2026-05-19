@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY="${RANGE_REPOSITORY:-georgerange/Range}"
+REPOSITORY="${RANGE_REPOSITORY:-georgetchelidze/Range}"
 INSTALL_DIR="${RANGE_INSTALL_DIR:-${HOME}/.local/bin}"
 VERSION="${1:-latest}"
 TARGET_NAME="range"
