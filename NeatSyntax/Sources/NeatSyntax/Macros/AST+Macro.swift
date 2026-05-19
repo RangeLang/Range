@@ -17,16 +17,15 @@ public struct MarkerDeclaration {
     public let parameters: [NeatFunctionParameter]
     public let target: MacroTarget
     public let valueType: TypeReference
-    public let globalRegistrations: [MarkerGlobalRegistration]
     public let bindings: MacroBindings?
     public let body: [Statement]
 
-    public var registersNamespace: Bool {
-        globalRegistrations.contains(.namespace) || valueType.isNamespaceRegistration
+    public var hasNamespaceEffect: Bool {
+        valueType.isNamespaceEffect
     }
 
-    public var registersLanguageBoundary: Bool {
-        valueType.isLanguageRegistration
+    public var hasLanguageEffect: Bool {
+        valueType.isLanguageEffect
     }
 
     public var foreignBodyLanguage: String? {
@@ -35,10 +34,6 @@ public struct MarkerDeclaration {
         }
         return parameters[0].typeReference?.foreignBodyLanguageName
     }
-}
-
-public enum MarkerGlobalRegistration: String, Equatable {
-    case namespace
 }
 
 public struct EmittedCodeBlock {
@@ -143,26 +138,26 @@ extension TypeReference {
         markerEffectTarget != nil
     }
 
-    var namespaceRegistrationTarget: TypeReference? {
+    var namespaceEffectTarget: TypeReference? {
         guard markerEffectName == "Namespace" else {
             return nil
         }
         return markerEffectTarget
     }
 
-    var isNamespaceRegistration: Bool {
-        namespaceRegistrationTarget != nil
+    var isNamespaceEffect: Bool {
+        namespaceEffectTarget != nil
     }
 
-    var languageRegistrationTarget: TypeReference? {
+    var languageEffectTarget: TypeReference? {
         guard markerEffectName == "Language" else {
             return nil
         }
         return markerEffectTarget
     }
 
-    var isLanguageRegistration: Bool {
-        languageRegistrationTarget != nil
+    var isLanguageEffect: Bool {
+        languageEffectTarget != nil
     }
 
     var foreignBodyLanguageName: String? {

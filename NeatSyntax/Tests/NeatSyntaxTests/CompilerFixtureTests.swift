@@ -522,14 +522,16 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Namespace declarations provide attribute names")
-    func namespaceDeclarationsProvideAttributeNames() throws {
+    @Test("Namespace markers provide attribute names")
+    func namespaceMarkersProvideAttributeNames() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/NamespaceAttribute.neat",
                 source: """
-                namespace Styling {}
+                #namespace
+                construct Styling {
+                }
 
                 @Styling
                 construct Panel {
@@ -641,7 +643,7 @@ struct CompilerFixtureTests {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
             Issue.record("Expected @Missing to require a matching namespace.")
         } catch {
-            #expect(String(describing: error).contains("Declare namespace Missing"))
+            #expect(String(describing: error).contains("Declare a Namespace<Construct> marker-backed namespace Missing"))
         }
     }
 
@@ -813,7 +815,8 @@ struct CompilerFixtureTests {
                     Module("acme/registry-snapshot")
                 }
 
-                namespace Styling {
+                #namespace
+                construct Styling {
                     let defaultTitle: String("Untitled")
                 }
 
@@ -897,7 +900,7 @@ struct CompilerFixtureTests {
         #expect(registry.hasProtocol(named: "Renderable"))
         #expect(registry.hasEnumeration(named: "DisplayMode"))
         #expect(registry.hasMacro(named: "decorate"))
-        #expect(graph.markersByName["hostSpace"]?.registersNamespace == true)
+        #expect(graph.markersByName["hostSpace"]?.hasNamespaceEffect == true)
         #expect(registry.hasExtensions(targeting: "Panel"))
         #expect(graph.hasNamespace(named: "Styling"))
         #expect(graph.hasNamespace(named: "Routes"))
@@ -1012,15 +1015,17 @@ struct CompilerFixtureTests {
         #expect(functionApplication?.site == .functionApplication)
     }
 
-    @Test("Namespaces qualify nested callables and constructs")
-    func namespacesQualifyNestedCallablesAndConstructs() throws {
+    @Test("Namespace markers qualify nested callables and constructs")
+    func namespaceMarkersQualifyNestedCallablesAndConstructs() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/Namespaces.neat",
                 source: """
-                namespace System {
-                    namespace Math {
+                #namespace
+                construct System {
+                    #namespace
+                    construct Math {
                         function zero() -> Int {
                             return 0
                         }
@@ -1029,10 +1034,6 @@ struct CompilerFixtureTests {
                             let number: Int
                         }
                     }
-                }
-
-                #main {
-                    let result = System.Math.zero()
                 }
                 """,
                 role: .project
@@ -1045,7 +1046,7 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.constructsByName["System.Math.Box"] != nil)
     }
 
-    @Test("#namespace construct declares namespace-shaped configuration")
+    @Test("#namespace marker declares namespace-shaped configuration")
     func namespaceConstructDeclaresNamespaceShapedConfiguration() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
@@ -1089,7 +1090,7 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Registered marker declares namespace-shaped configuration")
+    @Test("Namespace<Construct> marker declares namespace-shaped configuration")
     func registeredMarkerDeclaresNamespaceShapedConfiguration() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
@@ -1117,7 +1118,7 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let graph = program.declarationGraph
 
-        #expect(graph.markersByName["hostSpace"]?.registersNamespace == true)
+        #expect(graph.markersByName["hostSpace"]?.hasNamespaceEffect == true)
         #expect(graph.hasNamespace(named: "Client"))
         #expect(graph.hasNamespaceAttribute(named: "Client"))
         #expect(graph.constructsByName["Client"] == nil)

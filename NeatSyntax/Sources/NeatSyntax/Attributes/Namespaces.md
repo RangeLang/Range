@@ -2,7 +2,8 @@
 
 ## Definition
 
-Declaring a namespace makes its name available as an attribute.
+A namespace is declared by applying a marker whose effect type is `Namespace<Construct>` to a construct.
+That makes the construct name available as an attribute.
 
 ## Role
 
@@ -11,7 +12,9 @@ Namespace attributes are semantic tags. They let libraries group declarations un
 ## Example
 
 ```neat
-namespace Styling {}
+#namespace
+construct Styling {
+}
 
 @Styling
 construct Panel {
@@ -19,7 +22,7 @@ construct Panel {
 }
 ```
 
-Namespace-shaped configuration can use `#namespace` on a construct:
+The standard `#namespace` marker is just the core spelling of that pattern:
 
 ```neat
 marker namespace(): Namespace<Construct>
@@ -34,7 +37,7 @@ The marker's `Namespace<Construct>` effect declares a namespace named `Language`
 
 ## Validation
 
-Built-in attributes such as `@main`, `@background`, `@syntax`, and `@package` are always available.
+Built-in surfaces such as `#main`, `@background`, `@syntax`, and `@package` are always available.
 
 Any other attribute must match a visible namespace name:
 
@@ -43,4 +46,4 @@ Any other attribute must match a visible namespace name:
 construct Panel {}
 ```
 
-This fails unless `namespace Missing {}` exists in the program.
+This fails unless a visible `Namespace<Construct>` marker-backed namespace named `Missing` exists in the program, for example `#namespace construct Missing`.

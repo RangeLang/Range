@@ -59,14 +59,14 @@ public struct DeclarationGraph {
         let packageValues = packageSpaces.flatMap(\.values)
         let protocols = Self.collectProtocols(from: files)
         let markers = Self.collectMarkers(from: files)
-        let namespaceRegistrationMarkers = Self.namespaceRegistrationMarkerNames(in: markers)
+        let namespaceEffectMarkers = Self.namespaceEffectMarkerNames(in: markers)
         let namespaces = Self.collectNamespaces(
             from: files,
-            namespaceRegistrationMarkers: namespaceRegistrationMarkers
+            namespaceEffectMarkers: namespaceEffectMarkers
         )
         let namespaceAttributeNames = Self.collectNamespaceAttributeNames(
             from: files,
-            namespaceRegistrationMarkers: namespaceRegistrationMarkers
+            namespaceEffectMarkers: namespaceEffectMarkers
         )
         let namespaceAttributeAttachments = Self.collectNamespaceAttributeAttachments(
             from: files,
@@ -76,7 +76,7 @@ public struct DeclarationGraph {
         let constructs = Self.collectConstructs(
             from: files,
             protocols: protocols,
-            namespaceRegistrationMarkers: namespaceRegistrationMarkers
+            namespaceEffectMarkers: namespaceEffectMarkers
         )
         let enumerations = Self.collectEnums(from: files)
         let macros = Self.collectMacros(from: files)
@@ -255,18 +255,18 @@ public struct DeclarationGraph {
         namespaceAttributeNames.contains(name)
     }
 
-    public func markerApplicationRegistersNamespace(_ application: MacroApplication) -> Bool {
-        markersByName[application.name]?.registersNamespace == true
+    public func markerApplicationHasNamespaceEffect(_ application: MacroApplication) -> Bool {
+        markersByName[application.name]?.hasNamespaceEffect == true
     }
 
     public func isNamespaceShaped(_ declaration: ConstructDeclaration) -> Bool {
-        declaration.macros.contains(where: markerApplicationRegistersNamespace)
+        declaration.macros.contains(where: markerApplicationHasNamespaceEffect)
     }
 
     public func namespaceDeclaration(from construct: ConstructDeclaration) -> NamespaceDeclaration {
         Self.namespaceDeclaration(
             from: construct,
-            namespaceRegistrationMarkers: Self.namespaceRegistrationMarkerNames(in: markersByName)
+            namespaceEffectMarkers: Self.namespaceEffectMarkerNames(in: markersByName)
         )
     }
 
@@ -550,18 +550,18 @@ public struct DeclarationGraph {
     static func collectConstructs(
         from files: [ParsedSourceFile],
         protocols: [String: ProtocolDeclaration],
-        namespaceRegistrationMarkers: Set<String>
+        namespaceEffectMarkers: Set<String>
     ) -> [String: ConstructDeclaration] {
         var registry: [String: ConstructDeclaration] = [:]
         let namespaceRegistry = collectNamespaces(
             from: files,
-            namespaceRegistrationMarkers: namespaceRegistrationMarkers
+            namespaceEffectMarkers: namespaceEffectMarkers
         )
         let extensions = collectExtensions(from: files)
         for parsedFile in files {
             for declaration in constructs(
                 in: parsedFile.sourceFile,
-                namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                namespaceEffectMarkers: namespaceEffectMarkers
             ) {
                 collectConstruct(
                     declaration,
@@ -572,7 +572,7 @@ public struct DeclarationGraph {
             }
             for namespace in namespaces(
                 in: parsedFile.sourceFile,
-                namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                namespaceEffectMarkers: namespaceEffectMarkers
             ) {
                 collectNamespaceConstructs(
                     in: namespace,
@@ -597,13 +597,13 @@ public struct DeclarationGraph {
 
     static func collectNamespaces(
         from files: [ParsedSourceFile],
-        namespaceRegistrationMarkers: Set<String>
+        namespaceEffectMarkers: Set<String>
     ) -> [String: NamespaceDeclaration] {
         var registry: [String: NamespaceDeclaration] = [:]
         for parsedFile in files {
             for declaration in namespaces(
                 in: parsedFile.sourceFile,
-                namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                namespaceEffectMarkers: namespaceEffectMarkers
             ) {
                 collectNamespace(
                     declaration,
@@ -617,13 +617,13 @@ public struct DeclarationGraph {
 
     static func collectNamespaceAttributeNames(
         from files: [ParsedSourceFile],
-        namespaceRegistrationMarkers: Set<String>
+        namespaceEffectMarkers: Set<String>
     ) -> Set<String> {
         var names: Set<String> = []
         for parsedFile in files {
             for declaration in namespaces(
                 in: parsedFile.sourceFile,
-                namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                namespaceEffectMarkers: namespaceEffectMarkers
             ) {
                 collectNamespaceAttributeName(declaration, into: &names)
             }
@@ -864,12 +864,12 @@ public struct DeclarationGraph {
         from files: [ParsedSourceFile]
     ) -> [String: [NeatFunctionParameter]] {
         var registry: [String: [NeatFunctionParameter]] = [:]
-        let namespaceRegistrationMarkers = namespaceRegistrationMarkerNames(
+        let namespaceEffectMarkers = namespaceEffectMarkerNames(
             in: collectMarkers(from: files)
         )
         let namespaceRegistry = collectNamespaces(
             from: files,
-            namespaceRegistrationMarkers: namespaceRegistrationMarkers
+            namespaceEffectMarkers: namespaceEffectMarkers
         )
         let extensions = collectExtensions(from: files)
 
@@ -886,7 +886,7 @@ public struct DeclarationGraph {
                 for construct in module.constructs + module.packageSpaces.flatMap(\.constructs)
                 where !isNamespaceShaped(
                     construct,
-                    namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                    namespaceEffectMarkers: namespaceEffectMarkers
                 ) {
                     collectCallableParameters(
                         in: construct,
@@ -898,13 +898,13 @@ public struct DeclarationGraph {
                     .filter {
                         isNamespaceShaped(
                             $0,
-                            namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                            namespaceEffectMarkers: namespaceEffectMarkers
                         )
                     }
                     .map {
                         namespaceDeclaration(
                             from: $0,
-                            namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                            namespaceEffectMarkers: namespaceEffectMarkers
                         )
                     }
                 for namespace in module.namespaces + module.packageSpaces.flatMap(\.namespaces)
@@ -919,11 +919,11 @@ public struct DeclarationGraph {
             case .construct(let construct):
                 if isNamespaceShaped(
                     construct,
-                    namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                    namespaceEffectMarkers: namespaceEffectMarkers
                 ) {
                     let namespace = namespaceDeclaration(
                         from: construct,
-                        namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                        namespaceEffectMarkers: namespaceEffectMarkers
                     )
                     collectNamespaceCallableParameters(
                         in: namespace,
@@ -1052,12 +1052,12 @@ public struct DeclarationGraph {
     static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]]
     {
         var registry: [String: [CallableDeclaration]] = [:]
-        let namespaceRegistrationMarkers = namespaceRegistrationMarkerNames(
+        let namespaceEffectMarkers = namespaceEffectMarkerNames(
             in: collectMarkers(from: files)
         )
         let namespaceRegistry = collectNamespaces(
             from: files,
-            namespaceRegistrationMarkers: namespaceRegistrationMarkers
+            namespaceEffectMarkers: namespaceEffectMarkers
         )
         let extensions = collectExtensions(from: files)
         for parsedFile in files {
@@ -1066,7 +1066,7 @@ public struct DeclarationGraph {
             }
             for namespace in namespaces(
                 in: parsedFile.sourceFile,
-                namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                namespaceEffectMarkers: namespaceEffectMarkers
             ) {
                 collectNamespaceCallables(
                     in: namespace,
@@ -1621,20 +1621,20 @@ public struct DeclarationGraph {
 
     static func constructs(
         in sourceFile: SourceFileNode,
-        namespaceRegistrationMarkers: Set<String>
+        namespaceEffectMarkers: Set<String>
     ) -> [ConstructDeclaration] {
         switch sourceFile {
         case .construct(let declaration):
             return isNamespaceShaped(
                 declaration,
-                namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                namespaceEffectMarkers: namespaceEffectMarkers
             ) ? [] : [declaration]
         case .module(let module):
             return (module.constructs + module.packageSpaces.flatMap(\.constructs))
                 .filter {
                     !isNamespaceShaped(
                         $0,
-                        namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                        namespaceEffectMarkers: namespaceEffectMarkers
                     )
                 }
         case .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
@@ -1644,7 +1644,7 @@ public struct DeclarationGraph {
 
     static func namespaces(
         in sourceFile: SourceFileNode,
-        namespaceRegistrationMarkers: Set<String>
+        namespaceEffectMarkers: Set<String>
     ) -> [NamespaceDeclaration] {
         switch sourceFile {
         case .namespace(let declaration):
@@ -1654,25 +1654,25 @@ public struct DeclarationGraph {
                 .filter {
                     isNamespaceShaped(
                         $0,
-                        namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                        namespaceEffectMarkers: namespaceEffectMarkers
                     )
                 }
                 .map {
                     namespaceDeclaration(
                         from: $0,
-                        namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                        namespaceEffectMarkers: namespaceEffectMarkers
                     )
                 }
             return module.namespaces + module.packageSpaces.flatMap(\.namespaces) + namespaceConstructs
         case .construct(let declaration):
             return isNamespaceShaped(
                 declaration,
-                namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                namespaceEffectMarkers: namespaceEffectMarkers
             )
                 ? [
                     namespaceDeclaration(
                         from: declaration,
-                        namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                        namespaceEffectMarkers: namespaceEffectMarkers
                     )
                 ] : []
         case .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
@@ -1682,42 +1682,42 @@ public struct DeclarationGraph {
 
     static func namespaceDeclaration(
         from construct: ConstructDeclaration,
-        namespaceRegistrationMarkers: Set<String>
+        namespaceEffectMarkers: Set<String>
     ) -> NamespaceDeclaration {
         NamespaceDeclaration(
             name: construct.name,
             values: construct.values,
             callables: construct.callables,
             constructs: construct.constructs.filter {
-                !isNamespaceShaped($0, namespaceRegistrationMarkers: namespaceRegistrationMarkers)
+                !isNamespaceShaped($0, namespaceEffectMarkers: namespaceEffectMarkers)
             },
             namespaces: construct.constructs
                 .filter {
                     isNamespaceShaped(
                         $0,
-                        namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                        namespaceEffectMarkers: namespaceEffectMarkers
                     )
                 }
                 .map {
                     namespaceDeclaration(
                         from: $0,
-                        namespaceRegistrationMarkers: namespaceRegistrationMarkers
+                        namespaceEffectMarkers: namespaceEffectMarkers
                     )
                 }
         )
     }
 
-    static func namespaceRegistrationMarkerNames(
+    static func namespaceEffectMarkerNames(
         in markers: [String: MarkerDeclaration]
     ) -> Set<String> {
-        Set(markers.values.filter(\.registersNamespace).map(\.name))
+        Set(markers.values.filter(\.hasNamespaceEffect).map(\.name))
     }
 
     static func isNamespaceShaped(
         _ declaration: ConstructDeclaration,
-        namespaceRegistrationMarkers: Set<String>
+        namespaceEffectMarkers: Set<String>
     ) -> Bool {
-        declaration.macros.contains { namespaceRegistrationMarkers.contains($0.name) }
+        declaration.macros.contains { namespaceEffectMarkers.contains($0.name) }
     }
 
     static func topLevelStates(in sourceFile: SourceFileNode) -> [StateDeclaration] {
