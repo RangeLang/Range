@@ -1,6 +1,6 @@
 #package
 construct Project {
     let name: Title = Title("Neat")
-    let version: Version(0.1.25)
+    let version: Version(0.1.26)
     let author: String = "George"
 }

@@ -21,4 +21,29 @@ struct VersionCheckerTests {
         #expect(try SemanticVersion.parse("0.2.0") > SemanticVersion(major: 0, minor: 1, patch: 9))
         #expect(try SemanticVersion.parse("0.1.2") > SemanticVersion(major: 0, minor: 1, patch: 1))
     }
+
+    @Test("GitHub release URL is derived from update repository")
+    func githubReleaseURLIsDerivedFromUpdateRepository() throws {
+        #expect(
+            VersionChecker.githubLatestReleaseAPIURL(
+                for: "https://github.com/georgetchelidze/Neat.git"
+            )?.absoluteString
+                == "https://api.github.com/repos/georgetchelidze/Neat/releases/latest"
+        )
+        #expect(
+            VersionChecker.githubLatestReleaseAPIURL(
+                for: "git@github.com:georgetchelidze/Neat.git"
+            )?.absoluteString
+                == "https://api.github.com/repos/georgetchelidze/Neat/releases/latest"
+        )
+    }
+
+    @Test("Latest GitHub release JSON parses semantic tag")
+    func latestGitHubReleaseJSONParsesSemanticTag() throws {
+        let data = #"{"tag_name":"v0.1.24"}"#.data(using: .utf8)!
+        #expect(
+            try VersionChecker.latestSemanticVersion(inGitHubLatestReleaseJSON: data)
+                == SemanticVersion(major: 0, minor: 1, patch: 24)
+        )
+    }
 }
