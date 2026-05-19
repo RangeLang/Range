@@ -12,23 +12,23 @@ $HOME/.neat/NeatCLI/<version>
 The selected prefix exposes symlinks:
 
 ```text
-/usr/local/bin/neat -> $HOME/.neat/NeatCLI/<version>/bin/neat
-/usr/local/share/neat/NeatCore -> $HOME/.neat/NeatCLI/<version>/share/neat/NeatCore
-/usr/local/share/neat/Skills -> $HOME/.neat/NeatCLI/<version>/share/neat/Skills
+$HOME/.neat/bin/neat -> $HOME/.neat/NeatCLI/<version>/bin/neat
+$HOME/.neat/share/neat/NeatCore -> $HOME/.neat/NeatCLI/<version>/share/neat/NeatCore
+$HOME/.neat/share/neat/Skills -> $HOME/.neat/NeatCLI/<version>/share/neat/Skills
 ```
 
 The install location can be changed with `NEAT_INSTALL_PREFIX`:
 
 ```sh
-NEAT_INSTALL_PREFIX="$HOME/.local" ./install.sh
+NEAT_INSTALL_PREFIX="$HOME/.neat" ./install.sh
 ```
 
 With that setting, the visible symlinks are:
 
 ```text
-$HOME/.local/bin/neat
-$HOME/.local/share/neat/NeatCore
-$HOME/.local/share/neat/Skills
+$HOME/.neat/bin/neat
+$HOME/.neat/share/neat/NeatCore
+$HOME/.neat/share/neat/Skills
 ```
 
 The installer does not add login items, background services, launch agents, shell profile changes, or system extensions.

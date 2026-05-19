@@ -17,16 +17,16 @@ The macOS package installs shared Neat resources under the selected prefix:
 <prefix>/share/neat/Skills
 ```
 
-The default `.pkg` prefix is `/usr/local`, so the CLI is normally:
+The shell installer default prefix is `~/.neat`, so the CLI is normally:
 
 ```text
-/usr/local/bin/neat
+$HOME/.neat/bin/neat
 ```
 
 The `.lang.tar.gz` installer can use another writable prefix:
 
 ```sh
-NEAT_INSTALL_PREFIX="$HOME/.local" ./install.sh
+NEAT_INSTALL_PREFIX="$HOME/.neat" ./install.sh
 ```
 
 ## First Checks

@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-default_prefix="/usr/local"
-if [[ -z "${NEAT_INSTALL_PREFIX:-}" && ! -e "$default_prefix/bin/neat" ]]; then
-  default_prefix="$HOME/.local"
-fi
+default_prefix="$HOME/.neat"
 prefix="${NEAT_INSTALL_PREFIX:-$default_prefix}"
 target="$prefix/bin/neat"
 core_target="$prefix/share/neat/NeatCore"

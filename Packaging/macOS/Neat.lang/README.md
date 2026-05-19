@@ -8,10 +8,9 @@ the standard macOS Installer flow:
 - `neat-macos-arm64.pkg`
 - `neat-macos-x64.pkg`
 
-Those packages expose `neat` at `/usr/local/bin/neat`, NeatCore at
-`/usr/local/share/neat/NeatCore`, and bundled Codex skills at
-`/usr/local/share/neat/Skills`. The exposed paths are symlinks to a
-versioned Neat-owned store under `$HOME/.neat/NeatCLI/<version>`.
+The shell installer exposes `neat` and shared resources from `~/.neat`. The
+exposed paths are symlinks to a versioned Neat-owned store under
+`$HOME/.neat/NeatCLI/<version>`.
 
 ## Contents
 
@@ -29,34 +28,26 @@ versioned Neat-owned store under `$HOME/.neat/NeatCLI/<version>`.
 ./install.sh
 ```
 
-When `/usr/local` is writable, this exposes:
+By default, this exposes:
 
 ```text
-/usr/local/bin/neat
-/usr/local/share/neat/NeatCore
-/usr/local/share/neat/Skills
-```
-
-When `/usr/local` is not writable, the shell installer defaults to:
-
-```text
-$HOME/.local/bin/neat
-$HOME/.local/share/neat/NeatCore
-$HOME/.local/share/neat/Skills
+$HOME/.neat/bin/neat
+$HOME/.neat/share/neat/NeatCore
+$HOME/.neat/share/neat/Skills
 ```
 
 To install somewhere else:
 
 ```sh
-NEAT_INSTALL_PREFIX="$HOME/.local" ./install.sh
+NEAT_INSTALL_PREFIX="$HOME/.neat" ./install.sh
 ```
 
 That installs:
 
 ```text
-$HOME/.local/bin/neat
-$HOME/.local/share/neat/NeatCore
-$HOME/.local/share/neat/Skills
+$HOME/.neat/bin/neat
+$HOME/.neat/share/neat/NeatCore
+$HOME/.neat/share/neat/Skills
 ```
 
 In all cases, the versioned payload is stored under:
