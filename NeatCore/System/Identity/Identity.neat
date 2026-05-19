@@ -1,3 +1,7 @@
 #namespace
 construct Identity {
 }
+
+marker identity(): Construct -> String {
+    return "identity"
+}

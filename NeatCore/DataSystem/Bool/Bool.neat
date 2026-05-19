@@ -1,4 +1,4 @@
-@language
+#language
 construct Bool: ExpressibleByBoolLiteral {
     let storage: BoolStorage
 

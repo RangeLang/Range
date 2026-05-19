@@ -1,4 +1,4 @@
-@language
+#language
 construct Date {
     let storage: DateStorage
 

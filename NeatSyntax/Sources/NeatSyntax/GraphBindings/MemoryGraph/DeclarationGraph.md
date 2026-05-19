@@ -113,7 +113,7 @@ From the declaration graph, the compiler can derive that `Int` accepts `IntLiter
 
 - Default literal resolution should also be derived after declaration-graph realization.
 
-If a literal has no contextual type, the semantic phase may choose a preferred destination such as an `@language` bridge. That is still part of Neat semantics, not backend behavior.
+If a literal has no contextual type, the semantic phase may choose a preferred destination such as an `#language` bridge. That is still part of Neat semantics, not backend behavior.
 
 - The declaration graph precedes the memory graph.
 

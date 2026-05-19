@@ -90,7 +90,7 @@ public struct CallableDeclaration {
     }
 
     public var isCore: Bool {
-        attribute?.isLanguageBoundary == true
+        attribute?.isLanguageBoundary == true || macros.contains { $0.name == "language" }
     }
 
     public var isPackaging: Bool {

@@ -38,4 +38,4 @@ construct Construct {
 - `@syntax` may be applied only inside NeatCore.
 - `@syntax` declarations are compiler-recognized syntax surfaces.
 - Capability protocols such as `SyntaxReplaceable`, `SyntaxExpandable`, and `SyntaxEmittable` still describe what a syntax surface can do.
-- `@language` remains for foundational language/runtime boundaries such as scalar storage and primitive operations.
+- `#language` remains for foundational language/runtime boundaries such as scalar storage and primitive operations.

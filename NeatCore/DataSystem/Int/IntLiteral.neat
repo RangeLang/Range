@@ -1,4 +1,4 @@
-@language
+#language
 construct IntLiteral { }
 
 extension IntLiteral {

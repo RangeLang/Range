@@ -1,4 +1,4 @@
-@language
+#language
 construct Dictionary<Key: Hashable, Value>: ExpressibleByDictionaryLiteral {
     state storage: DictionaryStorage<Key, Value> = DictionaryStorage<Key, Value>()
 

@@ -1,4 +1,4 @@
-@language
+#language
 construct String: ExpressibleByStringLiteral {
     let storage: StringStorage
 

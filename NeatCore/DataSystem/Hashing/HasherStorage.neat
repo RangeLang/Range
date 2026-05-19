@@ -1,4 +1,4 @@
-@language
+#language
 construct HasherStorage {
     function combine(_ value: IntStorage)
 

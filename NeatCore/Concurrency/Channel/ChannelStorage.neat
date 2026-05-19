@@ -1,4 +1,4 @@
-@language
+#language
 construct ChannelStorage<Element> {
     let capacity: Int = 0
     function send(element: Element)

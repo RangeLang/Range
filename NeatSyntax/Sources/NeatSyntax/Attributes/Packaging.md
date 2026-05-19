@@ -46,7 +46,7 @@ Package manifests can write metadata directly in the package space:
 
 ## Notes
 
-- `@package` is not a replacement for `@language`.
+- `@package` is not a replacement for `#language`.
 - `@package` does not make declarations non-identity-bearing.
 - `@package` is not a namespace declaration. It is a package metadata space collected by the graph.
 - Package entries such as `Module("owner/repo")` are also collected in the package space.

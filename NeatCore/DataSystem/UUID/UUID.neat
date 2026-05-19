@@ -1,4 +1,5 @@
-@language
+#identity
+#language
 construct UUID {
     let storage: UUIDStorage
 

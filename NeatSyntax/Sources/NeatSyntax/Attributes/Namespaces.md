@@ -34,7 +34,7 @@ The marker's `Namespace<Construct>` effect declares a namespace named `Language`
 
 ## Validation
 
-Built-in attributes such as `@main`, `@background`, `@language`, `@syntax`, and `@package` are always available.
+Built-in attributes such as `@main`, `@background`, `@syntax`, and `@package` are always available.
 
 Any other attribute must match a visible namespace name:
 

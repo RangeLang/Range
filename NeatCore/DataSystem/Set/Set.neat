@@ -1,4 +1,4 @@
-@language
+#language
 construct Set<Element: Hashable>: ExpressibleBySetLiteral {
     state storage: SetStorage<Element> = SetStorage<Element>()
 

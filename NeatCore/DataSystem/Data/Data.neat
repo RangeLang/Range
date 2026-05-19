@@ -1,4 +1,4 @@
-@language
+#language
 construct Data {
     let storage: DataStorage
 

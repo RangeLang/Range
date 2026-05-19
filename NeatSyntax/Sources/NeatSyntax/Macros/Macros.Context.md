@@ -61,7 +61,7 @@ surface is for the target kind to expose:
 Current preferred `Init` shape:
 
 ```neat
-@language
+#language
 construct Init: Syntax {
     let declaration: Declaration
     let application: Application
@@ -90,7 +90,7 @@ This keeps the model clean:
 Current aligned `Parameter` shape:
 
 ```neat
-@language
+#language
 construct Parameter: Syntax {
     let declaration: Declaration
     let application: Application
@@ -113,7 +113,7 @@ construct Parameter: Syntax {
 Current preferred `Function` shape:
 
 ```neat
-@language
+#language
 construct Function: Syntax {
     let declaration: Declaration
     let application: Application

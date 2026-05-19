@@ -16,7 +16,7 @@ User code writes `construct` for concrete modeled entities.
 
 Ordinary `construct` declarations are identity-bearing by default.
 
-Plain foundational and compiler-structural values such as `Int` and `Closure` belong to `@language construct`, not the default `construct` model.
+Plain foundational and compiler-structural values such as `Int` and `Closure` belong to `#language construct`, not the default `construct` model.
 
 ## Properties
 
@@ -73,4 +73,4 @@ construct Book {
 - `construct` does not inherit from other constructs.
 - `construct` replaces the struct/class split in normal user modeling.
 - Recursive relationships between constructs are legal because construct-to-construct members are modeled as construct relationships in the graph.
-- Non-identity foundational types belong to `@language construct`, not ordinary `construct`.
+- Non-identity foundational types belong to `#language construct`, not ordinary `construct`.

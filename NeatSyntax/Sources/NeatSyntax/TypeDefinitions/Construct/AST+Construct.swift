@@ -70,7 +70,7 @@ public struct AttributeApplication {
     }
 
     public var isLanguageBoundary: Bool {
-        name == "language" || name == "core" || name == "syntax"
+        name == "core" || name == "syntax"
     }
 
     public var isSyntaxBoundary: Bool {

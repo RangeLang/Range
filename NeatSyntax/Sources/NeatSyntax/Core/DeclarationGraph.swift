@@ -2058,7 +2058,7 @@ private struct SemanticGraphCollector {
 
     private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
         let constructID = "\(parentID)/construct:\(declaration.name)"
-        let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
+        let label = declaration.isCore ? "#language \(declaration.name)" : declaration.name
         addEntity(id: constructID, kind: .construct, label: label)
         addRelation(from: parentID, to: constructID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: constructID)
@@ -2097,7 +2097,7 @@ private struct SemanticGraphCollector {
 
     private mutating func addProtocol(_ declaration: ProtocolDeclaration, parentID: String) {
         let protocolID = "\(parentID)/protocol:\(declaration.name)"
-        let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
+        let label = declaration.isCore ? "#language \(declaration.name)" : declaration.name
         addEntity(id: protocolID, kind: .protocolDefinition, label: label)
         addRelation(from: parentID, to: protocolID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: protocolID)

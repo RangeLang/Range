@@ -1,4 +1,4 @@
-@language
+#language
 construct Array<Element>: ExpressibleByArrayLiteral {
     state storage: ArrayStorage<Element> = ArrayStorage<Element>()
 
