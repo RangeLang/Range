@@ -135,7 +135,7 @@ struct MacroTargetSurface {
     private func emittedSyntaxKinds(of value: CompileTimeValue) -> Set<EmittedSyntaxKind> {
         switch value {
         case .string:
-            return [.callableName, .declaration]
+            return [.expression]
         case .integer, .double, .boolean, .array:
             return [.expression]
         case .object(let typeName, _) where typeName == "Block":
@@ -149,7 +149,10 @@ struct MacroTargetSurface {
     }
 
     private func emittedSyntaxKinds(forConstructedTypeNamed typeName: String) -> Set<EmittedSyntaxKind>? {
-        context.rewriteSurfaceView.emittedSyntaxKinds(
+        if typeName == "Identifier" {
+            return [.callableName, .declaration]
+        }
+        return context.rewriteSurfaceView.emittedSyntaxKinds(
             forSemanticType: TypeReference.named(typeName)
         )
     }

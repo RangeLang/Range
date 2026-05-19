@@ -2132,11 +2132,6 @@ extension MacroExpander {
                     )
                 }
                 let substituted = targetSurface.render(expression)
-                if (expected == .callableName || expected == .declaration),
-                    case .string(let name) = substituted
-                {
-                    return name
-                }
                 if expected == .expressionList,
                     let rendered = renderExpressionList(substituted)
                 {
@@ -2317,11 +2312,6 @@ extension MacroExpander {
             case .splice(let expression, let expected):
                 guard let value = evaluator.evaluate(expression) else {
                     throw ParseError("Could not evaluate syntax macro splice.")
-                }
-                if (expected == .callableName || expected == .declaration),
-                    case .string(let name) = value
-                {
-                    return name
                 }
                 if expected == .expressionList, let rendered = renderExpressionList(value, renderer: renderer) {
                     return rendered

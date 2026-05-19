@@ -233,12 +233,12 @@ public struct Parser {
         markerDeclarationsByName[declaration.name] = declaration
     }
 
-    func markerApplicationHasNamespaceEffect(_ application: MacroApplication) -> Bool {
-        markerDeclarationsByName[application.name]?.hasNamespaceEffect == true
+    func markerApplicationHasMetadataSlotEffect(_ application: MacroApplication) -> Bool {
+        markerDeclarationsByName[application.name]?.hasMetadataSlotEffect == true
     }
 
     func isNamespaceShaped(_ declaration: ConstructDeclaration) -> Bool {
-        declaration.macros.contains(where: markerApplicationHasNamespaceEffect)
+        false
     }
 
     func isCurrentExpressionTerminator(_ token: Token) -> Bool {

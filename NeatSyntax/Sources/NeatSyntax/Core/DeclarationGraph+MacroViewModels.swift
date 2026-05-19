@@ -470,7 +470,7 @@ struct RewriteSurfaceView {
             return [.expression]
         }
 
-        if semanticName == "String" {
+        if semanticName == "Identifier" {
             return [.callableName, .declaration]
         }
 

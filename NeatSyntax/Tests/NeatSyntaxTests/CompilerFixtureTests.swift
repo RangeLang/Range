@@ -522,18 +522,16 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Namespace markers provide attribute names")
-    func namespaceMarkersProvideAttributeNames() throws {
+    @Test("Metadata slot markers declare semantic slots")
+    func metadataSlotMarkersDeclareSemanticSlots() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/NamespaceAttribute.neat",
+                path: "/tmp/MetadataSlot.neat",
                 source: """
-                #namespace
-                construct Styling {
-                }
+                marker styling(): Namespace<Construct>
 
-                @Styling
+                #styling
                 construct Panel {
                     let title: String
                 }
@@ -543,26 +541,21 @@ struct CompilerFixtureTests {
         )
 
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        #expect(program.declarationGraph.hasNamespaceAttribute(named: "Styling"))
+        let graph = program.declarationGraph
+        #expect(graph.markersByName["styling"]?.hasMetadataSlotEffect == true)
+        #expect(graph.constructsByName["Panel"]?.macros.contains { $0.name == "styling" } == true)
     }
 
-    @Test("Namespace attributes attach namespace behavior")
-    func namespaceAttributesAttachNamespaceBehavior() throws {
+    @Test("Metadata slot markers keep targets as declarations")
+    func metadataSlotMarkersKeepTargetsAsDeclarations() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/NamespaceAttributeBehavior.neat",
+                path: "/tmp/MetadataSlotTarget.neat",
                 source: """
-                #namespace
-                construct Persisted {
-                    let keyPrefix: String("settings")
+                marker persisted(_ prefix: String): Namespace<Construct>
 
-                    function key(_ name: String) -> String {
-                        return keyPrefix + "." + name
-                    }
-                }
-
-                @Persisted
+                #persisted("settings")
                 construct Profile {
                     let displayName: String
                 }
@@ -572,15 +565,9 @@ struct CompilerFixtureTests {
         )
 
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let attachments = program.declarationGraph.namespaceAttributeAttachments(
-            onDeclarationNamed: "Profile"
-        )
-
-        #expect(attachments.count == 1)
-        #expect(attachments[0].attribute.name == "Persisted")
-        #expect(attachments[0].namespace.name == "Persisted")
-        #expect(attachments[0].namespace.values.map(\.name) == ["keyPrefix"])
-        #expect(attachments[0].namespace.callables.map(\.name) == ["key"])
+        let profile = try #require(program.declarationGraph.constructsByName["Profile"])
+        #expect(profile.macros.map(\.name) == ["persisted"])
+        #expect(profile.macros.first?.argumentClause == #""settings""#)
     }
 
     @Test("Package spaces collect package metadata")
@@ -623,7 +610,7 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Unknown attributes require matching namespaces")
+    @Test("Unknown attributes reject non-macro spelling")
     func unknownAttributesRequireMatchingNamespaces() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
@@ -641,9 +628,9 @@ struct CompilerFixtureTests {
 
         do {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
-            Issue.record("Expected @Missing to require a matching namespace.")
+            Issue.record("Expected @Missing to be rejected.")
         } catch {
-            #expect(String(describing: error).contains("Declare a Namespace<Construct> marker-backed namespace Missing"))
+            #expect(String(describing: error).contains("Unknown attribute @Missing"))
         }
     }
 
@@ -815,10 +802,7 @@ struct CompilerFixtureTests {
                     Module("acme/registry-snapshot")
                 }
 
-                #namespace
-                construct Styling {
-                    let defaultTitle: String("Untitled")
-                }
+                marker styling(): Namespace<Construct>
 
                 marker hostSpace(): Namespace<Construct>
 
@@ -840,7 +824,7 @@ struct CompilerFixtureTests {
                     let street: String
                 }
 
-                @Styling
+                #styling
                 construct Panel: Renderable {
                     state count: Int = 0
                     binding selected: Bool {
@@ -896,16 +880,16 @@ struct CompilerFixtureTests {
 
         #expect(registry.construct(named: "Panel") != nil)
         #expect(registry.construct(named: "Panel.Nested") != nil)
-        #expect(registry.construct(named: "Routes") == nil)
+        #expect(registry.construct(named: "Routes") != nil)
         #expect(registry.hasProtocol(named: "Renderable"))
         #expect(registry.hasEnumeration(named: "DisplayMode"))
         #expect(registry.hasMacro(named: "decorate"))
-        #expect(graph.markersByName["hostSpace"]?.hasNamespaceEffect == true)
+        #expect(graph.markersByName["hostSpace"]?.hasMetadataSlotEffect == true)
         #expect(registry.hasExtensions(targeting: "Panel"))
-        #expect(graph.hasNamespace(named: "Styling"))
-        #expect(graph.hasNamespace(named: "Routes"))
-        #expect(graph.hasNamespaceAttribute(named: "Styling"))
-        #expect(graph.hasNamespaceAttribute(named: "Routes"))
+        #expect(graph.hasNamespace(named: "Styling") == false)
+        #expect(graph.hasNamespace(named: "Routes") == false)
+        #expect(graph.hasNamespaceAttribute(named: "Styling") == false)
+        #expect(graph.hasNamespaceAttribute(named: "Routes") == false)
 
         #expect(graph.packageValues(named: "packageName").count == 1)
         #expect(
@@ -954,9 +938,8 @@ struct CompilerFixtureTests {
             "selected",
         ])
 
-        let attachments = graph.namespaceAttributeAttachments(onDeclarationNamed: "Panel")
-        #expect(attachments.map(\.attribute.name) == ["Styling"])
-        #expect(graph.callablesByName["Routes.home"] != nil)
+        #expect(graph.constructsByName["Panel"]?.macros.map(\.name).contains("styling") == true)
+        #expect(graph.constructsByName["Routes"]?.callables.map(\.name) == ["home"])
         #expect(
             graph.programGraph.entities.contains {
                 $0.kind == .macro && $0.label == "decorate"
@@ -1015,16 +998,14 @@ struct CompilerFixtureTests {
         #expect(functionApplication?.site == .functionApplication)
     }
 
-    @Test("Namespace markers qualify nested callables and constructs")
-    func namespaceMarkersQualifyNestedCallablesAndConstructs() throws {
+    @Test("Nested constructs qualify nested callables and constructs")
+    func nestedConstructsQualifyNestedCallablesAndConstructs() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/Namespaces.neat",
                 source: """
-                #namespace
                 construct System {
-                    #namespace
                     construct Math {
                         function zero() -> Int {
                             return 0
@@ -1042,18 +1023,20 @@ struct CompilerFixtureTests {
 
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
 
-        #expect(program.declarationGraph.callablesByName["System.Math.zero"] != nil)
+        #expect(program.declarationGraph.constructsByName["System.Math"]?.callables.map(\.name) == ["zero"])
         #expect(program.declarationGraph.constructsByName["System.Math.Box"] != nil)
     }
 
-    @Test("#namespace marker declares namespace-shaped configuration")
-    func namespaceConstructDeclaresNamespaceShapedConfiguration() throws {
+    @Test("Metadata slot marker keeps target as construct")
+    func metadataSlotMarkerKeepsTargetAsConstruct() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/NamespaceConstruct.neat",
                 source: """
-                #namespace
+                marker semantic(): Namespace<Construct>
+
+                #semantic
                 construct Language {
                     let defaultLocale: String("en")
 
@@ -1066,10 +1049,6 @@ struct CompilerFixtureTests {
                     }
                 }
 
-                @Language
-                construct Document {
-                    let title: String
-                }
                 """,
                 role: .project
             )
@@ -1078,11 +1057,11 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let graph = program.declarationGraph
 
-        #expect(graph.hasNamespace(named: "Language"))
-        #expect(graph.hasNamespaceAttribute(named: "Language"))
-        #expect(graph.constructsByName["Language"] == nil)
+        #expect(graph.hasNamespace(named: "Language") == false)
+        #expect(graph.hasNamespaceAttribute(named: "Language") == false)
+        #expect(graph.constructsByName["Language"] != nil)
         #expect(graph.constructsByName["Language.Token"] != nil)
-        #expect(graph.callablesByName["Language.identifier"] != nil)
+        #expect(graph.constructsByName["Language"]?.callables.map(\.name) == ["identifier"])
         #expect(
             graph.programGraph.entities.contains {
                 $0.kind == .value && $0.label == "defaultLocale"
@@ -1090,8 +1069,8 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Namespace<Construct> marker declares namespace-shaped configuration")
-    func registeredMarkerDeclaresNamespaceShapedConfiguration() throws {
+    @Test("Namespace<Construct> marker declares construct metadata slot")
+    func metadataSlotMarkerDeclaresConstructMetadataSlot() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
@@ -1105,11 +1084,6 @@ struct CompilerFixtureTests {
                         return "home"
                     }
                 }
-
-                @Client
-                construct Screen {
-                    let title: String
-                }
                 """,
                 role: .project
             )
@@ -1118,25 +1092,28 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let graph = program.declarationGraph
 
-        #expect(graph.markersByName["hostSpace"]?.hasNamespaceEffect == true)
-        #expect(graph.hasNamespace(named: "Client"))
-        #expect(graph.hasNamespaceAttribute(named: "Client"))
-        #expect(graph.constructsByName["Client"] == nil)
-        #expect(graph.callablesByName["Client.route"] != nil)
+        #expect(graph.markersByName["hostSpace"]?.hasMetadataSlotEffect == true)
+        #expect(graph.hasNamespace(named: "Client") == false)
+        #expect(graph.hasNamespaceAttribute(named: "Client") == false)
+        #expect(graph.constructsByName["Client"] != nil)
+        #expect(graph.constructsByName["Client"]?.callables.map(\.name) == ["route"])
     }
 
-    @Test("Core Math namespace is available")
-    func coreMathNamespaceIsAvailable() throws {
+    @Test("Core Math construct is available")
+    func coreMathConstructIsAvailable() throws {
         let program = try CompilerPipeline().buildValidated(inputs: neatCoreInputs())
 
-        #expect(program.declarationGraph.callablesByName["Math.abs"] != nil)
-        #expect(program.declarationGraph.callablesByName["Math.min"] != nil)
-        #expect(program.declarationGraph.callablesByName["Math.max"] != nil)
-        #expect(program.declarationGraph.callablesByName["Math.clamp"] != nil)
+        #expect(program.declarationGraph.constructsByName["Math"]?.callables.map(\.name) == [
+            "abs",
+            "abs",
+            "min",
+            "max",
+            "clamp",
+        ])
     }
 
-    @Test("Namespace extensions reopen namespace members")
-    func namespaceExtensionsReopenNamespaceMembers() throws {
+    @Test("Construct extensions reopen static member surface")
+    func constructExtensionsReopenStaticMemberSurface() throws {
         var inputs = try neatCoreInputs()
         inputs.append(
             SourceInput(
@@ -1158,8 +1135,7 @@ struct CompilerFixtureTests {
 
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
 
-        #expect(program.declarationGraph.callablesByName["Math.twice"] != nil)
-        #expect(program.declarationGraph.constructsByName["Math.Box"] != nil)
+        #expect(program.declarationGraph.registryView.hasExtensions(targeting: "Math"))
     }
 
     @Test("Construct conformances require nominal type references")

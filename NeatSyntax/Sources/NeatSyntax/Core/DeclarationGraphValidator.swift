@@ -518,7 +518,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             || declarationGraph.hasNamespaceAttribute(named: attribute.name)
         else {
             throw SemanticValidationError(
-                "Unknown attribute @\(attribute.name) in \(lastPathComponent(of: filePath)). Declare a Namespace<Construct> marker-backed namespace \(attribute.name) to use @\(attribute.name)."
+                "Unknown attribute @\(attribute.name) in \(lastPathComponent(of: filePath)). Use @ for macros and built-in attribute surfaces; use # for semantic markers."
             )
         }
     }

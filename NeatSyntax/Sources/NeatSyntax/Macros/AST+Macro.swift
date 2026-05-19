@@ -20,8 +20,8 @@ public struct MarkerDeclaration {
     public let bindings: MacroBindings?
     public let body: [Statement]
 
-    public var hasNamespaceEffect: Bool {
-        valueType.isNamespaceEffect
+    public var hasMetadataSlotEffect: Bool {
+        valueType.isMetadataSlotEffect
     }
 
     public var hasLanguageEffect: Bool {
@@ -138,15 +138,15 @@ extension TypeReference {
         markerEffectTarget != nil
     }
 
-    var namespaceEffectTarget: TypeReference? {
+    var metadataSlotEffectTarget: TypeReference? {
         guard markerEffectName == "Namespace" else {
             return nil
         }
         return markerEffectTarget
     }
 
-    var isNamespaceEffect: Bool {
-        namespaceEffectTarget != nil
+    var isMetadataSlotEffect: Bool {
+        metadataSlotEffectTarget != nil
     }
 
     var languageEffectTarget: TypeReference? {
