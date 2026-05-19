@@ -1,0 +1,12 @@
+marker encoding(): Namespace<Construct>
+
+#encoding
+construct Encoding {
+    function apiKeyEncode(_ data: Data) -> String {
+        return data.apiKeyEncodedString()
+    }
+
+    function apiKeyDecode(_ text: String) -> Result<Data, DecodingError> {
+        return text.apiKeyDecodedData()
+    }
+}

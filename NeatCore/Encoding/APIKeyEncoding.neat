@@ -1,9 +1,0 @@
-construct APIKeyEncoding {
-    function encode(_ data: Data) -> String {
-        return data.apiKeyEncodedString()
-    }
-
-    function decode(_ text: String) -> Result<Data, DecodingError> {
-        return text.apiKeyDecodedData()
-    }
-}

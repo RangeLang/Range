@@ -1,12 +1,10 @@
 function encodeAPIKeyData() -> String {
-    let encoder = APIKeyEncoding()
     let value = Data(storage: DataStorage())
-    return encoder.encode(value)
+    return Encoding.apiKeyEncode(value)
 }
 
 function decodeAPIKeyText() -> Result<Data, DecodingError> {
-    let encoder = APIKeyEncoding()
-    return encoder.decode("")
+    return Encoding.apiKeyDecode("")
 }
 
 #main {
