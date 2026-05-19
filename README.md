@@ -1,26 +1,32 @@
 # Range
 
-Range is a language project with a Swift-hosted compiler, CLI, core library, and editor tooling.
+Range runs `.range` projects by generating a small Swift package and building it with Swift Embedded.
 
 ## Download
 
-Install the `range` command line tool from the latest GitHub release:
+Install the `range` CLI from the latest GitHub release:
 
 https://github.com/georgetchelidze/Range/releases/latest
 
-After installing, make sure `range` is available on your `PATH`:
+Check that it is on your `PATH`:
 
 ```sh
 range version
 ```
 
-## Create a Project
+## Start
 
-Create a new Range project with:
+Create a project:
 
 ```sh
 range create MyProject
 cd MyProject
 ```
 
-A Range project is recognized by the `Package.range` file at its root.
+Run it:
+
+```sh
+range run
+```
+
+`range run` reads `Package.range`, compiles the project to generated Swift, enables Swift Embedded for that package, and launches it through SwiftPM.
