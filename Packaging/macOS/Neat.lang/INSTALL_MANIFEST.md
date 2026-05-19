@@ -17,6 +17,12 @@ $HOME/.neat/share/neat/NeatCore -> $HOME/.neat/NeatCLI/<version>/share/neat/Neat
 $HOME/.neat/share/neat/Skills -> $HOME/.neat/NeatCLI/<version>/share/neat/Skills
 ```
 
+The installer also creates the machine package store:
+
+```text
+$HOME/.neat/Packages
+```
+
 The install location can be changed with `NEAT_INSTALL_PREFIX`:
 
 ```sh
@@ -29,9 +35,11 @@ With that setting, the visible symlinks are:
 $HOME/.neat/bin/neat
 $HOME/.neat/share/neat/NeatCore
 $HOME/.neat/share/neat/Skills
+$HOME/.neat/Packages
 ```
 
 The installer does not add login items, background services, launch agents, shell profile changes, or system extensions.
 
 The uninstall script removes only the installed `neat` executable and bundled
-shared Neat resources from the selected prefix.
+shared Neat resources from the selected prefix. It does not remove
+`$HOME/.neat/Packages`.

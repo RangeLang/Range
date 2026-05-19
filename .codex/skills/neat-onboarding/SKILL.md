@@ -21,6 +21,13 @@ The shell installer default prefix is `~/.neat`, so the CLI is normally:
 
 ```text
 $HOME/.neat/bin/neat
+$HOME/.neat/Packages
+```
+
+Downloaded machine packages live under:
+
+```text
+$HOME/.neat/Packages
 ```
 
 The `.lang.tar.gz` installer can use another writable prefix:

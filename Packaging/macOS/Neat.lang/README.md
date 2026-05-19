@@ -34,6 +34,7 @@ By default, this exposes:
 $HOME/.neat/bin/neat
 $HOME/.neat/share/neat/NeatCore
 $HOME/.neat/share/neat/Skills
+$HOME/.neat/Packages
 ```
 
 To install somewhere else:
@@ -48,6 +49,7 @@ That installs:
 $HOME/.neat/bin/neat
 $HOME/.neat/share/neat/NeatCore
 $HOME/.neat/share/neat/Skills
+$HOME/.neat/Packages
 ```
 
 In all cases, the versioned payload is stored under:

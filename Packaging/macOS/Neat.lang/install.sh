@@ -13,6 +13,7 @@ target="$install_dir/neat"
 share_dir="$prefix/share/neat"
 core_target="$share_dir/NeatCore"
 skill_target="$share_dir/Skills"
+packages_dir="$HOME/.neat/Packages"
 version_file="$package_root/VERSION"
 version="unknown"
 
@@ -42,6 +43,7 @@ echo "to:"
 echo "  $target"
 echo "  $core_target"
 echo "  $skill_target"
+echo "  $packages_dir"
 echo
 
 if [[ "${NEAT_INSTALL_ASSUME_YES:-false}" != "true" ]]; then
@@ -90,6 +92,7 @@ if [[ ! -w "$install_dir" || ! -w "$share_dir" ]]; then
   exit 1
 fi
 
+mkdir -p "$packages_dir"
 mkdir -p "$payload_bin_dir" "$payload_share_dir"
 install -m 755 "$binary" "$payload_binary"
 rm -rf "$payload_core" "$payload_skills"
