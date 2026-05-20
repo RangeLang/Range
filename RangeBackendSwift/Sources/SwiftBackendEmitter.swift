@@ -576,31 +576,6 @@ struct SwiftBackendEmitter {
 
                     return result
                 }
-
-                func __rangeAPIKeyDecodedData() -> Range_Result<Data, Range_DecodingError> {
-                    var value = self
-                        .replacingOccurrences(of: "-", with: "+")
-                        .replacingOccurrences(of: "_", with: "/")
-                    let padding = (4 - value.count % 4) % 4
-                    if padding > 0 {
-                        value += String(repeating: "=", count: padding)
-                    }
-
-                    guard let data = Data(base64Encoded: value) else {
-                        return .failure(cause: .failed)
-                    }
-
-                    return .success(result: data)
-                }
-            }
-
-            extension Data {
-                func __rangeAPIKeyEncodedString() -> String {
-                    base64EncodedString()
-                        .replacingOccurrences(of: "+", with: "-")
-                        .replacingOccurrences(of: "/", with: "_")
-                        .replacingOccurrences(of: "=", with: "")
-                }
             }
 
             struct __RangeDateOnly: Hashable, Comparable, CustomStringConvertible, Sendable {
@@ -2917,12 +2892,6 @@ struct SwiftBackendEmitter {
         case "snakeCase":
             guard arguments.isEmpty else { return nil }
             return "\(base).__rangeSnakeCase()"
-        case "apiKeyDecodedData":
-            guard arguments.isEmpty else { return nil }
-            return "\(base).__rangeAPIKeyDecodedData()"
-        case "apiKeyEncodedString":
-            guard arguments.isEmpty else { return nil }
-            return "\(base).__rangeAPIKeyEncodedString()"
         case "map", "compactMap", "flatMap", "forEach":
             guard let transform = unlabeledArgument() else { return nil }
             return "\(base).\(member)(\(try emitExpression(transform, scope: scope)))"

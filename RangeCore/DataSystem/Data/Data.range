@@ -1,10 +1,7 @@
 #language
 construct Data {
     let storage: DataStorage
-
-    function apiKeyEncodedString() -> String
-
-    }
+}
 
 extension Data: Equatable {
     function ==(lhs: Self, rhs: Self) -> Bool
