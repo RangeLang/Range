@@ -147,7 +147,7 @@ extension Parser {
         -> (type: TypeReference, initializer: Expression?)
     {
         var result = try parseTypeReferenceBaseNode()
-        let constructionType = result
+        let constructionType = wrappedOptionalType(result) ?? result
         while peek() == .question {
             try consume(.question)
             result = .optional(result)
@@ -175,9 +175,7 @@ extension Parser {
         _ expression: Expression,
         for type: TypeReference
     ) -> Expression {
-        let normalizedTypeName = type.displayName.hasSuffix("?")
-            ? String(type.displayName.dropLast())
-            : type.displayName
+        let normalizedTypeName = (wrappedOptionalType(type) ?? type).displayName
         guard case .call(let name, let arguments) = expression,
             name == normalizedTypeName,
             arguments.count == 1,
@@ -197,6 +195,13 @@ extension Parser {
         default:
             return expression
         }
+    }
+
+    func wrappedOptionalType(_ type: TypeReference) -> TypeReference? {
+        if case .optional(let wrapped) = type {
+            return wrapped
+        }
+        return nil
     }
 
     mutating func parseNominalTypeReferenceNode(

@@ -386,13 +386,13 @@ struct CompilerFixtureTests {
         }
 
         construct Counter {
-            let count: Int?(5)
-            let widgetCount: WidgetCount?(value: 0.1)
-            state current: Int?(5)
+            let count: Optional<Int>(5)
+            let widgetCount: Optional<WidgetCount>(value: 0.1)
+            state current: Optional<Int>(5)
         }
 
         #main {
-            let local: Int?(5)
+            let local: Optional<Int>(5)
         }
         """
 

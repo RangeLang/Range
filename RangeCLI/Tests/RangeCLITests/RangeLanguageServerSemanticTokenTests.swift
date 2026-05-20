@@ -374,7 +374,7 @@ struct RangeLanguageServerSemanticTokenTests {
 
         @Styling
         construct Panel {
-            let count: Int?(5)
+            let count: Optional<Int>(5)
             let value: Optional<Int>
         }
         """
