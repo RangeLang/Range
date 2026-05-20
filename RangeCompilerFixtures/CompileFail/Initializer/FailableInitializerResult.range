@@ -10,7 +10,7 @@ construct User: StringDecodable {
     let name: String
 
     init(value: String) -> Result<Self, ParseError> {
-        self.name = value
+        self.name := value
     }
 }
 

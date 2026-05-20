@@ -9,7 +9,11 @@ extension Parser {
         let annotation = try parseTypedConstructionAnnotation()
         var value = annotation.initializer
         if peek() == .equal {
-            try consume(.equal)
+            throw ParseError(
+                "let '\(localName)' uses `=` initialization. Use typed construction, for example `let \(localName): \(annotation.type.displayName)(value)`."
+            )
+        } else if peek() == .colonEqual {
+            try consume(.colonEqual)
             value = try parseExpression()
         }
         if peek() == .leftBrace {

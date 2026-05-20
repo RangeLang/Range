@@ -3,5 +3,5 @@ function acceptDeferred(@autoclosure value: Int) -> Int {
 }
 
 #main {
-    let result = acceptDeferred(1 + 2)
+    let result := acceptDeferred(1 + 2)
 }

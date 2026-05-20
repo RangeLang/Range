@@ -142,7 +142,7 @@ extension RangeCLI.Package {
                 }
 
                 print("    " + TerminalLog.subtleStdout(result.url.absoluteString))
-                print("    " + TerminalLog.subtleStdout("Package.range: let modules: [String] = [\"\(result.package)\"]"))
+                print("    " + TerminalLog.subtleStdout("Package.range: let modules: [String] := [\"\(result.package)\"]"))
             }
         }
 

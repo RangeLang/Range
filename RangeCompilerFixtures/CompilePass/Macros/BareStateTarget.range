@@ -6,5 +6,5 @@ macro passthrough(): State { target, diagnostics in
 
 construct Sample {
     @passthrough()
-    state name: String = "George"
+    state name: String := "George"
 }

@@ -1,5 +1,5 @@
 macro enumSyntaxValue(): Construct { target, diagnostics in
-    let generatedFields: Enum.Declaration = Enum.Declaration(
+    let generatedFields: Enum.Declaration := Enum.Declaration(
         self: NamedTypeReference(name: "GeneratedFields"),
         generics: [],
         cases: [

@@ -3,10 +3,10 @@ construct FixtureDirectInt {
 
     @literal<IntLiteral>
     init(literal: IntLiteral) {
-        self.storage = literal.storage()
+        self.storage := literal.storage()
     }
 }
 
 #main {
-    let number: FixtureDirectInt = 1
+    let number: FixtureDirectInt := 1
 }

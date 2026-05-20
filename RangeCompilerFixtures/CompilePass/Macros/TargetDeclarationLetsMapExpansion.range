@@ -1,19 +1,19 @@
 macro enumCasesFromLets(): Construct { target, diagnostics in
-    let generatedFields: Enum.Declaration = Enum.Declaration(
+    let generatedFields: Enum.Declaration := Enum.Declaration(
         self: NamedTypeReference(name: "GeneratedFields"),
         generics: [],
         cases: target.declaration.lets.map { property in
             Enum.Case(identifier: property.identifier, associatedValues: [])
         }
     )
-    let compactGeneratedFields: Enum.Declaration = Enum.Declaration(
+    let compactGeneratedFields: Enum.Declaration := Enum.Declaration(
         self: NamedTypeReference(name: "CompactGeneratedFields"),
         generics: [],
         cases: target.declaration.lets.compactMap { property in
             Enum.Case(identifier: property.identifier, associatedValues: [])
         }
     )
-    let flatGeneratedFields: Enum.Declaration = Enum.Declaration(
+    let flatGeneratedFields: Enum.Declaration := Enum.Declaration(
         self: NamedTypeReference(name: "FlatGeneratedFields"),
         generics: [],
         cases: target.declaration.lets.flatMap { property in

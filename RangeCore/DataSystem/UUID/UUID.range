@@ -21,7 +21,7 @@ extension UUID: Equatable {
 
 extension UUID: Decodable {
     function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
-        let container = decoder.singleValueContainer()
+        let container := decoder.singleValueContainer()
         switch container.decode(UUID.self) {
         case .success(let value):
             return .success(result: value)
@@ -33,7 +33,7 @@ extension UUID: Decodable {
 
 extension UUID: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
-        let container = encoder.singleValueContainer()
+        let container := encoder.singleValueContainer()
         return container.encode(self)
     }
 }

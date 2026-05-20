@@ -85,7 +85,7 @@ extension Parser {
         let target = try parseAssignmentTarget(localBindings: localBindings)
 
         switch peek() {
-        case .equal:
+        case .colonEqual:
             advance()
             return .assignment(target: target, expression: try parseExpression())
         case .plusEqual:
@@ -96,7 +96,7 @@ extension Parser {
                 expression: try parseExpression()
             )
         default:
-            throw ParseError("Expected assignment operator in action block.")
+            throw ParseError("Expected assignment operator (`:=` or `+=`) in action block.")
         }
     }
 
@@ -251,7 +251,7 @@ extension Parser {
             offset += 2
         }
         let next = peek(offset: offset)
-        return next == .equal || next == .plusEqual
+        return next == .colonEqual || next == .plusEqual
     }
 
     func isExpressionStatementStart() -> Bool {
@@ -290,20 +290,20 @@ extension Parser {
 
         let expression: Expression
         if peek() == .equal {
-            try consume(.equal)
-            expression = try parseExpression()
-            try rejectAssignmentShapedTypeDeclaration(
-                name: name,
-                expression: expression,
-                bindingKindDescription: kind == .constant ? "let" : "state"
+            throw ParseError(
+                "\(kind == .constant ? "let" : "state") '\(name)' uses `=` initialization. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): Type(value)`."
             )
+        } else if peek() == .colonEqual {
+            try consume(.colonEqual)
+            expression = try parseExpression()
         } else if let typedInitializer {
             expression = typedInitializer
         } else if let explicitType {
             expression = .call(name: explicitType.displayName, arguments: [])
         } else {
-            try consume(.equal)
-            expression = try parseExpression()
+            throw ParseError(
+                "\(kind == .constant ? "let" : "state") '\(name)' requires typed construction, for example `\(kind == .constant ? "let" : "state") \(name): Type(value)`."
+            )
         }
         let resolvedType = try inferInitializedBindingType(
             name: name,

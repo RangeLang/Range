@@ -1,6 +1,6 @@
 #language
 construct Dictionary<Key: Hashable, Value> {
-    state storage: DictionaryStorage<Key, Value> = DictionaryStorage<Key, Value>()
+    state storage: DictionaryStorage<Key, Value> := DictionaryStorage<Key, Value>()
 
     @literal<DictionaryLiteral>
     function literal(literal: DictionaryLiteral) -> Self {
@@ -50,12 +50,12 @@ construct Dictionary<Key: Hashable, Value> {
 
 extension Dictionary<String, Value: Encodable>: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
-        state container = encoder.keyedContainer()
-        let values: [DictionaryEntry<String, Value>] = entries()
-        state index = 0
+        state container := encoder.keyedContainer()
+        let values: [DictionaryEntry<String, Value>] := entries()
+        state index := 0
 
         while index < values.count {
-            let entry: DictionaryEntry<String, Value> = values.element(index: index)
+            let entry: DictionaryEntry<String, Value> := values.element(index: index)
 
             switch container.encode(entry.value, forKey: entry.key) {
             case .success:

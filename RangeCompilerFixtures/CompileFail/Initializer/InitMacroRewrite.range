@@ -11,7 +11,7 @@ construct SingleInitRewriteFixture {
 
     @forwardOnlyArgument
     init(_ number: Int) {
-        self.number = number
+        self.number := number
     }
 }
 

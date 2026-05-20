@@ -6,7 +6,7 @@ macro incremented(by amount: Int): State<Int> { target, diagnostics in
 
 construct Reader {
     @incremented(by: 1)
-    state age: Int = 10
+    state age: Int := 10
 
     function current() -> Int {
         return age

@@ -176,7 +176,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/MacroGraphExpansion.range",
                 source: """
                 macro graphNamed(): Construct { target, diagnostics, graph in
-                    let declaration: Construct.Declaration = graph.declaration(target.identity)
+                    let declaration: Construct.Declaration := graph.declaration(target.identity)
                     target.declaration.expand {
                         extension #(declaration.self) {
                             function graphName() -> String {
@@ -211,7 +211,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/MarkerGraphIdentity.range",
                 source: """
                 marker graphName(): Construct -> String { target, diagnostics, graph in
-                    let declaration: Construct.Declaration = graph.declaration(target.identity)
+                    let declaration: Construct.Declaration := graph.declaration(target.identity)
                     return declaration.self.name
                 }
 
@@ -368,7 +368,7 @@ struct CompilerFixtureTests {
                 }
 
                 #main {
-                    let user = User(id: 1, name: "George")
+                    let user := User(id: 1, name: "George")
                 }
                 """,
                 role: .project
@@ -386,13 +386,13 @@ struct CompilerFixtureTests {
         }
 
         construct Counter {
-            let count: Int(5)?
-            let widgetCount: WidgetCount(value: 0.1)?
-            state current: Int(5)?
+            let count: Int?(5)
+            let widgetCount: WidgetCount?(value: 0.1)
+            state current: Int?(5)
         }
 
         #main {
-            let local: Int(5)?
+            let local: Int?(5)
         }
         """
 
@@ -487,7 +487,7 @@ struct CompilerFixtureTests {
         #expect(
             diagnostics.contains {
                 $0.path == invalidPath
-                    && $0.message.contains("Use `let input: Channel<Int>`")
+                    && $0.message.contains("uses `=` initialization")
             }
         )
     }
@@ -506,7 +506,7 @@ struct CompilerFixtureTests {
                 }
 
                 #main {
-                    let user = User(identifier: 1, name: "George")
+                    let user := User(identifier: 1, name: "George")
                 }
                 """,
                 role: .project
@@ -582,7 +582,7 @@ struct CompilerFixtureTests {
                     let name: Title("Example")
                     let version: Version(0.1.0)
                     let author: String("George")
-                    let modules: [String] = ["acme/logger"]
+                    let modules: [String] := ["acme/logger"]
                 }
                 """,
                 role: .project
@@ -638,7 +638,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/ProjectMain.range",
                 source: """
                 #main {
-                    let text = @captureText(1 + 2)
+                    let text := @captureText(1 + 2)
                 }
                 """,
                 role: .project
@@ -656,8 +656,8 @@ struct CompilerFixtureTests {
                 path: "/tmp/ForwardDeclarations.range",
                 source: """
                 #main {
-                    let messageText = message()
-                    let captured = @captureText(1 + 2)
+                    let messageText := message()
+                    let captured := @captureText(1 + 2)
                 }
 
                 function message() -> String {
@@ -785,7 +785,7 @@ struct CompilerFixtureTests {
                 #package
                 construct Project {
                     let packageName: String("Registry Snapshot")
-                    let modules: [String] = ["acme/registry-snapshot"]
+                    let modules: [String] := ["acme/registry-snapshot"]
                 }
 
                 marker styling(): Namespace<Construct>
@@ -804,7 +804,7 @@ struct CompilerFixtureTests {
                     case expanded
                 }
 
-                state globalCount: Int = 0
+                state globalCount: Int(0)
 
                 construct Address {
                     let street: String
@@ -812,7 +812,7 @@ struct CompilerFixtureTests {
 
                 #styling
                 construct Panel: Renderable {
-                    state count: Int = 0
+                    state count: Int(0)
                     binding selected: Bool {
                         get {
                             return true

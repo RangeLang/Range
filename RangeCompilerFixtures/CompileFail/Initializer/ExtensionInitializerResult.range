@@ -21,7 +21,7 @@ extension ExtensionDecodedUser {
         case .blocked, .unknown:
             return .failure(cause: .failed)
         case .george:
-            self.name = "George"
+            self.name := "George"
             return .success(result: self)
         }
     }

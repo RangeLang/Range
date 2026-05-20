@@ -1,6 +1,6 @@
 function encodeArray() -> Result<String, EncodingError> {
-    let encoder = JSONEncoder()
-    let values = [1, 2, 3]
+    let encoder := JSONEncoder()
+    let values := [1, 2, 3]
     return encoder.encode(values)
 }
 

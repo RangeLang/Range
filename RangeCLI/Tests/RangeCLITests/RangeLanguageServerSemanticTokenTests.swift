@@ -208,7 +208,7 @@ struct RangeLanguageServerSemanticTokenTests {
     func definitionResolvesCoreTypesThroughGraph() {
         let source = """
         #main {
-            let enabled: Bool = true
+            let enabled: Bool(true)
         }
         """
         let support = """
@@ -374,7 +374,7 @@ struct RangeLanguageServerSemanticTokenTests {
 
         @Styling
         construct Panel {
-            let count: Int(5)?
+            let count: Int?(5)
             let value: Optional<Int>
         }
         """

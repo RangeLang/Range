@@ -1,25 +1,25 @@
 function intRangeContainsMiddle() -> Bool {
-    let range = Range<Int>(lowerBound: 0, upperBound: 10)
+    let range := Range<Int>(lowerBound: 0, upperBound: 10)
     return range.contains(5)
 }
 
 function intRangeExcludesUpperBound() -> Bool {
-    let range = Range<Int>(lowerBound: 0, upperBound: 10)
+    let range := Range<Int>(lowerBound: 0, upperBound: 10)
     return !range.contains(10)
 }
 
 function closedRangeIncludesUpperBound() -> Bool {
-    let range = ClosedRange<Int>(lowerBound: 0, upperBound: 10)
+    let range := ClosedRange<Int>(lowerBound: 0, upperBound: 10)
     return range.contains(10)
 }
 
 function emptyRangeReportsEmpty() -> Bool {
-    let range = Range<Int>(lowerBound: 3, upperBound: 3)
+    let range := Range<Int>(lowerBound: 3, upperBound: 3)
     return range.isEmpty
 }
 
 function closedRangeAllowsSingleValue() -> Bool {
-    let range = ClosedRange<Int>(lowerBound: 3, upperBound: 3)
+    let range := ClosedRange<Int>(lowerBound: 3, upperBound: 3)
     return !range.isEmpty && range.contains(3)
 }
 

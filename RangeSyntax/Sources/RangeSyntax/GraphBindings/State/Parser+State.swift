@@ -22,7 +22,11 @@ extension Parser {
         let inferredType: TypeReference
 
         if peek() == .equal {
-            try consume(.equal)
+            throw ParseError(
+                "state '\(name)' uses `=` initialization. Use typed construction, for example `state \(name): Type(value)`."
+            )
+        } else if peek() == .colonEqual {
+            try consume(.colonEqual)
             let initialValue = try parseExpression()
             inferredType = try inferInitializedBindingType(
                 name: name,
@@ -50,7 +54,7 @@ extension Parser {
             if allowDeclaredStorage {
                 throw ParseError("state '\(name)' without initializer requires an explicit type.")
             }
-            throw ParseError("state '\(name)' requires `= expression` outside construct storage.")
+            throw ParseError("state '\(name)' requires typed construction outside construct storage.")
         }
         return StateDeclaration(
             macros: macros,

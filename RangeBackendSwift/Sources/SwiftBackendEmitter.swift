@@ -370,7 +370,6 @@ struct SwiftBackendEmitter {
         let main = try emitMain(program.mainBlock)
 
         let sections = [
-            "import Foundation",
             emitRuntimeSupport(includeFoundationImport: false),
             protocols,
             program.protocols.contains(where: { $0.name == "Encodable" })
@@ -404,7 +403,7 @@ struct SwiftBackendEmitter {
             let package = Package(
                 name: "RangeGenerated",
                 platforms: [
-                    .macOS(.v13)
+                    .macOS(.v14)
                 ],
                 targets: [
                     .executableTarget(
@@ -423,7 +422,7 @@ struct SwiftBackendEmitter {
             encoding: .utf8
         )
 
-        let runtimeSwift = emitRuntimeSupport(includeFoundationImport: true)
+        let runtimeSwift = emitRuntimeSupport(includeFoundationImport: false)
 
         try runtimeSwift.write(
             to: sourcesDirectory.appendingPathComponent("Runtime.swift"),
@@ -457,7 +456,6 @@ struct SwiftBackendEmitter {
             }
 
             final class Range_ChannelStorage<Element>: @unchecked Sendable {
-                private let condition = NSCondition()
                 private var buffer: [Element] = []
                 private let capacity: Int
                 private var closed = false
@@ -471,86 +469,97 @@ struct SwiftBackendEmitter {
                 }
 
                 func send(element: Element) {
-                    condition.lock()
-                    defer { condition.unlock() }
-
                     precondition(!closed, "Cannot send to a closed channel.")
-
-                    if capacity == 0 {
-                        while !closed && !buffer.isEmpty {
-                            condition.wait()
-                        }
-
-                        precondition(!closed, "Cannot send to a closed channel.")
-
-                        buffer.append(element)
-                        condition.broadcast()
-
-                        while !closed && !buffer.isEmpty {
-                            condition.wait()
-                        }
-                        return
-                    }
-
-                    while !closed && buffer.count >= capacity {
-                        condition.wait()
-                    }
-
-                    precondition(!closed, "Cannot send to a closed channel.")
-
+                    precondition(capacity == 0 || buffer.count < capacity, "Channel buffer is full.")
                     buffer.append(element)
-                    condition.broadcast()
                 }
 
                 func receive() -> Element {
-                    condition.lock()
-                    defer { condition.unlock() }
-
-                    while buffer.isEmpty {
-                        if closed {
-                            preconditionFailure(
-                                "Cannot receive from a closed channel with no remaining elements."
-                            )
-                        }
-                        condition.wait()
+                    if buffer.isEmpty {
+                        preconditionFailure(
+                            "Cannot receive from an empty channel in the single-threaded Swift backend."
+                        )
                     }
 
-                    let element = buffer.removeFirst()
-                    condition.broadcast()
-                    return element
+                    return buffer.removeFirst()
                 }
 
                 func close() {
-                    condition.lock()
                     closed = true
-                    condition.broadcast()
-                    condition.unlock()
                 }
             }
 
             enum Range_Logger {
-                static func log(_ value: Any) {
-                    print(String(describing: value))
+                static func log(_ value: String) {
+                    print(value)
                 }
 
-                static func debug(_ value: Any) {
-                    print(String(describing: value))
+                static func log(_ value: Int) {
+                    print(value)
                 }
 
-                static func info(_ value: Any) {
-                    print(String(describing: value))
+                static func log(_ value: Bool) {
+                    print(value ? "true" : "false")
                 }
 
-                static func success(_ value: Any) {
-                    print(String(describing: value))
+                static func log(_ value: Float) {
+                    print(value)
                 }
 
-                static func warning(_ value: Any) {
-                    print(String(describing: value))
+                static func log(_ value: Double) {
+                    print(value)
                 }
 
-                static func error(_ value: Any) {
-                    fputs("\\(String(describing: value))\\n", stderr)
+                static func debug(_ value: String) {
+                    print(value)
+                }
+
+                static func info(_ value: String) {
+                    print(value)
+                }
+
+                static func success(_ value: String) {
+                    print(value)
+                }
+
+                static func warning(_ value: String) {
+                    print(value)
+                }
+
+                static func error(_ value: String) {
+                    print(value)
+                }
+            }
+
+            struct Data: Hashable, Sendable {
+                var bytes: [UInt8]
+
+                init() {
+                    self.bytes = []
+                }
+
+                init(_ bytes: [UInt8]) {
+                    self.bytes = bytes
+                }
+
+            }
+
+            struct UUID: Hashable, CustomStringConvertible, Sendable {
+                let uuidString: String
+
+                init() {
+                    self.uuidString = "00000000-0000-0000-0000-000000000000"
+                }
+
+                init?(uuidString: String) {
+                    guard !uuidString.isEmpty else {
+                        return nil
+                    }
+                    self.uuidString = uuidString
+                }
+
+                var description: String {
+                    uuidString
                 }
             }
 
@@ -564,7 +573,7 @@ struct SwiftBackendEmitter {
                         let string = String(character)
                         let isUppercase = string.uppercased() == string && string.lowercased() != string
                         let isLowercase = string.lowercased() == string && string.uppercased() != string
-                        let isDigit = CharacterSet.decimalDigits.contains(scalar)
+                        let isDigit = scalar.value >= 48 && scalar.value <= 57
 
                         if isUppercase && previousWasLowercaseOrDigit && !result.isEmpty {
                             result.append("_")
@@ -584,34 +593,28 @@ struct SwiftBackendEmitter {
                 let day: Int
 
                 init() {
-                    let calendar = Calendar(identifier: .gregorian)
-                    let components = calendar.dateComponents(in: TimeZone(secondsFromGMT: 0)!, from: Foundation.Date())
-                    self.year = components.year!
-                    self.month = components.month!
-                    self.day = components.day!
+                    self.year = 1970
+                    self.month = 1
+                    self.day = 1
                 }
 
                 init(iso8601String: String) throws {
-                    let formatter = DateFormatter()
-                    formatter.calendar = Calendar(identifier: .gregorian)
-                    formatter.locale = Locale(identifier: "en_US_POSIX")
-                    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-                    formatter.dateFormat = "yyyy-MM-dd"
-
-                    guard let date = formatter.date(from: iso8601String),
-                        formatter.string(from: date) == iso8601String
+                    let parts = iso8601String.split(separator: "-")
+                    guard parts.count == 3,
+                        let year = Int(parts[0]),
+                        let month = Int(parts[1]),
+                        let day = Int(parts[2])
                     else {
                         throw __RangeThrownFailure<Range_DecodingError>(failure: .failed)
                     }
 
-                    let components = formatter.calendar.dateComponents([.year, .month, .day], from: date)
-                    self.year = components.year!
-                    self.month = components.month!
-                    self.day = components.day!
+                    self.year = year
+                    self.month = month
+                    self.day = day
                 }
 
                 var description: String {
-                    String(format: "%04d-%02d-%02d", year, month, day)
+                    "\\(year)-\\(month)-\\(day)"
                 }
 
                 static func < (lhs: Self, rhs: Self) -> Bool {
@@ -628,28 +631,18 @@ struct SwiftBackendEmitter {
             }
 
             struct __RangeDateTime: Hashable, Comparable, CustomStringConvertible, Sendable {
-                let storage: Foundation.Date
+                let storage: String
 
                 init() {
-                    self.storage = Foundation.Date()
+                    self.storage = "1970-01-01T00:00:00Z"
                 }
 
                 init(iso8601String: String) throws {
-                    if let value = Self.makeFormatter(fractionalSeconds: false).date(from: iso8601String) {
-                        self.storage = value
-                        return
-                    }
-
-                    if let value = Self.makeFormatter(fractionalSeconds: true).date(from: iso8601String) {
-                        self.storage = value
-                        return
-                    }
-
-                    throw __RangeThrownFailure<Range_DecodingError>(failure: .failed)
+                    self.storage = iso8601String
                 }
 
                 var description: String {
-                    Self.makeFormatter(fractionalSeconds: false).string(from: storage)
+                    storage
                 }
 
                 static func < (lhs: Self, rhs: Self) -> Bool {
@@ -662,15 +655,6 @@ struct SwiftBackendEmitter {
                     } catch {
                         return .failure(cause: .failed)
                     }
-                }
-
-                private static func makeFormatter(fractionalSeconds: Bool) -> ISO8601DateFormatter {
-                    let formatter = ISO8601DateFormatter()
-                    formatter.formatOptions = fractionalSeconds
-                        ? [.withInternetDateTime, .withFractionalSeconds]
-                        : [.withInternetDateTime]
-                    formatter.timeZone = TimeZone(secondsFromGMT: 0)
-                    return formatter
                 }
             }
 
@@ -726,15 +710,11 @@ struct SwiftBackendEmitter {
             }
             """
 
-        guard includeFoundationImport else {
-            return support
-        }
-
-        return "import Foundation\n\n\(support)"
+        return support
     }
 
     private func emitSourceUnit(_ unit: LoweredSourceUnit) throws -> String {
-        var sections: [String] = ["import Foundation"]
+        var sections: [String] = []
 
         let protocols = try unit.protocols.map(emitProtocol).joined(separator: "\n\n")
         if !protocols.isEmpty {

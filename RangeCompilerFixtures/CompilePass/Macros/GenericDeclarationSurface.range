@@ -1,5 +1,5 @@
 macro exposeGenericCount(): Construct { target, diagnostics in
-    let generatedGenerics: Enum.Declaration = Enum.Declaration(
+    let generatedGenerics: Enum.Declaration := Enum.Declaration(
         self: NamedTypeReference(name: "GeneratedGenerics"),
         generics: [],
         cases: target.declaration.generics.map { item in

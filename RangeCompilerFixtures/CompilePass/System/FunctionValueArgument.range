@@ -7,5 +7,5 @@ function accept(_ task: () -> Int) -> Int {
 }
 
 #main {
-    let result = accept(compute)
+    let result := accept(compute)
 }

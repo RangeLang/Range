@@ -1,5 +1,5 @@
 function replace(_ task: binding () -> Int, _ replacement: () -> Int) {
-    task = replacement
+    task := replacement
 }
 
 #main {

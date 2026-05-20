@@ -1,4 +1,4 @@
 @main {
-    state prefersNumber = true
-    state selected: Int? = prefersNumber ? 1 : nil
+    state prefersNumber := true
+    state selected: Int? := prefersNumber ? 1 : nil
 }

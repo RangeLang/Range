@@ -1,10 +1,10 @@
 #main {
-    let source = Channel<String>()
-    let listenerA = Channel<String>()
-    let listenerB = Channel<String>()
+    let source := Channel<String>()
+    let listenerA := Channel<String>()
+    let listenerB := Channel<String>()
 
     @background {
-        let message = source.receive()
+        let message := source.receive()
         listenerA.send(message)
         listenerB.send(message)
     }

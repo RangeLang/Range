@@ -438,7 +438,7 @@ extension Parser {
                 }
             case .eof, .leftBrace, .rightBrace, .rightParen, .rightBracket, .equal, .equalEqual,
                 .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .andAnd, .orOr,
-                .questionQuestion, .colon, .arrow:
+                .questionQuestion, .colon, .colonEqual, .arrow:
                 return false
             case .hash, .hashDirective, .foreignBody, .atAttribute, .dollar, .percent, .bang:
                 return false

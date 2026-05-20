@@ -13,5 +13,5 @@ function describe(_ value: SwitchReturnValue) -> String {
 }
 
 #main {
-    let value = describe(.first)
+    let value := describe(.first)
 }

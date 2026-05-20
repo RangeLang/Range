@@ -20,6 +20,7 @@ enum Token: Equatable {
     case dot
     case ellipsis
     case colon
+    case colonEqual
     case arrow
     case bang
     case equal

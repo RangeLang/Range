@@ -2455,6 +2455,8 @@ extension MacroExpander {
             return "..."
         case .colon:
             return ":"
+        case .colonEqual:
+            return ":="
         case .arrow:
             return "->"
         case .bang:

@@ -1,5 +1,5 @@
 @main {
-    state count: Int = 0
+    state count: Int := 0
 
     while count < 3 {
         count += 1

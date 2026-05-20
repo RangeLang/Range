@@ -1,6 +1,6 @@
 #language
 construct Channel<Element> {
-    let storage: ChannelStorage<Element> = ChannelStorage<Element>(capacity: 0)
+    let storage: ChannelStorage<Element> := ChannelStorage<Element>(capacity: 0)
 
     function send(_ element: Element) {
         storage.send(element: element)

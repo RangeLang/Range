@@ -3,5 +3,5 @@ macro badCapture(_ value: capture String): Expression { target, diagnostics in
 }
 
 #main {
-    let text: String = @badCapture("hello")
+    let text: String := @badCapture("hello")
 }

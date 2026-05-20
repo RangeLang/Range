@@ -6,5 +6,5 @@ macro invalidSetter(): Let<Int> { target, diagnostics in
 
 construct Holder {
     @invalidSetter()
-    let count: Int = 10
+    let count: Int := 10
 }

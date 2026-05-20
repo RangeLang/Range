@@ -1,5 +1,5 @@
 construct ComponentStorage<Component> {
-    let components: [Component] = []
+    let components: [Component] := []
 
     derived count: Int {
         components.count

@@ -12,7 +12,7 @@ macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
 
         construct #(Identifier(name: "GeneratedTypedExpandNamespace")) {
             function #(Identifier(name: "message"))() -> #(String) {
-                let local: #(String) = "ok"
+                let local: #(String) := "ok"
                 return local
             }
         }
@@ -36,7 +36,7 @@ construct AdditionalTypedExpandFixture {
 }
 
 #main {
-    let fixture = AdditionalTypedExpandFixture()
+    let fixture := AdditionalTypedExpandFixture()
     fixture.typedTargetFunction(input: 1)
     GeneratedTypedExpandNamespace.message()
 }

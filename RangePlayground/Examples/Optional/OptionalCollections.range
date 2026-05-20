@@ -1,5 +1,5 @@
 @main {
-    state values: [Int?] = [1, nil, 3]
-    state counts: Dictionary<String, Int?> = ["a": 1, "b": nil]
-    state unique: Set<Int?> = [1, nil, 3]
+    state values: [Int?] := [1, nil, 3]
+    state counts: Dictionary<String, Int?> := ["a": 1, "b": nil]
+    state unique: Set<Int?> := [1, nil, 3]
 }

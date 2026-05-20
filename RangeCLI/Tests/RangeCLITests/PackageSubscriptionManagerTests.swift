@@ -41,7 +41,7 @@ struct PackageSubscriptionManagerTests {
             encoding: .utf8
         )
         #expect(action == .subscribed)
-        #expect(source.contains(#"let modules: [String] = ["acme/logger"]"#))
+        #expect(source.contains(#"let modules: [String] := ["acme/logger"]"#))
         _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.range"))
     }
 

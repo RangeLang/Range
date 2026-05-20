@@ -147,18 +147,7 @@ extension Parser {
         -> (type: TypeReference, initializer: Expression?)
     {
         var result = try parseTypeReferenceBaseNode()
-        let initializer: Expression?
-        if peek() == .leftParen {
-            initializer = normalizedTypedConstructionInitializer(
-                .call(
-                name: result.displayName,
-                arguments: try parseInvocationArgumentsIfPresent()
-                ),
-                for: result
-            )
-        } else {
-            initializer = nil
-        }
+        let constructionType = result
         while peek() == .question {
             try consume(.question)
             result = .optional(result)
@@ -167,6 +156,18 @@ extension Parser {
             try consume(.ellipsis)
             result = .variadic(result)
         }
+        let initializer: Expression?
+        if peek() == .leftParen {
+            initializer = normalizedTypedConstructionInitializer(
+                .call(
+                name: constructionType.displayName,
+                arguments: try parseInvocationArgumentsIfPresent()
+                ),
+                for: result
+            )
+        } else {
+            initializer = nil
+        }
         return (result, initializer)
     }
 
@@ -174,15 +175,18 @@ extension Parser {
         _ expression: Expression,
         for type: TypeReference
     ) -> Expression {
+        let normalizedTypeName = type.displayName.hasSuffix("?")
+            ? String(type.displayName.dropLast())
+            : type.displayName
         guard case .call(let name, let arguments) = expression,
-            name == type.displayName,
+            name == normalizedTypeName,
             arguments.count == 1,
             arguments[0].label == nil
         else {
             return expression
         }
 
-        switch (type.displayName, arguments[0].value) {
+        switch (normalizedTypeName, arguments[0].value) {
         case ("Int", .integer),
             ("String", .string),
             ("String", .interpolatedString),

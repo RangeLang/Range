@@ -99,6 +99,8 @@ public struct CompilationArtifactsEmitter {
             return "ellipsis"
         case .colon:
             return "colon"
+        case .colonEqual:
+            return "colonEqual"
         case .arrow:
             return "arrow"
         case .bang:

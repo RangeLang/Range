@@ -1,5 +1,5 @@
 @main {
-  state person: Person = Person(name: "George", age: 26)
+  state person: Person := Person(name: "George", age: 26)
 
   person.age += 1
 
@@ -7,7 +7,7 @@
     "Person: \(person.name), Age: \(person.age)"
   }
 
-  state user: User = User(person: $person)
+  state user: User := User(person: $person)
   user.incrementAge()
 
 }
