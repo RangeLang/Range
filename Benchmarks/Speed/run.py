@@ -102,6 +102,7 @@ def build_targets() -> list[BenchTarget]:
 
     c_binary = BUILD / "speed-c"
     rust_binary = BUILD / "speed-rust"
+    swift_binary = BUILD / "speed-swift"
     range_project = prepare_range_project()
     range_cli = ROOT / "RangeCLI" / ".build" / "release" / "RangeCLI"
     range_binary = range_project / ".range" / "Build" / "swift" / ".build" / "release" / "RangeGenerated"
@@ -116,6 +117,11 @@ def build_targets() -> list[BenchTarget]:
         ["rustc", "-C", "opt-level=3", str(BENCH / "rust" / "main.rs"), "-o", str(rust_binary)],
     ):
         raise SystemExit("Rust setup failed")
+    if not timed_setup(
+        "Swift",
+        ["swiftc", "-O", str(BENCH / "swift" / "main.swift"), "-o", str(swift_binary)],
+    ):
+        raise SystemExit("Swift setup failed")
     if not timed_setup(
         "Range CLI",
         ["swift", "build", "-c", "release", "--package-path", "RangeCLI", "--product", "RangeCLI"],
@@ -135,6 +141,7 @@ def build_targets() -> list[BenchTarget]:
     targets = [
         BenchTarget("C", [str(c_binary), str(ITERATIONS)]),
         BenchTarget("Rust", [str(rust_binary), str(ITERATIONS)]),
+        BenchTarget("Swift", [str(swift_binary), str(ITERATIONS)]),
         BenchTarget("Python", ["python3", str(BENCH / "python" / "main.py"), str(ITERATIONS)]),
     ]
 
