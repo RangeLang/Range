@@ -2,7 +2,7 @@ import ArgumentParser
 import Foundation
 
 enum RangeVersion {
-    static let current = SemanticVersion(major: 0, minor: 1, patch: 27)
+    static let current = SemanticVersion(major: 0, minor: 1, patch: 28)
     static let updateRepository = "https://github.com/georgetchelidze/Range.git"
 }
 
