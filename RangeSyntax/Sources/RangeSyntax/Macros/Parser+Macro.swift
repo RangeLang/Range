@@ -317,14 +317,30 @@ extension Parser {
 
     mutating func parseEmittedCodeBlock() throws -> EmittedCodeBlock {
         var parts: [EmittedCodePart] = []
-        var currentTextTokens: [String] = []
+        var currentText = ""
+        var previousTextRange: RangeSourceRange?
         var emittedTokens: [Token] = []
         var braceDepth = 1
 
         func flushText() {
-            guard !currentTextTokens.isEmpty else { return }
-            parts.append(.text(currentTextTokens.joined(separator: " ")))
-            currentTextTokens.removeAll(keepingCapacity: true)
+            guard !currentText.isEmpty else { return }
+            parts.append(.text(currentText))
+            currentText.removeAll(keepingCapacity: true)
+            previousTextRange = nil
+        }
+
+        func appendTextToken(_ token: Token, range: RangeSourceRange) {
+            if !currentText.isEmpty {
+                if let previousTextRange,
+                    previousTextRange.end.line < range.start.line
+                {
+                    currentText.append("\n")
+                } else {
+                    currentText.append(" ")
+                }
+            }
+            currentText.append(renderMacroToken(token))
+            previousTextRange = range
         }
 
         while braceDepth > 0 {
@@ -340,14 +356,16 @@ extension Parser {
                     break
                 }
                 braceDepth -= 1
+                let range = tokens[index].range
                 let consumed = advance()
                 emittedTokens.append(consumed)
-                currentTextTokens.append(renderMacroToken(consumed))
+                appendTextToken(consumed, range: range)
             case .leftBrace:
                 braceDepth += 1
+                let range = tokens[index].range
                 let consumed = advance()
                 emittedTokens.append(consumed)
-                currentTextTokens.append(renderMacroToken(consumed))
+                appendTextToken(consumed, range: range)
             case .hash where peek(offset: 1) == .leftParen:
                 flushText()
                 try consume(.hash)
@@ -374,9 +392,10 @@ extension Parser {
                 let arguments = try parseInvocationArgumentsIfPresent()
                 parts.append(.syntaxMacroInvocation(name: name, arguments: arguments))
             default:
+                let range = tokens[index].range
                 let consumed = advance()
                 emittedTokens.append(consumed)
-                currentTextTokens.append(renderMacroToken(consumed))
+                appendTextToken(consumed, range: range)
             }
         }
 

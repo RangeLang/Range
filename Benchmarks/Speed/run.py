@@ -180,7 +180,7 @@ def cases() -> list[BenchmarkCase]:
                 print(acc)
             """,
             range_source=rf"""
-                #main {{
+                @main {{
                     let n: Int({n})
                     state i: Int(0)
                     state acc: Int(1)
@@ -251,7 +251,7 @@ def cases() -> list[BenchmarkCase]:
                 print(acc + len(s))
             """,
             range_source=rf"""
-                #main {{
+                @main {{
                     let n: Int({small})
                     state i: Int(0)
                     state text: String("")
@@ -314,7 +314,7 @@ def cases() -> list[BenchmarkCase]:
                 print(sum(value * 2 for value in values if value % 2 == 0))
             """,
             range_source=rf"""
-                #main {{
+                @main {{
                     let n: Int({small})
                     state i: Int(0)
                     state values: [Int]
@@ -392,7 +392,7 @@ def cases() -> list[BenchmarkCase]:
                     let y: Int
                 }}
 
-                #main {{
+                @main {{
                     let n: Int({small})
                     state i: Int(0)
                     state acc: Int(0)
@@ -463,7 +463,7 @@ def cases() -> list[BenchmarkCase]:
                     return rhs
                 }}
 
-                #main {{
+                @main {{
                     let n: Int({n})
                     state i: Int(0)
                     state acc: Int(0)

@@ -6,10 +6,10 @@ construct FixtureInt {
 
     @literal<IntLiteral>
     init(literal: IntLiteral) {
-        self.storage := literal.storage()
+        set self.storage   literal.storage()
     }
 }
 
-#main {
-    let number: FixtureInt := 1
+@main {
+    let number: FixtureInt   1
 }

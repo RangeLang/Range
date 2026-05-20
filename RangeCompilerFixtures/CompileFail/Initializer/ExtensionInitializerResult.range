@@ -21,7 +21,7 @@ extension ExtensionDecodedUser {
         case .blocked, .unknown:
             return .failure(cause: .failed)
         case .george:
-            self.name := "George"
+            set self.name   "George"
             return .success(result: self)
         }
     }
@@ -31,7 +31,7 @@ function decodeExtensionUser() -> Result<ExtensionDecodedUser, DecodeProblem> {
     return ExtensionDecodedUser(input: .george)
 }
 
-#main {
+@main {
     switch decodeExtensionUser() {
     case .success(let user):
         Logger.info(user.name)

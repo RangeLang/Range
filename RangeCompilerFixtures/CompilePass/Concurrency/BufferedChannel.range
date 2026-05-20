@@ -7,13 +7,13 @@ function enqueueBufferedValues(queue: Channel<Int>) {
     }
 }
 
-#main {
-    let queue := Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
+@main {
+    let queue   Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
 
     enqueueBufferedValues(queue: queue)
 
-    let first := queue.receive()
-    let second := queue.receive()
+    let first   queue.receive()
+    let second   queue.receive()
 
     Logger.info(first)
     Logger.info(second)

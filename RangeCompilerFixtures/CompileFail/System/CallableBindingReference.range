@@ -3,9 +3,9 @@ function compute() -> Int {
 }
 
 function replace(_ task: binding () -> Int, _ replacement: () -> Int) {
-    task := replacement
+    set task   replacement
 }
 
-#main {
+@main {
     replace($compute, compute)
 }

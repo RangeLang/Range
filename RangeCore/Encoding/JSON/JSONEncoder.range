@@ -1,12 +1,12 @@
 construct JSONEncoder: Encoder {
-    state output: String := ""
-    state isObject: Bool := false
-    state isArray: Bool := false
+    state output: String   ""
+    state isObject: Bool   false
+    state isArray: Bool   false
 
     function encode<T: Encodable>(_ value: T) -> Result<String, EncodingError> {
-        output := ""
-        isObject := false
-        isArray := false
+        set output   ""
+        set isObject   false
+        set isArray   false
 
         switch value.encode(to: self) {
         case .success:
@@ -28,12 +28,12 @@ construct JSONEncoder: Encoder {
     }
 
     function keyedContainer() -> KeyedEncodingContainer {
-        isObject := true
+        set isObject   true
         return JSONKeyedEncodingContainer(output: $self.output, isObject: $self.isObject)
     }
 
     function unkeyedContainer() -> UnkeyedEncodingContainer {
-        isArray := true
+        set isArray   true
         return JSONUnkeyedEncodingContainer(output: $self.output, isArray: $self.isArray)
     }
 

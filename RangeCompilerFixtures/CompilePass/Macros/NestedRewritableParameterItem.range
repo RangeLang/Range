@@ -8,6 +8,6 @@ function passthrough(@nestedArgumentRewrite value: Int) -> Int {
     return value
 }
 
-#main {
-    let output: Int := passthrough(42)
+@main {
+    let output: Int   passthrough(42)
 }

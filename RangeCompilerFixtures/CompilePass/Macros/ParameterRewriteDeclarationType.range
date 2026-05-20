@@ -10,6 +10,6 @@ function collect(@arrayifyParameter values: Int) -> [Int] {
     return values
 }
 
-#main {
-    let output: [Int] := collect(1, 2, 3)
+@main {
+    let output: [Int]   collect(1, 2, 3)
 }

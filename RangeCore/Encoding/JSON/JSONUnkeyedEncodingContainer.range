@@ -1,7 +1,7 @@
 construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     binding output: String
     binding isArray: Bool
-    state wroteValue: Bool := false
+    state wroteValue: Bool   false
 
     function encode(_ value: Bool) -> Result<Void, EncodingError> {
         appendValue(value: "\(value)")
@@ -43,7 +43,7 @@ construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
     }
 
     function encode<T: Encodable>(_ value: T) -> Result<Void, EncodingError> {
-        let encoder: JSONEncoder := JSONEncoder()
+        let encoder: JSONEncoder   JSONEncoder()
 
         switch encoder.encode(value) {
         case .success(let encoded):
@@ -58,11 +58,11 @@ construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
 
     function appendValue(value: String) {
         if wroteValue {
-            output := output + ","
+            set output   output + ","
         } else {
-            wroteValue := true
+            set wroteValue   true
         }
 
-        output := output + value
+        set output   output + value
     }
 }

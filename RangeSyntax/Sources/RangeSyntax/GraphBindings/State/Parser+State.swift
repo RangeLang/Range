@@ -25,8 +25,7 @@ extension Parser {
             throw ParseError(
                 "state '\(name)' uses `=` initialization. Use typed construction, for example `state \(name): Type(value)`."
             )
-        } else if peek() == .colonEqual {
-            try consume(.colonEqual)
+        } else if canStartInlineExpression() {
             let initialValue = try parseExpression()
             inferredType = try inferInitializedBindingType(
                 name: name,

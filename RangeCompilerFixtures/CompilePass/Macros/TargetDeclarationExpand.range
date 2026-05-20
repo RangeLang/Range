@@ -16,7 +16,7 @@ macro targetDeclarationExpand(): Construct { target, diagnostics in
 construct TargetDeclarationExpandFixture {
 }
 
-#main {
-    let value := TargetDeclarationExpandFixture()
+@main {
+    let value   TargetDeclarationExpandFixture()
     value.generatedByTargetDeclarationExpand()
 }

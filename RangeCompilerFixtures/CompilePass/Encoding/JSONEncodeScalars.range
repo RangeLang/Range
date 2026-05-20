@@ -1,26 +1,26 @@
 function encodeBool() -> Result<String, EncodingError> {
-    let encoder := JSONEncoder()
-    let value := true
+    let encoder   JSONEncoder()
+    let value   true
     return encoder.encode(value)
 }
 
 function encodeString() -> Result<String, EncodingError> {
-    let encoder := JSONEncoder()
-    let value := "George"
+    let encoder   JSONEncoder()
+    let value   "George"
     return encoder.encode(value)
 }
 
 function encodeFloat() -> Result<String, EncodingError> {
-    let encoder := JSONEncoder()
-    let value := 4.2
+    let encoder   JSONEncoder()
+    let value   4.2
     return encoder.encode(value)
 }
 
 function encodeData() -> Result<String, EncodingError> {
-    let encoder := JSONEncoder()
-    let value := Data(storage: DataStorage())
+    let encoder   JSONEncoder()
+    let value   Data(storage: DataStorage())
     return encoder.encode(value)
 }
 
-#main {
+@main {
 }

@@ -176,7 +176,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/MacroGraphExpansion.range",
                 source: """
                 macro graphNamed(): Construct { target, diagnostics, graph in
-                    let declaration: Construct.Declaration := graph.declaration(target.identity)
+                    let declaration: Construct.Declaration   graph.declaration(target.identity)
                     target.declaration.expand {
                         extension #(declaration.self) {
                             function graphName() -> String {
@@ -211,7 +211,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/MarkerGraphIdentity.range",
                 source: """
                 marker graphName(): Construct -> String { target, diagnostics, graph in
-                    let declaration: Construct.Declaration := graph.declaration(target.identity)
+                    let declaration: Construct.Declaration   graph.declaration(target.identity)
                     return declaration.self.name
                 }
 
@@ -367,8 +367,8 @@ struct CompilerFixtureTests {
                     let name: String
                 }
 
-                #main {
-                    let user := User(id: 1, name: "George")
+                @main {
+                    let user   User(id: 1, name: "George")
                 }
                 """,
                 role: .project
@@ -391,7 +391,7 @@ struct CompilerFixtureTests {
             state current: Optional<Int>(5)
         }
 
-        #main {
+        @main {
             let local: Optional<Int>(5)
         }
         """
@@ -454,7 +454,7 @@ struct CompilerFixtureTests {
     @Test("Local typed declarations replace assignment-shaped type construction")
     func localTypedDeclarationsReplaceAssignmentShapedTypeConstruction() throws {
         let validSource = """
-        #main {
+        @main {
             let input: Channel<Int>
         }
         """
@@ -475,7 +475,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: invalidPath,
                 source: """
-                #main {
+                @main {
                     let input = Channel<Int>
                 }
                 """,
@@ -505,8 +505,8 @@ struct CompilerFixtureTests {
                     let name: String
                 }
 
-                #main {
-                    let user := User(identifier: 1, name: "George")
+                @main {
+                    let user   User(identifier: 1, name: "George")
                 }
                 """,
                 role: .project
@@ -582,7 +582,7 @@ struct CompilerFixtureTests {
                     let name: Title("Example")
                     let version: Version(0.1.0)
                     let author: String("George")
-                    let modules: [String] := ["acme/logger"]
+                    let modules: [String]   ["acme/logger"]
                 }
                 """,
                 role: .project
@@ -637,8 +637,8 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ProjectMain.range",
                 source: """
-                #main {
-                    let text := @captureText(1 + 2)
+                @main {
+                    let text   @captureText(1 + 2)
                 }
                 """,
                 role: .project
@@ -655,9 +655,9 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ForwardDeclarations.range",
                 source: """
-                #main {
-                    let messageText := message()
-                    let captured := @captureText(1 + 2)
+                @main {
+                    let messageText   message()
+                    let captured   @captureText(1 + 2)
                 }
 
                 function message() -> String {
@@ -785,7 +785,7 @@ struct CompilerFixtureTests {
                 #package
                 construct Project {
                     let packageName: String("Registry Snapshot")
-                    let modules: [String] := ["acme/registry-snapshot"]
+                    let modules: [String]   ["acme/registry-snapshot"]
                 }
 
                 marker styling(): Namespace<Construct>

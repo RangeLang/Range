@@ -19,19 +19,19 @@ struct ProjectScriptStoreTests {
         let root = try temporaryPackage()
         let script = try ProjectScriptStore(projectPath: root.path).save(
             "deploy.range",
-            content: "#main {}"
+            content: "@main {}"
         )
 
         #expect(script.lastPathComponent == "deploy.range")
-        #expect(try String(contentsOf: script, encoding: .utf8) == "#main {}\n")
+        #expect(try String(contentsOf: script, encoding: .utf8) == "@main {}\n")
     }
 
     @Test("List returns saved scripts")
     func listReturnsSavedScripts() throws {
         let root = try temporaryPackage()
         let store = ProjectScriptStore(projectPath: root.path)
-        _ = try store.save("deploy", content: "#main {}")
-        _ = try store.save("build", content: "#main {}")
+        _ = try store.save("deploy", content: "@main {}")
+        _ = try store.save("build", content: "@main {}")
 
         #expect(try store.list().map(\.lastPathComponent) == ["build.range", "deploy.range"])
     }

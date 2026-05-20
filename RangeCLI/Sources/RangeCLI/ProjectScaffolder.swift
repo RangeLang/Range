@@ -310,7 +310,7 @@ struct ProjectScaffolder {
 
     private func renderProgramPlayground(name: String) -> String {
         return """
-            #main {
+            @main {
               Logger.info("Range program playground")
 
               let values = [1, 2, 3]

@@ -33,8 +33,8 @@ construct ExtendableFixture {
     let number: Int
 }
 
-#main {
-    let result: ExtendableFixture := ExtendableFixture(number: 1)
+@main {
+    let result: ExtendableFixture   ExtendableFixture(number: 1)
 
     result.greet()
 }

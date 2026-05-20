@@ -9,13 +9,13 @@ macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: 
 
 macro encodeBody(container: KeyedEncodingContainer, properties: [Let], strategy: CodingKeyStrategy) -> [Switch] {
     #(properties.map { property in
-        let codingKeyMarkers: [Marker.Application] := property.markers.filter { application in
+        let codingKeyMarkers: [Marker.Application]   property.markers.filter { application in
             application.identifier.name == "codingKey"
         }
-        let codingKeyValues: [String] := codingKeyMarkers.map { application in
+        let codingKeyValues: [String]   codingKeyMarkers.map { application in
             application.value
         }
-        let key := codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
+        let key   codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
 
         @encodeProperty(
             container: container,
@@ -28,7 +28,7 @@ macro encodeBody(container: KeyedEncodingContainer, properties: [Let], strategy:
 macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, value: Identifier, key: String) -> Switch {
     switch container.decode(#(type).self, forKey: key) {
     case .success(let #(value)):
-        self.#(value) := #(value)
+        set self.#(value)   #(value)
     case .failure(let error):
         return .failure(cause: error)
     }
@@ -36,13 +36,13 @@ macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, val
 
 macro decodeBody(container: KeyedDecodingContainer, properties: [Let], strategy: CodingKeyStrategy) -> [Switch] {
     #(properties.map { property in
-        let codingKeyMarkers: [Marker.Application] := property.markers.filter { application in
+        let codingKeyMarkers: [Marker.Application]   property.markers.filter { application in
             application.identifier.name == "codingKey"
         }
-        let codingKeyValues: [String] := codingKeyMarkers.map { application in
+        let codingKeyValues: [String]   codingKeyMarkers.map { application in
             application.value
         }
-        let key := codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
+        let key   codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
 
         @decodeProperty(
             container: container,
@@ -57,7 +57,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
     target.declaration.expand {
         extension #(target.declaration.self): Codable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
-                let container: KeyedEncodingContainer := encoder.keyedContainer()
+                let container: KeyedEncodingContainer   encoder.keyedContainer()
                 @encodeBody(
                     container: container,
                     properties: target.declaration.lets,
@@ -67,7 +67,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
             }
 
             function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
-                let container: KeyedDecodingContainer := decoder.keyedContainer()
+                let container: KeyedDecodingContainer   decoder.keyedContainer()
                 @decodeBody(
                     container: container,
                     properties: target.declaration.lets,

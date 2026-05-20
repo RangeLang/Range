@@ -1,15 +1,15 @@
 function write(_ target: binding Int, _ let: Int) {
-    target := value
+    set target   value
 }
 
 construct Counter {
-    state count: Int := 0
+    state count: Int   0
 
     init() {
         write($self.count, 3)
     }
 }
 
-#main {
-    let counter := Counter()
+@main {
+    let counter   Counter()
 }

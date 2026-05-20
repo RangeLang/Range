@@ -18,7 +18,7 @@ struct PackageManifestTests {
                 let version: Version(1.2.3)
                 let author: String("Test Author")
                 let remote: String("https://github.com/acme/fixture.git")
-                let remotes: [Remote] := [
+                let remotes: [Remote]   [
                     Remote(url: "https://github.com/acme/fixture.git"),
                     Remote(url: "git@github.com:acme/fixture.git"),
                 ]

@@ -15,7 +15,7 @@ macro typedExpandSpliceSlots(): Construct { target, diagnostics in
 construct TypedExpandSpliceFixture {
 }
 
-#main {
-    let value := TypedExpandSpliceFixture()
+@main {
+    let value   TypedExpandSpliceFixture()
     value.generatedName()
 }

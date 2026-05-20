@@ -1952,7 +1952,7 @@ private struct SemanticGraphCollector {
         case .module(let module):
             if module.mainBlock != nil {
                 let mainID = "\(fileID)/main"
-                addEntity(id: mainID, kind: .mainBlock, label: "#main")
+                addEntity(id: mainID, kind: .mainBlock, label: "@main")
                 addRelation(from: fileID, to: mainID, kind: .contains)
             }
             for state in module.states {
@@ -1987,7 +1987,7 @@ private struct SemanticGraphCollector {
             }
         case .mainBlock:
             let mainID = "\(fileID)/main"
-            addEntity(id: mainID, kind: .mainBlock, label: "#main")
+            addEntity(id: mainID, kind: .mainBlock, label: "@main")
             addRelation(from: fileID, to: mainID, kind: .contains)
         }
     }

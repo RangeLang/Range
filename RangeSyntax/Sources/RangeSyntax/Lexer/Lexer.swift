@@ -73,11 +73,7 @@ struct Lexer {
                 }
             case ":":
                 advance()
-                if match("=") {
-                    emit(.colonEqual, start: start)
-                } else {
-                    emit(.colon, start: start)
-                }
+                emit(.colon, start: start)
             case "-":
                 advance()
                 if match(">") {

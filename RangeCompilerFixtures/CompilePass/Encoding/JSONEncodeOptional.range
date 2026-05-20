@@ -1,16 +1,16 @@
 function encodeNilOptional() -> Result<String, EncodingError> {
-    let encoder := JSONEncoder()
-    let value: Int? := nil
+    let encoder   JSONEncoder()
+    let value: Int?   nil
     return encoder.encode(value)
 }
 
 function encodeSomeOptional() -> Result<String, EncodingError> {
-    let encoder := JSONEncoder()
-    let value: Int? := 42
+    let encoder   JSONEncoder()
+    let value: Int?   42
     return encoder.encode(value)
 }
 
-#main {
+@main {
     switch encodeNilOptional() {
     case .success(let json):
         Logger.info(json)

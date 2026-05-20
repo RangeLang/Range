@@ -1,7 +1,7 @@
-#main {
-    let text := "Hello"
-    let count := text.count
-    let empty := text.isEmpty
-    let ordered := text < "Zed"
-    let greeting := text + " World"
+@main {
+    let text   "Hello"
+    let count   text.count
+    let empty   text.isEmpty
+    let ordered   text < "Zed"
+    let greeting   text + " World"
 }

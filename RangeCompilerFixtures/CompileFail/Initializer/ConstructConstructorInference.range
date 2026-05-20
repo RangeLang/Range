@@ -2,7 +2,7 @@ construct User {
     init() { }
 }
 
-#main {
-    let user := User()
+@main {
+    let user   User()
     Logger.info("constructed user")
 }

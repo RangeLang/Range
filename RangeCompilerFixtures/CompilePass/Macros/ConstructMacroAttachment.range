@@ -5,6 +5,6 @@ construct FixtureConstruct {
     let number: Int
 }
 
-#main {
-    let result: FixtureConstruct := FixtureConstruct(number: 1)
+@main {
+    let result: FixtureConstruct   FixtureConstruct(number: 1)
 }

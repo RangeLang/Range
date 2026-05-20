@@ -78,7 +78,7 @@ struct ProjectScriptStore {
 
     private func starterScript(named name: String) -> String {
         """
-        #main {
+        @main {
           Logger.info("Running \(name)")
         }
         """

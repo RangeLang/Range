@@ -1,6 +1,6 @@
-#main {
+@main {
     @background {
-        state counter := 0
+        state counter   0
 
         while counter < 3 {
             counter += 1
@@ -17,5 +17,5 @@
         return
     }
 
-    let finished := true
+    let finished   true
 }

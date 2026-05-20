@@ -12,8 +12,7 @@ extension Parser {
             throw ParseError(
                 "let '\(localName)' uses `=` initialization. Use typed construction, for example `let \(localName): \(annotation.type.displayName)(value)`."
             )
-        } else if peek() == .colonEqual {
-            try consume(.colonEqual)
+        } else if canStartInlineExpression() {
             value = try parseExpression()
         }
         if peek() == .leftBrace {

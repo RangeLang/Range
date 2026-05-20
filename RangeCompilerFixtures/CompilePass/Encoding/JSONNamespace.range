@@ -6,5 +6,5 @@ function decodeJSONString() -> Result<String, DecodingError> {
     return JSON.decode(String.self, from: .string(value: "George"))
 }
 
-#main {
+@main {
 }

@@ -164,9 +164,6 @@ extension Parser {
         case .plusEqual:
             advance()
             return "+="
-        case .colonEqual:
-            advance()
-            return ":="
         case .bang:
             advance()
             return "!"

@@ -1,5 +1,5 @@
-#main {
-    let values: [Int?] := [1, nil, 3]
-    let counts: Dictionary<String, Int?> := ["a": 1, "b": nil]
-    let unique: Set<Int?> := [1, nil, 3]
+@main {
+    let values: [Int?]   [1, nil, 3]
+    let counts: Dictionary<String, Int?>   ["a": 1, "b": nil]
+    let unique: Set<Int?>   [1, nil, 3]
 }

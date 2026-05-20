@@ -2,6 +2,6 @@ function invalid() -> Void {
     return 1
 }
 
-#main {
+@main {
     invalid()
 }

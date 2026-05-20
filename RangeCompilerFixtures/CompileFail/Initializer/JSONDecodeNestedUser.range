@@ -4,11 +4,11 @@ construct NestedAddress {
 
 extension NestedAddress: Decodable {
     init(from decoder: Decoder) -> Result<Self, DecodingError> {
-        let container := decoder.keyedContainer()
+        let container   decoder.keyedContainer()
 
         switch container.decode(String.self, forKey: "city") {
         case .success(let city):
-            self.city := city
+            set self.city   city
         case .failure(let error):
             return .failure(cause: error)
         }
@@ -24,18 +24,18 @@ construct NestedDecodedUser {
 
 extension NestedDecodedUser: Decodable {
     init(from decoder: Decoder) -> Result<Self, DecodingError> {
-        let container := decoder.keyedContainer()
+        let container   decoder.keyedContainer()
 
         switch container.decode(Int.self, forKey: "id") {
         case .success(let id):
-            self.id := id
+            set self.id   id
         case .failure(let error):
             return .failure(cause: error)
         }
 
         switch container.decode(NestedAddress.self, forKey: "address") {
         case .success(let address):
-            self.address := address
+            set self.address   address
         case .failure(let error):
             return .failure(cause: error)
         }
@@ -45,18 +45,18 @@ extension NestedDecodedUser: Decodable {
 }
 
 function decodeNestedUser() -> Result<NestedDecodedUser, DecodingError> {
-    let addressFields: [JSONField] := [
+    let addressFields: [JSONField]   [
         JSONField(key: "city", value: .string(value: "Tbilisi")),
     ]
-    let fields: [JSONField] := [
+    let fields: [JSONField]   [
         JSONField(key: "id", value: .int(value: 42)),
         JSONField(key: "address", value: .object(fields: addressFields)),
     ]
-    let decoder := JSONDecoder(value: .object(fields: fields))
+    let decoder   JSONDecoder(value: .object(fields: fields))
     return NestedDecodedUser.decode(from: decoder)
 }
 
-#main {
+@main {
     switch decodeNestedUser() {
     case .success(let user):
         Logger.info(user.address.city)

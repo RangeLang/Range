@@ -11,10 +11,10 @@ construct SingleInitRewriteFixture {
 
     @forwardOnlyArgument
     init(_ number: Int) {
-        self.number := number
+        set self.number   number
     }
 }
 
-#main {
+@main {
     SingleInitRewriteFixture(1)
 }

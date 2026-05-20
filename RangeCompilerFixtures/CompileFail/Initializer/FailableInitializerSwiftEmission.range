@@ -10,7 +10,7 @@ construct DecodedUser {
             return .failure(cause: .failed)
         }
 
-        self.name := name
+        set self.name   name
         return .success(result: self)
     }
 }
@@ -19,7 +19,7 @@ function decodeUser() -> Result<DecodedUser, DecodeError> {
     return DecodedUser(name: "George")
 }
 
-#main {
+@main {
     switch decodeUser() {
     case .success(let user):
         Logger.info(user.name)

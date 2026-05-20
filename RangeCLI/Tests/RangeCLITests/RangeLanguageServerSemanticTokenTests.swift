@@ -11,14 +11,14 @@ struct RangeLanguageServerSemanticTokenTests {
             let number: Int
         }
 
-        #main {
+        @main {
             let item = Something()
         }
         """
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsExactToken(tokens, text: "#main", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@main", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "Something", type: .type, modifiers: [.declaration]))
         #expect(containsToken(tokens, text: "Int", type: .type, modifiers: []))
         #expect(containsExactToken(tokens, text: "Something", type: .type, modifiers: []))
@@ -69,7 +69,7 @@ struct RangeLanguageServerSemanticTokenTests {
             let number: Int
         }
 
-        #main {
+        @main {
             let result: FixtureConstruct = FixtureConstruct(number: 1)
         }
         """
@@ -207,7 +207,7 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Definition resolves core types through graph")
     func definitionResolvesCoreTypesThroughGraph() {
         let source = """
-        #main {
+        @main {
             let enabled: Bool(true)
         }
         """
@@ -283,7 +283,7 @@ struct RangeLanguageServerSemanticTokenTests {
             return values
         }
 
-        #main {
+        @main {
             let text = @stringify(1 + 2)
         }
         """
@@ -395,7 +395,7 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Member call receivers do not emit plain variable read tokens")
     func memberCallReceiversDoNotEmitVariableReadTokens() {
         let source = """
-        #main {
+        @main {
             let output = Channel<String>()
             output.send("george")
             state received = output.receive()

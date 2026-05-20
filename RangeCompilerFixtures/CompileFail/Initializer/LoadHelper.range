@@ -20,25 +20,25 @@ function load<Value, Failure>(
     _ target: binding Promise<Value, Failure>,
     @autoclosure task: Result<Value, Failure>
 ) {
-    target := .loading
+    set target   .loading
 
     @background {
         switch task() {
         case .success(let item):
-            target := .success(result: item)
+            set target   .success(result: item)
 
         case .failure(let reason):
-            target := .failure(cause: reason)
+            set target   .failure(cause: reason)
         }
     }
 }
 
 construct UserView {
     let id: Int
-    state user: Promise<User, LoadError> := .loading
+    state user: Promise<User, LoadError>   .loading
 
     init(id: Int) {
-        self.id := id
+        set self.id   id
         load($self.user, fetchUser(id: id))
     }
 
@@ -47,6 +47,6 @@ construct UserView {
     }
 }
 
-#main {
-    let view := UserView(id: 1)
+@main {
+    let view   UserView(id: 1)
 }

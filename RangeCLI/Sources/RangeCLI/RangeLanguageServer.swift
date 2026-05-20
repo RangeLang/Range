@@ -619,7 +619,7 @@ struct RangeLanguageServer {
 
     private func attributeCompletions() -> [[String: Any]] {
         let builtinAttributes = [
-            "#main", "#package", "#syntax", "@background", "@language",
+            "@main", "#package", "#syntax", "@background", "@language",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
         let namespaceAttributes = documents.values
             .flatMap(\.symbols)
@@ -1343,8 +1343,8 @@ private struct DocumentIndex {
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
         let macroTokenPattern = #"([@#][a-z_][A-Za-z0-9_]*)\b"#
-        let metadataTokenPattern = #"(#namespace|#main|#package|#syntax)\b"#
-        let attributeKeywordPattern = #"@(background|defer|language|[A-Z][A-Za-z0-9_]*)\b"#
+        let metadataTokenPattern = #"(#namespace|#package|#syntax)\b"#
+        let attributeKeywordPattern = #"@(main|background|defer|language|[A-Z][A-Za-z0-9_]*)\b"#
         let enumCaseDeclarationPattern = #"^\s*case\s+([a-z_][A-Za-z0-9_]*)\b"#
         let argumentValuePattern = #"(?:\(\s*|,\s*|:\s*)([a-z_][A-Za-z0-9_]*)\s*(?=[,)])"#
         let argumentLabelPattern = #"(?:\(\s*|,\s*|^\s*)([a-z_][A-Za-z0-9_]*)\s*:"#

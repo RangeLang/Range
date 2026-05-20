@@ -2,10 +2,10 @@ function computeValue() -> Int {
     return 42
 }
 
-#main {
+@main {
     @background {
-        let result := computeValue()
+        let result   computeValue()
     }
 
-    let finished := true
+    let finished   true
 }

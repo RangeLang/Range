@@ -2,6 +2,6 @@ function takeMany(@variadic values: Int) -> [Int] {
     return values
 }
 
-#main {
-    let values := takeMany(1, 2, 3)
+@main {
+    let values   takeMany(1, 2, 3)
 }

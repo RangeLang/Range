@@ -24,7 +24,7 @@ extension DateTime: Comparable {
 
 extension DateTime: Decodable {
     function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
-        let container := decoder.singleValueContainer()
+        let container   decoder.singleValueContainer()
         switch container.decode(DateTime.self) {
         case .success(let value):
             return .success(result: value)
@@ -36,7 +36,7 @@ extension DateTime: Decodable {
 
 extension DateTime: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
-        let container := encoder.singleValueContainer()
+        let container   encoder.singleValueContainer()
         return container.encode(self)
     }
 }

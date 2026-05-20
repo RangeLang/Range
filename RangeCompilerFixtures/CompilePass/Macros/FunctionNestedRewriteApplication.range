@@ -11,6 +11,6 @@ function select(text text: String, number number: Int) -> String {
     return text
 }
 
-#main {
-    let result: Int := select(text: "Hello", number: 27)
+@main {
+    let result: Int   select(text: "Hello", number: 27)
 }

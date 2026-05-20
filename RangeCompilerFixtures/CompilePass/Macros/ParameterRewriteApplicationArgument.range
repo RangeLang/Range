@@ -8,6 +8,6 @@ function identity(@rewriteSingleArgument value: Int) -> Int {
     return value
 }
 
-#main {
-    let output: Int := identity(7)
+@main {
+    let output: Int   identity(7)
 }

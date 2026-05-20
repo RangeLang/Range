@@ -20,10 +20,10 @@ function stageTwo(parsed: Channel<Int>, output: Channel<Int>) {
     }
 }
 
-#main {
-    let input := Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
-    let parsed := Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
-    let output := Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
+@main {
+    let input   Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
+    let parsed   Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
+    let output   Channel<Int>(storage: ChannelStorage<Int>(capacity: 2))
 
     stageOne(input: input, parsed: parsed)
     stageTwo(parsed: parsed, output: output)

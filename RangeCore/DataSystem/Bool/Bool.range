@@ -14,7 +14,7 @@ extension Bool: Equatable {
 
 extension Bool: Decodable {
     function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
-        let container := decoder.singleValueContainer()
+        let container   decoder.singleValueContainer()
         switch container.decode(Bool.self) {
         case .success(let value):
             return .success(result: value)
@@ -26,7 +26,7 @@ extension Bool: Decodable {
 
 extension Bool: Encodable {
     function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
-        let container := encoder.singleValueContainer()
+        let container   encoder.singleValueContainer()
         return container.encode(self)
     }
 }

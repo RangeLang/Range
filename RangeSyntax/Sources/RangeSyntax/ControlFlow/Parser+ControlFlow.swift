@@ -78,6 +78,12 @@ extension Parser {
             return .continue
         }
 
+        if case .keyword("set") = peek() {
+            advance()
+            let target = try parseAssignmentTarget(localBindings: localBindings)
+            return .assignment(target: target, expression: try parseExpression())
+        }
+
         if isExpressionStatementStart() && !isAssignmentStatementStart() {
             return .expression(try parseExpression())
         }
@@ -85,9 +91,6 @@ extension Parser {
         let target = try parseAssignmentTarget(localBindings: localBindings)
 
         switch peek() {
-        case .colonEqual:
-            advance()
-            return .assignment(target: target, expression: try parseExpression())
         case .plusEqual:
             advance()
             return .compoundAssignment(
@@ -96,7 +99,7 @@ extension Parser {
                 expression: try parseExpression()
             )
         default:
-            throw ParseError("Expected assignment operator (`:=` or `+=`) in action block.")
+            throw ParseError("Expected assignment operator (`+=`) or `set` statement in action block.")
         }
     }
 
@@ -251,7 +254,7 @@ extension Parser {
             offset += 2
         }
         let next = peek(offset: offset)
-        return next == .colonEqual || next == .plusEqual
+        return next == .plusEqual
     }
 
     func isExpressionStatementStart() -> Bool {
@@ -293,8 +296,7 @@ extension Parser {
             throw ParseError(
                 "\(kind == .constant ? "let" : "state") '\(name)' uses `=` initialization. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): Type(value)`."
             )
-        } else if peek() == .colonEqual {
-            try consume(.colonEqual)
+        } else if canStartInlineExpression() {
             expression = try parseExpression()
         } else if let typedInitializer {
             expression = typedInitializer
@@ -322,6 +324,25 @@ extension Parser {
         )
         localBindings[name] = LocalBindingSymbol(kind: kind, type: declaration.type)
         return .localBinding(declaration)
+    }
+
+    func canStartExpression(_ token: Token) -> Bool {
+        switch token {
+        case .identifier, .integer, .double, .stringLiteral, .hashDirective,
+            .atAttribute, .leftBracket, .leftParen, .leftBrace, .dollar, .dot, .bang:
+            return true
+        case .keyword(let value):
+            return !RangeSyntax.keywordIdentifiers.contains(value)
+        default:
+            return false
+        }
+    }
+
+    func canStartInlineExpression() -> Bool {
+        guard index > 0, index < tokens.count, canStartExpression(peek()) else {
+            return false
+        }
+        return tokens[index - 1].range.end.line == tokens[index].range.start.line
     }
 
     func rejectAssignmentShapedTypeDeclaration(

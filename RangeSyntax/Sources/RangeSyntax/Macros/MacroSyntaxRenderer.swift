@@ -206,7 +206,7 @@ struct MacroSyntaxRenderer {
             return nil
         }
 
-        return statements.compactMap(renderStatement).joined(separator: " ")
+        return statements.compactMap(renderStatement).joined(separator: "\n")
     }
 
     private func renderBlock(_ expression: Expression) -> String? {
@@ -218,7 +218,7 @@ struct MacroSyntaxRenderer {
             return nil
         }
 
-        return statements.compactMap(renderStatement).joined(separator: " ")
+        return statements.compactMap(renderStatement).joined(separator: "\n")
     }
 
     private func renderStatement(_ value: CompileTimeValue) -> String? {
@@ -257,7 +257,7 @@ struct MacroSyntaxRenderer {
             else {
                 return nil
             }
-            return "\(renderExpressionForSyntax(target)) := \(renderExpressionForSyntax(expression))"
+            return "set \(renderExpressionForSyntax(target)) \(renderExpressionForSyntax(expression))"
         case .object(let typeName, let fields) where typeName == "ExpressionStatement":
             guard let expression = fields["expression"] else {
                 return nil
@@ -311,7 +311,7 @@ struct MacroSyntaxRenderer {
             else {
                 return nil
             }
-            return "\(renderExpressionForSyntax(target)) := \(renderExpressionForSyntax(assignmentExpression))"
+            return "set \(renderExpressionForSyntax(target)) \(renderExpressionForSyntax(assignmentExpression))"
         case .call(let name, let arguments) where name == "ExpressionStatement":
             guard let statementExpression = argument("expression", in: arguments) else {
                 return nil

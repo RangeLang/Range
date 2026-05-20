@@ -181,8 +181,8 @@ extension Parser {
     }
 
     mutating func skipMainBlockForDeclarationDiscovery() throws {
-        guard case .hashDirective(let name) = peek(), name == "main" else {
-            throw ParseError("Expected #main block.")
+        guard case .atAttribute(let name, nil) = peek(), name == "main" else {
+            throw ParseError("Expected @main block.")
         }
         advance()
         try consume(.leftBrace)

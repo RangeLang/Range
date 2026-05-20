@@ -2,10 +2,10 @@ construct FixtureInt {
     let storage: IntStorage
 
     init(literal: IntLiteral) {
-        self.storage := literal.storage()
+        set self.storage   literal.storage()
     }
 }
 
-#main {
-    let number: FixtureInt := 1
+@main {
+    let number: FixtureInt   1
 }

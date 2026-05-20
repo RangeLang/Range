@@ -1,7 +1,7 @@
 #syntax
 construct Closure: Expression {
     let type: TypeReference?
-    let parameters: [Parameter.Declaration] := []
+    let parameters: [Parameter.Declaration]   []
     let body: Block
 
     function replace(with replacement: Expression) -> Expression

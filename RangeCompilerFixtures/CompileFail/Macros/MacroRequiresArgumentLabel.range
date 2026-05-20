@@ -2,6 +2,6 @@ macro requiresLabel(value: Int): Expression { target, diagnostics in
     target.replace(with: value)
 }
 
-#main {
-    let value: Int := @requiresLabel(1)
+@main {
+    let value: Int   @requiresLabel(1)
 }
