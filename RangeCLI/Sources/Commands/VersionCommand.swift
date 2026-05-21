@@ -134,7 +134,7 @@ extension RangeCLI {
         private func installedExecutablePath() -> String {
             let executable = CommandLine.arguments.first ?? "range"
             if executable.contains("/") {
-                return URL(fileURLWithPath: executable).standardizedFileURL.path
+                return displayPath(URL(fileURLWithPath: executable).standardizedFileURL.path)
             }
 
             guard let lookupTool = Platform.defaultExecutableLookupTool else {
@@ -155,7 +155,7 @@ extension RangeCLI {
                     let path = String(data: data, encoding: .utf8)?
                         .trimmingCharacters(in: .whitespacesAndNewlines)
                     if let path, !path.isEmpty {
-                        return path
+                        return displayPath(path)
                     }
                 }
             } catch {
@@ -163,6 +163,18 @@ extension RangeCLI {
             }
 
             return executable
+        }
+
+        private func displayPath(_ path: String) -> String {
+            let home = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL.path
+            if path == home {
+                return "~"
+            }
+            let prefix = home.hasSuffix("/") ? home : home + "/"
+            if path.hasPrefix(prefix) {
+                return "~/" + path.dropFirst(prefix.count)
+            }
+            return path
         }
     }
 }

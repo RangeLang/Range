@@ -1,13 +1,13 @@
 param(
     [string]$Version = "latest",
     [string]$Repository = $(if ($env:RANGE_REPOSITORY) { $env:RANGE_REPOSITORY } else { "georgetchelidze/Range" }),
-    [string]$InstallDir = $(if ($env:RANGE_INSTALL_DIR) { $env:RANGE_INSTALL_DIR } else { Join-Path $HOME ".range\bin" })
+    [string]$InstallPrefix = $(if ($env:RANGE_INSTALL_PREFIX) { $env:RANGE_INSTALL_PREFIX } else { Join-Path $HOME ".range" })
 )
 
 $ErrorActionPreference = "Stop"
 
 if ($Version -eq "-h" -or $Version -eq "--help") {
-    Write-Host "Usage: ./install-range-release.ps1 [-Version latest|vX.Y.Z] [-Repository owner/repo] [-InstallDir path]"
+    Write-Host "Usage: ./install-range-release.ps1 [-Version latest|vX.Y.Z] [-Repository owner/repo] [-InstallPrefix path]"
     exit 0
 }
 
@@ -38,14 +38,25 @@ try {
     Invoke-WebRequest -Uri $url -OutFile $zipPath
     Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
 
-    New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-    Copy-Item -Path (Join-Path $tmp "$artifact\range.exe") -Destination (Join-Path $InstallDir "range.exe") -Force
+    $resolvedVersion = if ($Version.StartsWith("v")) { $Version.Substring(1) } else { $Version }
+    if ($resolvedVersion -eq "latest") {
+        $resolvedVersion = "unknown"
+    }
+    $versionRoot = Join-Path $InstallPrefix "versions\$resolvedVersion"
+    New-Item -ItemType Directory -Force -Path $versionRoot | Out-Null
+    Copy-Item -Path (Join-Path $tmp "$artifact\range.exe") -Destination (Join-Path $versionRoot "range.exe") -Force
 
-    Write-Host "Installed range to $(Join-Path $InstallDir "range.exe")"
+    $current = Join-Path $InstallPrefix "current"
+    if (Test-Path $current) {
+        Remove-Item -Recurse -Force $current
+    }
+    New-Item -ItemType SymbolicLink -Path $current -Target $versionRoot | Out-Null
+
+    Write-Host "Installed range to $(Join-Path $current "range.exe")"
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    if (($userPath -split ";") -notcontains $InstallDir) {
+    if (($userPath -split ";") -notcontains $current) {
         Write-Host "Add this directory to your user PATH:"
-        Write-Host "  $InstallDir"
+        Write-Host "  $current"
     }
 } finally {
     Remove-Item -Recurse -Force $tmp

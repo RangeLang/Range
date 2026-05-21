@@ -2,13 +2,12 @@
 set -euo pipefail
 
 REPOSITORY="${RANGE_REPOSITORY:-georgetchelidze/Range}"
-INSTALL_DIR="${RANGE_INSTALL_DIR:-${HOME}/.local/bin}"
+INSTALL_PREFIX="${RANGE_INSTALL_PREFIX:-${HOME}/.range}"
 VERSION="${1:-latest}"
-TARGET_NAME="range"
 
 usage() {
   echo "Usage: $0 [latest|vX.Y.Z]"
-  echo "Environment: RANGE_REPOSITORY=owner/repo RANGE_INSTALL_DIR=/path/to/bin"
+  echo "Environment: RANGE_REPOSITORY=owner/repo RANGE_INSTALL_PREFIX=\$HOME/.range"
 }
 
 case "${VERSION}" in
@@ -44,7 +43,7 @@ detect_platform() {
 }
 
 platform="$(detect_platform)"
-archive="range-${platform}.tar.gz"
+archive="range-${platform}.lang.tar.gz"
 
 if [[ "${VERSION}" == "latest" ]]; then
   url="https://github.com/${REPOSITORY}/releases/latest/download/${archive}"
@@ -59,11 +58,12 @@ echo "Downloading ${url}"
 curl -fsSL "${url}" -o "${tmp_dir}/${archive}"
 tar -xzf "${tmp_dir}/${archive}" -C "${tmp_dir}"
 
-mkdir -p "${INSTALL_DIR}"
-install -m 755 "${tmp_dir}/range-${platform}/${TARGET_NAME}" "${INSTALL_DIR}/${TARGET_NAME}"
+RANGE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
+RANGE_INSTALL_ASSUME_YES=true \
+  "${tmp_dir}/range-${platform}.lang/install.sh"
 
-echo "Installed ${TARGET_NAME} to ${INSTALL_DIR}/${TARGET_NAME}"
-if [[ ":${PATH}:" != *":${INSTALL_DIR}:"* ]]; then
+echo "Installed range to ${INSTALL_PREFIX}/current/range"
+if [[ ":${PATH}:" != *":${INSTALL_PREFIX}/current:"* ]]; then
   echo "Add this to your shell profile:"
-  echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+  echo "  export PATH=\"${INSTALL_PREFIX}/current:\$PATH\""
 fi

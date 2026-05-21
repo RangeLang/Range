@@ -9,18 +9,20 @@ Use this skill for first-run setup, package installation questions, and project-
 
 ## Installed Layout
 
-The macOS package installs shared Range resources under the selected prefix:
+The macOS package installs Range under a versioned payload and points
+`current` at the active version:
 
 ```text
-<prefix>/bin/range
-<prefix>/share/range/RangeCore
-<prefix>/share/range/Skills
+<prefix>/current -> versions/<version>
+<prefix>/current/range
+<prefix>/current/RangeCore
+<prefix>/current/Skills
 ```
 
 The shell installer default prefix is `~/.range`, so the CLI is normally:
 
 ```text
-$HOME/.range/bin/range
+$HOME/.range/current/range
 $HOME/.range/Packages
 ```
 
@@ -68,12 +70,13 @@ range link .
 This stores versioned CLI copies inside the project workspace:
 
 ```text
-.range/RangeCLI/<version>/bin/range
-.range/bin/range
+.range/versions/<version>/range
+.range/current/range
 .range/Links/range.package-link.json
 ```
 
-Different CLI versions can coexist under `.range/RangeCLI`. The `.range/bin/range` path points to the selected project-local version.
+Different CLI versions can coexist under `.range/versions`. The `.range/current`
+path points to the selected project-local version.
 
 ## Project Scripts
 
@@ -111,6 +114,6 @@ Use `range version` to see the installed version and whether an update is availa
 ## Troubleshooting
 
 - If `range update` prompts for a destination, prefer a writable prefix rather than adding random privilege prompts.
-- If `RangeCore` is missing, inspect `<prefix>/share/range/RangeCore`.
-- If bundled skills are missing, inspect `<prefix>/share/range/Skills`.
+- If `RangeCore` is missing, inspect `<prefix>/current/RangeCore`.
+- If bundled skills are missing, inspect `<prefix>/current/Skills`.
 - If project-local commands feel stale, rerun `range link .` from the project root after updating Range.

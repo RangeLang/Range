@@ -12,10 +12,11 @@ struct ProjectBinaryLinkerTests {
             binaryPath: fixture.binary.path
         ).run()
 
-        #expect(link.path == fixture.root.appendingPathComponent(".range/bin/range").path)
+        #expect(link.path == fixture.root.appendingPathComponent(".range/current/range").path)
         let versionedBinary = fixture.root
-            .appendingPathComponent(".range/RangeCLI/\(RangeVersion.current)/bin/range")
-        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == versionedBinary.path)
+            .appendingPathComponent(".range/versions/\(RangeVersion.current)/range")
+        let current = fixture.root.appendingPathComponent(".range/current")
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: current.path) == versionedBinary.deletingLastPathComponent().path)
         #expect(try String(contentsOf: versionedBinary, encoding: .utf8) == "#!/usr/bin/env bash\nexit 0\n")
 
         let receipt = fixture.root.appendingPathComponent(".range/Links/range.package-link.json")
@@ -34,13 +35,13 @@ struct ProjectBinaryLinkerTests {
             binaryPath: fixture.binary.path
         ).run()
 
-        #expect(link.path == fixture.root.appendingPathComponent(".range/bin/range").path)
+        #expect(link.path == fixture.root.appendingPathComponent(".range/current/range").path)
     }
 
     @Test("Existing symlink upgrades to versioned package install")
     func existingSymlinkUpgradesToVersionedPackageInstall() throws {
         let fixture = try temporaryPackage()
-        let link = fixture.root.appendingPathComponent(".range/bin/range", isDirectory: false)
+        let link = fixture.root.appendingPathComponent(".range/current", isDirectory: false)
         try FileManager.default.createDirectory(
             at: link.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -52,10 +53,10 @@ struct ProjectBinaryLinkerTests {
             binaryPath: fixture.binary.path
         ).run()
 
-        #expect(packaged.path == link.path)
+        #expect(packaged.path == fixture.root.appendingPathComponent(".range/current/range").path)
         let versionedBinary = fixture.root
-            .appendingPathComponent(".range/RangeCLI/\(RangeVersion.current)/bin/range")
-        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: packaged.path) == versionedBinary.path)
+            .appendingPathComponent(".range/versions/\(RangeVersion.current)/range")
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: link.path) == versionedBinary.deletingLastPathComponent().path)
         #expect(try String(contentsOf: versionedBinary, encoding: .utf8) == "#!/usr/bin/env bash\nexit 0\n")
     }
 

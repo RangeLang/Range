@@ -2,23 +2,16 @@
 
 This folder installs the Range command line tool.
 
-GitHub releases also include `.pkg` installer artifacts for users who prefer
-the standard macOS Installer flow:
-
-- `range-macos-arm64.pkg`
-- `range-macos-x64.pkg`
-
-The shell installer exposes `range` and shared resources from `~/.range`. The
-exposed paths are symlinks to a versioned Range-owned store under
-`$HOME/.range/RangeCLI/<version>`.
+The shell installer stores each release under `~/.range/versions/<version>` and
+points `~/.range/current` at the active installed release.
 
 ## Contents
 
-- `bin/range`: the Range CLI executable
-- `share/range/RangeCore`: language core sources used by the CLI
-- `share/range/Skills`: bundled Codex skills for Range onboarding
-- `install.sh`: copies `bin/range` into your command line path
-- `uninstall.sh`: removes the installed `range` executable and shared Range resources
+- `range`: the Range CLI executable
+- `RangeCore`: language core sources used by the CLI
+- `Skills`: bundled Codex skills for Range onboarding
+- `install.sh`: installs this release under `~/.range/versions`
+- `uninstall.sh`: removes the active `~/.range/current` selection
 - `INSTALL_MANIFEST.md`: describes what the installer changes
 - `VERSION`: the release version packaged by GitHub Actions
 
@@ -28,13 +21,15 @@ exposed paths are symlinks to a versioned Range-owned store under
 ./install.sh
 ```
 
-By default, this exposes:
+By default, this creates:
 
 ```text
-$HOME/.range/bin/range
-$HOME/.range/share/range/RangeCore
-$HOME/.range/share/range/Skills
+$HOME/.range/current -> versions/<version>
+$HOME/.range/versions/<version>/range
+$HOME/.range/versions/<version>/RangeCore
+$HOME/.range/versions/<version>/Skills
 $HOME/.range/Packages
+$HOME/.range/Projects
 ```
 
 To install somewhere else:
@@ -43,20 +38,13 @@ To install somewhere else:
 RANGE_INSTALL_PREFIX="$HOME/.range" ./install.sh
 ```
 
-That installs:
+That installs the same layout under the selected prefix:
 
 ```text
-$HOME/.range/bin/range
-$HOME/.range/share/range/RangeCore
-$HOME/.range/share/range/Skills
-$HOME/.range/Packages
+$HOME/.range/current/range
 ```
 
-In all cases, the versioned payload is stored under:
-
-```text
-$HOME/.range/RangeCLI/<version>
-```
+Add `~/.range/current` to `PATH` to use `range` from the shell.
 
 ## Verify
 

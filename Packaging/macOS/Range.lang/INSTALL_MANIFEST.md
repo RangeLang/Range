@@ -2,25 +2,33 @@
 
 Package: Range CLI
 
-This package stores one executable, the bundled RangeCore sources required
-by the CLI, and bundled Codex skills in a versioned Range-owned directory:
+This package stores one executable, the bundled RangeCore sources required by
+the CLI, and bundled Codex skills in a versioned Range-owned directory:
 
 ```text
-$HOME/.range/RangeCLI/<version>
+$HOME/.range/versions/<version>
 ```
 
-The selected prefix exposes symlinks:
+The selected prefix exposes one active-install symlink:
 
 ```text
-$HOME/.range/bin/range -> $HOME/.range/RangeCLI/<version>/bin/range
-$HOME/.range/share/range/RangeCore -> $HOME/.range/RangeCLI/<version>/share/range/RangeCore
-$HOME/.range/share/range/Skills -> $HOME/.range/RangeCLI/<version>/share/range/Skills
+$HOME/.range/current -> $HOME/.range/versions/<version>
 ```
 
-The installer also creates the machine package store:
+The active release contains:
+
+```text
+$HOME/.range/current/range
+$HOME/.range/current/RangeCore
+$HOME/.range/current/Skills
+$HOME/.range/current/VERSION
+```
+
+The installer also creates machine stores:
 
 ```text
 $HOME/.range/Packages
+$HOME/.range/Projects
 ```
 
 The install location can be changed with `RANGE_INSTALL_PREFIX`:
@@ -29,17 +37,9 @@ The install location can be changed with `RANGE_INSTALL_PREFIX`:
 RANGE_INSTALL_PREFIX="$HOME/.range" ./install.sh
 ```
 
-With that setting, the visible symlinks are:
+The installer does not add login items, background services, launch agents,
+shell profile changes, or system extensions.
 
-```text
-$HOME/.range/bin/range
-$HOME/.range/share/range/RangeCore
-$HOME/.range/share/range/Skills
-$HOME/.range/Packages
-```
-
-The installer does not add login items, background services, launch agents, shell profile changes, or system extensions.
-
-The uninstall script removes only the installed `range` executable and bundled
-shared Range resources from the selected prefix. It does not remove
-`$HOME/.range/Packages`.
+The uninstall script removes only the active `current` symlink from the selected
+prefix. It does not remove installed versions, `$HOME/.range/Packages`, or
+`$HOME/.range/Projects`.

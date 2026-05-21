@@ -27,9 +27,8 @@ enum RangeCoreLoader {
 
         let executableURL = installedExecutableURL()
         let executableDirectory = executableURL.deletingLastPathComponent()
-        let installShareRoot = executableDirectory
-            .deletingLastPathComponent()
-            .appendingPathComponent("share/range/RangeCore", isDirectory: true)
+        let installRoot = executableDirectory
+            .appendingPathComponent("RangeCore", isDirectory: true)
 
         let sourceRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -38,7 +37,7 @@ enum RangeCoreLoader {
             .deletingLastPathComponent()
             .appendingPathComponent("RangeCore", isDirectory: true)
 
-        return [explicitPath, installShareRoot, sourceRoot].compactMap(\.self)
+        return [explicitPath, installRoot, sourceRoot].compactMap(\.self)
     }
 
     private static func installedExecutableURL() -> URL {

@@ -2,7 +2,11 @@ import ArgumentParser
 import Foundation
 
 struct ProjectBinaryLinker {
-    static let defaultMacOSBinaryPath = "/usr/local/bin/range"
+    static var defaultMacOSBinaryPath: String {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".range/current/range", isDirectory: false)
+            .path
+    }
 
     let projectPath: String
     let binaryPath: String
@@ -20,34 +24,32 @@ struct ProjectBinaryLinker {
         let selectedVersion = "\(RangeVersion.current)"
         let selectedInstallDirectory = projectRoot
             .appendingPathComponent(".range", isDirectory: true)
-            .appendingPathComponent("RangeCLI", isDirectory: true)
+            .appendingPathComponent("versions", isDirectory: true)
             .appendingPathComponent(selectedVersion, isDirectory: true)
-            .appendingPathComponent("bin", isDirectory: true)
-        let shimDirectory = projectRoot
+        let currentURL = projectRoot
             .appendingPathComponent(".range", isDirectory: true)
-            .appendingPathComponent("bin", isDirectory: true)
+            .appendingPathComponent("current", isDirectory: false)
         let linksDirectory = projectRoot
             .appendingPathComponent(".range", isDirectory: true)
             .appendingPathComponent("Links", isDirectory: true)
         try fileManager.createDirectory(at: selectedInstallDirectory, withIntermediateDirectories: true)
-        try fileManager.createDirectory(at: shimDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: linksDirectory, withIntermediateDirectories: true)
 
         let versionedBinaryURL = selectedInstallDirectory.appendingPathComponent(
             "range",
             isDirectory: false
         )
-        let packageBinaryURL = shimDirectory.appendingPathComponent("range", isDirectory: false)
+        let packageBinaryURL = currentURL.appendingPathComponent("range", isDirectory: false)
         let receiptURL = linksDirectory.appendingPathComponent(
             "range.package-link.json",
             isDirectory: false
         )
 
-        if fileManager.fileExists(atPath: packageBinaryURL.path)
-            && !isReplaceablePackageShim(at: packageBinaryURL, receiptURL: receiptURL)
+        if fileManager.fileExists(atPath: currentURL.path)
+            && !isReplaceablePackageShim(at: currentURL, receiptURL: receiptURL)
         {
             throw ValidationError(
-                "Refusing to replace existing file at \(packageBinaryURL.path). Remove it and run link again."
+                "Refusing to replace existing file at \(currentURL.path). Remove it and run link again."
             )
         }
 
@@ -57,10 +59,10 @@ struct ProjectBinaryLinker {
         try fileManager.copyItem(at: binaryURL, to: versionedBinaryURL)
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: versionedBinaryURL.path)
 
-        if fileManager.fileExists(atPath: packageBinaryURL.path) {
-            try fileManager.removeItem(at: packageBinaryURL)
+        if fileManager.fileExists(atPath: currentURL.path) {
+            try fileManager.removeItem(at: currentURL)
         }
-        try fileManager.createSymbolicLink(at: packageBinaryURL, withDestinationURL: versionedBinaryURL)
+        try fileManager.createSymbolicLink(at: currentURL, withDestinationURL: selectedInstallDirectory)
 
         let receipt = PackageLinkReceipt(
             kind: "range.package-link",
@@ -93,8 +95,8 @@ struct ProjectBinaryLinker {
         return root
     }
 
-    private func isReplaceablePackageShim(at packageBinaryURL: URL, receiptURL: URL) -> Bool {
-        if (try? FileManager.default.destinationOfSymbolicLink(atPath: packageBinaryURL.path)) != nil {
+    private func isReplaceablePackageShim(at currentURL: URL, receiptURL: URL) -> Bool {
+        if (try? FileManager.default.destinationOfSymbolicLink(atPath: currentURL.path)) != nil {
             return true
         }
         return FileManager.default.fileExists(atPath: receiptURL.path)

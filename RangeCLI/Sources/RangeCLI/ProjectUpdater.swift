@@ -112,9 +112,9 @@ struct ProjectUpdater {
 
     private static func isWritableInstallPrefix(_ prefix: URL) -> Bool {
         let fileManager = FileManager.default
-        let binDirectory = prefix.appendingPathComponent("bin", isDirectory: true)
-        if fileManager.fileExists(atPath: binDirectory.path) {
-            return fileManager.isWritableFile(atPath: binDirectory.path)
+        let versionsDirectory = prefix.appendingPathComponent("versions", isDirectory: true)
+        if fileManager.fileExists(atPath: versionsDirectory.path) {
+            return fileManager.isWritableFile(atPath: versionsDirectory.path)
         }
 
         return fileManager.isWritableFile(atPath: prefix.path)
