@@ -24,7 +24,7 @@ let package = Package(
             ],
             path: "Sources",
             swiftSettings: [
-                .treatWarning("EmbeddedRestrictions", as: .warning),
+                .treatWarning("EmbeddedRestrictions", as: .error),
             ]
         ),
         .testTarget(

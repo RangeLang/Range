@@ -40,7 +40,7 @@ let package = Package(
                 "TypeSystem/Generics.md",
             ],
             swiftSettings: [
-                .treatWarning("EmbeddedRestrictions", as: .warning),
+                .treatWarning("EmbeddedRestrictions", as: .error),
             ]
         ),
         .testTarget(

@@ -28,7 +28,7 @@ let package = Package(
                 "Terminal",
             ],
             swiftSettings: [
-                .treatWarning("EmbeddedRestrictions", as: .warning),
+                .treatWarning("EmbeddedRestrictions", as: .error),
             ]
         ),
         .testTarget(
