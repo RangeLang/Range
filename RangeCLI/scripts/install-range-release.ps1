@@ -38,9 +38,19 @@ try {
     Invoke-WebRequest -Uri $url -OutFile $zipPath
     Expand-Archive -Path $zipPath -DestinationPath $tmp -Force
 
+    $packageRoot = Join-Path $tmp $artifact
+    $binary = Join-Path $packageRoot "range.exe"
+    $coreSources = Join-Path $packageRoot "RangeCore"
+    if (-not (Test-Path $binary)) {
+        throw "Release archive is missing range.exe."
+    }
+    if (-not (Test-Path $coreSources)) {
+        throw "Release archive is missing RangeCore sources."
+    }
+
     $resolvedVersion = if ($Version.StartsWith("v")) { $Version.Substring(1) } else { $Version }
     if ($resolvedVersion -eq "latest") {
-        $versionFile = Join-Path $tmp "$artifact\VERSION"
+        $versionFile = Join-Path $packageRoot "VERSION"
         if (Test-Path $versionFile) {
             $resolvedVersion = (Get-Content -Raw $versionFile).Trim()
         } else {
@@ -48,19 +58,28 @@ try {
         }
     }
     $versionRoot = Join-Path $InstallPrefix "releases\$resolvedVersion"
+    if (Test-Path $versionRoot) {
+        Remove-Item -Recurse -Force $versionRoot
+    }
     New-Item -ItemType Directory -Force -Path $versionRoot | Out-Null
-    Copy-Item -Path (Join-Path $tmp "$artifact\range.exe") -Destination (Join-Path $versionRoot "range.exe") -Force
+    Copy-Item -Path (Join-Path $packageRoot "*") -Destination $versionRoot -Recurse -Force
 
     $current = Join-Path $InstallPrefix "current"
+    $packages = Join-Path $InstallPrefix "Packages"
+    $projects = Join-Path $InstallPrefix "Projects"
     if ((Test-Path $current) -and -not (Get-Item $current).PSIsContainer) {
         Remove-Item -Recurse -Force $current
     }
-    New-Item -ItemType Directory -Force -Path $current | Out-Null
+    New-Item -ItemType Directory -Force -Path $current, $packages, $projects | Out-Null
     $currentVersion = Join-Path $current $resolvedVersion
     if (Test-Path $currentVersion) {
         Remove-Item -Recurse -Force $currentVersion
     }
-    New-Item -ItemType SymbolicLink -Path $currentVersion -Target $versionRoot | Out-Null
+    try {
+        New-Item -ItemType Junction -Path $currentVersion -Target $versionRoot | Out-Null
+    } catch {
+        New-Item -ItemType SymbolicLink -Path $currentVersion -Target $versionRoot | Out-Null
+    }
 
     Write-Host "Installed range to $(Join-Path $currentVersion "range.exe")"
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")

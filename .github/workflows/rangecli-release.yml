@@ -21,6 +21,10 @@ jobs:
             artifact: range-macos-arm64
             archive: range-macos-arm64.lang.tar.gz
             shell: bash
+          - os: windows-latest
+            artifact: range-windows-x64
+            archive: range-windows-x64.zip
+            shell: pwsh
 
     defaults:
       run:
@@ -60,6 +64,33 @@ jobs:
           chmod 755 "dist/${package}/range"
           chmod 755 "dist/${package}/install.sh" "dist/${package}/uninstall.sh"
           tar -C dist -czf ${{ matrix.archive }} "$package"
+
+      - name: Package Windows install folder
+        if: runner.os == 'Windows'
+        working-directory: RangeCLI
+        run: |
+          $package = "${{ matrix.artifact }}"
+          $releaseVersion = "${env:GITHUB_REF_NAME}" -replace '^v', ''
+          if ($releaseVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
+            $versionSource = Get-Content "Sources/RangeCLI/RangeVersion.swift" -Raw
+            if ($versionSource -match 'SemanticVersion\(major: ([0-9]+), minor: ([0-9]+), patch: ([0-9]+)\)') {
+              $releaseVersion = "$($Matches[1]).$($Matches[2]).$($Matches[3])"
+            }
+          }
+          New-Item -ItemType Directory -Force -Path "dist\$package" | Out-Null
+          Copy-Item -Recurse -Force "..\Packaging\Windows\Range\*" "dist\$package"
+          $binary = Get-ChildItem -Path ".build" -Recurse -Filter "RangeCLI.exe" |
+            Where-Object { $_.FullName -match '[\\/](release)[\\/]' } |
+            Select-Object -First 1
+          if (-not $binary) {
+            throw "Build succeeded but RangeCLI.exe was not found under .build."
+          }
+          Copy-Item -Force $binary.FullName "dist\$package\range.exe"
+          Copy-Item -Recurse -Force "..\RangeCore" "dist\$package\RangeCore"
+          New-Item -ItemType Directory -Force -Path "dist\$package\Skills" | Out-Null
+          Copy-Item -Recurse -Force "..\.codex\skills\range-onboarding" "dist\$package\Skills\range-onboarding"
+          Set-Content -NoNewline -Path "dist\$package\VERSION" -Value $releaseVersion
+          Compress-Archive -Path "dist\$package" -DestinationPath "${{ matrix.archive }}" -Force
 
       - uses: actions/upload-artifact@v4
         with:
