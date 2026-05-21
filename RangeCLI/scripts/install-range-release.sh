@@ -62,8 +62,14 @@ RANGE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
 RANGE_INSTALL_ASSUME_YES=true \
   "${tmp_dir}/range-${platform}.lang/install.sh"
 
-echo "Installed range to ${INSTALL_PREFIX}/current/range"
-if [[ ":${PATH}:" != *":${INSTALL_PREFIX}/current:"* ]]; then
+installed_version="$VERSION"
+if [[ -f "${tmp_dir}/range-${platform}.lang/VERSION" ]]; then
+  installed_version="$(tr -d '\n' < "${tmp_dir}/range-${platform}.lang/VERSION")"
+fi
+
+current_path="${INSTALL_PREFIX}/current/${installed_version}"
+echo "Installed range to ${current_path}/range"
+if [[ ":${PATH}:" != *":${current_path}:"* ]]; then
   echo "Add this to your shell profile:"
-  echo "  export PATH=\"${INSTALL_PREFIX}/current:\$PATH\""
+  echo "  export PATH=\"${current_path}:\$PATH\""
 fi

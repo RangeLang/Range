@@ -4,7 +4,7 @@ import Foundation
 struct ProjectBinaryLinker {
     static var defaultMacOSBinaryPath: String {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent(".range/current/range", isDirectory: false)
+            .appendingPathComponent(".range/current/\(RangeVersion.current)/range", isDirectory: false)
             .path
     }
 
@@ -24,11 +24,13 @@ struct ProjectBinaryLinker {
         let selectedVersion = "\(RangeVersion.current)"
         let selectedInstallDirectory = projectRoot
             .appendingPathComponent(".range", isDirectory: true)
-            .appendingPathComponent("versions", isDirectory: true)
+            .appendingPathComponent("releases", isDirectory: true)
             .appendingPathComponent(selectedVersion, isDirectory: true)
-        let currentURL = projectRoot
+        let currentDirectoryURL = projectRoot
             .appendingPathComponent(".range", isDirectory: true)
-            .appendingPathComponent("current", isDirectory: false)
+            .appendingPathComponent("current", isDirectory: true)
+        let currentVersionURL = currentDirectoryURL
+            .appendingPathComponent(selectedVersion, isDirectory: true)
         let linksDirectory = projectRoot
             .appendingPathComponent(".range", isDirectory: true)
             .appendingPathComponent("Links", isDirectory: true)
@@ -39,17 +41,24 @@ struct ProjectBinaryLinker {
             "range",
             isDirectory: false
         )
-        let packageBinaryURL = currentURL.appendingPathComponent("range", isDirectory: false)
+        let packageBinaryURL = currentVersionURL.appendingPathComponent("range", isDirectory: false)
         let receiptURL = linksDirectory.appendingPathComponent(
             "range.package-link.json",
             isDirectory: false
         )
 
-        if fileManager.fileExists(atPath: currentURL.path)
-            && !isReplaceablePackageShim(at: currentURL, receiptURL: receiptURL)
+        let currentIsSymlink = (try? fileManager.destinationOfSymbolicLink(atPath: currentDirectoryURL.path)) != nil
+        var currentIsDirectory: ObjCBool = false
+        let currentExists = fileManager.fileExists(
+            atPath: currentDirectoryURL.path,
+            isDirectory: &currentIsDirectory
+        )
+        if currentExists
+            && !currentIsDirectory.boolValue
+            && !isReplaceablePackageShim(at: currentDirectoryURL, receiptURL: receiptURL)
         {
             throw ValidationError(
-                "Refusing to replace existing file at \(currentURL.path). Remove it and run link again."
+                "Refusing to replace existing file at \(currentDirectoryURL.path). Remove it and run link again."
             )
         }
 
@@ -59,10 +68,19 @@ struct ProjectBinaryLinker {
         try fileManager.copyItem(at: binaryURL, to: versionedBinaryURL)
         try fileManager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: versionedBinaryURL.path)
 
-        if fileManager.fileExists(atPath: currentURL.path) {
-            try fileManager.removeItem(at: currentURL)
+        if currentIsSymlink {
+            try fileManager.removeItem(at: currentDirectoryURL)
         }
-        try fileManager.createSymbolicLink(at: currentURL, withDestinationURL: selectedInstallDirectory)
+        try fileManager.createDirectory(at: currentDirectoryURL, withIntermediateDirectories: true)
+        if fileManager.fileExists(atPath: currentVersionURL.path)
+            || (try? fileManager.destinationOfSymbolicLink(atPath: currentVersionURL.path)) != nil
+        {
+            try fileManager.removeItem(at: currentVersionURL)
+        }
+        try fileManager.createSymbolicLink(
+            at: currentVersionURL,
+            withDestinationURL: selectedInstallDirectory
+        )
 
         let receipt = PackageLinkReceipt(
             kind: "range.package-link",

@@ -24,7 +24,7 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --local|--global|--fully)
-      echo "Flag $1 is no longer used. Range installs under a prefix with current -> versions/<version>."
+      echo "Flag $1 is no longer used. Range installs under a prefix with current/<version> -> releases/<version>."
       echo "Use --path <install-prefix> or RANGE_INSTALL_PREFIX instead."
       exit 1
       ;;
@@ -71,7 +71,8 @@ RANGE_INSTALL_PREFIX="${INSTALL_PREFIX}" \
 RANGE_INSTALL_ASSUME_YES=true \
   "${package}/install.sh"
 
-if [[ ":${PATH}:" != *":${INSTALL_PREFIX}/current:"* ]]; then
+current_path="${INSTALL_PREFIX}/current/${release_version}"
+if [[ ":${PATH}:" != *":${current_path}:"* ]]; then
   echo "Add this to your shell profile:"
-  echo "  export PATH=\"${INSTALL_PREFIX}/current:\$PATH\""
+  echo "  export PATH=\"${current_path}:\$PATH\""
 fi

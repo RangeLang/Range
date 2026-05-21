@@ -40,23 +40,33 @@ try {
 
     $resolvedVersion = if ($Version.StartsWith("v")) { $Version.Substring(1) } else { $Version }
     if ($resolvedVersion -eq "latest") {
-        $resolvedVersion = "unknown"
+        $versionFile = Join-Path $tmp "$artifact\VERSION"
+        if (Test-Path $versionFile) {
+            $resolvedVersion = (Get-Content -Raw $versionFile).Trim()
+        } else {
+            $resolvedVersion = "unknown"
+        }
     }
-    $versionRoot = Join-Path $InstallPrefix "versions\$resolvedVersion"
+    $versionRoot = Join-Path $InstallPrefix "releases\$resolvedVersion"
     New-Item -ItemType Directory -Force -Path $versionRoot | Out-Null
     Copy-Item -Path (Join-Path $tmp "$artifact\range.exe") -Destination (Join-Path $versionRoot "range.exe") -Force
 
     $current = Join-Path $InstallPrefix "current"
-    if (Test-Path $current) {
+    if ((Test-Path $current) -and -not (Get-Item $current).PSIsContainer) {
         Remove-Item -Recurse -Force $current
     }
-    New-Item -ItemType SymbolicLink -Path $current -Target $versionRoot | Out-Null
+    New-Item -ItemType Directory -Force -Path $current | Out-Null
+    $currentVersion = Join-Path $current $resolvedVersion
+    if (Test-Path $currentVersion) {
+        Remove-Item -Recurse -Force $currentVersion
+    }
+    New-Item -ItemType SymbolicLink -Path $currentVersion -Target $versionRoot | Out-Null
 
-    Write-Host "Installed range to $(Join-Path $current "range.exe")"
+    Write-Host "Installed range to $(Join-Path $currentVersion "range.exe")"
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-    if (($userPath -split ";") -notcontains $current) {
+    if (($userPath -split ";") -notcontains $currentVersion) {
         Write-Host "Add this directory to your user PATH:"
-        Write-Host "  $current"
+        Write-Host "  $currentVersion"
     }
 } finally {
     Remove-Item -Recurse -Force $tmp

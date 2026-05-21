@@ -7,10 +7,10 @@ core_sources="$package_root/RangeCore"
 skill_sources="$package_root/Skills"
 default_prefix="$HOME/.range"
 prefix="${RANGE_INSTALL_PREFIX:-$default_prefix}"
-store_root="${RANGE_STORE_ROOT:-$prefix/versions}"
+store_root="${RANGE_STORE_ROOT:-$prefix/releases}"
 current_target="$prefix/current"
-packages_dir="$HOME/.range/Packages"
-projects_dir="$HOME/.range/Projects"
+packages_dir="$prefix/Packages"
+projects_dir="$prefix/Projects"
 version_file="$package_root/VERSION"
 version="unknown"
 
@@ -18,6 +18,7 @@ if [[ -f "$version_file" ]]; then
   version="$(tr -d '\n' < "$version_file")"
 fi
 
+current_version_target="$current_target/$version"
 payload_dir="$store_root/$version"
 payload_binary="$payload_dir/range"
 payload_core="$payload_dir/RangeCore"
@@ -35,7 +36,7 @@ echo "Will install Range $version"
 echo "stored in:"
 echo "  $payload_dir"
 echo "active install:"
-echo "  $current_target"
+echo "  $current_version_target"
 echo
 
 if [[ "${RANGE_INSTALL_ASSUME_YES:-false}" != "true" ]]; then
@@ -73,15 +74,19 @@ if [[ ! -w "$prefix" ]]; then
   exit 1
 fi
 
-mkdir -p "$packages_dir" "$projects_dir" "$store_root" "$payload_dir"
+if [[ -L "$current_target" || -f "$current_target" ]]; then
+  rm -f "$current_target"
+fi
+
+mkdir -p "$packages_dir" "$projects_dir" "$store_root" "$payload_dir" "$current_target"
 install -m 755 "$binary" "$payload_binary"
 rm -rf "$payload_core" "$payload_skills"
 cp -R "$core_sources" "$payload_core"
 cp -R "$skill_sources" "$payload_skills"
 printf '%s\n' "$version" > "$payload_dir/VERSION"
 
-ln -sfn "versions/$version" "$current_target"
+ln -sfn "../releases/$version" "$current_version_target"
 
 echo
-echo "Installed $current_target/range"
+echo "Installed $current_version_target/range"
 echo "Run: range version"

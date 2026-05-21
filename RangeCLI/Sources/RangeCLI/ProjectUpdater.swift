@@ -90,9 +90,7 @@ struct ProjectUpdater {
             return URL(fileURLWithPath: override, isDirectory: true).standardizedFileURL
         }
 
-        let executablePrefix = installedExecutableURL()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+        let executablePrefix = installedExecutablePrefix(from: installedExecutableURL())
         if isRangeUserPrefix(executablePrefix), isWritableInstallPrefix(executablePrefix) {
             return executablePrefix
         }
@@ -112,9 +110,9 @@ struct ProjectUpdater {
 
     private static func isWritableInstallPrefix(_ prefix: URL) -> Bool {
         let fileManager = FileManager.default
-        let versionsDirectory = prefix.appendingPathComponent("versions", isDirectory: true)
-        if fileManager.fileExists(atPath: versionsDirectory.path) {
-            return fileManager.isWritableFile(atPath: versionsDirectory.path)
+        let releasesDirectory = prefix.appendingPathComponent("releases", isDirectory: true)
+        if fileManager.fileExists(atPath: releasesDirectory.path) {
+            return fileManager.isWritableFile(atPath: releasesDirectory.path)
         }
 
         return fileManager.isWritableFile(atPath: prefix.path)
@@ -156,6 +154,15 @@ struct ProjectUpdater {
         }
 
         return URL(fileURLWithPath: executable).standardizedFileURL
+    }
+
+    private static func installedExecutablePrefix(from executable: URL) -> URL {
+        let installDirectory = executable.deletingLastPathComponent()
+        let container = installDirectory.deletingLastPathComponent()
+        if container.lastPathComponent == "current" || container.lastPathComponent == "releases" {
+            return container.deletingLastPathComponent()
+        }
+        return container
     }
 
     private static func releasePlatform() throws -> String {

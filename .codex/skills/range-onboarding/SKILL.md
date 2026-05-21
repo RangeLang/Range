@@ -1,6 +1,6 @@
 ---
 name: range-onboarding
-description: Use when helping a user get started with an installed Range macOS package, explain where Range installs shared resources, set up a Package.range project, link or install project-local Range CLI versions, create .range/.scripts entries, update Range from GitHub releases, or troubleshoot first-run Range CLI usage.
+description: Use when helping a user get started with an installed Range macOS package, explain where Range installs shared resources, set up a Package.range project, link or install project-local Range CLI releases, create .range/.scripts entries, update Range from GitHub releases, or troubleshoot first-run Range CLI usage.
 ---
 
 # Range Onboarding
@@ -13,16 +13,16 @@ The macOS package installs Range under a versioned payload and points
 `current` at the active version:
 
 ```text
-<prefix>/current -> versions/<version>
-<prefix>/current/range
-<prefix>/current/RangeCore
-<prefix>/current/Skills
+<prefix>/current/<version> -> ../releases/<version>
+<prefix>/current/<version>/range
+<prefix>/current/<version>/RangeCore
+<prefix>/current/<version>/Skills
 ```
 
 The shell installer default prefix is `~/.range`, so the CLI is normally:
 
 ```text
-$HOME/.range/current/range
+$HOME/.range/current/<version>/range
 $HOME/.range/Packages
 ```
 
@@ -47,7 +47,7 @@ range version
 range --help
 ```
 
-If `range` is not found, check whether the install prefix's `bin` directory is on `PATH`.
+If `range` is not found, check whether the active install directory is on `PATH`.
 
 ## Project Setup
 
@@ -70,12 +70,12 @@ range link .
 This stores versioned CLI copies inside the project workspace:
 
 ```text
-.range/versions/<version>/range
-.range/current/range
+.range/releases/<version>/range
+.range/current/<version>/range
 .range/Links/range.package-link.json
 ```
 
-Different CLI versions can coexist under `.range/versions`. The `.range/current`
+Different CLI releases can coexist under `.range/releases`. The `.range/current/<version>`
 path points to the selected project-local version.
 
 ## Project Scripts
@@ -114,6 +114,6 @@ Use `range version` to see the installed version and whether an update is availa
 ## Troubleshooting
 
 - If `range update` prompts for a destination, prefer a writable prefix rather than adding random privilege prompts.
-- If `RangeCore` is missing, inspect `<prefix>/current/RangeCore`.
-- If bundled skills are missing, inspect `<prefix>/current/Skills`.
+- If `RangeCore` is missing, inspect `<prefix>/current/<version>/RangeCore`.
+- If bundled skills are missing, inspect `<prefix>/current/<version>/Skills`.
 - If project-local commands feel stale, rerun `range link .` from the project root after updating Range.
