@@ -7,6 +7,13 @@ description: Use when helping a user get started with an installed Range macOS p
 
 Use this skill for first-run setup, package installation questions, and project-local workflow questions after Range is installed.
 
+## Workflow
+
+1. Check whether the user is asking about a global install, a project-local CLI, project scripts, or updates.
+2. Prefer `range version` and `range --help` as the first sanity checks.
+3. Keep paths concrete and avoid suggesting privileged writes unless the chosen install prefix requires them.
+4. For stale project-local commands, prefer rerunning `range link .` from the package root.
+
 ## Installed Layout
 
 The macOS package installs Range under a versioned payload and points

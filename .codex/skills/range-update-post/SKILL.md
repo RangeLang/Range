@@ -9,7 +9,7 @@ description: Create very short Range update, addition, or feature posts with a c
 
 1. Identify the post kind: `Update post`, `Addition post`, or `Feature post`.
 2. Choose a concept title, not an action title.
-3. Keep the post short. Prefer one title, one sentence of context, one compact example section, and a compact reason.
+3. Keep the post short: title, one sentence of context, one compact example section, and a compact reason.
 4. Write to a user-named destination; if none is given, return the Markdown draft in the response.
 5. Use the user's first-person Range developer voice only when needed, but avoid filler like "to me because".
 6. Explain what repetition, awkwardness, or unclear shape was removed, and what the new shape makes easier to see.
@@ -90,7 +90,6 @@ Write like a concise update note from the Range developer:
 - short paragraphs
 - direct technical claims
 - design-oriented wording
-- concept titles, not action titles
 - concrete examples over abstract framing
 - no detached changelog boilerplate
 - no long academic argument
@@ -114,5 +113,5 @@ Good explanation lines sound like:
 - Use fenced `range` blocks for Range code.
 - Use plain text blocks for graph sketches.
 - Use Markdown quote blocks for quoted reasons.
-- Do not call a first-class language concept "sugar" unless the update is specifically about surface syntax.
+- Do not call a first-class language concept `sugar` unless the update is specifically about surface syntax.
 - Distinguish source intent, graph meaning, and backend lowering when that distinction matters.

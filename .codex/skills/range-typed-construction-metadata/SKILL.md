@@ -1,6 +1,6 @@
 ---
 name: range-typed-construction-metadata
-description: Use when changing typed construction syntax such as `let version: Version(0.1.8)`, binding/property initialization, graph initializer shape, assignment vs declaration metadata, parser diagnostics, backend lowering, or docs about construction metadata. Use the embedded direction in this skill to catch stale syntax or model drift.
+description: Use when changing typed construction syntax such as `let version: Version(0.1.8)`, binding/property initialization, graph initializer shape, assignment vs declaration metadata, parser diagnostics, backend lowering, or docs about construction metadata. Keeps declaration-time construction separate from assignment.
 ---
 
 # Range Typed Construction Metadata
@@ -13,7 +13,7 @@ description: Use when changing typed construction syntax such as `let version: V
 4. Keep source intent separate from backend lowering.
 5. If `Type(args)` appears after `:`, treat it as typed construction metadata, not sugar for `= Type(args)`.
 
-## Shape Bias
+## Current Direction
 
 ```range
 let version: Version(0.1.8)
@@ -28,3 +28,9 @@ binding version
 ```
 
 Do not model it first as slot assignment.
+
+## Guardrails
+
+- Parser diagnostics should distinguish invalid typed construction from invalid assignment.
+- Graph storage should preserve the declaration-time construction fact.
+- Backend lowering may emit an initializer call, but that is not the source-language meaning.

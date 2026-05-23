@@ -6,20 +6,29 @@ description: Use when working on the Range Zed extension, Range semantic highlig
 # Zed Range Extension
 
 Use this skill when the task touches:
+
 - `/Users/george/Documents/RangeZed`
 - `RangeCLI` language-server behavior
 - semantic highlighting in `.range` files
 - Zed extension install/sync/debugging
 
-## Repo split
+## Workflow
+
+1. Identify whether the bug is in semantic meaning, fallback grammar/query behavior, extension launch/sync, or Zed state.
+2. Check the relevant repo status before editing. The main Range repo and `RangeZed` are separate worktrees.
+3. For semantic token and completion issues, start with the local `RangeCLI` output before patching Zed integration.
+4. Validate in the layer you changed, then tell the user the smallest required Zed action.
+
+## Repo Split
 
 There are two repos:
+
 - main repo: `/Users/george/Documents/Range`
 - Zed extension repo: `/Users/george/Documents/RangeZed`
 
 Treat them separately when checking git status or making commits.
 
-## Source of truth
+## Source Of Truth
 
 Use this rule first:
 
@@ -27,6 +36,7 @@ Use this rule first:
 - extension packaging, grammar, fallback queries, and Zed integration belong in `/Users/george/Documents/RangeZed`
 
 Examples:
+
 - token kind/coloring issue in `.range` files:
   start in `RangeLanguageServer.swift`
 - autocomplete/completion issue:
@@ -36,7 +46,7 @@ Examples:
 - extension install/launcher/sync issue:
   start in `/Users/george/Documents/RangeZed/src/lib.rs` and `/Users/george/Documents/RangeZed/scripts`
 
-## Current architecture
+## Current Architecture
 
 Range in Zed is semantic-first.
 
@@ -46,7 +56,7 @@ Range in Zed is semantic-first.
 - semantic tokens should drive Range colors
 - Tree-sitter queries are fallback only
 
-## Normal workflows
+## Normal Workflows
 
 ### 1. LSP-only change
 
@@ -64,6 +74,7 @@ swift test
 ```
 
 Then tell the user:
+
 - `zed: restart language servers`
 
 Do not reinstall the extension for pure `RangeCLI` changes.
@@ -85,11 +96,12 @@ cd /Users/george/Documents/RangeZed
 ```
 
 Then tell the user:
+
 - `zed: reload extensions`
 
 If the change affects the launcher or grammar revision, a full Zed restart may still be needed.
 
-## First debugging step
+## First Debugging Step
 
 Before patching, identify which layer is wrong.
 
@@ -104,12 +116,13 @@ Use:
 If the token stream is wrong, fix `RangeLanguageServer.swift`.
 
 If the token stream is correct, then inspect Zed integration:
+
 - `semantic_token_rules.json`
 - extension sync state
 - Zed settings
 - live logs
 
-## Important files
+## Important Files
 
 ### Main repo
 
@@ -154,7 +167,7 @@ Use them to answer:
 - Keep attributes limited to real supported forms only.
 - Prefer semantic-token tests and fixture tests over visual guesswork.
 
-## Minimal validation checklist
+## Minimal Validation Checklist
 
 For LSP work:
 
@@ -179,7 +192,7 @@ cd /Users/george/Documents/RangeZed
 ./scripts/sync-zed-extension.sh
 ```
 
-## Quick diagnosis map
+## Quick Diagnosis Map
 
 - wrong token meaning or autocomplete:
   `RangeLanguageServer.swift`
