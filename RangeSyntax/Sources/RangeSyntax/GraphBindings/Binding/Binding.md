@@ -57,7 +57,7 @@ construct Person {
     binding name: String
 }
 
-state name: String = "George"
+state name: "George"
 
 Person(name: $name)
 ```

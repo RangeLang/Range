@@ -47,7 +47,7 @@ binding selectedPerson: Person
 - `let` is immutable owned data declared here.
 
 ```range
-let title: String = "Range"
+let title: "Range"
 ```
 
 The compiler does not need to track mutation for `let`.

@@ -65,7 +65,7 @@ struct PackagePublisher {
 
     private func updatingVersion(in source: String, to version: String) throws -> String {
         let versionPattern =
-            #"let\s+version\s*:\s*(?:Version\([0-9]+\.[0-9]+\.[0-9]+\)|Version\s*=\s*Version\([0-9]+\.[0-9]+\.[0-9]+\)|String\("[^"]*"\)|String\s*=\s*"[^"]*")"#
+            #"let\s+version\s*:\s*Version\([0-9]+\.[0-9]+\.[0-9]+\)"#
         let regex = try NSRegularExpression(pattern: versionPattern)
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
 

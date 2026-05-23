@@ -27,7 +27,7 @@ let name: String
 - Can be initialized directly
 
 ```range
-let name: String = "Ava"
+let name: "Ava"
 ```
 
 - Can participate in memberwise initialization

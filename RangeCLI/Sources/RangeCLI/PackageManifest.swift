@@ -78,7 +78,7 @@ enum PackageManifestLoader {
     ) throws -> String {
         let value = try requireValue(named: name, typeName: "String", in: values)
         guard case .string(let string)? = value.value else {
-            throw ValidationError("Package.range requires let \(name): String(\"...\").")
+            throw ValidationError("Package.range requires let \(name): \"...\".")
         }
         return string
     }
@@ -120,14 +120,7 @@ enum PackageManifestLoader {
         named name: String,
         in values: [ValueDeclaration]
     ) throws -> String {
-        let value = try requireValue(named: name, typeNames: ["Version", "String"], in: values)
-        if value.typeName == "String" {
-            guard case .string(let string)? = value.value else {
-                throw ValidationError("Package.range requires let \(name): String(\"...\").")
-            }
-            return string
-        }
-
+        let value = try requireValue(named: name, typeNames: ["Version"], in: values)
         guard case .call(let callName, let arguments)? = value.value, callName == "Version" else {
             throw ValidationError("Package.range requires let \(name): Version(0.1.0).")
         }

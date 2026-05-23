@@ -20,7 +20,7 @@ extension Parser {
                 typedInitializer = annotation.initializer
                 if canStartInlineExpression() {
                     throw ParseError(
-                        "state '\(name)' uses a value after a type annotation. Use typed construction, for example `state \(name): \(annotation.type.displayName)(value)`."
+                        "state '\(name)' expects one initializer after ':'. Use typed construction, for example `state \(name): \(annotation.type.displayName)(value)`."
                     )
                 }
             } else {
@@ -32,11 +32,11 @@ extension Parser {
 
         if peek() == .equal {
             throw ParseError(
-                "state '\(name)' uses `=` initialization. Use typed construction, for example `state \(name): Type(value)`."
+                "state '\(name)' expects declaration initialization after ':'. Use typed construction, for example `state \(name): Type(value)`."
             )
         } else if explicitType != nil, canStartInlineExpression() {
             throw ParseError(
-                "state '\(name)' uses a value after a type annotation. Use typed construction, for example `state \(name): \(explicitType!.displayName)(value)`."
+                "state '\(name)' expects one initializer after ':'. Use typed construction, for example `state \(name): \(explicitType!.displayName)(value)`."
             )
         } else if explicitType == nil, typedInitializer == nil, canStartInlineExpression() {
             let initialValue = try parseExpression()

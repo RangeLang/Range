@@ -218,7 +218,7 @@ struct PackageSubscriptionManager {
     private func parseModules(from source: String) -> Set<String> {
         guard
             let modulesRegex = try? NSRegularExpression(
-                pattern: #"\blet\s+modules\s*:\s*(?:\[String\]\s*)?\[(.*?)\]"#,
+                pattern: #"\blet\s+modules\s*:\s*\[(.*?)\]"#,
                 options: [.dotMatchesLineSeparators]
             ),
             let stringRegex = try? NSRegularExpression(pattern: #""([^"]+)""#)
@@ -255,7 +255,6 @@ struct PackageSubscriptionManager {
         if let modulesLineIndex = lines.firstIndex(where: {
             let trimmed = $0.trimmingCharacters(in: .whitespaces)
             return trimmed.hasPrefix("let modules: [")
-                || trimmed.hasPrefix("let modules: [String] [")
         }) {
             let line = lines[modulesLineIndex]
             if let bracketIndex = line.lastIndex(of: "]") {

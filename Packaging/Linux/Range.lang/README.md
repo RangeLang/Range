@@ -1,4 +1,4 @@
-# Range macOS Install Folder
+# Range Linux Install Folder
 
 This folder installs the Range command line tool.
 

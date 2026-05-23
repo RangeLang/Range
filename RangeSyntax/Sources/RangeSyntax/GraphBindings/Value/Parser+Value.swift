@@ -15,7 +15,7 @@ extension Parser {
             value = annotation!.initializer
             if canStartInlineExpression() {
                 throw ParseError(
-                    "let '\(localName)' uses a value after a type annotation. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
+                    "let '\(localName)' expects one initializer after ':'. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
                 )
             }
         } else {
@@ -31,7 +31,7 @@ extension Parser {
         }
         if peek() == .equal {
             throw ParseError(
-                "let '\(localName)' uses `=` initialization. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
+                "let '\(localName)' expects declaration initialization after ':'. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
             )
         }
         if peek() == .leftBrace {

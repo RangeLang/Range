@@ -3,10 +3,18 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-PACKAGE_TEMPLATE="${ROOT_DIR}/Packaging/macOS/Range.lang"
 PRODUCT_NAME="RangeCLI"
 INSTALL_PREFIX="${RANGE_INSTALL_PREFIX:-${HOME}/.range}"
 ACTION="install"
+
+case "$(uname -s)" in
+  Darwin) PACKAGE_TEMPLATE="${ROOT_DIR}/Packaging/macOS/Range.lang" ;;
+  Linux) PACKAGE_TEMPLATE="${ROOT_DIR}/Packaging/Linux/Range.lang" ;;
+  *)
+    echo "Unsupported OS: $(uname -s)" >&2
+    exit 1
+    ;;
+esac
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -62,8 +70,6 @@ package="${stage}/Range.lang"
 cp -R "${PACKAGE_TEMPLATE}" "${package}"
 cp "${BINARY}" "${package}/range"
 cp -R "${ROOT_DIR}/RangeCore" "${package}/RangeCore"
-mkdir -p "${package}/Skills"
-cp -R "${ROOT_DIR}/.codex/skills/range-onboarding" "${package}/Skills/range-onboarding"
 printf '%s\n' "${release_version}" > "${package}/VERSION"
 chmod 755 "${package}/range" "${package}/install.sh" "${package}/uninstall.sh"
 

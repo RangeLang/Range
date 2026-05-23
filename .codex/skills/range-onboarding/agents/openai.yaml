@@ -1,4 +1,0 @@
-interface:
-  display_name: "Range Onboarding"
-  short_description: "Help users install Range, inspect shared resources, and set up project-local CLI/scripts."
-  default_prompt: "Help me get started with Range after installing the macOS package."

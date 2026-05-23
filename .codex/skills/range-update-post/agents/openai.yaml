@@ -1,4 +1,0 @@
-interface:
-  display_name: "Range Update Post"
-  short_description: "Draft short Range update posts with before, after, and why."
-  default_prompt: "Write a short Range update post with before and after examples."

@@ -4,7 +4,8 @@ Range runs `.range` projects by generating a small Swift package and building it
 
 ## Download
 
-Install the `range` CLI from the latest GitHub release:
+Install the `range` CLI from the latest GitHub release. macOS is the primary
+release target, with Windows and Linux builds published alongside it:
 
 https://github.com/georgetchelidze/Range/releases/latest
 

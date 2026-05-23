@@ -289,7 +289,7 @@ extension Parser {
                 typedInitializer = annotation.initializer
                 if canStartInlineExpression() {
                     throw ParseError(
-                        "\(kind == .constant ? "let" : "state") '\(name)' uses a value after a type annotation. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): \(annotation.type.displayName)(value)`."
+                        "\(kind == .constant ? "let" : "state") '\(name)' expects one initializer after ':'. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): \(annotation.type.displayName)(value)`."
                     )
                 }
             } else {
@@ -304,11 +304,11 @@ extension Parser {
         let expression: Expression
         if peek() == .equal {
             throw ParseError(
-                "\(kind == .constant ? "let" : "state") '\(name)' uses `=` initialization. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): Type(value)`."
+                "\(kind == .constant ? "let" : "state") '\(name)' expects declaration initialization after ':'. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): Type(value)`."
             )
         } else if explicitType != nil, canStartInlineExpression() {
             throw ParseError(
-                "\(kind == .constant ? "let" : "state") '\(name)' uses a value after a type annotation. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): \(explicitType!.displayName)(value)`."
+                "\(kind == .constant ? "let" : "state") '\(name)' expects one initializer after ':'. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): \(explicitType!.displayName)(value)`."
             )
         } else if explicitType == nil, typedInitializer == nil, canStartInlineExpression() {
             expression = try parseExpression()
@@ -318,7 +318,7 @@ extension Parser {
             expression = .call(name: explicitType.displayName, arguments: [])
         } else {
             throw ParseError(
-                "\(kind == .constant ? "let" : "state") '\(name)' requires typed construction, for example `\(kind == .constant ? "let" : "state") \(name): Type(value)`."
+                "\(kind == .constant ? "let" : "state") '\(name)' expects typed construction, for example `\(kind == .constant ? "let" : "state") \(name): Type(value)`."
             )
         }
         let resolvedType = try inferInitializedBindingType(

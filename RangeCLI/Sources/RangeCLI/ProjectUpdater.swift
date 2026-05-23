@@ -220,7 +220,7 @@ struct ProjectUpdater {
     private func parseModules(from source: String) -> [String] {
         guard
             let modulesRegex = try? NSRegularExpression(
-                pattern: #"\blet\s+modules\s*:\s*\[String\]\s*\[(.*?)\]"#,
+                pattern: #"\blet\s+modules\s*:\s*\[(.*?)\]"#,
                 options: [.dotMatchesLineSeparators]
             ),
             let stringRegex = try? NSRegularExpression(pattern: #""([^"]+)""#)

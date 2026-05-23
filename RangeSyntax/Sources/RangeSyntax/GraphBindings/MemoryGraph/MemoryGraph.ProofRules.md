@@ -26,7 +26,7 @@ count += 1
 - `let` is immutable after initialization.
 
 ```range
-let name: String = "George"
+let name: "George"
 name = "Ava" // invalid
 ```
 

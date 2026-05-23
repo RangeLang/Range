@@ -9,7 +9,6 @@ and points `%USERPROFILE%\.range\current\<version>` at the active installed rele
 
 - `range.exe`: the Range CLI executable
 - `RangeCore`: language core sources used by the CLI
-- `Skills`: bundled Codex skills for Range onboarding
 - `install.ps1`: installs this release under `%USERPROFILE%\.range\releases`
 - `VERSION`: the release version packaged by GitHub Actions
 

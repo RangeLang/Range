@@ -199,7 +199,7 @@ extension Parser {
     mutating func parseCallableReturnTypeIfPresent(kind: String) throws -> TypeReference? {
         if peek() == .arrow {
             throw ParseError(
-                "\(kind) return types use ': ReturnType', not '-> ReturnType'.",
+                "\(kind) return type clause must be ': ReturnType'.",
                 range: currentRange()
             )
         }

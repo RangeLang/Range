@@ -57,7 +57,7 @@ extension RangeCLI {
 
         struct Link: ParsableCommand {
             static let configuration = CommandConfiguration(
-                abstract: "Install the macOS Range CLI into a Package.range project."
+                abstract: "Install the Range CLI into a Package.range project."
             )
 
             @Argument(help: "Package.range project root.")

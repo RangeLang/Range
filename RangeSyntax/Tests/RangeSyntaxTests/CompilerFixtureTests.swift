@@ -344,7 +344,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
     let diagnostic = try #require(
         diagnostics.first {
-            $0.message == "Function return types use ': ReturnType', not '-> ReturnType'."
+            $0.message == "Function return type clause must be ': ReturnType'."
                 && $0.source == "range-parser"
                 && $0.path == projectPath
         }
@@ -516,7 +516,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(
             diagnostics.contains {
                 $0.path == invalidPath
-                    && $0.message.contains("uses `=` initialization")
+                    && $0.message.contains("expects declaration initialization after ':'")
             }
         )
     }

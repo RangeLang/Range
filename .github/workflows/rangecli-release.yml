@@ -21,6 +21,12 @@ jobs:
             artifact: range-macos-arm64
             archive: range-macos-arm64.lang.tar.gz
             shell: bash
+            package_template: Packaging/macOS/Range.lang
+          - os: ubuntu-24.04
+            artifact: range-linux-x64
+            archive: range-linux-x64.lang.tar.gz
+            shell: bash
+            package_template: Packaging/Linux/Range.lang
           - os: windows-latest
             artifact: range-windows-x64
             archive: range-windows-x64.zip
@@ -41,8 +47,8 @@ jobs:
         working-directory: RangeCLI
         run: swift build -c release --product RangeCLI
 
-      - name: Package macOS install folder
-        if: runner.os == 'macOS'
+      - name: Package Unix install folder
+        if: runner.os == 'macOS' || runner.os == 'Linux'
         working-directory: RangeCLI
         run: |
           package="${{ matrix.artifact }}.lang"
@@ -55,11 +61,9 @@ jobs:
             )"
           fi
           mkdir -p dist
-          cp -R ../Packaging/macOS/Range.lang "dist/${package}"
+          cp -R "../${{ matrix.package_template }}" "dist/${package}"
           cp .build/release/RangeCLI "dist/${package}/range"
           cp -R ../RangeCore "dist/${package}/RangeCore"
-          mkdir -p "dist/${package}/Skills"
-          cp -R ../.codex/skills/range-onboarding "dist/${package}/Skills/range-onboarding"
           printf '%s\n' "$release_version" > "dist/${package}/VERSION"
           chmod 755 "dist/${package}/range"
           chmod 755 "dist/${package}/install.sh" "dist/${package}/uninstall.sh"
@@ -87,8 +91,6 @@ jobs:
           }
           Copy-Item -Force $binary.FullName "dist\$package\range.exe"
           Copy-Item -Recurse -Force "..\RangeCore" "dist\$package\RangeCore"
-          New-Item -ItemType Directory -Force -Path "dist\$package\Skills" | Out-Null
-          Copy-Item -Recurse -Force "..\.codex\skills\range-onboarding" "dist\$package\Skills\range-onboarding"
           Set-Content -NoNewline -Path "dist\$package\VERSION" -Value $releaseVersion
           Compress-Archive -Path "dist\$package" -DestinationPath "${{ matrix.archive }}" -Force
 

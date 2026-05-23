@@ -1,4 +1,0 @@
-interface:
-  display_name: "Range Direct Construct Application"
-  short_description: "Keep construct calls tied directly to data shape."
-  default_prompt: "Review this construct application change against the direct application model."

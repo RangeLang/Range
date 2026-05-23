@@ -1,4 +1,0 @@
-interface:
-  display_name: "Range Namespace Attributes"
-  short_description: "Keep namespace-backed attributes graph-owned."
-  default_prompt: "Review this namespace attribute change against the graph-owned design."

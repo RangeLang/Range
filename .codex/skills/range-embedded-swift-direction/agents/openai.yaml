@@ -1,4 +1,0 @@
-interface:
-  display_name: "Range Embedded Swift Direction"
-  short_description: "Use Embedded Swift constraints to catch Range implementation drift."
-  default_prompt: "Review this Range Swift change against the Embedded Swift direction."

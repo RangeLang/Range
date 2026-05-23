@@ -7,7 +7,6 @@ $ErrorActionPreference = "Stop"
 $packageRoot = $PSScriptRoot
 $binary = Join-Path $packageRoot "range.exe"
 $coreSources = Join-Path $packageRoot "RangeCore"
-$skillSources = Join-Path $packageRoot "Skills"
 $versionFile = Join-Path $packageRoot "VERSION"
 $version = "unknown"
 
@@ -28,10 +27,6 @@ if (-not (Test-Path $binary)) {
 
 if (-not (Test-Path $coreSources)) {
     throw "Missing RangeCore sources: $coreSources"
-}
-
-if (-not (Test-Path $skillSources)) {
-    throw "Missing Range skills: $skillSources"
 }
 
 Write-Host "Range CLI installer"
