@@ -21,7 +21,7 @@ function greet(person name: String)
 - Can declare a return type
 
 ```range
-function greet(name: String) -> String
+function greet(name: String): String
 ```
 
 - Can omit the return type when it can be inferred from the body
@@ -35,7 +35,7 @@ function greet(name: String) {
 - Can appear at the top level
 
 ```range
-function add(left: Int, right: Int) -> Int {
+function add(left: Int, right: Int): Int {
     return left + right
 }
 ```
@@ -44,7 +44,7 @@ function add(left: Int, right: Int) -> Int {
 
 ```range
 #language
-function +(lhs: Int, rhs: Int) -> Int
+function +(lhs: Int, rhs: Int): Int
 ```
 
 - Can appear inside a construct
@@ -53,7 +53,7 @@ function +(lhs: Int, rhs: Int) -> Int
 construct User {
     let name: String
 
-    function displayName() -> String {
+    function displayName(): String {
         return name
     }
 }
@@ -63,7 +63,7 @@ construct User {
 
 ```range
 protocol Named {
-    function displayName() -> String
+    function displayName(): String
 }
 ```
 
@@ -71,7 +71,7 @@ protocol Named {
 
 ```range
 extension Named {
-    function displayName() -> String {
+    function displayName(): String {
         return name
     }
 }
@@ -83,7 +83,7 @@ extension Named {
 construct User {
     let name: String
 
-    function displayName() -> String {
+    function displayName(): String {
         return name
     }
 }
@@ -95,7 +95,7 @@ construct User {
 #language
 construct ArrayStorage<Element> {
     function append(element: Element)
-    function element(index: Int) -> Element
+    function element(index: Int): Element
 }
 ```
 
@@ -103,7 +103,7 @@ construct ArrayStorage<Element> {
 
 ```range
 protocol Named {
-    function displayName() -> String
+    function displayName(): String
 }
 ```
 
@@ -111,7 +111,7 @@ protocol Named {
 
 ```range
 extension Named {
-    function displayName() -> String {
+    function displayName(): String {
         return name
     }
 }
@@ -120,7 +120,7 @@ extension Named {
 - Uses static dispatch by default
 
 ```range
-function greet(name: String) -> String {
+function greet(name: String): String {
     return "Hello " + name
 }
 ```

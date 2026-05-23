@@ -18,7 +18,7 @@ macro emitEncodingSwitch(): Construct { target, diagnostics in
 
     target.declaration.expand {
         extension #(target.declaration.self): Encodable {
-            function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+            function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
                 #(statement)
                 return .success(result: Void())

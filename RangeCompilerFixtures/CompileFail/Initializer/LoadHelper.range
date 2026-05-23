@@ -8,7 +8,7 @@ construct User {
     let name: String
 }
 
-function fetchUser(id: Int) -> Result<User, LoadError> {
+function fetchUser(id: Int): Result<User, LoadError> {
     if id == 0 {
         return .failure(cause: .missing)
     }

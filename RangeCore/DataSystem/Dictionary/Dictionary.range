@@ -3,7 +3,7 @@ construct Dictionary<Key: Hashable, Value> {
     state storage: DictionaryStorage<Key, Value>()
 
     @literal<DictionaryLiteral>
-    function literal(literal: DictionaryLiteral) -> Self {
+    function literal(literal: DictionaryLiteral): Self {
         return Self(storage: literal.storage())
     }
 
@@ -15,7 +15,7 @@ construct Dictionary<Key: Hashable, Value> {
         storage.isEmpty
     }
 
-    function value(key: Key) -> Value? {
+    function value(key: Key): Value? {
         return storage.value(key: key)
     }
 
@@ -23,23 +23,23 @@ construct Dictionary<Key: Hashable, Value> {
         storage.updateValue(value: value, key: key)
     }
 
-    function removeValue(key: Key) -> Value? {
+    function removeValue(key: Key): Value? {
         return storage.removeValue(key: key)
     }
 
-    function contains(key: Key) -> Bool {
+    function contains(key: Key): Bool {
         return storage.contains(key: key)
     }
 
-    function entries() -> [DictionaryEntry<Key, Value>] {
+    function entries(): [DictionaryEntry<Key, Value>] {
         return storage.entries()
     }
 
-    function filter(include: (DictionaryEntry<Key, Value>) -> Bool) -> [DictionaryEntry<Key, Value>] {
+    function filter(include: (DictionaryEntry<Key, Value>) -> Bool): [DictionaryEntry<Key, Value>] {
         return storage.filter(include: include)
     }
 
-    function first(where include: (DictionaryEntry<Key, Value>) -> Bool) -> DictionaryEntry<Key, Value>? {
+    function first(where include: (DictionaryEntry<Key, Value>) -> Bool): DictionaryEntry<Key, Value>? {
         return storage.first(where: include)
     }
 
@@ -49,7 +49,7 @@ construct Dictionary<Key: Hashable, Value> {
 }
 
 extension Dictionary<String, Value: Encodable>: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container   encoder.keyedContainer()
         let values: Array<DictionaryEntry<String, Value>>(entries())
         state index   0

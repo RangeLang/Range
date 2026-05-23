@@ -1,4 +1,4 @@
-function encodeNumber() -> Result<String, EncodingError> {
+function encodeNumber(): Result<String, EncodingError> {
     let encoder   JSONEncoder()
     let value   42
     return encoder.encode(value)

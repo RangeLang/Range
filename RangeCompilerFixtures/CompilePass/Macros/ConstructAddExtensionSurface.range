@@ -1,27 +1,27 @@
 protocol Greetable {
-    function greet() -> String
+    function greet(): String
 }
 
 macro extendConstructSurface(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Greetable {
-            function greet() -> String {
+            function greet(): String {
                 return "Hello"
             }
 
-            function clone() -> #(target.declaration.self) {
+            function clone(): #(target.declaration.self) {
                 return self
             }
 
             construct ChildConstruct {
-                function doThing() -> String {
+                function doThing(): String {
                     return "Thing"
                 }
             }
         }
 
         construct SiblingConstruct {
-            function doThing() -> String {
+            function doThing(): String {
                 return "Thing"
             }
         }

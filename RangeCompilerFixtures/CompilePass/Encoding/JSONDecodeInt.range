@@ -1,4 +1,4 @@
-function decodeNumber() -> Result<Int, DecodingError> {
+function decodeNumber(): Result<Int, DecodingError> {
     let decoder   JSONDecoder(value: .int(value: 42))
     return Int.decode(from: decoder)
 }

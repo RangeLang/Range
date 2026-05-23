@@ -193,8 +193,8 @@ extension Parser {
             _ = try parseFunctionParameters()
         }
 
-        if peek() == .arrow {
-            try consume(.arrow)
+        if peek() == .colon || peek() == .arrow {
+            advance()
             _ = try parseTypeReferenceNode()
         }
 

@@ -15,7 +15,7 @@ construct DecodedUser {
     }
 }
 
-function decodeUser() -> Result<DecodedUser, DecodeError> {
+function decodeUser(): Result<DecodedUser, DecodeError> {
     return DecodedUser(name: "George")
 }
 

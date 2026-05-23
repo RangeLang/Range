@@ -2,5 +2,5 @@
 construct BoolLiteral { }
 
 extension BoolLiteral {
-    function storage() -> BoolStorage
+    function storage(): BoolStorage
 }

@@ -87,7 +87,7 @@ The protocol requires the member, but the storage lives in the construct.
 
 ```range
 protocol Named {
-    function displayName() -> String
+    function displayName(): String
 }
 ```
 

@@ -27,7 +27,7 @@ extension ExtensionDecodedUser {
     }
 }
 
-function decodeExtensionUser() -> Result<ExtensionDecodedUser, DecodeProblem> {
+function decodeExtensionUser(): Result<ExtensionDecodedUser, DecodeProblem> {
     return ExtensionDecodedUser(input: .george)
 }
 

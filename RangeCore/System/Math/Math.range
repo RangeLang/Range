@@ -1,5 +1,5 @@
 construct Math {
-    function abs(value: Int) -> Int {
+    function abs(value: Int): Int {
         if value < 0 {
             return 0 - value
         }
@@ -7,7 +7,7 @@ construct Math {
         return value
     }
 
-    function abs(value: Float) -> Float {
+    function abs(value: Float): Float {
         if value < 0.0 {
             return 0.0 - value
         }
@@ -15,7 +15,7 @@ construct Math {
         return value
     }
 
-    function min<T: Comparable>(lhs: T, rhs: T) -> T {
+    function min<T: Comparable>(lhs: T, rhs: T): T {
         if lhs < rhs {
             return lhs
         }
@@ -23,7 +23,7 @@ construct Math {
         return rhs
     }
 
-    function max<T: Comparable>(lhs: T, rhs: T) -> T {
+    function max<T: Comparable>(lhs: T, rhs: T): T {
         if lhs < rhs {
             return rhs
         }
@@ -31,7 +31,7 @@ construct Math {
         return lhs
     }
 
-    function clamp<T: Comparable>(value: T, min lower: T, max upper: T) -> T {
+    function clamp<T: Comparable>(value: T, min lower: T, max upper: T): T {
         return Math.min(lhs: Math.max(lhs: value, rhs: lower), rhs: upper)
     }
 }

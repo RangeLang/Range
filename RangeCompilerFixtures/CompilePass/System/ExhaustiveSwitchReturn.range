@@ -3,7 +3,7 @@ enum SwitchReturnValue {
     case second
 }
 
-function describe(_ value: SwitchReturnValue) -> String {
+function describe(_ value: SwitchReturnValue): String {
     switch value {
     case .first:
         return "first"

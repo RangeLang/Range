@@ -4,7 +4,7 @@ macro rewriteSingleArgument(): Parameter { target, diagnostics in
     )
 }
 
-function identity(@rewriteSingleArgument value: Int) -> Int {
+function identity(@rewriteSingleArgument value: Int): Int {
     return value
 }
 

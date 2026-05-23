@@ -5,7 +5,7 @@ macro returnTrueStatement() -> Statement {
 macro emitReturnTemplate(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
-            function generated() -> Bool {
+            function generated(): Bool {
                 @returnTrueStatement()
             }
         }

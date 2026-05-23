@@ -3,7 +3,7 @@ construct Array<Element> {
     state storage: ArrayStorage<Element>()
 
     @literal<ArrayLiteral>
-    function literal(literal: ArrayLiteral) -> Self {
+    function literal(literal: ArrayLiteral): Self {
         return Self(storage: literal.storage())
     }
 
@@ -19,19 +19,19 @@ construct Array<Element> {
         storage.append(element: element)
     }
 
-    function element(index: Int) -> Element {
+    function element(index: Int): Element {
         return storage.element(index: index)
     }
 
-    function first() -> Element? {
+    function first(): Element? {
         return storage.first()
     }
 
-    function first(where include: (Element) -> Bool) -> Element? {
+    function first(where include: (Element) -> Bool): Element? {
         return storage.first(where: include)
     }
 
-    function last() -> Element? {
+    function last(): Element? {
         return storage.last()
     }
 
@@ -43,11 +43,11 @@ construct Array<Element> {
         storage.insert(element: element, index: index)
     }
 
-    function remove(index: Int) -> Element {
+    function remove(index: Int): Element {
         return storage.remove(index: index)
     }
 
-    function removeLast() -> Element? {
+    function removeLast(): Element? {
         return storage.removeLast()
     }
 
@@ -55,19 +55,19 @@ construct Array<Element> {
         storage.clear()
     }
 
-    function filter(include: (Element) -> Bool) -> Array<Element> {
+    function filter(include: (Element) -> Bool): Array<Element> {
         return Array(storage: storage.filter(include: include))
     }
 
-    function map<Output>(_ transform: (Element) -> Output) -> Array<Output> {
+    function map<Output>(_ transform: (Element) -> Output): Array<Output> {
         return Array<Output>(storage: storage.map(transform))
     }
 
-    function compactMap<Output>(_ transform: (Element) -> Output?) -> Array<Output> {
+    function compactMap<Output>(_ transform: (Element) -> Output?): Array<Output> {
         return Array<Output>(storage: storage.compactMap(transform))
     }
 
-    function flatMap<Output>(_ transform: (Element) -> Array<Output>) -> Array<Output> {
+    function flatMap<Output>(_ transform: (Element) -> Array<Output>): Array<Output> {
         return Array<Output>(storage: storage.flatMap(transform))
     }
 
@@ -77,7 +77,7 @@ construct Array<Element> {
 }
 
 extension Array: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container   encoder.unkeyedContainer()
         state index   0
 

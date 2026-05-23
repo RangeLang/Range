@@ -1,7 +1,7 @@
 construct Greeter: Greetable {
     let name: String
 
-    function greeting() -> String {
+    function greeting(): String {
         "Hello, \(name)"
     }
 }

@@ -8,11 +8,11 @@ construct Reader {
     @incremented(by: 1)
     state age: Int(10)
 
-    function current() -> Int {
+    function current(): Int {
         return age
     }
 
-    function total(value: Int) -> Int {
+    function total(value: Int): Int {
         return age + value
     }
 }

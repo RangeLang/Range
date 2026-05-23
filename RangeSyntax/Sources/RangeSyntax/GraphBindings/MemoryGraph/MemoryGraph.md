@@ -148,7 +148,7 @@ construct IntLiteral { }
 
 #language
 construct IntStorage {
-    function storage(literal: IntLiteral) -> Self
+    function storage(literal: IntLiteral): Self
 }
 
 #language

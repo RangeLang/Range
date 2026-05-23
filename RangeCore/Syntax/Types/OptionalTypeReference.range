@@ -2,5 +2,5 @@
 construct OptionalTypeReference: StructuralTypeReference {
     let wrapped: TypeReference
 
-    function replace(with replacement: TypeReference) -> TypeReference
+    function replace(with replacement: TypeReference): TypeReference
 }

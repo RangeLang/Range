@@ -5,7 +5,7 @@ macro warnOnConstruct(): Construct { target, diagnostics in
 
     target.declaration.expand {
         extension #(target.declaration.self) {
-            function macroDiagnosticProbe() -> String {
+            function macroDiagnosticProbe(): String {
                 return "ok"
             }
         }

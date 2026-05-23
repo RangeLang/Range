@@ -58,7 +58,7 @@ It also precedes backend adaptation:
 ```range
 construct Int {
     @literal<IntLiteral>
-    function literal(literal: IntLiteral) -> Self
+    function literal(literal: IntLiteral): Self
 }
 
 macro literal<T>(): Function { target, diagnostics in }
@@ -69,7 +69,7 @@ macro literal<T>(): Function { target, diagnostics in }
 ```range
 construct Int {
     @literal<IntLiteral>
-    function literal(literal: IntLiteral) -> Self
+    function literal(literal: IntLiteral): Self
 }
 ```
 
@@ -80,7 +80,7 @@ The graph records that `Int.literal(literal:)` accepts `IntLiteral`.
 ```range
 construct Int {
     @literal<IntLiteral>
-    function literal(literal: IntLiteral) -> Self { }
+    function literal(literal: IntLiteral): Self { }
 }
 ```
 
@@ -107,7 +107,7 @@ The compiler should know that `Int` is a valid declaration-level type before it 
 ```range
 construct String {
     @literal<StringLiteral>
-    function literal(literal: StringLiteral) -> Self { }
+    function literal(literal: StringLiteral): Self { }
 }
 ```
 
@@ -136,7 +136,7 @@ That semantic result is settled before any backend runs.
 ```range
 #equatable
 protocol Equatable {
-    function ==(lhs: Self, rhs: Self) -> Bool
+    function ==(lhs: Self, rhs: Self): Bool
 }
 
 construct Point: Equatable {

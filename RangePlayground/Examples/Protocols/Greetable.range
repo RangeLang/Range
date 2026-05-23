@@ -1,3 +1,3 @@
 protocol Greetable {
-    function greeting() -> String
+    function greeting(): String
 }

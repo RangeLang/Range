@@ -2,5 +2,5 @@
 construct FloatLiteral { }
 
 extension FloatLiteral {
-    function storage() -> FloatStorage
+    function storage(): FloatStorage
 }

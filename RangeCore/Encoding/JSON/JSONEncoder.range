@@ -3,7 +3,7 @@ construct JSONEncoder: Encoder {
     state isObject: Bool(false)
     state isArray: Bool(false)
 
-    function encode<T: Encodable>(_ value: T) -> Result<String, EncodingError> {
+    function encode<T: Encodable>(_ value: T): Result<String, EncodingError> {
         set output   ""
         set isObject   false
         set isArray   false
@@ -27,17 +27,17 @@ construct JSONEncoder: Encoder {
         return .failure(cause: .failed)
     }
 
-    function keyedContainer() -> KeyedEncodingContainer {
+    function keyedContainer(): KeyedEncodingContainer {
         set isObject   true
         return JSONKeyedEncodingContainer(output: $self.output, isObject: $self.isObject)
     }
 
-    function unkeyedContainer() -> UnkeyedEncodingContainer {
+    function unkeyedContainer(): UnkeyedEncodingContainer {
         set isArray   true
         return JSONUnkeyedEncodingContainer(output: $self.output, isArray: $self.isArray)
     }
 
-    function singleValueContainer() -> SingleValueEncodingContainer {
+    function singleValueContainer(): SingleValueEncodingContainer {
         return JSONSingleValueEncodingContainer(output: $self.output)
     }
 }

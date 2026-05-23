@@ -1,4 +1,4 @@
-function decodePair() -> Result<String, DecodingError> {
+function decodePair(): Result<String, DecodingError> {
     let values: Array<JSONValue>([
         .int(value: 42),
         .string(value: "George"),

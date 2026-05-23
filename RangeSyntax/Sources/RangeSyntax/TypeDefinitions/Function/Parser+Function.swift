@@ -65,13 +65,7 @@ extension Parser {
         let parameters = try parseFunctionParameters(
             allowOmittedLocalName: signatureOnly
         )
-        let returnType: TypeReference?
-        if peek() == .arrow {
-            try consume(.arrow)
-            returnType = try parseTypeReferenceNode()
-        } else {
-            returnType = nil
-        }
+        let returnType = try parseCallableReturnTypeIfPresent(kind: "Function")
         registerVisibleCallableReturnType(
             targetType: targetType,
             name: name,
@@ -122,8 +116,8 @@ extension Parser {
             _ = try parseFunctionParameters()
         }
 
-        if peek() == .arrow {
-            try consume(.arrow)
+        if peek() == .colon || peek() == .arrow {
+            advance()
             _ = try parseTypeReferenceNode()
         }
 
@@ -169,13 +163,7 @@ extension Parser {
         }
 
         let parameters = try parseFunctionParameters()
-        let returnType: TypeReference?
-        if peek() == .arrow {
-            try consume(.arrow)
-            returnType = try parseTypeReferenceNode()
-        } else {
-            returnType = nil
-        }
+        let returnType = try parseCallableReturnTypeIfPresent(kind: "Builder hook")
         registerVisibleCallableReturnType(
             targetType: nil,
             name: mappedName,
@@ -206,6 +194,22 @@ extension Parser {
             returnType: returnType,
             body: body
         )
+    }
+
+    mutating func parseCallableReturnTypeIfPresent(kind: String) throws -> TypeReference? {
+        if peek() == .arrow {
+            throw ParseError(
+                "\(kind) return types use ': ReturnType', not '-> ReturnType'.",
+                range: currentRange()
+            )
+        }
+
+        guard peek() == .colon else {
+            return nil
+        }
+
+        try consume(.colon)
+        return try parseTypeReferenceNode()
     }
 
     mutating func parseFunctionParameters(

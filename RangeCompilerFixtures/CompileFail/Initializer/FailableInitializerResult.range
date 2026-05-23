@@ -14,6 +14,6 @@ construct User: StringDecodable {
     }
 }
 
-function makeUser() -> Result<User, ParseError> {
+function makeUser(): Result<User, ParseError> {
     return User(value: "George")
 }

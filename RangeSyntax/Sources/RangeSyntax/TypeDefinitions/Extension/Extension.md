@@ -23,7 +23,7 @@ construct User {
 }
 
 extension User {
-    function displayName() -> String {
+    function displayName(): String {
         return name
     }
 }
@@ -38,7 +38,7 @@ enum Direction {
 }
 
 extension Direction {
-    function isVertical() -> Bool {
+    function isVertical(): Bool {
         return self == .north || self == .south
     }
 }

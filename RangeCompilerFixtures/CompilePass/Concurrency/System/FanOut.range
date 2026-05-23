@@ -1,4 +1,4 @@
-function double(value: Int) -> Int {
+function double(value: Int): Int {
     return value * 2
 }
 

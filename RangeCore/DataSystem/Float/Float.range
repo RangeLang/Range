@@ -3,21 +3,21 @@ construct Float<let width: FloatingPointWidth> {
     let storage: FloatStorage
 
     @literal<FloatLiteral>
-    function literal(literal: FloatLiteral) -> Self {
+    function literal(literal: FloatLiteral): Self {
         return Self(storage: literal.storage())
     }
 }
 
 extension Float: Equatable {
-    function ==(lhs: Self, rhs: Self) -> Bool
+    function ==(lhs: Self, rhs: Self): Bool
 }
 
 extension Float: Comparable {
-    function <(lhs: Self, rhs: Self) -> Bool
+    function <(lhs: Self, rhs: Self): Bool
 }
 
 extension Float: Decodable {
-    function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
+    function decode(from decoder: Decoder): Result<Self, DecodingError> {
         let container   decoder.singleValueContainer()
         switch container.decode(Float.self) {
         case .success(let value):
@@ -29,7 +29,7 @@ extension Float: Decodable {
 }
 
 extension Float: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container   encoder.singleValueContainer()
         return container.encode(self)
     }

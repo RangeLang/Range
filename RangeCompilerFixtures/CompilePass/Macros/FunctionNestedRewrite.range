@@ -7,7 +7,7 @@ macro forwardFirstArgument(): Function { target, diagnostics in
 }
 
 @forwardFirstArgument
-function passthrough(value value: Int) -> Int {
+function passthrough(value value: Int): Int {
     return value
 }
 

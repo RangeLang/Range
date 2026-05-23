@@ -4,11 +4,11 @@ construct Data {
 }
 
 extension Data: Equatable {
-    function ==(lhs: Self, rhs: Self) -> Bool
+    function ==(lhs: Self, rhs: Self): Bool
 }
 
 extension Data: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container   encoder.singleValueContainer()
         return container.encode(self)
     }

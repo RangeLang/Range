@@ -27,13 +27,13 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Functions, variables, parameters, and member semantics are emitted")
     func declarationsAndMembersEmitSemanticTokens() {
         let source = """
-        function identity(_ value: Int) -> Int {
+        function identity(_ value: Int): Int {
             let number: Int = 0
             Logger.info(number)
             return value
         }
 
-        function fetchUsername(_ id: Int) -> String {
+        function fetchUsername(_ id: Int): String {
             return ""
         }
 
@@ -123,7 +123,7 @@ struct RangeLanguageServerSemanticTokenTests {
     func operatorFunctionDeclarationsEmitDeclarationTokens() {
         let source = """
         protocol Comparable: Equatable {
-            function <(lhs: Self, rhs: Self) -> Bool
+            function <(lhs: Self, rhs: Self): Bool
         }
         """
 
@@ -140,7 +140,7 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Switch pattern bindings stay plain text")
     func switchPatternBindingsStayPlainText() {
         let source = """
-        function encode() -> Result<Void, EncodingError> {
+        function encode(): Result<Void, EncodingError> {
             switch container.encode(id, forKey: "id") {
             case .success:
                 break
@@ -231,7 +231,7 @@ struct RangeLanguageServerSemanticTokenTests {
     func externalParameterLabelsEmitLabelTokens() {
         let source = """
         protocol KeyedDecodingContainer {
-            function decode(_ type: Bool.Type, forKey key: String) -> Result<Bool, DecodingError>
+            function decode(_ type: Bool.Type, forKey key: String): Result<Bool, DecodingError>
         }
         """
 
@@ -248,7 +248,7 @@ struct RangeLanguageServerSemanticTokenTests {
     func twoNameParametersKeepInternalNamesPlain() {
         let source = """
         extension User: Encodable {
-            function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+            function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer = encoder.keyedContainer()
                 return .success(result: Void())
             }
@@ -279,7 +279,7 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Macro applications, including parameter macros, emit semantic tokens")
     func macroApplicationsEmitSemanticTokens() {
         let source = """
-        function takeMany(@variadic values: Int) -> [Int] {
+        function takeMany(@variadic values: Int): [Int] {
             return values
         }
 
@@ -332,7 +332,7 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Nil emits a keyword semantic token")
     func nilEmitsKeywordToken() {
         let source = """
-        function fallback() -> String? {
+        function fallback(): String? {
             return nil
         }
         """

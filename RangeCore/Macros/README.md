@@ -33,7 +33,7 @@ Current bootstrap rules:
   syntax capture.
 - Parameter-targeted macros operate through explicit declaration/application facets on `Parameter`, for example `target.declaration.type.rewrite(...)` and nested application-side expression rewrite paths such as `target.application.expression.rewrite(...)`.
 - Function-targeted macros are graph-driven declaration macros. Concrete literal bridge functions carry `@literal<T>` directly.
-- For literal bridging, the base form is `@literal<T>` on `function literal(literal: T) -> Self`, where `T` is a compiler-recognized literal carrier type.
+- For literal bridging, the base form is `@literal<T>` on `function literal(literal: T): Self`, where `T` is a compiler-recognized literal carrier type.
 - The compiler recognizes carrier types and literal categories; the macro model defines how the bridge is realized on concrete literal functions.
 - Macro closures currently use only `target` and `diagnostics`; bootstrap work should not add extra bindings.
 - Local bindings inside macro bodies are syntactically valid, for example

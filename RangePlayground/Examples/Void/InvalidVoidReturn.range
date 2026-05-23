@@ -1,4 +1,4 @@
-function invalid() -> Void {
+function invalid(): Void {
     return 1
 }
 

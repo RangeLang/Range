@@ -16,5 +16,5 @@ construct HasherStorage {
 
     function combine(_ value: UUIDStorage)
 
-    function finalize() -> Int
+    function finalize(): Int
 }

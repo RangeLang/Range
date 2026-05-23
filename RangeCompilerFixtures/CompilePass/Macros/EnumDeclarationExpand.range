@@ -1,7 +1,7 @@
 macro enumDeclarationExpand(): Enum { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
-            function generatedEnumName() -> String {
+            function generatedEnumName(): String {
                 return "enum"
             }
         }

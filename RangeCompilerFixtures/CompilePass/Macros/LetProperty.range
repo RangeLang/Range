@@ -12,7 +12,7 @@ construct Holder {
     @shifted(by: 2)
     let count: Int(10)
 
-    function current() -> Int {
+    function current(): Int {
         return count
     }
 }

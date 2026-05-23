@@ -1,4 +1,4 @@
 #language
 construct ArrayLiteral {
-    function storage<Element>() -> ArrayStorage<Element>
+    function storage<Element>(): ArrayStorage<Element>
 }

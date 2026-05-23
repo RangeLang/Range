@@ -3,28 +3,28 @@ infix operator /: MultiplicationPrecedence
 infix operator %: MultiplicationPrecedence
 
 #language
-function *(lhs: Int, rhs: Int) -> Int
+function *(lhs: Int, rhs: Int): Int
 
 #language
-function *(lhs: Float, rhs: Float) -> Float
+function *(lhs: Float, rhs: Float): Float
 
 #language
-function *(lhs: Int, rhs: Float) -> Float
+function *(lhs: Int, rhs: Float): Float
 
 #language
-function *(lhs: Float, rhs: Int) -> Float
+function *(lhs: Float, rhs: Int): Float
 
 #language
-function /(lhs: Int, rhs: Int) -> Int
+function /(lhs: Int, rhs: Int): Int
 
 #language
-function /(lhs: Float, rhs: Float) -> Float
+function /(lhs: Float, rhs: Float): Float
 
 #language
-function /(lhs: Int, rhs: Float) -> Float
+function /(lhs: Int, rhs: Float): Float
 
 #language
-function /(lhs: Float, rhs: Int) -> Float
+function /(lhs: Float, rhs: Int): Float
 
 #language
-function %(lhs: Int, rhs: Int) -> Int
+function %(lhs: Int, rhs: Int): Int

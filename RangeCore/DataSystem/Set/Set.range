@@ -3,7 +3,7 @@ construct Set<Element: Hashable> {
     state storage: SetStorage<Element>()
 
     @literal<SetLiteral>
-    function literal(literal: SetLiteral) -> Self {
+    function literal(literal: SetLiteral): Self {
         return Self(storage: literal.storage())
     }
 
@@ -15,7 +15,7 @@ construct Set<Element: Hashable> {
         storage.isEmpty
     }
 
-    function contains(element: Element) -> Bool {
+    function contains(element: Element): Bool {
         return storage.contains(element: element)
     }
 
@@ -23,19 +23,19 @@ construct Set<Element: Hashable> {
         storage.insert(element: element)
     }
 
-    function remove(element: Element) -> Element? {
+    function remove(element: Element): Element? {
         return storage.remove(element: element)
     }
 
-    function elements() -> [Element] {
+    function elements(): [Element] {
         return storage.elements()
     }
 
-    function filter(include: (Element) -> Bool) -> [Element] {
+    function filter(include: (Element) -> Bool): [Element] {
         return storage.filter(include: include)
     }
 
-    function first(where include: (Element) -> Bool) -> Element? {
+    function first(where include: (Element) -> Bool): Element? {
         return storage.first(where: include)
     }
 
@@ -45,7 +45,7 @@ construct Set<Element: Hashable> {
 }
 
 extension Set<Element: Encodable>: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container   encoder.unkeyedContainer()
         let values: Array<Element>(elements())
         state index   0

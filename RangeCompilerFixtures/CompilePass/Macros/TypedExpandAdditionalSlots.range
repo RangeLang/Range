@@ -11,7 +11,7 @@ macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
         }
 
         construct #(Identifier(name: "GeneratedTypedExpandNamespace")) {
-            function #(Identifier(name: "message"))() -> #(String) {
+            function #(Identifier(name: "message"))(): #(String) {
                 let local: String("ok")
                 return local
             }
@@ -24,7 +24,7 @@ macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
         }
 
         extension #(target.declaration.self) {
-            #(target.declaration.self) function #(Identifier(name: "typedTargetFunction"))(input: #(Int)) -> #(target.declaration.self) {
+            #(target.declaration.self) function #(Identifier(name: "typedTargetFunction"))(input: #(Int)): #(target.declaration.self) {
                 return self
             }
         }

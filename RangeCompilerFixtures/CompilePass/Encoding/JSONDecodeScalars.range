@@ -1,9 +1,9 @@
-function decodeStringValue() -> Result<String, DecodingError> {
+function decodeStringValue(): Result<String, DecodingError> {
     let decoder   JSONDecoder(value: .string(value: "George"))
     return String.decode(from: decoder)
 }
 
-function decodeBoolValue() -> Result<Bool, DecodingError> {
+function decodeBoolValue(): Result<Bool, DecodingError> {
     let decoder   JSONDecoder(value: .bool(value: true))
     return Bool.decode(from: decoder)
 }

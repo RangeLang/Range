@@ -97,7 +97,7 @@ Functions do not become special just because they may be used from concurrent co
 Example:
 
 ```range
-function fetchUserName(id: Int) -> String {
+function fetchUserName(id: Int): String {
     if id == 0 {
         return "system"
     }
@@ -140,7 +140,7 @@ construct Channel<Element> {
     init()
     init(capacity: Int)
     function send(element _: Element)
-    function receive() -> Element
+    function receive(): Element
     function close()
 }
 ```
@@ -249,7 +249,7 @@ enum LoadError {
     case denied
 }
 
-function parseUser(id: Int) -> Result<String, LoadError> {
+function parseUser(id: Int): Result<String, LoadError> {
     if id == 0 {
         return .success(result: "system")
     }

@@ -1,4 +1,4 @@
 #language
 construct UUIDStorage {
-    function parse(uuidString: String) -> Result<Self, DecodingError>
+    function parse(uuidString: String): Result<Self, DecodingError>
 }

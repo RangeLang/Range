@@ -38,7 +38,7 @@ construct Hasher {
         storage.combine(value)
     }
 
-    function finalize() -> Int {
+    function finalize(): Int {
         return storage.finalize()
     }
 }

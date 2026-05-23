@@ -2,5 +2,5 @@
 construct IntLiteral { }
 
 extension IntLiteral {
-    function storage() -> IntStorage
+    function storage(): IntStorage
 }

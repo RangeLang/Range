@@ -17,6 +17,6 @@ construct Function {
         let identifier: Identifier
         let arguments: [Parameter.Application]
 
-        function replace(with replacement: Expression) -> Expression
+        function replace(with replacement: Expression): Expression
     }
 }

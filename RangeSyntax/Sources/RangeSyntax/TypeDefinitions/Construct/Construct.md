@@ -42,13 +42,13 @@ let user: Person(name: "George")
 
 ```range
 protocol Named {
-    function displayName() -> String
+    function displayName(): String
 }
 
 construct Person: Named {
     let name: String
 
-    function displayName() -> String {
+    function displayName(): String {
         return name
     }
 }

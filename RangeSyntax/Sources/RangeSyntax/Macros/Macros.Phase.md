@@ -15,7 +15,7 @@ The same base rule applies to literal bridge functions:
 ```range
 construct Int {
     @literal<IntLiteral>
-    function literal(literal: IntLiteral) -> Self { }
+    function literal(literal: IntLiteral): Self { }
 }
 ```
 
@@ -29,7 +29,7 @@ A protocol can also carry macros targeted at declaration kinds that conform to i
 ```range
 #equatable
 protocol Equatable {
-    function ==(lhs: Self, rhs: Self) -> Bool
+    function ==(lhs: Self, rhs: Self): Bool
 }
 ```
 

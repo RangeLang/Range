@@ -1,4 +1,4 @@
-function computeValue() -> Int {
+function computeValue(): Int {
     return 42
 }
 

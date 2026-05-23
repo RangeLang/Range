@@ -25,7 +25,7 @@ extension DecodedUser: Decodable {
     }
 }
 
-function decodeUser() -> Result<DecodedUser, DecodingError> {
+function decodeUser(): Result<DecodedUser, DecodingError> {
     let fields: [
         JSONField(key: "id", value: .int(value: 42)),
         JSONField(key: "name", value: .string(value: "George")),

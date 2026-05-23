@@ -1,6 +1,6 @@
 protocol Encoder {
-    function keyedContainer() -> KeyedEncodingContainer
+    function keyedContainer(): KeyedEncodingContainer
 
-    function unkeyedContainer() -> UnkeyedEncodingContainer
-    function singleValueContainer() -> SingleValueEncodingContainer
+    function unkeyedContainer(): UnkeyedEncodingContainer
+    function singleValueContainer(): SingleValueEncodingContainer
 }

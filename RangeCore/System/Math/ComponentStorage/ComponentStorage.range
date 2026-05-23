@@ -9,11 +9,11 @@ construct ComponentStorage<Component> {
         components.isEmpty
     }
 
-    function component(index: Int) -> Component {
+    function component(index: Int): Component {
         return components.element(index: index)
     }
 
-    function map<Output>(_ transform: (Component) -> Output) -> ComponentStorage<Output> {
+    function map<Output>(_ transform: (Component) -> Output): ComponentStorage<Output> {
         return ComponentStorage<Output>(components: components.map(transform))
     }
 }

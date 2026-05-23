@@ -1,11 +1,11 @@
 protocol TargetDeclarationExpandableProtocol {
-    function generatedByTargetDeclarationExpand() -> String
+    function generatedByTargetDeclarationExpand(): String
 }
 
 macro targetDeclarationExpand(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): TargetDeclarationExpandableProtocol {
-            function generatedByTargetDeclarationExpand() -> String {
+            function generatedByTargetDeclarationExpand(): String {
                 return "expanded"
             }
         }

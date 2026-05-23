@@ -44,8 +44,8 @@ prefix operator !
 ```
 
 ```range
-function +(left: Int, right: Int) -> Int
-function !(value: Bool) -> Bool
+function +(left: Int, right: Int): Int
+function !(value: Bool): Bool
 ```
 
 ## Notes

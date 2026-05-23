@@ -3,11 +3,11 @@ construct Range<Bound: Comparable> {
     let lowerBound: Bound
     let upperBound: Bound
 
-    function contains(_ value: Bound) -> Bool {
+    function contains(_ value: Bound): Bool {
         return !(value < lowerBound) && value < upperBound
     }
 
-    function overlaps(_ other: Range<Bound>) -> Bool {
+    function overlaps(_ other: Range<Bound>): Bool {
         return contains(other.lowerBound) || other.contains(lowerBound)
     }
 
@@ -17,7 +17,7 @@ construct Range<Bound: Comparable> {
 }
 
 extension Range: Equatable {
-    function ==(lhs: Self, rhs: Self) -> Bool {
+    function ==(lhs: Self, rhs: Self): Bool {
         return lhs.lowerBound == rhs.lowerBound && lhs.upperBound == rhs.upperBound
     }
 }

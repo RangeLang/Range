@@ -1,4 +1,4 @@
-function acceptDeferred(@autoclosure value: Int) -> Int {
+function acceptDeferred(@autoclosure value: Int): Int {
     return value()
 }
 

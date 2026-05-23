@@ -1,4 +1,4 @@
 #language
 construct SetLiteral {
-    function storage<Element: Hashable>() -> SetStorage<Element>
+    function storage<Element: Hashable>(): SetStorage<Element>
 }

@@ -7,7 +7,7 @@ protocol DerivedProtocol: BaseProtocol {
 construct DerivedImplementation: DerivedProtocol {
 }
 
-function makeBase() -> BaseProtocol {
+function makeBase(): BaseProtocol {
     return DerivedImplementation()
 }
 

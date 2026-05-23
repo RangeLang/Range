@@ -1,4 +1,4 @@
-function fetchUserName(id: Int) -> String {
+function fetchUserName(id: Int): String {
     if id == 0 {
         return "system"
     }

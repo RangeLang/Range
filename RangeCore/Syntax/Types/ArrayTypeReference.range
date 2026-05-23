@@ -2,5 +2,5 @@
 construct ArrayTypeReference: StructuralTypeReference {
     let element: TypeReference
 
-    function replace(with replacement: TypeReference) -> TypeReference
+    function replace(with replacement: TypeReference): TypeReference
 }

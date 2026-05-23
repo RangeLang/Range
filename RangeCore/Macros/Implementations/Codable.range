@@ -64,7 +64,7 @@ macro decodeBody(container: KeyedDecodingContainer, properties: [Let], strategy:
 macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Codable {
-            function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+            function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
                 @encodeBody(
                     container: container,
@@ -74,7 +74,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
                 return .success(result: Void())
             }
 
-            function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
+            function decode(from decoder: Decoder): Result<Self, DecodingError> {
                 let container: KeyedDecodingContainer(decoder.keyedContainer())
                 @decodeBody(
                     container: container,

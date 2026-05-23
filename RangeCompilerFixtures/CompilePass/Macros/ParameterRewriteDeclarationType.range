@@ -6,7 +6,7 @@ macro arrayifyParameter(): Parameter { target, diagnostics in
     )
 }
 
-function collect(@arrayifyParameter values: Int) -> [Int] {
+function collect(@arrayifyParameter values: Int): [Int] {
     return values
 }
 

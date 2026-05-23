@@ -4,7 +4,7 @@ construct CodableManualUser {
 }
 
 extension CodableManualUser: Codable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container   encoder.keyedContainer()
         container.encode(id, forKey: "id")
         return container.encode(name, forKey: "name")
@@ -31,7 +31,7 @@ extension CodableManualUser: Codable {
     }
 }
 
-function roundTripCodableManualUser() -> Result<CodableManualUser, DecodingError> {
+function roundTripCodableManualUser(): Result<CodableManualUser, DecodingError> {
     let fields: [
         JSONField(key: "id", value: .int(value: 42)),
         JSONField(key: "name", value: .string(value: "George")),

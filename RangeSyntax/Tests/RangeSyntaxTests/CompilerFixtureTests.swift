@@ -179,7 +179,7 @@ struct CompilerFixtureTests {
                     let declaration: Construct.Declaration(graph.declaration(target.identity))
                     target.declaration.expand {
                         extension #(declaration.self) {
-                            function graphName() -> String {
+                            function graphName(): String {
                                 return "User"
                             }
                         }
@@ -244,7 +244,7 @@ struct CompilerFixtureTests {
 
                 #extensionTargetName
                 extension User {
-                    function displayName() -> String {
+                    function displayName(): String {
                         return name
                     }
                 }
@@ -277,7 +277,7 @@ struct CompilerFixtureTests {
 
                 #constructOnly
                 extension User {
-                    function displayName() -> String {
+                    function displayName(): String {
                         return name
                     }
                 }
@@ -324,6 +324,35 @@ struct CompilerFixtureTests {
         #expect(diagnostic.range?.end.line == 1)
         #expect(diagnostic.range?.end.character == 17)
     }
+
+@Test("Function declarations reject arrow return syntax")
+func functionDeclarationsRejectArrowReturnSyntax() throws {
+    let projectPath = "/tmp/FunctionArrowReturn.range"
+    var inputs = try rangeCoreInputs()
+    inputs.append(
+        SourceInput(
+            path: projectPath,
+            source: """
+            function passthrough(value: Int) -> Int {
+                return value
+            }
+            """,
+            role: .project
+        )
+    )
+
+    let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+    let diagnostic = try #require(
+        diagnostics.first {
+            $0.message == "Function return types use ': ReturnType', not '-> ReturnType'."
+                && $0.source == "range-parser"
+                && $0.path == projectPath
+        }
+    )
+
+    #expect(diagnostic.range?.start.line == 0)
+    #expect(diagnostic.range?.start.character == 33)
+}
 
     @Test("Project source cannot declare initializers")
     func projectSourceCannotDeclareInitializers() throws {
@@ -660,7 +689,7 @@ struct CompilerFixtureTests {
                     let captured   @captureText(1 + 2)
                 }
 
-                function message() -> String {
+                function message(): String {
                     return "Hello"
                 }
 
@@ -753,7 +782,7 @@ struct CompilerFixtureTests {
         construct User {
         }
 
-        function makeUser() -> User {
+        function makeUser(): User {
             return User()
         }
         """
@@ -796,7 +825,7 @@ struct CompilerFixtureTests {
                 }
 
                 protocol Renderable {
-                    function render(title: String) -> String
+                    function render(title: String): String
                 }
 
                 enum DisplayMode {
@@ -827,11 +856,11 @@ struct CompilerFixtureTests {
                     let title: String
                     let address: Address
 
-                    function render(title: String) -> String {
+                    function render(title: String): String {
                         return title
                     }
 
-                    function configure(_ value: Int, label name: String) -> String {
+                    function configure(_ value: Int, label name: String): String {
                         return name
                     }
 
@@ -851,7 +880,7 @@ struct CompilerFixtureTests {
 
                 #hostSpace
                 construct Routes {
-                    function home() -> String {
+                    function home(): String {
                         return "home"
                     }
                 }
@@ -975,7 +1004,7 @@ struct CompilerFixtureTests {
                 source: """
                 construct System {
                     construct Math {
-                        function zero() -> Int {
+                        function zero(): Int {
                             return 0
                         }
 
@@ -1008,7 +1037,7 @@ struct CompilerFixtureTests {
                 construct Language {
                     let defaultLocale: String("en")
 
-                    function identifier() -> String {
+                    function identifier(): String {
                         return defaultLocale
                     }
 
@@ -1048,7 +1077,7 @@ struct CompilerFixtureTests {
 
                 #hostSpace
                 construct Client {
-                    function route() -> String {
+                    function route(): String {
                         return "home"
                     }
                 }
@@ -1088,7 +1117,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/NamespaceExtension.range",
                 source: """
                 extension Math {
-                    function twice(value: Int) -> Int {
+                    function twice(value: Int): Int {
                         return value + value
                     }
 
@@ -1601,10 +1630,10 @@ struct CompilerFixtureTests {
         }
 
         protocol Cache<T: Comparable, let capacity: Int = 1> {
-            function get(value: T) -> T
+            function get(value: T): T
         }
 
-        function identity<T: Comparable, let count: Int = 3>(value: T) -> T {
+        function identity<T: Comparable, let count: Int = 3>(value: T): T {
             return value
         }
 

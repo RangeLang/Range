@@ -5,7 +5,7 @@ macro secondArgument(): Function { target, diagnostics in
 }
 
 @secondArgument
-function select(text text: String, number number: Int) -> String {
+function select(text text: String, number number: Int): String {
     return text
 }
 

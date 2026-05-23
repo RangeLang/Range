@@ -12,7 +12,7 @@ construct Reader {
         age
     }
 
-    function current() -> Int {
+    function current(): Int {
         return next
     }
 }

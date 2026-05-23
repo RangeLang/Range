@@ -21,19 +21,19 @@ The core protocol shape is now non-generic:
 
 ```range
 protocol Encoder {
-    function keyedContainer() -> KeyedEncodingContainer
-    function unkeyedContainer() -> UnkeyedEncodingContainer
-    function singleValueContainer() -> SingleValueEncodingContainer
+    function keyedContainer(): KeyedEncodingContainer
+    function unkeyedContainer(): UnkeyedEncodingContainer
+    function singleValueContainer(): SingleValueEncodingContainer
 }
 
 protocol Decoder {
-    function keyedContainer() -> KeyedDecodingContainer
-    function unkeyedContainer() -> UnkeyedDecodingContainer
-    function singleValueContainer() -> SingleValueDecodingContainer
+    function keyedContainer(): KeyedDecodingContainer
+    function unkeyedContainer(): UnkeyedDecodingContainer
+    function singleValueContainer(): SingleValueDecodingContainer
 }
 
 protocol Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError>
+    function encode(to encoder: Encoder): Result<Void, EncodingError>
 }
 
 protocol Decodable {
@@ -48,11 +48,11 @@ Keyed containers use string keys:
 
 ```range
 protocol KeyedEncodingContainer {
-    function encode<T: Encodable>(_ value: T, forKey key: String) -> Result<Void, EncodingError>
+    function encode<T: Encodable>(_ value: T, forKey key: String): Result<Void, EncodingError>
 }
 
 protocol KeyedDecodingContainer {
-    function decode<T: Decodable>(_ type: T.Type, forKey key: String) -> Result<T, DecodingError>
+    function decode<T: Decodable>(_ type: T.Type, forKey key: String): Result<T, DecodingError>
 }
 ```
 

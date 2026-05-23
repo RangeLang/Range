@@ -5,7 +5,7 @@ construct Parent {
         let text: String
     }
 
-    function childText() -> String {
+    function childText(): String {
         return self.child.text
     }
 }

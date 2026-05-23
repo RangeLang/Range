@@ -22,7 +22,7 @@ construct Box {
         }
     }
 
-    function current() -> Int {
+    function current(): Int {
         return score
     }
 

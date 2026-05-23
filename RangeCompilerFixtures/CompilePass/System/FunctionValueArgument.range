@@ -1,8 +1,8 @@
-function compute() -> Int {
+function compute(): Int {
     return 1
 }
 
-function accept(_ task: () -> Int) -> Int {
+function accept(_ task: () -> Int): Int {
     return task()
 }
 

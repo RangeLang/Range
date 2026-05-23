@@ -2,5 +2,5 @@
 construct StringLiteral { }
 
 extension StringLiteral {
-    function storage() -> StringStorage
+    function storage(): StringStorage
 }

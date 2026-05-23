@@ -1,6 +1,6 @@
 protocol Decoder {
-    function keyedContainer() -> KeyedDecodingContainer
+    function keyedContainer(): KeyedDecodingContainer
 
-    function unkeyedContainer() -> UnkeyedDecodingContainer
-    function singleValueContainer() -> SingleValueDecodingContainer
+    function unkeyedContainer(): UnkeyedDecodingContainer
+    function singleValueContainer(): SingleValueDecodingContainer
 }

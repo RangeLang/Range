@@ -6,7 +6,7 @@ construct Channel<Element> {
         storage.send(element: element)
     }
 
-    function receive() -> Element {
+    function receive(): Element {
         return storage.receive()
     }
 

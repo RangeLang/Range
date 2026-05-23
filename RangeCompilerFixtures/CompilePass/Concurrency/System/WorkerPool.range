@@ -1,4 +1,4 @@
-function process(value: Int) -> Int {
+function process(value: Int): Int {
     return value * 100
 }
 

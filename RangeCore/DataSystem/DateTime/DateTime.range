@@ -3,7 +3,7 @@ construct DateTime {
     let storage: DateTimeStorage
 
     
-    function parse(iso8601String: String) -> Result<Self, DecodingError> {
+    function parse(iso8601String: String): Result<Self, DecodingError> {
         switch DateTimeStorage.parse(iso8601String: iso8601String) {
         case .success(let storage):
             return .success(result: Self(storage: storage))
@@ -15,15 +15,15 @@ construct DateTime {
 }
 
 extension DateTime: Equatable {
-    function ==(lhs: Self, rhs: Self) -> Bool
+    function ==(lhs: Self, rhs: Self): Bool
 }
 
 extension DateTime: Comparable {
-    function <(lhs: Self, rhs: Self) -> Bool
+    function <(lhs: Self, rhs: Self): Bool
 }
 
 extension DateTime: Decodable {
-    function decode(from decoder: Decoder) -> Result<Self, DecodingError> {
+    function decode(from decoder: Decoder): Result<Self, DecodingError> {
         let container   decoder.singleValueContainer()
         switch container.decode(DateTime.self) {
         case .success(let value):
@@ -35,7 +35,7 @@ extension DateTime: Decodable {
 }
 
 extension DateTime: Encodable {
-    function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container   encoder.singleValueContainer()
         return container.encode(self)
     }

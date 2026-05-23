@@ -11,7 +11,7 @@ macro hashableBody(hasher: Hasher, properties: [Let]) -> [Statement] {
 macro hashable(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Hashable {
-            function ==(lhs: Self, rhs: Self) -> Bool {
+            function ==(lhs: Self, rhs: Self): Bool {
                 @equatableBody(
                     lhs: lhs,
                     rhs: rhs,

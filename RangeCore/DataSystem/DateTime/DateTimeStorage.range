@@ -1,4 +1,4 @@
 #language
 construct DateTimeStorage {
-    function parse(iso8601String: String) -> Result<Self, DecodingError>
+    function parse(iso8601String: String): Result<Self, DecodingError>
 }
