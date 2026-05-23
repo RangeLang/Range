@@ -1,6 +1,6 @@
 construct JSONUnkeyedDecodingContainer: UnkeyedDecodingContainer {
     let values: [JSONValue]
-    state index: Int   0
+    state index: Int(0)
 
     function isAtEnd() -> Bool {
         return index >= values.count

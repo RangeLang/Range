@@ -13,10 +13,10 @@ function fetchUserName(id: Int) -> String {
 
 function server(requests: Channel<Request>) {
     @background {
-        let first: Request   requests.receive()
+        let first: Request(requests.receive())
         first.replyTo.send(fetchUserName(id: first.id))
 
-        let second: Request   requests.receive()
+        let second: Request(requests.receive())
         second.replyTo.send(fetchUserName(id: second.id))
     }
 }
@@ -25,8 +25,8 @@ function server(requests: Channel<Request>) {
     let requests   Channel<Request>(storage: ChannelStorage<Request>(capacity: 2))
     let replyA   Channel<String>()
     let replyB   Channel<String>()
-    let requestA: Request   Request(id: 0, replyTo: replyA)
-    let requestB: Request   Request(id: 1, replyTo: replyB)
+    let requestA: Request(id: 0, replyTo: replyA)
+    let requestB: Request(id: 1, replyTo: replyB)
 
     server(requests: requests)
 

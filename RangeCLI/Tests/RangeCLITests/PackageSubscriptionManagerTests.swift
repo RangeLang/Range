@@ -41,7 +41,7 @@ struct PackageSubscriptionManagerTests {
             encoding: .utf8
         )
         #expect(action == .subscribed)
-        #expect(source.contains(#"let modules: [String] ["acme/logger"]"#))
+        #expect(source.contains(#"let modules: ["acme/logger"]"#))
         _ = try PackageManifestLoader.load(from: root.appendingPathComponent("Package.range"))
     }
 
@@ -81,7 +81,7 @@ struct PackageSubscriptionManagerTests {
             construct Project {
                 let name: Title("\(name)")
                 let version: Version(0.1.0)
-                let author: String("Test Author")
+                let author: "Test Author"
             }
             """.write(to: url, atomically: true, encoding: .utf8)
     }

@@ -303,7 +303,7 @@ struct ProjectScaffolder {
             construct Project {
                 let name: Title("\(escapedStringLiteral(name))")
                 let version: Version(0.1.0)
-                let author: String("\(escapedStringLiteral(NSFullUserName()))")
+                let author: "\(escapedStringLiteral(NSFullUserName()))"
             }
             """
     }

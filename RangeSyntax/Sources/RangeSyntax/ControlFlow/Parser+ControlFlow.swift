@@ -283,9 +283,19 @@ extension Parser {
         let typedInitializer: Expression?
         if peek() == .colon {
             try consume(.colon)
-            let annotation = try parseTypedConstructionAnnotation()
-            explicitType = annotation.type
-            typedInitializer = annotation.initializer
+            if shouldParseTypedConstructionAfterColon() {
+                let annotation = try parseTypedConstructionAnnotation()
+                explicitType = annotation.type
+                typedInitializer = annotation.initializer
+                if canStartInlineExpression() {
+                    throw ParseError(
+                        "\(kind == .constant ? "let" : "state") '\(name)' uses a value after a type annotation. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): \(annotation.type.displayName)(value)`."
+                    )
+                }
+            } else {
+                explicitType = nil
+                typedInitializer = try parseExpression()
+            }
         } else {
             explicitType = nil
             typedInitializer = nil
@@ -296,7 +306,11 @@ extension Parser {
             throw ParseError(
                 "\(kind == .constant ? "let" : "state") '\(name)' uses `=` initialization. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): Type(value)`."
             )
-        } else if canStartInlineExpression() {
+        } else if explicitType != nil, canStartInlineExpression() {
+            throw ParseError(
+                "\(kind == .constant ? "let" : "state") '\(name)' uses a value after a type annotation. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): \(explicitType!.displayName)(value)`."
+            )
+        } else if explicitType == nil, typedInitializer == nil, canStartInlineExpression() {
             expression = try parseExpression()
         } else if let typedInitializer {
             expression = typedInitializer

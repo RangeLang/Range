@@ -32,7 +32,7 @@ extension CodableManualUser: Codable {
 }
 
 function roundTripCodableManualUser() -> Result<CodableManualUser, DecodingError> {
-    let fields: [JSONField]   [
+    let fields: [
         JSONField(key: "id", value: .int(value: 42)),
         JSONField(key: "name", value: .string(value: "George")),
     ]

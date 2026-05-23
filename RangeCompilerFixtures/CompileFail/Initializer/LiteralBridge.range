@@ -7,5 +7,5 @@ construct FixtureInt {
 }
 
 @main {
-    let number: FixtureInt   1
+    let number: FixtureInt(1)
 }

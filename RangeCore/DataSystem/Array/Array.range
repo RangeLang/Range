@@ -1,6 +1,6 @@
 #language
 construct Array<Element> {
-    state storage: ArrayStorage<Element>   ArrayStorage<Element>()
+    state storage: ArrayStorage<Element>()
 
     @literal<ArrayLiteral>
     function literal(literal: ArrayLiteral) -> Self {

@@ -17,7 +17,7 @@
     let positiveEntries   counts.filter(include: { entry in entry.value > 0 })
     let firstPositiveEntry   counts.first(where: { entry in entry.value > 0 })
 
-    state unique: Set<Int>   [1, 2]
+    state unique: Set<Int>([1, 2])
     unique.insert(element: 3)
 
     let hasOne   unique.contains(element: 1)

@@ -11,7 +11,7 @@ macro emitIdentifierContainerSwitch(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self): Encodable {
             function encode(to encoder: Encoder) -> Result<Void, EncodingError> {
-                let container: KeyedEncodingContainer   encoder.keyedContainer()
+                let container: KeyedEncodingContainer(encoder.keyedContainer())
                 @identifierContainerSwitch(
                     container: Identifier(name: "container"),
                     value: Identifier(name: "id"),

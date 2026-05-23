@@ -1,6 +1,6 @@
 #package
 construct Project {
-    let name: Title   Title("Range")
+    let name: Title("Range")
     let version: Version(0.1.28)
-    let author: String   "George"
+    let author: "George"
 }

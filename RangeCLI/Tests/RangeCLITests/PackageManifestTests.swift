@@ -16,12 +16,12 @@ struct PackageManifestTests {
             construct Fixture {
                 let name: Title("Fixture")
                 let version: Version(1.2.3)
-                let author: String("Test Author")
+                let author: "Test Author"
                 let remote: String("https://github.com/acme/fixture.git")
-                let remotes: [Remote]   [
+                let remotes: Array<Remote>([
                     Remote(url: "https://github.com/acme/fixture.git"),
                     Remote(url: "git@github.com:acme/fixture.git"),
-                ]
+                ])
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 
@@ -49,7 +49,7 @@ struct PackageManifestTests {
             construct Fixture {
                 let name: Title("Fixture")
                 let version: Int(1)
-                let author: String("Test Author")
+                let author: "Test Author"
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 
@@ -75,7 +75,7 @@ struct PackageManifestTests {
             construct Fixture {
                 let name: Title("Fixture")
                 let version: Version(1.2.3)
-                let author: String("Test Author")
+                let author: "Test Author"
             }
             """.write(to: packageFile, atomically: true, encoding: .utf8)
 

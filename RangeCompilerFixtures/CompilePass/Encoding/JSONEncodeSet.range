@@ -1,6 +1,6 @@
 function encodeSet() -> Result<String, EncodingError> {
-    let encoder: JSONEncoder   JSONEncoder()
-    let values: Set<Int>   [1]
+    let encoder: JSONEncoder()
+    let values: Set<Int>([1])
     return encoder.encode(values)
 }
 

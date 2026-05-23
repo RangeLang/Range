@@ -9,6 +9,6 @@ enum LoadError {
         output.send("george")
     }
 
-    let received: String   output.receive()
+    let received: String(output.receive())
     Logger.info(received)
 }

@@ -57,7 +57,7 @@ struct ProjectScriptStoreTests {
             construct Project {
                 let name: Title("Scripts")
                 let version: Version(0.1.0)
-                let author: String("Test Author")
+                let author: "Test Author"
             }
             """.write(to: root.appendingPathComponent("Package.range"), atomically: true, encoding: .utf8)
         return root

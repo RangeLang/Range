@@ -176,7 +176,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/MacroGraphExpansion.range",
                 source: """
                 macro graphNamed(): Construct { target, diagnostics, graph in
-                    let declaration: Construct.Declaration   graph.declaration(target.identity)
+                    let declaration: Construct.Declaration(graph.declaration(target.identity))
                     target.declaration.expand {
                         extension #(declaration.self) {
                             function graphName() -> String {
@@ -211,7 +211,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/MarkerGraphIdentity.range",
                 source: """
                 marker graphName(): Construct -> String { target, diagnostics, graph in
-                    let declaration: Construct.Declaration   graph.declaration(target.identity)
+                    let declaration: Construct.Declaration(graph.declaration(target.identity))
                     return declaration.self.name
                 }
 
@@ -581,8 +581,8 @@ struct CompilerFixtureTests {
                 construct Project {
                     let name: Title("Example")
                     let version: Version(0.1.0)
-                    let author: String("George")
-                    let modules: [String]   ["acme/logger"]
+                    let author: "George"
+                    let modules: ["acme/logger"]
                 }
                 """,
                 role: .project
@@ -785,7 +785,7 @@ struct CompilerFixtureTests {
                 #package
                 construct Project {
                     let packageName: String("Registry Snapshot")
-                    let modules: [String]   ["acme/registry-snapshot"]
+                    let modules: ["acme/registry-snapshot"]
                 }
 
                 marker styling(): Namespace<Construct>

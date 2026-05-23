@@ -1,4 +1,4 @@
 @main {
-    state count: Int?   1
-    state missing: Int?   nil
+    state count: Optional<Int>(1)
+    state missing: Optional<Int>(nil)
 }

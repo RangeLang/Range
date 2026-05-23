@@ -1,7 +1,7 @@
 construct JSONKeyedEncodingContainer: KeyedEncodingContainer {
     binding output: String
     binding isObject: Bool
-    state wroteField: Bool   false
+    state wroteField: Bool(false)
 
     function encode(_ value: Bool, forKey key: String) -> Result<Void, EncodingError> {
         appendField(key: key, value: "\(value)")
@@ -43,7 +43,7 @@ construct JSONKeyedEncodingContainer: KeyedEncodingContainer {
     }
 
     function encode<T: Encodable>(_ value: T, forKey key: String) -> Result<Void, EncodingError> {
-        let encoder: JSONEncoder   JSONEncoder()
+        let encoder: JSONEncoder()
 
         switch encoder.encode(value) {
         case .success(let encoded):

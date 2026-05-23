@@ -171,6 +171,70 @@ extension Parser {
         return (result, initializer)
     }
 
+    func shouldParseTypedConstructionAfterColon() -> Bool {
+        switch peek() {
+        case .identifier(let value), .keyword(let value):
+            return value.first?.isUppercase == true
+        case .leftBracket:
+            return isBracketedTypeReferenceAfterColon()
+        case .leftParen:
+            return isFunctionTypeReferenceAfterColon()
+        default:
+            return false
+        }
+    }
+
+    func isBracketedTypeReferenceAfterColon() -> Bool {
+        var offset = 1
+        switch peek(offset: offset) {
+        case .identifier(let value) where value.first?.isUppercase == true,
+            .keyword(let value) where value.first?.isUppercase == true:
+            offset += 1
+        default:
+            return false
+        }
+
+        var genericDepth = 0
+        while true {
+            switch peek(offset: offset) {
+            case .less:
+                genericDepth += 1
+            case .greater:
+                genericDepth -= 1
+            case .rightBracket where genericDepth == 0:
+                return true
+            case .colon where genericDepth == 0:
+                return false
+            case .eof:
+                return false
+            default:
+                break
+            }
+            offset += 1
+        }
+    }
+
+    func isFunctionTypeReferenceAfterColon() -> Bool {
+        var depth = 0
+        var offset = 0
+        while true {
+            switch peek(offset: offset) {
+            case .leftParen:
+                depth += 1
+            case .rightParen:
+                depth -= 1
+                if depth == 0 {
+                    return peek(offset: offset + 1) == .arrow
+                }
+            case .eof:
+                return false
+            default:
+                break
+            }
+            offset += 1
+        }
+    }
+
     func normalizedTypedConstructionInitializer(
         _ expression: Expression,
         for type: TypeReference
@@ -185,6 +249,8 @@ extension Parser {
         }
 
         switch (normalizedTypeName, arguments[0].value) {
+        case ("Title", _), ("Version", _):
+            return expression
         case ("Int", .integer),
             ("String", .string),
             ("String", .interpolatedString),
@@ -193,7 +259,7 @@ extension Parser {
             ("Double", .double):
             return arguments[0].value
         default:
-            return expression
+            return arguments[0].value
         }
     }
 

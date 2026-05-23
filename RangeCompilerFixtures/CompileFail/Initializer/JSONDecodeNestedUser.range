@@ -45,10 +45,10 @@ extension NestedDecodedUser: Decodable {
 }
 
 function decodeNestedUser() -> Result<NestedDecodedUser, DecodingError> {
-    let addressFields: [JSONField]   [
+    let addressFields: [
         JSONField(key: "city", value: .string(value: "Tbilisi")),
     ]
-    let fields: [JSONField]   [
+    let fields: [
         JSONField(key: "id", value: .int(value: 42)),
         JSONField(key: "address", value: .object(fields: addressFields)),
     ]

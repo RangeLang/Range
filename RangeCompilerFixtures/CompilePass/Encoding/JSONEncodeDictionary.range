@@ -1,6 +1,6 @@
 function encodeDictionary() -> Result<String, EncodingError> {
-    let encoder: JSONEncoder   JSONEncoder()
-    let values: Dictionary<String, Int>   ["b": 2, "a": 1]
+    let encoder: JSONEncoder()
+    let values: Dictionary<String, Int>(["b": 2, "a": 1])
     return encoder.encode(values)
 }
 

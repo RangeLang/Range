@@ -3,6 +3,6 @@ macro fallbackOne(_ value: Int?): Expression { target, diagnostics in
 }
 
 @main {
-    let maybe: Int?   nil
-    let resolved: Int   @fallbackOne(maybe)
+    let maybe: Optional<Int>(nil)
+    let resolved: Int(@fallbackOne(maybe))
 }

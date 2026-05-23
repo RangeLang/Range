@@ -14,9 +14,18 @@ extension Parser {
         var typedInitializer: Expression?
         if peek() == .colon {
             try consume(.colon)
-            let annotation = try parseTypedConstructionAnnotation()
-            explicitType = annotation.type
-            typedInitializer = annotation.initializer
+            if shouldParseTypedConstructionAfterColon() {
+                let annotation = try parseTypedConstructionAnnotation()
+                explicitType = annotation.type
+                typedInitializer = annotation.initializer
+                if canStartInlineExpression() {
+                    throw ParseError(
+                        "state '\(name)' uses a value after a type annotation. Use typed construction, for example `state \(name): \(annotation.type.displayName)(value)`."
+                    )
+                }
+            } else {
+                typedInitializer = try parseExpression()
+            }
         }
         let storage: StateStorage
         let inferredType: TypeReference
@@ -25,7 +34,11 @@ extension Parser {
             throw ParseError(
                 "state '\(name)' uses `=` initialization. Use typed construction, for example `state \(name): Type(value)`."
             )
-        } else if canStartInlineExpression() {
+        } else if explicitType != nil, canStartInlineExpression() {
+            throw ParseError(
+                "state '\(name)' uses a value after a type annotation. Use typed construction, for example `state \(name): \(explicitType!.displayName)(value)`."
+            )
+        } else if explicitType == nil, typedInitializer == nil, canStartInlineExpression() {
             let initialValue = try parseExpression()
             inferredType = try inferInitializedBindingType(
                 name: name,
@@ -122,6 +135,10 @@ extension Parser {
                     "\(bindingKindDescription) '\(name)' initialized with [:] requires an explicit dictionary type."
                 )
             }
+            return explicitType
+        }
+
+        if let explicitType, isCollectionLiteral(expression) {
             return explicitType
         }
 
@@ -224,6 +241,15 @@ extension Parser {
             return elements.isEmpty
         }
         return false
+    }
+
+    func isCollectionLiteral(_ expression: Expression) -> Bool {
+        switch expression {
+        case .array, .dictionary:
+            return true
+        default:
+            return false
+        }
     }
 
     func isExplicitBracketCollectionType(_ typeReference: TypeReference) -> Bool {

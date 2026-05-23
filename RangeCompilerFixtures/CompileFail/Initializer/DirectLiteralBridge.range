@@ -8,5 +8,5 @@ construct FixtureDirectInt {
 }
 
 @main {
-    let number: FixtureDirectInt   1
+    let number: FixtureDirectInt(1)
 }

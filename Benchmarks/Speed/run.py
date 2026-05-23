@@ -118,7 +118,7 @@ def package_manifest(name: str) -> str:
 construct Project {{
     let name: Title("{name}")
     let version: Version(0.1.0)
-    let author: String("George")
+    let author: "George"
 }}
 """
 

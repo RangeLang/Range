@@ -1,5 +1,5 @@
 macro caseIterable(): Enum { target, diagnostics in
-    let casesArray: Expression   ArrayExpression(
+    let casesArray: ArrayExpression(
         type: ArrayTypeReference(element: NamedTypeReference(name: "Self")),
         elements: target.declaration.cases.map { enumCase in
             EnumCaseExpression(

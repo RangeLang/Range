@@ -6,14 +6,33 @@ extension Parser {
         try consumeKeyword(.let)
         let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "let")
         try consume(.colon)
-        let annotation = try parseTypedConstructionAnnotation()
-        var value = annotation.initializer
+        let annotation: (type: TypeReference, initializer: Expression?)?
+        let value: Expression?
+        let type: TypeReference
+        if shouldParseTypedConstructionAfterColon() {
+            annotation = try parseTypedConstructionAnnotation()
+            type = annotation!.type
+            value = annotation!.initializer
+            if canStartInlineExpression() {
+                throw ParseError(
+                    "let '\(localName)' uses a value after a type annotation. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
+                )
+            }
+        } else {
+            annotation = nil
+            value = try parseExpression()
+            type = try inferInitializedBindingType(
+                name: localName,
+                explicitType: nil,
+                expression: value!,
+                accessibleTypes: accessibleContextTypes(),
+                bindingKindDescription: "let"
+            )
+        }
         if peek() == .equal {
             throw ParseError(
-                "let '\(localName)' uses `=` initialization. Use typed construction, for example `let \(localName): \(annotation.type.displayName)(value)`."
+                "let '\(localName)' uses `=` initialization. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
             )
-        } else if canStartInlineExpression() {
-            value = try parseExpression()
         }
         if peek() == .leftBrace {
             try consume(.leftBrace)
@@ -24,7 +43,7 @@ extension Parser {
             macros: macros,
             localName: localName,
             externalLabel: externalLabel,
-            typeName: annotation.type.displayName,
+            typeName: type.displayName,
             value: value
         )
     }

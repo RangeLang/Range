@@ -1,8 +1,8 @@
 function decodePair() -> Result<String, DecodingError> {
-    let values: [JSONValue]   [
+    let values: Array<JSONValue>([
         .int(value: 42),
         .string(value: "George"),
-    ]
+    ])
     let decoder   JSONDecoder(value: .array(values: values))
     state container   decoder.unkeyedContainer()
 
