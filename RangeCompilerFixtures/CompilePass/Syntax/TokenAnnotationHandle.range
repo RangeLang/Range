@@ -1,7 +1,7 @@
-@token("fixtureToken")
+#Token("fixtureToken")
 construct FixtureToken {
 }
 
 construct TokenHandleStore {
-    state tokens: Array<@token>()
+    state tokens: Array<#Token>()
 }

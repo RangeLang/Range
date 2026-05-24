@@ -4,238 +4,289 @@ construct ASCIILiteral {
 }
 
 @syntax
-@token(" ")
+#Token(" ")
+@lexer<.skip>
 construct Whitespace {
     let value: String
 }
 
 @syntax
-@token(",")
+#Token(",")
+@lexer<.emit>
 construct Comma {
 }
 
 @syntax
-@token(".")
+#Token(".")
+@lexer<.emit>
 construct Dot {
 }
 
 @syntax
-@token("{")
+#Token("{")
+@lexer<.emit>
+#Delimiter<.prefix>(RightBrace)
 construct LeftBrace {
 }
 
 @syntax
-@token("}")
+#Token("}")
+@lexer<.emit>
+#Delimiter<.postfix>(LeftBrace)
 construct RightBrace {
 }
 
 @syntax
-@token("(")
+#Token("(")
+@lexer<.emit>
+#Delimiter<.prefix>(RightParen)
 construct LeftParen {
 }
 
 @syntax
-@token(")")
+#Token(")")
+@lexer<.emit>
+#Delimiter<.postfix>(LeftParen)
 construct RightParen {
 }
 
 @syntax
-@token("[")
+#Token("[")
+@lexer<.emit>
+#Delimiter<.prefix>(RightBracket)
 construct LeftBracket {
 }
 
 @syntax
-@token("]")
+#Token("]")
+@lexer<.emit>
+#Delimiter<.postfix>(LeftBracket)
 construct RightBracket {
 }
 
 @syntax
-@token(":")
+#Token(":")
+@lexer<.emit>
 construct Colon {
 }
 
 @syntax
-@token("*")
+#Token("*")
+@lexer<.emit>
 construct Asterisk {
 }
 
 @syntax
-@token("/")
+#Token("/")
+@lexer<.emit>
 construct Slash {
 }
 
 @syntax
-@token("$")
+#Token("$")
+@lexer<.emit>
 construct Dollar {
 }
 
 @syntax
-@token("%")
+#Token("%")
+@lexer<.emit>
 construct Percent {
 }
 
 @syntax
-@token("#")
+#Token("#")
+@lexer<.emit>
 construct Hash {
 }
 
 @syntax
-@token("...")
+#Token("...")
+@lexer<.emit>
 construct Ellipsis {
 }
 
 @syntax
-@token("->")
+#Token("->")
+@lexer<.emit>
 construct Arrow {
 }
 
 @syntax
-@token("-")
+#Token("-")
+@lexer<.emit>
 construct Minus {
 }
 
 @syntax
-@token("!")
+#Token("!")
+@lexer<.emit>
 construct Bang {
 }
 
 @syntax
-@token("!=")
+#Token("!=")
+@lexer<.emit>
 construct BangEqual {
 }
 
 @syntax
-@token("=")
+#Token("=")
+@lexer<.emit>
 construct Equal {
 }
 
 @syntax
-@token("==")
+#Token("==")
+@lexer<.emit>
 construct EqualEqual {
 }
 
 @syntax
-@token("<")
+#Token("<")
+@lexer<.emit>
 construct Less {
 }
 
 @syntax
-@token("<=")
+#Token("<=")
+@lexer<.emit>
 construct LessEqual {
 }
 
 @syntax
-@token(">")
+#Token(">")
+@lexer<.emit>
 construct Greater {
 }
 
 @syntax
-@token(">=")
+#Token(">=")
+@lexer<.emit>
 construct GreaterEqual {
 }
 
 @syntax
-@token("+")
+#Token("+")
+@lexer<.emit>
 construct Plus {
 }
 
 @syntax
-@token("+=")
+#Token("+=")
+@lexer<.emit>
 construct PlusEqual {
 }
 
 @syntax
-@token("&")
+#Token("&")
+@lexer<.emit>
 construct Ampersand {
 }
 
 @syntax
-@token("&&")
+#Token("&&")
+@lexer<.emit>
 construct AndAnd {
 }
 
 @syntax
-@token("|")
+#Token("|")
+@lexer<.emit>
 construct Pipe {
 }
 
 @syntax
-@token("||")
+#Token("||")
+@lexer<.emit>
 construct OrOr {
 }
 
 @syntax
-@token("?")
+#Token("?")
+@lexer<.emit>
 construct Question {
 }
 
 @syntax
-@token("??")
+#Token("??")
+@lexer<.emit>
 construct QuestionQuestion {
 }
 
 @syntax
-@token("identifier")
+#Token("identifier")
+@lexer<.emit>
 construct IdentifierToken {
     let value: String
 }
 
 @syntax
-@token("keywordIdentifier")
+#Token("keywordIdentifier")
+@lexer<.emit>
 construct Keyword {
     let value: String
 }
 
 @syntax
-@token("`identifier`")
+#Token("`identifier`")
+@lexer<.emit>
 construct EscapedIdentifier {
     let value: String
 }
 
 @syntax
-@token("quotedString")
+#Token("quotedString")
+@lexer<.emit>
 construct StringLiteralToken {
     let value: String
 }
 
 @syntax
-@token("digits")
+#Token("digits")
+@lexer<.emit>
 construct IntegerLiteral {
     let value: String
 }
 
 @syntax
-@token("digits.digits")
+#Token("digits.digits")
+@lexer<.emit>
 construct DoubleLiteral {
     let value: String
 }
 
 @syntax
-@token("#identifier")
+#Token("#identifier")
+@lexer<.emit>
 construct HashDirective {
     let value: String
 }
 
 @syntax
-@token("@identifier")
+#Token("@identifier")
+@lexer<.emit>
 construct AtAttribute {
     let name: String
 }
 
 @syntax
-@token("foreignBody")
+#Token("foreignBody")
+@lexer<.emit>
 construct ForeignBody {
     let language: String
     let text: String
 }
 
 @syntax
-@token("end")
+#Token("end")
+@lexer<.emit>
 construct EOF {
 }
 
 @syntax
-@token("//")
+#Token("//")
+@lexer<.diagnostic>
 construct LineComment {
 }
 

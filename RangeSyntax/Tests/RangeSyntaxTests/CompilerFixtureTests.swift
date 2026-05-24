@@ -908,6 +908,103 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.syntaxResolver.typeConformsToSyntax(.named("Expression")))
     }
 
+    @Test("Token metadata reads delimiter markers")
+    func tokenMetadataReadsDelimiterMarkers() throws {
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
+        let tokens = program.declarationGraph.tokenMetadataConcepts
+        let delimiters = program.declarationGraph.tokenDelimiterConcepts
+        let lexerTokens = program.declarationGraph.lexerTokenConcepts
+
+        #expect(
+            tokens.contains(
+                TokenMetadataConcept(
+                    token: "LeftBracket",
+                    pattern: "[",
+                    delimiter: TokenDelimiterConcept(
+                        token: "LeftBracket",
+                        role: .prefix,
+                        pairedToken: "RightBracket"
+                    )
+                )
+            )
+        )
+        #expect(
+            tokens.contains(
+                TokenMetadataConcept(token: "Comma", pattern: ",", delimiter: nil)
+            )
+        )
+        #expect(
+            lexerTokens.contains(
+                LexerTokenConcept(token: "Whitespace", pattern: " ", option: .skip, delimiter: nil)
+            )
+        )
+        #expect(
+            lexerTokens.contains(
+                LexerTokenConcept(token: "Comma", pattern: ",", option: .emit, delimiter: nil)
+            )
+        )
+        #expect(
+            lexerTokens.contains(
+                LexerTokenConcept(
+                    token: "LineComment",
+                    pattern: "//",
+                    option: .diagnostic,
+                    delimiter: nil
+                )
+            )
+        )
+        #expect(
+            lexerTokens.contains(
+                LexerTokenConcept(
+                    token: "LeftBracket",
+                    pattern: "[",
+                    option: .emit,
+                    delimiter: TokenDelimiterConcept(
+                        token: "LeftBracket",
+                        role: .prefix,
+                        pairedToken: "RightBracket"
+                    )
+                )
+            )
+        )
+        #expect(
+            delimiters.contains(
+                TokenDelimiterConcept(
+                    token: "LeftBrace",
+                    role: .prefix,
+                    pairedToken: "RightBrace"
+                )
+            )
+        )
+        #expect(
+            delimiters.contains(
+                TokenDelimiterConcept(
+                    token: "LeftParen",
+                    role: .prefix,
+                    pairedToken: "RightParen"
+                )
+            )
+        )
+        #expect(
+            delimiters.contains(
+                TokenDelimiterConcept(
+                    token: "LeftBracket",
+                    role: .prefix,
+                    pairedToken: "RightBracket"
+                )
+            )
+        )
+        #expect(
+            delimiters.contains(
+                TokenDelimiterConcept(
+                    token: "RightBracket",
+                    role: .postfix,
+                    pairedToken: "LeftBracket"
+                )
+            )
+        )
+    }
+
     @Test("Declaration graph carries source locations")
     func declarationGraphCarriesSourceLocations() throws {
         let source = """

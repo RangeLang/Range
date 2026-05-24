@@ -1,8 +1,0 @@
-#Important
-construct ImportantMarkerFixture {
-    let value: Int
-}
-
-@main {
-    let fixture: ImportantMarkerFixture(value: 1)
-}

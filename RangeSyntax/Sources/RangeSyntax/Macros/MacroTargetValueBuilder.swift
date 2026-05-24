@@ -263,17 +263,22 @@ struct MacroTargetValueBuilder {
             argumentClause: application.argumentClause,
             rawBody: application.rawBody
         )
+        let genericBindings = markerGenericArgumentBindings(
+            for: marker,
+            application: application
+        )
+        let initialBindings = bindings.merging(genericBindings) { _, generic in generic }
         let markerBindings = marker.bindings
 
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: markerBindings?.target ?? "__marker_target__",
             targetValue: targetValue,
             graphBinding: markerBindings?.graph,
-            localBindings: bindings,
+            localBindings: initialBindings,
             context: context
         )
 
-        var localBindings = bindings
+        var localBindings = initialBindings
         var value: CompileTimeValue?
         for statement in marker.body {
             switch statement {
@@ -302,6 +307,20 @@ struct MacroTargetValueBuilder {
         }
 
         return value
+    }
+
+    private static func markerGenericArgumentBindings(
+        for marker: MarkerDeclaration,
+        application: MacroApplication
+    ) -> [String: Expression] {
+        var bindings: [String: Expression] = [:]
+        for (parameter, argument) in zip(marker.genericParameters, application.genericArguments) {
+            guard case .value(let name, _, _) = parameter else {
+                continue
+            }
+            bindings[name] = .identifier(argument.displayName)
+        }
+        return bindings
     }
 
     private static func markerValue(_ value: CompileTimeValue, matches type: TypeReference) -> Bool {

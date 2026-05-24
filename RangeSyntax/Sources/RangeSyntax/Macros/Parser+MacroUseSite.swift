@@ -125,10 +125,10 @@ extension Parser {
         }
 
         try consume(.less)
-        var arguments: [TypeReference] = [try parseTypeReferenceNode()]
+        var arguments: [TypeReference] = [try parseGenericArgumentReferenceNode()]
         while peek() == .comma {
             advance()
-            arguments.append(try parseTypeReferenceNode())
+            arguments.append(try parseGenericArgumentReferenceNode())
         }
         try consume(.greater)
         return arguments

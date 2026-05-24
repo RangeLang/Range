@@ -1,0 +1,12 @@
+@syntax
+enum LexingOption {
+    case emit
+    case skip
+    case diagnostic
+}
+
+@syntax
+construct Lexing {
+    let token: Identifier
+    let option: LexingOption
+}

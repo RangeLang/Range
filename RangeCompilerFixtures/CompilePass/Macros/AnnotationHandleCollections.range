@@ -1,10 +1,10 @@
-#View
+#Token("annotationHandleView")
 @access(InternalGraph)
 construct AnnotationHandleView {
     let id: Int
 }
 
 construct AnnotationHandleStore {
-    state views: [#View]
+    state views: [#Token]
     state accessMacros: [@access]
 }

@@ -27,7 +27,6 @@ let package = Package(
                 "GraphBindings/Derived/Derived.md",
                 "GraphBindings/MemoryGraph/DeclarationGraph.md",
                 "GraphBindings/MemoryGraph/MemoryGraph.md",
-                "GraphBindings/MemoryGraph/MemoryGraph.ProofRules.md",
                 "GraphBindings/State/State.md",
                 "GraphBindings/Value/Value.md",
                 "ControlFlow/ControlFlow.md",

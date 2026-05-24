@@ -8,7 +8,11 @@ extension ApplicationGraphValidator {
         let bindingConstructNames = Set(
             parsedFiles
                 .flatMap { declarations(in: $0.sourceFile) }
-                .filter { !declarationGraph.bindings(onConstruct: $0.name).isEmpty }
+                .filter {
+                    declarationGraph.bindings(onConstruct: $0.name).contains(where: {
+                        !isMetadataBinding($0)
+                    })
+                }
                 .map(\.name)
         )
 
@@ -276,4 +280,8 @@ extension ApplicationGraphValidator {
 
         return text.isEmpty ? nil : text
     }
+}
+
+private func isMetadataBinding(_ binding: BindingDeclaration) -> Bool {
+    binding.typeName.contains("@") || binding.typeName.contains("#")
 }

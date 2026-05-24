@@ -527,8 +527,11 @@ public struct DeclarationGraph {
                 capturesSyntax: false
             )
         }
-        let bindings = construct.bindings.map { binding in
-            RangeFunctionParameter(
+        let bindings = construct.bindings.compactMap { binding -> RangeFunctionParameter? in
+            guard !binding.typeName.contains("@") && !binding.typeName.contains("#") else {
+                return nil
+            }
+            return RangeFunctionParameter(
                 macros: [],
                 localName: binding.name,
                 externalLabel: binding.externalLabel ?? binding.name,

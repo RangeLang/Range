@@ -137,7 +137,11 @@ extension MacroExpander {
                     "\(kind) #\(name) argument for \(parameter.localName) should not use label \(actualLabel)."
                 )
             }
-            bindings[parameter.localName] = argument.value
+            bindings[parameter.localName] = normalizedArgumentValue(
+                argument.value,
+                for: parameter,
+                kind: kind
+            )
         }
 
         for parameter in parameters.dropFirst(arguments.count) {
@@ -148,6 +152,26 @@ extension MacroExpander {
         }
 
         return bindings
+    }
+
+    private static func normalizedArgumentValue(
+        _ value: Expression,
+        for parameter: RangeFunctionParameter,
+        kind: String
+    ) -> Expression {
+        guard kind == "Marker" else {
+            return value
+        }
+        guard case .named("Identifier") = parameter.typeReference,
+            case .identifier(let name) = value
+        else {
+            return value
+        }
+
+        return .call(
+            name: "Identifier",
+            arguments: [CallArgument(label: "name", value: .string(name))]
+        )
     }
 
     static func macroArgumentLabel(for parameter: RangeFunctionParameter) -> String? {

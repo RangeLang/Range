@@ -241,9 +241,9 @@ struct CompileTimeValueEvaluator {
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
             "ValueGeneric", "Graph.Identity", "Macro.Application", "Macro.Declaration", "Macro.Target",
-            "Marker.Application", "Proof", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
+            "Marker.Application", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
-            "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexicalToken", "TokenKind", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
+            "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexicalToken", "TokenKind", "Token", "Lexing", "Delimiter", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
                 guard let label = argument.label,

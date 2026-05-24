@@ -1,6 +1,6 @@
 import Foundation
 
-// Range lexer source fingerprint: fb285db573abda7f
+// Range lexer source fingerprint: f2c135ded807d05d
 // Boundary rule: lexer behavior belongs in RangeCore/Syntax/Lexing/*.range.
 // This Swift file adapts the parser to the Range-authored bootstrap projection.
 
