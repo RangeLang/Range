@@ -1,4 +1,4 @@
-#syntax
+@syntax
 construct MemberTypeReference: NominalTypeReference {
     let base: NominalTypeReference
     let name: String

@@ -240,9 +240,9 @@ struct CompileTimeValueEvaluator {
         case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
-            "ValueGeneric", "Graph.Identity", "Macro.Application", "Marker.Application", "Block", "Switch",
+            "ValueGeneric", "Graph.Identity", "Macro.Application", "Marker.Application", "Proof", "Block", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
-            "ArrayExpression", "EnumCaseExpression":
+            "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexicalToken", "TokenKind", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
                 guard let label = argument.label,
@@ -304,7 +304,7 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        let supportedSuffixes = [".snakeCase"]
+        let supportedSuffixes = [".snakeCase", ".obfuscated", ".lastComponent"]
         guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
             arguments.isEmpty,
             let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
@@ -313,7 +313,25 @@ struct CompileTimeValueEvaluator {
             return nil
         }
 
-        return .string(snakeCase(value))
+        switch suffix {
+        case ".snakeCase":
+            return .string(snakeCase(value))
+        case ".obfuscated":
+            return .string(obfuscated(value))
+        case ".lastComponent":
+            return .string(value.split(separator: ".").last.map(String.init) ?? value)
+        default:
+            return nil
+        }
+    }
+
+    private func obfuscated(_ name: String) -> String {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in name.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 0x100000001b3
+        }
+        return "r_" + String(hash, radix: 16)
     }
 
     private func snakeCase(_ name: String) -> String {

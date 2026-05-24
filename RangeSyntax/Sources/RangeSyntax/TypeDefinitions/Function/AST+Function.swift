@@ -47,7 +47,7 @@ public struct RangeFunctionParameter {
             return "binding \(typeReference.displayName)"
         }
         if capturesSyntax {
-            return "capture \(typeReference.displayName)"
+            return "@capture \(typeReference.displayName)"
         }
         return typeReference.displayName
     }

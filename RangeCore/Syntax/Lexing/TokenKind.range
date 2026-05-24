@@ -1,0 +1,43 @@
+@syntax
+enum TokenKind {
+    case hash
+    case identifier(value: String)
+    case hashDirective(value: String)
+    case foreignBody(language: String, text: String)
+    case stringLiteral(value: String)
+    case integer(value: String)
+    case double(value: String)
+    case keyword(value: String)
+    case atAttribute(name: String, argument: String?)
+    case leftBrace
+    case rightBrace
+    case leftParen
+    case rightParen
+    case leftBracket
+    case rightBracket
+    case asterisk
+    case dot
+    case ellipsis
+    case colon
+    case arrow
+    case bang
+    case equal
+    case equalEqual
+    case bangEqual
+    case minus
+    case less
+    case lessEqual
+    case greater
+    case greaterEqual
+    case plus
+    case plusEqual
+    case slash
+    case andAnd
+    case orOr
+    case question
+    case questionQuestion
+    case dollar
+    case percent
+    case comma
+    case eof
+}

@@ -670,11 +670,10 @@ extension MacroExpander {
         for application in applications {
             guard let macro = macros[application.name] else {
                 if let marker = context.markerDeclarationsByName[application.name] {
-                    guard allowedMacroTargetKinds(for: propertyKind)
-                        .contains(macroTargetKind(for: marker.target.typeReference))
+                    guard macroTargetAllowsAny(marker.target, kinds: allowedMacroTargetKinds(for: propertyKind))
                     else {
                         throw ParseError(
-                            "Marker #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(marker.target.typeReference.displayName)."
+                            "Marker #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(marker.target.displayName)."
                         )
                     }
                     guard context.propertyMarkerTargetMatches(
@@ -683,7 +682,7 @@ extension MacroExpander {
                         propertyValueType: propertyValueType
                     ) else {
                         throw ParseError(
-                            "Marker #\(application.name) targeting \(marker.target.typeReference.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
+                            "Marker #\(application.name) targeting \(marker.target.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                         )
                     }
                     _ = try parseMarkerArgumentBindings(
@@ -707,9 +706,9 @@ extension MacroExpander {
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard allowedMacroTargetKinds(for: propertyKind).contains(macroTargetKind(for: macro)) else {
+            guard macroTargetAllowsAny(macro.target!, kinds: allowedMacroTargetKinds(for: propertyKind)) else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target!.typeReference.displayName)."
+                    "Macro #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target!.displayName)."
                 )
             }
             guard context.propertyMacroTargetMatches(
@@ -718,7 +717,7 @@ extension MacroExpander {
                 propertyValueType: propertyValueType
             ) else {
                 throw ParseError(
-                    "Macro #\(application.name) targeting \(macro.target!.typeReference.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
+                    "Macro #\(application.name) targeting \(macro.target!.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                 )
             }
 
@@ -1317,7 +1316,7 @@ extension MacroExpander {
             let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
                 macroApplication in
                 guard let macro = macros[macroApplication.name],
-                    macroTargetKind(for: macro) == .parameter
+                    macroTargetAllows(macro.target!, kind: .parameter)
                 else {
                     return nil
                 }
@@ -1443,7 +1442,7 @@ extension MacroExpander {
             return .call(name: name, arguments: callArguments)
         case .macroInvocation(let name, let arguments):
             guard let macro = macros[name],
-                macroTargetKind(for: macro) == .expression
+                macroTargetAllows(macro.target!, kind: .expression)
             else {
                 let rewrittenArguments = try arguments.map { argument in
                     CallArgument(
@@ -1650,7 +1649,7 @@ extension MacroExpander {
         var emitted = EmittedDeclarationBundle()
 
         for application in construct.macros {
-            guard let macro = macros[application.name], macroTargetKind(for: macro) == .construct else {
+            guard let macro = macros[application.name], macroTargetAllows(macro.target!, kind: .construct) else {
                 continue
             }
             let argumentBindings = try parseMacroArgumentBindings(
@@ -1699,7 +1698,7 @@ extension MacroExpander {
         var emitted = EmittedDeclarationBundle()
 
         for application in enumeration.macros {
-            guard let macro = macros[application.name], macroTargetKind(for: macro) == .enumeration else {
+            guard let macro = macros[application.name], macroTargetAllows(macro.target!, kind: .enumeration) else {
                 continue
             }
             emitted.merge(
@@ -1726,7 +1725,7 @@ extension MacroExpander {
         for application in protocolDeclaration.macros {
             guard
                 let macro = macros[application.name],
-                macroTargetKind(for: macro) == .protocolDefinition
+                macroTargetAllows(macro.target!, kind: .protocolDefinition)
             else {
                 continue
             }
@@ -2481,8 +2480,12 @@ extension MacroExpander {
             return "+="
         case .slash:
             return "/"
+        case .ampersand:
+            return "&"
         case .andAnd:
             return "&&"
+        case .pipe:
+            return "|"
         case .orOr:
             return "||"
         case .question:

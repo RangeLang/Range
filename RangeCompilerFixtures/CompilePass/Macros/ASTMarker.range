@@ -1,0 +1,8 @@
+#AST
+construct GenericASTNodeFixture {
+    let identifier: Identifier
+}
+
+@main {
+    let fixture: GenericASTNodeFixture(identifier: Identifier(name: "node"))
+}

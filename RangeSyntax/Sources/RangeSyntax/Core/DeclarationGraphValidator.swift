@@ -10,6 +10,27 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             in: program.projectParsedFiles,
             declarationGraph: program.declarationGraph
         )
+        let coreParsedFiles = program.parsedFiles.filter { program.sourceRole(forPath: $0.path) == .core }
+        let closedCoreMarkerNames = Set(
+            coreParsedFiles
+                .flatMap { markerDeclarations(in: $0.sourceFile) }
+                .filter { $0.packageVisibility == .closed }
+                .map(\.name)
+        )
+        let closedCoreMacroNames = Set(
+            coreParsedFiles
+                .flatMap { macroDeclarations(in: $0.sourceFile) }
+                .filter { $0.packageVisibility == .closed }
+                .map(\.name)
+        )
+        try validateClosedMarkerUsage(
+            in: program.projectParsedFiles,
+            closedMarkerNames: closedCoreMarkerNames
+        )
+        try validateClosedMacroUsage(
+            in: program.projectParsedFiles,
+            closedMacroNames: closedCoreMacroNames
+        )
         try validatePrimaryDeclarations(in: program.parsedFiles)
         try validateTopLevelStates(in: program.parsedFiles)
         try validateProtocolConformances(in: program.declarationGraph)
@@ -555,6 +576,234 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         }
     }
 
+    private func validateClosedMarkerUsage(
+        in parsedFiles: [ParsedSourceFile],
+        closedMarkerNames: Set<String>
+    ) throws {
+        guard !closedMarkerNames.isEmpty else {
+            return
+        }
+
+        for parsedFile in parsedFiles {
+            for usage in markerUsages(in: parsedFile.sourceFile) {
+                guard let marker = usage.macros.first(where: { closedMarkerNames.contains($0.name) }) else {
+                    continue
+                }
+                throw SemanticValidationError(
+                    "Closed marker #\(marker.name) can only be used inside its declaring package. Remove #\(marker.name) from \(usage.declarationName) in \(lastPathComponent(of: parsedFile.path))."
+                )
+            }
+        }
+    }
+
+    private func validateClosedMacroUsage(
+        in parsedFiles: [ParsedSourceFile],
+        closedMacroNames: Set<String>
+    ) throws {
+        guard !closedMacroNames.isEmpty else {
+            return
+        }
+
+        for parsedFile in parsedFiles {
+            for usage in macroUsages(in: parsedFile.sourceFile) {
+                guard let macro = usage.macros.first(where: { closedMacroNames.contains($0.name) }) else {
+                    continue
+                }
+                throw SemanticValidationError(
+                    "Closed macro #\(macro.name) can only be used inside its declaring package. Remove #\(macro.name) from \(usage.declarationName) in \(lastPathComponent(of: parsedFile.path))."
+                )
+            }
+        }
+    }
+
+    private func markerUsages(in sourceFile: SourceFileNode) -> [MarkerUsage] {
+        switch sourceFile {
+        case .construct(let declaration):
+            return markerUsages(in: declaration)
+        case .namespace(let declaration):
+            return markerUsages(in: declaration)
+        case .enumeration(let declaration):
+            return [MarkerUsage(macros: declaration.macros, declarationName: declaration.name)]
+        case .protocolDefinition(let declaration):
+            return markerUsages(in: declaration)
+        case .extensions(let declarations):
+            return declarations.flatMap(markerUsages(in:))
+        case .module(let module):
+            return module.states.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+                + module.callables.flatMap(markerUsages(in:))
+                + module.constructs.flatMap(markerUsages(in:))
+                + module.namespaces.flatMap(markerUsages(in:))
+                + module.enumerations.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+                + module.protocols.flatMap(markerUsages(in:))
+                + module.packageSpaces.flatMap(markerUsages(in:))
+                + module.extensions.flatMap(markerUsages(in:))
+        case .mainBlock, .macro, .marker:
+            return []
+        }
+    }
+
+    private func markerUsages(in declaration: ConstructDeclaration) -> [MarkerUsage] {
+        [MarkerUsage(macros: declaration.macros, declarationName: declaration.name)]
+            + declaration.values.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.states.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.bindings.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.deriveds.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.initializers.flatMap(markerUsages(in:))
+            + declaration.callables.flatMap(markerUsages(in:))
+            + declaration.constructs.flatMap(markerUsages(in:))
+    }
+
+    private func markerUsages(in declaration: NamespaceDeclaration) -> [MarkerUsage] {
+        declaration.values.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.callables.flatMap(markerUsages(in:))
+            + declaration.constructs.flatMap(markerUsages(in:))
+            + declaration.namespaces.flatMap(markerUsages(in:))
+    }
+
+    private func markerUsages(in declaration: ProtocolDeclaration) -> [MarkerUsage] {
+        [MarkerUsage(macros: declaration.macros, declarationName: declaration.name)]
+            + declaration.values.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.states.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.bindings.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.deriveds.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.initializers.flatMap(markerUsages(in:))
+            + declaration.callables.flatMap(markerUsages(in:))
+    }
+
+    private func markerUsages(in declaration: ExtensionDeclaration) -> [MarkerUsage] {
+        [MarkerUsage(macros: declaration.macros, declarationName: declaration.targetName)]
+            + declaration.initializers.flatMap(markerUsages(in:))
+            + declaration.callables.flatMap(markerUsages(in:))
+            + declaration.constructs.flatMap(markerUsages(in:))
+            + declaration.namespaces.flatMap(markerUsages(in:))
+            + declaration.enumerations.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.protocols.flatMap(markerUsages(in:))
+    }
+
+    private func markerUsages(in declaration: PackageSpaceDeclaration) -> [MarkerUsage] {
+        declaration.values.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.callables.flatMap(markerUsages(in:))
+            + declaration.constructs.flatMap(markerUsages(in:))
+            + declaration.namespaces.flatMap(markerUsages(in:))
+            + declaration.enumerations.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+            + declaration.protocols.flatMap(markerUsages(in:))
+    }
+
+    private func markerUsages(in declaration: InitializerDeclaration) -> [MarkerUsage] {
+        [MarkerUsage(macros: declaration.macros, declarationName: "init")]
+            + declaration.parameters.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+    }
+
+    private func markerUsages(in declaration: CallableDeclaration) -> [MarkerUsage] {
+        [MarkerUsage(macros: declaration.macros, declarationName: declaration.name)]
+            + declaration.parameters.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+    }
+
+    private func macroUsages(in sourceFile: SourceFileNode) -> [MarkerUsage] {
+        markerUsages(in: sourceFile) + expressionMacroUsages(in: sourceFile)
+    }
+
+    private func expressionMacroUsages(in sourceFile: SourceFileNode) -> [MarkerUsage] {
+        switch sourceFile {
+        case .mainBlock(let mainBlock):
+            return expressionMacroUsages(in: mainBlock.body, declarationName: "@main")
+        case .module(let module):
+            return module.mainBlock.map { expressionMacroUsages(in: $0.body, declarationName: "@main") } ?? []
+        default:
+            return []
+        }
+    }
+
+    private func expressionMacroUsages(in statements: [Statement], declarationName: String) -> [MarkerUsage] {
+        statements.flatMap { expressionMacroUsages(in: $0, declarationName: declarationName) }
+    }
+
+    private func expressionMacroUsages(in statement: Statement, declarationName: String) -> [MarkerUsage] {
+        switch statement {
+        case .expression(let expression), .return(let expression?):
+            return expressionMacroUsages(in: expression, declarationName: declarationName)
+        case .localBinding(let declaration):
+            return expressionMacroUsages(in: declaration.expression, declarationName: declaration.name)
+        case .assignment(_, let expression), .compoundAssignment(_, _, let expression):
+            return expressionMacroUsages(in: expression, declarationName: declarationName)
+        case .forEach(_, let sequence, let body):
+            return expressionMacroUsages(in: sequence, declarationName: declarationName)
+                + expressionMacroUsages(in: body, declarationName: declarationName)
+        case .whileLoop(let condition, let body):
+            return expressionMacroUsages(in: condition, declarationName: declarationName)
+                + expressionMacroUsages(in: body, declarationName: declarationName)
+        case .conditional(let branches):
+            return branches.flatMap { branch in
+                (branch.condition.map { expressionMacroUsages(in: $0, declarationName: declarationName) } ?? [])
+                    + expressionMacroUsages(in: branch.body, declarationName: declarationName)
+            }
+        case .switchStatement(let expression, let cases, let defaultBody):
+            return expressionMacroUsages(in: expression, declarationName: declarationName)
+                + cases.flatMap { expressionMacroUsages(in: $0.body, declarationName: declarationName) }
+                + (defaultBody.map { expressionMacroUsages(in: $0, declarationName: declarationName) } ?? [])
+        case .background(let background):
+            return expressionMacroUsages(in: background.body, declarationName: declarationName)
+        case .deferBlock(let deferred):
+            return expressionMacroUsages(in: deferred.body, declarationName: declarationName)
+        case .localCallable(let declaration):
+            return expressionMacroUsages(in: declaration.body, declarationName: declaration.name)
+        case .macroInvocation, .expand, .derived, .return(nil), .break, .continue:
+            return []
+        }
+    }
+
+    private func expressionMacroUsages(in expression: Expression, declarationName: String) -> [MarkerUsage] {
+        switch expression {
+        case .macroInvocation(let name, let arguments):
+            return [MarkerUsage(macros: [MacroApplication(name: name, genericArguments: [], argumentClause: nil)], declarationName: declarationName)]
+                + arguments.flatMap { expressionMacroUsages(in: $0.value, declarationName: declarationName) }
+        case .call(_, let arguments):
+            return arguments.flatMap { expressionMacroUsages(in: $0.value, declarationName: declarationName) }
+        case .array(let elements):
+            return elements.flatMap { expressionMacroUsages(in: $0, declarationName: declarationName) }
+        case .dictionary(let elements):
+            return elements.flatMap {
+                expressionMacroUsages(in: $0.key, declarationName: declarationName)
+                    + expressionMacroUsages(in: $0.value, declarationName: declarationName)
+            }
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return expressionMacroUsages(in: condition, declarationName: declarationName)
+                + expressionMacroUsages(in: trueExpression, declarationName: declarationName)
+                + expressionMacroUsages(in: falseExpression, declarationName: declarationName)
+        case .unary(_, let expression):
+            return expressionMacroUsages(in: expression, declarationName: declarationName)
+        case .binary(let lhs, _, let rhs):
+            return expressionMacroUsages(in: lhs, declarationName: declarationName)
+                + expressionMacroUsages(in: rhs, declarationName: declarationName)
+        case .block(let statements):
+            return expressionMacroUsages(in: statements, declarationName: declarationName)
+        case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral, .identifier, .bindingReference:
+            return []
+        }
+    }
+
+    private func macroDeclarations(in sourceFile: SourceFileNode) -> [MacroDeclaration] {
+        switch sourceFile {
+        case .macro(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.macros
+        case .construct, .namespace, .enumeration, .protocolDefinition, .marker, .mainBlock, .extensions:
+            return []
+        }
+    }
+
+    private func markerDeclarations(in sourceFile: SourceFileNode) -> [MarkerDeclaration] {
+        switch sourceFile {
+        case .marker(let declaration):
+            return [declaration]
+        case .module(let module):
+            return module.markers
+        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+            return []
+        }
+    }
+
     private func attributedConstructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
         switch sourceFile {
         case .construct(let declaration):
@@ -670,6 +919,11 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     private func lastPathComponent(of path: String) -> String {
         URL(fileURLWithPath: path).lastPathComponent
     }
+}
+
+private struct MarkerUsage {
+    let macros: [MacroApplication]
+    let declarationName: String
 }
 
 private struct ProtocolRequirements {

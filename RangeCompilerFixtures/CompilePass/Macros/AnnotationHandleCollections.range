@@ -1,0 +1,10 @@
+#View
+@access(InternalGraph)
+construct AnnotationHandleView {
+    let id: Int
+}
+
+construct AnnotationHandleStore {
+    state views: [#View]
+    state accessMacros: [@access]
+}

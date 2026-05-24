@@ -1,0 +1,7 @@
+
+#Token
+construct LexicalToken {
+    let kind: TokenKind
+    let range: SourceRange
+    let source: String
+}

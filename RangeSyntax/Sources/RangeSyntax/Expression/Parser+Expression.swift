@@ -128,6 +128,8 @@ extension Parser {
                 name: name,
                 arguments: try parseInvocationArgumentsIfPresent()
             )
+        case .atAttribute(let name, _) where isSingleCapturedSyntaxExpressionMacro(name):
+            return try parseCapturedSyntaxExpressionMacroInvocation(name: name)
         case .atAttribute(let name, _) where isMacroApplicationAttribute(name):
             advance()
             return .macroInvocation(
@@ -192,6 +194,50 @@ extension Parser {
         }
 
         return .call(name: fullName, arguments: arguments)
+    }
+
+    func isSingleCapturedSyntaxExpressionMacro(_ name: String) -> Bool {
+        guard let macro = macroDeclarationsByName[name] else {
+            return false
+        }
+        return macro.parameters.count == 1 && macro.parameters[0].capturesSyntax
+    }
+
+    mutating func parseCapturedSyntaxExpressionMacroInvocation(name: String) throws -> Expression {
+        advance()
+        try consume(.leftParen)
+
+        var depth = 1
+        var parts: [String] = []
+        while depth > 0 {
+            let token = advance()
+            switch token {
+            case .leftParen:
+                depth += 1
+                parts.append(renderMacroToken(token))
+            case .rightParen:
+                depth -= 1
+                if depth > 0 {
+                    parts.append(renderMacroToken(token))
+                }
+            case .eof:
+                throw ParseError("Unterminated captured macro argument clause.")
+            default:
+                parts.append(renderMacroToken(token))
+            }
+        }
+
+        let rawArgument = parts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawArgument.isEmpty else {
+            throw ParseError("Captured macro argument cannot be empty.")
+        }
+
+        return .macroInvocation(
+            name: name,
+            arguments: [
+                CallArgument(label: nil, value: .identifier(rawArgument))
+            ]
+        )
     }
 
     func isClosureExpressionStart() -> Bool {
@@ -437,7 +483,7 @@ extension Parser {
                     return true
                 }
             case .eof, .leftBrace, .rightBrace, .rightParen, .rightBracket, .equal, .equalEqual,
-                .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .andAnd, .orOr,
+                .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .ampersand, .andAnd, .pipe, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
             case .hash, .hashDirective, .foreignBody, .atAttribute, .dollar, .percent, .bang:

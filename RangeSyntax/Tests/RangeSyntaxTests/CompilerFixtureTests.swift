@@ -655,7 +655,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/ProjectMacros.range",
                 source: """
-                macro captureText(_ value: capture Expression): Expression -> String { target, diagnostics in
+                macro captureText(@capture _ value: Expression): Expression -> String { target, diagnostics in
                     target.replace(with: "captured: \\(value)")
                 }
                 """,
@@ -693,7 +693,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     return "Hello"
                 }
 
-                macro captureText(_ value: capture Expression): Expression -> String { target, diagnostics in
+                macro captureText(@capture _ value: Expression): Expression -> String { target, diagnostics in
                     target.replace(with: "captured: \\(value)")
                 }
                 """,
@@ -759,7 +759,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.constructsByName["Namespace.Application"]?.isCore == true)
     }
 
-    @Test("#syntax declarations are syntax-facing without Syntax conformance")
+    @Test("@syntax declarations are syntax-facing without Syntax conformance")
     func syntaxDeclarationsAreSyntaxFacingWithoutSyntaxConformance() throws {
         let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
         let graph = program.declarationGraph
@@ -1663,6 +1663,118 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         expectSharedGenericShape(module.macros[0].genericParameters)
     }
 
+
+
+    @Test("Closed macros cannot be used outside declaring package")
+    func closedMacrosCannotBeUsedOutsideDeclaringPackage() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/test/ClosedMacro.range",
+                source: """
+                closed macro coreOnly(): Construct { target, diagnostics in
+                    target.declaration.expand {
+                    }
+                }
+                """,
+                role: .core
+            )
+        )
+        inputs.append(
+            SourceInput(
+                path: "/test/UseClosedMacro.range",
+                source: """
+                @coreOnly
+                construct UseClosedMacro {
+                }
+                """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected closed macro use outside its package to fail.")
+        } catch {
+            #expect(String(describing: error).contains("Closed macro #coreOnly can only be used inside its declaring package"))
+        }
+    }
+
+    @Test("Range runtime hook executes range lexer declaration")
+    func rangeRuntimeHookExecutesRangeLexerDeclaration() throws {
+        let program = try CompilerPipeline().build(
+            inputs: try rangeCoreInputs(),
+            runtimeHooks: [RangeFunctionRuntimeHook(functionName: "rangeLexer")]
+        )
+
+        let result = try #require(
+            program.runtimeHookResults.first { $0.hookName == "range.function.rangeLexer" }
+        )
+        let artifact = try #require(result.artifacts["rangeLexer"])
+
+        #expect(artifact.contains("Lexer("))
+        #expect(artifact.contains("LexerRule("))
+        #expect(artifact.contains("whitespace"))
+        #expect(artifact.contains("hashDirective"))
+    }
+
+    @Test("Compiler pipeline runtime hooks run beside Swift pipeline")
+    func compilerPipelineRuntimeHooksRunBesideSwiftPipeline() throws {
+        let hook = RecordingRuntimeHook()
+        let diagnostics = RangeDiagnosticEngine()
+        let program = try CompilerPipeline().build(
+            inputs: try rangeCoreInputs(),
+            diagnosticEngine: diagnostics,
+            runtimeHooks: [hook]
+        )
+
+        #expect(hook.stages == [
+            .coreDeclarationsDiscovered,
+            .coreParsed,
+            .projectDeclarationsDiscovered,
+            .projectParsed,
+            .macrosExpanded,
+            .declarationGraphBuilt,
+        ])
+        #expect(program.runtimeHookResults.count == 6)
+        #expect(program.runtimeHookResults.last?.artifacts["constructs"] != nil)
+        #expect(
+            diagnostics.diagnostics.contains {
+                $0.source == "range-runtime-hook"
+                    && $0.code == "runtime.side-by-side"
+            }
+        )
+    }
+
+}
+
+private final class RecordingRuntimeHook: CompilerPipelineRuntimeHook {
+    let name = "recording"
+    var stages: [CompilerPipelineRuntimeStage] = []
+
+    func run(context: CompilerPipelineRuntimeContext) throws -> CompilerPipelineRuntimeResult? {
+        stages.append(context.stage)
+
+        guard context.stage == .declarationGraphBuilt else {
+            return CompilerPipelineRuntimeResult(hookName: name, stage: context.stage)
+        }
+
+        return CompilerPipelineRuntimeResult(
+            hookName: name,
+            stage: context.stage,
+            diagnostics: [
+                RangeDiagnostic(
+                    severity: .information,
+                    message: "runtime hook observed declaration graph",
+                    source: "range-runtime-hook",
+                    code: "runtime.side-by-side"
+                )
+            ],
+            artifacts: [
+                "constructs": String(context.declarationGraph?.constructsByName.count ?? 0)
+            ]
+        )
+    }
 }
 
 private enum FixtureRole {

@@ -1,0 +1,18 @@
+construct Proof {
+}
+
+closed marker Token(): Construct -> Proof {
+    return Proof()
+}
+
+open marker Important(): Construct -> Proof {
+    return Proof()
+}
+
+open marker AST(): Construct -> Proof {
+    return Proof()
+}
+
+open marker View(): Construct -> Proof {
+    return Proof()
+}

@@ -131,16 +131,18 @@ struct Lexer {
                 emit(.dollar, start: start)
             case "&":
                 advance()
-                guard match("&") else {
-                    throw ParseError("Unexpected character &.", range: range(from: start))
+                if match("&") {
+                    emit(.andAnd, start: start)
+                } else {
+                    emit(.ampersand, start: start)
                 }
-                emit(.andAnd, start: start)
             case "|":
                 advance()
-                guard match("|") else {
-                    throw ParseError("Unexpected character |.", range: range(from: start))
+                if match("|") {
+                    emit(.orOr, start: start)
+                } else {
+                    emit(.pipe, start: start)
                 }
-                emit(.orOr, start: start)
             case "%":
                 advance()
                 emit(.percent, start: start)

@@ -54,7 +54,7 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws -> Expression? {
         guard let macro = macros[macroName],
-            [.initializer, .function].contains(macroTargetKind(for: macro))
+            macroTargetAllowsAny(macro.target!, kinds: [.initializer, .function])
         else {
             return nil
         }
@@ -105,7 +105,7 @@ extension MacroExpander {
 
         for macroApplication in target.macros {
             guard let macro = macros[macroApplication.name],
-                macroTargetKind(for: macro) == .initializer
+                macroTargetAllows(macro.target!, kind: .initializer)
             else {
                 continue
             }
@@ -438,9 +438,9 @@ extension MacroExpander {
             }
             guard let macro = macros[application.name] else {
                 if let marker = context.markerDeclarationsByName[application.name] {
-                    guard macroTargetKind(for: marker.target.typeReference) == .construct else {
+                    guard macroTargetAllows(marker.target, kind: .construct) else {
                         throw ParseError(
-                            "Marker #\(application.name) is used on a construct but targets \(marker.target.typeReference.displayName)."
+                            "Marker #\(application.name) is used on a construct but targets \(marker.target.displayName)."
                         )
                     }
                     _ = try parseMarkerArgumentBindings(
@@ -461,9 +461,9 @@ extension MacroExpander {
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetKind(for: macro) == .construct else {
+            guard macroTargetAllows(macro.target!, kind: .construct) else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on a construct but targets \(macro.target!.typeReference.displayName)."
+                    "Macro #\(application.name) is used on a construct but targets \(macro.target!.displayName)."
                 )
             }
             try emitMacroDiagnostics(from: macro.body, macro: macro, context: context)
@@ -482,9 +482,9 @@ extension MacroExpander {
         for application in applications {
             guard let macro = macros[application.name] else {
                 if let marker = context.markerDeclarationsByName[application.name] {
-                    guard macroTargetKind(for: marker.target.typeReference) == .typeExtension else {
+                    guard macroTargetAllows(marker.target, kind: .typeExtension) else {
                         throw ParseError(
-                            "Marker #\(application.name) is used on an extension but targets \(marker.target.typeReference.displayName)."
+                            "Marker #\(application.name) is used on an extension but targets \(marker.target.displayName)."
                         )
                     }
                     _ = try parseMarkerArgumentBindings(
@@ -507,9 +507,9 @@ extension MacroExpander {
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetKind(for: macro) == .typeExtension else {
+            guard macroTargetAllows(macro.target!, kind: .typeExtension) else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on an extension but targets \(macro.target!.typeReference.displayName)."
+                    "Macro #\(application.name) is used on an extension but targets \(macro.target!.displayName)."
                 )
             }
             try emitMacroDiagnostics(from: macro.body, macro: macro, context: context)

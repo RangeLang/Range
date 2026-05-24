@@ -2,14 +2,40 @@ import Foundation
 
 extension Parser {
     func isMacroDeclarationStart() -> Bool {
-        peek() == .keyword(RangeSyntax.Keyword.macro.rawValue)
+        if peek() == .keyword(RangeSyntax.Keyword.macro.rawValue) {
+            return true
+        }
+        if peek() == .keyword(RangeSyntax.Keyword.open.rawValue)
+            || peek() == .keyword(RangeSyntax.Keyword.closed.rawValue)
+        {
+            return peek(offset: 1) == .keyword(RangeSyntax.Keyword.macro.rawValue)
+        }
+        return false
     }
 
     func isMarkerDeclarationStart() -> Bool {
-        peek() == .keyword(RangeSyntax.Keyword.marker.rawValue)
+        if peek() == .keyword(RangeSyntax.Keyword.marker.rawValue) {
+            return true
+        }
+        if peek() == .keyword(RangeSyntax.Keyword.open.rawValue)
+            || peek() == .keyword(RangeSyntax.Keyword.closed.rawValue)
+        {
+            return peek(offset: 1) == .keyword(RangeSyntax.Keyword.marker.rawValue)
+        }
+        return false
     }
 
     mutating func parseMacroDeclaration(signatureOnly: Bool = false) throws -> MacroDeclaration {
+        let packageVisibility: PackageVisibility
+        if peek() == .keyword(RangeSyntax.Keyword.closed.rawValue) {
+            try consumeKeyword(.closed)
+            packageVisibility = .closed
+        } else if peek() == .keyword(RangeSyntax.Keyword.open.rawValue) {
+            try consumeKeyword(.open)
+            packageVisibility = .open
+        } else {
+            packageVisibility = .open
+        }
         try consumeKeyword(.macro)
 
         let name = try consumeCallableName()
@@ -41,6 +67,7 @@ extension Parser {
                 body = []
             }
             return MacroDeclaration(
+                packageVisibility: packageVisibility,
                 name: name,
                 genericParameters: genericParameters,
                 parameters: parameters,
@@ -93,6 +120,7 @@ extension Parser {
         }
 
         return MacroDeclaration(
+            packageVisibility: packageVisibility,
             name: name,
             genericParameters: genericParameters,
             parameters: parameters,
@@ -105,10 +133,48 @@ extension Parser {
     }
 
     mutating func parseMacroTarget() throws -> MacroTarget {
-        .syntax(try parseTypeReferenceNode())
+        try parseMacroTargetList()
     }
 
+    mutating func parseMacroTargetList() throws -> MacroTarget {
+        var targets = [try parseMacroTargetUnion()]
+        while peek() == .comma {
+            advance()
+            targets.append(try parseMacroTargetUnion())
+        }
+        return targets.count == 1 ? targets[0] : .anyOf(targets)
+    }
+
+    mutating func parseMacroTargetUnion() throws -> MacroTarget {
+        var targets = [try parseMacroTargetIntersection()]
+        while peek() == .pipe {
+            advance()
+            targets.append(try parseMacroTargetIntersection())
+        }
+        return targets.count == 1 ? targets[0] : .anyOf(targets)
+    }
+
+    mutating func parseMacroTargetIntersection() throws -> MacroTarget {
+        var targets = [MacroTarget.syntax(try parseTypeReferenceNode())]
+        while peek() == .ampersand {
+            advance()
+            targets.append(.syntax(try parseTypeReferenceNode()))
+        }
+        return targets.count == 1 ? targets[0] : .allOf(targets)
+    }
+
+
     mutating func parseMarkerDeclaration(signatureOnly: Bool = false) throws -> MarkerDeclaration {
+        let packageVisibility: PackageVisibility
+        if peek() == .keyword(RangeSyntax.Keyword.closed.rawValue) {
+            try consumeKeyword(.closed)
+            packageVisibility = .closed
+        } else if peek() == .keyword(RangeSyntax.Keyword.open.rawValue) {
+            try consumeKeyword(.open)
+            packageVisibility = .open
+        } else {
+            packageVisibility = .open
+        }
         try consumeKeyword(.marker)
 
         let name = try consumeCallableName()
@@ -121,11 +187,12 @@ extension Parser {
         let parameters = try parseFunctionParameters(allowSyntaxCapture: false)
 
         try consume(.colon)
-        let firstType = try parseTypeReferenceNode()
+        let firstTarget = try parseMacroTarget()
+        let firstType = firstTarget.typeReference
         let target: MacroTarget
         let valueType: TypeReference
         if peek() == .arrow {
-            target = .syntax(firstType)
+            target = firstTarget
             try consume(.arrow)
             valueType = try parseTypeReferenceNode()
         } else if let effectTarget = firstType.markerEffectTarget {
@@ -142,6 +209,7 @@ extension Parser {
             guard peek() == .leftBrace else {
                 body = []
                 return MarkerDeclaration(
+                    packageVisibility: packageVisibility,
                     name: name,
                     genericParameters: genericParameters,
                     parameters: parameters,
@@ -165,6 +233,7 @@ extension Parser {
         }
 
         return MarkerDeclaration(
+            packageVisibility: packageVisibility,
             name: name,
             genericParameters: genericParameters,
             parameters: parameters,

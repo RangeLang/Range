@@ -36,17 +36,24 @@ extension MacroExpander {
             )
         }
 
-        var parser = try Parser(source: "macro(\(normalizedArgumentClause))")
-        _ = try parser.consumeCallableName()
-        let arguments = try parser.parseInvocationArgumentsIfPresent()
-        try parser.consume(Token.eof)
+        do {
+            var parser = try Parser(source: "macro(\(normalizedArgumentClause))")
+            _ = try parser.consumeCallableName()
+            let arguments = try parser.parseInvocationArgumentsIfPresent()
+            try parser.consume(Token.eof)
 
-        return try argumentBindings(
-            kind: "Macro",
-            name: macro.name,
-            parameters: parameters,
-            arguments: arguments
-        )
+            return try argumentBindings(
+                kind: "Macro",
+                name: macro.name,
+                parameters: parameters,
+                arguments: arguments
+            )
+        } catch {
+            if parameters.count == 1, parameters[0].capturesSyntax {
+                return [parameters[0].localName: .identifier(normalizedArgumentClause)]
+            }
+            throw error
+        }
     }
 
     static func parseMarkerArgumentBindings(

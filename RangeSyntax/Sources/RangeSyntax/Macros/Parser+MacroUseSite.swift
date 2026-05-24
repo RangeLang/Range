@@ -247,8 +247,12 @@ extension Parser {
             return "+="
         case .slash:
             return "/"
+        case .ampersand:
+            return "&"
         case .andAnd:
             return "&&"
+        case .pipe:
+            return "|"
         case .orOr:
             return "||"
         case .question:

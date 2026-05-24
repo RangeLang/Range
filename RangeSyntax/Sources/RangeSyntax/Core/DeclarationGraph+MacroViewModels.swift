@@ -81,6 +81,31 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
     }
 }
 
+
+func macroTargetKinds(for target: MacroTarget) -> Set<MacroTargetKind> {
+    switch target {
+    case .syntax(let typeReference):
+        return [macroTargetKind(for: typeReference)]
+    case .anyOf(let targets), .allOf(let targets):
+        return Set(targets.flatMap { macroTargetKinds(for: $0) })
+    }
+}
+
+func macroTargetAllows(_ target: MacroTarget, kind: MacroTargetKind) -> Bool {
+    switch target {
+    case .syntax(let typeReference):
+        return macroTargetKind(for: typeReference) == kind
+    case .anyOf(let targets):
+        return targets.contains { macroTargetAllows($0, kind: kind) }
+    case .allOf(let targets):
+        return targets.allSatisfy { macroTargetAllows($0, kind: kind) }
+    }
+}
+
+func macroTargetAllowsAny(_ target: MacroTarget, kinds: Set<MacroTargetKind>) -> Bool {
+    kinds.contains { macroTargetAllows(target, kind: $0) }
+}
+
 func indexedReference(
     _ identifier: String,
     prefix: String,
@@ -112,7 +137,7 @@ struct MacroRegistryView {
         targetKind: MacroTargetKind
     ) -> MacroDeclaration? {
         applications.lazy.compactMap { macrosByName[$0.name] }.first(where: {
-            macroTargetKind(for: $0) == targetKind
+            macroTargetAllows($0.target!, kind: targetKind)
         })
     }
 
@@ -121,7 +146,7 @@ struct MacroRegistryView {
         targetKind: MacroTargetKind
     ) -> [MacroDeclaration] {
         applications.compactMap { application in
-            guard let macro = macrosByName[application.name], macroTargetKind(for: macro) == targetKind
+            guard let macro = macrosByName[application.name], macroTargetAllows(macro.target!, kind: targetKind)
             else {
                 return nil
             }
@@ -543,7 +568,7 @@ struct MacroExpansionContext {
 
         return matcher.matches(
             actual: actualTargetType,
-            expected: macro.target!.typeReference
+            expected: macro.target!
         )
     }
 
@@ -564,7 +589,7 @@ struct MacroExpansionContext {
 
         return matcher.matches(
             actual: actualTargetType,
-            expected: marker.target.typeReference
+            expected: marker.target
         )
     }
 
@@ -612,7 +637,7 @@ struct MacroExpansionContext {
                 allowedDescription = allowedPaths.sorted().joined(separator: ", ")
             }
             throw ParseError(
-                "Macro #\(macro.name) targeting \(macro.target!.typeReference.displayName) uses unsupported replace site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
+                "Macro #\(macro.name) targeting \(macro.target!.displayName) uses unsupported replace site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
             )
         }
     }
@@ -627,7 +652,7 @@ struct MacroExpansionContext {
             targetType: macro.target!.typeReference
         ) else {
             throw ParseError(
-                "Macro #\(macro.name) targeting \(macro.target!.typeReference.displayName) uses unsupported expand site '\(path).expand'."
+                "Macro #\(macro.name) targeting \(macro.target!.displayName) uses unsupported expand site '\(path).expand'."
             )
         }
     }
@@ -820,8 +845,23 @@ private struct MacroTargetTypeMatcher {
 
     func matches(
         actual: TypeReference,
+        expected: MacroTarget
+    ) -> Bool {
+        switch expected {
+        case .syntax(let typeReference):
+            return matches(actual: actual, expected: typeReference)
+        case .anyOf(let targets):
+            return targets.contains { matches(actual: actual, expected: $0) }
+        case .allOf(let targets):
+            return targets.allSatisfy { matches(actual: actual, expected: $0) }
+        }
+    }
+
+    func matches(
+        actual: TypeReference,
         expected: TypeReference
     ) -> Bool {
+
         var bindings: [String: TypeReference] = [:]
         guard typeMatches(actual: actual, expected: expected, bindings: &bindings) else {
             return false

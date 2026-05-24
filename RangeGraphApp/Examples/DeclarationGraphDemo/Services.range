@@ -1,0 +1,71 @@
+protocol WorkspaceRepository {
+  function save(workspace: Workspace): String
+  function load(): Workspace
+}
+
+protocol ActivityRecording {
+  function record(event: ActivityEvent): String
+}
+
+protocol SearchProviding {
+  function query(text: String): SearchResult
+}
+
+enum SyncState {
+  case idle
+  case syncing
+  case failed
+}
+
+construct SearchResult {
+  let title: String
+  let score: Int
+  binding project: Project
+}
+
+construct PermissionPolicy {
+  binding user: User
+  binding project: Project
+
+  derived canEdit: Bool {
+    user.role == .owner
+  }
+}
+
+construct InMemoryWorkspaceRepository: WorkspaceRepository {
+  state workspace: Workspace
+
+  function save(workspace: Workspace): String {
+    return workspace.title
+  }
+
+  function load(): Workspace {
+    return workspace
+  }
+}
+
+construct ActivityLog: ActivityRecording {
+  state latestEvent: ActivityEvent
+
+  function record(event: ActivityEvent): String {
+    return event.summary
+  }
+}
+
+construct SearchIndex: SearchProviding {
+  binding workspace: Workspace
+
+  function query(text: String): SearchResult {
+    return SearchResult(title: text, score: 1, project: workspace.project)
+  }
+}
+
+construct SyncEngine {
+  binding repository: InMemoryWorkspaceRepository
+  binding activityLog: ActivityLog
+  state syncState: SyncState
+
+  function push(workspace: Workspace): String {
+    return repository.save(workspace: workspace)
+  }
+}

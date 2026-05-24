@@ -33,7 +33,9 @@ enum Token: Equatable {
     case plus
     case plusEqual
     case slash
+    case ampersand
     case andAnd
+    case pipe
     case orOr
     case question
     case questionQuestion

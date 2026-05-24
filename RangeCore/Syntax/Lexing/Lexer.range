@@ -1,0 +1,5 @@
+@syntax
+construct Lexer {
+    let rules: [LexerRule]
+    let tokens: [LexicalToken]
+}

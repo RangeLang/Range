@@ -33,6 +33,8 @@ enum RangeSyntax {
         case construct = "construct"
         case macro = "macro"
         case marker = "marker"
+        case open = "open"
+        case closed = "closed"
         case function = "function"
         case getter = "get"
         case setter = "set"

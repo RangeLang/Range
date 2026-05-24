@@ -232,7 +232,14 @@ extension Parser {
                 var typeReference: TypeReference?
                 var slotName: String?
                 var isBinding = false
-                var capturesSyntax = false
+                let capturesSyntax = macros.contains { $0.name == "capture" }
+                if capturesSyntax {
+                    guard allowSyntaxCapture else {
+                        throw ParseError(
+                            "@capture parameters are only valid in macro declarations."
+                        )
+                    }
+                }
                 if peek() == .colon {
                     try consume(.colon)
                     if case .atAttribute(let slot, _) = peek() {
@@ -243,19 +250,10 @@ extension Parser {
                             advance()
                             isBinding = true
                         }
-                        if case .identifier(let name) = peek(), name == "capture" {
-                            if isBinding {
-                                throw ParseError(
-                                    "binding capture parameters are not supported."
-                                )
-                            }
-                            guard allowSyntaxCapture else {
-                                throw ParseError(
-                                    "capture parameters are only valid in macro declarations."
-                                )
-                            }
-                            advance()
-                            capturesSyntax = true
+                        if capturesSyntax && isBinding {
+                            throw ParseError(
+                                "binding capture parameters are not supported."
+                            )
                         }
                         typeReference = try parseTypeReferenceNode()
                     }

@@ -22,6 +22,7 @@ public struct CompiledProgram {
     public let parsedFiles: [ParsedSourceFile]
     public let expandedFiles: [ParsedSourceFile]
     public let declarationGraph: DeclarationGraph
+    public let runtimeHookResults: [CompilerPipelineRuntimeResult]
 
     private let inputRoleByPath: [String: SourceInputRole]
 
@@ -29,12 +30,14 @@ public struct CompiledProgram {
         inputs: [SourceInput],
         parsedFiles: [ParsedSourceFile],
         expandedFiles: [ParsedSourceFile],
-        declarationGraph: DeclarationGraph
+        declarationGraph: DeclarationGraph,
+        runtimeHookResults: [CompilerPipelineRuntimeResult] = []
     ) {
         self.inputs = inputs
         self.parsedFiles = parsedFiles
         self.expandedFiles = expandedFiles
         self.declarationGraph = declarationGraph
+        self.runtimeHookResults = runtimeHookResults
         self.inputRoleByPath = Dictionary(
             uniqueKeysWithValues: inputs.map { ($0.path, $0.role) }
         )
@@ -78,7 +81,8 @@ public struct CompilerPipeline {
 
     public func build(
         inputs: [SourceInput],
-        diagnosticEngine: RangeDiagnosticEngine? = nil
+        diagnosticEngine: RangeDiagnosticEngine? = nil,
+        runtimeHooks: [any CompilerPipelineRuntimeHook] = []
     ) throws -> CompiledProgram {
         let orderedInputs = inputs.sorted { lhs, rhs in
             if lhs.role != rhs.role {
@@ -89,9 +93,18 @@ public struct CompilerPipeline {
 
         let coreInputs = orderedInputs.filter { $0.role == .core }
         let projectInputs = orderedInputs.filter { $0.role == .project }
+        var runtimeHookResults: [CompilerPipelineRuntimeResult] = []
 
         let discoveredCoreDeclarationFiles = try discoverProjectDeclarationFiles(
             inputs: coreInputs
+        )
+        try runRuntimeHooks(
+            runtimeHooks,
+            stage: .coreDeclarationsDiscovered,
+            inputs: orderedInputs,
+            parsedFiles: discoveredCoreDeclarationFiles,
+            diagnosticEngine: diagnosticEngine,
+            results: &runtimeHookResults
         )
         let discoveredCoreGraph = DeclarationGraph(files: discoveredCoreDeclarationFiles)
         let discoveredCoreViews = discoveredCoreGraph.views
@@ -121,12 +134,30 @@ public struct CompilerPipeline {
             macroExpansionTypes: discoveredCoreMacroExpansionTypes
         )
 
+        try runRuntimeHooks(
+            runtimeHooks,
+            stage: .coreParsed,
+            inputs: orderedInputs,
+            parsedFiles: parsedCoreFiles,
+            diagnosticEngine: diagnosticEngine,
+            results: &runtimeHookResults
+        )
+
         let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
         let coreMarkersByName = MacroExpander.collectMarkers(from: parsedCoreFiles)
         let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(from: parsedCoreFiles)
         let discoveredProjectDeclarationFiles = try discoverProjectDeclarationFiles(
             inputs: projectInputs,
+            macroDeclarationsByName: coreMacrosByName,
             markerDeclarationsByName: coreMarkersByName
+        )
+        try runRuntimeHooks(
+            runtimeHooks,
+            stage: .projectDeclarationsDiscovered,
+            inputs: orderedInputs,
+            parsedFiles: parsedCoreFiles + discoveredProjectDeclarationFiles,
+            diagnosticEngine: diagnosticEngine,
+            results: &runtimeHookResults
         )
         let discoveredProjectGraph = DeclarationGraph(
             files: parsedCoreFiles + discoveredProjectDeclarationFiles
@@ -167,25 +198,59 @@ public struct CompilerPipeline {
         )
 
         let parsedFiles = parsedCoreFiles + parsedProjectFiles
+        try runRuntimeHooks(
+            runtimeHooks,
+            stage: .projectParsed,
+            inputs: orderedInputs,
+            parsedFiles: parsedFiles,
+            diagnosticEngine: diagnosticEngine,
+            results: &runtimeHookResults
+        )
+
         let expandedFiles = try MacroExpander.expand(
             files: parsedFiles,
             diagnosticEngine: diagnosticEngine
         )
+        try runRuntimeHooks(
+            runtimeHooks,
+            stage: .macrosExpanded,
+            inputs: orderedInputs,
+            parsedFiles: parsedFiles,
+            expandedFiles: expandedFiles,
+            diagnosticEngine: diagnosticEngine,
+            results: &runtimeHookResults
+        )
         let declarationGraph = DeclarationGraph(files: expandedFiles)
+        try runRuntimeHooks(
+            runtimeHooks,
+            stage: .declarationGraphBuilt,
+            inputs: orderedInputs,
+            parsedFiles: parsedFiles,
+            expandedFiles: expandedFiles,
+            declarationGraph: declarationGraph,
+            diagnosticEngine: diagnosticEngine,
+            results: &runtimeHookResults
+        )
 
         return CompiledProgram(
             inputs: orderedInputs,
             parsedFiles: parsedFiles,
             expandedFiles: expandedFiles,
-            declarationGraph: declarationGraph
+            declarationGraph: declarationGraph,
+            runtimeHookResults: runtimeHookResults
         )
     }
 
     public func buildValidated(
         inputs: [SourceInput],
-        diagnosticEngine: RangeDiagnosticEngine? = nil
+        diagnosticEngine: RangeDiagnosticEngine? = nil,
+        runtimeHooks: [any CompilerPipelineRuntimeHook] = []
     ) throws -> CompiledProgram {
-        let program = try build(inputs: inputs, diagnosticEngine: diagnosticEngine)
+        let program = try build(
+            inputs: inputs,
+            diagnosticEngine: diagnosticEngine,
+            runtimeHooks: runtimeHooks
+        )
         try CompiledProgramValidator().validate(program)
         return program
     }
@@ -208,6 +273,37 @@ public struct CompilerPipeline {
     public func validatePrimaryDeclarations(inputs: [SourceInput]) throws {
         let program = try build(inputs: inputs)
         try CompiledProgramValidator().validatePrimaryDeclarations(in: program)
+    }
+
+
+    private func runRuntimeHooks(
+        _ hooks: [any CompilerPipelineRuntimeHook],
+        stage: CompilerPipelineRuntimeStage,
+        inputs: [SourceInput],
+        parsedFiles: [ParsedSourceFile] = [],
+        expandedFiles: [ParsedSourceFile] = [],
+        declarationGraph: DeclarationGraph? = nil,
+        diagnosticEngine: RangeDiagnosticEngine?,
+        results: inout [CompilerPipelineRuntimeResult]
+    ) throws {
+        guard !hooks.isEmpty else { return }
+        let context = CompilerPipelineRuntimeContext(
+            stage: stage,
+            inputs: inputs,
+            parsedFiles: parsedFiles,
+            expandedFiles: expandedFiles,
+            declarationGraph: declarationGraph
+        )
+
+        for hook in hooks {
+            guard let result = try hook.run(context: context) else {
+                continue
+            }
+            results.append(result)
+            for diagnostic in result.diagnostics {
+                diagnosticEngine?.emit(diagnostic)
+            }
+        }
     }
 
     private func parse(
@@ -269,10 +365,20 @@ public struct CompilerPipeline {
 
     private func discoverProjectDeclarationFiles(
         inputs: [SourceInput],
+        macroDeclarationsByName: [String: MacroDeclaration] = [:],
         markerDeclarationsByName: [String: MarkerDeclaration] = [:]
     ) throws -> [ParsedSourceFile] {
+        let discoveredMacrosByName = try discoverMacroDeclarations(
+            inputs: inputs,
+            macroDeclarationsByName: macroDeclarationsByName,
+            markerDeclarationsByName: markerDeclarationsByName
+        )
+        let macrosByName = macroDeclarationsByName.merging(discoveredMacrosByName) {
+            _, new in new
+        }
         let discoveredMarkersByName = try discoverMarkerDeclarations(
             inputs: inputs,
+            macroDeclarationsByName: macrosByName,
             markerDeclarationsByName: markerDeclarationsByName
         )
         let markersByName = markerDeclarationsByName.merging(discoveredMarkersByName) {
@@ -283,6 +389,7 @@ public struct CompilerPipeline {
         for input in inputs {
             var parser = try Parser(
                 source: input.source,
+                macroDeclarationsByName: macrosByName,
                 markerDeclarationsByName: markersByName,
                 allowInitializerDeclarations: false
             )
@@ -297,8 +404,37 @@ public struct CompilerPipeline {
         return parsedFiles
     }
 
+    private func discoverMacroDeclarations(
+        inputs: [SourceInput],
+        macroDeclarationsByName: [String: MacroDeclaration],
+        markerDeclarationsByName: [String: MarkerDeclaration]
+    ) throws -> [String: MacroDeclaration] {
+        var macrosByName = macroDeclarationsByName
+
+        for input in inputs {
+            var parser = try Parser(
+                source: input.source,
+                macroDeclarationsByName: macrosByName,
+                markerDeclarationsByName: markerDeclarationsByName,
+                allowInitializerDeclarations: false
+            )
+            let parsedFile = ParsedSourceFile(
+                path: input.path,
+                source: input.source,
+                sourceFile: try parser.parseSourceFileForDeclarationDiscovery()
+            )
+            let discoveredMacros = MacroExpander.collectMacros(from: [parsedFile])
+            if !discoveredMacros.isEmpty {
+                macrosByName.merge(discoveredMacros) { _, new in new }
+            }
+        }
+
+        return macrosByName
+    }
+
     private func discoverMarkerDeclarations(
         inputs: [SourceInput],
+        macroDeclarationsByName: [String: MacroDeclaration],
         markerDeclarationsByName: [String: MarkerDeclaration]
     ) throws -> [String: MarkerDeclaration] {
         var markersByName = markerDeclarationsByName
@@ -306,6 +442,7 @@ public struct CompilerPipeline {
         for input in inputs {
             var parser = try Parser(
                 source: input.source,
+                macroDeclarationsByName: macroDeclarationsByName,
                 markerDeclarationsByName: markersByName,
                 allowInitializerDeclarations: false
             )

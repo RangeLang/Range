@@ -1,0 +1,7 @@
+@syntax
+construct LexerRule {
+    let name: String
+    let pattern: String
+    let token: String
+    let priority: Int
+}

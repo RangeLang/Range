@@ -139,6 +139,8 @@ struct MacroTargetValueBuilder {
             fields: [
                 "identity": graphIdentity(kind: "construct", name: qualifiedName),
                 "self": nominalTypeReference(qualifiedName),
+                "macros": .array(declaration.macros.map(value(for:))),
+                "markers": .array(markerValues(for: declaration.macros)),
                 "generics": .array(declaration.genericParameters.map(value(for:))),
                 "conformances": .array(declaration.conformances.map(typeReferenceValue)),
                 "inits": .array(declaration.initializers.map(value(for:))),
@@ -217,11 +219,21 @@ struct MacroTargetValueBuilder {
                 typeName: "Marker.Application",
                 fields: [
                     "identifier": identifier(application.name),
+                    "packageVisibility": .string(packageVisibilityName(for: marker.packageVisibility)),
                     "valueType": typeReferenceValue(marker.valueType),
                     "valueTypeName": .string(marker.valueType.displayName),
                     "value": value,
                 ]
             )
+        }
+    }
+
+    private func packageVisibilityName(for packageVisibility: PackageVisibility) -> String {
+        switch packageVisibility {
+        case .open:
+            return "open"
+        case .closed:
+            return "closed"
         }
     }
 
@@ -289,6 +301,8 @@ struct MacroTargetValueBuilder {
             return true
         case (.boolean, .named("Bool")):
             return true
+        case (.object(let typeName, _), .named(let name)):
+            return typeName == name
         default:
             return false
         }

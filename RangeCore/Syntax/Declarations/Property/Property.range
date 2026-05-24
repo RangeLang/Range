@@ -1,4 +1,4 @@
-#syntax
+@syntax
 protocol Property {
     let macros: [Macro.Application]
     let markers: [Marker.Application]
@@ -6,7 +6,7 @@ protocol Property {
     let type: TypeReference
 }
 
-#syntax
+@syntax
 protocol StoredProperty: Property {
     let value: Expression?
 }

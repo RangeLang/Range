@@ -1,4 +1,8 @@
-macro variadic(): Parameter { target, diagnostics in
+enum Delimiter {
+    case comma
+}
+
+macro variadic<let delimiter: Delimiter = .comma>(): Parameter { target, diagnostics in
     target.declaration.type.replace(with:
         ArrayTypeReference(
             element: target.declaration.type

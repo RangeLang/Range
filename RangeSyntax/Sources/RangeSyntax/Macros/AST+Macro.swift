@@ -1,6 +1,7 @@
 import Foundation
 
 public struct MacroDeclaration {
+    public let packageVisibility: PackageVisibility
     public let name: String
     public let genericParameters: [GenericParameter]
     public let parameters: [RangeFunctionParameter]
@@ -11,7 +12,13 @@ public struct MacroDeclaration {
     public let syntaxBody: EmittedCodeBlock?
 }
 
+public enum PackageVisibility {
+    case open
+    case closed
+}
+
 public struct MarkerDeclaration {
+    public let packageVisibility: PackageVisibility
     public let name: String
     public let genericParameters: [GenericParameter]
     public let parameters: [RangeFunctionParameter]
@@ -98,13 +105,37 @@ public struct MacroApplication {
     }
 }
 
-public enum MacroTarget {
+public indirect enum MacroTarget {
     case syntax(TypeReference)
+    case anyOf([MacroTarget])
+    case allOf([MacroTarget])
 
     public var typeReference: TypeReference {
         switch self {
         case .syntax(let typeReference):
             return typeReference
+        case .anyOf(let targets), .allOf(let targets):
+            return targets.first?.typeReference ?? .named("Unknown")
+        }
+    }
+
+    public var displayName: String {
+        switch self {
+        case .syntax(let typeReference):
+            return typeReference.displayName
+        case .anyOf(let targets):
+            return targets.map(\.displayName).joined(separator: " | ")
+        case .allOf(let targets):
+            return targets.map(\.displayName).joined(separator: " & ")
+        }
+    }
+
+    public var typeReferences: [TypeReference] {
+        switch self {
+        case .syntax(let typeReference):
+            return [typeReference]
+        case .anyOf(let targets), .allOf(let targets):
+            return targets.flatMap(\.typeReferences)
         }
     }
 }

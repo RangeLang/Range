@@ -1,0 +1,65 @@
+function makeTheme(): Theme {
+  let background: ColorToken(name: "Canvas", hex: "#111318")
+  let foreground: ColorToken(name: "Text", hex: "#F2F5F7")
+  let titleFont: TypographyToken(name: "Title", size: 16, weight: "semibold")
+  let bodyFont: TypographyToken(name: "Body", size: 13, weight: "regular")
+  let spacing: SpacingScale(name: "Base", unit: 8)
+  return Theme(
+    name: "Studio",
+    mode: .system,
+    density: .regular,
+    accent: .teal,
+    background: background,
+    foreground: foreground,
+    titleFont: titleFont,
+    bodyFont: bodyFont,
+    spacing: spacing
+  )
+}
+
+function makeWorkspace(): Workspace {
+  let owner: User(id: 1, name: "Ada", role: .owner, isOnline: true)
+  let team: Team(id: 10, name: "Design Systems", lead: owner, memberCount: 6)
+  let project: Project(id: 20, name: "Graph Studio", status: .active, owner: owner)
+  let milestone: Milestone(id: 30, name: "Workbench", progress: 58, project: project)
+  let item: WorkItem(id: 40, name: "File containers", priority: .high, assignee: owner, milestone: milestone)
+  return Workspace(id: 100, name: "Range Demo", team: team, project: project, activeMilestone: milestone, selectedItem: item)
+}
+
+@main {
+  state theme: makeTheme()
+  state workspace: makeWorkspace()
+  state repository: InMemoryWorkspaceRepository(workspace: workspace)
+  state latestEvent: ActivityEvent(id: 50, kind: .created, message: "opened workspace", actor: workspace.team.lead, project: workspace.project)
+  state activityLog: ActivityLog(latestEvent: latestEvent)
+  state searchIndex: SearchIndex(workspace: workspace)
+  state syncEngine: SyncEngine(repository: repository, activityLog: activityLog, syncState: .idle)
+  state policy: PermissionPolicy(user: workspace.team.lead, project: workspace.project)
+
+  state navigation: NavigationModel(
+    activePanel: .graph,
+    overview: SidebarItem(id: 1, title: "Overview", panel: .overview),
+    board: SidebarItem(id: 2, title: "Board", panel: .board),
+    graph: SidebarItem(id: 3, title: "Graph", panel: .graph),
+    settings: SidebarItem(id: 4, title: "Settings", panel: .settings)
+  )
+
+  state board: BoardViewModel(workspace: workspace, repository: repository, searchIndex: searchIndex, selectedItem: workspace.selectedItem)
+  state guide: LayoutGuide(name: "Workbench", spacing: theme.spacing, minWidth: 320, maxWidth: 1280)
+  state viewport: CanvasViewport(x: 0, y: 0, zoom: 1, guide: guide)
+  state node: NodeCard(id: 60, title: workspace.selectedItem.name, subtitle: workspace.project.name, visualState: .selected, theme: theme)
+  state targetNode: NodeCard(id: 61, title: workspace.activeMilestone.name, subtitle: workspace.project.status, visualState: .idle, theme: theme)
+  state edge: EdgeBadge(id: 70, title: "belongs to", direction: .outgoing, source: node, target: targetNode)
+  state section: InspectorSection(id: 80, title: "Selection", node: node, theme: theme)
+  state surface: GraphSurface(viewport: viewport, selectedNode: node, inspector: section, theme: theme)
+  state inspector: InspectorViewModel(workspace: workspace, policy: policy, selectedNode: node)
+  state commands: CommandPalette(navigation: navigation, board: board, syncEngine: syncEngine, query: "")
+  state dashboard: DashboardViewModel(workspace: workspace, navigation: navigation, board: board, inspector: inspector, surface: surface, commands: commands)
+
+  dashboard.refresh()
+  surface.viewport.zoomIn()
+
+  derived title: String {
+    dashboard.summary
+  }
+}

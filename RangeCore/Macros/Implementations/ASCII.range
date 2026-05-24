@@ -1,0 +1,3 @@
+closed macro ASCII(@capture _ value: Expression): Expression -> String { target, diagnostics in
+    target.replace(with: "\(value)")
+}

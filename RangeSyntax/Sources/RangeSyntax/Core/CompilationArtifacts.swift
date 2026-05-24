@@ -125,8 +125,12 @@ public struct CompilationArtifactsEmitter {
             return "plusEqual"
         case .slash:
             return "slash"
+        case .ampersand:
+            return "ampersand"
         case .andAnd:
             return "andAnd"
+        case .pipe:
+            return "pipe"
         case .orOr:
             return "orOr"
         case .question:

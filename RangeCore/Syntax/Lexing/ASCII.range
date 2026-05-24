@@ -1,0 +1,23 @@
+@syntax
+construct ASCIILiteral {
+    let value: String
+}
+
+@syntax
+construct Whitespace {
+    let value: String
+}
+
+@syntax
+construct ASCIISymbol {
+    let value: String
+}
+
+@syntax
+construct ASCIIIdentifierCharacter {
+    let value: String
+}
+@syntax
+construct ASCII {
+    let value: ASCIILiteral
+}

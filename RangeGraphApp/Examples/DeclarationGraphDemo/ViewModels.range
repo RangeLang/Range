@@ -1,0 +1,73 @@
+construct NavigationModel {
+  state activePanel: PanelKind
+  let overview: SidebarItem
+  let board: SidebarItem
+  let graph: SidebarItem
+  let settings: SidebarItem
+
+  function currentPanelTitle(): String {
+    return "\(activePanel)"
+  }
+}
+
+construct BoardViewModel {
+  binding workspace: Workspace
+  binding repository: InMemoryWorkspaceRepository
+  binding searchIndex: SearchIndex
+  state selectedItem: WorkItem
+
+  derived title: String {
+    workspace.title
+  }
+
+  function preview(item: WorkItem): String {
+    return item.name
+  }
+
+  function save() {
+    repository.save(workspace: workspace)
+  }
+}
+
+construct InspectorViewModel {
+  binding workspace: Workspace
+  binding policy: PermissionPolicy
+  state selectedNode: NodeCard
+
+  derived heading: String {
+    "\(workspace.selectedItem.name) details"
+  }
+}
+
+construct CommandPalette {
+  binding navigation: NavigationModel
+  binding board: BoardViewModel
+  binding syncEngine: SyncEngine
+  state query: String
+
+  function openGraph(): String {
+    return navigation.currentPanelTitle()
+  }
+
+  function synchronize(): String {
+    return syncEngine.push(workspace: board.workspace)
+  }
+}
+
+construct DashboardViewModel {
+  binding workspace: Workspace
+  binding navigation: NavigationModel
+  binding board: BoardViewModel
+  binding inspector: InspectorViewModel
+  binding surface: GraphSurface
+  binding commands: CommandPalette
+
+  derived summary: String {
+    "\(workspace.title) / \(navigation.activePanel)"
+  }
+
+  function refresh() {
+    board.save()
+    commands.synchronize()
+  }
+}

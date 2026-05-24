@@ -1,0 +1,28 @@
+@syntax
+enum CompilerPipelineRuntimeStage {
+    case coreDeclarationsDiscovered
+    case coreParsed
+    case projectDeclarationsDiscovered
+    case projectParsed
+    case macrosExpanded
+    case declarationGraphBuilt
+}
+
+@syntax
+construct CompilerPipelineRuntimeContext {
+    let stage: CompilerPipelineRuntimeStage
+}
+
+@syntax
+construct CompilerPipelineRuntimeResult {
+    let hookName: String
+    let stage: CompilerPipelineRuntimeStage
+    let diagnostics: [String]
+    let artifacts: [String]
+}
+
+@syntax
+construct CompilerPipelineRuntimeHook {
+    let name: String
+    let stages: [CompilerPipelineRuntimeStage]
+}

@@ -2118,7 +2118,7 @@ private struct SemanticGraphCollector {
         addEntity(id: macroID, kind: .macro, label: declaration.name)
         addRelation(from: parentID, to: macroID, kind: .contains)
         if let target = declaration.target {
-            addTypeReference(target.typeReference, from: macroID, kind: .targetsMacro)
+            addTypeReferences(target.typeReferences, from: macroID, kind: .targetsMacro)
         }
         if let expansionType = declaration.expansionType {
             addTypeReference(expansionType, from: macroID, kind: .referencesType)
@@ -2129,7 +2129,7 @@ private struct SemanticGraphCollector {
         let markerID = "\(parentID)/marker:\(declaration.name)"
         addEntity(id: markerID, kind: .marker, label: declaration.name)
         addRelation(from: parentID, to: markerID, kind: .contains)
-        addTypeReference(declaration.target.typeReference, from: markerID, kind: .targetsMacro)
+        addTypeReferences(declaration.target.typeReferences, from: markerID, kind: .targetsMacro)
         addTypeReference(declaration.valueType, from: markerID, kind: .referencesType)
     }
 

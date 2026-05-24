@@ -947,7 +947,7 @@ public enum ExpressionTypeSemantics {
                 return nil
             }
             switch (baseName, memberName, arguments.count) {
-            case ("String", "snakeCase", 0):
+            case ("String", "snakeCase", 0), ("String", "obfuscated", 0), ("String", "lastComponent", 0):
                 return baseType
             case ("Array", "map", 1), ("Array", "compactMap", 1), ("Array", "flatMap", 1),
                 ("Array", "filter", 1):

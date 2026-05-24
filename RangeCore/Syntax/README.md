@@ -80,7 +80,7 @@ ExpressionStatement
 
 The broad protocols still matter. `Array.Expression` can conform to
 `Expression`, and `Array.TypeReference` can conform to `StructuralTypeReference`.
-The `#syntax` marker marks compiler-visible syntax surfaces. The nested
+The `` marker marks compiler-visible syntax surfaces. The nested
 name records semantic ownership, while capability protocol conformance records
 how the broader compiler pipeline can consume it.
 
@@ -94,7 +94,7 @@ In short:
 
 - Granularize where the graphs need stable meaning.
 - Nest syntax under the concept that semantically owns it.
-- Use `#syntax` for compiler-visible syntax surfaces.
+- Use `` for compiler-visible syntax surfaces.
 - Use capability protocols for consumption across the compiler.
 - Do not promote punctuation or renderer details into syntax constructs.
 

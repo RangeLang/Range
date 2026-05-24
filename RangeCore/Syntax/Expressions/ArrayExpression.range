@@ -1,4 +1,4 @@
-#syntax
+@syntax
 construct ArrayExpression: Expression {
     let type: TypeReference?
     let elements: [Expression]

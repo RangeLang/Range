@@ -1,0 +1,8 @@
+#View
+construct ProofCollectionView {
+    let id: Int
+}
+
+construct ProofCollectionStore {
+    state views: [#View]
+}
