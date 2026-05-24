@@ -968,7 +968,7 @@ struct GraphCollector {
     private func renderParameterList(_ parameters: [RangeFunctionParameter]) -> String {
         parameters.map { parameter in
             let typeName =
-                parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+                parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
                 ?? "_"
             let label = parameter.externalLabel ?? "_"
             return "\(label):\(typeName)"

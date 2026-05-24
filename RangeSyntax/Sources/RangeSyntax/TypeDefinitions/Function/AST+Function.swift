@@ -9,6 +9,7 @@ public struct RangeFunctionParameter {
     public let slotName: String?
     public let isBinding: Bool
     public let capturesSyntax: Bool
+    public let captureMetadataType: TypeReference?
 
     public init(
         macros: [MacroApplication],
@@ -18,7 +19,8 @@ public struct RangeFunctionParameter {
         defaultValue: Expression? = nil,
         slotName: String?,
         isBinding: Bool = false,
-        capturesSyntax: Bool = false
+        capturesSyntax: Bool = false,
+        captureMetadataType: TypeReference? = nil
     ) {
         self.macros = macros
         self.localName = localName
@@ -28,6 +30,7 @@ public struct RangeFunctionParameter {
         self.slotName = slotName
         self.isBinding = isBinding
         self.capturesSyntax = capturesSyntax
+        self.captureMetadataType = captureMetadataType
     }
 
     public var name: String {
@@ -47,7 +50,8 @@ public struct RangeFunctionParameter {
             return "binding \(typeReference.displayName)"
         }
         if capturesSyntax {
-            return "@capture \(typeReference.displayName)"
+            let metadata = captureMetadataType.map { "<\($0.displayName)>" } ?? ""
+            return "@capture\(metadata) \(typeReference.displayName)"
         }
         return typeReference.displayName
     }

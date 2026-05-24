@@ -9,14 +9,14 @@ Expression-targeted and block-targeted macros are syntax rewrites invoked direct
 - Come in expression and block forms
 
 ```range
-macro stringify(value _: capture Expression): Expression -> String { }
+macro stringify(@capture<Expression> _ value: Expression): Expression -> String { }
 macro lock(): Block { }
 ```
 
 - Are declared by direct target type
 
 ```range
-macro stringify(value _: capture Expression): Expression -> String { }
+macro stringify(@capture<Expression> _ value: Expression): Expression -> String { }
 ```
 
 ```range
@@ -34,7 +34,7 @@ macro lock(): Block { }
 - Can rewrite expressions
 
 ```range
-macro stringify(value _: capture Expression): Expression -> String { }
+macro stringify(@capture<Expression> _ value: Expression): Expression -> String { }
 
 #stringify(1 + 2)
 ```
@@ -52,7 +52,7 @@ macro lock(): Block { }
 - Operate on syntax rather than resolved types
 
 ```range
-macro stringify(value _: capture Expression): Expression -> String { target, diagnostics in
+macro stringify(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
     target.rewrite("\(value)")
 }
 ```
@@ -68,7 +68,7 @@ macro lock(): Block { target, diagnostics in
 ```
 
 ```range
-macro stringify(value _: capture Expression): Expression -> String { target, diagnostics in
+macro stringify(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
     target.rewrite("\(value)")
 }
 ```

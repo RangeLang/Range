@@ -15,6 +15,14 @@ construct String {
         storage.isEmpty
     }
 
+    function character(index: Int): String {
+        return storage.character(index: index)
+    }
+
+    function substring(start: Int, end: Int): String {
+        return storage.substring(start: start, end: end)
+    }
+
     function snakeCase(): String {
         return storage.snakeCase()
     }

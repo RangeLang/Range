@@ -1045,7 +1045,8 @@ private extension RangeFunctionParameter {
             defaultValue: defaultValue,
             slotName: slotName,
             isBinding: isBinding,
-            capturesSyntax: capturesSyntax
+            capturesSyntax: capturesSyntax,
+            captureMetadataType: captureMetadataType.map { substitute($0, using: bindings) }
         )
     }
 }

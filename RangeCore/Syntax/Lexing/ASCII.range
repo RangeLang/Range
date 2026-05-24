@@ -4,8 +4,239 @@ construct ASCIILiteral {
 }
 
 @syntax
+@token(" ")
 construct Whitespace {
     let value: String
+}
+
+@syntax
+@token(",")
+construct Comma {
+}
+
+@syntax
+@token(".")
+construct Dot {
+}
+
+@syntax
+@token("{")
+construct LeftBrace {
+}
+
+@syntax
+@token("}")
+construct RightBrace {
+}
+
+@syntax
+@token("(")
+construct LeftParen {
+}
+
+@syntax
+@token(")")
+construct RightParen {
+}
+
+@syntax
+@token("[")
+construct LeftBracket {
+}
+
+@syntax
+@token("]")
+construct RightBracket {
+}
+
+@syntax
+@token(":")
+construct Colon {
+}
+
+@syntax
+@token("*")
+construct Asterisk {
+}
+
+@syntax
+@token("/")
+construct Slash {
+}
+
+@syntax
+@token("$")
+construct Dollar {
+}
+
+@syntax
+@token("%")
+construct Percent {
+}
+
+@syntax
+@token("#")
+construct Hash {
+}
+
+@syntax
+@token("...")
+construct Ellipsis {
+}
+
+@syntax
+@token("->")
+construct Arrow {
+}
+
+@syntax
+@token("-")
+construct Minus {
+}
+
+@syntax
+@token("!")
+construct Bang {
+}
+
+@syntax
+@token("!=")
+construct BangEqual {
+}
+
+@syntax
+@token("=")
+construct Equal {
+}
+
+@syntax
+@token("==")
+construct EqualEqual {
+}
+
+@syntax
+@token("<")
+construct Less {
+}
+
+@syntax
+@token("<=")
+construct LessEqual {
+}
+
+@syntax
+@token(">")
+construct Greater {
+}
+
+@syntax
+@token(">=")
+construct GreaterEqual {
+}
+
+@syntax
+@token("+")
+construct Plus {
+}
+
+@syntax
+@token("+=")
+construct PlusEqual {
+}
+
+@syntax
+@token("&")
+construct Ampersand {
+}
+
+@syntax
+@token("&&")
+construct AndAnd {
+}
+
+@syntax
+@token("|")
+construct Pipe {
+}
+
+@syntax
+@token("||")
+construct OrOr {
+}
+
+@syntax
+@token("?")
+construct Question {
+}
+
+@syntax
+@token("??")
+construct QuestionQuestion {
+}
+
+@syntax
+@token("identifier")
+construct IdentifierToken {
+    let value: String
+}
+
+@syntax
+@token("keywordIdentifier")
+construct Keyword {
+    let value: String
+}
+
+@syntax
+@token("`identifier`")
+construct EscapedIdentifier {
+    let value: String
+}
+
+@syntax
+@token("quotedString")
+construct StringLiteralToken {
+    let value: String
+}
+
+@syntax
+@token("digits")
+construct IntegerLiteral {
+    let value: String
+}
+
+@syntax
+@token("digits.digits")
+construct DoubleLiteral {
+    let value: String
+}
+
+@syntax
+@token("#identifier")
+construct HashDirective {
+    let value: String
+}
+
+@syntax
+@token("@identifier")
+construct AtAttribute {
+    let name: String
+}
+
+@syntax
+@token("foreignBody")
+construct ForeignBody {
+    let language: String
+    let text: String
+}
+
+@syntax
+@token("end")
+construct EOF {
+}
+
+@syntax
+@token("//")
+construct LineComment {
 }
 
 @syntax

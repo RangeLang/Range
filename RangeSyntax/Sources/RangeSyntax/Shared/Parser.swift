@@ -197,13 +197,15 @@ public struct Parser {
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         markerDeclarationsByName: [String: MarkerDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:],
-        foreignBodyLanguage: ((String) -> String?)? = nil,
         allowInitializerDeclarations: Bool = false
     ) throws {
-        let bodyLanguage = foreignBodyLanguage ?? { directive in
-            markerDeclarationsByName[directive]?.foreignBodyLanguage
+        let foreignBodies = markerDeclarationsByName.values.compactMap { marker -> LexerForeignBody? in
+            guard let language = marker.foreignBodyLanguage else {
+                return nil
+            }
+            return LexerForeignBody(directive: marker.name, language: language)
         }
-        var lexer = Lexer(source: source, foreignBodyLanguage: bodyLanguage)
+        var lexer = Lexer(source: source, foreignBodies: foreignBodies)
         self.tokens = try lexer.tokenize()
         self.operatorEnvironment = .bootstrap()
         self.literalBridgeResolver = literalBridgeResolver

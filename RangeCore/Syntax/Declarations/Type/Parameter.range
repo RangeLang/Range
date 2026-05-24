@@ -8,6 +8,7 @@ construct Parameter {
         let externalName: String?
         let localName: String
         let type: TypeReference
+        let captureMetadataType: TypeReference?
         let defaultValue: Expression?
     }
 

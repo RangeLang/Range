@@ -499,7 +499,8 @@ extension MacroExpander {
                         for: application,
                         marker: marker,
                         targetValue: MacroTargetValueBuilder(
-                            markerDeclarationsByName: context.markerDeclarationsByName
+                            markerDeclarationsByName: context.markerDeclarationsByName,
+                            writtenSyntaxByID: context.graphContext.writtenSyntaxByID
                         ).targetValue(for: extensionDeclaration),
                         context: context
                     )

@@ -155,12 +155,21 @@ extension Parser {
     }
 
     mutating func parseMacroTargetIntersection() throws -> MacroTarget {
-        var targets = [MacroTarget.syntax(try parseTypeReferenceNode())]
+        var targets = [try parseMacroTargetAtom()]
         while peek() == .ampersand {
             advance()
-            targets.append(.syntax(try parseTypeReferenceNode()))
+            targets.append(try parseMacroTargetAtom())
         }
         return targets.count == 1 ? targets[0] : .allOf(targets)
+    }
+
+    mutating func parseMacroTargetAtom() throws -> MacroTarget {
+        if case .atAttribute(let name, _) = peek() {
+            advance()
+            return .macroSurface(name)
+        }
+
+        return .syntax(try parseTypeReferenceNode())
     }
 
 

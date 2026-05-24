@@ -107,6 +107,7 @@ public struct MacroApplication {
 
 public indirect enum MacroTarget {
     case syntax(TypeReference)
+    case macroSurface(String)
     case anyOf([MacroTarget])
     case allOf([MacroTarget])
 
@@ -114,6 +115,8 @@ public indirect enum MacroTarget {
         switch self {
         case .syntax(let typeReference):
             return typeReference
+        case .macroSurface(let name):
+            return .named("@\(name)")
         case .anyOf(let targets), .allOf(let targets):
             return targets.first?.typeReference ?? .named("Unknown")
         }
@@ -123,6 +126,8 @@ public indirect enum MacroTarget {
         switch self {
         case .syntax(let typeReference):
             return typeReference.displayName
+        case .macroSurface(let name):
+            return "@\(name)"
         case .anyOf(let targets):
             return targets.map(\.displayName).joined(separator: " | ")
         case .allOf(let targets):
@@ -134,6 +139,8 @@ public indirect enum MacroTarget {
         switch self {
         case .syntax(let typeReference):
             return [typeReference]
+        case .macroSurface:
+            return []
         case .anyOf(let targets), .allOf(let targets):
             return targets.flatMap(\.typeReferences)
         }

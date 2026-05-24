@@ -232,13 +232,28 @@ extension Parser {
                 var typeReference: TypeReference?
                 var slotName: String?
                 var isBinding = false
-                let capturesSyntax = macros.contains { $0.name == "capture" }
+                let captureMacros = macros.filter { $0.name == "capture" }
+                let capturesSyntax = !captureMacros.isEmpty
+                let captureMetadataType: TypeReference?
                 if capturesSyntax {
                     guard allowSyntaxCapture else {
                         throw ParseError(
                             "@capture parameters are only valid in macro declarations."
                         )
                     }
+                    guard captureMacros.count == 1 else {
+                        throw ParseError(
+                            "@capture parameters can only declare one capture annotation."
+                        )
+                    }
+                    guard captureMacros[0].genericArguments.count == 1 else {
+                        throw ParseError(
+                            "@capture parameters must declare one metadata type, for example @capture<Expression>."
+                        )
+                    }
+                    captureMetadataType = captureMacros[0].genericArguments[0]
+                } else {
+                    captureMetadataType = nil
                 }
                 if peek() == .colon {
                     try consume(.colon)
@@ -276,7 +291,8 @@ extension Parser {
                         defaultValue: defaultValue,
                         slotName: slotName,
                         isBinding: isBinding,
-                        capturesSyntax: capturesSyntax
+                        capturesSyntax: capturesSyntax,
+                        captureMetadataType: captureMetadataType
                     )
                 )
 
@@ -687,6 +703,7 @@ extension Parser {
                 && $0.slotName == $1.slotName
                 && $0.isBinding == $1.isBinding
                 && $0.capturesSyntax == $1.capturesSyntax
+                && $0.captureMetadataType == $1.captureMetadataType
         }
     }
 

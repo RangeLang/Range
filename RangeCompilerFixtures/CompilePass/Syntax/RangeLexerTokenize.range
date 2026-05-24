@@ -1,0 +1,109 @@
+function lexRangeConstruct(): Result<[LexicalToken], LexingError> {
+    let lexer: Lexer(rangeLexer())
+    return lexer.tokenize(source: "construct User { let name: String }")
+}
+
+function tokenKindName(kind: TokenKind): String {
+    switch kind {
+    case .hash:
+        return "hash"
+    case .identifier:
+        return "identifier"
+    case .hashDirective:
+        return "hashDirective"
+    case .foreignBody:
+        return "foreignBody"
+    case .stringLiteral:
+        return "stringLiteral"
+    case .integer:
+        return "integer"
+    case .double:
+        return "double"
+    case .keyword:
+        return "keyword"
+    case .atAttribute:
+        return "atAttribute"
+    case .leftBrace:
+        return "leftBrace"
+    case .rightBrace:
+        return "rightBrace"
+    case .leftParen:
+        return "leftParen"
+    case .rightParen:
+        return "rightParen"
+    case .leftBracket:
+        return "leftBracket"
+    case .rightBracket:
+        return "rightBracket"
+    case .asterisk:
+        return "asterisk"
+    case .dot:
+        return "dot"
+    case .ellipsis:
+        return "ellipsis"
+    case .colon:
+        return "colon"
+    case .arrow:
+        return "arrow"
+    case .bang:
+        return "bang"
+    case .equal:
+        return "equal"
+    case .equalEqual:
+        return "equalEqual"
+    case .bangEqual:
+        return "bangEqual"
+    case .minus:
+        return "minus"
+    case .less:
+        return "less"
+    case .lessEqual:
+        return "lessEqual"
+    case .greater:
+        return "greater"
+    case .greaterEqual:
+        return "greaterEqual"
+    case .plus:
+        return "plus"
+    case .plusEqual:
+        return "plusEqual"
+    case .slash:
+        return "slash"
+    case .ampersand:
+        return "ampersand"
+    case .andAnd:
+        return "andAnd"
+    case .pipe:
+        return "pipe"
+    case .orOr:
+        return "orOr"
+    case .question:
+        return "question"
+    case .questionQuestion:
+        return "questionQuestion"
+    case .dollar:
+        return "dollar"
+    case .percent:
+        return "percent"
+    case .comma:
+        return "comma"
+    case .eof:
+        return "eof"
+    }
+}
+
+@main {
+    switch lexRangeConstruct() {
+    case .success(let tokens):
+        state index   0
+        while index < tokens.count {
+            let token: LexicalToken(tokens.element(index: index))
+            Logger.info(
+                "\(index): \(tokenKindName(kind: token.kind)) \"\(token.source)\" @ \(token.range.start.line):\(token.range.start.character)-\(token.range.end.line):\(token.range.end.character)"
+            )
+            index += 1
+        }
+    case .failure(let error):
+        Logger.error(error.message)
+    }
+}

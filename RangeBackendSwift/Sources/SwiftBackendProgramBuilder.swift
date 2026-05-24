@@ -268,9 +268,10 @@ struct SwiftBackendProgramBuilder {
     }
 
     private func coreSupportUnits(in compiledProgram: CompiledProgram) -> [LoweredSourceUnit] {
-        let encodingUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
+        let coreUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
             guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
                 parsedFile.path.contains("/RangeCore/Encoding/")
+                    || parsedFile.path.contains("/RangeCore/Syntax/Lexing/")
             else {
                 return nil
             }
@@ -338,7 +339,7 @@ struct SwiftBackendProgramBuilder {
 
         let channelDeclarations = coreSupportDeclarations(in: compiledProgram)
         guard !channelDeclarations.isEmpty else {
-            return encodingUnits
+            return coreUnits
         }
 
         return [
@@ -351,6 +352,6 @@ struct SwiftBackendProgramBuilder {
                 callables: [],
                 mainBlock: nil
             )
-        ] + encodingUnits
+        ] + coreUnits
     }
 }

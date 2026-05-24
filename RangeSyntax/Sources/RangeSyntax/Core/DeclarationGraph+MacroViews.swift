@@ -11,6 +11,7 @@ extension DeclarationGraph {
             rewriteSurfaceView: rewriteSurfaceView,
             graphContext: MacroGraphContext(
                 declarationGraph: self,
+                macroDeclarationsByName: macrosByName,
                 markerDeclarationsByName: markersByName
             ),
             macroDeclarationsByName: macrosByName,

@@ -1,4 +1,4 @@
-macro captureText(@capture _ value: Expression): Expression -> String { target, diagnostics in
+macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
     target.replace(with: "captured: \(value)")
 }
 

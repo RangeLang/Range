@@ -70,12 +70,13 @@ The current macro fixtures cover only the supported bootstrap surface:
 - expression-targeted `#stringify(...)`
 - expression-targeted rewrite through `target.rewrite(...)`, including
   `#unwrap(...)` and a custom macro fixture
-- custom `capture Expression` macro parameters
+- custom `@capture<Expression>` macro parameters
 - generic expression macro result substitution, for example
   `#unwrap<T>(...) -> T` inferring the expanded expression result type
-- syntax-category expression macro parameters must use `capture`, for example
-  `value _: capture Expression`
-- invalid capture usage, for example `capture String`
+- syntax-category expression macro parameters must use typed `@capture`, for example
+  `@capture<Expression> _ value: Expression`
+- invalid capture usage, for example `@capture<String> _ value: String`
+- missing capture metadata, for example bare `@capture _ value: Expression`
 - invalid rewrite-site usage for a macro target kind, for example a
   `Parameter` macro using `target.rewrite(...)`
 - invalid nested parameter rewrite-site usage, for example

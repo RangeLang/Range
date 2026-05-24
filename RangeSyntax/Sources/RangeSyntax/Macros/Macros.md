@@ -38,7 +38,7 @@ macro codable(): Construct { }
 macro clamped(min: Int, max: Int): State { }
 macro lock(): Block { }
 macro literal<T>(): Function { }
-macro stringify(value _: capture Expression): Expression -> String { }
+macro stringify(@capture<Expression> _ value: Expression): Expression -> String { }
 ```
 
 - Support composition through the existing type system

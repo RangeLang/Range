@@ -1,2 +1,2 @@
-open macro capture(): Parameter, Construct, Construct & Enum, Construct | Enum { target, diagnostics in
+open macro capture<Meta>(): @syntax { target, diagnostics in
 }

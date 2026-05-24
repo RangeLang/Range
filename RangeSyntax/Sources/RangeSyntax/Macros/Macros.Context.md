@@ -137,7 +137,7 @@ construct Function: Syntax {
 - Expression-targeted macros receive expression syntax directly
 
 ```range
-macro stringify(value _: capture Expression): Expression -> String { target, diagnostics in
+macro stringify(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
     target.rewrite("\(value)")
 }
 ```

@@ -1,0 +1,7 @@
+@token("fixtureToken")
+construct FixtureToken {
+}
+
+construct TokenHandleStore {
+    state tokens: Array<@token>()
+}

@@ -29,14 +29,19 @@ extension MacroExpander {
                 guard syntaxResolver.typeConformsToSyntax(parameter.typeReference) else {
                     if parameter.capturesSyntax {
                         throw ParseError(
-                            "Macro #\(macro.name) parameter \(parameter.localName) uses capture with non-syntax type \(parameter.typeReference?.displayName ?? "unknown")."
+                            "Macro #\(macro.name) parameter \(parameter.localName) uses @capture with non-syntax type \(parameter.typeReference?.displayName ?? "unknown")."
                         )
                     }
                     continue
                 }
                 guard parameter.capturesSyntax else {
                     throw ParseError(
-                        "Macro #\(macro.name) parameter \(parameter.localName) must use capture \(parameter.typeReference?.displayName ?? "syntax") to bind syntax."
+                        "Macro #\(macro.name) parameter \(parameter.localName) must use @capture<\(parameter.typeReference?.displayName ?? "Syntax")> to bind syntax."
+                    )
+                }
+                guard parameter.captureMetadataType != nil else {
+                    throw ParseError(
+                        "Macro #\(macro.name) parameter \(parameter.localName) must use typed capture metadata, for example @capture<\(parameter.typeReference?.displayName ?? "Syntax")>."
                     )
                 }
             }

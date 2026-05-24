@@ -49,12 +49,18 @@ public struct DeclarationGraph {
     public let parametersByInitializerIdentity: [String: [RangeFunctionParameter]]
     public let callablesByName: [String: [CallableDeclaration]]
     public let operatorCallablesByName: [String: [CallableDeclaration]]
+    public let sourceTextByPath: [String: String]
     public let sourceLocations: [DeclarationSourceLocation]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
     public let realizedInitMacroTargets: [RealizedInitMacroTarget]
     public let programGraph: ProgramGraph
 
     public init(files: [ParsedSourceFile]) {
+        let sourceTextByPath = Dictionary(
+            uniqueKeysWithValues: files.compactMap { file in
+                file.source.map { (file.path, $0) }
+            }
+        )
         let packageSpaces = Self.collectPackageSpaces(from: files)
         let packageValues = packageSpaces.flatMap(\.values)
             + Self.collectPackageManifestValues(from: files)
@@ -119,6 +125,7 @@ public struct DeclarationGraph {
         self.parametersByInitializerIdentity = parametersByInitializerIdentity
         self.callablesByName = callables
         self.operatorCallablesByName = operatorCallables
+        self.sourceTextByPath = sourceTextByPath
         self.sourceLocations = Self.collectSourceLocations(from: files)
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
@@ -1840,7 +1847,7 @@ public struct DeclarationGraph {
     static func renderParameterList(_ parameters: [RangeFunctionParameter]) -> String {
         parameters.map { parameter in
             let typeName =
-                parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+                parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
                 ?? "_"
             let label = parameter.externalLabel ?? "_"
             return "\(label):\(typeName)"
@@ -2269,7 +2276,7 @@ private struct SemanticGraphCollector {
     private func renderParameterList(_ parameters: [RangeFunctionParameter]) -> String {
         parameters.map { parameter in
             let typeName =
-                parameter.slotName.map { "@\($0)" } ?? parameter.typeReference?.displayName
+                parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
                 ?? "_"
             let label = parameter.externalLabel ?? "_"
             return "\(label):\(typeName)"

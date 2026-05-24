@@ -1,0 +1,2 @@
+macro token(_ pattern: String): Construct { target, diagnostics in
+}

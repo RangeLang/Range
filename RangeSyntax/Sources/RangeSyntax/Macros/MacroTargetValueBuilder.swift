@@ -1,27 +1,39 @@
 import Foundation
 
 struct MacroTargetValueBuilder {
+    let macroDeclarationsByName: [String: MacroDeclaration]
     let markerDeclarationsByName: [String: MarkerDeclaration]
+    let writtenSyntaxByID: [String: CompileTimeValue]
 
-    init(markerDeclarationsByName: [String: MarkerDeclaration] = [:]) {
+    init(
+        macroDeclarationsByName: [String: MacroDeclaration] = [:],
+        markerDeclarationsByName: [String: MarkerDeclaration] = [:],
+        writtenSyntaxByID: [String: CompileTimeValue] = [:]
+    ) {
+        self.macroDeclarationsByName = macroDeclarationsByName
         self.markerDeclarationsByName = markerDeclarationsByName
+        self.writtenSyntaxByID = writtenSyntaxByID
     }
 
     func targetValue(for construct: ConstructDeclaration) -> CompileTimeValue {
+        let id = "construct:\(construct.name)"
         return .object(
             typeName: "Construct",
             fields: [
                 "identity": graphIdentity(kind: "construct", name: construct.name),
+                "written": writtenSyntaxByID[id] ?? writtenSyntax(""),
                 "declaration": declarationValue(for: construct, qualifiedName: construct.name),
             ]
         )
     }
 
     func targetValue(for enumeration: EnumDeclaration) -> CompileTimeValue {
+        let id = "enum:\(enumeration.name)"
         return .object(
             typeName: "Enum",
             fields: [
                 "identity": graphIdentity(kind: "enum", name: enumeration.name),
+                "written": writtenSyntaxByID[id] ?? writtenSyntax(""),
                 "declaration": .object(
                     typeName: "Enum.Declaration",
                     fields: [
@@ -36,10 +48,12 @@ struct MacroTargetValueBuilder {
     }
 
     func targetValue(for protocolDeclaration: ProtocolDeclaration) -> CompileTimeValue {
+        let id = "protocol:\(protocolDeclaration.name)"
         return .object(
             typeName: "Protocol",
             fields: [
                 "identity": graphIdentity(kind: "protocol", name: protocolDeclaration.name),
+                "written": writtenSyntaxByID[id] ?? writtenSyntax(""),
                 "declaration": .object(
                     typeName: "Protocol.Declaration",
                     fields: [
@@ -76,6 +90,7 @@ struct MacroTargetValueBuilder {
                     kind: "extension",
                     name: extensionDeclaration.targetType.displayName
                 ),
+                "written": writtenSyntaxByID["extension:\(extensionDeclaration.targetType.displayName)"] ?? writtenSyntax(""),
                 "target": target,
                 "declaration": declaration,
                 "markers": .array(markerValues(for: extensionDeclaration.macros)),
@@ -309,17 +324,233 @@ struct MacroTargetValueBuilder {
     }
 
     private func value(for application: MacroApplication) -> CompileTimeValue {
-        .object(
+        let rawBody = application.rawBody ?? ""
+        var fields: [String: CompileTimeValue] = [
+            "identifier": identifier(application.name),
+            "genericArguments": .array(application.genericArguments.map(typeReferenceValue)),
+            "argumentClause": .string(application.argumentClause ?? ""),
+            "rawBodyLanguage": .string(application.rawBodyLanguage ?? ""),
+            "rawBody": writtenSyntax(rawBody),
+            "rawBodyText": .string(rawBody),
+            "arguments": .array(argumentValues(for: application)),
+        ]
+
+        if let declaration = macroDeclarationsByName[application.name] {
+            fields["declaration"] = value(for: declaration)
+        }
+
+        return .object(
             typeName: "Macro.Application",
+            fields: fields
+        )
+    }
+
+    private func value(for declaration: MacroDeclaration) -> CompileTimeValue {
+        let bodyText = renderStatements(declaration.body)
+        return .object(
+            typeName: "Macro.Declaration",
             fields: [
-                "identifier": identifier(application.name),
-                "genericArguments": .array(application.genericArguments.map(typeReferenceValue)),
-                "argumentClause": .string(application.argumentClause ?? ""),
-                "rawBodyLanguage": .string(application.rawBodyLanguage ?? ""),
-                "rawBody": .string(application.rawBody ?? ""),
-                "arguments": .array(argumentValues(for: application)),
+                "identifier": identifier(declaration.name),
+                "packageVisibility": .string(packageVisibilityName(for: declaration.packageVisibility)),
+                "target": .string(declaration.target?.displayName ?? ""),
+                "targetSyntax": declaration.target.map(value(for:)) ?? .string(""),
+                "expansionType": declaration.expansionType.map(typeReferenceValue) ?? .string(""),
+                "generics": .array(declaration.genericParameters.map(value(for:))),
+                "parameters": .array(declaration.parameters.map(value(for:))),
+                "writtenBody": writtenSyntax(bodyText),
+                "parsedBody": parsedValue(
+                    written: bodyText,
+                    value: blockValue(for: declaration.body),
+                    diagnostics: []
+                ),
+                "body": .string(bodyText),
+                "syntaxBody": .string(renderEmittedCodeBlock(declaration.syntaxBody)),
             ]
         )
+    }
+
+    private func value(for target: MacroTarget) -> CompileTimeValue {
+        switch target {
+        case .syntax(let typeReference):
+            return .object(
+                typeName: "Macro.Target",
+                fields: [
+                    "kind": .string("type"),
+                    "name": .string(typeReference.displayName),
+                    "type": typeReferenceValue(typeReference),
+                    "elements": .array([]),
+                    "written": writtenSyntax(typeReference.displayName),
+                ]
+            )
+        case .macroSurface(let name):
+            return .object(
+                typeName: "Macro.Target",
+                fields: [
+                    "kind": .string("macroSurface"),
+                    "name": .string(name),
+                    "elements": .array([]),
+                    "written": writtenSyntax("@\(name)"),
+                ]
+            )
+        case .anyOf(let targets):
+            let text = targets.map(\.displayName).joined(separator: " | ")
+            return .object(
+                typeName: "Macro.Target",
+                fields: [
+                    "kind": .string("anyOf"),
+                    "name": .string(""),
+                    "elements": .array(targets.map(value(for:))),
+                    "written": writtenSyntax(text),
+                ]
+            )
+        case .allOf(let targets):
+            let text = targets.map(\.displayName).joined(separator: " & ")
+            return .object(
+                typeName: "Macro.Target",
+                fields: [
+                    "kind": .string("allOf"),
+                    "name": .string(""),
+                    "elements": .array(targets.map(value(for:))),
+                    "written": writtenSyntax(text),
+                ]
+            )
+        }
+    }
+
+    func writtenSyntax(_ text: String) -> CompileTimeValue {
+        .object(
+            typeName: "WrittenSyntax",
+            fields: [
+                "text": .string(text),
+                "range": zeroSourceRange(),
+            ]
+        )
+    }
+
+    private func parsedValue(
+        written: String,
+        value: CompileTimeValue,
+        diagnostics: [String]
+    ) -> CompileTimeValue {
+        .object(
+            typeName: "Parsed",
+            fields: [
+                "written": writtenSyntax(written),
+                "value": value,
+                "diagnostics": .array(diagnostics.map { .string($0) }),
+            ]
+        )
+    }
+
+    private func zeroSourceRange() -> CompileTimeValue {
+        .object(
+            typeName: "SourceRange",
+            fields: [
+                "start": zeroSourceLocation(),
+                "end": zeroSourceLocation(),
+            ]
+        )
+    }
+
+    private func zeroSourceLocation() -> CompileTimeValue {
+        .object(
+            typeName: "SourceLocation",
+            fields: [
+                "line": .integer(0),
+                "character": .integer(0),
+            ]
+        )
+    }
+
+    private func blockValue(for statements: [Statement]) -> CompileTimeValue {
+        .object(
+            typeName: "Block",
+            fields: ["statements": .array(statements.map(statementValue))]
+        )
+    }
+
+    private func statementValue(_ statement: Statement) -> CompileTimeValue {
+        switch statement {
+        case .localBinding(let declaration):
+            return .object(
+                typeName: "LocalBinding",
+                fields: [
+                    "mutable": .boolean(declaration.kind == .mutable),
+                    "identifier": identifier(declaration.name),
+                    "type": typeReferenceValue(declaration.type),
+                    "expression": writtenSyntax(MacroExpander.renderExpressionForStringify(declaration.expression)),
+                ]
+            )
+        case .return(let expression):
+            return .object(
+                typeName: "Return",
+                fields: [
+                    "expression": expression.map { writtenSyntax(MacroExpander.renderExpressionForStringify($0)) } ?? writtenSyntax("")
+                ]
+            )
+        case .expression(let expression):
+            return .object(
+                typeName: "ExpressionStatement",
+                fields: [
+                    "expression": writtenSyntax(MacroExpander.renderExpressionForStringify(expression))
+                ]
+            )
+        case .background(let background):
+            return .object(typeName: "Background", fields: ["body": blockValue(for: background.body)])
+        case .deferBlock(let deferred):
+            return .object(typeName: "Defer", fields: ["body": blockValue(for: deferred.body)])
+        case .break:
+            return .object(typeName: "Break", fields: [:])
+        default:
+            return writtenSyntax(renderStatement(statement))
+        }
+    }
+
+    private func renderStatements(_ statements: [Statement]) -> String {
+        statements.map(renderStatement).joined(separator: "\n")
+    }
+
+    private func renderStatement(_ statement: Statement) -> String {
+        switch statement {
+        case .localBinding(let declaration):
+            let keyword = declaration.kind == .constant ? "let" : "state"
+            let expression = MacroExpander.renderExpressionForStringify(declaration.expression)
+            return "\(keyword) \(declaration.name): \(declaration.type.displayName)(\(expression))"
+        case .return(let expression?):
+            return "return \(MacroExpander.renderExpressionForStringify(expression))"
+        case .return(nil):
+            return "return"
+        case .expression(let expression):
+            return MacroExpander.renderExpressionForStringify(expression)
+        case .macroInvocation(let name, let argumentClause, let body):
+            let arguments = argumentClause.map { "(\($0))" } ?? ""
+            return "#\(name)\(arguments) { \(renderStatements(body)) }"
+        case .expand(let targetPath, _):
+            return [targetPath, "expand"].compactMap { $0 }.joined(separator: ".")
+        default:
+            return String(describing: statement)
+        }
+    }
+
+    private func renderEmittedCodeBlock(_ block: EmittedCodeBlock?) -> String {
+        guard let block else {
+            return ""
+        }
+
+        return block.parts.map { part in
+            switch part {
+            case .text(let text):
+                return text
+            case .splice(let expression, let expected):
+                return "#(\(MacroExpander.renderExpressionForStringify(expression)): \(expected.rawValue))"
+            case .syntaxMacroInvocation(let name, let arguments):
+                let renderedArguments = arguments.map { argument in
+                    let value = MacroExpander.renderExpressionForStringify(argument.value)
+                    return argument.label.map { "\($0): \(value)" } ?? value
+                }.joined(separator: ", ")
+                return "#\(name)(\(renderedArguments))"
+            }
+        }.joined()
     }
 
     private func argumentValues(for application: MacroApplication) -> [CompileTimeValue] {
@@ -400,6 +631,7 @@ struct MacroTargetValueBuilder {
                 "externalName": declaration.externalLabel.map(CompileTimeValue.string) ?? .string(""),
                 "localName": .string(declaration.localName),
                 "type": declaration.typeReference.map(typeReferenceValue) ?? .string("Void"),
+                "captureMetadataType": declaration.captureMetadataType.map(typeReferenceValue) ?? .string(""),
                 "defaultValue": declaration.defaultValue.flatMap(value(for:)) ?? .string(""),
             ]
         )

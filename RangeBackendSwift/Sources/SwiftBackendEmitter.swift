@@ -564,6 +564,17 @@ struct SwiftBackendEmitter {
             }
 
             extension String {
+                func __rangeCharacter(index: Int) -> String {
+                    let position = self.index(startIndex, offsetBy: index)
+                    return String(self[position])
+                }
+
+                func __rangeSubstring(start: Int, end: Int) -> String {
+                    let lowerBound = self.index(startIndex, offsetBy: start)
+                    let upperBound = self.index(startIndex, offsetBy: end)
+                    return String(self[lowerBound..<upperBound])
+                }
+
                 func __rangeSnakeCase() -> String {
                     var result = ""
                     var previousWasLowercaseOrDigit = false
@@ -1360,6 +1371,9 @@ struct SwiftBackendEmitter {
     ) -> String {
         switch typeReference {
         case .named(let name):
+            if isAnnotationHandleTypeName(name) {
+                return "Any"
+            }
             if let storageTypeName = swiftNativeStorageTypeNames[name] {
                 return storageTypeName
             }
@@ -2696,6 +2710,9 @@ struct SwiftBackendEmitter {
     }
 
     private func emitSwiftSymbolName(_ name: String) -> String {
+        if isAnnotationHandleTypeName(name) {
+            return "Any"
+        }
         if let storageTypeName = swiftNativeStorageTypeNames[name] {
             return storageTypeName
         }
@@ -2708,12 +2725,20 @@ struct SwiftBackendEmitter {
         return "Range_\(name.replacingOccurrences(of: ".", with: "_"))"
     }
 
+    private func isAnnotationHandleTypeName(_ name: String) -> Bool {
+        name.hasPrefix("@") || name.hasPrefix("#")
+    }
+
     private func emitSwiftReferenceName(
         _ name: String,
         scope: EmissionScope = .empty
     ) -> String {
         if name.hasPrefix(".") {
             return name
+        }
+
+        if let genericName = emitGenericSwiftReferenceName(name, scope: scope) {
+            return genericName
         }
 
         guard let dotIndex = name.firstIndex(of: ".") else {
@@ -2735,6 +2760,77 @@ struct SwiftBackendEmitter {
             return name
         }
         return "\(emitSwiftSymbolName(base))\(suffix)"
+    }
+
+    private func emitGenericSwiftReferenceName(
+        _ name: String,
+        scope: EmissionScope
+    ) -> String? {
+        guard let genericStart = name.firstIndex(of: "<"),
+            name.last == ">"
+        else {
+            return nil
+        }
+
+        let base = String(name[..<genericStart])
+        let argumentStart = name.index(after: genericStart)
+        let argumentEnd = name.index(before: name.endIndex)
+        let arguments = splitGenericArgumentNames(String(name[argumentStart..<argumentEnd]))
+        guard !arguments.isEmpty else {
+            return nil
+        }
+
+        let renderedArguments = arguments.map {
+            emitGenericSwiftReferenceArgument($0, scope: scope)
+        }.joined(separator: ", ")
+        return "\(emitSwiftReferenceName(base, scope: scope))<\(renderedArguments)>"
+    }
+
+    private func splitGenericArgumentNames(_ source: String) -> [String] {
+        var arguments: [String] = []
+        var current = ""
+        var depth = 0
+
+        for character in source {
+            if character == "<" {
+                depth += 1
+                current.append(character)
+                continue
+            }
+            if character == ">" {
+                depth -= 1
+                current.append(character)
+                continue
+            }
+            if character == ",", depth == 0 {
+                let argument = current.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !argument.isEmpty {
+                    arguments.append(argument)
+                }
+                current = ""
+                continue
+            }
+            current.append(character)
+        }
+
+        let finalArgument = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !finalArgument.isEmpty {
+            arguments.append(finalArgument)
+        }
+        return arguments
+    }
+
+    private func emitGenericSwiftReferenceArgument(
+        _ argument: String,
+        scope: EmissionScope
+    ) -> String {
+        if isAnnotationHandleTypeName(argument) {
+            return "Any"
+        }
+        if let nested = emitGenericSwiftReferenceName(argument, scope: scope) {
+            return nested
+        }
+        return emitSwiftReferenceName(argument, scope: scope)
     }
 
     private func emitCoreClosureCall(
@@ -2869,6 +2965,13 @@ struct SwiftBackendEmitter {
         case "filter":
             guard let include = argument("include") ?? unlabeledArgument() else { return nil }
             return "\(base).filter(\(try emitExpression(include, scope: scope)))"
+        case "character":
+            guard let index = argument("index") else { return nil }
+            return "\(base).__rangeCharacter(index: \(try emitExpression(index, scope: scope)))"
+        case "substring":
+            guard let start = argument("start"), let end = argument("end") else { return nil }
+            return
+                "\(base).__rangeSubstring(start: \(try emitExpression(start, scope: scope)), end: \(try emitExpression(end, scope: scope)))"
         case "snakeCase":
             guard arguments.isEmpty else { return nil }
             return "\(base).__rangeSnakeCase()"
@@ -3191,6 +3294,8 @@ struct SwiftBackendEmitter {
             .replacingOccurrences(of: "\\", with: "\\\\")
             .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\t", with: "\\t")
     }
 
     private func emitRawCall(

@@ -240,7 +240,8 @@ struct CompileTimeValueEvaluator {
         case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
-            "ValueGeneric", "Graph.Identity", "Macro.Application", "Marker.Application", "Proof", "Block", "Switch",
+            "ValueGeneric", "Graph.Identity", "Macro.Application", "Macro.Declaration", "Macro.Target",
+            "Marker.Application", "Proof", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
             "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexicalToken", "TokenKind", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
             var fields: [String: CompileTimeValue] = [:]
@@ -294,6 +295,21 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return context.graphContext.markers(on: identity)
+        case "\(graphBinding).macros":
+            guard arguments.count == 1 else {
+                return nil
+            }
+            if arguments[0].label == "on",
+                let identity = evaluate(arguments[0].value, locals: locals)
+            {
+                return context.graphContext.macros(on: identity)
+            }
+            if arguments[0].label == "named",
+                case .string(let name)? = evaluate(arguments[0].value, locals: locals)
+            {
+                return context.graphContext.macros(named: name)
+            }
+            return nil
         default:
             return nil
         }

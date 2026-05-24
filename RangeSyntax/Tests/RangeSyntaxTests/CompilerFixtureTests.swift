@@ -54,6 +54,43 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Construct macro target carries localized written source")
+    func constructMacroTargetCarriesLocalizedWrittenSource() throws {
+        let projectPath = "/tmp/MacroTargetWrittenSource.range"
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: projectPath,
+                source: """
+                macro reportWritten(): Construct { target, diagnostics in
+                    diagnostics.warning(target.written.text)
+                }
+
+                @reportWritten
+                construct SourceReadable {
+                    let value: Int
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+        fputs(diagnostics.map { "DIAG \($0.severity): \($0.message) path=\($0.path ?? "nil")\n" }.joined(), stderr)
+        let diagnostic = try #require(
+            diagnostics.first {
+                $0.severity == .warning
+                    && $0.source == "range-macro"
+                    && $0.code == "macro.diagnostic.warning"
+                    && $0.message.contains("@reportWritten")
+                    && $0.message.contains("construct SourceReadable")
+                    && $0.message.contains("let value: Int")
+                    && $0.path == projectPath
+            }
+        )
+        #expect(diagnostic.message.contains("target.written") == false)
+    }
+
     @Test("User macro diagnostics feed compiler diagnostics")
     func userMacroDiagnosticsFeedCompilerDiagnostics() throws {
         let fixture = try fixtureFile(
@@ -103,7 +140,9 @@ struct CompilerFixtureTests {
     @Test("Macros query graph through identities")
     func macrosQueryGraphThroughIdentities() throws {
         let source = """
+        #tracked("root")
         construct User {
+            #tracked("name")
             let name: String
             let age: Int
 
@@ -127,7 +166,18 @@ struct CompilerFixtureTests {
                 )
             ]
         )
-        let context = graph.macroExpansionContext(macrosByName: [:])
+        let trackedMacro = MacroDeclaration(
+            packageVisibility: .open,
+            name: "tracked",
+            genericParameters: [],
+            parameters: [],
+            target: .macroSurface("syntax"),
+            expansionType: nil,
+            bindings: nil,
+            body: [.return(.string("macro body"))],
+            syntaxBody: nil
+        )
+        let context = graph.macroExpansionContext(macrosByName: ["tracked": trackedMacro])
         let target = MacroTargetValueBuilder().targetValue(for: construct)
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",
@@ -159,6 +209,71 @@ struct CompilerFixtureTests {
             return
         }
         #expect(memberIdentities.count == 3)
+
+        let attachedMacros = try #require(
+            evaluator.evaluate(
+                Expression.call(
+                    name: "graph.macros",
+                    arguments: [
+                        CallArgument(label: "on", value: .identifier("target.identity"))
+                    ]
+                )
+            )
+        )
+        guard case .array(let targetMacros) = attachedMacros else {
+            Issue.record("Expected graph.macros(on:) to return macro application array.")
+            return
+        }
+        #expect(targetMacros.count == 1)
+        guard let macroDeclaration = targetMacros.first?.field("declaration") else {
+            Issue.record("Expected attached macro to carry declaration metadata.")
+            return
+        }
+        guard case .string("return \"macro body\"")? = macroDeclaration.field("body") else {
+            Issue.record("Expected attached macro declaration body to be readable.")
+            return
+        }
+        guard case .string("@syntax")? = macroDeclaration.field("target") else {
+            Issue.record("Expected attached macro declaration target text to be readable.")
+            return
+        }
+        guard case .object("Macro.Target", let targetFields)? = macroDeclaration.field("targetSyntax"),
+            case .string("macroSurface")? = targetFields["kind"],
+            case .string("syntax")? = targetFields["name"]
+        else {
+            Issue.record("Expected attached macro declaration target to be a metaobject.")
+            return
+        }
+        guard case .object("WrittenSyntax", let writtenFields)? = macroDeclaration.field("writtenBody"),
+            case .string("return \"macro body\"")? = writtenFields["text"]
+        else {
+            Issue.record("Expected attached macro written body to carry authored text.")
+            return
+        }
+        guard case .object("Parsed", let parsedFields)? = macroDeclaration.field("parsedBody"),
+            case .object("Block", let blockFields)? = parsedFields["value"],
+            case .array(let statements)? = blockFields["statements"]
+        else {
+            Issue.record("Expected attached macro parsed body to carry a block metaobject.")
+            return
+        }
+        #expect(statements.count == 1)
+
+        let namedMacros = try #require(
+            evaluator.evaluate(
+                Expression.call(
+                    name: "graph.macros",
+                    arguments: [
+                        CallArgument(label: "named", value: .string("tracked"))
+                    ]
+                )
+            )
+        )
+        guard case .array(let trackedMacros) = namedMacros else {
+            Issue.record("Expected graph.macros(named:) to return macro application array.")
+            return
+        }
+        #expect(trackedMacros.count == 2)
 
         let declaration = try #require(
             evaluator.evaluate(
@@ -201,6 +316,30 @@ struct CompilerFixtureTests {
                 $0.callables.contains { $0.name == "graphName" }
             } == true
         )
+    }
+
+    @Test("WrittenSyntax marker isolates raw ASCII body")
+    func writtenSyntaxMarkerIsolatesRawASCIIBody() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/WrittenSyntaxMarker.range",
+                source: """
+                #WrittenSyntax {
+                function this is not parsed -> nope
+                @@@ raw ascii stays isolated
+                }
+                construct User {
+                    let name: String
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let construct = try #require(program.declarationGraph.constructsByName["User"])
+        #expect(construct.macros.map(\.name) == ["WrittenSyntax"])
     }
 
     @Test("Markers query graph through identities")
@@ -655,7 +794,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/ProjectMacros.range",
                 source: """
-                macro captureText(@capture _ value: Expression): Expression -> String { target, diagnostics in
+                macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
                     target.replace(with: "captured: \\(value)")
                 }
                 """,
@@ -693,7 +832,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     return "Hello"
                 }
 
-                macro captureText(@capture _ value: Expression): Expression -> String { target, diagnostics in
+                macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
                     target.replace(with: "captured: \\(value)")
                 }
                 """,
@@ -1718,6 +1857,25 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(artifact.contains("hashDirective"))
     }
 
+    @Test("Range lexer bootstrap tracks Range source")
+    func rangeLexerBootstrapTracksRangeSource() throws {
+        let root = try repositoryRoot()
+        let bootstrap = try String(
+            contentsOf: root.appendingPathComponent(
+                "RangeSyntax/Sources/RangeSyntax/Lexer/Lexer.swift"
+            ),
+            encoding: .utf8
+        )
+        let marker = "// Range lexer source fingerprint: "
+        let recorded = bootstrap.split(separator: "\n")
+            .map(String.init)
+            .first { $0.hasPrefix(marker) }?
+            .replacingOccurrences(of: marker, with: "")
+        let actual = try rangeLexerSourceFingerprint(root: root)
+
+        #expect(recorded == actual)
+    }
+
     @Test("Compiler pipeline runtime hooks run beside Swift pipeline")
     func compilerPipelineRuntimeHooksRunBesideSwiftPipeline() throws {
         let hook = RecordingRuntimeHook()
@@ -2030,6 +2188,41 @@ private func rangeCoreInputs() throws -> [SourceInput] {
             role: .core
         )
     }
+}
+
+private let rangeLexerSourceRelativePaths = [
+    "RangeCore/Syntax/Lexing/ASCII.range",
+    "RangeCore/Syntax/Lexing/Lexer.range",
+    "RangeCore/Syntax/Lexing/LexerRule.range",
+    "RangeCore/Syntax/Lexing/LexicalToken.range",
+    "RangeCore/Syntax/Lexing/RangeLexer.range",
+    "RangeCore/Syntax/Lexing/SourceLocation.range",
+    "RangeCore/Syntax/Lexing/SourceRange.range",
+    "RangeCore/Syntax/Lexing/TokenKind.range",
+]
+
+private func rangeLexerSourceFingerprint(root: URL) throws -> String {
+    var hash: UInt64 = 14_695_981_039_346_656_037
+
+    func feed(_ byte: UInt8) {
+        hash ^= UInt64(byte)
+        hash = hash &* 1_099_511_628_211
+    }
+
+    for relativePath in rangeLexerSourceRelativePaths {
+        for byte in relativePath.utf8 {
+            feed(byte)
+        }
+        feed(0)
+
+        let data = try Data(contentsOf: root.appendingPathComponent(relativePath))
+        for byte in data {
+            feed(byte)
+        }
+        feed(255)
+    }
+
+    return String(format: "%016llx", hash)
 }
 
 private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL] {

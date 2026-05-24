@@ -1342,7 +1342,8 @@ extension MacroExpander {
                 defaultValue: parameter.defaultValue,
                 slotName: parameter.slotName,
                 isBinding: parameter.isBinding,
-                capturesSyntax: parameter.capturesSyntax
+                capturesSyntax: parameter.capturesSyntax,
+                captureMetadataType: parameter.captureMetadataType
             )
         }
     }
@@ -1705,7 +1706,8 @@ extension MacroExpander {
                 try emittedDeclarations(
                     from: macro,
                     targetValue: MacroTargetValueBuilder(
-                        markerDeclarationsByName: context.markerDeclarationsByName
+                        markerDeclarationsByName: context.markerDeclarationsByName,
+                        writtenSyntaxByID: context.graphContext.writtenSyntaxByID
                     ).targetValue(for: enumeration),
                     context: context
                 )
@@ -1733,7 +1735,8 @@ extension MacroExpander {
                 try emittedDeclarations(
                     from: macro,
                     targetValue: MacroTargetValueBuilder(
-                        markerDeclarationsByName: context.markerDeclarationsByName
+                        markerDeclarationsByName: context.markerDeclarationsByName,
+                        writtenSyntaxByID: context.graphContext.writtenSyntaxByID
                     ).targetValue(for: protocolDeclaration),
                     context: context
                 )
@@ -1752,7 +1755,8 @@ extension MacroExpander {
         try emittedDeclarations(
             from: macro,
             targetValue: MacroTargetValueBuilder(
-                markerDeclarationsByName: context.markerDeclarationsByName
+                markerDeclarationsByName: context.markerDeclarationsByName,
+                writtenSyntaxByID: context.graphContext.writtenSyntaxByID
             ).targetValue(for: construct),
             context: context,
             argumentBindings: argumentBindings
