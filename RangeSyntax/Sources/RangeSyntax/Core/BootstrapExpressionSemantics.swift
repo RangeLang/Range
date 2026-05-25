@@ -36,6 +36,9 @@ public enum ExpressionTypeSemantics {
             ) {
                 return .typed(expansionType)
             }
+            if arguments.isEmpty, name.first?.isUppercase == true {
+                return .typed(.named("#\(name)"))
+            }
             throw ParseError(
                 "Expression macro #\(name) must be expanded before inference."
             )

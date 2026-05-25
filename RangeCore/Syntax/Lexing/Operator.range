@@ -19,20 +19,23 @@ construct OperatorBindingRange {
 }
 
 @syntax
+#Polarity
 construct Negativity {
 }
 
 @syntax
+#Polarity
 construct Neutrality {
 }
 
 @syntax
+#Polarity
 construct Positivity {
 }
 
 @syntax
 construct Signage {
-    let polarity: Identifier
+    let polarity: #Polarity
 }
 
 @syntax

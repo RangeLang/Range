@@ -1185,6 +1185,16 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         )
     }
 
+    @Test("Polarity metadata records carrier constructs")
+    func polarityMetadataRecordsCarrierConstructs() throws {
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
+
+        for polarity in ["Negativity", "Neutrality", "Positivity"] {
+            let declaration = try #require(program.declarationGraph.constructsByName[polarity])
+            #expect(declaration.macros.contains { $0.name == "Polarity" })
+        }
+    }
+
     @Test("Declaration graph carries source locations")
     func declarationGraphCarriesSourceLocations() throws {
         let source = """

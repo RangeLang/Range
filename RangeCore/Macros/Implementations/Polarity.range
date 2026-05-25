@@ -1,0 +1,3 @@
+marker Polarity(): Construct -> Identifier { target, diagnostics in
+    return Identifier(name: target.declaration.self.name)
+}
