@@ -466,7 +466,15 @@ extension MacroExpander {
                     "Macro #\(application.name) is used on a construct but targets \(macro.target!.displayName)."
                 )
             }
-            try emitMacroDiagnostics(from: macro.body, macro: macro, context: context)
+            try emitMacroDiagnostics(
+                from: macro.body,
+                macro: macro,
+                targetValue: MacroTargetValueBuilder(
+                    macroDeclarationsByName: context.macroDeclarationsByName,
+                    markerDeclarationsByName: context.markerDeclarationsByName
+                ).targetValue(for: construct),
+                context: context
+            )
             if !macroOperationExpressions(in: macro.body).isEmpty {
                 _ = try resolvedRewriteCalls(for: macro, context: context)
             }

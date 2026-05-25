@@ -1,0 +1,6 @@
+#Token("[")
+#Delimiter<.prefix>(RightBracket)
+#Delimiter<.infix>(RightBracket)
+@lexer<.emit>
+construct DuplicateDelimiterToken {
+}

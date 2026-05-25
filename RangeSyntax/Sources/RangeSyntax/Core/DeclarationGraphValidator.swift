@@ -31,9 +31,43 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             in: program.projectParsedFiles,
             closedMacroNames: closedCoreMacroNames
         )
+        try validateLexerRepresentationMetadata(in: program.declarationGraph)
         try validatePrimaryDeclarations(in: program.parsedFiles)
         try validateTopLevelStates(in: program.parsedFiles)
         try validateProtocolConformances(in: program.declarationGraph)
+    }
+
+    private func validateLexerRepresentationMetadata(in declarationGraph: DeclarationGraph) throws {
+        for declaration in declarationGraph.constructsByName.values {
+            let lexerApplications = declaration.macros.filter { $0.name == "lexer" }
+            guard !lexerApplications.isEmpty else {
+                continue
+            }
+
+            let tokenApplications = declaration.macros.filter { $0.name == "Token" }
+            let delimiterApplications = declaration.macros.filter { $0.name == "Delimiter" }
+
+            if tokenApplications.isEmpty {
+                throw SemanticValidationError(
+                    "@lexer requires #Token metadata on \(declaration.name)."
+                )
+            }
+            if tokenApplications.count > 1 {
+                throw SemanticValidationError(
+                    "@lexer found multiple #Token markers on \(declaration.name)."
+                )
+            }
+            if delimiterApplications.count > 1 {
+                throw SemanticValidationError(
+                    "@lexer found multiple #Delimiter markers on \(declaration.name)."
+                )
+            }
+            if lexerApplications.count > 1 {
+                throw SemanticValidationError(
+                    "Duplicate @lexer macro on \(declaration.name)."
+                )
+            }
+        }
     }
 
     public func validatePrimaryDeclarations(in program: CompiledProgram) throws {

@@ -913,7 +913,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
         let tokens = program.declarationGraph.tokenMetadataConcepts
         let delimiters = program.declarationGraph.tokenDelimiterConcepts
-        let lexerTokens = program.declarationGraph.lexerTokenConcepts
+        let lexerRepresentations = program.declarationGraph.lexerRepresentationConcepts
 
         #expect(
             tokens.contains(
@@ -934,28 +934,18 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             )
         )
         #expect(
-            lexerTokens.contains(
-                LexerTokenConcept(token: "Whitespace", pattern: " ", option: .skip, delimiter: nil)
+            lexerRepresentations.contains(
+                LexerRepresentationConcept(token: "Whitespace", pattern: " ", option: .skip, delimiter: nil)
             )
         )
         #expect(
-            lexerTokens.contains(
-                LexerTokenConcept(token: "Comma", pattern: ",", option: .emit, delimiter: nil)
+            lexerRepresentations.contains(
+                LexerRepresentationConcept(token: "Comma", pattern: ",", option: .emit, delimiter: nil)
             )
         )
         #expect(
-            lexerTokens.contains(
-                LexerTokenConcept(
-                    token: "LineComment",
-                    pattern: "//",
-                    option: .diagnostic,
-                    delimiter: nil
-                )
-            )
-        )
-        #expect(
-            lexerTokens.contains(
-                LexerTokenConcept(
+            lexerRepresentations.contains(
+                LexerRepresentationConcept(
                     token: "LeftBracket",
                     pattern: "[",
                     option: .emit,

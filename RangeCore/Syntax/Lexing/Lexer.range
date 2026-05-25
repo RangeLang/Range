@@ -4,7 +4,7 @@ construct Lexer {
     binding tokens: Array<@lexer>
 
     function tokenize(source: String): Result<[LexicalToken], LexingError> {
-        state cursor   LexerCursor(source: source, foreignBodies: [])
+        state cursor   LexerCursor(source: source, foreignBodies: [], rules: rules)
         return cursor.tokenize()
     }
 
@@ -12,7 +12,7 @@ construct Lexer {
         source: String,
         foreignBodies: [LexerForeignBody]
     ): Result<[LexicalToken], LexingError> {
-        state cursor   LexerCursor(source: source, foreignBodies: foreignBodies)
+        state cursor   LexerCursor(source: source, foreignBodies: foreignBodies, rules: rules)
         return cursor.tokenize()
     }
 }
@@ -37,6 +37,7 @@ construct LexerPosition {
 construct LexerCursor {
     let source: String
     let foreignBodies: [LexerForeignBody]
+    let rules: [LexerRule]
     state index: Int(0)
     state line: Int(0)
     state column: Int(0)
@@ -52,121 +53,8 @@ construct LexerCursor {
             let start   currentPosition()
             let character   currentCharacter()
 
-            if character == "/" {
-                advance()
-                if match("/") {
-                    return failure(
-                        message: "Line comments are not Range syntax. Use a marker such as #description { ... } for source notes.",
-                        start: start
-                    )
-                }
-                emit(kind: .slash, start: start)
-            } else if character == "{" {
-                advance()
-                emit(kind: .leftBrace, start: start)
-            } else if character == "}" {
-                advance()
-                emit(kind: .rightBrace, start: start)
-            } else if character == "(" {
-                advance()
-                emit(kind: .leftParen, start: start)
-            } else if character == ")" {
-                advance()
-                emit(kind: .rightParen, start: start)
-            } else if character == "[" {
-                advance()
-                emit(kind: .leftBracket, start: start)
-            } else if character == "]" {
-                advance()
-                emit(kind: .rightBracket, start: start)
-            } else if character == "*" {
-                advance()
-                emit(kind: .asterisk, start: start)
-            } else if character == "." {
-                advance()
-                if match(".") {
-                    if !match(".") {
-                        return failure(message: "Unexpected character sequence ..", start: start)
-                    }
-                    emit(kind: .ellipsis, start: start)
-                } else {
-                    emit(kind: .dot, start: start)
-                }
-            } else if character == ":" {
-                advance()
-                emit(kind: .colon, start: start)
-            } else if character == "-" {
-                advance()
-                if match(">") {
-                    emit(kind: .arrow, start: start)
-                } else {
-                    emit(kind: .minus, start: start)
-                }
-            } else if character == "!" {
-                advance()
-                if match("=") {
-                    emit(kind: .bangEqual, start: start)
-                } else {
-                    emit(kind: .bang, start: start)
-                }
-            } else if character == "," {
-                advance()
-                emit(kind: .comma, start: start)
-            } else if character == "=" {
-                advance()
-                if match("=") {
-                    emit(kind: .equalEqual, start: start)
-                } else {
-                    emit(kind: .equal, start: start)
-                }
-            } else if character == "<" {
-                advance()
-                if match("=") {
-                    emit(kind: .lessEqual, start: start)
-                } else {
-                    emit(kind: .less, start: start)
-                }
-            } else if character == ">" {
-                advance()
-                if match("=") {
-                    emit(kind: .greaterEqual, start: start)
-                } else {
-                    emit(kind: .greater, start: start)
-                }
-            } else if character == "+" {
-                advance()
-                if match("=") {
-                    emit(kind: .plusEqual, start: start)
-                } else {
-                    emit(kind: .plus, start: start)
-                }
-            } else if character == "?" {
-                advance()
-                if match("?") {
-                    emit(kind: .questionQuestion, start: start)
-                } else {
-                    emit(kind: .question, start: start)
-                }
-            } else if character == "$" {
-                advance()
-                emit(kind: .dollar, start: start)
-            } else if character == "&" {
-                advance()
-                if match("&") {
-                    emit(kind: .andAnd, start: start)
-                } else {
-                    emit(kind: .ampersand, start: start)
-                }
-            } else if character == "|" {
-                advance()
-                if match("|") {
-                    emit(kind: .orOr, start: start)
-                } else {
-                    emit(kind: .pipe, start: start)
-                }
-            } else if character == "%" {
-                advance()
-                emit(kind: .percent, start: start)
+            if matchLexerRuleLiteral(start: start) {
+                continue
             } else if character == "\"" {
                 switch readString(start: start) {
                 case .success(let value):
@@ -244,6 +132,145 @@ construct LexerCursor {
         let eof   currentPosition()
         emit(kind: .eof, start: eof)
         return .success(result: tokens)
+    }
+
+    function matchLexerRuleLiteral(start: LexerPosition): Bool {
+        state ruleIndex   0
+        while ruleIndex < rules.count {
+            let rule: LexerRule(rules.element(index: ruleIndex))
+            if isLiteralLexerRule(rule) && hasPrefix(rule.pattern) {
+                advancePattern(rule.pattern)
+                return emitRuleToken(token: rule.token, start: start)
+            }
+            ruleIndex += 1
+        }
+        return false
+    }
+
+    function isLiteralLexerRule(_ rule: LexerRule): Bool {
+        return isLiteralLexerToken(rule.token)
+    }
+
+    function isLiteralLexerToken(_ token: String): Bool {
+        return token == "leftBrace"
+            || token == "rightBrace"
+            || token == "leftParen"
+            || token == "rightParen"
+            || token == "leftBracket"
+            || token == "rightBracket"
+            || token == "asterisk"
+            || token == "dot"
+            || token == "ellipsis"
+            || token == "colon"
+            || token == "arrow"
+            || token == "bang"
+            || token == "equal"
+            || token == "equalEqual"
+            || token == "bangEqual"
+            || token == "minus"
+            || token == "less"
+            || token == "lessEqual"
+            || token == "greater"
+            || token == "greaterEqual"
+            || token == "plus"
+            || token == "plusEqual"
+            || token == "slash"
+            || token == "ampersand"
+            || token == "andAnd"
+            || token == "pipe"
+            || token == "orOr"
+            || token == "question"
+            || token == "questionQuestion"
+            || token == "dollar"
+            || token == "percent"
+            || token == "comma"
+    }
+
+    function emitRuleToken(token: String, start: LexerPosition): Bool {
+        if token == "leftBrace" {
+            emit(kind: .leftBrace, start: start)
+        } else if token == "rightBrace" {
+            emit(kind: .rightBrace, start: start)
+        } else if token == "leftParen" {
+            emit(kind: .leftParen, start: start)
+        } else if token == "rightParen" {
+            emit(kind: .rightParen, start: start)
+        } else if token == "leftBracket" {
+            emit(kind: .leftBracket, start: start)
+        } else if token == "rightBracket" {
+            emit(kind: .rightBracket, start: start)
+        } else if token == "asterisk" {
+            emit(kind: .asterisk, start: start)
+        } else if token == "dot" {
+            emit(kind: .dot, start: start)
+        } else if token == "ellipsis" {
+            emit(kind: .ellipsis, start: start)
+        } else if token == "colon" {
+            emit(kind: .colon, start: start)
+        } else if token == "arrow" {
+            emit(kind: .arrow, start: start)
+        } else if token == "bang" {
+            emit(kind: .bang, start: start)
+        } else if token == "equal" {
+            emit(kind: .equal, start: start)
+        } else if token == "equalEqual" {
+            emit(kind: .equalEqual, start: start)
+        } else if token == "bangEqual" {
+            emit(kind: .bangEqual, start: start)
+        } else if token == "minus" {
+            emit(kind: .minus, start: start)
+        } else if token == "less" {
+            emit(kind: .less, start: start)
+        } else if token == "lessEqual" {
+            emit(kind: .lessEqual, start: start)
+        } else if token == "greater" {
+            emit(kind: .greater, start: start)
+        } else if token == "greaterEqual" {
+            emit(kind: .greaterEqual, start: start)
+        } else if token == "plus" {
+            emit(kind: .plus, start: start)
+        } else if token == "plusEqual" {
+            emit(kind: .plusEqual, start: start)
+        } else if token == "slash" {
+            emit(kind: .slash, start: start)
+        } else if token == "ampersand" {
+            emit(kind: .ampersand, start: start)
+        } else if token == "andAnd" {
+            emit(kind: .andAnd, start: start)
+        } else if token == "pipe" {
+            emit(kind: .pipe, start: start)
+        } else if token == "orOr" {
+            emit(kind: .orOr, start: start)
+        } else if token == "question" {
+            emit(kind: .question, start: start)
+        } else if token == "questionQuestion" {
+            emit(kind: .questionQuestion, start: start)
+        } else if token == "dollar" {
+            emit(kind: .dollar, start: start)
+        } else if token == "percent" {
+            emit(kind: .percent, start: start)
+        } else if token == "comma" {
+            emit(kind: .comma, start: start)
+        } else {
+            return false
+        }
+        return true
+    }
+
+    function hasPrefix(_ pattern: String): Bool {
+        if index + pattern.count > source.count {
+            return false
+        }
+        let value: String(source.substring(start: index, end: index + pattern.count))
+        return value == pattern
+    }
+
+    function advancePattern(_ pattern: String) {
+        state remaining   pattern.count
+        while remaining > 0 {
+            advance()
+            set remaining   remaining - 1
+        }
     }
 
     function isAtEnd(): Bool {

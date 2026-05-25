@@ -6,7 +6,9 @@ enum LexingOption {
 }
 
 @syntax
-construct Lexing {
+construct LexerRepresentation {
     let token: Identifier
+    let pattern: String
     let option: LexingOption
+    let delimiter: Delimiter?
 }

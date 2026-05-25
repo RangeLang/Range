@@ -3,7 +3,6 @@ function rangeLexer(): Lexer {
     return Lexer(
         rules: [
             LexerRule(name: "whitespace", pattern: "whitespace+", token: "skip", priority: 0),
-            LexerRule(name: "lineComment", pattern: "//", token: "diagnostic.lineComment", priority: 10),
             LexerRule(name: "leftBrace", pattern: "{", token: "leftBrace", priority: 20),
             LexerRule(name: "rightBrace", pattern: "}", token: "rightBrace", priority: 20),
             LexerRule(name: "leftParen", pattern: "(", token: "leftParen", priority: 20),

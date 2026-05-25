@@ -1,6 +1,6 @@
 import Foundation
 
-// Range lexer source fingerprint: f2c135ded807d05d
+// Range lexer source fingerprint: c4263123283fb9d9
 // Boundary rule: lexer behavior belongs in RangeCore/Syntax/Lexing/*.range.
 // This Swift file adapts the parser to the Range-authored bootstrap projection.
 
@@ -138,9 +138,56 @@ private struct RangeAuthoredLexer {
         source: String,
         foreignBodies: [RangeAuthoredLexerForeignBody]
     ) -> Result<[RangeAuthoredLexicalToken], RangeAuthoredLexingError> {
-        var cursor = RangeAuthoredLexerCursor(source: source, foreignBodies: foreignBodies)
+        var cursor = RangeAuthoredLexerCursor(
+            source: source,
+            foreignBodies: foreignBodies,
+            rules: Self.rules
+        )
         return cursor.tokenize()
     }
+
+    private static let rules: [RangeAuthoredLexerRule] = [
+        RangeAuthoredLexerRule(name: "whitespace", pattern: "whitespace+", token: "skip", priority: 0),
+        RangeAuthoredLexerRule(name: "leftBrace", pattern: "{", token: "leftBrace", priority: 20),
+        RangeAuthoredLexerRule(name: "rightBrace", pattern: "}", token: "rightBrace", priority: 20),
+        RangeAuthoredLexerRule(name: "leftParen", pattern: "(", token: "leftParen", priority: 20),
+        RangeAuthoredLexerRule(name: "rightParen", pattern: ")", token: "rightParen", priority: 20),
+        RangeAuthoredLexerRule(name: "leftBracket", pattern: "[", token: "leftBracket", priority: 20),
+        RangeAuthoredLexerRule(name: "rightBracket", pattern: "]", token: "rightBracket", priority: 20),
+        RangeAuthoredLexerRule(name: "ellipsis", pattern: "...", token: "ellipsis", priority: 30),
+        RangeAuthoredLexerRule(name: "dot", pattern: ".", token: "dot", priority: 20),
+        RangeAuthoredLexerRule(name: "arrow", pattern: "->", token: "arrow", priority: 30),
+        RangeAuthoredLexerRule(name: "minus", pattern: "-", token: "minus", priority: 20),
+        RangeAuthoredLexerRule(name: "bangEqual", pattern: "!=", token: "bangEqual", priority: 30),
+        RangeAuthoredLexerRule(name: "bang", pattern: "!", token: "bang", priority: 20),
+        RangeAuthoredLexerRule(name: "equalEqual", pattern: "==", token: "equalEqual", priority: 30),
+        RangeAuthoredLexerRule(name: "equal", pattern: "=", token: "equal", priority: 20),
+        RangeAuthoredLexerRule(name: "lessEqual", pattern: "<=", token: "lessEqual", priority: 30),
+        RangeAuthoredLexerRule(name: "less", pattern: "<", token: "less", priority: 20),
+        RangeAuthoredLexerRule(name: "greaterEqual", pattern: ">=", token: "greaterEqual", priority: 30),
+        RangeAuthoredLexerRule(name: "greater", pattern: ">", token: "greater", priority: 20),
+        RangeAuthoredLexerRule(name: "plusEqual", pattern: "+=", token: "plusEqual", priority: 30),
+        RangeAuthoredLexerRule(name: "plus", pattern: "+", token: "plus", priority: 20),
+        RangeAuthoredLexerRule(name: "questionQuestion", pattern: "??", token: "questionQuestion", priority: 30),
+        RangeAuthoredLexerRule(name: "question", pattern: "?", token: "question", priority: 20),
+        RangeAuthoredLexerRule(name: "andAnd", pattern: "&&", token: "andAnd", priority: 30),
+        RangeAuthoredLexerRule(name: "orOr", pattern: "||", token: "orOr", priority: 30),
+        RangeAuthoredLexerRule(name: "asterisk", pattern: "*", token: "asterisk", priority: 20),
+        RangeAuthoredLexerRule(name: "colon", pattern: ":", token: "colon", priority: 20),
+        RangeAuthoredLexerRule(name: "comma", pattern: ",", token: "comma", priority: 20),
+        RangeAuthoredLexerRule(name: "slash", pattern: "/", token: "slash", priority: 20),
+        RangeAuthoredLexerRule(name: "ampersand", pattern: "&", token: "ampersand", priority: 20),
+        RangeAuthoredLexerRule(name: "dollar", pattern: "$", token: "dollar", priority: 20),
+        RangeAuthoredLexerRule(name: "percent", pattern: "%", token: "percent", priority: 20),
+        RangeAuthoredLexerRule(name: "pipe", pattern: "|", token: "pipe", priority: 20),
+    ]
+}
+
+private struct RangeAuthoredLexerRule {
+    let name: String
+    let pattern: String
+    let token: String
+    let priority: Int
 }
 
 private struct RangeAuthoredLexerForeignBody {
@@ -213,15 +260,21 @@ private struct RangeAuthoredLexerCursor {
     let source: String
     let characters: [String]
     let foreignBodies: [RangeAuthoredLexerForeignBody]
+    let rules: [RangeAuthoredLexerRule]
     var index: Int = 0
     var line: Int = 0
     var column: Int = 0
     var tokens: [RangeAuthoredLexicalToken] = []
 
-    init(source: String, foreignBodies: [RangeAuthoredLexerForeignBody]) {
+    init(
+        source: String,
+        foreignBodies: [RangeAuthoredLexerForeignBody],
+        rules: [RangeAuthoredLexerRule]
+    ) {
         self.source = source
         self.characters = source.map(String.init)
         self.foreignBodies = foreignBodies
+        self.rules = rules
     }
 
     mutating func tokenize() -> Result<[RangeAuthoredLexicalToken], RangeAuthoredLexingError> {
@@ -234,121 +287,8 @@ private struct RangeAuthoredLexerCursor {
             let start = currentPosition()
             let character = currentCharacter()
 
-            if character == "/" {
-                _ = advance()
-                if match("/") {
-                    return failure(
-                        message: "Line comments are not Range syntax. Use a marker such as #description { ... } for source notes.",
-                        start: start
-                    )
-                }
-                emit(kind: .slash, start: start)
-            } else if character == "{" {
-                _ = advance()
-                emit(kind: .leftBrace, start: start)
-            } else if character == "}" {
-                _ = advance()
-                emit(kind: .rightBrace, start: start)
-            } else if character == "(" {
-                _ = advance()
-                emit(kind: .leftParen, start: start)
-            } else if character == ")" {
-                _ = advance()
-                emit(kind: .rightParen, start: start)
-            } else if character == "[" {
-                _ = advance()
-                emit(kind: .leftBracket, start: start)
-            } else if character == "]" {
-                _ = advance()
-                emit(kind: .rightBracket, start: start)
-            } else if character == "*" {
-                _ = advance()
-                emit(kind: .asterisk, start: start)
-            } else if character == "." {
-                _ = advance()
-                if match(".") {
-                    if !match(".") {
-                        return failure(message: "Unexpected character sequence ..", start: start)
-                    }
-                    emit(kind: .ellipsis, start: start)
-                } else {
-                    emit(kind: .dot, start: start)
-                }
-            } else if character == ":" {
-                _ = advance()
-                emit(kind: .colon, start: start)
-            } else if character == "-" {
-                _ = advance()
-                if match(">") {
-                    emit(kind: .arrow, start: start)
-                } else {
-                    emit(kind: .minus, start: start)
-                }
-            } else if character == "!" {
-                _ = advance()
-                if match("=") {
-                    emit(kind: .bangEqual, start: start)
-                } else {
-                    emit(kind: .bang, start: start)
-                }
-            } else if character == "," {
-                _ = advance()
-                emit(kind: .comma, start: start)
-            } else if character == "=" {
-                _ = advance()
-                if match("=") {
-                    emit(kind: .equalEqual, start: start)
-                } else {
-                    emit(kind: .equal, start: start)
-                }
-            } else if character == "<" {
-                _ = advance()
-                if match("=") {
-                    emit(kind: .lessEqual, start: start)
-                } else {
-                    emit(kind: .less, start: start)
-                }
-            } else if character == ">" {
-                _ = advance()
-                if match("=") {
-                    emit(kind: .greaterEqual, start: start)
-                } else {
-                    emit(kind: .greater, start: start)
-                }
-            } else if character == "+" {
-                _ = advance()
-                if match("=") {
-                    emit(kind: .plusEqual, start: start)
-                } else {
-                    emit(kind: .plus, start: start)
-                }
-            } else if character == "?" {
-                _ = advance()
-                if match("?") {
-                    emit(kind: .questionQuestion, start: start)
-                } else {
-                    emit(kind: .question, start: start)
-                }
-            } else if character == "$" {
-                _ = advance()
-                emit(kind: .dollar, start: start)
-            } else if character == "&" {
-                _ = advance()
-                if match("&") {
-                    emit(kind: .andAnd, start: start)
-                } else {
-                    emit(kind: .ampersand, start: start)
-                }
-            } else if character == "|" {
-                _ = advance()
-                if match("|") {
-                    emit(kind: .orOr, start: start)
-                } else {
-                    emit(kind: .pipe, start: start)
-                }
-            } else if character == "%" {
-                _ = advance()
-                emit(kind: .percent, start: start)
+            if matchLexerRuleLiteral(start: start) {
+                continue
             } else if character == "\"" {
                 switch readString(start: start) {
                 case .success(let value):
@@ -429,6 +369,117 @@ private struct RangeAuthoredLexerCursor {
         let eof = currentPosition()
         emit(kind: .eof, start: eof)
         return .success(tokens)
+    }
+
+    mutating func matchLexerRuleLiteral(start: RangeAuthoredLexerPosition) -> Bool {
+        for rule in rules where isLiteralLexerRule(rule) && hasPrefix(rule.pattern) {
+            advancePattern(rule.pattern)
+            return emitRuleToken(token: rule.token, start: start)
+        }
+        return false
+    }
+
+    func isLiteralLexerRule(_ rule: RangeAuthoredLexerRule) -> Bool {
+        isLiteralLexerToken(rule.token)
+    }
+
+    func isLiteralLexerToken(_ token: String) -> Bool {
+        switch token {
+        case "leftBrace", "rightBrace", "leftParen", "rightParen", "leftBracket", "rightBracket",
+            "asterisk", "dot", "ellipsis", "colon", "arrow", "bang", "equal", "equalEqual",
+            "bangEqual", "minus", "less", "lessEqual", "greater", "greaterEqual", "plus",
+            "plusEqual", "slash", "ampersand", "andAnd", "pipe", "orOr", "question",
+            "questionQuestion", "dollar", "percent", "comma":
+            return true
+        default:
+            return false
+        }
+    }
+
+    mutating func emitRuleToken(token: String, start: RangeAuthoredLexerPosition) -> Bool {
+        switch token {
+        case "leftBrace":
+            emit(kind: .leftBrace, start: start)
+        case "rightBrace":
+            emit(kind: .rightBrace, start: start)
+        case "leftParen":
+            emit(kind: .leftParen, start: start)
+        case "rightParen":
+            emit(kind: .rightParen, start: start)
+        case "leftBracket":
+            emit(kind: .leftBracket, start: start)
+        case "rightBracket":
+            emit(kind: .rightBracket, start: start)
+        case "asterisk":
+            emit(kind: .asterisk, start: start)
+        case "dot":
+            emit(kind: .dot, start: start)
+        case "ellipsis":
+            emit(kind: .ellipsis, start: start)
+        case "colon":
+            emit(kind: .colon, start: start)
+        case "arrow":
+            emit(kind: .arrow, start: start)
+        case "bang":
+            emit(kind: .bang, start: start)
+        case "equal":
+            emit(kind: .equal, start: start)
+        case "equalEqual":
+            emit(kind: .equalEqual, start: start)
+        case "bangEqual":
+            emit(kind: .bangEqual, start: start)
+        case "minus":
+            emit(kind: .minus, start: start)
+        case "less":
+            emit(kind: .less, start: start)
+        case "lessEqual":
+            emit(kind: .lessEqual, start: start)
+        case "greater":
+            emit(kind: .greater, start: start)
+        case "greaterEqual":
+            emit(kind: .greaterEqual, start: start)
+        case "plus":
+            emit(kind: .plus, start: start)
+        case "plusEqual":
+            emit(kind: .plusEqual, start: start)
+        case "slash":
+            emit(kind: .slash, start: start)
+        case "ampersand":
+            emit(kind: .ampersand, start: start)
+        case "andAnd":
+            emit(kind: .andAnd, start: start)
+        case "pipe":
+            emit(kind: .pipe, start: start)
+        case "orOr":
+            emit(kind: .orOr, start: start)
+        case "question":
+            emit(kind: .question, start: start)
+        case "questionQuestion":
+            emit(kind: .questionQuestion, start: start)
+        case "dollar":
+            emit(kind: .dollar, start: start)
+        case "percent":
+            emit(kind: .percent, start: start)
+        case "comma":
+            emit(kind: .comma, start: start)
+        default:
+            return false
+        }
+        return true
+    }
+
+    func hasPrefix(_ pattern: String) -> Bool {
+        let patternCharacters = pattern.map(String.init)
+        guard index + patternCharacters.count <= characters.count else {
+            return false
+        }
+        return Array(characters[index..<(index + patternCharacters.count)]) == patternCharacters
+    }
+
+    mutating func advancePattern(_ pattern: String) {
+        for _ in pattern {
+            _ = advance()
+        }
     }
 
     func isAtEnd() -> Bool {

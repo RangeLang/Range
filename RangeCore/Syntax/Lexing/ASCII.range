@@ -285,12 +285,6 @@ construct EOF {
 }
 
 @syntax
-#Token("//")
-@lexer<.diagnostic>
-construct LineComment {
-}
-
-@syntax
 construct ASCIISymbol {
     let value: String
 }

@@ -55,6 +55,8 @@ public struct LexerTokenConcept: Equatable, Sendable {
     }
 }
 
+public typealias LexerRepresentationConcept = LexerTokenConcept
+
 extension DeclarationGraph {
     public var tokenMetadataConcepts: [TokenMetadataConcept] {
         Self.collectTokenMetadataConcepts(from: constructsByName)
@@ -65,7 +67,11 @@ extension DeclarationGraph {
     }
 
     public var lexerTokenConcepts: [LexerTokenConcept] {
-        Self.collectLexerTokenConcepts(from: constructsByName)
+        lexerRepresentationConcepts
+    }
+
+    public var lexerRepresentationConcepts: [LexerRepresentationConcept] {
+        Self.collectLexerRepresentationConcepts(from: constructsByName)
     }
 
     static func collectTokenMetadataConcepts(
@@ -115,9 +121,9 @@ extension DeclarationGraph {
         }
     }
 
-    static func collectLexerTokenConcepts(
+    static func collectLexerRepresentationConcepts(
         from constructsByName: [String: ConstructDeclaration]
-    ) -> [LexerTokenConcept] {
+    ) -> [LexerRepresentationConcept] {
         collectTokenMetadataConcepts(from: constructsByName).compactMap { token in
             guard let tokenDeclaration = constructsByName[token.token],
                 let lexerApplication = tokenDeclaration.macros.first(where: { $0.name == "lexer" }),
@@ -126,7 +132,7 @@ extension DeclarationGraph {
                 return nil
             }
 
-            return LexerTokenConcept(
+            return LexerRepresentationConcept(
                 token: token.token,
                 pattern: token.pattern,
                 option: option,
