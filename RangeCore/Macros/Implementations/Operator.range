@@ -6,6 +6,11 @@ marker Operator<let fixity: OperatorFixity>(
         token: Identifier(name: target.declaration.self.name),
         fixity: fixity,
         binding: binding,
+        metric: OperatorBindingMetric(
+            step: 10,
+            delta: 0 - 10,
+            signage: Signage(polarity: Identifier(name: "Negativity"))
+        ),
         associativity: associativity
     )
 }

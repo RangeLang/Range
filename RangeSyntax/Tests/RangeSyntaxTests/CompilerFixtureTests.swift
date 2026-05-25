@@ -1025,6 +1025,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     token: "Asterisk",
                     fixity: .infix,
                     binding: TokenOperatorBindingRange(lower: 70, upper: 80),
+                    step: 10,
+                    delta: -10,
+                    signage: "Negativity",
                     associativity: .left
                 )
             )
@@ -1035,6 +1038,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     token: "Bang",
                     fixity: .prefix,
                     binding: TokenOperatorBindingRange(lower: 90, upper: 100),
+                    step: 10,
+                    delta: -10,
+                    signage: "Negativity",
                     associativity: .none
                 )
             )
@@ -1045,6 +1051,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     token: "QuestionQuestion",
                     fixity: .infix,
                     binding: TokenOperatorBindingRange(lower: 50, upper: 60),
+                    step: 10,
+                    delta: -10,
+                    signage: "Negativity",
                     associativity: .right
                 )
             )
@@ -1055,6 +1064,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     token: "Plus",
                     fixity: .infix,
                     binding: TokenOperatorBindingRange(lower: 60, upper: 70),
+                    step: 10,
+                    delta: -10,
+                    signage: "Negativity",
                     associativity: .left
                 )
             )
@@ -1065,10 +1077,28 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     token: "Minus",
                     fixity: .infix,
                     binding: TokenOperatorBindingRange(lower: 60, upper: 70),
+                    step: 10,
+                    delta: -10,
+                    signage: "Negativity",
                     associativity: .left
                 )
             )
         )
+        for comparisonToken in ["BangEqual", "EqualEqual", "Less", "LessEqual", "Greater", "GreaterEqual"] {
+            #expect(
+                operators.contains(
+                    TokenOperatorConcept(
+                        token: comparisonToken,
+                        fixity: .infix,
+                        binding: TokenOperatorBindingRange(lower: 40, upper: 50),
+                        step: 10,
+                        delta: -10,
+                        signage: "Negativity",
+                        associativity: .none
+                    )
+                )
+            )
+        }
         #expect(
             program.declarationGraph.lexerRepresentationConcepts.contains(
                 LexerRepresentationConcept(
@@ -1080,6 +1110,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                         token: "Plus",
                         fixity: .infix,
                         binding: TokenOperatorBindingRange(lower: 60, upper: 70),
+                        step: 10,
+                        delta: -10,
+                        signage: "Negativity",
                         associativity: .left
                     )
                 )
@@ -1096,6 +1129,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                         token: "Minus",
                         fixity: .infix,
                         binding: TokenOperatorBindingRange(lower: 60, upper: 70),
+                        step: 10,
+                        delta: -10,
+                        signage: "Negativity",
                         associativity: .left
                     )
                 )

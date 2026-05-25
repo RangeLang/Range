@@ -19,9 +19,34 @@ construct OperatorBindingRange {
 }
 
 @syntax
+construct Negativity {
+}
+
+@syntax
+construct Neutrality {
+}
+
+@syntax
+construct Positivity {
+}
+
+@syntax
+construct Signage {
+    let polarity: Identifier
+}
+
+@syntax
+construct OperatorBindingMetric {
+    let step: Int
+    let delta: Int
+    let signage: Signage
+}
+
+@syntax
 construct OperatorBinding {
     let token: Identifier
     let fixity: OperatorFixity
     let binding: OperatorBindingRange
+    let metric: OperatorBindingMetric
     let associativity: OperatorAssociativity
 }

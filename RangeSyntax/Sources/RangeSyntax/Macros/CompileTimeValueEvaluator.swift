@@ -71,6 +71,13 @@ struct CompileTimeValueEvaluator {
             if path.hasPrefix(".") {
                 return enumCaseValue(named: String(path.dropFirst()))
             }
+            let components = path.split(separator: ".").map(String.init)
+            if components.count == 2,
+                let root = components.first,
+                root.first?.isUppercase == true
+            {
+                return enumCaseValue(named: components[1])
+            }
             return evaluatePath(path, locals: locals)
         case .array(let elements):
             let values = elements.compactMap { evaluate($0, locals: locals) }
@@ -79,6 +86,12 @@ struct CompileTimeValueEvaluator {
             }
             return .array(values)
         case .call(let name, let arguments):
+            if arguments.isEmpty,
+                let dot = name.lastIndex(of: "."),
+                dot < name.index(before: name.endIndex)
+            {
+                return enumCaseValue(named: String(name[name.index(after: dot)...]))
+            }
             if let graphValue = evaluateGraphCall(
                 name: name,
                 arguments: arguments,
@@ -120,6 +133,13 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return .string(left + right)
+        case .binary(let lhs, .subtraction, let rhs):
+            guard case .integer(let left) = evaluate(lhs, locals: locals),
+                case .integer(let right) = evaluate(rhs, locals: locals)
+            else {
+                return nil
+            }
+            return .integer(left - right)
         case .binary(let lhs, .equal, let rhs):
             guard let left = evaluate(lhs, locals: locals),
                 let right = evaluate(rhs, locals: locals)
@@ -243,7 +263,7 @@ struct CompileTimeValueEvaluator {
             "ValueGeneric", "Graph.Identity", "Macro.Application", "Macro.Declaration", "Macro.Target",
             "Marker.Application", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
-            "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
+            "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "Signage", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
                 guard let label = argument.label,

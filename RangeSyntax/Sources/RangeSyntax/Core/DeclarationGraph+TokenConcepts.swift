@@ -44,17 +44,26 @@ public struct TokenOperatorConcept: Equatable, Sendable {
     public let token: String
     public let fixity: TokenOperatorFixity
     public let binding: TokenOperatorBindingRange
+    public let step: Int
+    public let delta: Int
+    public let signage: String
     public let associativity: TokenOperatorAssociativity
 
     public init(
         token: String,
         fixity: TokenOperatorFixity,
         binding: TokenOperatorBindingRange,
+        step: Int,
+        delta: Int,
+        signage: String,
         associativity: TokenOperatorAssociativity
     ) {
         self.token = token
         self.fixity = fixity
         self.binding = binding
+        self.step = step
+        self.delta = delta
+        self.signage = signage
         self.associativity = associativity
     }
 }
@@ -177,6 +186,9 @@ extension DeclarationGraph {
                     token: tokenDeclaration.name,
                     fixity: fixity,
                     binding: binding,
+                    step: binding.upper - binding.lower,
+                    delta: binding.lower - binding.upper,
+                    signage: signage(of: binding.lower - binding.upper),
                     associativity: operatorAssociativity(from: application) ?? .none
                 )
             }.first
@@ -380,5 +392,15 @@ extension DeclarationGraph {
             .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "\n", with: "")
             .replacingOccurrences(of: "\t", with: "")
+    }
+
+    private static func signage(of value: Int) -> String {
+        if value < 0 {
+            return "Negativity"
+        }
+        if value > 0 {
+            return "Positivity"
+        }
+        return "Neutrality"
     }
 }
