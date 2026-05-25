@@ -1,2 +1,24 @@
 construct Visual {
 }
+
+construct Shape {
+}
+
+construct Surface {
+    let sides: IntLiteral
+}
+
+construct SurfaceSample {
+    let x: Float
+    let y: Float
+    let distance: Float
+}
+
+marker Shape<let sides: IntLiteral>(): Construct -> Surface { target, diagnostics in
+    return Surface(sides: sides)
+}
+
+construct Rectangle {
+    let width: Float
+    let height: Float
+}

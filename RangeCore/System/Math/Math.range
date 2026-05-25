@@ -1,3 +1,41 @@
+construct MathFunction<Input, Output> {
+    let signature: FunctionTypeReference
+    let body: Closure
+    let source: WrittenSyntax?
+}
+
+construct MathField<Sample, Output> {
+    let value: MathFunction<Sample, Output>
+}
+
+construct MathPair<A, B> {
+    let first: A
+    let second: B
+}
+
+construct MathRelation<Domain, Codomain> {
+    let from: Domain
+    let to: Codomain
+}
+
+construct MathLine<Point> {
+    let start: Point
+    let end: Point
+}
+
+construct MathEdge<Node> {
+    let start: Node
+    let end: Node
+}
+
+construct MathAxis<Edge> {
+    let edges: [Edge]
+}
+
+construct MathSample<Domain> {
+    let domain: Domain
+}
+
 construct Math {
     function abs(value: Int): Int {
         if value < 0 {

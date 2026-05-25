@@ -49,6 +49,7 @@ public struct DeclarationGraph {
     public let parametersByInitializerIdentity: [String: [RangeFunctionParameter]]
     public let callablesByName: [String: [CallableDeclaration]]
     public let operatorCallablesByName: [String: [CallableDeclaration]]
+    public let precedenceGroupsByName: [String: PrecedenceGroupDeclaration]
     public let sourceTextByPath: [String: String]
     public let sourceLocations: [DeclarationSourceLocation]
     public let realizedLiteralBridges: [RealizedLiteralBridge]
@@ -98,6 +99,7 @@ public struct DeclarationGraph {
         )
         let callables = Self.collectCallables(from: files)
         let operatorCallables = Self.collectOperatorCallables(from: files)
+        let precedenceGroups = Self.collectPrecedenceGroups(from: files)
         let parametersByCallableIdentity = Self.collectParametersByCallableIdentity(from: files)
         let parametersByInitializerIdentity = Self.collectParametersByInitializerIdentity(
             from: constructs,
@@ -125,6 +127,7 @@ public struct DeclarationGraph {
         self.parametersByInitializerIdentity = parametersByInitializerIdentity
         self.callablesByName = callables
         self.operatorCallablesByName = operatorCallables
+        self.precedenceGroupsByName = precedenceGroups
         self.sourceTextByPath = sourceTextByPath
         self.sourceLocations = Self.collectSourceLocations(from: files)
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
@@ -1121,6 +1124,16 @@ public struct DeclarationGraph {
         return registry
     }
 
+    static func collectPrecedenceGroups(
+        from files: [ParsedSourceFile]
+    ) -> [String: PrecedenceGroupDeclaration] {
+        Dictionary(
+            uniqueKeysWithValues: files
+                .flatMap { precedenceGroups(in: $0.sourceFile) }
+                .map { ($0.name, $0) }
+        )
+    }
+
     private static func collectNamespaceConstructs(
         in namespace: NamespaceDeclaration,
         qualifiedPrefix: String,
@@ -1796,6 +1809,15 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.operators
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+            return []
+        }
+    }
+
+    static func precedenceGroups(in sourceFile: SourceFileNode) -> [PrecedenceGroupDeclaration] {
+        switch sourceFile {
+        case .module(let module):
+            return module.precedenceGroups
         case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
             return []
         }

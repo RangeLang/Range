@@ -1103,6 +1103,52 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         )
     }
 
+    @Test("Precedence metadata records binding ranges")
+    func precedenceMetadataRecordsBindingRanges() throws {
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
+        let precedence = program.declarationGraph.precedenceMetadataConcepts
+
+        #expect(
+            precedence.contains(
+                PrecedenceMetadataConcept(
+                    name: "AssignmentPrecedence",
+                    associativity: .right,
+                    higherThan: [],
+                    lowerThan: [],
+                    assignment: true,
+                    step: 10,
+                    binding: TokenOperatorBindingRange(lower: 10, upper: 20)
+                )
+            )
+        )
+        #expect(
+            precedence.contains(
+                PrecedenceMetadataConcept(
+                    name: "AdditionPrecedence",
+                    associativity: .left,
+                    higherThan: ["NilCoalescingPrecedence"],
+                    lowerThan: [],
+                    assignment: nil,
+                    step: 10,
+                    binding: TokenOperatorBindingRange(lower: 60, upper: 70)
+                )
+            )
+        )
+        #expect(
+            precedence.contains(
+                PrecedenceMetadataConcept(
+                    name: "MultiplicationPrecedence",
+                    associativity: .left,
+                    higherThan: ["AdditionPrecedence"],
+                    lowerThan: [],
+                    assignment: nil,
+                    step: 10,
+                    binding: TokenOperatorBindingRange(lower: 70, upper: 80)
+                )
+            )
+        )
+    }
+
     @Test("Declaration graph carries source locations")
     func declarationGraphCarriesSourceLocations() throws {
         let source = """

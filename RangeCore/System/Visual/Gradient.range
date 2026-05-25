@@ -1,0 +1,48 @@
+construct SharedColor<let space: ColorSpace> {
+    state value: Color<space>
+}
+
+construct BoundColor<let space: ColorSpace> {
+    binding value: Color<space>
+}
+
+construct ColorLink<Sample, let space: ColorSpace> {
+    let source: SharedColor<space>
+    let transform: MathFunction<Sample, Color<space>>
+}
+
+construct BoundColorLink<Sample, let space: ColorSpace> {
+    binding source: Color<space>
+    let transform: MathFunction<Sample, Color<space>>
+}
+
+construct GradientStop<let space: ColorSpace> {
+    state position: Float
+    binding color: Color<space>
+}
+
+construct GradientPoint<let space: ColorSpace> {
+    let x: Float
+    let y: Float
+    let color: SharedColor<space>
+}
+
+construct GradientEdge<let space: ColorSpace> {
+    let line: MathLine<GradientPoint<space>>
+    let color: ColorLink<GradientPoint<space>, space>?
+}
+
+construct GradientAxis<let space: ColorSpace> {
+    let edges: [GradientEdge<space>]
+}
+
+construct GradientDefinition<Sample, let space: ColorSpace> {
+    let stops: [GradientStop<space>]
+    let points: [GradientPoint<space>]
+    let axes: [GradientAxis<space>]
+}
+
+construct Gradient<Sample, let space: ColorSpace> {
+    let color: MathFunction<Sample, Color<space>>
+    let definition: GradientDefinition<Sample, space>
+}

@@ -1,0 +1,70 @@
+construct Shadow {
+}
+
+enum ShadowPlacement {
+    case outer
+    case inner
+}
+
+construct ShadowVector {
+    let x: Float
+    let y: Float
+}
+
+construct ShadowRadius {
+    let blur: Float
+    let spread: Float
+}
+
+construct ShadowSample {
+    let surface: SurfaceSample
+}
+
+construct ShadowLayer<let space: ColorSpace> {
+    let placement: ShadowPlacement
+    let offset: ShadowVector
+    let radius: ShadowRadius
+    let color: Color<space>
+    let field: MathFunction<ShadowSample, Color<space>>?
+}
+
+construct ShadowStack<let space: ColorSpace> {
+    let layers: [ShadowLayer<space>]
+}
+
+construct ShadowConfiguration<let space: ColorSpace> {
+    let outer: ShadowLayer<space>
+    let inner: ShadowLayer<space>
+}
+
+function defaultRectangleShadowConfiguration(): ShadowConfiguration<.rgb> {
+    return ShadowConfiguration<.rgb>(
+        outer: ShadowLayer<.rgb>(
+            placement: .outer,
+            offset: ShadowVector(x: 0.0, y: 8.0),
+            radius: ShadowRadius(blur: 24.0, spread: 0.0),
+            color: ColorLibrary.rgb(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.18),
+            field: nil
+        ),
+        inner: ShadowLayer<.rgb>(
+            placement: .inner,
+            offset: ShadowVector(x: 0.0, y: 1.0),
+            radius: ShadowRadius(blur: 2.0, spread: 0.0),
+            color: ColorLibrary.rgb(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.65),
+            field: nil
+        )
+    )
+}
+
+function shadowStack<let space: ColorSpace>(configuration: ShadowConfiguration<space>): ShadowStack<space> {
+    return ShadowStack<space>(layers: [configuration.outer, configuration.inner])
+}
+
+construct ShadowAxis {
+    let name: Identifier
+}
+
+construct ShadowState<Surface, let space: ColorSpace> {
+    let surface: Surface
+    let stack: ShadowStack<space>
+}
