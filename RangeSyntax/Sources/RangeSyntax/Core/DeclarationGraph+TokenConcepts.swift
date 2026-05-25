@@ -18,15 +18,63 @@ public struct TokenDelimiterConcept: Equatable, Sendable {
     }
 }
 
+public enum TokenOperatorFixity: String, Sendable {
+    case prefix
+    case infix
+    case postfix
+}
+
+public enum TokenOperatorAssociativity: String, Sendable {
+    case none
+    case left
+    case right
+}
+
+public struct TokenOperatorBindingRange: Equatable, Sendable {
+    public let lower: Int
+    public let upper: Int
+
+    public init(lower: Int, upper: Int) {
+        self.lower = lower
+        self.upper = upper
+    }
+}
+
+public struct TokenOperatorConcept: Equatable, Sendable {
+    public let token: String
+    public let fixity: TokenOperatorFixity
+    public let binding: TokenOperatorBindingRange
+    public let associativity: TokenOperatorAssociativity
+
+    public init(
+        token: String,
+        fixity: TokenOperatorFixity,
+        binding: TokenOperatorBindingRange,
+        associativity: TokenOperatorAssociativity
+    ) {
+        self.token = token
+        self.fixity = fixity
+        self.binding = binding
+        self.associativity = associativity
+    }
+}
+
 public struct TokenMetadataConcept: Equatable, Sendable {
     public let token: String
     public let pattern: String
     public let delimiter: TokenDelimiterConcept?
+    public let operatorBinding: TokenOperatorConcept?
 
-    public init(token: String, pattern: String, delimiter: TokenDelimiterConcept?) {
+    public init(
+        token: String,
+        pattern: String,
+        delimiter: TokenDelimiterConcept?,
+        operatorBinding: TokenOperatorConcept?
+    ) {
         self.token = token
         self.pattern = pattern
         self.delimiter = delimiter
+        self.operatorBinding = operatorBinding
     }
 }
 
@@ -41,17 +89,20 @@ public struct LexerTokenConcept: Equatable, Sendable {
     public let pattern: String
     public let option: LexerTokenOption
     public let delimiter: TokenDelimiterConcept?
+    public let operatorBinding: TokenOperatorConcept?
 
     public init(
         token: String,
         pattern: String,
         option: LexerTokenOption,
-        delimiter: TokenDelimiterConcept?
+        delimiter: TokenDelimiterConcept?,
+        operatorBinding: TokenOperatorConcept? = nil
     ) {
         self.token = token
         self.pattern = pattern
         self.option = option
         self.delimiter = delimiter
+        self.operatorBinding = operatorBinding
     }
 }
 
@@ -64,6 +115,10 @@ extension DeclarationGraph {
 
     public var tokenDelimiterConcepts: [TokenDelimiterConcept] {
         tokenMetadataConcepts.compactMap(\.delimiter)
+    }
+
+    public var tokenOperatorConcepts: [TokenOperatorConcept] {
+        tokenMetadataConcepts.compactMap(\.operatorBinding)
     }
 
     public var lexerTokenConcepts: [LexerTokenConcept] {
@@ -110,10 +165,27 @@ extension DeclarationGraph {
                 )
             }.first
 
+            let operatorBinding = tokenDeclaration.macros.compactMap { application -> TokenOperatorConcept? in
+                guard application.name == "Operator",
+                    let fixity = operatorFixity(from: application),
+                    let binding = operatorBindingRange(from: application)
+                else {
+                    return nil
+                }
+
+                return TokenOperatorConcept(
+                    token: tokenDeclaration.name,
+                    fixity: fixity,
+                    binding: binding,
+                    associativity: operatorAssociativity(from: application) ?? .none
+                )
+            }.first
+
             return TokenMetadataConcept(
                 token: tokenDeclaration.name,
                 pattern: pattern,
-                delimiter: delimiter
+                delimiter: delimiter,
+                operatorBinding: operatorBinding
             )
         }
         .sorted {
@@ -136,7 +208,8 @@ extension DeclarationGraph {
                 token: token.token,
                 pattern: token.pattern,
                 option: option,
-                delimiter: token.delimiter
+                delimiter: token.delimiter,
+                operatorBinding: token.operatorBinding
             )
         }
         .sorted {
@@ -214,5 +287,98 @@ extension DeclarationGraph {
         let optionName = application.genericArguments[0].displayName
         let normalized = optionName.hasPrefix(".") ? String(optionName.dropFirst()) : optionName
         return LexerTokenOption(rawValue: normalized)
+    }
+
+    private static func operatorFixity(from application: MacroApplication) -> TokenOperatorFixity? {
+        guard application.genericArguments.count == 1 else {
+            return nil
+        }
+
+        let fixityName = application.genericArguments[0].displayName
+        let normalized = fixityName.hasPrefix(".") ? String(fixityName.dropFirst()) : fixityName
+        return TokenOperatorFixity(rawValue: normalized)
+    }
+
+    private static func operatorBindingRange(
+        from application: MacroApplication
+    ) -> TokenOperatorBindingRange? {
+        guard let argumentClause = application.argumentClause else {
+            return nil
+        }
+
+        let normalized = normalizedMacroArgumentClause(argumentClause)
+        guard let binding = macroArgument(named: "binding", in: normalized) else {
+            return nil
+        }
+
+        if binding.hasPrefix("OperatorBindingRange("), binding.hasSuffix(")") {
+            guard let lowerValue = macroArgument(named: "lower", in: binding),
+                let upperValue = macroArgument(named: "upper", in: binding),
+                let lower = Int(lowerValue),
+                let upper = Int(upperValue)
+            else {
+                return nil
+            }
+            return TokenOperatorBindingRange(lower: lower, upper: upper)
+        } else {
+            let bounds = binding.components(separatedBy: "..")
+            guard bounds.count == 2,
+                let lower = Int(bounds[0].trimmingCharacters(in: .whitespacesAndNewlines)),
+                let upper = Int(bounds[1].trimmingCharacters(in: .whitespacesAndNewlines))
+            else {
+                return nil
+            }
+            return TokenOperatorBindingRange(lower: lower, upper: upper)
+        }
+    }
+
+    private static func operatorAssociativity(
+        from application: MacroApplication
+    ) -> TokenOperatorAssociativity? {
+        guard let argumentClause = application.argumentClause else {
+            return nil
+        }
+
+        let normalized = normalizedMacroArgumentClause(argumentClause)
+        guard let associativity = macroArgument(named: "associativity", in: normalized) else {
+            return nil
+        }
+
+        let normalizedAssociativity = associativity.hasPrefix(".")
+            ? String(associativity.dropFirst())
+            : associativity
+        return TokenOperatorAssociativity(rawValue: normalizedAssociativity)
+    }
+
+    private static func macroArgument(named name: String, in normalized: String) -> String? {
+        guard let valueStart = normalized.range(of: "\(name):")?.upperBound else {
+            return nil
+        }
+
+        var depth = 0
+        var current = valueStart
+        while current < normalized.endIndex {
+            let character = normalized[current]
+            if character == "(" {
+                depth += 1
+            } else if character == ")" {
+                if depth == 0 {
+                    break
+                }
+                depth -= 1
+            } else if character == "," && depth == 0 {
+                break
+            }
+            current = normalized.index(after: current)
+        }
+
+        return String(normalized[valueStart..<current])
+    }
+
+    private static func normalizedMacroArgumentClause(_ argumentClause: String) -> String {
+        argumentClause
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "\n", with: "")
+            .replacingOccurrences(of: "\t", with: "")
     }
 }

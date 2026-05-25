@@ -73,12 +73,14 @@ construct Colon {
 @syntax
 #Token("*")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
 construct Asterisk {
 }
 
 @syntax
 #Token("/")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
 construct Slash {
 }
 
@@ -91,6 +93,7 @@ construct Dollar {
 @syntax
 #Token("%")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
 construct Percent {
 }
 
@@ -103,6 +106,7 @@ construct Hash {
 @syntax
 #Token("...")
 @lexer<.emit>
+#Operator<.postfix>(binding: OperatorBindingRange(lower: 90, upper: 100))
 construct Ellipsis {
 }
 
@@ -115,18 +119,21 @@ construct Arrow {
 @syntax
 #Token("-")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 60, upper: 70), associativity: .left)
 construct Minus {
 }
 
 @syntax
 #Token("!")
 @lexer<.emit>
+#Operator<.prefix>(binding: OperatorBindingRange(lower: 90, upper: 100))
 construct Bang {
 }
 
 @syntax
 #Token("!=")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 construct BangEqual {
 }
 
@@ -139,36 +146,42 @@ construct Equal {
 @syntax
 #Token("==")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 construct EqualEqual {
 }
 
 @syntax
 #Token("<")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 construct Less {
 }
 
 @syntax
 #Token("<=")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 construct LessEqual {
 }
 
 @syntax
 #Token(">")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 construct Greater {
 }
 
 @syntax
 #Token(">=")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 construct GreaterEqual {
 }
 
 @syntax
 #Token("+")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 60, upper: 70), associativity: .left)
 construct Plus {
 }
 
@@ -187,6 +200,7 @@ construct Ampersand {
 @syntax
 #Token("&&")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 30, upper: 40), associativity: .left)
 construct AndAnd {
 }
 
@@ -199,6 +213,7 @@ construct Pipe {
 @syntax
 #Token("||")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 20, upper: 30), associativity: .left)
 construct OrOr {
 }
 
@@ -211,6 +226,7 @@ construct Question {
 @syntax
 #Token("??")
 @lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 50, upper: 60), associativity: .right)
 construct QuestionQuestion {
 }
 

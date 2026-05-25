@@ -924,23 +924,41 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                         token: "LeftBracket",
                         role: .prefix,
                         pairedToken: "RightBracket"
-                    )
+                    ),
+                    operatorBinding: nil
                 )
             )
         )
         #expect(
             tokens.contains(
-                TokenMetadataConcept(token: "Comma", pattern: ",", delimiter: nil)
+                TokenMetadataConcept(
+                    token: "Comma",
+                    pattern: ",",
+                    delimiter: nil,
+                    operatorBinding: nil
+                )
             )
         )
         #expect(
             lexerRepresentations.contains(
-                LexerRepresentationConcept(token: "Whitespace", pattern: " ", option: .skip, delimiter: nil)
+                LexerRepresentationConcept(
+                    token: "Whitespace",
+                    pattern: " ",
+                    option: .skip,
+                    delimiter: nil,
+                    operatorBinding: nil
+                )
             )
         )
         #expect(
             lexerRepresentations.contains(
-                LexerRepresentationConcept(token: "Comma", pattern: ",", option: .emit, delimiter: nil)
+                LexerRepresentationConcept(
+                    token: "Comma",
+                    pattern: ",",
+                    option: .emit,
+                    delimiter: nil,
+                    operatorBinding: nil
+                )
             )
         )
         #expect(
@@ -953,7 +971,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                         token: "LeftBracket",
                         role: .prefix,
                         pairedToken: "RightBracket"
-                    )
+                    ),
+                    operatorBinding: nil
                 )
             )
         )
@@ -990,6 +1009,95 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     token: "RightBracket",
                     role: .postfix,
                     pairedToken: "LeftBracket"
+                )
+            )
+        )
+    }
+
+    @Test("Token metadata reads operator binding ranges")
+    func tokenMetadataReadsOperatorBindingRanges() throws {
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
+        let operators = program.declarationGraph.tokenOperatorConcepts
+
+        #expect(
+            operators.contains(
+                TokenOperatorConcept(
+                    token: "Asterisk",
+                    fixity: .infix,
+                    binding: TokenOperatorBindingRange(lower: 70, upper: 80),
+                    associativity: .left
+                )
+            )
+        )
+        #expect(
+            operators.contains(
+                TokenOperatorConcept(
+                    token: "Bang",
+                    fixity: .prefix,
+                    binding: TokenOperatorBindingRange(lower: 90, upper: 100),
+                    associativity: .none
+                )
+            )
+        )
+        #expect(
+            operators.contains(
+                TokenOperatorConcept(
+                    token: "QuestionQuestion",
+                    fixity: .infix,
+                    binding: TokenOperatorBindingRange(lower: 50, upper: 60),
+                    associativity: .right
+                )
+            )
+        )
+        #expect(
+            operators.contains(
+                TokenOperatorConcept(
+                    token: "Plus",
+                    fixity: .infix,
+                    binding: TokenOperatorBindingRange(lower: 60, upper: 70),
+                    associativity: .left
+                )
+            )
+        )
+        #expect(
+            operators.contains(
+                TokenOperatorConcept(
+                    token: "Minus",
+                    fixity: .infix,
+                    binding: TokenOperatorBindingRange(lower: 60, upper: 70),
+                    associativity: .left
+                )
+            )
+        )
+        #expect(
+            program.declarationGraph.lexerRepresentationConcepts.contains(
+                LexerRepresentationConcept(
+                    token: "Plus",
+                    pattern: "+",
+                    option: .emit,
+                    delimiter: nil,
+                    operatorBinding: TokenOperatorConcept(
+                        token: "Plus",
+                        fixity: .infix,
+                        binding: TokenOperatorBindingRange(lower: 60, upper: 70),
+                        associativity: .left
+                    )
+                )
+            )
+        )
+        #expect(
+            program.declarationGraph.lexerRepresentationConcepts.contains(
+                LexerRepresentationConcept(
+                    token: "Minus",
+                    pattern: "-",
+                    option: .emit,
+                    delimiter: nil,
+                    operatorBinding: TokenOperatorConcept(
+                        token: "Minus",
+                        fixity: .infix,
+                        binding: TokenOperatorBindingRange(lower: 60, upper: 70),
+                        associativity: .left
+                    )
                 )
             )
         )

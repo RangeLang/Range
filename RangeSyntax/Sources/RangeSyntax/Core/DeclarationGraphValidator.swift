@@ -46,6 +46,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
             let tokenApplications = declaration.macros.filter { $0.name == "Token" }
             let delimiterApplications = declaration.macros.filter { $0.name == "Delimiter" }
+            let operatorApplications = declaration.macros.filter { $0.name == "Operator" }
 
             if tokenApplications.isEmpty {
                 throw SemanticValidationError(
@@ -62,9 +63,33 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     "@lexer found multiple #Delimiter markers on \(declaration.name)."
                 )
             }
+            if operatorApplications.count > 1 {
+                throw SemanticValidationError(
+                    "@lexer found multiple #Operator markers on \(declaration.name)."
+                )
+            }
             if lexerApplications.count > 1 {
                 throw SemanticValidationError(
                     "Duplicate @lexer macro on \(declaration.name)."
+                )
+            }
+        }
+
+        for declaration in declarationGraph.constructsByName.values {
+            let operatorApplications = declaration.macros.filter { $0.name == "Operator" }
+            guard !operatorApplications.isEmpty else {
+                continue
+            }
+
+            let tokenApplications = declaration.macros.filter { $0.name == "Token" }
+            if tokenApplications.isEmpty {
+                throw SemanticValidationError(
+                    "#Operator requires #Token metadata on \(declaration.name)."
+                )
+            }
+            if operatorApplications.count > 1 {
+                throw SemanticValidationError(
+                    "Duplicate #Operator marker on \(declaration.name)."
                 )
             }
         }
