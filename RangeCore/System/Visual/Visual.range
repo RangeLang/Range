@@ -14,6 +14,11 @@ construct SurfaceSample {
     let distance: Float
 }
 
+construct SurfaceEdge<SurfaceType> {
+    let surface: SurfaceType
+    let line: MathLine<SurfaceSample>
+}
+
 marker Shape<let sides: IntLiteral>(): Construct -> Surface { target, diagnostics in
     return Surface(sides: sides)
 }

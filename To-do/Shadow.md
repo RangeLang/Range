@@ -80,6 +80,62 @@ Mathematically, the rectangle is a finite four-sided surface with a sample domai
 over `width` and `height`. Shadows and filters attach to that surface; they are
 not fields inside the rectangle itself.
 
+## Edge Projection
+
+Projection is the bridge between shape geometry and shadow filters.
+
+A rectangle can expose an edge as a line over its surface sample domain:
+
+```range
+construct SurfaceEdge<SurfaceType> {
+    let surface: SurfaceType
+    let line: MathLine<SurfaceSample>
+}
+```
+
+The edge is still geometric. It does not decide whether a shadow is inside or
+outside. Shadow projection does that by splitting the same edge into filter
+relations:
+
+```range
+construct ShadowProjectionSample {
+    let edge: SurfaceSample
+    let surface: SurfaceSample
+    let placement: ShadowPlacement
+}
+
+construct ShadowFilter<SurfaceType, let space: ColorSpace> {
+    let edge: SurfaceEdge<SurfaceType>
+    let layer: ShadowLayer<space>
+    let projection: MathFunction<ShadowProjectionSample, ShadowSample>?
+}
+
+construct ShadowProjection<SurfaceType, let space: ColorSpace> {
+    let edge: SurfaceEdge<SurfaceType>
+    let outer: ShadowFilter<SurfaceType, space>
+    let inner: ShadowFilter<SurfaceType, space>
+}
+```
+
+That means a rectangle edge can feed both an outer drop shadow and an inner
+shadow highlight without duplicating the edge. The edge is the source relation;
+`ShadowProjection` is the split; `ShadowFilter` is the layer-specific visual
+effect.
+
+For a default rectangle, the framework can build the split from the default
+configuration:
+
+```range
+function shadowProjection<SurfaceType, let space: ColorSpace>(
+    edge: SurfaceEdge<SurfaceType>,
+    configuration: ShadowConfiguration<space>
+): ShadowProjection<SurfaceType, space>
+```
+
+The optional `projection` function is where a more advanced model can describe
+how edge samples map into shadow samples. Fixed CSS-style shadows can leave it
+empty and lower from offset, blur, spread, and color.
+
 ## Shadow Stack
 
 The first standard vocabulary is intentionally small:

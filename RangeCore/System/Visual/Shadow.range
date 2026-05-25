@@ -20,6 +20,12 @@ construct ShadowSample {
     let surface: SurfaceSample
 }
 
+construct ShadowProjectionSample {
+    let edge: SurfaceSample
+    let surface: SurfaceSample
+    let placement: ShadowPlacement
+}
+
 construct ShadowLayer<let space: ColorSpace> {
     let placement: ShadowPlacement
     let offset: ShadowVector
@@ -30,6 +36,18 @@ construct ShadowLayer<let space: ColorSpace> {
 
 construct ShadowStack<let space: ColorSpace> {
     let layers: [ShadowLayer<space>]
+}
+
+construct ShadowFilter<SurfaceType, let space: ColorSpace> {
+    let edge: SurfaceEdge<SurfaceType>
+    let layer: ShadowLayer<space>
+    let projection: MathFunction<ShadowProjectionSample, ShadowSample>?
+}
+
+construct ShadowProjection<SurfaceType, let space: ColorSpace> {
+    let edge: SurfaceEdge<SurfaceType>
+    let outer: ShadowFilter<SurfaceType, space>
+    let inner: ShadowFilter<SurfaceType, space>
 }
 
 construct ShadowConfiguration<let space: ColorSpace> {
@@ -58,6 +76,25 @@ function defaultRectangleShadowConfiguration(): ShadowConfiguration<.rgb> {
 
 function shadowStack<let space: ColorSpace>(configuration: ShadowConfiguration<space>): ShadowStack<space> {
     return ShadowStack<space>(layers: [configuration.outer, configuration.inner])
+}
+
+function shadowProjection<SurfaceType, let space: ColorSpace>(
+    edge: SurfaceEdge<SurfaceType>,
+    configuration: ShadowConfiguration<space>
+): ShadowProjection<SurfaceType, space> {
+    return ShadowProjection<SurfaceType, space>(
+        edge: edge,
+        outer: ShadowFilter<SurfaceType, space>(
+            edge: edge,
+            layer: configuration.outer,
+            projection: nil
+        ),
+        inner: ShadowFilter<SurfaceType, space>(
+            edge: edge,
+            layer: configuration.inner,
+            projection: nil
+        )
+    )
 }
 
 construct ShadowAxis {
