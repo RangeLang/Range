@@ -16,7 +16,8 @@ construct SurfaceSample {
 
 construct SurfaceEdge<SurfaceType> {
     let surface: SurfaceType
-    let line: MathLine<SurfaceSample>
+    let start: SurfaceSample
+    let end: SurfaceSample
 }
 
 marker Shape<let sides: IntLiteral>(): Construct -> Surface { target, diagnostics in

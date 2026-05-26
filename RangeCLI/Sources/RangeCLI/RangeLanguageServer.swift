@@ -644,7 +644,7 @@ struct RangeLanguageServer {
         [
             "backgroundColor", "buttonStyle", "cornerRadius", "fontFamily", "fontSize",
             "fontWeight", "foregroundColor", "frame", "italic", "lineHeight", "offset",
-            "opacity", "padding", "shadow", "textFieldStyle", "zIndex",
+            "opacity", "padding", "textFieldStyle", "zIndex",
         ].map { completionItem(label: $0, kind: 2, detail: "modifier") }
     }
 

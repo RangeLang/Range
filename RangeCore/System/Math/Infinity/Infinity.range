@@ -1,6 +1,0 @@
-enum DynamicInt {
-    case negativeInfinity
-    case finite(value: Int)
-    case zero
-    case positiveInfinity
-}
