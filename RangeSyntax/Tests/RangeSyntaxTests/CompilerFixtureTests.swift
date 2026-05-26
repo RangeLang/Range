@@ -1423,7 +1423,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
         let functionArgument = context.resolvedRewriteCall(
             from: .call(
-                name: "target.application.arguments[0].expression.replace",
+                name: "target.call.arguments[0].expression.replace",
                 arguments: [CallArgument(label: "with", value: .string("value"))]
             ),
             targetBinding: "target",
@@ -1433,7 +1433,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
         let functionApplication = context.resolvedRewriteCall(
             from: .call(
-                name: "target.application.replace",
+                name: "target.call.replace",
                 arguments: [CallArgument(label: "with", value: .string("value"))]
             ),
             targetBinding: "target",

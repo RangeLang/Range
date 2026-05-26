@@ -4,6 +4,7 @@ construct Construct {
     let application: Application
 
     @syntax
+    #GraphDeclaration
     construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType>, SyntaxEmittable {
         let self: SelfType
         let macros: [Macro.Application]
@@ -22,6 +23,7 @@ construct Construct {
     }
 
     @syntax
+    #GraphApplication
     construct Application: SyntaxReplaceable<Expression> {
         let type: TypeReference
         let arguments: [Parameter.Application]

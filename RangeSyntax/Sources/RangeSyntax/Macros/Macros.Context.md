@@ -38,7 +38,7 @@ Expression -> application-facing
 Block      -> application-facing
 Parameter  -> declaration + application
 Init       -> declaration + application
-Function   -> declaration + application
+Function   -> declaration + call
 Construct  -> declaration-facing
 Enum       -> declaration-facing
 Protocol   -> declaration-facing
@@ -116,7 +116,7 @@ Current preferred `Function` shape:
 #language
 construct Function: Syntax {
     let declaration: Declaration
-    let application: Application
+    let call: Call
 
     construct Declaration {
         let identifier: Identifier
@@ -125,7 +125,7 @@ construct Function: Syntax {
         let body: Block
     }
 
-    construct Application {
+    construct Call {
         let identifier: Identifier
         let arguments: [Parameter.Application]
     }
@@ -223,14 +223,14 @@ macro clamped(min: Int, max: Int): Property { target, diagnostics in
 ```range
 macro literal<T>(): Function { target, diagnostics in
     let declaration = target.declaration
-    let application = target.application
+    let call = target.call
 }
 ```
 
 ```range
 macro traced(): Function { target, diagnostics in
     let declaration = target.declaration
-    let application = target.application
+    let call = target.call
 }
 ```
 
@@ -261,6 +261,6 @@ Function
   `Expression` and `Block` are effectively syntax/application-first;
   `Parameter` now uses declaration plus application facets in the active
   bootstrap surface;
-  `Function` now uses declaration plus application facets authoritatively for
+  `Function` now uses declaration plus call facets authoritatively for
   `literal`.
 - `@literal<T>` is the canonical literal bridge macro annotation form, with `T` constrained to compiler-recognized literal carrier types.

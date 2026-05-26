@@ -41,8 +41,8 @@ Current bootstrap rules:
   currently path-driven and expects direct `target...rewrite(...)` paths for
   reliable behavior.
 - Parameter now uses explicit declaration/application facet values on its macro surface.
-- Function literal lowering now executes through explicit declaration/application facet semantics.
-- Function-side attached rewrites should read from the application argument surface, for example `target.application.arguments[0].expression`, with an enclosing emptiness check when needed.
+- Function literal lowering now executes through explicit declaration/call facet semantics.
+- Function-side attached rewrites should read from the call argument surface, for example `target.call.arguments[0].expression`, with an enclosing emptiness check when needed.
 - Rewrite, expansion, and future omission capability are modeled explicitly with macro-surface protocols such as `SyntaxReplaceable<T>`, `SyntaxExpandable<Target>`, and `SyntaxOmittable`.
 - Preferred target-surface design uses declaration/application facet values on
   target kinds such as `Init`, with nested `Declaration` and `Application`
@@ -54,10 +54,10 @@ Current function-targeted literal status:
 - Concrete `@literal<T>` attachment already participates in graph-backed literal bridge realization.
 - Protocol init requirements are parsed and keep their carried macros.
 - Conforming initializers inherit carried init macros through conformance matching.
-- The `Function` surface models `target.declaration` and `target.application`,
+- The `Function` surface models `target.declaration` and `target.call`,
   and `literal` is written in that shape in RangeCore.
 - Literal bridge lowering now executes through the authoritative `Function`
-  declaration/application rewrite path for `literal`, with an explicit
+  declaration/call rewrite path for `literal`, with an explicit
   diagnostic if that rewrite cannot be interpreted.
 - Full generalized `Init` macro execution for arbitrary init-targeted macros is
   separate from the function-targeted literal bridge.

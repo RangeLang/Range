@@ -1243,9 +1243,9 @@ extension RewriteSurfaceView {
             }
         case .function:
             switch relativePath {
-            case "application.replace":
+            case "call.replace":
                 return .functionApplication
-            case "application.arguments[].expression.replace":
+            case "call.arguments[].expression.replace":
                 return .functionArgumentExpression
             default:
                 return nil

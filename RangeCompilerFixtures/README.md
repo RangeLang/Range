@@ -60,7 +60,7 @@ The current macro fixtures cover only the supported bootstrap surface:
 - direct literal bridge attachment through `@literal<T>` on a concrete literal function
 - init-targeted call-site rewrite from attached init macros
 - function-targeted macro attachment and rewrite-site validation
-- function nested argument-slot rewrite shape (`target.application.arguments[i].expression.rewrite(...)`)
+- function nested argument-slot rewrite shape (`target.call.arguments[i].expression.rewrite(...)`)
 - construct-target macro attachment validation
 - construct extension-surface call shape (`target.addExtension(...)`)
 - parameter-targeted `#autoclosure`

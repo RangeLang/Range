@@ -502,17 +502,105 @@ struct SwiftBackendEmitter {
 
                     return .success(result: Data(bytes))
                 }
+
+                static func writeData(path: String, data: Data) -> Range_Result<Void, Range_FileWriteError> {
+                    let descriptor = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
+                    guard descriptor >= 0 else {
+                        return .failure(cause: .unwritable)
+                    }
+                    defer { close(descriptor) }
+
+                    let byteCount = data.bytes.count
+                    var offset = 0
+                    while offset < byteCount {
+                        let writeCount = data.bytes.withUnsafeBufferPointer { buffer in
+                            write(descriptor, buffer.baseAddress! + offset, byteCount - offset)
+                        }
+
+                        if writeCount < 0 {
+                            if errno == EINTR {
+                                continue
+                            }
+                            return .failure(cause: .unwritable)
+                        }
+
+                        if writeCount == 0 {
+                            return .failure(cause: .unwritable)
+                        }
+
+                        offset += writeCount
+                    }
+
+                    return .success(result: Void())
+                }
+
+                static func listEntries(path: String) -> Range_Result<[Range_FileSystemEntry], Range_FileReadError> {
+                    guard let directory = opendir(path) else {
+                        return errno == ENOENT
+                            ? .failure(cause: .missing)
+                            : .failure(cause: .unreadable)
+                    }
+                    defer { closedir(directory) }
+
+                    var entries: [Range_FileSystemEntry] = []
+                    while let entry = readdir(directory) {
+                        let name = withUnsafePointer(to: entry.pointee.d_name) { pointer in
+                            pointer.withMemoryRebound(to: CChar.self, capacity: MemoryLayout.size(ofValue: entry.pointee.d_name)) {
+                                String(cString: $0)
+                            }
+                        }
+
+                        if name == "." || name == ".." {
+                            continue
+                        }
+
+                        let childPath: String
+                        if path == "/" || path.hasSuffix("/") {
+                            childPath = "\\(path)\\(name)"
+                        } else {
+                            childPath = "\\(path)/\\(name)"
+                        }
+                        var metadata = stat()
+                        guard lstat(childPath, &metadata) == 0 else {
+                            return .failure(cause: .unreadable)
+                        }
+
+                        let kind: Range_FileSystemEntryKind =
+                            (metadata.st_mode & S_IFMT) == S_IFDIR ? .directory : .file
+                        entries.append(
+                            Range_FileSystemEntry(
+                                path: childPath,
+                                name: name,
+                                kind: kind
+                            )
+                        )
+                    }
+
+                    return .success(result: entries)
+                }
             }
 
             enum Range_HostFileSystem {
                 static func readData(path: String) -> Range_Result<Data, Range_FileReadError> {
                     return Range_POSIXFileSystem.readData(path: path)
                 }
+
+                static func writeData(path: String, data: Data) -> Range_Result<Void, Range_FileWriteError> {
+                    return Range_POSIXFileSystem.writeData(path: path, data: data)
+                }
+
+                static func listEntries(path: String) -> Range_Result<[Range_FileSystemEntry], Range_FileReadError> {
+                    return Range_POSIXFileSystem.listEntries(path: path)
+                }
             }
 
             enum Range_UTF8 {
                 static func decode(data: Data) -> String {
                     return String(decoding: data.bytes, as: UTF8.self)
+                }
+
+                static func encode(text: String) -> Data {
+                    return Data(Array(text.utf8))
                 }
             }
 
@@ -731,17 +819,31 @@ struct SwiftBackendEmitter {
             }
 
             final class __RangeBinding<Value> {
+                private var storedValue: Value?
                 private let getter: () -> Value
                 private let setter: (Value) -> Void
 
                 init(get: @escaping () -> Value, set: @escaping (Value) -> Void) {
+                    self.storedValue = nil
                     self.getter = get
                     self.setter = set
                 }
 
+                init(value: Value) {
+                    self.storedValue = value
+                    self.getter = { value }
+                    self.setter = { _ in }
+                }
+
                 var value: Value {
-                    get { getter() }
-                    set { setter(newValue) }
+                    get { storedValue ?? getter() }
+                    set {
+                        if storedValue != nil {
+                            storedValue = newValue
+                        } else {
+                            setter(newValue)
+                        }
+                    }
                 }
             }
 
@@ -1320,7 +1422,13 @@ struct SwiftBackendEmitter {
                 binding.typeName,
                 genericParameterNames: genericParameterNames
             )
-            parameters.append("\(binding.name): __RangeBinding<\(typeName)>")
+            if let defaultValue = emitBindingDefaultValue(forDeclaredTypeName: binding.typeName) {
+                parameters.append(
+                    "\(binding.name): __RangeBinding<\(typeName)> = __RangeBinding(value: \(defaultValue))"
+                )
+            } else {
+                parameters.append("\(binding.name): __RangeBinding<\(typeName)>")
+            }
             assignments.append("self.__binding_\(binding.name) = \(binding.name)")
         }
 
@@ -1333,6 +1441,16 @@ struct SwiftBackendEmitter {
             \(indentBlock(assignments.joined(separator: "\n"), level: 1))
             }
             """
+    }
+
+    private func emitBindingDefaultValue(forDeclaredTypeName name: String) -> String? {
+        if name.hasPrefix("[") && name.hasSuffix("]") {
+            return "[]"
+        }
+        if name.hasPrefix("Array<") && name.hasSuffix(">") {
+            return "[]"
+        }
+        return nil
     }
 
     private func forwardedInitializerParameters(
@@ -1651,7 +1769,38 @@ struct SwiftBackendEmitter {
             return "\(emitDeclaredTypeName(wrappedName, genericParameterNames: genericParameterNames))?"
         }
 
+        if let genericName = emitGenericDeclaredTypeName(
+            name,
+            genericParameterNames: genericParameterNames
+        ) {
+            return genericName
+        }
+
         return emitTypeName(.named(name), genericParameterNames: genericParameterNames)
+    }
+
+    private func emitGenericDeclaredTypeName(
+        _ name: String,
+        genericParameterNames: Set<String>
+    ) -> String? {
+        guard let genericStart = name.firstIndex(of: "<"),
+            name.last == ">"
+        else {
+            return nil
+        }
+
+        let base = String(name[..<genericStart])
+        let argumentStart = name.index(after: genericStart)
+        let argumentEnd = name.index(before: name.endIndex)
+        let arguments = splitGenericArgumentNames(String(name[argumentStart..<argumentEnd]))
+        guard !arguments.isEmpty else {
+            return nil
+        }
+
+        let renderedArguments = arguments.map {
+            emitDeclaredTypeName($0, genericParameterNames: genericParameterNames)
+        }.joined(separator: ", ")
+        return "\(emitDeclaredTypeName(base, genericParameterNames: genericParameterNames))<\(renderedArguments)>"
     }
 
     private struct SwiftLayoutEstimate {

@@ -4,6 +4,7 @@ construct Protocol {
     let application: Application
 
     @syntax
+    #GraphDeclaration
     construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
         let self: NominalTypeReference
         let generics: [Generic]
@@ -13,6 +14,7 @@ construct Protocol {
     }
 
     @syntax
+    #GraphApplication
     construct Application<Conformer> {
         let self: NominalTypeReference
         let conformer: Conformer

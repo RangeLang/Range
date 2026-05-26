@@ -277,6 +277,11 @@ struct SwiftBackendProgramBuilder {
                 parsedFile.path.contains("/RangeCore/Encoding/")
                     || (includeSyntaxLexingSupport
                         && parsedFile.path.contains("/RangeCore/Syntax/Lexing/"))
+                    || (includeSyntaxLexingSupport
+                        && parsedFile.path.contains("/RangeCore/Syntax/Identifier.range"))
+                    || (includeSyntaxLexingSupport
+                        && parsedFile.path.contains("/RangeCore/Macros/CoreMacro/SyntaxEmittable.range"))
+                    || parsedFile.path.contains("/RangeCore/Syntax/Program/")
                     || parsedFile.path.contains("/RangeCore/System/File/")
             else {
                 return nil

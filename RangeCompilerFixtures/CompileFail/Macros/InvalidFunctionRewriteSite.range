@@ -1,5 +1,5 @@
 macro badFunctionRewrite(): Function { target, diagnostics in
-    target.replace(with: target.application.arguments[0].expression)
+    target.replace(with: target.call.arguments[0].expression)
 }
 
 @badFunctionRewrite

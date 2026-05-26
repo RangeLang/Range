@@ -1,7 +1,7 @@
 macro forwardFirstArgument(): Function { target, diagnostics in
-    if !target.application.arguments.isEmpty {
-        target.application.arguments[0].expression.replace(with:
-            target.application.arguments[0].expression
+    if !target.call.arguments.isEmpty {
+        target.call.arguments[0].expression.replace(with:
+            target.call.arguments[0].expression
         )
     }
 }

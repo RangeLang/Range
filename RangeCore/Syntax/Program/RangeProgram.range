@@ -1,0 +1,34 @@
+#language
+construct RangeProgram {
+    let graph: ProgramGraph
+}
+
+#language
+construct ProgramGraph {
+    let files: [FileTreeNode]
+    let syntax: [GraphSyntax]
+}
+
+#language
+construct GraphSyntax {
+    let identity: RangeGraphIdentity
+    let declarations: [#GraphDeclaration]
+    let applications: [#GraphApplication]
+}
+
+#language
+construct RangeGraphIdentity {
+    let id: String
+    let kind: String
+    let name: String
+}
+
+#language
+construct GraphDeclaration {
+    let identity: RangeGraphIdentity
+}
+
+#language
+construct GraphApplication {
+    let identity: RangeGraphIdentity
+}

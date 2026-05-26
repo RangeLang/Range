@@ -39,7 +39,7 @@ extension MacroExpander {
             )
         else {
             throw ParseError(
-                "Literal macro @literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/application rewrite semantics."
+                "Literal macro @literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/call rewrite semantics."
             )
         }
 
@@ -188,10 +188,10 @@ extension MacroExpander {
 
             let targetBinding = macro.bindings!.target
             var bindings: [String: Expression] = [
-                "\(targetBinding).application.arguments": .array(callArguments.map(\.value))
+                "\(targetBinding).call.arguments": .array(callArguments.map(\.value))
             ]
             for (index, argument) in callArguments.enumerated() {
-                bindings["\(targetBinding).application.arguments[\(index)].expression"] =
+                bindings["\(targetBinding).call.arguments[\(index)].expression"] =
                     argument.value
             }
 
@@ -311,8 +311,14 @@ extension MacroExpander {
         targetBinding: String,
         applicationArguments: [CallArgument]
     ) -> CallArgument? {
-        let wholePrefixes = ["\(targetBinding).application.arguments["]
-        let expressionPrefix = "\(targetBinding).application.arguments["
+        let wholePrefixes = [
+            "\(targetBinding).application.arguments[",
+            "\(targetBinding).call.arguments[",
+        ]
+        let expressionPrefixes = [
+            "\(targetBinding).application.arguments[",
+            "\(targetBinding).call.arguments[",
+        ]
 
         for prefix in wholePrefixes {
             if let index = indexedReference(identifier, prefix: prefix, suffix: "]") {
@@ -323,16 +329,18 @@ extension MacroExpander {
             }
         }
 
-        if let index = indexedReference(
-            identifier,
-            prefix: expressionPrefix,
-            suffix: "].expression"
-        ) {
-            guard applicationArguments.indices.contains(index) else {
-                return nil
+        for prefix in expressionPrefixes {
+            if let index = indexedReference(
+                identifier,
+                prefix: prefix,
+                suffix: "].expression"
+            ) {
+                guard applicationArguments.indices.contains(index) else {
+                    return nil
+                }
+                let argument = applicationArguments[index]
+                return CallArgument(label: argument.label, value: argument.value)
             }
-            let argument = applicationArguments[index]
-            return CallArgument(label: argument.label, value: argument.value)
         }
 
         return nil

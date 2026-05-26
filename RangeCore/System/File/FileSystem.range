@@ -5,13 +5,42 @@ enum FileReadError {
 }
 
 #language
+enum FileWriteError {
+    case unwritable
+}
+
+#language
+enum FileSystemEntryKind {
+    case file
+    case directory
+}
+
+#language
+construct FileSystemEntry {
+    let path: String
+    let name: String
+    let kind: FileSystemEntryKind
+}
+
+#language
+construct FileTreeNode {
+    let path: String
+    let name: String
+    let kind: FileSystemEntryKind
+    let children: [FileTreeNode]
+}
+
+#language
 construct HostFileSystem {
     function readData(path: String): Result<Data, FileReadError>
+    function writeData(path: String, data: Data): Result<Void, FileWriteError>
+    function listEntries(path: String): Result<[FileSystemEntry], FileReadError>
 }
 
 #language
 construct UTF8 {
     function decode(data: Data): String
+    function encode(text: String): Data
 }
 
 #language
@@ -27,5 +56,71 @@ construct FileSystem {
         case .failure(let error):
             return .failure(cause: error)
         }
+    }
+
+    function writeData(path: String, data: Data): Result<Void, FileWriteError> {
+        return HostFileSystem.writeData(path: path, data: data)
+    }
+
+    function writeText(path: String, text: String): Result<Void, FileWriteError> {
+        return writeData(path: path, data: UTF8.encode(text: text))
+    }
+
+    function listEntries(path: String): Result<[FileSystemEntry], FileReadError> {
+        return HostFileSystem.listEntries(path: path)
+    }
+}
+
+#language
+construct FileTree {
+    function read(path: String): Result<FileTreeNode, FileReadError> {
+        switch FileSystem.listEntries(path: path) {
+        case .success(let entries):
+            state children: [FileTreeNode]([])
+            state index   0
+
+            while index < entries.count {
+                let entry: FileSystemEntry(entries.element(index: index))
+
+                if !entry.name.isEmpty && entry.name.character(index: 0) == "." {
+                    index += 1
+                    continue
+                }
+
+                switch entry.kind {
+                case .directory:
+                    switch read(path: entry.path) {
+                    case .success(let child):
+                        children.append(element: child)
+                    case .failure(let error):
+                        return .failure(cause: error)
+                    }
+                case .file:
+                    children.append(
+                        element: FileTreeNode(
+                            path: entry.path,
+                            name: entry.name,
+                            kind: entry.kind,
+                            children: []
+                        )
+                    )
+                }
+
+                index += 1
+            }
+
+            return .success(
+                result: FileTreeNode(
+                    path: path,
+                    name: path,
+                    kind: .directory,
+                    children: children
+                )
+            )
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+
+        return .failure(cause: .unreadable)
     }
 }

@@ -1,0 +1,73 @@
+#GraphDeclaration
+construct ProgramFileGraphNode { }
+
+function renderProgram(program: RangeProgram): String {
+    return "files: \(program.graph.files.count)\nsyntax: \(program.graph.syntax.count)\ndeclarations: \(countDeclarations(graph: program.graph))\napplications: \(countApplications(graph: program.graph))\n"
+}
+
+function countDeclarations(graph: ProgramGraph): Int {
+    state count   0
+    state index   0
+
+    while index < graph.syntax.count {
+        let syntax: GraphSyntax(graph.syntax.element(index: index))
+        count += syntax.declarations.count
+        index += 1
+    }
+
+    return count
+}
+
+function countApplications(graph: ProgramGraph): Int {
+    state count   0
+    state index   0
+
+    while index < graph.syntax.count {
+        let syntax: GraphSyntax(graph.syntax.element(index: index))
+        count += syntax.applications.count
+        index += 1
+    }
+
+    return count
+}
+
+@main {
+    switch FileTree.read(path: "../../../") {
+    case .success(let tree):
+        let program: RangeProgram(
+            graph: ProgramGraph(
+                files: [tree],
+                syntax: [
+                    GraphSyntax(
+                        identity: RangeGraphIdentity(
+                            id: "ProgramFileGraphNode",
+                            kind: "construct",
+                            name: "ProgramFileGraphNode"
+                        ),
+                        declarations: [
+                            GraphDeclaration(
+                                identity: RangeGraphIdentity(
+                                    id: "ProgramFileGraphNode",
+                                    kind: "construct",
+                                    name: "ProgramFileGraphNode"
+                                )
+                            )
+                        ],
+                        applications: [
+                            GraphApplication(
+                                identity: RangeGraphIdentity(
+                                    id: "FileTree.read",
+                                    kind: "function",
+                                    name: "FileTree.read"
+                                )
+                            )
+                        ]
+                    )
+                ]
+            )
+        )
+        Logger.info(renderProgram(program: program))
+    case .failure:
+        Logger.error("failed to read program file graph")
+    }
+}
