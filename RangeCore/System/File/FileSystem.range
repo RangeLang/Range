@@ -1,0 +1,10 @@
+#language
+enum FileReadError {
+    case missing
+    case unreadable
+}
+
+#language
+construct FileSystem {
+    function readText(path: String): Result<String, FileReadError>
+}

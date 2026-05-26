@@ -1,6 +1,5 @@
 import Foundation
 
-// Range lexer source fingerprint: 97669892a57e09b1
 // Boundary rule: lexer behavior belongs in RangeCore/Syntax/Lexing/*.range.
 // This Swift file adapts the parser to the Range-authored bootstrap projection.
 
@@ -28,112 +27,15 @@ struct Lexer {
         }
         switch lexer.tokenize(source: source, foreignBodies: rangeForeignBodies) {
         case .success(let tokens):
-            return try tokens.map(Self.convert)
+            return try tokens.map(Self.convertGenerated)
         case .failure(let error):
             throw ParseError(error.message, range: error.range)
         }
     }
-
-    private static func convert(_ token: RangeAuthoredLexicalToken) throws -> LexedToken {
-        let parserToken: Token
-        switch token.kind {
-        case .hash:
-            parserToken = .hash
-        case .identifier(let value):
-            parserToken = .identifier(value)
-        case .hashDirective(let value):
-            parserToken = .hashDirective(value)
-        case .foreignBody(let language, let text):
-            parserToken = .foreignBody(language: language, text: text)
-        case .stringLiteral(let value):
-            parserToken = .stringLiteral(value)
-        case .integer(let value):
-            guard let integer = Int(value) else {
-                throw ParseError("Invalid integer literal \(value).", range: token.range)
-            }
-            parserToken = .integer(integer)
-        case .double(let value):
-            guard let double = Double(value) else {
-                throw ParseError("Invalid numeric literal \(value).", range: token.range)
-            }
-            parserToken = .double(double)
-        case .keyword(let value):
-            parserToken = .keyword(value)
-        case .atAttribute(let name, let argument):
-            parserToken = .atAttribute(name: name, argument: argument)
-        case .leftBrace:
-            parserToken = .leftBrace
-        case .rightBrace:
-            parserToken = .rightBrace
-        case .leftParen:
-            parserToken = .leftParen
-        case .rightParen:
-            parserToken = .rightParen
-        case .leftBracket:
-            parserToken = .leftBracket
-        case .rightBracket:
-            parserToken = .rightBracket
-        case .asterisk:
-            parserToken = .asterisk
-        case .dot:
-            parserToken = .dot
-        case .ellipsis:
-            parserToken = .ellipsis
-        case .colon:
-            parserToken = .colon
-        case .arrow:
-            parserToken = .arrow
-        case .bang:
-            parserToken = .bang
-        case .equal:
-            parserToken = .equal
-        case .equalEqual:
-            parserToken = .equalEqual
-        case .bangEqual:
-            parserToken = .bangEqual
-        case .minus:
-            parserToken = .minus
-        case .less:
-            parserToken = .less
-        case .lessEqual:
-            parserToken = .lessEqual
-        case .greater:
-            parserToken = .greater
-        case .greaterEqual:
-            parserToken = .greaterEqual
-        case .plus:
-            parserToken = .plus
-        case .plusEqual:
-            parserToken = .plusEqual
-        case .slash:
-            parserToken = .slash
-        case .ampersand:
-            parserToken = .ampersand
-        case .andAnd:
-            parserToken = .andAnd
-        case .pipe:
-            parserToken = .pipe
-        case .orOr:
-            parserToken = .orOr
-        case .question:
-            parserToken = .question
-        case .questionQuestion:
-            parserToken = .questionQuestion
-        case .dollar:
-            parserToken = .dollar
-        case .percent:
-            parserToken = .percent
-        case .comma:
-            parserToken = .comma
-        case .eof:
-            parserToken = .eof
-        }
-        return LexedToken(token: parserToken, range: token.range)
-    }
 }
 
 // Bootstrap projection of RangeCore/Syntax/Lexing/Lexer.range.
-private struct RangeAuthoredLexer {
+struct RangeAuthoredLexer {
     func tokenize(
         source: String,
         foreignBodies: [RangeAuthoredLexerForeignBody]
@@ -141,122 +43,41 @@ private struct RangeAuthoredLexer {
         var cursor = RangeAuthoredLexerCursor(
             source: source,
             foreignBodies: foreignBodies,
-            rules: Self.rules
+            rules: Self.generatedRules
         )
         return cursor.tokenize()
     }
-
-    private static let rules: [RangeAuthoredLexerRule] = [
-        RangeAuthoredLexerRule(name: "whitespace", pattern: "whitespace+", token: "skip", priority: 0),
-        RangeAuthoredLexerRule(name: "leftBrace", pattern: "{", token: "leftBrace", priority: 20),
-        RangeAuthoredLexerRule(name: "rightBrace", pattern: "}", token: "rightBrace", priority: 20),
-        RangeAuthoredLexerRule(name: "leftParen", pattern: "(", token: "leftParen", priority: 20),
-        RangeAuthoredLexerRule(name: "rightParen", pattern: ")", token: "rightParen", priority: 20),
-        RangeAuthoredLexerRule(name: "leftBracket", pattern: "[", token: "leftBracket", priority: 20),
-        RangeAuthoredLexerRule(name: "rightBracket", pattern: "]", token: "rightBracket", priority: 20),
-        RangeAuthoredLexerRule(name: "ellipsis", pattern: "...", token: "ellipsis", priority: 30),
-        RangeAuthoredLexerRule(name: "dot", pattern: ".", token: "dot", priority: 20),
-        RangeAuthoredLexerRule(name: "arrow", pattern: "->", token: "arrow", priority: 30),
-        RangeAuthoredLexerRule(name: "minus", pattern: "-", token: "minus", priority: 20),
-        RangeAuthoredLexerRule(name: "bangEqual", pattern: "!=", token: "bangEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "bang", pattern: "!", token: "bang", priority: 20),
-        RangeAuthoredLexerRule(name: "equalEqual", pattern: "==", token: "equalEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "equal", pattern: "=", token: "equal", priority: 20),
-        RangeAuthoredLexerRule(name: "lessEqual", pattern: "<=", token: "lessEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "less", pattern: "<", token: "less", priority: 20),
-        RangeAuthoredLexerRule(name: "greaterEqual", pattern: ">=", token: "greaterEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "greater", pattern: ">", token: "greater", priority: 20),
-        RangeAuthoredLexerRule(name: "plusEqual", pattern: "+=", token: "plusEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "plus", pattern: "+", token: "plus", priority: 20),
-        RangeAuthoredLexerRule(name: "questionQuestion", pattern: "??", token: "questionQuestion", priority: 30),
-        RangeAuthoredLexerRule(name: "question", pattern: "?", token: "question", priority: 20),
-        RangeAuthoredLexerRule(name: "andAnd", pattern: "&&", token: "andAnd", priority: 30),
-        RangeAuthoredLexerRule(name: "orOr", pattern: "||", token: "orOr", priority: 30),
-        RangeAuthoredLexerRule(name: "asterisk", pattern: "*", token: "asterisk", priority: 20),
-        RangeAuthoredLexerRule(name: "colon", pattern: ":", token: "colon", priority: 20),
-        RangeAuthoredLexerRule(name: "comma", pattern: ",", token: "comma", priority: 20),
-        RangeAuthoredLexerRule(name: "slash", pattern: "/", token: "slash", priority: 20),
-        RangeAuthoredLexerRule(name: "ampersand", pattern: "&", token: "ampersand", priority: 20),
-        RangeAuthoredLexerRule(name: "dollar", pattern: "$", token: "dollar", priority: 20),
-        RangeAuthoredLexerRule(name: "percent", pattern: "%", token: "percent", priority: 20),
-        RangeAuthoredLexerRule(name: "pipe", pattern: "|", token: "pipe", priority: 20),
-    ]
 }
 
-private struct RangeAuthoredLexerRule {
+struct RangeAuthoredLexerRule {
     let name: String
     let pattern: String
     let token: String
     let priority: Int
 }
 
-private struct RangeAuthoredLexerForeignBody {
+struct RangeAuthoredLexerForeignBody {
     let directive: String
     let language: String
 }
 
-private struct RangeAuthoredLexingError: Error {
+struct RangeAuthoredLexingError: Error {
     let message: String
     let range: RangeSourceRange
 }
 
-private struct RangeAuthoredLexerPosition {
+struct RangeAuthoredLexerPosition {
     let index: Int
     let location: RangeSourceLocation
 }
 
-private struct RangeAuthoredLexicalToken {
+struct RangeAuthoredLexicalToken {
     let kind: RangeAuthoredTokenKind
     let range: RangeSourceRange
     let source: String
 }
 
-private enum RangeAuthoredTokenKind {
-    case hash
-    case identifier(value: String)
-    case hashDirective(value: String)
-    case foreignBody(language: String, text: String)
-    case stringLiteral(value: String)
-    case integer(value: String)
-    case double(value: String)
-    case keyword(value: String)
-    case atAttribute(name: String, argument: String?)
-    case leftBrace
-    case rightBrace
-    case leftParen
-    case rightParen
-    case leftBracket
-    case rightBracket
-    case asterisk
-    case dot
-    case ellipsis
-    case colon
-    case arrow
-    case bang
-    case equal
-    case equalEqual
-    case bangEqual
-    case minus
-    case less
-    case lessEqual
-    case greater
-    case greaterEqual
-    case plus
-    case plusEqual
-    case slash
-    case ampersand
-    case andAnd
-    case pipe
-    case orOr
-    case question
-    case questionQuestion
-    case dollar
-    case percent
-    case comma
-    case eof
-}
-
-private struct RangeAuthoredLexerCursor {
+struct RangeAuthoredLexerCursor {
     let source: String
     let characters: [String]
     let foreignBodies: [RangeAuthoredLexerForeignBody]

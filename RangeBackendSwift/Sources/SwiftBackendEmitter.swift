@@ -455,6 +455,38 @@ struct SwiftBackendEmitter {
                 case failure(cause: Failure)
             }
 
+            enum Range_FileReadError {
+                case missing
+                case unreadable
+            }
+
+            enum Range_FileSystem {
+                static func readText(path: String) -> Range_Result<String, Range_FileReadError> {
+                    guard let file = fopen(path, "rb") else {
+                        return .failure(cause: .missing)
+                    }
+                    defer { fclose(file) }
+
+                    guard fseek(file, 0, SEEK_END) == 0 else {
+                        return .failure(cause: .unreadable)
+                    }
+                    let length = ftell(file)
+                    guard length >= 0, fseek(file, 0, SEEK_SET) == 0 else {
+                        return .failure(cause: .unreadable)
+                    }
+
+                    var bytes = [UInt8](repeating: 0, count: Int(length))
+                    let readCount = bytes.withUnsafeMutableBufferPointer { buffer in
+                        fread(buffer.baseAddress, 1, bytes.count, file)
+                    }
+                    guard readCount == bytes.count else {
+                        return .failure(cause: .unreadable)
+                    }
+
+                    return .success(result: String(decoding: bytes, as: UTF8.self))
+                }
+            }
+
             final class Range_ChannelStorage<Element>: @unchecked Sendable {
                 private var buffer: [Element] = []
                 private let capacity: Int
@@ -721,7 +753,15 @@ struct SwiftBackendEmitter {
             }
             """
 
-        return support
+        let hostIOImport = """
+            #if os(Linux)
+            import Glibc
+            #else
+            import Darwin
+            #endif
+            """
+        let imports = includeFoundationImport ? "import Foundation\n\n\(hostIOImport)" : hostIOImport
+        return "\(imports)\n\n\(support)"
     }
 
     private func emitSourceUnit(_ unit: LoweredSourceUnit) throws -> String {

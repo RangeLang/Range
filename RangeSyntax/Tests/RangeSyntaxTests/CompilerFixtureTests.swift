@@ -2144,23 +2144,24 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(artifact.contains("hashDirective"))
     }
 
+    @Test("FileSystem readText surface validates")
+    func fileSystemReadTextSurfaceValidates() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "System/FileSystemReadText.range")
+        _ = try compile(fixture: fixture, expectedRole: .pass)
+    }
+
     @Test("Range lexer bootstrap tracks Range source")
     func rangeLexerBootstrapTracksRangeSource() throws {
         let root = try repositoryRoot()
-        let bootstrap = try String(
+        let checkedIn = try String(
             contentsOf: root.appendingPathComponent(
-                "RangeSyntax/Sources/RangeSyntax/Lexer/Lexer.swift"
+                "RangeSyntax/Sources/RangeSyntax/Lexer/Lexer+Generated.swift"
             ),
             encoding: .utf8
         )
-        let marker = "// Range lexer source fingerprint: "
-        let recorded = bootstrap.split(separator: "\n")
-            .map(String.init)
-            .first { $0.hasPrefix(marker) }?
-            .replacingOccurrences(of: marker, with: "")
-        let actual = try rangeLexerSourceFingerprint(root: root)
+        let generated = try generatedRangeLexerBootstrap(root: root)
 
-        #expect(recorded == actual)
+        #expect(checkedIn == generated)
     }
 
     @Test("Compiler pipeline runtime hooks run beside Swift pipeline")
@@ -2477,39 +2478,29 @@ private func rangeCoreInputs() throws -> [SourceInput] {
     }
 }
 
-private let rangeLexerSourceRelativePaths = [
-    "RangeCore/Syntax/Lexing/ASCII.range",
-    "RangeCore/Syntax/Lexing/Lexer.range",
-    "RangeCore/Syntax/Lexing/LexerRule.range",
-    "RangeCore/Syntax/Lexing/LexicalToken.range",
-    "RangeCore/Syntax/Lexing/RangeLexer.range",
-    "RangeCore/Syntax/Lexing/SourceLocation.range",
-    "RangeCore/Syntax/Lexing/SourceRange.range",
-    "RangeCore/Syntax/Lexing/TokenKind.range",
-]
+private func generatedRangeLexerBootstrap(root: URL) throws -> String {
+    let script = root.appendingPathComponent("scripts/generate-range-lexer-bootstrap.rb")
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+    process.arguments = ["ruby", script.path, "--print"]
+    process.currentDirectoryURL = root
 
-private func rangeLexerSourceFingerprint(root: URL) throws -> String {
-    var hash: UInt64 = 14_695_981_039_346_656_037
+    let output = Pipe()
+    let error = Pipe()
+    process.standardOutput = output
+    process.standardError = error
 
-    func feed(_ byte: UInt8) {
-        hash ^= UInt64(byte)
-        hash = hash &* 1_099_511_628_211
+    try process.run()
+    process.waitUntilExit()
+
+    let data = output.fileHandleForReading.readDataToEndOfFile()
+    let errorData = error.fileHandleForReading.readDataToEndOfFile()
+    if process.terminationStatus != 0 {
+        let message = String(data: errorData, encoding: .utf8) ?? "unknown generator failure"
+        throw FixtureError.commandFailed(message)
     }
 
-    for relativePath in rangeLexerSourceRelativePaths {
-        for byte in relativePath.utf8 {
-            feed(byte)
-        }
-        feed(0)
-
-        let data = try Data(contentsOf: root.appendingPathComponent(relativePath))
-        for byte in data {
-            feed(byte)
-        }
-        feed(255)
-    }
-
-    return String(format: "%016llx", hash)
+    return String(data: data, encoding: .utf8) ?? ""
 }
 
 private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL] {
@@ -2571,11 +2562,14 @@ private func repositoryRoot() throws -> URL {
 }
 
 private enum FixtureError: Error, CustomStringConvertible {
+    case commandFailed(String)
     case missingDirectory(String)
     case repositoryRootNotFound
 
     var description: String {
         switch self {
+        case .commandFailed(let message):
+            return message
         case .missingDirectory(let path):
             return "Missing fixture directory at \(path)."
         case .repositoryRootNotFound:
