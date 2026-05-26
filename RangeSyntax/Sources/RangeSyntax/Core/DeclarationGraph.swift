@@ -466,7 +466,7 @@ public struct DeclarationGraph {
     ) -> [DeclaredInitializerSurface] {
         var surfaces: [DeclaredInitializerSurface] = []
         if let construct = constructsByName[named] {
-            let parameters = Self.directConstructApplicationParameters(for: construct)
+            let parameters = directConstructApplicationParameters(for: construct)
             if !parameters.isEmpty || construct.initializers.isEmpty {
                 surfaces.append(
                     DeclaredInitializerSurface(
@@ -495,10 +495,75 @@ public struct DeclarationGraph {
         return surfaces
     }
 
+    public func directConstructApplicationParameters(
+        for construct: ConstructDeclaration
+    ) -> [RangeFunctionParameter] {
+        Self.directConstructApplicationParameters(
+            for: construct,
+            constructsByName: constructsByName,
+            macrosByName: macrosByName,
+            activeConstructs: []
+        )
+    }
+
     static func directConstructApplicationParameters(
         for construct: ConstructDeclaration
     ) -> [RangeFunctionParameter] {
-        let values = construct.values.map { value in
+        directConstructApplicationParameters(
+            for: construct,
+            constructsByName: [:],
+            macrosByName: [:],
+            activeConstructs: []
+        )
+    }
+
+    private static func directConstructApplicationParameters(
+        for construct: ConstructDeclaration,
+        constructsByName: [String: ConstructDeclaration],
+        macrosByName: [String: MacroDeclaration],
+        activeConstructs: Set<String>
+    ) -> [RangeFunctionParameter] {
+        let activeConstructs = activeConstructs.union([construct.name])
+
+        let forwardedValues = construct.values.flatMap { value -> [RangeFunctionParameter] in
+            if propertyForwardsInitializer(macros: value.macros, macrosByName: macrosByName),
+                let forwardedConstruct = forwardedConstruct(
+                    named: value.typeName,
+                    constructsByName: constructsByName,
+                    activeConstructs: activeConstructs
+                )
+            {
+                return directConstructApplicationParameters(
+                    for: forwardedConstruct,
+                    constructsByName: constructsByName,
+                    macrosByName: macrosByName,
+                    activeConstructs: activeConstructs
+                )
+            }
+            return []
+        }
+        let forwardedStates = construct.states.flatMap { state -> [RangeFunctionParameter] in
+            if propertyForwardsInitializer(macros: state.macros, macrosByName: macrosByName),
+                let forwardedConstruct = forwardedConstruct(
+                    named: state.type.displayName,
+                    constructsByName: constructsByName,
+                    activeConstructs: activeConstructs
+                )
+            {
+                return directConstructApplicationParameters(
+                    for: forwardedConstruct,
+                    constructsByName: constructsByName,
+                    macrosByName: macrosByName,
+                    activeConstructs: activeConstructs
+                )
+            }
+            return []
+        }
+
+        let values = construct.values.compactMap { value -> RangeFunctionParameter? in
+            if propertyForwardsInitializer(macros: value.macros, macrosByName: macrosByName) {
+                return nil
+            }
             let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
             return RangeFunctionParameter(
                 macros: [],
@@ -511,7 +576,10 @@ public struct DeclarationGraph {
                 capturesSyntax: false
             )
         }
-        let states = construct.states.map { state in
+        let states = construct.states.compactMap { state -> RangeFunctionParameter? in
+            if propertyForwardsInitializer(macros: state.macros, macrosByName: macrosByName) {
+                return nil
+            }
             let defaultValue: Expression?
             switch state.storage {
             case .stored(let expression):
@@ -544,7 +612,39 @@ public struct DeclarationGraph {
                 capturesSyntax: false
             )
         }
-        return values + states + bindings
+        return forwardedValues + forwardedStates + values + states + bindings
+    }
+
+    private static func propertyForwardsInitializer(
+        macros applications: [MacroApplication],
+        macrosByName: [String: MacroDeclaration]
+    ) -> Bool {
+        applications.contains { application in
+            guard let macro = macrosByName[application.name],
+                let targetBinding = macro.bindings?.target
+            else {
+                return false
+            }
+
+            return MacroExpander.macroOperationExpressions(in: macro.body).contains { expression in
+                guard case .call(let name, let arguments) = expression else {
+                    return false
+                }
+                return name == "\(targetBinding).initializer.forward" && arguments.isEmpty
+            }
+        }
+    }
+
+    private static func forwardedConstruct(
+        named rawName: String,
+        constructsByName: [String: ConstructDeclaration],
+        activeConstructs: Set<String>
+    ) -> ConstructDeclaration? {
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !activeConstructs.contains(name) else {
+            return nil
+        }
+        return constructsByName[name]
     }
 
     static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {

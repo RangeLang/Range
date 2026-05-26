@@ -7,6 +7,7 @@ struct SwiftLoweredProgramAdapter {
 
     func adapt(program: LoweredProgram) -> LoweredProgram {
         .init(
+            macrosByName: program.macrosByName,
             callables: program.callables.map(lower(callable:)),
             protocols: program.protocols,
             enumerations: program.enumerations,

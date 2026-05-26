@@ -6,6 +6,8 @@ struct SwiftBackendEmitter {
         var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
         var failableInitializersByProtocolName: [String: [FailableInitializerSignature]] = [:]
         var genericParameterNames: Set<String> = []
+        var constructsByName: [String: ConstructDeclaration] = [:]
+        var macrosByName: [String: MacroDeclaration] = [:]
 
         init() {}
 
@@ -28,6 +30,11 @@ struct SwiftBackendEmitter {
                 fromProtocols: protocols
             )
             self.genericParameterNames = Self.collectGenericParameterNames(from: program)
+            self.constructsByName = Self.allDeclarations(in: program).reduce(into: [:]) {
+                result, declaration in
+                result[declaration.name] = declaration
+            }
+            self.macrosByName = program.macrosByName
         }
 
         private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<String> {
@@ -407,10 +414,7 @@ struct SwiftBackendEmitter {
                 ],
                 targets: [
                     .executableTarget(
-                        name: "RangeGenerated",
-                        swiftSettings: [
-                            .enableExperimentalFeature("Embedded")
-                        ]
+                        name: "RangeGenerated"
                     )
                 ]
             )
@@ -1244,7 +1248,50 @@ struct SwiftBackendEmitter {
         var parameters: [String] = []
         var assignments: [String] = []
 
+        for value in declaration.values where value.value == nil
+            && propertyForwardsInitializer(macros: value.macros)
+        {
+            guard let forwardedConstruct = context.constructsByName[value.typeName] else {
+                continue
+            }
+            let forwardedParameters = forwardedInitializerParameters(for: forwardedConstruct)
+            parameters.append(contentsOf: try forwardedParameters.map {
+                try emitParameter($0, genericParameterNames: genericParameterNames)
+            })
+            let arguments = forwardedParameters.map { parameter in
+                CallArgument(
+                    label: parameter.externalLabel,
+                    value: .identifier(parameter.localName)
+                )
+            }
+            assignments.append(
+                "self.\(value.name) = \(try emitRawCall(name: value.typeName, arguments: arguments))"
+            )
+        }
+
+        for state in declaration.states where propertyForwardsInitializer(macros: state.macros) {
+            guard let forwardedConstruct = context.constructsByName[state.type.displayName] else {
+                continue
+            }
+            let forwardedParameters = forwardedInitializerParameters(for: forwardedConstruct)
+            parameters.append(contentsOf: try forwardedParameters.map {
+                try emitParameter($0, genericParameterNames: genericParameterNames)
+            })
+            let arguments = forwardedParameters.map { parameter in
+                CallArgument(
+                    label: parameter.externalLabel,
+                    value: .identifier(parameter.localName)
+                )
+            }
+            assignments.append(
+                "self.\(state.name) = \(try emitRawCall(name: state.type.displayName, arguments: arguments))"
+            )
+        }
+
         for value in declaration.values where value.value == nil {
+            guard !propertyForwardsInitializer(macros: value.macros) else {
+                continue
+            }
             let typeName = emitDeclaredTypeName(
                 value.typeName,
                 genericParameterNames: genericParameterNames
@@ -1254,6 +1301,9 @@ struct SwiftBackendEmitter {
         }
 
         for state in declaration.states {
+            guard !propertyForwardsInitializer(macros: state.macros) else {
+                continue
+            }
             guard case .declared = state.storage else {
                 continue
             }
@@ -1283,6 +1333,113 @@ struct SwiftBackendEmitter {
             \(indentBlock(assignments.joined(separator: "\n"), level: 1))
             }
             """
+    }
+
+    private func forwardedInitializerParameters(
+        for construct: ConstructDeclaration,
+        activeConstructs: Set<String> = []
+    ) -> [RangeFunctionParameter] {
+        let activeConstructs = activeConstructs.union([construct.name])
+        let forwardedValues = construct.values.flatMap { value -> [RangeFunctionParameter] in
+            guard propertyForwardsInitializer(macros: value.macros),
+                !activeConstructs.contains(value.typeName),
+                let nested = context.constructsByName[value.typeName]
+            else {
+                return []
+            }
+            return forwardedInitializerParameters(for: nested, activeConstructs: activeConstructs)
+        }
+        let forwardedStates = construct.states.flatMap { state -> [RangeFunctionParameter] in
+            guard propertyForwardsInitializer(macros: state.macros),
+                !activeConstructs.contains(state.type.displayName),
+                let nested = context.constructsByName[state.type.displayName]
+            else {
+                return []
+            }
+            return forwardedInitializerParameters(for: nested, activeConstructs: activeConstructs)
+        }
+        let values = construct.values.compactMap { value -> RangeFunctionParameter? in
+            guard !propertyForwardsInitializer(macros: value.macros) else { return nil }
+            let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
+            return RangeFunctionParameter(
+                macros: [],
+                localName: value.localName,
+                externalLabel: value.externalLabel ?? value.localName,
+                typeReference: .named(value.typeName),
+                defaultValue: defaultValue,
+                slotName: nil
+            )
+        }
+        let states = construct.states.compactMap { state -> RangeFunctionParameter? in
+            guard !propertyForwardsInitializer(macros: state.macros) else { return nil }
+            let defaultValue: RangeExpression?
+            switch state.storage {
+            case .stored(let expression):
+                defaultValue = expression
+            case .declared:
+                defaultValue = nil
+            }
+            return RangeFunctionParameter(
+                macros: [],
+                localName: state.name,
+                externalLabel: state.name,
+                typeReference: state.type,
+                defaultValue: defaultValue,
+                slotName: nil
+            )
+        }
+        return forwardedValues + forwardedStates + values + states
+    }
+
+    private func propertyForwardsInitializer(macros applications: [MacroApplication]) -> Bool {
+        applications.contains { application in
+            guard let macro = context.macrosByName[application.name],
+                let targetBinding = macro.bindings?.target
+            else {
+                return false
+            }
+            return macroOperationExpressions(in: macro.body).contains { expression in
+                guard case .call(let name, let arguments) = expression else {
+                    return false
+                }
+                return name == "\(targetBinding).initializer.forward" && arguments.isEmpty
+            }
+        }
+    }
+
+    private func macroOperationExpressions(in statements: [RangeStatement]) -> [RangeExpression] {
+        var expressions: [RangeExpression] = []
+        for statement in statements {
+            switch statement {
+            case .expand:
+                continue
+            case .expression(let expression):
+                expressions.append(expression)
+            case .conditional(let branches):
+                for branch in branches {
+                    expressions.append(contentsOf: macroOperationExpressions(in: branch.body))
+                }
+            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
+                expressions.append(contentsOf: macroOperationExpressions(in: body))
+            case .background(let background):
+                expressions.append(contentsOf: macroOperationExpressions(in: background.body))
+            case .deferBlock(let deferred):
+                expressions.append(contentsOf: macroOperationExpressions(in: deferred.body))
+            case .localCallable(let declaration):
+                expressions.append(contentsOf: macroOperationExpressions(in: declaration.body))
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    expressions.append(contentsOf: macroOperationExpressions(in: switchCase.body))
+                }
+                if let defaultBody {
+                    expressions.append(contentsOf: macroOperationExpressions(in: defaultBody))
+                }
+            case .localBinding, .assignment, .compoundAssignment, .return, .macroInvocation,
+                .break, .continue:
+                continue
+            }
+        }
+        return expressions
     }
 
     private func emitExtension(_ declaration: ExtensionDeclaration) throws -> String {

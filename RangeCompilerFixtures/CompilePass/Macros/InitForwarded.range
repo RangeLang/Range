@@ -1,0 +1,20 @@
+construct Point {
+    let x: Int
+    let y: Int
+}
+
+construct Metadata {
+    let title: String
+}
+
+construct PointWithMetadata {
+    #initForwarded
+    state point: Point
+
+    let somethingElse: Metadata
+}
+
+@main {
+    let metadata: Metadata(title: "origin")
+    let wrapped: PointWithMetadata(x: 1, y: 2, somethingElse: metadata)
+}

@@ -137,6 +137,12 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Init forwarded property macro exposes nested initializer")
+    func initForwardedPropertyMacroExposesNestedInitializer() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/InitForwarded.range")
+        _ = try compile(fixture: fixture, expectedRole: .pass)
+    }
+
     @Test("Macros query graph through identities")
     func macrosQueryGraphThroughIdentities() throws {
         let source = """

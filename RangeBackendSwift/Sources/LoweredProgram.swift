@@ -12,6 +12,7 @@ struct LoweredSourceUnit {
 }
 
 struct LoweredProgram {
+    let macrosByName: [String: MacroDeclaration]
     let callables: [CallableDeclaration]
     let protocols: [ProtocolDeclaration]
     let enumerations: [EnumDeclaration]

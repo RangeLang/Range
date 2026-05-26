@@ -34,6 +34,7 @@ struct SwiftBackendProgramBuilder {
         switch sourceFile {
         case .mainBlock(let mainBlock):
             return .init(
+                macrosByName: compiledProgram.declarationGraph.macrosByName,
                 callables: [],
                 protocols: supportUnits.flatMap(\.protocols),
                 enumerations: [],
@@ -65,6 +66,7 @@ struct SwiftBackendProgramBuilder {
             }
 
             return .init(
+                macrosByName: compiledProgram.declarationGraph.macrosByName,
                 callables: module.callables,
                 protocols: supportUnits.flatMap(\.protocols) + module.protocols,
                 enumerations: module.enumerations,
@@ -235,6 +237,7 @@ struct SwiftBackendProgramBuilder {
         }
 
         return .init(
+            macrosByName: compiledProgram.declarationGraph.macrosByName,
             callables: callables,
             protocols: protocols,
             enumerations: enumerations,
@@ -268,10 +271,12 @@ struct SwiftBackendProgramBuilder {
     }
 
     private func coreSupportUnits(in compiledProgram: CompiledProgram) -> [LoweredSourceUnit] {
+        let includeSyntaxLexingSupport = projectUsesSyntaxLexingSupport(compiledProgram)
         let coreUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
             guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
                 parsedFile.path.contains("/RangeCore/Encoding/")
-                    || parsedFile.path.contains("/RangeCore/Syntax/Lexing/")
+                    || (includeSyntaxLexingSupport
+                        && parsedFile.path.contains("/RangeCore/Syntax/Lexing/"))
                     || parsedFile.path.contains("/RangeCore/System/File/")
             else {
                 return nil
@@ -361,6 +366,15 @@ struct SwiftBackendProgramBuilder {
                 mainBlock: nil
             )
         ] + coreUnits
+    }
+
+    private func projectUsesSyntaxLexingSupport(_ compiledProgram: CompiledProgram) -> Bool {
+        compiledProgram.projectExpandedFiles.contains { parsedFile in
+            parsedFile.path.contains("/Syntax/")
+                || parsedFile.source?.contains("Lexer") == true
+                || parsedFile.source?.contains("LexicalToken") == true
+                || parsedFile.source?.contains("rangeLexer") == true
+        }
     }
 
     private func shouldEmitCoreSupportConstruct(

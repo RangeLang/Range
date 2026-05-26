@@ -8,6 +8,7 @@ struct SwiftBackendEmitterLayoutTests {
     func runtimeFileSystemSupportLowersThroughPOSIXDescriptors() throws {
         let swift = try SwiftBackendEmitter().emit(
             program: LoweredProgram(
+                macrosByName: [:],
                 callables: [],
                 protocols: [],
                 enumerations: [],
@@ -46,6 +47,7 @@ struct SwiftBackendEmitterLayoutTests {
         let declaration = try parser.parseConstructDeclaration()
         let swift = try SwiftBackendEmitter().emit(
             program: LoweredProgram(
+                macrosByName: [:],
                 callables: [],
                 protocols: [],
                 enumerations: [],

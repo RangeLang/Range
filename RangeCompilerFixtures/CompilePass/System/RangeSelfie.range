@@ -1,0 +1,8 @@
+@main {
+    switch FileSystem.readText(path: "../../../RangeSelfie.range") {
+    case .success(let source):
+        Logger.info(source)
+    case .failure:
+        Logger.error("failed to read selfie")
+    }
+}
