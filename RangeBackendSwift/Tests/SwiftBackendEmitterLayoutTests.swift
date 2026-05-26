@@ -19,10 +19,15 @@ struct SwiftBackendEmitterLayoutTests {
         )
 
         #expect(swift.contains("enum Range_POSIXFileSystem"))
+        #expect(swift.contains("enum Range_HostFileSystem"))
+        #expect(swift.contains("enum Range_UTF8"))
+        #expect(!swift.contains("enum Range_FileSystem"))
         #expect(swift.contains("open(path, O_RDONLY)"))
         #expect(swift.contains("fstat(descriptor, &metadata)"))
         #expect(swift.contains("read(descriptor,"))
         #expect(swift.contains("defer { close(descriptor) }"))
+        #expect(swift.contains("return Range_POSIXFileSystem.readData(path: path)"))
+        #expect(swift.contains("return String(decoding: data.bytes, as: UTF8.self)"))
         #expect(!swift.contains("fopen("))
         #expect(!swift.contains("fread("))
     }

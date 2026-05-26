@@ -455,13 +455,8 @@ struct SwiftBackendEmitter {
                 case failure(cause: Failure)
             }
 
-            enum Range_FileReadError {
-                case missing
-                case unreadable
-            }
-
             enum Range_POSIXFileSystem {
-                static func readAllBytes(path: String) -> Range_Result<[UInt8], Range_FileReadError> {
+                static func readData(path: String) -> Range_Result<Data, Range_FileReadError> {
                     let descriptor = open(path, O_RDONLY)
                     guard descriptor >= 0 else {
                         return errno == ENOENT
@@ -501,18 +496,19 @@ struct SwiftBackendEmitter {
                         offset += readCount
                     }
 
-                    return .success(result: bytes)
+                    return .success(result: Data(bytes))
                 }
             }
 
-            enum Range_FileSystem {
-                static func readText(path: String) -> Range_Result<String, Range_FileReadError> {
-                    switch Range_POSIXFileSystem.readAllBytes(path: path) {
-                    case .success(let bytes):
-                        return .success(result: String(decoding: bytes, as: UTF8.self))
-                    case .failure(let cause):
-                        return .failure(cause: cause)
-                    }
+            enum Range_HostFileSystem {
+                static func readData(path: String) -> Range_Result<Data, Range_FileReadError> {
+                    return Range_POSIXFileSystem.readData(path: path)
+                }
+            }
+
+            enum Range_UTF8 {
+                static func decode(data: Data) -> String {
+                    return String(decoding: data.bytes, as: UTF8.self)
                 }
             }
 
@@ -1212,7 +1208,8 @@ struct SwiftBackendEmitter {
                     $0,
                     constructGenericParameterNames: genericParameterNames,
                     constructGenericParameters: declaration.genericParameters,
-                    isReferenceType: isReferenceType
+                    isReferenceType: isReferenceType,
+                    forceStatic: constructShouldEmitStaticMethods(declaration)
                 )
             }
             .joined(separator: "\n\n")
@@ -1888,7 +1885,8 @@ struct SwiftBackendEmitter {
         constructGenericParameterNames: Set<String> = [],
         constructGenericParameters: [GenericParameter] = [],
         inheritedScope: EmissionScope = .empty,
-        isReferenceType: Bool = false
+        isReferenceType: Bool = false,
+        forceStatic: Bool = false
     ) throws -> String {
         guard let body = callable.body else {
             throw SwiftBackendError(
@@ -1918,7 +1916,7 @@ struct SwiftBackendEmitter {
             enclosingReturnType: callable.returnType ?? .named("Void"),
             scope: scope
         )
-        let isStatic = callableShouldEmitStatic(callable)
+        let isStatic = forceStatic || callableShouldEmitStatic(callable)
         let staticPrefix = isStatic ? "static " : ""
         let mutatingPrefix = !isStatic && !isReferenceType && methodNeedsMutation(callable) ? "mutating " : ""
 
@@ -1927,6 +1925,13 @@ struct SwiftBackendEmitter {
             \(functionBody)
             }
             """
+    }
+
+    private func constructShouldEmitStaticMethods(_ declaration: ConstructDeclaration) -> Bool {
+        declaration.isCore
+            && declaration.values.isEmpty
+            && declaration.states.isEmpty
+            && declaration.bindings.isEmpty
     }
 
     private func callableShouldEmitStatic(_ callable: CallableDeclaration) -> Bool {

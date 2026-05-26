@@ -272,6 +272,7 @@ struct SwiftBackendProgramBuilder {
             guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
                 parsedFile.path.contains("/RangeCore/Encoding/")
                     || parsedFile.path.contains("/RangeCore/Syntax/Lexing/")
+                    || parsedFile.path.contains("/RangeCore/System/File/")
             else {
                 return nil
             }
@@ -281,6 +282,10 @@ struct SwiftBackendProgramBuilder {
 
             switch parsedFile.sourceFile {
             case .construct(let declaration):
+                guard shouldEmitCoreSupportConstruct(declaration, in: parsedFile.path) else {
+                    return nil
+                }
+
                 return .init(
                     outputFileName: outputFileName,
                     protocols: [],
@@ -321,13 +326,16 @@ struct SwiftBackendProgramBuilder {
                     mainBlock: nil
                 )
             case .module(let module):
+                let declarations = module.constructs.filter {
+                    ($0.kind == .declaration || $0.kind == .entry)
+                        && shouldEmitCoreSupportConstruct($0, in: parsedFile.path)
+                }
+
                 return .init(
                     outputFileName: outputFileName,
                     protocols: module.protocols,
                     enumerations: module.enumerations,
-                    declarations: module.constructs.filter {
-                        $0.kind == .declaration || $0.kind == .entry
-                    },
+                    declarations: declarations,
                     extensions: module.extensions,
                     callables: module.callables,
                     mainBlock: nil
@@ -353,5 +361,16 @@ struct SwiftBackendProgramBuilder {
                 mainBlock: nil
             )
         ] + coreUnits
+    }
+
+    private func shouldEmitCoreSupportConstruct(
+        _ declaration: ConstructDeclaration,
+        in path: String
+    ) -> Bool {
+        guard path.contains("/RangeCore/System/File/") else {
+            return true
+        }
+
+        return declaration.name != "HostFileSystem" && declaration.name != "UTF8"
     }
 }

@@ -5,6 +5,27 @@ enum FileReadError {
 }
 
 #language
+construct HostFileSystem {
+    function readData(path: String): Result<Data, FileReadError>
+}
+
+#language
+construct UTF8 {
+    function decode(data: Data): String
+}
+
+#language
 construct FileSystem {
-    function readText(path: String): Result<String, FileReadError>
+    function readData(path: String): Result<Data, FileReadError> {
+        return HostFileSystem.readData(path: path)
+    }
+
+    function readText(path: String): Result<String, FileReadError> {
+        switch readData(path: path) {
+        case .success(let data):
+            return .success(result: UTF8.decode(data: data))
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
 }
