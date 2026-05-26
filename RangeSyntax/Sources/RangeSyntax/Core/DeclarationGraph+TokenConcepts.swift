@@ -396,11 +396,11 @@ extension DeclarationGraph {
 
     private static func signage(of value: Int) -> String {
         if value < 0 {
-            return "Negativity"
+            return "negative"
         }
         if value > 0 {
-            return "Positivity"
+            return "positive"
         }
-        return "Neutrality"
+        return "neutral"
     }
 }

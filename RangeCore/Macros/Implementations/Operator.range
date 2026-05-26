@@ -9,7 +9,7 @@ marker Operator<let fixity: OperatorFixity>(
         metric: OperatorBindingMetric(
             step: 10,
             delta: 0 - 10,
-            signage: Signage(polarity: Identifier(name: "Negativity"))
+            signage: "negative"
         ),
         associativity: associativity
     )

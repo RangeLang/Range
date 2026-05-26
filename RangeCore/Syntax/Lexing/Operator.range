@@ -19,30 +19,10 @@ construct OperatorBindingRange {
 }
 
 @syntax
-#Polarity
-construct Negativity {
-}
-
-@syntax
-#Polarity
-construct Neutrality {
-}
-
-@syntax
-#Polarity
-construct Positivity {
-}
-
-@syntax
-construct Signage {
-    let polarity: #Polarity
-}
-
-@syntax
 construct OperatorBindingMetric {
     let step: Int
     let delta: Int
-    let signage: Signage
+    let signage: String
 }
 
 @syntax

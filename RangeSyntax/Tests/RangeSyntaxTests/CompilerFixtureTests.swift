@@ -1027,7 +1027,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     binding: TokenOperatorBindingRange(lower: 70, upper: 80),
                     step: 10,
                     delta: -10,
-                    signage: "Negativity",
+                    signage: "negative",
                     associativity: .left
                 )
             )
@@ -1040,7 +1040,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     binding: TokenOperatorBindingRange(lower: 90, upper: 100),
                     step: 10,
                     delta: -10,
-                    signage: "Negativity",
+                    signage: "negative",
                     associativity: .none
                 )
             )
@@ -1053,7 +1053,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     binding: TokenOperatorBindingRange(lower: 50, upper: 60),
                     step: 10,
                     delta: -10,
-                    signage: "Negativity",
+                    signage: "negative",
                     associativity: .right
                 )
             )
@@ -1066,7 +1066,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     binding: TokenOperatorBindingRange(lower: 60, upper: 70),
                     step: 10,
                     delta: -10,
-                    signage: "Negativity",
+                    signage: "negative",
                     associativity: .left
                 )
             )
@@ -1079,7 +1079,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     binding: TokenOperatorBindingRange(lower: 60, upper: 70),
                     step: 10,
                     delta: -10,
-                    signage: "Negativity",
+                    signage: "negative",
                     associativity: .left
                 )
             )
@@ -1093,7 +1093,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                         binding: TokenOperatorBindingRange(lower: 40, upper: 50),
                         step: 10,
                         delta: -10,
-                        signage: "Negativity",
+                        signage: "negative",
                         associativity: .none
                     )
                 )
@@ -1112,7 +1112,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                         binding: TokenOperatorBindingRange(lower: 60, upper: 70),
                         step: 10,
                         delta: -10,
-                        signage: "Negativity",
+                        signage: "negative",
                         associativity: .left
                     )
                 )
@@ -1131,7 +1131,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                         binding: TokenOperatorBindingRange(lower: 60, upper: 70),
                         step: 10,
                         delta: -10,
-                        signage: "Negativity",
+                        signage: "negative",
                         associativity: .left
                     )
                 )
@@ -1183,16 +1183,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 )
             )
         )
-    }
-
-    @Test("Polarity metadata records carrier constructs")
-    func polarityMetadataRecordsCarrierConstructs() throws {
-        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
-
-        for polarity in ["Negativity", "Neutrality", "Positivity"] {
-            let declaration = try #require(program.declarationGraph.constructsByName[polarity])
-            #expect(declaration.macros.contains { $0.name == "Polarity" })
-        }
     }
 
     @Test("Declaration graph carries source locations")
