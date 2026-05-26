@@ -209,6 +209,30 @@ struct CompilerFixtureTests {
             return
         }
         #expect(memberIdentities.count == 3)
+        guard case .object("GraphIdentity", let firstMemberFields)? = memberIdentities.first,
+            case .string("let:User.name")? = firstMemberFields["id"]
+        else {
+            Issue.record("Expected first member identity to describe User.name.")
+            return
+        }
+
+        let parent = try #require(
+            evaluator.evaluate(
+                Expression.call(
+                    name: "graph.parent",
+                    arguments: [
+                        CallArgument(label: "of", value: memberIdentities[0].expression!)
+                    ]
+                )
+            )
+        )
+        guard case .object("GraphIdentity", let parentFields) = parent,
+            case .string("construct:User")? = parentFields["id"],
+            case .string("User")? = parentFields["name"]
+        else {
+            Issue.record("Expected graph.parent(of:) to resolve User.name back to User.")
+            return
+        }
 
         let attachedMacros = try #require(
             evaluator.evaluate(
@@ -284,6 +308,7 @@ struct CompilerFixtureTests {
             )
         )
         #expect(declaration.field("identifier") != nil)
+        #expect(declaration.field("parent") != nil)
 
         var inputs = try rangeCoreInputs()
         inputs.append(
@@ -2137,6 +2162,12 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     @Test("FileSystem readText surface validates")
     func fileSystemReadTextSurfaceValidates() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "System/FileSystemReadText.range")
+        _ = try compile(fixture: fixture, expectedRole: .pass)
+    }
+
+    @Test("Range lexer reads Range source file")
+    func rangeLexerReadsRangeSourceFile() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Syntax/RangeLexerReadFile.range")
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 

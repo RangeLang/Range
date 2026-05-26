@@ -260,7 +260,7 @@ struct CompileTimeValueEvaluator {
         case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
-            "ValueGeneric", "Graph.Identity", "Macro.Application", "Macro.Declaration", "Macro.Target",
+            "ValueGeneric", "GraphIdentity", "Macro.Application", "Macro.Declaration", "Macro.Target",
             "Marker.Application", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
             "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
@@ -299,6 +299,14 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return context.graphContext.declaration(for: identity)
+        case "\(graphBinding).parent":
+            guard arguments.count == 1,
+                arguments[0].label == "of",
+                let identity = evaluate(arguments[0].value, locals: locals)
+            else {
+                return nil
+            }
+            return context.graphContext.parent(of: identity)
         case "\(graphBinding).members":
             guard arguments.count == 1,
                 arguments[0].label == "of",

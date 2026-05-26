@@ -1,0 +1,36 @@
+function lexRangeFile(path: String): Result<[LexicalToken], LexingError> {
+    switch FileSystem.readText(path: path) {
+    case .success(let source):
+        let lexer: Lexer(rangeLexer())
+        return lexer.tokenize(source: source)
+    case .failure:
+        return .failure(
+            cause: LexingError(
+                message: "Failed to read Range source file.",
+                range: SourceRange(
+                    start: SourceLocation(line: 0, character: 0),
+                    end: SourceLocation(line: 0, character: 0)
+                )
+            )
+        )
+    }
+
+    return .failure(
+        cause: LexingError(
+            message: "Failed to read Range source file.",
+            range: SourceRange(
+                start: SourceLocation(line: 0, character: 0),
+                end: SourceLocation(line: 0, character: 0)
+            )
+        )
+    )
+}
+
+@main {
+    switch lexRangeFile(path: "RangeCompilerFixtures/CompilePass/Syntax/RangeLexerReadFile.range") {
+    case .success(let tokens):
+        Logger.info("tokens: \(tokens.count)")
+    case .failure(let error):
+        Logger.error(error.message)
+    }
+}

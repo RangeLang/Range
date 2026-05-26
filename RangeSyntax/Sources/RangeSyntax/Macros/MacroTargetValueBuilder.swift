@@ -159,10 +159,18 @@ struct MacroTargetValueBuilder {
                 "generics": .array(declaration.genericParameters.map(value(for:))),
                 "conformances": .array(declaration.conformances.map(typeReferenceValue)),
                 "inits": .array(declaration.initializers.map(value(for:))),
-                "lets": .array(declaration.values.map(value(for:))),
-                "states": .array(declaration.states.map(value(for:))),
-                "bindings": .array(declaration.bindings.map(value(for:))),
-                "deriveds": .array(declaration.deriveds.map(value(for:))),
+                "lets": .array(declaration.values.map {
+                    value(for: $0, ownerConstructName: qualifiedName)
+                }),
+                "states": .array(declaration.states.map {
+                    value(for: $0, ownerConstructName: qualifiedName)
+                }),
+                "bindings": .array(declaration.bindings.map {
+                    value(for: $0, ownerConstructName: qualifiedName)
+                }),
+                "deriveds": .array(declaration.deriveds.map {
+                    value(for: $0, ownerConstructName: qualifiedName)
+                }),
                 "functions": .array(declaration.callables.map(value(for:))),
                 "constructs": .array(
                     declaration.constructs.map {
@@ -175,52 +183,121 @@ struct MacroTargetValueBuilder {
     }
 
     func value(for declaration: ValueDeclaration) -> CompileTimeValue {
+        value(for: declaration, ownerConstructName: nil)
+    }
+
+    func value(
+        for declaration: ValueDeclaration,
+        ownerConstructName: String?
+    ) -> CompileTimeValue {
+        var fields: [String: CompileTimeValue] = [
+            "macros": .array(declaration.macros.map(value(for:))),
+            "markers": .array(markerValues(for: declaration.macros)),
+            "identifier": identifier(declaration.name),
+            "type": typeReferenceValue(declaration.typeName),
+            "typeName": .string(declaration.typeName),
+        ]
+        addPropertyGraphFields(
+            to: &fields,
+            kind: "let",
+            name: declaration.name,
+            ownerConstructName: ownerConstructName
+        )
         return .object(
             typeName: "Let",
-            fields: [
-                "macros": .array(declaration.macros.map(value(for:))),
-                "markers": .array(markerValues(for: declaration.macros)),
-                "identifier": identifier(declaration.name),
-                "type": typeReferenceValue(declaration.typeName),
-                "typeName": .string(declaration.typeName),
-            ]
+            fields: fields
         )
     }
 
     func value(for declaration: StateDeclaration) -> CompileTimeValue {
-        .object(
+        value(for: declaration, ownerConstructName: nil)
+    }
+
+    func value(
+        for declaration: StateDeclaration,
+        ownerConstructName: String?
+    ) -> CompileTimeValue {
+        var fields: [String: CompileTimeValue] = [
+            "macros": .array(declaration.macros.map(value(for:))),
+            "markers": .array(markerValues(for: declaration.macros)),
+            "identifier": identifier(declaration.name),
+            "type": typeReferenceValue(declaration.type.displayName),
+        ]
+        addPropertyGraphFields(
+            to: &fields,
+            kind: "state",
+            name: declaration.name,
+            ownerConstructName: ownerConstructName
+        )
+        return .object(
             typeName: "State",
-            fields: [
-                "macros": .array(declaration.macros.map(value(for:))),
-                "markers": .array(markerValues(for: declaration.macros)),
-                "identifier": identifier(declaration.name),
-                "type": typeReferenceValue(declaration.type.displayName),
-            ]
+            fields: fields
         )
     }
 
     func value(for declaration: BindingDeclaration) -> CompileTimeValue {
-        .object(
+        value(for: declaration, ownerConstructName: nil)
+    }
+
+    func value(
+        for declaration: BindingDeclaration,
+        ownerConstructName: String?
+    ) -> CompileTimeValue {
+        var fields: [String: CompileTimeValue] = [
+            "macros": .array(declaration.macros.map(value(for:))),
+            "markers": .array(markerValues(for: declaration.macros)),
+            "identifier": identifier(declaration.name),
+            "type": typeReferenceValue(declaration.typeName),
+        ]
+        addPropertyGraphFields(
+            to: &fields,
+            kind: "binding",
+            name: declaration.name,
+            ownerConstructName: ownerConstructName
+        )
+        return .object(
             typeName: "Binding",
-            fields: [
-                "macros": .array(declaration.macros.map(value(for:))),
-                "markers": .array(markerValues(for: declaration.macros)),
-                "identifier": identifier(declaration.name),
-                "type": typeReferenceValue(declaration.typeName),
-            ]
+            fields: fields
         )
     }
 
     func value(for declaration: DerivedDeclaration) -> CompileTimeValue {
-        .object(
-            typeName: "Derived",
-            fields: [
-                "macros": .array(declaration.macros.map(value(for:))),
-                "markers": .array(markerValues(for: declaration.macros)),
-                "identifier": identifier(declaration.name),
-                "type": typeReferenceValue(declaration.typeName),
-            ]
+        value(for: declaration, ownerConstructName: nil)
+    }
+
+    func value(
+        for declaration: DerivedDeclaration,
+        ownerConstructName: String?
+    ) -> CompileTimeValue {
+        var fields: [String: CompileTimeValue] = [
+            "macros": .array(declaration.macros.map(value(for:))),
+            "markers": .array(markerValues(for: declaration.macros)),
+            "identifier": identifier(declaration.name),
+            "type": typeReferenceValue(declaration.typeName),
+        ]
+        addPropertyGraphFields(
+            to: &fields,
+            kind: "derived",
+            name: declaration.name,
+            ownerConstructName: ownerConstructName
         )
+        return .object(
+            typeName: "Derived",
+            fields: fields
+        )
+    }
+
+    private func addPropertyGraphFields(
+        to fields: inout [String: CompileTimeValue],
+        kind: String,
+        name: String,
+        ownerConstructName: String?
+    ) {
+        guard let ownerConstructName else {
+            return
+        }
+        fields["identity"] = graphIdentity(kind: kind, name: "\(ownerConstructName).\(name)")
+        fields["parent"] = graphIdentity(kind: "construct", name: ownerConstructName)
     }
 
     private func markerValues(for applications: [MacroApplication]) -> [CompileTimeValue] {
@@ -694,7 +771,7 @@ struct MacroTargetValueBuilder {
 
     func graphIdentity(kind: String, name: String) -> CompileTimeValue {
         .object(
-            typeName: "Graph.Identity",
+            typeName: "GraphIdentity",
             fields: [
                 "id": .string("\(kind):\(name)"),
                 "kind": .string(kind),

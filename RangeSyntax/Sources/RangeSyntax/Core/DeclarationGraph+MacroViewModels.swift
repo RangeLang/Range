@@ -757,6 +757,7 @@ struct MacroExpansionContext {
 struct MacroGraphContext {
     let declarationsByID: [String: CompileTimeValue]
     let membersByID: [String: [CompileTimeValue]]
+    let parentByID: [String: CompileTimeValue]
     let markersByID: [String: [CompileTimeValue]]
     let macrosByID: [String: [CompileTimeValue]]
     let macrosByName: [String: [CompileTimeValue]]
@@ -775,6 +776,7 @@ struct MacroGraphContext {
         )
         var declarationsByID: [String: CompileTimeValue] = [:]
         var membersByID: [String: [CompileTimeValue]] = [:]
+        var parentByID: [String: CompileTimeValue] = [:]
         var markersByID: [String: [CompileTimeValue]] = [:]
         var macrosByID: [String: [CompileTimeValue]] = [:]
         var macrosByName: [String: [CompileTimeValue]] = [:]
@@ -800,34 +802,39 @@ struct MacroGraphContext {
             recordMacros(Self.macroValues(from: constructValue), id: constructID)
 
             var members: [CompileTimeValue] = []
+            let constructIdentity = builder.graphIdentity(kind: "construct", name: construct.name)
             for value in construct.values {
                 let id = "let:\(construct.name).\(value.name)"
-                let valueValue = builder.value(for: value)
+                let valueValue = builder.value(for: value, ownerConstructName: construct.name)
                 declarationsByID[id] = valueValue
+                parentByID[id] = constructIdentity
                 markersByID[id] = Self.markerValues(from: valueValue)
                 recordMacros(Self.macroValues(from: valueValue), id: id)
                 members.append(builder.graphIdentity(kind: "let", name: "\(construct.name).\(value.name)"))
             }
             for state in construct.states {
                 let id = "state:\(construct.name).\(state.name)"
-                let stateValue = builder.value(for: state)
+                let stateValue = builder.value(for: state, ownerConstructName: construct.name)
                 declarationsByID[id] = stateValue
+                parentByID[id] = constructIdentity
                 markersByID[id] = Self.markerValues(from: stateValue)
                 recordMacros(Self.macroValues(from: stateValue), id: id)
                 members.append(builder.graphIdentity(kind: "state", name: "\(construct.name).\(state.name)"))
             }
             for binding in construct.bindings {
                 let id = "binding:\(construct.name).\(binding.name)"
-                let bindingValue = builder.value(for: binding)
+                let bindingValue = builder.value(for: binding, ownerConstructName: construct.name)
                 declarationsByID[id] = bindingValue
+                parentByID[id] = constructIdentity
                 markersByID[id] = Self.markerValues(from: bindingValue)
                 recordMacros(Self.macroValues(from: bindingValue), id: id)
                 members.append(builder.graphIdentity(kind: "binding", name: "\(construct.name).\(binding.name)"))
             }
             for derived in construct.deriveds {
                 let id = "derived:\(construct.name).\(derived.name)"
-                let derivedValue = builder.value(for: derived)
+                let derivedValue = builder.value(for: derived, ownerConstructName: construct.name)
                 declarationsByID[id] = derivedValue
+                parentByID[id] = constructIdentity
                 markersByID[id] = Self.markerValues(from: derivedValue)
                 recordMacros(Self.macroValues(from: derivedValue), id: id)
                 members.append(builder.graphIdentity(kind: "derived", name: "\(construct.name).\(derived.name)"))
@@ -863,6 +870,7 @@ struct MacroGraphContext {
 
         self.declarationsByID = declarationsByID
         self.membersByID = membersByID
+        self.parentByID = parentByID
         self.markersByID = markersByID
         self.macrosByID = macrosByID
         self.macrosByName = macrosByName
@@ -877,6 +885,11 @@ struct MacroGraphContext {
     func members(of identity: CompileTimeValue) -> CompileTimeValue? {
         guard let id = identityID(identity) else { return nil }
         return .array(membersByID[id, default: []])
+    }
+
+    func parent(of identity: CompileTimeValue) -> CompileTimeValue? {
+        guard let id = identityID(identity) else { return nil }
+        return parentByID[id]
     }
 
     func markers(on identity: CompileTimeValue) -> CompileTimeValue? {
@@ -968,7 +981,7 @@ struct MacroGraphContext {
     }
 
     private func identityID(_ identity: CompileTimeValue) -> String? {
-        guard case .object("Graph.Identity", let fields) = identity,
+        guard case .object("GraphIdentity", let fields) = identity,
             case .string(let id)? = fields["id"]
         else {
             return nil
