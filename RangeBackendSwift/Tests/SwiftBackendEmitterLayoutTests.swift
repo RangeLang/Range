@@ -4,6 +4,29 @@ import Testing
 
 @Suite("Swift backend layout emission")
 struct SwiftBackendEmitterLayoutTests {
+    @Test("Runtime file system support lowers through POSIX descriptors")
+    func runtimeFileSystemSupportLowersThroughPOSIXDescriptors() throws {
+        let swift = try SwiftBackendEmitter().emit(
+            program: LoweredProgram(
+                callables: [],
+                protocols: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(body: []),
+                units: []
+            )
+        )
+
+        #expect(swift.contains("enum Range_POSIXFileSystem"))
+        #expect(swift.contains("open(path, O_RDONLY)"))
+        #expect(swift.contains("fstat(descriptor, &metadata)"))
+        #expect(swift.contains("read(descriptor,"))
+        #expect(swift.contains("defer { close(descriptor) }"))
+        #expect(!swift.contains("fopen("))
+        #expect(!swift.contains("fread("))
+    }
+
     @Test("Value construct fields emit in descending layout alignment")
     func valueConstructFieldsEmitInDescendingLayoutAlignment() throws {
         let source = """

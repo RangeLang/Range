@@ -460,30 +460,59 @@ struct SwiftBackendEmitter {
                 case unreadable
             }
 
+            enum Range_POSIXFileSystem {
+                static func readAllBytes(path: String) -> Range_Result<[UInt8], Range_FileReadError> {
+                    let descriptor = open(path, O_RDONLY)
+                    guard descriptor >= 0 else {
+                        return errno == ENOENT
+                            ? .failure(cause: .missing)
+                            : .failure(cause: .unreadable)
+                    }
+                    defer { close(descriptor) }
+
+                    var metadata = stat()
+                    guard fstat(descriptor, &metadata) == 0 else {
+                        return .failure(cause: .unreadable)
+                    }
+
+                    let byteCount = Int(metadata.st_size)
+                    guard byteCount >= 0 else {
+                        return .failure(cause: .unreadable)
+                    }
+
+                    var bytes = [UInt8](repeating: 0, count: byteCount)
+                    var offset = 0
+                    while offset < byteCount {
+                        let readCount = bytes.withUnsafeMutableBufferPointer { buffer in
+                            read(descriptor, buffer.baseAddress! + offset, byteCount - offset)
+                        }
+
+                        if readCount < 0 {
+                            if errno == EINTR {
+                                continue
+                            }
+                            return .failure(cause: .unreadable)
+                        }
+
+                        if readCount == 0 {
+                            return .failure(cause: .unreadable)
+                        }
+
+                        offset += readCount
+                    }
+
+                    return .success(result: bytes)
+                }
+            }
+
             enum Range_FileSystem {
                 static func readText(path: String) -> Range_Result<String, Range_FileReadError> {
-                    guard let file = fopen(path, "rb") else {
-                        return .failure(cause: .missing)
+                    switch Range_POSIXFileSystem.readAllBytes(path: path) {
+                    case .success(let bytes):
+                        return .success(result: String(decoding: bytes, as: UTF8.self))
+                    case .failure(let cause):
+                        return .failure(cause: cause)
                     }
-                    defer { fclose(file) }
-
-                    guard fseek(file, 0, SEEK_END) == 0 else {
-                        return .failure(cause: .unreadable)
-                    }
-                    let length = ftell(file)
-                    guard length >= 0, fseek(file, 0, SEEK_SET) == 0 else {
-                        return .failure(cause: .unreadable)
-                    }
-
-                    var bytes = [UInt8](repeating: 0, count: Int(length))
-                    let readCount = bytes.withUnsafeMutableBufferPointer { buffer in
-                        fread(buffer.baseAddress, 1, bytes.count, file)
-                    }
-                    guard readCount == bytes.count else {
-                        return .failure(cause: .unreadable)
-                    }
-
-                    return .success(result: String(decoding: bytes, as: UTF8.self))
                 }
             }
 
