@@ -14,9 +14,8 @@ construct RuntimeDefaults {
   }
 
   #host.gpu
-  construct Render {
+  construct Accelerator {
     Float<.32>
-    TextureLayout<.tiled>
     Memory<.shared>
   }
 
@@ -75,7 +74,6 @@ construct RuntimeDefaults {
   construct MobileRuntime {
     Int<.64>
     Float<.32>
-    Vector<.neon>
     Memory<.unified>
   }
 
@@ -83,13 +81,12 @@ construct RuntimeDefaults {
   construct WorkstationRuntime {
     Int<.64>
     Float<.64>
-    Vector<.avx2>
     Memory<.system>
   }
 }
 ```
 
-CPU is not one target. A microcontroller, an ARM device, and an x86 workstation can share source concepts while carrying different numeric widths, memory rules, vector paths, and allocation defaults.
+CPU is not one target. A microcontroller, an ARM device, and an x86 workstation can share source concepts while carrying different numeric widths, memory rules, and allocation defaults.
 
 ## GPU Hosts
 
@@ -99,7 +96,6 @@ construct GraphicsDefaults {
   #host.gpu.apple
   construct AppleGPU {
     Float<.32>
-    TextureLayout<.tiled>
     Memory<.unified>
   }
 

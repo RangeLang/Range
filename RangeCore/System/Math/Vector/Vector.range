@@ -1,4 +1,0 @@
-@componentStorage
-construct Vector<let dimensionality: IntLiteral, Scalar> {
-    let storage: ComponentStorage<Scalar>()
-}

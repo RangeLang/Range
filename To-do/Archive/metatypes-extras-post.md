@@ -18,10 +18,10 @@ let tokens: Array<#Token>()
 This has the same shape as an existential collection:
 
 ```range
-let shapes: Array<Shape>()
+let services: Array<Service>()
 ```
 
-The array does not ask the graph to find every shape. It says each element in the array must satisfy the `Shape` surface.
+The array does not ask the graph to find every service. It says each element in the array must satisfy the `Service` surface.
 
 For Range, the spelling can stay explicit:
 

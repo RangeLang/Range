@@ -179,8 +179,6 @@ implementation tracking surface.
 
 - [ ] Add `Sequence` and `Collection` protocols before broadening
       collection-like APIs across storage types.
-- [ ] Revisit `ComponentStorage` and `Vector<let dimensionality, Scalar>` after
-      value-generic application support is less transitional.
 - [ ] Keep namespace-shaped domain surfaces as `#namespace construct ...` when
       they carry namespace behavior or configuration.
 - [ ] Keep representation/storage constructs ordinary unless they are actually

@@ -21,15 +21,13 @@ construct NeuralRuntime {
 }
 ```
 
-Another package may be a rendering framework:
+Another package may be a runtime framework:
 
 ```range
 #package.defaults
-construct RenderRuntime {
+construct WorkerRuntime {
   Float<.32>
-  Color<.linear>
-  TextureLayout<.tiled>
-  Engine<.gpu>
+  TaskQueue<.cooperative>
   Memory<.shared>
 }
 ```
