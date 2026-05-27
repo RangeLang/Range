@@ -30,11 +30,11 @@ function gatherProgramFiles(path: String, program: RangeProgram): Result<RangePr
     return .failure(cause: .unreadable)
 }
 
-function renderNeatProgram(program: RangeProgram): String {
-    return "NeatProgram\nfiles: \(program.graph.files.count)\n\(renderNeatFiles(files: program.graph.files))syntax: \(program.graph.syntax.count)\n"
+function renderRangeProgram(program: RangeProgram): String {
+    return "RangeProgram\nfiles: \(program.graph.files.count)\n\(renderProgramFiles(files: program.graph.files))syntax: \(program.graph.syntax.count)\n"
 }
 
-function renderNeatFiles(files: [FileTreeNode]): String {
+function renderProgramFiles(files: [FileTreeNode]): String {
     state output   ""
     state index   0
 
@@ -50,18 +50,18 @@ function renderNeatFiles(files: [FileTreeNode]): String {
 @main {
     let program: RangeProgram(emptyRangeProgram())
 
-    switch gatherProgramFiles(path: "../../../", program: program) {
+    switch gatherProgramFiles(path: "../../../../../../RangeCore", program: program) {
     case .success(let program):
-        let output: String(renderNeatProgram(program: program))
+        let output: String(renderRangeProgram(program: program))
         Logger.info(output)
 
-        switch FileSystem.writeText(path: "../../../NeatProgram.txt", text: output) {
+        switch FileSystem.writeText(path: "../../../RangeProgram.txt", text: output) {
         case .success:
-            Logger.info("wrote NeatProgram.txt")
+            Logger.info("wrote RangeProgram.txt")
         case .failure:
-            Logger.error("failed to write NeatProgram.txt")
+            Logger.error("failed to write RangeProgram.txt")
         }
     case .failure:
-        Logger.error("failed to read NeatProgram")
+        Logger.error("failed to read RangeProgram")
     }
 }
