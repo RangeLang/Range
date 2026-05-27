@@ -1,0 +1,9 @@
+RangeProgram
+files: 1
+- ../../../ children: 14
+syntax: 1
+declarations: 1
+applications: 1
+- syntax construct ProgramFileGraphNode [ProgramFileGraphNode]
+  declarations: 1
+  applications: 1

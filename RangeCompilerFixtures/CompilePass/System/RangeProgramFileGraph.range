@@ -2,7 +2,39 @@
 construct ProgramFileGraphNode { }
 
 function renderProgram(program: RangeProgram): String {
-    return "files: \(program.graph.files.count)\nsyntax: \(program.graph.syntax.count)\ndeclarations: \(countDeclarations(graph: program.graph))\napplications: \(countApplications(graph: program.graph))\n"
+    return "RangeProgram\nfiles: \(program.graph.files.count)\n\(renderFiles(files: program.graph.files))syntax: \(program.graph.syntax.count)\ndeclarations: \(countDeclarations(graph: program.graph))\napplications: \(countApplications(graph: program.graph))\n\(renderSyntaxItems(items: program.graph.syntax))"
+}
+
+function renderIdentity(identity: RangeGraphIdentity): String {
+    return "\(identity.kind) \(identity.name) [\(identity.id)]"
+}
+
+function renderFiles(files: [FileTreeNode]): String {
+    state output   ""
+    state index   0
+
+    while index < files.count {
+        let file: FileTreeNode(files.element(index: index))
+        output += "- \(file.path) children: \(file.children.count)\n"
+        index += 1
+    }
+
+    return output
+}
+
+function renderSyntaxItems(items: [GraphSyntax]): String {
+    state output   ""
+    state index   0
+
+    while index < items.count {
+        let item: GraphSyntax(items.element(index: index))
+        output += "- syntax \(renderIdentity(identity: item.identity))\n"
+        output += "  declarations: \(item.declarations.count)\n"
+        output += "  applications: \(item.applications.count)\n"
+        index += 1
+    }
+
+    return output
 }
 
 function countDeclarations(graph: ProgramGraph): Int {
@@ -66,7 +98,14 @@ function countApplications(graph: ProgramGraph): Int {
                 ]
             )
         )
-        Logger.info(renderProgram(program: program))
+        let output: String(renderProgram(program: program))
+        Logger.info(output)
+        switch FileSystem.writeText(path: "../../../RangeProgramFileGraph.txt", text: output) {
+        case .success:
+            Logger.info("wrote RangeProgramFileGraph.txt")
+        case .failure:
+            Logger.error("failed to write RangeProgramFileGraph.txt")
+        }
     case .failure:
         Logger.error("failed to read program file graph")
     }
