@@ -272,6 +272,7 @@ struct SwiftBackendProgramBuilder {
 
     private func coreSupportUnits(in compiledProgram: CompiledProgram) -> [LoweredSourceUnit] {
         let includeSyntaxLexingSupport = projectUsesSyntaxLexingSupport(compiledProgram)
+            || rangeProgramUsesSyntaxLexingSupport(compiledProgram)
         let coreUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
             guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
                 parsedFile.path.contains("/RangeCore/Encoding/")
@@ -379,6 +380,14 @@ struct SwiftBackendProgramBuilder {
                 || parsedFile.source?.contains("Lexer") == true
                 || parsedFile.source?.contains("LexicalToken") == true
                 || parsedFile.source?.contains("rangeLexer") == true
+        }
+    }
+
+    private func rangeProgramUsesSyntaxLexingSupport(_ compiledProgram: CompiledProgram) -> Bool {
+        compiledProgram.expandedFiles.contains { parsedFile in
+            compiledProgram.sourceRole(forPath: parsedFile.path) == .core
+                && parsedFile.path.contains("/RangeCore/Syntax/Program/")
+                && parsedFile.source?.contains("LexicalToken") == true
         }
     }
 

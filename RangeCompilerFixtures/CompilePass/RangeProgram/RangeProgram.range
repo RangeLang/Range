@@ -2,15 +2,19 @@ function emptyRangeProgram(): RangeProgram {
     return RangeProgram(
         graph: ProgramGraph(
             files: [],
+            sources: [],
+            lexedSources: [],
             syntax: []
         )
     )
 }
 
-function rangeProgram(files: [FileTreeNode], syntax: [GraphSyntax]): RangeProgram {
+function rangeProgram(files: [FileTreeNode], sources: [ProgramSourceFile], lexedSources: [ProgramLexedSource], syntax: [GraphSyntax]): RangeProgram {
     return RangeProgram(
         graph: ProgramGraph(
             files: files,
+            sources: sources,
+            lexedSources: lexedSources,
             syntax: syntax
         )
     )
@@ -18,11 +22,18 @@ function rangeProgram(files: [FileTreeNode], syntax: [GraphSyntax]): RangeProgra
 
 function gatherProgramFiles(path: String, program: RangeProgram): Result<RangeProgram, FileReadError> {
     state files: [FileTreeNode](program.graph.files)
+    state sources: [ProgramSourceFile](program.graph.sources)
 
     switch FileTree.read(path: path) {
     case .success(let tree):
         files.append(element: tree)
-        return .success(result: rangeProgram(files: files, syntax: program.graph.syntax))
+
+        switch gatherProgramSources(node: tree, sources: sources) {
+        case .success(let gatheredSources):
+            return .success(result: rangeProgram(files: files, sources: gatheredSources, lexedSources: program.graph.lexedSources, syntax: program.graph.syntax))
+        case .failure(let error):
+            return .failure(cause: error)
+        }
     case .failure(let error):
         return .failure(cause: error)
     }
@@ -30,8 +41,84 @@ function gatherProgramFiles(path: String, program: RangeProgram): Result<RangePr
     return .failure(cause: .unreadable)
 }
 
+function lexProgramSources(program: RangeProgram): Result<RangeProgram, LexingError> {
+    state lexedSources: [ProgramLexedSource](program.graph.lexedSources)
+    let lexer: Lexer(rangeLexer())
+    state index   0
+
+    while index < program.graph.sources.count {
+        let source: ProgramSourceFile(program.graph.sources.element(index: index))
+
+        switch lexer.tokenize(source: source.text) {
+        case .success(let tokens):
+            lexedSources.append(element: ProgramLexedSource(path: source.path, tokens: tokens))
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+
+        index += 1
+    }
+
+    return .success(
+        result: rangeProgram(
+            files: program.graph.files,
+            sources: program.graph.sources,
+            lexedSources: lexedSources,
+            syntax: program.graph.syntax
+        )
+    )
+}
+
+function gatherProgramSources(node: FileTreeNode, sources: [ProgramSourceFile]): Result<[ProgramSourceFile], FileReadError> {
+    state gathered: [ProgramSourceFile](sources)
+
+    switch node.kind {
+    case .file:
+        if isRangeSourceFile(name: node.name) {
+            switch FileSystem.readText(path: node.path) {
+            case .success(let text):
+                gathered.append(element: ProgramSourceFile(path: node.path, text: text))
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        }
+    case .directory:
+        state index   0
+
+        while index < node.children.count {
+            let child: FileTreeNode(node.children.element(index: index))
+
+            switch gatherProgramSources(node: child, sources: []) {
+            case .success(let childSources):
+                state childIndex   0
+
+                while childIndex < childSources.count {
+                    gathered.append(element: childSources.element(index: childIndex))
+                    childIndex += 1
+                }
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+
+            index += 1
+        }
+    }
+
+    return .success(result: gathered)
+}
+
+function isRangeSourceFile(name: String): Bool {
+    let suffix   ".range"
+
+    if name.count < suffix.count {
+        return false
+    }
+
+    return name.substring(start: name.count - suffix.count, end: name.count) == suffix
+}
+
 function renderRangeProgram(program: RangeProgram): String {
-    return "RangeProgram\nfiles: \(program.graph.files.count)\n\(renderProgramFiles(files: program.graph.files))syntax: \(program.graph.syntax.count)\n"
+    return "RangeProgram\nfiles: \(program.graph.files.count)\n\(renderProgramFiles(files: program.graph.files))sources: \(program.graph.sources.count)\n\(renderProgramSources(sources: program.graph.sources))lexed sources: \(program.graph.lexedSources.count)\n\(renderProgramLexedSources(lexedSources: program.graph.lexedSources))syntax: \(program.graph.syntax.count)\n"
 }
 
 function renderProgramFiles(files: [FileTreeNode]): String {
@@ -47,19 +134,50 @@ function renderProgramFiles(files: [FileTreeNode]): String {
     return output
 }
 
+function renderProgramSources(sources: [ProgramSourceFile]): String {
+    state output   ""
+    state index   0
+
+    while index < sources.count {
+        let source: ProgramSourceFile(sources.element(index: index))
+        output += "- \(source.path) characters: \(source.text.count)\n"
+        index += 1
+    }
+
+    return output
+}
+
+function renderProgramLexedSources(lexedSources: [ProgramLexedSource]): String {
+    state output   ""
+    state index   0
+
+    while index < lexedSources.count {
+        let source: ProgramLexedSource(lexedSources.element(index: index))
+        output += "- \(source.path) tokens: \(source.tokens.count)\n"
+        index += 1
+    }
+
+    return output
+}
+
 @main {
     let program: RangeProgram(emptyRangeProgram())
 
     switch gatherProgramFiles(path: "../../../../../../RangeCore", program: program) {
     case .success(let program):
-        let output: String(renderRangeProgram(program: program))
-        Logger.info(output)
+        switch lexProgramSources(program: program) {
+        case .success(let program):
+            let output: String(renderRangeProgram(program: program))
+            Logger.info(output)
 
-        switch FileSystem.writeText(path: "../../../RangeProgram.txt", text: output) {
-        case .success:
-            Logger.info("wrote RangeProgram.txt")
-        case .failure:
-            Logger.error("failed to write RangeProgram.txt")
+            switch FileSystem.writeText(path: "../../../RangeProgram.txt", text: output) {
+            case .success:
+                Logger.info("wrote RangeProgram.txt")
+            case .failure:
+                Logger.error("failed to write RangeProgram.txt")
+            }
+        case .failure(let error):
+            Logger.error(error.message)
         }
     case .failure:
         Logger.error("failed to read RangeProgram")

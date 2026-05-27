@@ -6,7 +6,21 @@ construct RangeProgram {
 #language
 construct ProgramGraph {
     let files: [FileTreeNode]
+    let sources: [ProgramSourceFile]
+    let lexedSources: [ProgramLexedSource]
     let syntax: [GraphSyntax]
+}
+
+#language
+construct ProgramSourceFile {
+    let path: String
+    let text: String
+}
+
+#language
+construct ProgramLexedSource {
+    let path: String
+    let tokens: [LexicalToken]
 }
 
 #language

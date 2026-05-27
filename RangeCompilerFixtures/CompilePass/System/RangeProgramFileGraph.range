@@ -69,6 +69,8 @@ function countApplications(graph: ProgramGraph): Int {
         let program: RangeProgram(
             graph: ProgramGraph(
                 files: [tree],
+                sources: [],
+                lexedSources: [],
                 syntax: [
                     GraphSyntax(
                         identity: RangeGraphIdentity(
