@@ -1,2 +1,3 @@
-open macro capture(): Parameter { target, diagnostics in
+open macro capture(): Parameter -> String { target, diagnostics in
+    return target.application.syntax.description
 }

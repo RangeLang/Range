@@ -17,5 +17,6 @@ construct Parameter {
         let label: String?
         let type: TypeReference
         let expression: Expression
+        let syntax: WrittenSyntax
     }
 }
