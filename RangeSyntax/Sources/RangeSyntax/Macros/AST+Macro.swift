@@ -39,6 +39,9 @@ public struct MarkerDeclaration {
         guard parameters.count == 1 else {
             return nil
         }
+        if parameters[0].capturesSyntax {
+            return valueType.foreignBodyLanguageName
+        }
         return parameters[0].typeReference?.foreignBodyLanguageName
     }
 }

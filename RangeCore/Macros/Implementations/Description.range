@@ -1,4 +1,3 @@
-marker Description(_ markdown: () -> Markdown): Construct {
-    target, diagnostics, graph in
-    markdown()
+marker Description(@capture markdown: Expression): Construct -> Markdown {
+    return markdown
 }

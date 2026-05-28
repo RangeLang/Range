@@ -178,7 +178,10 @@ extension Parser {
                 "Marker declarations must declare an explicit parameter clause. Use () for zero-argument markers."
             )
         }
-        let parameters = try parseFunctionParameters(allowSyntaxCapture: false)
+        let parameters = try parseFunctionParameters(
+            allowSyntaxCapture: true,
+            allowOmittedLocalName: true
+        )
 
         try consume(.colon)
         let firstTarget = try parseMacroTarget()
@@ -192,6 +195,12 @@ extension Parser {
         } else if let effectTarget = firstType.markerEffectTarget {
             target = .syntax(effectTarget)
             valueType = firstType
+        } else if parameters.count == 1,
+            let parameterType = parameters[0].typeReference,
+            parameters[0].localName.hasPrefix("__anonymous")
+        {
+            target = firstTarget
+            valueType = parameterType
         } else {
             target = firstTarget
             valueType = .named("Void")

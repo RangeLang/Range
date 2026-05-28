@@ -1,2 +1,3 @@
-open macro capture<Meta>(): @syntax { target, diagnostics in
+open macro capture(): Parameter { target, diagnostics in
+    target.application.expression.replace(with: "\(target.application.expression)")
 }

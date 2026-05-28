@@ -39,11 +39,6 @@ extension MacroExpander {
                         "Macro #\(macro.name) parameter \(parameter.localName) must use @capture<\(parameter.typeReference?.displayName ?? "Syntax")> to bind syntax."
                     )
                 }
-                guard parameter.captureMetadataType != nil else {
-                    throw ParseError(
-                        "Macro #\(macro.name) parameter \(parameter.localName) must use typed capture metadata, for example @capture<\(parameter.typeReference?.displayName ?? "Syntax")>."
-                    )
-                }
             }
         }
     }

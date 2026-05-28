@@ -224,6 +224,26 @@ extension Parser {
         if peek() != .rightParen {
             while true {
                 let macros = try parseMacroApplicationsIfPresent()
+                if allowOmittedLocalName {
+                    let anonymousParameterStart = index
+                    if let typeReference = try? parseTypeReferenceNode(),
+                        peek() == .comma || peek() == .rightParen
+                    {
+                        parameters.append(
+                            RangeFunctionParameter(
+                                macros: macros,
+                                localName: "__anonymous\(parameters.count)",
+                                externalLabel: nil,
+                                typeReference: typeReference,
+                                slotName: nil
+                            )
+                        )
+                        guard peek() == .comma else { break }
+                        advance()
+                        continue
+                    }
+                    index = anonymousParameterStart
+                }
                 let (localName, externalLabel) = try parseLabeledDeclarationName(
                     expecting: "parameter",
                     allowOmittedLocalName: allowOmittedLocalName
@@ -234,7 +254,7 @@ extension Parser {
                 var isBinding = false
                 let captureMacros = macros.filter { $0.name == "capture" }
                 let capturesSyntax = !captureMacros.isEmpty
-                let captureMetadataType: TypeReference?
+                var captureMetadataType: TypeReference?
                 if capturesSyntax {
                     guard allowSyntaxCapture else {
                         throw ParseError(
@@ -246,12 +266,12 @@ extension Parser {
                             "@capture parameters can only declare one capture annotation."
                         )
                     }
-                    guard captureMacros[0].genericArguments.count == 1 else {
+                    guard captureMacros[0].genericArguments.count <= 1 else {
                         throw ParseError(
-                            "@capture parameters must declare one metadata type, for example @capture<Expression>."
+                            "@capture parameters can declare at most one metadata type."
                         )
                     }
-                    captureMetadataType = captureMacros[0].genericArguments[0]
+                    captureMetadataType = captureMacros[0].genericArguments.first
                 } else {
                     captureMetadataType = nil
                 }
@@ -272,6 +292,9 @@ extension Parser {
                         }
                         typeReference = try parseTypeReferenceNode()
                     }
+                }
+                if capturesSyntax && captureMetadataType == nil {
+                    captureMetadataType = typeReference
                 }
 
                 let defaultValue: Expression?
