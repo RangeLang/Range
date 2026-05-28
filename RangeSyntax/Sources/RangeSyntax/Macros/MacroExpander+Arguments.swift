@@ -35,6 +35,9 @@ extension MacroExpander {
                 arguments: []
             )
         }
+        if parameters.count == 1, parameterRequestsCapture(parameters[0]) {
+            return [parameters[0].localName: .string(normalizedArgumentClause)]
+        }
 
         do {
             var parser = try Parser(source: "macro(\(normalizedArgumentClause))")
@@ -49,7 +52,7 @@ extension MacroExpander {
                 arguments: arguments
             )
         } catch {
-            if parameters.count == 1, parameters[0].capturesSyntax {
+            if parameters.count == 1, parameterRequestsCapture(parameters[0]) {
                 return [parameters[0].localName: .identifier(normalizedArgumentClause)]
             }
             throw error
@@ -88,6 +91,9 @@ extension MacroExpander {
                 parameters: parameters,
                 arguments: []
             )
+        }
+        if parameters.count == 1, parameterRequestsCapture(parameters[0]) {
+            return [parameters[0].localName: .string(normalizedArgumentClause)]
         }
 
         var parser = try Parser(source: "marker(\(normalizedArgumentClause))")
@@ -176,5 +182,9 @@ extension MacroExpander {
 
     static func macroArgumentLabel(for parameter: RangeFunctionParameter) -> String? {
         parameter.externalLabel
+    }
+
+    private static func parameterRequestsCapture(_ parameter: RangeFunctionParameter) -> Bool {
+        parameter.capturesSyntax || parameter.macros.contains { $0.name == "capture" }
     }
 }

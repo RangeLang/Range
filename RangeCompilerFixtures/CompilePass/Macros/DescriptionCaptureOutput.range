@@ -1,0 +1,33 @@
+macro exposeDescription(): Construct { target, diagnostics in
+    let descriptionMarkers: Array<Marker.Application>(
+        target.declaration.markers.filter { application in
+            application.identifier.name == "Description"
+        }
+    )
+    let descriptionValues: Array<String>(
+        descriptionMarkers.map { application in
+            application.value
+        }
+    )
+    let description: String(descriptionValues.first(default: "missing description"))
+    let quotedDescription: String("\"" + description + "\"")
+
+    target.declaration.expand {
+        extension #(target.declaration.self) {
+            function descriptionOutput(): String {
+                return #(quotedDescription)
+            }
+        }
+    }
+}
+
+#Description(1 + 2)
+@exposeDescription
+construct DescriptionCaptureOutputFixture {
+    let value: Int
+}
+
+@main {
+    let fixture: DescriptionCaptureOutputFixture(value: 1)
+    Logger.info(fixture.descriptionOutput())
+}

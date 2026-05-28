@@ -1,11 +1,4 @@
-#Description {
-# FixtureConstruct
-
-Carries Markdown as marker source.
-
-- attached to the construct
-- captured as raw text
-}
+#Description(FixtureConstruct carries marker source)
 construct FixtureConstruct {
     let number: Int
 }

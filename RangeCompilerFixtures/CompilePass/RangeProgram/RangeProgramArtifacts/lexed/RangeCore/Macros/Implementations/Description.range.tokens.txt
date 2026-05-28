@@ -9,8 +9,8 @@
 8: colon ":" @ 0:49-0:50
 9: identifier "Construct" @ 0:51-0:60
 10: arrow "->" @ 0:61-0:63
-11: identifier "Markdown" @ 0:64-0:72
-12: leftBrace "{" @ 0:73-0:74
+11: identifier "String" @ 0:64-0:70
+12: leftBrace "{" @ 0:71-0:72
 13: keyword "return" @ 1:4-1:10
 14: identifier "markdown" @ 1:11-1:19
 15: rightBrace "}" @ 2:0-2:1
