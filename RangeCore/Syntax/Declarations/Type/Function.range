@@ -3,7 +3,6 @@ construct Function {
     let declaration: Declaration
     let call: Call
 
-    @syntax
     #GraphDeclaration
     construct Declaration: SyntaxEmittable {
         let identifier: Identifier
@@ -13,7 +12,6 @@ construct Function {
         let body: Block
     }
 
-    @syntax
     #GraphApplication
     construct Call: SyntaxEmittable, SyntaxReplaceable<Expression> {
         let identifier: Identifier

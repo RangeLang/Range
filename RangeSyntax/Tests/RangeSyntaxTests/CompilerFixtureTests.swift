@@ -54,19 +54,19 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Construct macro target carries localized written source")
-    func constructMacroTargetCarriesLocalizedWrittenSource() throws {
+    @Test("Construct macro target carries localized syntax body")
+    func constructMacroTargetCarriesLocalizedSyntaxBody() throws {
         let projectPath = "/tmp/MacroTargetWrittenSource.range"
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: projectPath,
                 source: """
-                macro reportWritten(): Construct { target, diagnostics in
-                    diagnostics.warning(target.written.text)
+                macro reportBody(): Construct { target, diagnostics in
+                    diagnostics.warning(target.body.text)
                 }
 
-                @reportWritten
+                @reportBody
                 construct SourceReadable {
                     let value: Int
                 }
@@ -82,13 +82,13 @@ struct CompilerFixtureTests {
                 $0.severity == .warning
                     && $0.source == "range-macro"
                     && $0.code == "macro.diagnostic.warning"
-                    && $0.message.contains("@reportWritten")
+                    && $0.message.contains("@reportBody")
                     && $0.message.contains("construct SourceReadable")
                     && $0.message.contains("let value: Int")
                     && $0.path == projectPath
             }
         )
-        #expect(diagnostic.message.contains("target.written") == false)
+        #expect(diagnostic.message.contains("target.body") == false)
     }
 
     @Test("User macro diagnostics feed compiler diagnostics")
@@ -924,6 +924,21 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.constructsByName["Construct"] != nil)
         #expect(graph.constructsByName["Construct.Application"] != nil)
         #expect(graph.syntaxResolver.declaration(named: "Construct.Application", conformsTo: "SyntaxReplaceable"))
+        #expect(graph.constructsByName["Construct"]?.macros.contains { $0.name == "syntax" } == true)
+        #expect(graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "syntax" } == false)
+        #expect(graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "GraphDeclaration" } == true)
+        #expect(graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "syntax" } == false)
+        #expect(graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
+        #expect(graph.constructsByName["Macro"]?.macros.contains { $0.name == "syntax" } == true)
+        #expect(graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "syntax" } == false)
+        #expect(graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "GraphDeclaration" } == true)
+        #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "syntax" } == false)
+        #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
+        #expect(graph.constructsByName["Marker"]?.macros.contains { $0.name == "syntax" } == true)
+        #expect(graph.constructsByName["Marker.Declaration"]?.macros.contains { $0.name == "syntax" } == false)
+        #expect(graph.constructsByName["Marker.Declaration"]?.macros.contains { $0.name == "GraphDeclaration" } == true)
+        #expect(graph.constructsByName["Marker.Application"]?.macros.contains { $0.name == "syntax" } == false)
+        #expect(graph.constructsByName["Marker.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
         #expect(graph.constructsByName["Namespace"]?.isCore == true)
         #expect(graph.constructsByName["Namespace.Declaration"]?.isCore == true)
         #expect(graph.constructsByName["Namespace.Application"]?.isCore == true)

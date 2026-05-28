@@ -12,6 +12,9 @@ indirect enum CompileTimeValue {
         guard case .object(_, let fields) = self else {
             return nil
         }
+        if name == "body", let written = fields["written"] {
+            return written
+        }
         return fields[name]
     }
 

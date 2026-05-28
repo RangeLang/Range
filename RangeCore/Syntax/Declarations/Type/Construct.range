@@ -3,7 +3,6 @@ construct Construct {
     let declaration: Declaration
     let application: Application
 
-    @syntax
     #GraphDeclaration
     construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType>, SyntaxEmittable {
         let self: SelfType
@@ -22,7 +21,6 @@ construct Construct {
         function expand(_ expansion: () -> [Syntax])
     }
 
-    @syntax
     #GraphApplication
     construct Application: SyntaxReplaceable<Expression> {
         let type: TypeReference
