@@ -1,0 +1,16 @@
+0: macroAttribute "@syntax" @ 0:0-0:7
+1: keyword "construct" @ 1:0-1:9
+2: identifier "Assignment" @ 1:10-1:20
+3: colon ":" @ 1:20-1:21
+4: identifier "Statement" @ 1:22-1:31
+5: leftBrace "{" @ 1:32-1:33
+6: keyword "let" @ 2:4-2:7
+7: identifier "target" @ 2:8-2:14
+8: colon ":" @ 2:14-2:15
+9: identifier "Expression" @ 2:16-2:26
+10: keyword "let" @ 3:4-3:7
+11: identifier "expression" @ 3:8-3:18
+12: colon ":" @ 3:18-3:19
+13: identifier "Expression" @ 3:20-3:30
+14: rightBrace "}" @ 4:0-4:1
+15: eof "" @ 5:0-5:0

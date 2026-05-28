@@ -3,13 +3,13 @@ import Foundation
 enum Token: Equatable {
     case hash
     case identifier(String)
-    case hashDirective(String)
+    case markerAttribute(String)
     case foreignBody(language: String, text: String)
     case stringLiteral(String)
     case integer(Int)
     case double(Double)
     case keyword(String)
-    case atAttribute(name: String, argument: String?)
+    case macroAttribute(name: String, argument: String?)
     case leftBrace
     case rightBrace
     case leftParen

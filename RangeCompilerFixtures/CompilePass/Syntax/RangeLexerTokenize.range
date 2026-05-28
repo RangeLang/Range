@@ -9,8 +9,8 @@ function tokenKindName(kind: TokenKind): String {
         return "hash"
     case .identifier:
         return "identifier"
-    case .hashDirective:
-        return "hashDirective"
+    case .markerAttribute:
+        return "markerAttribute"
     case .foreignBody:
         return "foreignBody"
     case .stringLiteral:
@@ -21,8 +21,8 @@ function tokenKindName(kind: TokenKind): String {
         return "double"
     case .keyword:
         return "keyword"
-    case .atAttribute:
-        return "atAttribute"
+    case .macroAttribute:
+        return "macroAttribute"
     case .leftBrace:
         return "leftBrace"
     case .rightBrace:

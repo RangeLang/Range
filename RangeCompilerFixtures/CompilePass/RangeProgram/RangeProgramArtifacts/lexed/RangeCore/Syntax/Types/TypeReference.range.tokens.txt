@@ -1,0 +1,11 @@
+0: macroAttribute "@syntax" @ 0:0-0:7
+1: keyword "protocol" @ 1:0-1:8
+2: identifier "TypeReference" @ 1:9-1:22
+3: colon ":" @ 1:22-1:23
+4: identifier "SyntaxReplaceable" @ 1:24-1:41
+5: less "<" @ 1:41-1:42
+6: identifier "TypeReference" @ 1:42-1:55
+7: greater ">" @ 1:55-1:56
+8: leftBrace "{" @ 1:57-1:58
+9: rightBrace "}" @ 1:58-1:59
+10: eof "" @ 2:0-2:0

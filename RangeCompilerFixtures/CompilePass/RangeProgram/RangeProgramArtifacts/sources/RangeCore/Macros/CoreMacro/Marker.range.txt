@@ -1,0 +1,16 @@
+@syntax
+construct Marker {
+    @syntax
+    construct Declaration {
+        let identifier: Identifier
+        let parameters: [Parameter.Declaration]
+        let target: TypeReference
+        let valueType: TypeReference
+    }
+
+    @syntax
+    construct Application<Value> {
+        let identifier: Identifier
+        let value: Value
+    }
+}

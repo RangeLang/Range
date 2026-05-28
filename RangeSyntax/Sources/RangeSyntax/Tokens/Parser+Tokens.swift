@@ -190,7 +190,7 @@ extension Parser {
         case .identifier(let value) where value.first?.isUppercase == true,
             .keyword(let value) where value.first?.isUppercase == true:
             offset += 1
-        case .hashDirective, .atAttribute:
+        case .markerAttribute, .macroAttribute:
             offset += 1
         default:
             return false
@@ -328,13 +328,13 @@ extension Parser {
 
         let baseName: String
         switch peek() {
-        case .hashDirective(let name):
+        case .markerAttribute(let name):
             advance()
             baseName = "#\(name)"
-        case .atAttribute(let name, nil):
+        case .macroAttribute(let name, nil):
             advance()
             baseName = "@\(name)"
-        case .atAttribute(let name, _):
+        case .macroAttribute(let name, _):
             throw ParseError("Macro handle @\(name) used as a type cannot include arguments.", range: currentRange())
         default:
             baseName = try consumeTypeName()

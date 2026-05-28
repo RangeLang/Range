@@ -113,9 +113,9 @@ def parser_token_expression(token_case)
     ]
   when "foreignBody"
     "parserToken = .foreignBody(language: language, text: text)"
-  when "atAttribute"
-    "parserToken = .atAttribute(name: name, argument: argument)"
-  when "identifier", "hashDirective", "stringLiteral", "keyword"
+  when "macroAttribute"
+    "parserToken = .macroAttribute(name: name, argument: argument)"
+  when "identifier", "markerAttribute", "stringLiteral", "keyword"
     "parserToken = .#{name}(value)"
   else
     if labels.empty?

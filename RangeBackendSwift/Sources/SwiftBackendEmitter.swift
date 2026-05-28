@@ -504,6 +504,13 @@ struct SwiftBackendEmitter {
                 }
 
                 static func writeData(path: String, data: Data) -> Range_Result<Void, Range_FileWriteError> {
+                    switch createParentDirectory(for: path) {
+                    case .success:
+                        break
+                    case .failure(let error):
+                        return .failure(cause: error)
+                    }
+
                     let descriptor = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0o644)
                     guard descriptor >= 0 else {
                         return .failure(cause: .unwritable)
@@ -532,6 +539,56 @@ struct SwiftBackendEmitter {
                     }
 
                     return .success(result: Void())
+                }
+
+                static func createDirectory(path: String) -> Range_Result<Void, Range_FileWriteError> {
+                    guard !path.isEmpty && path != "." else {
+                        return .success(result: Void())
+                    }
+
+                    let normalizedPath = path.hasSuffix("/") && path.count > 1
+                        ? String(path.dropLast())
+                        : path
+                    let components = normalizedPath.split(separator: "/", omittingEmptySubsequences: true)
+                    var current = normalizedPath.hasPrefix("/") ? "/" : ""
+
+                    for component in components {
+                        if current.isEmpty || current == "/" {
+                            current += component
+                        } else {
+                            current += "/\\(component)"
+                        }
+
+                        if mkdir(current, 0o755) == 0 {
+                            continue
+                        }
+
+                        if errno == EEXIST {
+                            var metadata = stat()
+                            guard lstat(current, &metadata) == 0,
+                                  (metadata.st_mode & S_IFMT) == S_IFDIR else {
+                                return .failure(cause: .unwritable)
+                            }
+                            continue
+                        }
+
+                        return .failure(cause: .unwritable)
+                    }
+
+                    return .success(result: Void())
+                }
+
+                private static func createParentDirectory(for path: String) -> Range_Result<Void, Range_FileWriteError> {
+                    guard let slashIndex = path.lastIndex(of: "/") else {
+                        return .success(result: Void())
+                    }
+
+                    let parent = String(path[..<slashIndex])
+                    guard !parent.isEmpty else {
+                        return .success(result: Void())
+                    }
+
+                    return createDirectory(path: parent)
                 }
 
                 static func listEntries(path: String) -> Range_Result<[Range_FileSystemEntry], Range_FileReadError> {
@@ -587,6 +644,41 @@ struct SwiftBackendEmitter {
 
                 static func writeData(path: String, data: Data) -> Range_Result<Void, Range_FileWriteError> {
                     return Range_POSIXFileSystem.writeData(path: path, data: data)
+                }
+
+                static func createDirectory(path: String) -> Range_Result<Void, Range_FileWriteError> {
+                    return Range_POSIXFileSystem.createDirectory(path: path)
+                }
+
+                static func listEntries(path: String) -> Range_Result<[Range_FileSystemEntry], Range_FileReadError> {
+                    return Range_POSIXFileSystem.listEntries(path: path)
+                }
+            }
+
+            enum Range_FileManager {
+                static func readData(path: String) -> Range_Result<Data, Range_FileReadError> {
+                    return Range_POSIXFileSystem.readData(path: path)
+                }
+
+                static func readFile(path: String) -> Range_Result<String, Range_FileReadError> {
+                    switch readData(path: path) {
+                    case .success(let data):
+                        return .success(result: Range_UTF8.decode(data: data))
+                    case .failure(let error):
+                        return .failure(cause: error)
+                    }
+                }
+
+                static func writeData(path: String, data: Data) -> Range_Result<Void, Range_FileWriteError> {
+                    return Range_POSIXFileSystem.writeData(path: path, data: data)
+                }
+
+                static func createFile(path: String, text: String) -> Range_Result<Void, Range_FileWriteError> {
+                    return writeData(path: path, data: Range_UTF8.encode(text: text))
+                }
+
+                static func createFolder(path: String) -> Range_Result<Void, Range_FileWriteError> {
+                    return Range_POSIXFileSystem.createDirectory(path: path)
                 }
 
                 static func listEntries(path: String) -> Range_Result<[Range_FileSystemEntry], Range_FileReadError> {

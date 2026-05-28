@@ -1,0 +1,16 @@
+marker Operator<let fixity: OperatorFixity>(
+    binding: OperatorBindingRange,
+    associativity: OperatorAssociativity = .none
+): Construct -> OperatorBinding { target, diagnostics in
+    return OperatorBinding(
+        token: Identifier(name: target.declaration.self.name),
+        fixity: fixity,
+        binding: binding,
+        metric: OperatorBindingMetric(
+            step: 10,
+            delta: 0 - 10,
+            signage: "negative"
+        ),
+        associativity: associativity
+    )
+}

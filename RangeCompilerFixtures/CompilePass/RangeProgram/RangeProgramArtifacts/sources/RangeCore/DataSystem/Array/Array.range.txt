@@ -1,0 +1,95 @@
+#language
+construct Array<Element> {
+    state storage: ArrayStorage<Element>()
+
+    @literal<ArrayLiteral>
+    function literal(literal: ArrayLiteral): Self {
+        return Self(storage: literal.storage())
+    }
+
+    derived count: Int {
+        storage.count
+    }
+
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
+
+    function append(element: Element) {
+        storage.append(element: element)
+    }
+
+    function element(index: Int): Element {
+        return storage.element(index: index)
+    }
+
+    function first(): Element? {
+        return storage.first()
+    }
+
+    function first(where include: (Element) -> Bool): Element? {
+        return storage.first(where: include)
+    }
+
+    function last(): Element? {
+        return storage.last()
+    }
+
+    function update(element: Element, index: Int) {
+        storage.update(element: element, index: index)
+    }
+
+    function insert(element: Element, index: Int) {
+        storage.insert(element: element, index: index)
+    }
+
+    function remove(index: Int): Element {
+        return storage.remove(index: index)
+    }
+
+    function removeLast(): Element? {
+        return storage.removeLast()
+    }
+
+    function clear() {
+        storage.clear()
+    }
+
+    function filter(include: (Element) -> Bool): Array<Element> {
+        return Array(storage: storage.filter(include: include))
+    }
+
+    function map<Output>(_ transform: (Element) -> Output): Array<Output> {
+        return Array<Output>(storage: storage.map(transform))
+    }
+
+    function compactMap<Output>(_ transform: (Element) -> Output?): Array<Output> {
+        return Array<Output>(storage: storage.compactMap(transform))
+    }
+
+    function flatMap<Output>(_ transform: (Element) -> Array<Output>): Array<Output> {
+        return Array<Output>(storage: storage.flatMap(transform))
+    }
+
+    function forEach(_ body: (Element) -> Void) {
+        storage.forEach(body)
+    }
+}
+
+extension Array: Encodable {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+        state container   encoder.unkeyedContainer()
+        state index   0
+
+        while index < count {
+            switch container.encode(element(index: index)) {
+            case .success:
+                index += 1
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        }
+
+        return .success(result: Void())
+    }
+}

@@ -1,0 +1,4 @@
+precedencegroup LogicalConjunctionPrecedence {
+    associativity: left
+    higherThan: LogicalDisjunctionPrecedence
+}

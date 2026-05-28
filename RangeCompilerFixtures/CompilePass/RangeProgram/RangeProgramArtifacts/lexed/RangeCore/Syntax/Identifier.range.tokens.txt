@@ -1,0 +1,12 @@
+0: macroAttribute "@syntax" @ 0:0-0:7
+1: keyword "construct" @ 1:0-1:9
+2: identifier "Identifier" @ 1:10-1:20
+3: colon ":" @ 1:20-1:21
+4: identifier "SyntaxEmittable" @ 1:22-1:37
+5: leftBrace "{" @ 1:38-1:39
+6: keyword "let" @ 2:4-2:7
+7: identifier "name" @ 2:8-2:12
+8: colon ":" @ 2:12-2:13
+9: identifier "String" @ 2:14-2:20
+10: rightBrace "}" @ 3:0-3:1
+11: eof "" @ 4:0-4:0

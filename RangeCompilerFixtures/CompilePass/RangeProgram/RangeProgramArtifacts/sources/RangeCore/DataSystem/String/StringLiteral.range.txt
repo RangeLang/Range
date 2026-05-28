@@ -1,0 +1,6 @@
+#language
+construct StringLiteral { }
+
+extension StringLiteral {
+    function storage(): StringStorage
+}

@@ -1,0 +1,4 @@
+precedencegroup AdditionPrecedence {
+    associativity: left
+    higherThan: NilCoalescingPrecedence
+}

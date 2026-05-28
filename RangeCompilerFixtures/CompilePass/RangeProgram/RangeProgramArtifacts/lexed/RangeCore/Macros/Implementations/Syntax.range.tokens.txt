@@ -1,0 +1,14 @@
+0: keyword "closed" @ 0:0-0:6
+1: keyword "macro" @ 0:7-0:12
+2: identifier "syntax" @ 0:13-0:19
+3: leftParen "(" @ 0:19-0:20
+4: rightParen ")" @ 0:20-0:21
+5: colon ":" @ 0:21-0:22
+6: identifier "Syntax" @ 0:23-0:29
+7: leftBrace "{" @ 0:30-0:31
+8: identifier "target" @ 0:32-0:38
+9: comma "," @ 0:38-0:39
+10: identifier "diagnostics" @ 0:40-0:51
+11: keyword "in" @ 0:52-0:54
+12: rightBrace "}" @ 1:0-1:1
+13: eof "" @ 2:0-2:0

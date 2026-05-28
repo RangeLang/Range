@@ -1,0 +1,3 @@
+macro stringify(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
+    target.replace(with: "\(value)")
+}

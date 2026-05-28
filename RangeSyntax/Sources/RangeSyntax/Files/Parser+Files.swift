@@ -6,7 +6,7 @@ extension Parser {
     }
 
     mutating func parsePackageSpace() throws -> PackageSpaceDeclaration {
-        guard case .atAttribute(let name, _) = peek(), name == "package" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "package" else {
             throw ParseError("Expected package block.")
         }
         advance()
@@ -71,7 +71,7 @@ extension Parser {
     }
 
     mutating func parsePackageSpaceForDeclarationDiscovery() throws -> PackageSpaceDeclaration {
-        guard case .atAttribute(let name, _) = peek(), name == "package" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "package" else {
             throw ParseError("Expected package block.")
         }
         advance()
@@ -143,14 +143,14 @@ extension Parser {
     }
 
     func isMainBlockStart() -> Bool {
-        guard case .atAttribute(let name, nil) = peek(), name == "main" else {
+        guard case .macroAttribute(let name, nil) = peek(), name == "main" else {
             return false
         }
         return peek(offset: 1) == .leftBrace
     }
 
     public mutating func parseMainBlock(requiresEOF: Bool = true) throws -> MainBlockNode {
-        guard case .atAttribute(let name, nil) = peek(), name == "main" else {
+        guard case .macroAttribute(let name, nil) = peek(), name == "main" else {
             throw ParseError("Expected @main block.")
         }
         advance()

@@ -1,0 +1,16 @@
+macro autoclosure(): Parameter { target, diagnostics in
+    target.declaration.type.replace(with:
+        FunctionTypeReference(
+            parameters: [],
+            returnType: target.declaration.type
+        )
+    )
+
+    target.application.expression.replace(with:
+        Closure(
+            body: {
+                target.application.expression
+            }
+        )
+    )
+}

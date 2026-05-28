@@ -1,0 +1,9 @@
+0: keyword "protocol" @ 0:0-0:8
+1: identifier "SyntaxOmittable" @ 0:9-0:24
+2: leftBrace "{" @ 0:25-0:26
+3: keyword "function" @ 1:4-1:12
+4: identifier "omit" @ 1:13-1:17
+5: leftParen "(" @ 1:17-1:18
+6: rightParen ")" @ 1:18-1:19
+7: rightBrace "}" @ 2:0-2:1
+8: eof "" @ 3:0-3:0

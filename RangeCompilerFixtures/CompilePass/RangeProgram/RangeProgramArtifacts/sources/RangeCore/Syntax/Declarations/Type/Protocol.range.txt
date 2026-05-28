@@ -1,0 +1,22 @@
+@syntax
+construct Protocol {
+    let declaration: Declaration
+    let application: Application
+
+    @syntax
+    #GraphDeclaration
+    construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
+        let self: NominalTypeReference
+        let generics: [Generic]
+        let functions: [Function.Declaration]
+
+        function expand(_ expansion: () -> [Syntax])
+    }
+
+    @syntax
+    #GraphApplication
+    construct Application<Conformer> {
+        let self: NominalTypeReference
+        let conformer: Conformer
+    }
+}

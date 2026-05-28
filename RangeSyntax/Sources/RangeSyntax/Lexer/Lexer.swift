@@ -124,7 +124,7 @@ struct RangeAuthoredLexerCursor {
                 } else {
                     switch readHashIdentifier(start: start) {
                     case .success(let identifier):
-                        emit(kind: .hashDirective(value: identifier), start: start)
+                        emit(kind: .markerAttribute(value: identifier), start: start)
                         let language = foreignBodyLanguage(directive: identifier)
                         if language != "" {
                             skipWhitespace()
@@ -161,7 +161,7 @@ struct RangeAuthoredLexerCursor {
             } else if character == "@" {
                 switch readSigilIdentifier(start: start) {
                 case .success(let identifier):
-                    emit(kind: .atAttribute(name: identifier, argument: nil), start: start)
+                    emit(kind: .macroAttribute(name: identifier, argument: nil), start: start)
                 case .failure(let error):
                     return .failure(error)
                 }

@@ -62,8 +62,8 @@ public struct CompilationArtifactsEmitter {
             return "hash"
         case .identifier(let value):
             return "identifier(\(value))"
-        case .hashDirective(let value):
-            return "hashDirective(#\(value))"
+        case .markerAttribute(let value):
+            return "markerAttribute(#\(value))"
         case .foreignBody(let language, let text):
             return "foreignBody(\(language), \(text.debugDescription))"
         case .stringLiteral(let value):
@@ -74,11 +74,11 @@ public struct CompilationArtifactsEmitter {
             return "double(\(value))"
         case .keyword(let value):
             return "keyword(\(value))"
-        case .atAttribute(let name, let argument):
+        case .macroAttribute(let name, let argument):
             if let argument {
-                return "atAttribute(@\(name)(\(argument)))"
+                return "macroAttribute(@\(name)(\(argument)))"
             }
-            return "atAttribute(@\(name))"
+            return "macroAttribute(@\(name))"
         case .leftBrace:
             return "leftBrace"
         case .rightBrace:

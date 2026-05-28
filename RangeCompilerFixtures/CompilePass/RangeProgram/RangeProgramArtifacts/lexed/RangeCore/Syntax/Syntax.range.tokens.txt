@@ -1,0 +1,6 @@
+0: macroAttribute "@syntax" @ 0:0-0:7
+1: keyword "protocol" @ 1:0-1:8
+2: identifier "Syntax" @ 1:9-1:15
+3: leftBrace "{" @ 1:16-1:17
+4: rightBrace "}" @ 1:17-1:18
+5: eof "" @ 2:0-2:0

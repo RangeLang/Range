@@ -1,0 +1,14 @@
+@syntax
+enum LexingOption {
+    case emit
+    case skip
+    case diagnostic
+}
+
+@syntax
+construct LexerRepresentation {
+    let token: Identifier
+    let pattern: String
+    let option: LexingOption
+    let delimiter: Delimiter?
+}

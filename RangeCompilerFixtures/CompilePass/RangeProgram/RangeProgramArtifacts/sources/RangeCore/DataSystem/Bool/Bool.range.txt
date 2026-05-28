@@ -1,0 +1,38 @@
+#language
+construct Bool {
+    let storage: BoolStorage
+
+    @literal<BoolLiteral>
+    function literal(literal: BoolLiteral): Self {
+        return Self(storage: literal.storage())
+    }
+}
+
+extension Bool: Equatable {
+    function ==(lhs: Self, rhs: Self): Bool
+}
+
+extension Bool: Decodable {
+    function decode(from decoder: Decoder): Result<Self, DecodingError> {
+        let container   decoder.singleValueContainer()
+        switch container.decode(Bool.self) {
+        case .success(let value):
+            return .success(result: value)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
+}
+
+extension Bool: Encodable {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+        let container   encoder.singleValueContainer()
+        return container.encode(self)
+    }
+}
+
+extension Bool: Hashable {
+    function hash(into hasher: Hasher) {
+        hasher.combineStorage(storage)
+    }
+}

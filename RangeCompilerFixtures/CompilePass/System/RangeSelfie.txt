@@ -4,8 +4,8 @@ function tokenKindName(kind: TokenKind): String {
         return "hash"
     case .identifier:
         return "identifier"
-    case .hashDirective:
-        return "hashDirective"
+    case .markerAttribute:
+        return "markerAttribute"
     case .foreignBody:
         return "foreignBody"
     case .stringLiteral:
@@ -16,8 +16,8 @@ function tokenKindName(kind: TokenKind): String {
         return "double"
     case .keyword:
         return "keyword"
-    case .atAttribute:
-        return "atAttribute"
+    case .macroAttribute:
+        return "macroAttribute"
     case .leftBrace:
         return "leftBrace"
     case .rightBrace:
@@ -101,10 +101,10 @@ function renderTokens(tokens: [LexicalToken]): String {
 }
 
 @main {
-    switch FileSystem.readText(path: "../../../RangeSelfie.range") {
+    switch FileManager.readFile(path: "../../../RangeSelfie.range") {
     case .success(let source):
         Logger.info(source)
-        switch FileSystem.writeText(path: "../../../RangeSelfie.txt", text: source) {
+        switch FileManager.createFile(path: "../../../RangeSelfie.txt", text: source) {
         case .success:
             Logger.info("wrote RangeSelfie.txt")
         case .failure:
@@ -115,7 +115,7 @@ function renderTokens(tokens: [LexicalToken]): String {
         switch lexer.tokenize(source: source) {
         case .success(let tokens):
             Logger.info("tokens: \(tokens.count)")
-            switch FileSystem.writeText(path: "../../../RangeSelfie.tokens.txt", text: renderTokens(tokens: tokens)) {
+            switch FileManager.createFile(path: "../../../RangeSelfie.tokens.txt", text: renderTokens(tokens: tokens)) {
             case .success:
                 Logger.info("wrote RangeSelfie.tokens.txt")
             case .failure:

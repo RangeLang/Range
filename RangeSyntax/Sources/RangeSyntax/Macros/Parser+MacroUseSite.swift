@@ -2,10 +2,10 @@ import Foundation
 
 extension Parser {
     func isMacroApplicationStart() -> Bool {
-        if case .hashDirective = peek() {
+        if case .markerAttribute = peek() {
             return true
         }
-        if case .atAttribute(let name, _) = peek(), isMacroApplicationAttribute(name) {
+        if case .macroAttribute(let name, _) = peek(), isMacroApplicationAttribute(name) {
             return true
         }
         return false
@@ -95,9 +95,9 @@ extension Parser {
 
     func macroApplicationName(at offset: Int) -> String? {
         switch peek(offset: offset) {
-        case .hashDirective(let name):
+        case .markerAttribute(let name):
             return name
-        case .atAttribute(let name, _) where isMacroApplicationAttribute(name, offset: offset):
+        case .macroAttribute(let name, _) where isMacroApplicationAttribute(name, offset: offset):
             return name
         default:
             return nil
@@ -184,7 +184,7 @@ extension Parser {
             return "#"
         case .identifier(let value):
             return value
-        case .hashDirective(let value):
+        case .markerAttribute(let value):
             return "#\(value)"
         case .foreignBody(_, let value):
             return value
@@ -196,7 +196,7 @@ extension Parser {
             return String(value)
         case .keyword(let value):
             return value
-        case .atAttribute(let name, let argument):
+        case .macroAttribute(let name, let argument):
             if let argument {
                 return "@\(name)(\(argument))"
             }

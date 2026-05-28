@@ -1,0 +1,10 @@
+0: macroAttribute "@syntax" @ 0:0-0:7
+1: keyword "construct" @ 1:0-1:9
+2: identifier "Token" @ 1:10-1:15
+3: leftBrace "{" @ 1:16-1:17
+4: keyword "let" @ 2:4-2:7
+5: identifier "pattern" @ 2:8-2:15
+6: colon ":" @ 2:15-2:16
+7: identifier "String" @ 2:17-2:23
+8: rightBrace "}" @ 3:0-3:1
+9: eof "" @ 4:0-4:0

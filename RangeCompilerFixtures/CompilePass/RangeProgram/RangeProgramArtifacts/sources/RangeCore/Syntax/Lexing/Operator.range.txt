@@ -1,0 +1,35 @@
+@syntax
+enum OperatorFixity {
+    case prefix
+    case infix
+    case postfix
+}
+
+@syntax
+enum OperatorAssociativity {
+    case none
+    case left
+    case right
+}
+
+@syntax
+construct OperatorBindingRange {
+    let lower: Int
+    let upper: Int
+}
+
+@syntax
+construct OperatorBindingMetric {
+    let step: Int
+    let delta: Int
+    let signage: String
+}
+
+@syntax
+construct OperatorBinding {
+    let token: Identifier
+    let fixity: OperatorFixity
+    let binding: OperatorBindingRange
+    let metric: OperatorBindingMetric
+    let associativity: OperatorAssociativity
+}

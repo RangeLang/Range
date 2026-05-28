@@ -1,0 +1,10 @@
+protocol KeyedDecodingContainer {
+    function decode(_ type: Bool.Type, forKey key: String): Result<Bool, DecodingError>
+    function decode(_ type: Date.Type, forKey key: String): Result<Date, DecodingError>
+    function decode(_ type: DateTime.Type, forKey key: String): Result<DateTime, DecodingError>
+    function decode(_ type: Float.Type, forKey key: String): Result<Float, DecodingError>
+    function decode(_ type: Int.Type, forKey key: String): Result<Int, DecodingError>
+    function decode(_ type: String.Type, forKey key: String): Result<String, DecodingError>
+    function decode(_ type: UUID.Type, forKey key: String): Result<UUID, DecodingError>
+    function decode<T: Decodable>(_ type: T.Type, forKey key: String): Result<T, DecodingError>
+}

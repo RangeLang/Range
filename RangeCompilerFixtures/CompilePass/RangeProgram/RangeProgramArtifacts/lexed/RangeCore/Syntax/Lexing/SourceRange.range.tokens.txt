@@ -1,0 +1,14 @@
+0: macroAttribute "@syntax" @ 0:0-0:7
+1: keyword "construct" @ 1:0-1:9
+2: identifier "SourceRange" @ 1:10-1:21
+3: leftBrace "{" @ 1:22-1:23
+4: keyword "let" @ 2:4-2:7
+5: identifier "start" @ 2:8-2:13
+6: colon ":" @ 2:13-2:14
+7: identifier "SourceLocation" @ 2:15-2:29
+8: keyword "let" @ 3:4-3:7
+9: identifier "end" @ 3:8-3:11
+10: colon ":" @ 3:11-3:12
+11: identifier "SourceLocation" @ 3:13-3:27
+12: rightBrace "}" @ 4:0-4:1
+13: eof "" @ 5:0-5:0

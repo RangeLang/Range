@@ -1,0 +1,30 @@
+macro hashProperty(hasher: Hasher, value: Identifier) -> Statement {
+    hasher.combine(#(value))
+}
+
+macro hashableBody(hasher: Hasher, properties: [Let]) -> [Statement] {
+    #(properties.map { property in
+        @hashProperty(hasher: hasher, value: property.identifier)
+    })
+}
+
+macro hashable(): Construct { target, diagnostics in
+    target.declaration.expand {
+        extension #(target.declaration.self): Hashable {
+            function ==(lhs: Self, rhs: Self): Bool {
+                @equatableBody(
+                    lhs: lhs,
+                    rhs: rhs,
+                    properties: target.declaration.lets
+                )
+            }
+
+            function hash(into hasher: Hasher) {
+                @hashableBody(
+                    hasher: hasher,
+                    properties: target.declaration.lets
+                )
+            }
+        }
+    }
+}

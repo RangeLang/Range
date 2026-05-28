@@ -1,0 +1,6 @@
+protocol Decoder {
+    function keyedContainer(): KeyedDecodingContainer
+
+    function unkeyedContainer(): UnkeyedDecodingContainer
+    function singleValueContainer(): SingleValueDecodingContainer
+}

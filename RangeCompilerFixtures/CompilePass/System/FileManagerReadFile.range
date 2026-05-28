@@ -1,5 +1,5 @@
 @main {
-    switch FileSystem.readText(path: "missing.txt") {
+    switch FileManager.readFile(path: "missing.txt") {
     case .success(let text):
         Logger.info(text)
     case .failure:

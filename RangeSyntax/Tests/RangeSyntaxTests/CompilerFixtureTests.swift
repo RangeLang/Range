@@ -2162,12 +2162,12 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(artifact.contains("Lexer("))
         #expect(artifact.contains("LexerRule("))
         #expect(artifact.contains("whitespace"))
-        #expect(artifact.contains("hashDirective"))
+        #expect(artifact.contains("markerAttribute"))
     }
 
-    @Test("FileSystem readText surface validates")
+    @Test("FileManager readFile surface validates")
     func fileSystemReadTextSurfaceValidates() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "System/FileSystemReadText.range")
+        let fixture = try fixtureFile(in: "CompilePass", path: "System/FileManagerReadFile.range")
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 

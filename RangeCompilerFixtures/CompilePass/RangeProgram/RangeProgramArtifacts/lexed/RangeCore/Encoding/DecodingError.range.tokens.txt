@@ -1,0 +1,7 @@
+0: keyword "enum" @ 0:0-0:4
+1: identifier "DecodingError" @ 0:5-0:18
+2: leftBrace "{" @ 0:19-0:20
+3: keyword "case" @ 1:4-1:8
+4: identifier "failed" @ 1:9-1:15
+5: rightBrace "}" @ 2:0-2:1
+6: eof "" @ 3:0-3:0

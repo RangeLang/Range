@@ -2421,7 +2421,7 @@ extension MacroExpander {
             return "#"
         case .identifier(let value):
             return value
-        case .hashDirective(let value):
+        case .markerAttribute(let value):
             return "#\(value)"
         case .foreignBody(_, let value):
             return value
@@ -2433,7 +2433,7 @@ extension MacroExpander {
             return String(value)
         case .keyword(let value):
             return value
-        case .atAttribute(let name, let argument):
+        case .macroAttribute(let name, let argument):
             if let argument {
                 return "@\(name)(\(argument))"
             }

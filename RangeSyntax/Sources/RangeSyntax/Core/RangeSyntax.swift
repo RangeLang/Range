@@ -57,7 +57,7 @@ enum RangeSyntax {
     }
 
     static func attributeApplication(for token: Token) -> AttributeApplication? {
-        guard case .atAttribute(let name, let argument) = token else {
+        guard case .macroAttribute(let name, let argument) = token else {
             return nil
         }
         return AttributeApplication(name: name, argument: argument)

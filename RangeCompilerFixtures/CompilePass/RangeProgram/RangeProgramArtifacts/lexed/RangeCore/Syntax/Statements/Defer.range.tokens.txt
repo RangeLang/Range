@@ -1,0 +1,12 @@
+0: macroAttribute "@syntax" @ 0:0-0:7
+1: keyword "construct" @ 1:0-1:9
+2: identifier "Defer" @ 1:10-1:15
+3: colon ":" @ 1:15-1:16
+4: identifier "Statement" @ 1:17-1:26
+5: leftBrace "{" @ 1:27-1:28
+6: keyword "let" @ 2:4-2:7
+7: identifier "body" @ 2:8-2:12
+8: colon ":" @ 2:12-2:13
+9: identifier "Block" @ 2:14-2:19
+10: rightBrace "}" @ 3:0-3:1
+11: eof "" @ 4:0-4:0

@@ -1,0 +1,6 @@
+#language
+construct IntLiteral { }
+
+extension IntLiteral {
+    function storage(): IntStorage
+}

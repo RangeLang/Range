@@ -345,6 +345,15 @@ struct MacroTargetValueBuilder {
             application: application
         )
         let initialBindings = bindings.merging(genericBindings) { _, generic in generic }
+        if marker.body.isEmpty, marker.foreignBodyLanguage != nil {
+            let value: CompileTimeValue = .string(application.rawBody ?? "")
+            guard markerValue(value, matches: marker.valueType) else {
+                throw ParseError(
+                    "Marker #\(marker.name) raw body value does not match \(marker.valueType.displayName)."
+                )
+            }
+            return value
+        }
         let markerBindings = marker.bindings
 
         let evaluator = CompileTimeValueEvaluator(
@@ -371,6 +380,10 @@ struct MacroTargetValueBuilder {
             if value != nil {
                 break
             }
+        }
+
+        if marker.valueType == .named("Void") {
+            return .object(typeName: "Void", fields: [:])
         }
 
         guard let value else {
@@ -411,6 +424,8 @@ struct MacroTargetValueBuilder {
         case (.double, .named("Float")):
             return true
         case (.boolean, .named("Bool")):
+            return true
+        case (.object("Void", _), .named("Void")):
             return true
         case (.object(let typeName, _), .named(let name)):
             return typeName == name

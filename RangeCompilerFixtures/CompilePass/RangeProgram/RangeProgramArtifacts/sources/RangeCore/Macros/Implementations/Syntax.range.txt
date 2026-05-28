@@ -1,0 +1,2 @@
+closed macro syntax(): Syntax { target, diagnostics in
+}

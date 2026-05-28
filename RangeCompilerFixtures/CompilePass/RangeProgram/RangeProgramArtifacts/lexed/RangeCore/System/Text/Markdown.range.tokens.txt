@@ -1,0 +1,6 @@
+0: markerAttribute "#language" @ 0:0-0:9
+1: keyword "construct" @ 1:0-1:9
+2: identifier "Markdown" @ 1:10-1:18
+3: leftBrace "{" @ 1:19-1:20
+4: rightBrace "}" @ 1:21-1:22
+5: eof "" @ 2:0-2:0

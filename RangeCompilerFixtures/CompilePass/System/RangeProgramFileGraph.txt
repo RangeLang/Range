@@ -1,6 +1,11 @@
 RangeProgram
 files: 1
 - ../../../ children: 14
+graph nodes: 2
+graph relationships: 1
+- node construct ProgramFileGraphNode [ProgramFileGraphNode] source: ../../../RangeProgramFileGraph.range labels: 2
+- node function FileTree.read [FileTree.read] source: ../../../RangeProgramFileGraph.range labels: 2
+- relationship uses ProgramFileGraphNode -> FileTree.read
 syntax: 1
 declarations: 1
 applications: 1

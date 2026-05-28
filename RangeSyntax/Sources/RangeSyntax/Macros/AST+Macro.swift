@@ -202,6 +202,8 @@ extension TypeReference {
         switch self {
         case .named("Markdown"):
             return "Markdown"
+        case .function(let parameters, let returnType) where parameters.isEmpty:
+            return returnType.foreignBodyLanguageName
         case .generic(let base, let arguments):
             guard case .named("Foreign") = base,
                 arguments.count == 1,

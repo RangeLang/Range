@@ -1,0 +1,13 @@
+#language
+construct DictionaryStorage<Key: Hashable, Value> {
+    derived count: Int
+    derived isEmpty: Bool
+    function value(key: Key): Value?
+    function updateValue(value: Value, key: Key)
+    function removeValue(key: Key): Value?
+    function contains(key: Key): Bool
+    function entries(): [DictionaryEntry<Key, Value>]
+    function filter(include: (DictionaryEntry<Key, Value>) -> Bool): [DictionaryEntry<Key, Value>]
+    function first(where include: (DictionaryEntry<Key, Value>) -> Bool): DictionaryEntry<Key, Value>?
+    function clear()
+}

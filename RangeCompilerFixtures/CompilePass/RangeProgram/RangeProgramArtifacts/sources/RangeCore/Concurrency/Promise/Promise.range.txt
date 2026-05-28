@@ -1,0 +1,6 @@
+#language
+enum Promise<Success, Failure> {
+    case loading
+    case success(result: Success)
+    case failure(cause: Failure)
+}

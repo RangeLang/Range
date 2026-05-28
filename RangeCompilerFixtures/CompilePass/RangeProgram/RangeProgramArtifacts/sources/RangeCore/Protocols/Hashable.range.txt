@@ -1,0 +1,3 @@
+protocol Hashable: Equatable {
+    function hash(into hasher: Hasher)
+}

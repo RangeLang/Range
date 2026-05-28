@@ -1,0 +1,3 @@
+open macro initForwarded(): Let | State { target, diagnostics in
+    target.initializer.forward()
+}

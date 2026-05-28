@@ -1,0 +1,2 @@
+macro lexer<let option: LexingOption>(): Construct { target, diagnostics in
+}

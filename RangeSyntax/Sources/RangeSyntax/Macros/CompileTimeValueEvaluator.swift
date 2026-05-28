@@ -87,6 +87,12 @@ struct CompileTimeValueEvaluator {
             return .array(values)
         case .call(let name, let arguments):
             if arguments.isEmpty,
+                let local = locals[name],
+                let value = evaluate(local, locals: locals)
+            {
+                return value
+            }
+            if arguments.isEmpty,
                 let dot = name.lastIndex(of: "."),
                 dot < name.index(before: name.endIndex)
             {

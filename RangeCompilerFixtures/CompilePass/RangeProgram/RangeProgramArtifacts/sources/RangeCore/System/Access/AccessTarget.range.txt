@@ -1,0 +1,9 @@
+construct AccessTarget {
+    let name: String
+}
+
+construct AccessTargets {
+    let InternalGraph: AccessTarget(name: "InternalGraph")
+    let PackageBoundary: AccessTarget(name: "PackageBoundary")
+    let PublicGraph: AccessTarget(name: "PublicGraph")
+}

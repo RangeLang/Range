@@ -1,0 +1,5 @@
+@syntax
+construct SourceRange {
+    let start: SourceLocation
+    let end: SourceLocation
+}

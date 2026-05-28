@@ -122,15 +122,15 @@ extension Parser {
                 return .interpolatedString(parseInterpolatedString(value))
             }
             return .string(value)
-        case .hashDirective(let name):
+        case .markerAttribute(let name):
             advance()
             return .macroInvocation(
                 name: name,
                 arguments: try parseInvocationArgumentsIfPresent()
             )
-        case .atAttribute(let name, _) where isSingleCapturedSyntaxExpressionMacro(name):
+        case .macroAttribute(let name, _) where isSingleCapturedSyntaxExpressionMacro(name):
             return try parseCapturedSyntaxExpressionMacroInvocation(name: name)
-        case .atAttribute(let name, _) where isMacroApplicationAttribute(name):
+        case .macroAttribute(let name, _) where isMacroApplicationAttribute(name):
             advance()
             return .macroInvocation(
                 name: name,
@@ -486,7 +486,7 @@ extension Parser {
                 .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .ampersand, .andAnd, .pipe, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
-            case .hash, .hashDirective, .foreignBody, .atAttribute, .dollar, .percent, .bang:
+            case .hash, .markerAttribute, .foreignBody, .macroAttribute, .dollar, .percent, .bang:
                 return false
             case .identifier, .keyword, .stringLiteral, .integer, .double, .leftBracket,
                 .leftParen, .asterisk, .dot, .ellipsis, .question, .comma:

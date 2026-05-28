@@ -2,7 +2,7 @@
 construct ProgramFileGraphNode { }
 
 function renderProgram(program: RangeProgram): String {
-    return "RangeProgram\nfiles: \(program.graph.files.count)\n\(renderFiles(files: program.graph.files))syntax: \(program.graph.syntax.count)\ndeclarations: \(countDeclarations(graph: program.graph))\napplications: \(countApplications(graph: program.graph))\n\(renderSyntaxItems(items: program.graph.syntax))"
+    return "RangeProgram\nfiles: \(program.graph.files.count)\n\(renderFiles(files: program.graph.files))graph nodes: \(program.graph.rangeGraph.nodes.count)\ngraph relationships: \(program.graph.rangeGraph.relationships.count)\n\(renderRangeGraph(graph: program.graph.rangeGraph))syntax: \(program.graph.syntax.count)\ndeclarations: \(countDeclarations(graph: program.graph))\napplications: \(countApplications(graph: program.graph))\n\(renderSyntaxItems(items: program.graph.syntax))"
 }
 
 function renderIdentity(identity: RangeGraphIdentity): String {
@@ -16,6 +16,36 @@ function renderFiles(files: [FileTreeNode]): String {
     while index < files.count {
         let file: FileTreeNode(files.element(index: index))
         output += "- \(file.path) children: \(file.children.count)\n"
+        index += 1
+    }
+
+    return output
+}
+
+function renderRangeGraph(graph: RangeGraph): String {
+    return "\(renderRangeGraphNodes(nodes: graph.nodes))\(renderRangeGraphRelationships(relationships: graph.relationships))"
+}
+
+function renderRangeGraphNodes(nodes: [RangeGraphNode]): String {
+    state output   ""
+    state index   0
+
+    while index < nodes.count {
+        let node: RangeGraphNode(nodes.element(index: index))
+        output += "- node \(renderIdentity(identity: node.identity)) source: \(node.sourcePath) labels: \(node.labels.count)\n"
+        index += 1
+    }
+
+    return output
+}
+
+function renderRangeGraphRelationships(relationships: [RangeGraphRelationship]): String {
+    state output   ""
+    state index   0
+
+    while index < relationships.count {
+        let relationship: RangeGraphRelationship(relationships.element(index: index))
+        output += "- relationship \(relationship.kind) \(relationship.origin.id) -> \(relationship.destination.id)\n"
         index += 1
     }
 
@@ -71,6 +101,44 @@ function countApplications(graph: ProgramGraph): Int {
                 files: [tree],
                 sources: [],
                 lexedSources: [],
+                artifacts: [],
+                rangeGraph: RangeGraph(
+                    nodes: [
+                        RangeGraphNode(
+                            identity: RangeGraphIdentity(
+                                id: "ProgramFileGraphNode",
+                                kind: "construct",
+                                name: "ProgramFileGraphNode"
+                            ),
+                            sourcePath: "../../../RangeProgramFileGraph.range",
+                            labels: ["declaration", "file-graph"]
+                        ),
+                        RangeGraphNode(
+                            identity: RangeGraphIdentity(
+                                id: "FileTree.read",
+                                kind: "function",
+                                name: "FileTree.read"
+                            ),
+                            sourcePath: "../../../RangeProgramFileGraph.range",
+                            labels: ["application", "file-graph"]
+                        )
+                    ],
+                    relationships: [
+                        RangeGraphRelationship(
+                            origin: RangeGraphIdentity(
+                                id: "ProgramFileGraphNode",
+                                kind: "construct",
+                                name: "ProgramFileGraphNode"
+                            ),
+                            destination: RangeGraphIdentity(
+                                id: "FileTree.read",
+                                kind: "function",
+                                name: "FileTree.read"
+                            ),
+                            kind: "uses"
+                        )
+                    ]
+                ),
                 syntax: [
                     GraphSyntax(
                         identity: RangeGraphIdentity(
@@ -102,7 +170,7 @@ function countApplications(graph: ProgramGraph): Int {
         )
         let output: String(renderProgram(program: program))
         Logger.info(output)
-        switch FileSystem.writeText(path: "../../../RangeProgramFileGraph.txt", text: output) {
+        switch FileManager.createFile(path: "../../../RangeProgramFileGraph.txt", text: output) {
         case .success:
             Logger.info("wrote RangeProgramFileGraph.txt")
         case .failure:

@@ -93,22 +93,7 @@ extension Parser {
         if signatureOnly {
             if peek() == .leftBrace {
                 try consume(.leftBrace)
-                let targetBinding = try consumeIdentifier()
-                try consume(.comma)
-                let diagnosticsBinding = try consumeIdentifier()
-                let graphBinding: String?
-                if peek() == .comma {
-                    try consume(.comma)
-                    graphBinding = try consumeIdentifier()
-                } else {
-                    graphBinding = nil
-                }
-                try consumeKeyword(.inKeyword)
-                bindings = MacroBindings(
-                    target: targetBinding,
-                    diagnostics: diagnosticsBinding,
-                    graph: graphBinding
-                )
+                bindings = try parseMacroBodyBindings()
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
             } else {
@@ -164,7 +149,7 @@ extension Parser {
     }
 
     mutating func parseMacroTargetAtom() throws -> MacroTarget {
-        if case .atAttribute(let name, _) = peek() {
+        if case .macroAttribute(let name, _) = peek() {
             advance()
             return .macroSurface(name)
         }
@@ -208,9 +193,8 @@ extension Parser {
             target = .syntax(effectTarget)
             valueType = firstType
         } else {
-            throw ParseError(
-                "Marker declarations without `->` must use an effect type such as Namespace<Construct> or Language<Construct>."
-            )
+            target = firstTarget
+            valueType = .named("Void")
         }
         let bindings: MacroBindings?
         let body: [Statement]
@@ -309,52 +293,20 @@ extension Parser {
             return nil
         }
 
-        let targetBinding = try consumeIdentifier()
-        try consume(.comma)
-        let diagnosticsBinding = try consumeIdentifier()
-        let graphBinding: String?
-        if peek() == .comma {
-            try consume(.comma)
-            graphBinding = try consumeIdentifier()
-        } else {
-            graphBinding = nil
-        }
-        try consumeKeyword(.inKeyword)
-
-        return MacroBindings(
-            target: targetBinding,
-            diagnostics: diagnosticsBinding,
-            graph: graphBinding
-        )
+        return try parseMacroBodyBindings()
     }
 
     mutating func parseMacroBody() throws -> (bindings: MacroBindings, body: [Statement]) {
         try consume(.leftBrace)
 
-        let targetBinding = try consumeIdentifier()
-        try consume(.comma)
-        let diagnosticsBinding = try consumeIdentifier()
-        let graphBinding: String?
-        if peek() == .comma {
-            try consume(.comma)
-            graphBinding = try consumeIdentifier()
-        } else {
-            graphBinding = nil
-        }
-        try consumeKeyword(.inKeyword)
-
-        let bindings = MacroBindings(
-            target: targetBinding,
-            diagnostics: diagnosticsBinding,
-            graph: graphBinding
-        )
+        let bindings = try parseMacroBodyBindings()
 
         var localBindings: [String: LocalBindingSymbol] = [
-            targetBinding: .init(kind: .constant, type: .named("MacroTarget")),
-            diagnosticsBinding: .init(kind: .constant, type: .named("MacroDiagnostics")),
+            bindings.target: .init(kind: .constant, type: .named("MacroTarget")),
+            bindings.diagnostics: .init(kind: .constant, type: .named("MacroDiagnostics")),
         ]
-        if let graphBinding {
-            localBindings[graphBinding] = .init(kind: .constant, type: .named("GraphContext"))
+        if let graph = bindings.graph {
+            localBindings[graph] = .init(kind: .constant, type: .named("GraphContext"))
         }
         var statements: [Statement] = []
         currentMacroBodyDepth += 1
@@ -365,6 +317,34 @@ extension Parser {
 
         try consume(.rightBrace)
         return (bindings, statements)
+    }
+
+    mutating func parseMacroBodyBindings() throws -> MacroBindings {
+        let targetBinding = try consumeIdentifier()
+        try consume(.comma)
+        let secondBinding = try consumeIdentifier()
+
+        if peek() == .keyword(RangeSyntax.Keyword.inKeyword.rawValue) {
+            try consumeKeyword(.inKeyword)
+            return MacroBindings(
+                target: targetBinding,
+                diagnostics: secondBinding,
+                graph: nil
+            )
+        }
+
+        try consume(.comma)
+        let thirdBinding = try consumeIdentifier()
+
+        if peek() == .keyword(RangeSyntax.Keyword.inKeyword.rawValue) {
+            try consumeKeyword(.inKeyword)
+            return MacroBindings(
+                target: targetBinding,
+                diagnostics: secondBinding,
+                graph: thirdBinding
+            )
+        }
+        throw ParseError("Macro bodies must bind `target, diagnostics in` or `target, diagnostics, graph in`.")
     }
 
     mutating func parseTargetExpandStatement(targetPath: String) throws -> Statement {
@@ -459,12 +439,12 @@ extension Parser {
                         )
                     )
                 )
-            case .hashDirective(let name):
+            case .markerAttribute(let name):
                 flushText()
                 advance()
                 let arguments = try parseInvocationArgumentsIfPresent()
                 parts.append(.syntaxMacroInvocation(name: name, arguments: arguments))
-            case .atAttribute(let name, _) where isMacroApplicationAttribute(name):
+            case .macroAttribute(let name, _) where isMacroApplicationAttribute(name):
                 flushText()
                 advance()
                 let arguments = try parseInvocationArgumentsIfPresent()

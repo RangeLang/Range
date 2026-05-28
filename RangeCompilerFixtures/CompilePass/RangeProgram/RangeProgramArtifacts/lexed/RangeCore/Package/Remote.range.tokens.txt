@@ -1,0 +1,9 @@
+0: keyword "construct" @ 0:0-0:9
+1: identifier "Remote" @ 0:10-0:16
+2: leftBrace "{" @ 0:17-0:18
+3: keyword "let" @ 1:4-1:7
+4: identifier "url" @ 1:8-1:11
+5: colon ":" @ 1:11-1:12
+6: identifier "String" @ 1:13-1:19
+7: rightBrace "}" @ 2:0-2:1
+8: eof "" @ 3:0-3:0

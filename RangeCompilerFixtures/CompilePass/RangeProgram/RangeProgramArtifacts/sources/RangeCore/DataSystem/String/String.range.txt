@@ -1,0 +1,62 @@
+#language
+construct String {
+    let storage: StringStorage
+
+    @literal<StringLiteral>
+    function literal(literal: StringLiteral): Self {
+        return Self(storage: literal.storage())
+    }
+
+    derived count: Int {
+        storage.count
+    }
+
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
+
+    function character(index: Int): String {
+        return storage.character(index: index)
+    }
+
+    function substring(start: Int, end: Int): String {
+        return storage.substring(start: start, end: end)
+    }
+
+    function snakeCase(): String {
+        return storage.snakeCase()
+    }
+}
+
+extension String: Equatable {
+    function ==(lhs: Self, rhs: Self): Bool
+}
+
+extension String: Comparable {
+    function <(lhs: Self, rhs: Self): Bool
+}
+
+extension String: Decodable {
+    function decode(from decoder: Decoder): Result<Self, DecodingError> {
+        let container   decoder.singleValueContainer()
+        switch container.decode(String.self) {
+        case .success(let value):
+            return .success(result: value)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
+}
+
+extension String: Encodable {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+        let container   encoder.singleValueContainer()
+        return container.encode(self)
+    }
+}
+
+extension String: Hashable {
+    function hash(into hasher: Hasher) {
+        hasher.combineStorage(storage)
+    }
+}

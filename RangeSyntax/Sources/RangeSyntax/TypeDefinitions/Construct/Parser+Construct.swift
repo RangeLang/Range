@@ -6,7 +6,7 @@ extension Parser {
         switch peek(offset: offset) {
         case .keyword(RangeSyntax.Keyword.construct.rawValue):
             return true
-        case .atAttribute:
+        case .macroAttribute:
             return peek(offset: offset + 1) == .keyword(RangeSyntax.Keyword.construct.rawValue)
         default:
             return false

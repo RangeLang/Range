@@ -1,0 +1,5 @@
+enum FloatingPointWidth {
+    case f16
+    case f32
+    case f64
+}

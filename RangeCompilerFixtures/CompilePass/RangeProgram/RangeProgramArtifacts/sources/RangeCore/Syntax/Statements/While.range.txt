@@ -1,0 +1,5 @@
+@syntax
+construct While: Statement {
+    let condition: Expression
+    let body: Block
+}

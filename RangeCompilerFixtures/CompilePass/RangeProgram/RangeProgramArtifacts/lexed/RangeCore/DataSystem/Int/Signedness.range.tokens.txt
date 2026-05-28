@@ -1,0 +1,9 @@
+0: keyword "enum" @ 0:0-0:4
+1: identifier "Signedness" @ 0:5-0:15
+2: leftBrace "{" @ 0:16-0:17
+3: keyword "case" @ 1:4-1:8
+4: identifier "signed" @ 1:9-1:15
+5: keyword "case" @ 2:4-2:8
+6: identifier "unsigned" @ 2:9-2:17
+7: rightBrace "}" @ 3:0-3:1
+8: eof "" @ 4:0-4:0

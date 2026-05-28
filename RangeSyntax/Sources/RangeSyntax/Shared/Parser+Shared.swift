@@ -100,7 +100,7 @@ extension Parser {
     mutating func parseAttributeIfPresent(before keyword: RangeSyntax.Keyword)
         -> AttributeApplication?
     {
-        guard case .atAttribute = peek() else {
+        guard case .macroAttribute = peek() else {
             return nil
         }
 
@@ -181,7 +181,7 @@ extension Parser {
     }
 
     mutating func skipMainBlockForDeclarationDiscovery() throws {
-        guard case .atAttribute(let name, nil) = peek(), name == "main" else {
+        guard case .macroAttribute(let name, nil) = peek(), name == "main" else {
             throw ParseError("Expected @main block.")
         }
         advance()

@@ -1,0 +1,2 @@
+open macro capture<Meta>(): @syntax { target, diagnostics in
+}

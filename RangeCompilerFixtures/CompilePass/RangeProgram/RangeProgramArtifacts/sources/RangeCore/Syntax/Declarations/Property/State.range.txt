@@ -1,0 +1,14 @@
+@syntax
+construct State<T>: StoredProperty {
+    let identity: GraphIdentity
+    let parent: GraphIdentity?
+    let macros: [Macro.Application]
+    let markers: [Marker.Application]
+    let identifier: Identifier
+    let type: TypeReference
+    let value: Expression?
+
+    function initializer(transform: (T) -> T)
+    function getter(transform: (T) -> T)
+    function setter(transform: (T) -> T)
+}

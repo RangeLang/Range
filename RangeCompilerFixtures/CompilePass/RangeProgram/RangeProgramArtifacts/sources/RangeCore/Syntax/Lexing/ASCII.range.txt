@@ -1,0 +1,315 @@
+@syntax
+construct ASCIILiteral {
+    let value: String
+}
+
+@syntax
+#Token(" ")
+@lexer<.skip>
+construct Whitespace {
+    let value: String
+}
+
+@syntax
+#Token(",")
+@lexer<.emit>
+construct Comma {
+}
+
+@syntax
+#Token(".")
+@lexer<.emit>
+construct Dot {
+}
+
+@syntax
+#Token("{")
+@lexer<.emit>
+#Delimiter<.prefix>(RightBrace)
+construct LeftBrace {
+}
+
+@syntax
+#Token("}")
+@lexer<.emit>
+#Delimiter<.postfix>(LeftBrace)
+construct RightBrace {
+}
+
+@syntax
+#Token("(")
+@lexer<.emit>
+#Delimiter<.prefix>(RightParen)
+construct LeftParen {
+}
+
+@syntax
+#Token(")")
+@lexer<.emit>
+#Delimiter<.postfix>(LeftParen)
+construct RightParen {
+}
+
+@syntax
+#Token("[")
+@lexer<.emit>
+#Delimiter<.prefix>(RightBracket)
+construct LeftBracket {
+}
+
+@syntax
+#Token("]")
+@lexer<.emit>
+#Delimiter<.postfix>(LeftBracket)
+construct RightBracket {
+}
+
+@syntax
+#Token(":")
+@lexer<.emit>
+construct Colon {
+}
+
+@syntax
+#Token("*")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
+construct Asterisk {
+}
+
+@syntax
+#Token("/")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
+construct Slash {
+}
+
+@syntax
+#Token("$")
+@lexer<.emit>
+construct Dollar {
+}
+
+@syntax
+#Token("%")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
+construct Percent {
+}
+
+@syntax
+#Token("#")
+@lexer<.emit>
+construct Hash {
+}
+
+@syntax
+#Token("...")
+@lexer<.emit>
+#Operator<.postfix>(binding: OperatorBindingRange(lower: 90, upper: 100))
+construct Ellipsis {
+}
+
+@syntax
+#Token("->")
+@lexer<.emit>
+construct Arrow {
+}
+
+@syntax
+#Token("-")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 60, upper: 70), associativity: .left)
+construct Minus {
+}
+
+@syntax
+#Token("!")
+@lexer<.emit>
+#Operator<.prefix>(binding: OperatorBindingRange(lower: 90, upper: 100))
+construct Bang {
+}
+
+@syntax
+#Token("!=")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+construct BangEqual {
+}
+
+@syntax
+#Token("=")
+@lexer<.emit>
+construct Equal {
+}
+
+@syntax
+#Token("==")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+construct EqualEqual {
+}
+
+@syntax
+#Token("<")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+construct Less {
+}
+
+@syntax
+#Token("<=")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+construct LessEqual {
+}
+
+@syntax
+#Token(">")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+construct Greater {
+}
+
+@syntax
+#Token(">=")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+construct GreaterEqual {
+}
+
+@syntax
+#Token("+")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 60, upper: 70), associativity: .left)
+construct Plus {
+}
+
+@syntax
+#Token("+=")
+@lexer<.emit>
+construct PlusEqual {
+}
+
+@syntax
+#Token("&")
+@lexer<.emit>
+construct Ampersand {
+}
+
+@syntax
+#Token("&&")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 30, upper: 40), associativity: .left)
+construct AndAnd {
+}
+
+@syntax
+#Token("|")
+@lexer<.emit>
+construct Pipe {
+}
+
+@syntax
+#Token("||")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 20, upper: 30), associativity: .left)
+construct OrOr {
+}
+
+@syntax
+#Token("?")
+@lexer<.emit>
+construct Question {
+}
+
+@syntax
+#Token("??")
+@lexer<.emit>
+#Operator<.infix>(binding: OperatorBindingRange(lower: 50, upper: 60), associativity: .right)
+construct QuestionQuestion {
+}
+
+@syntax
+#Token("identifier")
+@lexer<.emit>
+construct IdentifierToken {
+    let value: String
+}
+
+@syntax
+#Token("keywordIdentifier")
+@lexer<.emit>
+construct Keyword {
+    let value: String
+}
+
+@syntax
+#Token("`identifier`")
+@lexer<.emit>
+construct EscapedIdentifier {
+    let value: String
+}
+
+@syntax
+#Token("quotedString")
+@lexer<.emit>
+construct StringLiteralToken {
+    let value: String
+}
+
+@syntax
+#Token("digits")
+@lexer<.emit>
+construct IntegerLiteral {
+    let value: String
+}
+
+@syntax
+#Token("digits.digits")
+@lexer<.emit>
+construct DoubleLiteral {
+    let value: String
+}
+
+@syntax
+#Token("#identifier")
+@lexer<.emit>
+construct HashDirective {
+    let value: String
+}
+
+@syntax
+#Token("@identifier")
+@lexer<.emit>
+construct AtAttribute {
+    let name: String
+}
+
+@syntax
+#Token("foreignBody")
+@lexer<.emit>
+construct ForeignBody {
+    let language: String
+    let text: String
+}
+
+@syntax
+#Token("end")
+@lexer<.emit>
+construct EOF {
+}
+
+@syntax
+construct ASCIISymbol {
+    let value: String
+}
+
+@syntax
+construct ASCIIIdentifierCharacter {
+    let value: String
+}
+@syntax
+construct ASCII {
+    let value: ASCIILiteral
+}

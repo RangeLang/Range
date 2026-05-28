@@ -1,0 +1,6 @@
+#language
+construct BoolLiteral { }
+
+extension BoolLiteral {
+    function storage(): BoolStorage
+}

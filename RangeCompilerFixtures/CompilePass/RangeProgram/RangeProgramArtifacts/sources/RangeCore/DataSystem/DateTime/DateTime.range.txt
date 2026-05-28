@@ -1,0 +1,48 @@
+#language
+construct DateTime {
+    let storage: DateTimeStorage
+
+    
+    function parse(iso8601String: String): Result<Self, DecodingError> {
+        switch DateTimeStorage.parse(iso8601String: iso8601String) {
+        case .success(let storage):
+            return .success(result: Self(storage: storage))
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+        return .failure(cause: .failed)
+    }
+}
+
+extension DateTime: Equatable {
+    function ==(lhs: Self, rhs: Self): Bool
+}
+
+extension DateTime: Comparable {
+    function <(lhs: Self, rhs: Self): Bool
+}
+
+extension DateTime: Decodable {
+    function decode(from decoder: Decoder): Result<Self, DecodingError> {
+        let container   decoder.singleValueContainer()
+        switch container.decode(DateTime.self) {
+        case .success(let value):
+            return .success(result: value)
+        case .failure(let error):
+            return .failure(cause: error)
+        }
+    }
+}
+
+extension DateTime: Encodable {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+        let container   encoder.singleValueContainer()
+        return container.encode(self)
+    }
+}
+
+extension DateTime: Hashable {
+    function hash(into hasher: Hasher) {
+        hasher.combineStorage(storage)
+    }
+}

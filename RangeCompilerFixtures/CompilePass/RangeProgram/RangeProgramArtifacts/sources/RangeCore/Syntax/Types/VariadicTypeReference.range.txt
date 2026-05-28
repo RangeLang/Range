@@ -1,0 +1,6 @@
+@syntax
+construct VariadicTypeReference: StructuralTypeReference {
+    let element: TypeReference
+
+    function replace(with replacement: TypeReference): TypeReference
+}

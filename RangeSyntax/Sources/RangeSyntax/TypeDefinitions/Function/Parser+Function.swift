@@ -31,7 +31,7 @@ extension Parser {
             return try rejectNamedBackgroundCallableDeclaration()
         }
 
-        if case .atAttribute(let name, _) = peek(),
+        if case .macroAttribute(let name, _) = peek(),
             name == "background",
             peek(offset: 1) == .keyword(RangeSyntax.Keyword.function.rawValue)
         {
@@ -101,7 +101,7 @@ extension Parser {
     mutating func rejectNamedBackgroundCallableDeclaration() throws
         -> CallableDeclaration
     {
-        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "background" else {
             throw ParseError("Expected named @background callable declaration.")
         }
 
@@ -257,7 +257,7 @@ extension Parser {
                 }
                 if peek() == .colon {
                     try consume(.colon)
-                    if case .atAttribute(let slot, _) = peek() {
+                    if case .macroAttribute(let slot, _) = peek() {
                         advance()
                         slotName = slot
                     } else {
@@ -392,7 +392,7 @@ extension Parser {
             return true
         }
         let attributeOffset: Int
-        if case .atAttribute = peek(offset: offset),
+        if case .macroAttribute = peek(offset: offset),
             peek(offset: offset + 1) == .keyword(RangeSyntax.Keyword.function.rawValue)
         {
             attributeOffset = offset + 1
@@ -411,7 +411,7 @@ extension Parser {
     }
 
     private func isBackgroundWorkerStart(at offset: Int) -> Bool {
-        guard case .atAttribute(let name, _) = peek(offset: offset), name == "background" else {
+        guard case .macroAttribute(let name, _) = peek(offset: offset), name == "background" else {
             return false
         }
 

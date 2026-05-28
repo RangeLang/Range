@@ -1,0 +1,8 @@
+@syntax
+construct Closure: Expression {
+    let type: TypeReference?
+    let parameters: Array<Parameter.Declaration>()
+    let body: Block
+
+    function replace(with replacement: Expression): Expression
+}

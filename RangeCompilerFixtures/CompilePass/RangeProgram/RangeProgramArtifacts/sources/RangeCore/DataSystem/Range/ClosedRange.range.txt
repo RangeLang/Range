@@ -1,0 +1,30 @@
+#language
+construct ClosedRange<Bound: Comparable> {
+    let lowerBound: Bound
+    let upperBound: Bound
+
+    function contains(_ value: Bound): Bool {
+        return !(value < lowerBound) && !(upperBound < value)
+    }
+
+    function overlaps(_ other: ClosedRange<Bound>): Bool {
+        return contains(other.lowerBound) || other.contains(lowerBound)
+    }
+
+    derived isEmpty: Bool {
+        return upperBound < lowerBound
+    }
+}
+
+extension ClosedRange: Equatable {
+    function ==(lhs: Self, rhs: Self): Bool {
+        return lhs.lowerBound == rhs.lowerBound && lhs.upperBound == rhs.upperBound
+    }
+}
+
+extension ClosedRange: Hashable {
+    function hash(into hasher: Hasher) {
+        hasher.combine(lowerBound)
+        hasher.combine(upperBound)
+    }
+}

@@ -399,6 +399,8 @@ struct SwiftBackendProgramBuilder {
             return true
         }
 
-        return declaration.name != "HostFileSystem" && declaration.name != "UTF8"
+        return declaration.name != "HostFileSystem"
+            && declaration.name != "FileManager"
+            && declaration.name != "UTF8"
     }
 }

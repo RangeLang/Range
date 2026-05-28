@@ -1,5 +1,5 @@
 @main {
-    switch FileSystem.readText(path: "../../../.range/Artifacts/03-graph.txt") {
+    switch FileManager.readFile(path: "../../../.range/Artifacts/03-graph.txt") {
     case .success(let graph):
         Logger.info(graph)
     case .failure:

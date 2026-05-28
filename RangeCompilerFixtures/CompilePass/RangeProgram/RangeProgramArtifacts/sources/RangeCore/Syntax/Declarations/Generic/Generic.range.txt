@@ -1,0 +1,4 @@
+@syntax
+protocol Generic {
+    let identifier: Identifier
+}

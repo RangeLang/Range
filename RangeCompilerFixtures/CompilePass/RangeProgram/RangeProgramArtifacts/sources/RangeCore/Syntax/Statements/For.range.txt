@@ -1,0 +1,6 @@
+@syntax
+construct For: Statement {
+    let pattern: Expression
+    let sequence: Expression
+    let body: Block
+}

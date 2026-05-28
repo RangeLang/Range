@@ -1,5 +1,5 @@
 function lexRangeFile(path: String): Result<[LexicalToken], LexingError> {
-    switch FileSystem.readText(path: path) {
+    switch FileManager.readFile(path: path) {
     case .success(let source):
         let lexer: Lexer(rangeLexer())
         return lexer.tokenize(source: source)

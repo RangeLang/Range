@@ -138,21 +138,21 @@ extension Parser {
     }
 
     func isBackgroundStatementStart() -> Bool {
-        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "background" else {
             return false
         }
         return peek(offset: 1) == .leftBrace
     }
 
     func isDeferStatementStart() -> Bool {
-        guard case .atAttribute(let name, _) = peek(), name == "defer" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "defer" else {
             return false
         }
         return peek(offset: 1) == .leftBrace
     }
 
     func isLocalBackgroundCallableStart() -> Bool {
-        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "background" else {
             return false
         }
 
@@ -178,7 +178,7 @@ extension Parser {
     ) throws -> Statement {
         _ = localBindings
 
-        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "background" else {
             throw ParseError("Expected @background callable declaration.")
         }
 
@@ -212,7 +212,7 @@ extension Parser {
     mutating func parseBackgroundStatement(
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
-        guard case .atAttribute(let name, _) = peek(), name == "background" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "background" else {
             throw ParseError("Expected @background block.")
         }
         advance()
@@ -223,7 +223,7 @@ extension Parser {
     mutating func parseDeferStatement(
         localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
-        guard case .atAttribute(let name, _) = peek(), name == "defer" else {
+        guard case .macroAttribute(let name, _) = peek(), name == "defer" else {
             throw ParseError("Expected @defer block.")
         }
         advance()
@@ -259,7 +259,7 @@ extension Parser {
 
     func isExpressionStatementStart() -> Bool {
         switch peek() {
-        case .identifier, .integer, .double, .stringLiteral, .hashDirective, .leftBracket,
+        case .identifier, .integer, .double, .stringLiteral, .markerAttribute, .leftBracket,
             .leftParen, .dollar, .dot, .bang:
             return true
         default:
@@ -342,8 +342,8 @@ extension Parser {
 
     func canStartExpression(_ token: Token) -> Bool {
         switch token {
-        case .identifier, .integer, .double, .stringLiteral, .hashDirective,
-            .atAttribute, .leftBracket, .leftParen, .leftBrace, .dollar, .dot, .bang:
+        case .identifier, .integer, .double, .stringLiteral, .markerAttribute,
+            .macroAttribute, .leftBracket, .leftParen, .leftBrace, .dollar, .dot, .bang:
             return true
         case .keyword(let value):
             return !RangeSyntax.keywordIdentifiers.contains(value)

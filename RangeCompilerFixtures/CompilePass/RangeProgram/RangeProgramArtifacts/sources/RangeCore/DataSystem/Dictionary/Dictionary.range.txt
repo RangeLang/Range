@@ -1,0 +1,70 @@
+#language
+construct Dictionary<Key: Hashable, Value> {
+    state storage: DictionaryStorage<Key, Value>()
+
+    @literal<DictionaryLiteral>
+    function literal(literal: DictionaryLiteral): Self {
+        return Self(storage: literal.storage())
+    }
+
+    derived count: Int {
+        storage.count
+    }
+
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
+
+    function value(key: Key): Value? {
+        return storage.value(key: key)
+    }
+
+    function updateValue(value: Value, key: Key) {
+        storage.updateValue(value: value, key: key)
+    }
+
+    function removeValue(key: Key): Value? {
+        return storage.removeValue(key: key)
+    }
+
+    function contains(key: Key): Bool {
+        return storage.contains(key: key)
+    }
+
+    function entries(): [DictionaryEntry<Key, Value>] {
+        return storage.entries()
+    }
+
+    function filter(include: (DictionaryEntry<Key, Value>) -> Bool): [DictionaryEntry<Key, Value>] {
+        return storage.filter(include: include)
+    }
+
+    function first(where include: (DictionaryEntry<Key, Value>) -> Bool): DictionaryEntry<Key, Value>? {
+        return storage.first(where: include)
+    }
+
+    function clear() {
+        storage.clear()
+    }
+}
+
+extension Dictionary<String, Value: Encodable>: Encodable {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+        state container   encoder.keyedContainer()
+        let values: Array<DictionaryEntry<String, Value>>(entries())
+        state index   0
+
+        while index < values.count {
+            let entry: DictionaryEntry<String, Value>(values.element(index: index))
+
+            switch container.encode(entry.value, forKey: entry.key) {
+            case .success:
+                index += 1
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        }
+
+        return .success(result: Void())
+    }
+}

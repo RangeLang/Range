@@ -1,0 +1,9 @@
+0: keyword "enum" @ 0:0-0:4
+1: identifier "CodingKeyStrategy" @ 0:5-0:22
+2: leftBrace "{" @ 0:23-0:24
+3: keyword "case" @ 1:4-1:8
+4: identifier "identity" @ 1:9-1:17
+5: keyword "case" @ 2:4-2:8
+6: identifier "snakeCase" @ 2:9-2:18
+7: rightBrace "}" @ 3:0-3:1
+8: eof "" @ 4:0-4:0

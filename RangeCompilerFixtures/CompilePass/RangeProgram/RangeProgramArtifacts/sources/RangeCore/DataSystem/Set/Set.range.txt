@@ -1,0 +1,64 @@
+#language
+construct Set<Element: Hashable> {
+    state storage: SetStorage<Element>()
+
+    @literal<SetLiteral>
+    function literal(literal: SetLiteral): Self {
+        return Self(storage: literal.storage())
+    }
+
+    derived count: Int {
+        storage.count
+    }
+
+    derived isEmpty: Bool {
+        storage.isEmpty
+    }
+
+    function contains(element: Element): Bool {
+        return storage.contains(element: element)
+    }
+
+    function insert(element: Element) {
+        storage.insert(element: element)
+    }
+
+    function remove(element: Element): Element? {
+        return storage.remove(element: element)
+    }
+
+    function elements(): [Element] {
+        return storage.elements()
+    }
+
+    function filter(include: (Element) -> Bool): [Element] {
+        return storage.filter(include: include)
+    }
+
+    function first(where include: (Element) -> Bool): Element? {
+        return storage.first(where: include)
+    }
+
+    function clear() {
+        storage.clear()
+    }
+}
+
+extension Set<Element: Encodable>: Encodable {
+    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+        state container   encoder.unkeyedContainer()
+        let values: Array<Element>(elements())
+        state index   0
+
+        while index < values.count {
+            switch container.encode(values.element(index: index)) {
+            case .success:
+                index += 1
+            case .failure(let error):
+                return .failure(cause: error)
+            }
+        }
+
+        return .success(result: Void())
+    }
+}

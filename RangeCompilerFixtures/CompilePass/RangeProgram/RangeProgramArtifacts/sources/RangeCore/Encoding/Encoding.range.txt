@@ -1,0 +1,5 @@
+marker encoding(): Namespace<Construct>
+
+#encoding
+construct Encoding {
+}
