@@ -27,7 +27,7 @@ function lexRangeFile(path: String): Result<[LexicalToken], LexingError> {
 }
 
 @main {
-    switch lexRangeFile(path: "RangeCompilerFixtures/CompilePass/Syntax/RangeLexerReadFile.range") {
+    switch lexRangeFile(path: "RangeTests/CompilePass/Syntax/RangeLexerReadFile.range") {
     case .success(let tokens):
         Logger.info("tokens: \(tokens.count)")
     case .failure(let error):

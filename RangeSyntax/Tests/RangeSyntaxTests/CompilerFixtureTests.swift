@@ -2494,21 +2494,23 @@ private func compile(fixture: URL, expectedRole: FixtureRole) throws -> Compiled
 
 private func fixtureFiles(in suite: String) throws -> [URL] {
     let root = try repositoryRoot()
-        .appendingPathComponent("RangeCompilerFixtures", isDirectory: true)
+        .appendingPathComponent("RangeTests", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
     return try rangeFiles(in: root, excludingExploration: false)
 }
 
 private func fixtureFile(in suite: String, path: String) throws -> URL {
     try repositoryRoot()
-        .appendingPathComponent("RangeCompilerFixtures", isDirectory: true)
+        .appendingPathComponent("RangeTests", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
         .appendingPathComponent(path)
 }
 
 private func rangeCoreInputs() throws -> [SourceInput] {
     try rangeFiles(
-        in: try repositoryRoot().appendingPathComponent("RangeCore", isDirectory: true),
+        in: try repositoryRoot()
+            .appendingPathComponent("RangeCompiler", isDirectory: true)
+            .appendingPathComponent("Core", isDirectory: true),
         excludingExploration: true
     )
     .map { file in
@@ -2563,7 +2565,7 @@ private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL
         if excludingExploration,
             isDirectory,
             url.lastPathComponent == "Exploration",
-            url.path.contains("/RangeCore/")
+            url.path.contains("/RangeCompiler/Core/")
         {
             enumerator.skipDescendants()
             continue
@@ -2581,11 +2583,10 @@ private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL
 private func repositoryRoot() throws -> URL {
     var current = URL(fileURLWithPath: #filePath)
     while current.path != "/" {
-        let candidateCore = current.appendingPathComponent("RangeCore", isDirectory: true)
-        let candidateFixtures = current.appendingPathComponent(
-            "RangeCompilerFixtures",
-            isDirectory: true
-        )
+        let candidateCore = current
+            .appendingPathComponent("RangeCompiler", isDirectory: true)
+            .appendingPathComponent("Core", isDirectory: true)
+        let candidateFixtures = current.appendingPathComponent("RangeTests", isDirectory: true)
         var isCoreDirectory: ObjCBool = false
         var isFixturesDirectory: ObjCBool = false
         if FileManager.default.fileExists(atPath: candidateCore.path, isDirectory: &isCoreDirectory),

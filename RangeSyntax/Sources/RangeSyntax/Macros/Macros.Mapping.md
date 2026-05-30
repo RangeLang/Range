@@ -89,7 +89,7 @@ This document maps each macro target concept to the language-level structure it 
 - Expression and block targets are syntax-first.
 - Declaration targets are resolved semantic structures.
 - Syntax values should follow the semantic ownership model described in
-  `RangeCore/Syntax/README.md`: granularize where the compiler graphs need stable
+  `RangeCompiler/Core/Syntax/README.md`: granularize where the compiler graphs need stable
   meaning, and prefer owned nested forms such as `Array.Expression`,
   `Enum.Case.Expression`, and `Statement.Expression` over flat token-shaped
   names.

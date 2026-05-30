@@ -1,4 +1,4 @@
-# Range Compiler Fixtures
+# Range Tests
 
 This folder holds `.range` source files used by compiler regression tests.
 
@@ -21,7 +21,7 @@ Create new compiler fixtures in this folder, not inline inside Swift test files.
 - Keep each fixture focused. Prefer one behavior per file unless the behaviors
   are inseparable.
 - If a Swift test needs to inspect expanded AST or graph details for one
-  specific fixture, load the fixture file by path from `RangeCompilerFixtures`
+  specific fixture, load the fixture file by path from `RangeTests`
   rather than embedding the `.range` source directly in the test.
 
 Current top-level layout:
@@ -32,7 +32,7 @@ Current top-level layout:
 - `CompileFail/...`: negative fixtures grouped by the same surface areas
 
 The default rule is simple: if it is compiler input worth keeping around, it
-belongs in `RangeCompilerFixtures`.
+belongs in `RangeTests`.
 
 ## Roadmap
 

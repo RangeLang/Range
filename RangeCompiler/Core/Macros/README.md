@@ -5,7 +5,7 @@ Current macro surface is split into:
 - `CoreMacro`
 - `Implementations`
 
-Compiler-owned syntax surfaces now live in `RangeCore/Syntax`:
+Compiler-owned syntax surfaces now live in `RangeCompiler/Core/Syntax`:
 
 - `Bodies`
 - `Statements`

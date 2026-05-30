@@ -309,19 +309,19 @@ The goal is for compiler diagnostics, macro diagnostics, LSP diagnostics, and fi
 
 Important pass fixtures:
 
-- `RangeCompilerFixtures/CompilePass/Macros/CodableMacroSynthesis.range`
-- `RangeCompilerFixtures/CompilePass/Macros/SyntaxProducingMacroSwitch.range`
-- `RangeCompilerFixtures/CompilePass/Macros/SyntaxProducingMacroIdentifierMemberAccess.range`
-- `RangeCompilerFixtures/CompilePass/Macros/LetMacroApplicationsSurface.range`
-- `RangeCompilerFixtures/CompilePass/Macros/MacroDiagnosticsWarning.range`
+- `RangeTests/CompilePass/Macros/CodableMacroSynthesis.range`
+- `RangeTests/CompilePass/Macros/SyntaxProducingMacroSwitch.range`
+- `RangeTests/CompilePass/Macros/SyntaxProducingMacroIdentifierMemberAccess.range`
+- `RangeTests/CompilePass/Macros/LetMacroApplicationsSurface.range`
+- `RangeTests/CompilePass/Macros/MacroDiagnosticsWarning.range`
 
 Important fail fixtures:
 
-- `RangeCompilerFixtures/CompileFail/Macros/MarkerValueTypeMismatch.range`
-- `RangeCompilerFixtures/CompileFail/Macros/SyntaxProducingMacroUnknownTemplateIdentifier.range`
-- `RangeCompilerFixtures/CompileFail/Macros/MacroRequiresArgumentLabel.range`
-- `RangeCompilerFixtures/CompileFail/Macros/CaptureRequiresSyntaxType.range`
-- `RangeCompilerFixtures/CompileFail/Macros/SyntaxParameterRequiresCapture.range`
+- `RangeTests/CompileFail/Macros/MarkerValueTypeMismatch.range`
+- `RangeTests/CompileFail/Macros/SyntaxProducingMacroUnknownTemplateIdentifier.range`
+- `RangeTests/CompileFail/Macros/MacroRequiresArgumentLabel.range`
+- `RangeTests/CompileFail/Macros/CaptureRequiresSyntaxType.range`
+- `RangeTests/CompileFail/Macros/SyntaxParameterRequiresCapture.range`
 
 There is also an absence assertion in the compiler fixture tests to ensure `#codable` no longer emits `CodingKeys`.
 
@@ -350,4 +350,3 @@ There is also an absence assertion in the compiler fixture tests to ensure `#cod
 
 5. Unify diagnostics through the structured diagnostic engine.
    Macro-authored diagnostics should feed the same severity/channel shape as compiler and LSP diagnostics.
-
