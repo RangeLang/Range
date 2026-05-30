@@ -68,10 +68,10 @@ struct ProjectScriptStore {
 
     private func packageRoot(from rawPath: String) throws -> URL {
         let url = URL(fileURLWithPath: rawPath, isDirectory: true).standardizedFileURL
-        let root = url.lastPathComponent == "Package.range" ? url.deletingLastPathComponent() : url
-        let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
+        let root = url.lastPathComponent == "Project.range" ? url.deletingLastPathComponent() : url
+        let packageFile = root.appendingPathComponent("Project.range", isDirectory: false)
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.range in \(root.path).")
+            throw ValidationError("Missing Project.range in \(root.path).")
         }
         return root
     }

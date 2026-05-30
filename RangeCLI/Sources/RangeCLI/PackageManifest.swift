@@ -22,37 +22,34 @@ enum PackageManifestLoader {
         let sourceFile = try parser.parseSourceFile()
         switch sourceFile {
         case .mainBlock:
-            throw ValidationError("Package.range must declare construct Name: Package.")
+            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .extensions:
-            throw ValidationError("Package.range must declare construct Name: Package.")
+            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .module:
-            throw ValidationError("Package.range must declare #package construct Name { ... } or construct Name: Package.")
+            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .namespace:
-            throw ValidationError("Package.range must declare construct Name: Package.")
+            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .construct(let declaration):
             guard declaration.attribute == nil else {
-                throw ValidationError("Package.range cannot use declaration attributes.")
+                throw ValidationError("Project.range cannot use declaration attributes.")
             }
+            let usesProjectMarker = declaration.macros.contains { $0.name == "Project" }
             let usesPackageMacro = declaration.macros.contains { $0.name == "package" }
-            guard usesPackageMacro || declaration.conformances == [.named("Package")] else {
+            guard usesProjectMarker || usesPackageMacro else {
                 throw ValidationError(
-                    "Package.range must declare #package construct Name { ... } or construct Name: Package.")
+                    "Project.range must declare #Project construct Name { ... }.")
             }
 
             let name =
                 try titleValue(named: "name", in: declaration.values)
-                ?? (usesPackageMacro ? declaration.name : nil)
+                ?? (usesProjectMarker || usesPackageMacro ? declaration.name : nil)
                 ?? requiredTitleValue(named: "name", in: declaration.values)
             let version = try requiredVersionValue(named: "version", in: declaration.values)
             let author = try requiredStringValue(named: "author", in: declaration.values)
-            if !usesPackageMacro {
-                _ = try requireValue(named: "remotes", typeName: "[Remote]", in: declaration.values)
-            }
-
             let remote = stringValue(named: "remote", in: declaration.values)
             let remoteURLs = remoteURLs(remote: remote, in: declaration.values)
             let resolvedRemoteURLs =
-                remoteURLs.isEmpty && usesPackageMacro
+                remoteURLs.isEmpty && (usesProjectMarker || usesPackageMacro)
                 ? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
                 : remoteURLs
             return PackageManifest(
@@ -64,11 +61,11 @@ enum PackageManifestLoader {
                 declaration: declaration
             )
         case .enumeration:
-            throw ValidationError("Package.range must declare construct Name: Package.")
+            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .protocolDefinition:
-            throw ValidationError("Package.range must declare construct Name: Package.")
+            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .macro, .marker:
-            throw ValidationError("Package.range must declare construct Name: Package.")
+            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         }
     }
 
@@ -78,7 +75,7 @@ enum PackageManifestLoader {
     ) throws -> String {
         let value = try requireValue(named: name, typeName: "String", in: values)
         guard case .string(let string)? = value.value else {
-            throw ValidationError("Package.range requires let \(name): \"...\".")
+            throw ValidationError("Project.range requires let \(name): \"...\".")
         }
         return string
     }
@@ -88,7 +85,7 @@ enum PackageManifestLoader {
         in values: [ValueDeclaration]
     ) throws -> String {
         guard let title = try titleValue(named: name, in: values) else {
-            throw ValidationError("Package.range requires let \(name): Title(\"...\").")
+            throw ValidationError("Project.range requires let \(name): Title(\"...\").")
         }
         return title
     }
@@ -102,16 +99,16 @@ enum PackageManifestLoader {
         }
         guard value.typeName == "Title" else {
             throw ValidationError(
-                "Package.range requires let \(name): Title, got \(value.typeName)."
+                "Project.range requires let \(name): Title, got \(value.typeName)."
             )
         }
         guard case .call(let callName, let arguments)? = value.value, callName == "Title" else {
-            throw ValidationError("Package.range requires let \(name): Title(\"...\").")
+            throw ValidationError("Project.range requires let \(name): Title(\"...\").")
         }
         guard arguments.count == 1, arguments[0].label == nil,
             case .string(let title) = arguments[0].value
         else {
-            throw ValidationError("Package.range Title requires one string value.")
+            throw ValidationError("Project.range Title requires one string value.")
         }
         return title
     }
@@ -122,13 +119,13 @@ enum PackageManifestLoader {
     ) throws -> String {
         let value = try requireValue(named: name, typeNames: ["Version"], in: values)
         guard case .call(let callName, let arguments)? = value.value, callName == "Version" else {
-            throw ValidationError("Package.range requires let \(name): Version(0.1.0).")
+            throw ValidationError("Project.range requires let \(name): Version(0.1.0).")
         }
         guard arguments.count == 1, arguments[0].label == nil else {
-            throw ValidationError("Package.range Version requires one unlabeled semantic version.")
+            throw ValidationError("Project.range Version requires one unlabeled semantic version.")
         }
         guard case .string(let raw) = arguments[0].value else {
-            throw ValidationError("Package.range Version requires a semantic version like Version(0.1.0).")
+            throw ValidationError("Project.range Version requires a semantic version like Version(0.1.0).")
         }
         _ = try SemanticVersion.parse(raw)
         return raw
@@ -148,11 +145,11 @@ enum PackageManifestLoader {
         in values: [ValueDeclaration]
     ) throws -> ValueDeclaration {
         guard let value = values.first(where: { $0.name == name }) else {
-            throw ValidationError("Package.range requires let \(name): \(typeNames[0]).")
+            throw ValidationError("Project.range requires let \(name): \(typeNames[0]).")
         }
         guard typeNames.contains(value.typeName) else {
             throw ValidationError(
-                "Package.range requires let \(name): \(typeNames.joined(separator: " or ")), got \(value.typeName)."
+                "Project.range requires let \(name): \(typeNames.joined(separator: " or ")), got \(value.typeName)."
             )
         }
         return value

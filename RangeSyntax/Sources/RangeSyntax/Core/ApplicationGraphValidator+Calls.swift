@@ -381,6 +381,15 @@ extension ApplicationGraphValidator {
     ) throws {
         switch expression {
         case .call(let name, let arguments):
+            if try validateDataTypeConstructCallIfPresent(
+                name: name,
+                arguments: arguments,
+                environment: environment,
+                fileName: fileName
+            ) {
+                return
+            }
+
             if let (baseName, memberName) = splitMemberName(name),
                 let constructName =
                     baseName == "self"
@@ -643,8 +652,11 @@ extension ApplicationGraphValidator {
                 guard actualLabel == parameter.externalLabel else {
                     return false
                 }
+            } else if parameter.externalLabel != nil {
+                return false
             }
         }
+
         return true
     }
 
@@ -684,6 +696,110 @@ extension ApplicationGraphValidator {
         }
 
         return matched
+    }
+
+    func validateDataTypeConstructCallIfPresent(
+        name: String,
+        arguments: [CallArgument],
+        environment: CallLabelValidationEnvironment,
+        fileName: String
+    ) throws -> Bool {
+        guard let construct = environment.declarationGraph.construct(named: name),
+            let dataType = construct.macros.first(where: { $0.name == "DataType" })
+        else {
+            return false
+        }
+
+        guard arguments.count == 1, arguments[0].label == nil else {
+            throw SemanticValidationError(
+                "DataType initializer \(name)(\(renderCallArguments(arguments))) in \(fileName) expects one unlabeled value matching #DataType(\(dataType.argumentClause ?? ""))."
+            )
+        }
+
+        let pattern = normalizedDataTypeLiteral(dataType.argumentClause ?? "")
+        let patternSegments = try dataTypeSegments(
+            pattern,
+            description: "#DataType pattern on \(name)"
+        )
+        guard patternSegments.allSatisfy({ $0 == "0" }) else {
+            throw SemanticValidationError(
+                "#DataType pattern on \(name) currently supports only unsigned integer slots written as 0."
+            )
+        }
+
+        let parameters = environment.declarationGraph.directConstructApplicationParameters(for: construct)
+        guard patternSegments.count == parameters.count else {
+            throw SemanticValidationError(
+                "#DataType pattern on \(name) declares \(patternSegments.count) slot(s), but \(name) has \(parameters.count) initializer field(s)."
+            )
+        }
+
+        for parameter in parameters {
+            guard let type = parameter.typeReference, isUnsignedIntegerType(type) else {
+                throw SemanticValidationError(
+                    "#DataType pattern on \(name) can only map to unsigned Int fields. Field \(parameter.localName) has type \(parameter.typeReference?.displayName ?? "unknown")."
+                )
+            }
+        }
+
+        guard case .string(let rawValue) = arguments[0].value else {
+            throw SemanticValidationError(
+                "DataType initializer \(name)(\(renderCallArguments(arguments))) in \(fileName) expects a dotted unsigned integer literal."
+            )
+        }
+
+        let valueSegments = try dataTypeSegments(
+            rawValue,
+            description: "DataType initializer \(name)(\(rawValue))"
+        )
+        guard valueSegments.count == patternSegments.count else {
+            throw SemanticValidationError(
+                "DataType initializer \(name)(\(rawValue)) in \(fileName) has \(valueSegments.count) segment(s), but #DataType(\(pattern)) expects \(patternSegments.count)."
+            )
+        }
+
+        for segment in valueSegments {
+            guard isUnsignedIntegerLiteral(segment) else {
+                throw SemanticValidationError(
+                    "DataType initializer \(name)(\(rawValue)) in \(fileName) contains invalid unsigned integer segment '\(segment)'."
+                )
+            }
+        }
+
+        return true
+    }
+
+    func normalizedDataTypeLiteral(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2,
+            trimmed.first == "\"",
+            trimmed.last == "\""
+        else {
+            return trimmed
+        }
+        return String(trimmed.dropFirst().dropLast())
+    }
+
+    func dataTypeSegments(_ value: String, description: String) throws -> [String] {
+        let segments = value.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        guard !segments.isEmpty, !segments.contains(where: \.isEmpty) else {
+            throw SemanticValidationError("\(description) must contain non-empty dot-separated segments.")
+        }
+        return segments
+    }
+
+    func isUnsignedIntegerLiteral(_ value: String) -> Bool {
+        guard !value.isEmpty,
+            value.allSatisfy({ $0 >= "0" && $0 <= "9" })
+        else {
+            return false
+        }
+        return Int(value) != nil
+    }
+
+    func isUnsignedIntegerType(_ type: TypeReference) -> Bool {
+        let displayName = type.displayName
+        return displayName.hasPrefix("Int<") && displayName.contains("unsigned")
     }
 
     func renderCallArguments(_ arguments: [CallArgument]) -> String {

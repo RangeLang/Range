@@ -20,7 +20,7 @@ extension RangeCLI {
             @Argument(help: "Script name. Adds .range when omitted.")
             var name: String
 
-            @Option(name: .shortAndLong, help: "Package.range project root.")
+            @Option(name: .shortAndLong, help: "Project.range project root.")
             var project: String = "."
 
             @Flag(help: "Replace an existing script.")
@@ -45,7 +45,7 @@ extension RangeCLI {
             @Argument(help: "Script name. Adds .range when omitted.")
             var name: String
 
-            @Option(name: .shortAndLong, help: "Package.range project root.")
+            @Option(name: .shortAndLong, help: "Project.range project root.")
             var project: String = "."
 
             @Option(help: "Script content to save.")
@@ -94,7 +94,7 @@ extension RangeCLI {
                 abstract: "List scripts saved under .range/.scripts."
             )
 
-            @Option(name: .shortAndLong, help: "Package.range project root.")
+            @Option(name: .shortAndLong, help: "Project.range project root.")
             var project: String = "."
 
             mutating func run() throws {

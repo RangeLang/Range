@@ -26,7 +26,7 @@ extension RangeCLI {
             do {
                 let packageFile = URL(fileURLWithPath: path, isDirectory: true)
                     .standardizedFileURL
-                    .appendingPathComponent("Package.range", isDirectory: false)
+                    .appendingPathComponent("Project.range", isDirectory: false)
                 let manifest = try PackageManifestLoader.load(from: packageFile)
 
                 print(TerminalLog.style(manifest.name, level: .change, bold: true))
@@ -65,7 +65,7 @@ extension RangeCLI {
             if !published.author.isEmpty {
                 TerminalLog.subtleOut("Author: \(published.author)")
             }
-            TerminalLog.subtleOut("Package.range: \(published.packageFile.path)")
+            TerminalLog.subtleOut("Project.range: \(published.packageFile.path)")
             switch published.git {
             case .published(let commit, let tag, let pushed):
                 TerminalLog.subtleOut("Git: \(commit), \(tag)\(pushed ? ", pushed" : ", not pushed")")
@@ -82,7 +82,7 @@ extension RangeCLI {
             @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
             var projectPath: String = "."
 
-            @Flag(help: "Only bump Package.range; do not commit or tag.")
+            @Flag(help: "Only bump Project.range; do not commit or tag.")
             var noGit: Bool = false
 
             @Flag(help: "Commit and tag locally, but do not push to origin.")
@@ -111,7 +111,7 @@ extension RangeCLI {
             @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
             var projectPath: String = "."
 
-            @Flag(help: "Only bump Package.range; do not commit or tag.")
+            @Flag(help: "Only bump Project.range; do not commit or tag.")
             var noGit: Bool = false
 
             @Flag(help: "Commit and tag locally, but do not push to origin.")
@@ -140,7 +140,7 @@ extension RangeCLI {
             @Option(name: [.short, .customLong("path")], help: "Project directory. Defaults to current directory.")
             var projectPath: String = "."
 
-            @Flag(help: "Only bump Package.range; do not commit or tag.")
+            @Flag(help: "Only bump Project.range; do not commit or tag.")
             var noGit: Bool = false
 
             @Flag(help: "Commit and tag locally, but do not push to origin.")
@@ -175,7 +175,7 @@ extension RangeCLI {
             )
             var projectPath: String = "."
 
-            @Flag(help: "Only bump Package.range; do not commit or tag.")
+            @Flag(help: "Only bump Project.range; do not commit or tag.")
             var noGit: Bool = false
 
             @Flag(help: "Commit and tag locally, but do not push to origin.")

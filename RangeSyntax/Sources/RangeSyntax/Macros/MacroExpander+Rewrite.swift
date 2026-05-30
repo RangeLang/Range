@@ -456,13 +456,20 @@ extension MacroExpander {
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
                     )
+                    let targetValue = MacroTargetValueBuilder().targetValue(for: construct)
+                    try emitMarkerDiagnostics(
+                        from: marker.body,
+                        marker: marker,
+                        targetValue: targetValue,
+                        context: context
+                    )
                     if marker.valueType.isMarkerEffect {
                         continue
                     }
                     _ = try MacroTargetValueBuilder.evaluateMarkerValue(
                         for: application,
                         marker: marker,
-                        targetValue: MacroTargetValueBuilder().targetValue(for: construct),
+                        targetValue: targetValue,
                         context: context
                     )
                     continue

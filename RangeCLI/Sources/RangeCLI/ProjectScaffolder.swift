@@ -201,7 +201,7 @@ struct ProjectScaffolder {
     }
 
     private func createProject(name: String, targetDirectory: URL) throws {
-        let packagePath = targetDirectory.appendingPathComponent("Package.range", isDirectory: false)
+        let packagePath = targetDirectory.appendingPathComponent("Project.range", isDirectory: false)
         let playgroundPath = targetDirectory.appendingPathComponent(
             "Playground.range",
             isDirectory: false
@@ -211,7 +211,7 @@ struct ProjectScaffolder {
         if fileManager.fileExists(atPath: packagePath.path)
             || fileManager.fileExists(atPath: playgroundPath.path)
         {
-            throw ValidationError("Target already contains Package.range or Playground.range.")
+            throw ValidationError("Target already contains Project.range or Playground.range.")
         }
 
         try renderProgramPackage(name: name).write(
@@ -299,7 +299,7 @@ struct ProjectScaffolder {
 
     private func renderProgramPackage(name: String) -> String {
         return """
-            #package
+            #Project
             construct Project {
                 let name: Title("\(escapedStringLiteral(name))")
                 let version: Version(0.1.0)

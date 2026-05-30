@@ -1,4 +1,4 @@
-marker encoding(): Namespace<Construct>
+marker encoding(): Construct
 
 #encoding
 construct Encoding {

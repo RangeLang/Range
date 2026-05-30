@@ -43,13 +43,61 @@ struct CompilerFixtureTests {
         )
 
         let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
-        fputs(diagnostics.map { "\($0.severity): \($0.message)\n" }.joined(), stderr)
 
         #expect(
             diagnostics.contains {
                 $0.severity == .warning
                     && $0.code == "macro.identifier-member-splice"
                     && $0.path == fixture.path
+            }
+        )
+    }
+
+    @Test("#Project marker requires a single project declaration")
+    func projectMarkerRequiresSingleProjectDeclaration() throws {
+        let inputs = [
+            SourceInput(
+                path: "/tmp/DuplicateProjects.range",
+                source: """
+                open marker Project(): Construct { target, diagnostics, graph in
+                    let projectMarkers: Array<Marker>(
+                        graph.markers.where { entry in
+                            entry.application.identifier.name == "Project"
+                        }
+                    )
+                    if projectMarkers.count > 1 {
+                        diagnostics.error("A second #Project conflicts with the project already declared in this Range project.")
+                    }
+                }
+
+                construct Marker {
+                    construct Application<Value> {
+                        let identifier: Identifier
+                        let value: Value
+                    }
+                }
+
+                construct Identifier {
+                    let name: String
+                }
+
+                #Project
+                construct FirstProject {
+                }
+
+                #Project
+                construct SecondProject {
+                }
+                """,
+                role: .project
+            )
+        ]
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+        #expect(
+            diagnostics.contains {
+                $0.severity == .error
+                    && $0.source == "range-macro"
+                    && $0.message.contains("A second #Project conflicts")
             }
         )
     }
@@ -76,7 +124,6 @@ struct CompilerFixtureTests {
         )
 
         let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
-        fputs(diagnostics.map { "DIAG \($0.severity): \($0.message) path=\($0.path ?? "nil")\n" }.joined(), stderr)
         let diagnostic = try #require(
             diagnostics.first {
                 $0.severity == .warning
@@ -577,6 +624,79 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
+    @Test("DataType marker validates dotted unsigned integer initializer")
+    func dataTypeMarkerValidatesDottedUnsignedIntegerInitializer() throws {
+        let inputs = [
+            SourceInput(
+                path: "/tmp/DataTypeVersion.range",
+                source: """
+                marker DataType(_ pattern: String): Construct -> String {
+                    return pattern
+                }
+
+                enum Signedness {
+                    case unsigned
+                }
+
+                construct Int<let signedness: Signedness> {}
+
+                #DataType(0.0.0)
+                construct Version {
+                    state major: Int<.unsigned>
+                    state minor: Int<.unsigned>
+                    state patch: Int<.unsigned>
+                }
+
+                @main {
+                    let current   Version(0.1.0)
+                }
+                """,
+                role: .project
+            )
+        ]
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
+    @Test("DataType marker rejects non matching version initializer")
+    func dataTypeMarkerRejectsNonMatchingVersionInitializer() throws {
+        let inputs = [
+            SourceInput(
+                path: "/tmp/DataTypeInvalidVersion.range",
+                source: """
+                marker DataType(_ pattern: String): Construct -> String {
+                    return pattern
+                }
+
+                enum Signedness {
+                    case unsigned
+                }
+
+                construct Int<let signedness: Signedness> {}
+
+                #DataType(0.0.0)
+                construct Version {
+                    state major: Int<.unsigned>
+                    state minor: Int<.unsigned>
+                    state patch: Int<.unsigned>
+                }
+
+                @main {
+                    let current   Version("0.1")
+                }
+                """,
+                role: .project
+            )
+        ]
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected invalid DataType initializer to fail validation.")
+        } catch let error as SemanticValidationError {
+            #expect(error.description.contains("has 2 segment(s)"))
+        }
+    }
+
     @Test("Typed construction annotations can be optional")
     func typedConstructionAnnotationsCanBeOptional() throws {
         let source = """
@@ -728,7 +848,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MetadataSlot.range",
                 source: """
-                marker styling(): Namespace<Construct>
+                marker styling(): Construct
 
                 #styling
                 construct Panel {
@@ -752,7 +872,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MetadataSlotTarget.range",
                 source: """
-                marker persisted(_ prefix: String): Namespace<Construct>
+                marker persisted(_ prefix: String): Construct
 
                 #persisted("settings")
                 construct Profile {
@@ -939,9 +1059,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.constructsByName["Marker.Declaration"]?.macros.contains { $0.name == "GraphDeclaration" } == true)
         #expect(graph.constructsByName["Marker.Application"]?.macros.contains { $0.name == "syntax" } == false)
         #expect(graph.constructsByName["Marker.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
-        #expect(graph.constructsByName["Namespace"]?.isCore == true)
-        #expect(graph.constructsByName["Namespace.Declaration"]?.isCore == true)
-        #expect(graph.constructsByName["Namespace.Application"]?.isCore == true)
     }
 
     @Test("@syntax declarations are syntax-facing without Syntax conformance")
@@ -1279,9 +1396,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     let modules: ["acme/registry-snapshot"]
                 }
 
-                marker styling(): Namespace<Construct>
+                marker styling(): Construct
 
-                marker hostSpace(): Namespace<Construct>
+                marker hostSpace(): Construct
 
                 macro decorate(): Construct { target, diagnostics in
                 }
@@ -1491,9 +1608,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/NamespaceConstruct.range",
+                path: "/tmp/MetadataSlotConstruct.range",
                 source: """
-                marker semantic(): Namespace<Construct>
+                marker semantic(): Construct
 
                 #semantic
                 construct Language {
@@ -1528,14 +1645,14 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         )
     }
 
-    @Test("Namespace<Construct> marker declares construct metadata slot")
+    @Test("Construct marker declares construct metadata slot")
     func metadataSlotMarkerDeclaresConstructMetadataSlot() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/RegisteredNamespaceMarker.range",
+                path: "/tmp/RegisteredConstructMarker.range",
                 source: """
-                marker hostSpace(): Namespace<Construct>
+                marker hostSpace(): Construct
 
                 #hostSpace
                 construct Client {
@@ -2183,12 +2300,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     @Test("FileManager readFile surface validates")
     func fileSystemReadTextSurfaceValidates() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "System/FileManagerReadFile.range")
-        _ = try compile(fixture: fixture, expectedRole: .pass)
-    }
-
-    @Test("Range lexer reads Range source file")
-    func rangeLexerReadsRangeSourceFile() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Syntax/RangeLexerReadFile.range")
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 

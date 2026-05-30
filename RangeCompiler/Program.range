@@ -1,0 +1,32 @@
+construct RangeCompilerProgram {
+    function fileTree(path path: String): Result<FileTreeNode, FileReadError> {
+        return FileTree.read(path: path)
+    }
+
+    function structure(): String {
+        return "RangeCompiler\n" +
+            "|-- Core\n" +
+            "|   |-- DataSystem\n" +
+            "|   |-- Encoding\n" +
+            "|   |-- Macro\n" +
+            "|   |-- Operators\n" +
+            "|   |-- Protocols\n" +
+            "|   |-- Runtime\n" +
+            "|   |-- Syntax\n" +
+            "|   `-- System\n" +
+            "|-- Foundation\n" +
+            "|   `-- Macros\n" +
+            "`-- Lexer\n" +
+            "    `-- Macros\n"
+    }
+
+    function compilerPipeline(): String {
+        return "RangeCompiler/Core\n" +
+            "  -> normal compiler pipeline\n" +
+            "RangeCompiler/Foundation\n" +
+            "  -> bundled compiler-owned features\n" +
+            "RangeCompiler/Lexer\n" +
+            "  -> compiler support layer\n" +
+            "Project sources\n"
+    }
+}

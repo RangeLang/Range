@@ -126,7 +126,7 @@ struct PackageSubscriptionManager {
             )
 
             for repoURL in repos where isDirectory(repoURL) {
-                let url = repoURL.appendingPathComponent("Package.range", isDirectory: false)
+                let url = repoURL.appendingPathComponent("Project.range", isDirectory: false)
                 guard FileManager.default.fileExists(atPath: url.path) else {
                     continue
                 }
@@ -178,16 +178,16 @@ struct PackageSubscriptionManager {
         try updatedSource.write(to: packageFile, atomically: true, encoding: .utf8)
 
         TerminalLog.out("Subscribed to \(package.reference).", level: .success)
-        TerminalLog.subtleOut("Package.range: modules += \"\(package.reference)\"")
+        TerminalLog.subtleOut("Project.range: modules += \"\(package.reference)\"")
         return .subscribed
     }
 
     private func loadProjectContext() throws -> ProjectContext {
         let projectRoot = URL(fileURLWithPath: projectPath, isDirectory: true).standardizedFileURL
-        let packageFile = projectRoot.appendingPathComponent("Package.range", isDirectory: false)
+        let packageFile = projectRoot.appendingPathComponent("Project.range", isDirectory: false)
 
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.range in \(projectRoot.path)")
+            throw ValidationError("Missing Project.range in \(projectRoot.path)")
         }
 
         _ = try PackageManifestLoader.load(from: packageFile)
@@ -245,7 +245,7 @@ struct PackageSubscriptionManager {
     private func addingModule(_ package: String, to source: String) throws -> String {
         var lines = source.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         guard let closingBraceIndex = lines.lastIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "}" }) else {
-            throw ValidationError("Package.range must end with a package body closing brace.")
+            throw ValidationError("Project.range must end with a package body closing brace.")
         }
 
         if closingBraceIndex > 0 && lines[closingBraceIndex - 1].trimmingCharacters(in: .whitespaces).isEmpty {
@@ -271,7 +271,7 @@ struct PackageSubscriptionManager {
                     $0.trimmingCharacters(in: .whitespaces) == "]"
                 })
             else {
-                throw ValidationError("Package.range modules declaration must end with ].")
+                throw ValidationError("Project.range modules declaration must end with ].")
             }
 
             lines.insert("        \"\(package)\",", at: closingArrayIndex)

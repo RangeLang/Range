@@ -1,0 +1,11 @@
+open marker Project(): Construct { target, diagnostics, graph in
+    let projectMarkers: Array<Marker>(
+        graph.markers.where { entry in
+            entry.application.identifier.name == "Project"
+        }
+    )
+
+    if projectMarkers.count > 1 {
+        diagnostics.error("A second #Project conflicts with the project already declared in this Range project.")
+    }
+}

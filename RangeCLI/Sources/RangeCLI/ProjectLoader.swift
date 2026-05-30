@@ -79,9 +79,9 @@ enum ProjectLoader {
         guard fileURL.pathExtension.lowercased() == "range" else {
             throw ValidationError("Expected a .range file or project directory.")
         }
-        if fileURL.lastPathComponent == "Package.range" {
+        if fileURL.lastPathComponent == "Project.range" {
             throw ValidationError(
-                "Package.range cannot be used directly. Use a source file or project directory."
+                "Project.range cannot be used directly. Use a source file or project directory."
             )
         }
 
@@ -102,7 +102,7 @@ enum ProjectLoader {
         at rootURL: URL,
         options: Options
     ) throws -> LoadedProject {
-        let packageFile = rootURL.appendingPathComponent("Package.range", isDirectory: false)
+        let packageFile = rootURL.appendingPathComponent("Project.range", isDirectory: false)
         let packageManifest: PackageManifest?
         let packageManifestURL: URL?
 
@@ -110,7 +110,7 @@ enum ProjectLoader {
             packageManifest = try PackageManifestLoader.load(from: packageFile)
             packageManifestURL = packageFile
         } else if options.requireManifestForDirectory {
-            throw ValidationError("Missing Package.range in \(rootURL.path)")
+            throw ValidationError("Missing Project.range in \(rootURL.path)")
         } else {
             packageManifest = nil
             packageManifestURL = nil

@@ -302,9 +302,17 @@ struct MacroTargetValueBuilder {
 
     private func markerValues(for applications: [MacroApplication]) -> [CompileTimeValue] {
         applications.compactMap { application in
-            guard let marker = markerDeclarationsByName[application.name],
-                let value = try? Self.evaluateMarkerValue(for: application, marker: marker)
-            else {
+            guard let marker = markerDeclarationsByName[application.name] else {
+                return nil
+            }
+            let value: CompileTimeValue
+            if marker.valueType.isMarkerEffect {
+                value = .object(typeName: "Marker.Effect", fields: [:])
+            } else if marker.valueType == .named("Void") {
+                value = .object(typeName: "Void", fields: [:])
+            } else if let evaluatedValue = try? Self.evaluateMarkerValue(for: application, marker: marker) {
+                value = evaluatedValue
+            } else {
                 return nil
             }
             return .object(

@@ -1,3 +1,6 @@
+#DataType(0.0.0)
 construct Version {
-    let raw: String
+    state major: Int<.unsigned>
+    state minor: Int<.unsigned>
+    state patch: Int<.unsigned>
 }

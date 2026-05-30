@@ -194,10 +194,10 @@ struct ProjectUpdater {
 
     func run() throws {
         let root = URL(fileURLWithPath: path, isDirectory: true).standardizedFileURL
-        let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Project.range", isDirectory: false)
 
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.range in \(root.path)")
+            throw ValidationError("Missing Project.range in \(root.path)")
         }
 
         let source = try String(contentsOf: packageFile, encoding: .utf8)

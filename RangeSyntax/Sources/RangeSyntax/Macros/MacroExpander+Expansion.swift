@@ -690,18 +690,28 @@ extension MacroExpander {
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
                     )
+                    let targetValue = markerTargetValue(
+                        kind: propertyKindDescription(propertyKind),
+                        name: name
+                    )
+                    try emitMarkerDiagnostics(
+                        from: marker.body,
+                        marker: marker,
+                        targetValue: targetValue,
+                        context: context
+                    )
                     if marker.valueType.isMarkerEffect {
                         continue
                     }
                     _ = try MacroTargetValueBuilder.evaluateMarkerValue(
                         for: application,
                         marker: marker,
-                        targetValue: markerTargetValue(
-                            kind: propertyKindDescription(propertyKind),
-                            name: name
-                        ),
+                        targetValue: targetValue,
                         context: context
                     )
+                    continue
+                }
+                if application.name == "Parsed" {
                     continue
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
@@ -1844,9 +1854,43 @@ extension MacroExpander {
         guard let bindings = macro.bindings else {
             return
         }
+        try emitDiagnostics(
+            from: statements,
+            diagnosticOwnerName: macro.name,
+            bindings: bindings,
+            targetValue: targetValue,
+            context: context
+        )
+    }
+
+    static func emitMarkerDiagnostics(
+        from statements: [Statement],
+        marker: MarkerDeclaration,
+        targetValue: CompileTimeValue? = nil,
+        context: MacroExpansionContext
+    ) throws {
+        guard let bindings = marker.bindings else {
+            return
+        }
+        try emitDiagnostics(
+            from: statements,
+            diagnosticOwnerName: marker.name,
+            bindings: bindings,
+            targetValue: targetValue,
+            context: context
+        )
+    }
+
+    private static func emitDiagnostics(
+        from statements: [Statement],
+        diagnosticOwnerName: String,
+        bindings: MacroBindings,
+        targetValue: CompileTimeValue?,
+        context: MacroExpansionContext
+    ) throws {
         let diagnostics = try macroDiagnostics(
             in: statements,
-            macro: macro,
+            diagnosticOwnerName: diagnosticOwnerName,
             diagnosticsBinding: bindings.diagnostics,
             targetBinding: bindings.target,
             targetValue: targetValue,
@@ -1870,7 +1914,7 @@ extension MacroExpander {
 
     static func macroDiagnostics(
         in statements: [Statement],
-        macro: MacroDeclaration,
+        diagnosticOwnerName: String,
         diagnosticsBinding: String,
         targetBinding: String,
         targetValue: CompileTimeValue?,
@@ -1888,7 +1932,7 @@ extension MacroExpander {
             case .expression(let expression):
                 if let diagnostic = try macroDiagnostic(
                     from: expression,
-                    macro: macro,
+                    diagnosticOwnerName: diagnosticOwnerName,
                     diagnosticsBinding: diagnosticsBinding,
                     targetBinding: targetBinding,
                     targetValue: targetValue,
@@ -1899,11 +1943,24 @@ extension MacroExpander {
                     diagnostics.append(diagnostic)
                 }
             case .conditional(let branches):
+                let evaluator = CompileTimeValueEvaluator(
+                    targetBinding: targetBinding,
+                    targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
+                    graphBinding: graphBinding,
+                    localBindings: locals,
+                    macroDeclarationsByName: context.macroDeclarationsByName,
+                    context: context
+                )
                 for branch in branches {
+                    if let condition = branch.condition {
+                        guard case .boolean(true) = evaluator.evaluate(condition, with: locals) else {
+                            continue
+                        }
+                    }
                     diagnostics.append(
                         contentsOf: try macroDiagnostics(
                             in: branch.body,
-                            macro: macro,
+                            diagnosticOwnerName: diagnosticOwnerName,
                             diagnosticsBinding: diagnosticsBinding,
                             targetBinding: targetBinding,
                             targetValue: targetValue,
@@ -1912,12 +1969,13 @@ extension MacroExpander {
                             localBindings: locals
                         )
                     )
+                    break
                 }
             case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
                 diagnostics.append(
                     contentsOf: try macroDiagnostics(
                         in: body,
-                        macro: macro,
+                        diagnosticOwnerName: diagnosticOwnerName,
                         diagnosticsBinding: diagnosticsBinding,
                         targetBinding: targetBinding,
                         targetValue: targetValue,
@@ -1930,7 +1988,7 @@ extension MacroExpander {
                 diagnostics.append(
                     contentsOf: try macroDiagnostics(
                         in: background.body,
-                        macro: macro,
+                        diagnosticOwnerName: diagnosticOwnerName,
                         diagnosticsBinding: diagnosticsBinding,
                         targetBinding: targetBinding,
                         targetValue: targetValue,
@@ -1943,7 +2001,7 @@ extension MacroExpander {
                 diagnostics.append(
                     contentsOf: try macroDiagnostics(
                         in: deferred.body,
-                        macro: macro,
+                        diagnosticOwnerName: diagnosticOwnerName,
                         diagnosticsBinding: diagnosticsBinding,
                         targetBinding: targetBinding,
                         targetValue: targetValue,
@@ -1956,7 +2014,7 @@ extension MacroExpander {
                 diagnostics.append(
                     contentsOf: try macroDiagnostics(
                         in: declaration.body,
-                        macro: macro,
+                        diagnosticOwnerName: diagnosticOwnerName,
                         diagnosticsBinding: diagnosticsBinding,
                         targetBinding: targetBinding,
                         targetValue: targetValue,
@@ -1970,7 +2028,7 @@ extension MacroExpander {
                     diagnostics.append(
                         contentsOf: try macroDiagnostics(
                             in: switchCase.body,
-                            macro: macro,
+                            diagnosticOwnerName: diagnosticOwnerName,
                             diagnosticsBinding: diagnosticsBinding,
                             targetBinding: targetBinding,
                             targetValue: targetValue,
@@ -1984,7 +2042,7 @@ extension MacroExpander {
                     diagnostics.append(
                         contentsOf: try macroDiagnostics(
                             in: defaultBody,
-                            macro: macro,
+                            diagnosticOwnerName: diagnosticOwnerName,
                             diagnosticsBinding: diagnosticsBinding,
                             targetBinding: targetBinding,
                             targetValue: targetValue,
@@ -2005,7 +2063,7 @@ extension MacroExpander {
 
     static func macroDiagnostic(
         from expression: Expression,
-        macro: MacroDeclaration,
+        diagnosticOwnerName: String,
         diagnosticsBinding: String,
         targetBinding: String,
         targetValue: CompileTimeValue?,
@@ -2020,7 +2078,7 @@ extension MacroExpander {
         }
 
         guard let firstArgument = arguments.first(where: { $0.label == nil })?.value else {
-            throw ParseError("Macro #\(macro.name) \(name)(...) requires a message.")
+            throw ParseError("Macro #\(diagnosticOwnerName) \(name)(...) requires a message.")
         }
 
         let evaluator = CompileTimeValueEvaluator(
@@ -2032,7 +2090,7 @@ extension MacroExpander {
             context: context
         )
         guard case .string(let message) = evaluator.evaluate(firstArgument) else {
-            throw ParseError("Macro #\(macro.name) \(name)(...) message must evaluate to String.")
+            throw ParseError("Macro #\(diagnosticOwnerName) \(name)(...) message must evaluate to String.")
         }
 
         switch name {

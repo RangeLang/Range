@@ -200,7 +200,7 @@ private struct GitHubRepository: Decodable {
     let pushedAt: String?
 
     var manifestURL: URL {
-        URL(string: "https://raw.githubusercontent.com/\(fullName)/\(defaultBranch)/Package.range")!
+        URL(string: "https://raw.githubusercontent.com/\(fullName)/\(defaultBranch)/Project.range")!
     }
 
     enum CodingKeys: String, CodingKey {

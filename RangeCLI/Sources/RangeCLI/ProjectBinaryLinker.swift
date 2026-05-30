@@ -99,15 +99,15 @@ struct ProjectBinaryLinker {
     private func packageRoot(from rawPath: String) throws -> URL {
         let url = URL(fileURLWithPath: rawPath, isDirectory: true).standardizedFileURL
         let root: URL
-        if url.lastPathComponent == "Package.range" {
+        if url.lastPathComponent == "Project.range" {
             root = url.deletingLastPathComponent()
         } else {
             root = url
         }
 
-        let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
+        let packageFile = root.appendingPathComponent("Project.range", isDirectory: false)
         guard FileManager.default.fileExists(atPath: packageFile.path) else {
-            throw ValidationError("Missing Package.range in \(root.path).")
+            throw ValidationError("Missing Project.range in \(root.path).")
         }
 
         return root

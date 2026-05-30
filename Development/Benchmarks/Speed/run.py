@@ -486,7 +486,7 @@ def write_text(path: Path, value: str) -> None:
 def prepare_range_project(case: BenchmarkCase) -> Path:
     project = BUILD / "range-projects" / case.name
     project.mkdir(parents=True, exist_ok=True)
-    write_text(project / "Package.range", package_manifest("RangeSpeed" + case.name.title().replace("_", "")))
+    write_text(project / "Project.range", package_manifest("RangeSpeed" + case.name.title().replace("_", "")))
     write_text(project / "Playground.range", case.range_source)
     return project
 

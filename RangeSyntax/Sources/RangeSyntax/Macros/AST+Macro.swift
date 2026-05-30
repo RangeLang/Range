@@ -28,7 +28,7 @@ public struct MarkerDeclaration {
     public let body: [Statement]
 
     public var hasMetadataSlotEffect: Bool {
-        valueType.isMetadataSlotEffect
+        target.typeReferences.contains(.named("Construct")) && valueType == .named("Void")
     }
 
     public var hasLanguageEffect: Bool {
@@ -159,7 +159,8 @@ public struct MacroBindings {
 extension TypeReference {
     var markerEffectTarget: TypeReference? {
         guard case .generic(_, let arguments) = self,
-            arguments.count == 1
+            arguments.count == 1,
+            markerEffectName == "Language"
         else {
             return nil
         }
@@ -180,10 +181,7 @@ extension TypeReference {
     }
 
     var metadataSlotEffectTarget: TypeReference? {
-        guard markerEffectName == "Namespace" else {
-            return nil
-        }
-        return markerEffectTarget
+        nil
     }
 
     var isMetadataSlotEffect: Bool {

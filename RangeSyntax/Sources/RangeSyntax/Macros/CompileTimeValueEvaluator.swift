@@ -160,9 +160,31 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return .boolean(!valuesEqual(left, right))
+        case .binary(let lhs, .less, let rhs):
+            return evaluateIntegerComparison(lhs, rhs, locals: locals, <)
+        case .binary(let lhs, .lessEqual, let rhs):
+            return evaluateIntegerComparison(lhs, rhs, locals: locals, <=)
+        case .binary(let lhs, .greater, let rhs):
+            return evaluateIntegerComparison(lhs, rhs, locals: locals, >)
+        case .binary(let lhs, .greaterEqual, let rhs):
+            return evaluateIntegerComparison(lhs, rhs, locals: locals, >=)
         default:
             return nil
         }
+    }
+
+    private func evaluateIntegerComparison(
+        _ lhs: Expression,
+        _ rhs: Expression,
+        locals: [String: Expression],
+        _ compare: (Int, Int) -> Bool
+    ) -> CompileTimeValue? {
+        guard case .integer(let left) = evaluate(lhs, locals: locals),
+            case .integer(let right) = evaluate(rhs, locals: locals)
+        else {
+            return nil
+        }
+        return .boolean(compare(left, right))
     }
 
     private func enumCaseValue(named name: String) -> CompileTimeValue {
@@ -235,6 +257,11 @@ struct CompileTimeValueEvaluator {
         }
 
         for component in components.dropFirst() {
+            if case .object("GraphContext", _) = current, component == "markers", let context {
+                current = context.graphContext.markers()
+                continue
+            }
+
             if case .array(let values) = current {
                 switch component {
                 case "count":
@@ -262,12 +289,22 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
+        if name == "Array" || name.hasPrefix("Array<") {
+            guard arguments.count == 1,
+                arguments[0].label == nil,
+                case .array = evaluate(arguments[0].value, locals: locals)
+            else {
+                return nil
+            }
+            return evaluate(arguments[0].value, locals: locals)
+        }
+
         switch name {
         case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
             "ValueGeneric", "GraphIdentity", "Macro.Application", "Macro.Declaration", "Macro.Target",
-            "Marker.Application", "RangeGraphIdentity", "GraphDeclaration", "GraphApplication", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
+            "Marker", "Marker.Application", "Marker.Effect", "Void", "RangeGraphIdentity", "GraphDeclaration", "GraphApplication", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
             "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
             var fields: [String: CompileTimeValue] = [:]
@@ -322,13 +359,21 @@ struct CompileTimeValueEvaluator {
             }
             return context.graphContext.members(of: identity)
         case "\(graphBinding).markers":
-            guard arguments.count == 1,
-                arguments[0].label == "on",
-                let identity = evaluate(arguments[0].value, locals: locals)
+            guard arguments.count == 1
             else {
                 return nil
             }
-            return context.graphContext.markers(on: identity)
+            if arguments[0].label == "on",
+                let identity = evaluate(arguments[0].value, locals: locals)
+            {
+                return context.graphContext.markers(on: identity)
+            }
+            if arguments[0].label == "named",
+                case .string(let name)? = evaluate(arguments[0].value, locals: locals)
+            {
+                return context.graphContext.markers(named: name)
+            }
+            return nil
         case "\(graphBinding).macros":
             guard arguments.count == 1 else {
                 return nil
@@ -491,7 +536,7 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        let supportedSuffixes = [".map", ".compactMap", ".flatMap", ".filter"]
+        let supportedSuffixes = [".map", ".compactMap", ".flatMap", ".filter", ".where"]
         guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
             arguments.count == 1,
             arguments[0].label == nil,
@@ -527,7 +572,7 @@ struct CompileTimeValueEvaluator {
                 flattened.append(contentsOf: nested)
             }
             return .array(flattened)
-        case ".filter":
+        case ".filter", ".where":
             var filtered: [CompileTimeValue] = []
             for (element, value) in zip(elements, transformed) {
                 guard case .boolean(let include) = value else {

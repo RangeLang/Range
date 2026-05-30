@@ -1,0 +1,3 @@
+marker DataType(_ pattern: String): Construct -> String {
+    return pattern
+}
