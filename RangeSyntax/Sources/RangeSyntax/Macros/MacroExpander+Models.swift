@@ -136,7 +136,7 @@ struct MacroTargetSurface {
         switch value {
         case .string:
             return [.expression]
-        case .integer, .double, .boolean, .array:
+        case .integer, .double, .boolean, .nilValue, .array:
             return [.expression]
         case .object(let typeName, _) where typeName == "Block":
             return [.declaration]

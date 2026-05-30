@@ -47,6 +47,8 @@ struct CompileTimeValueEvaluator {
             return .double(value)
         case .boolean(let value):
             return .boolean(value)
+        case .nilLiteral:
+            return .nilValue
         case .macroInvocation(let name, let arguments):
             guard let macro = macroDeclarationsByName[name],
                 macro.target == nil,
@@ -112,6 +114,13 @@ struct CompileTimeValueEvaluator {
             ) {
                 return stringValue
             }
+            if let stringValue = evaluateStringCall(
+                name: name,
+                arguments: arguments,
+                locals: locals
+            ) {
+                return stringValue
+            }
             if let transformed = evaluateArrayTransform(
                 name: name,
                 arguments: arguments,
@@ -132,6 +141,11 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return evaluate(conditionValue ? trueExpression : falseExpression, locals: locals)
+        case .unary(.not, let expression):
+            guard case .boolean(let value) = evaluate(expression, locals: locals) else {
+                return nil
+            }
+            return .boolean(!value)
         case .binary(let lhs, .addition, let rhs):
             guard case .string(let left) = evaluate(lhs, locals: locals),
                 case .string(let right) = evaluate(rhs, locals: locals)
@@ -160,6 +174,14 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return .boolean(!valuesEqual(left, right))
+        case .binary(let lhs, .nilCoalescing, let rhs):
+            guard let left = evaluate(lhs, locals: locals) else {
+                return nil
+            }
+            if case .nilValue = left {
+                return evaluate(rhs, locals: locals)
+            }
+            return left
         case .binary(let lhs, .less, let rhs):
             return evaluateIntegerComparison(lhs, rhs, locals: locals, <)
         case .binary(let lhs, .lessEqual, let rhs):
@@ -207,6 +229,8 @@ struct CompileTimeValueEvaluator {
             return left == right
         case (.boolean(let left), .boolean(let right)):
             return left == right
+        case (.nilValue, .nilValue):
+            return true
         case (.object("Enum.Case", let left), .object("Enum.Case", let right)):
             guard let leftName = enumCaseName(left),
                 let rightName = enumCaseName(right)
@@ -275,6 +299,19 @@ struct CompileTimeValueEvaluator {
                 }
             }
 
+            if case .string(let value) = current {
+                switch component {
+                case "count":
+                    current = .integer(value.count)
+                    continue
+                case "isEmpty":
+                    current = .boolean(value.isEmpty)
+                    continue
+                default:
+                    break
+                }
+            }
+
             guard let next = current.field(component) else {
                 return nil
             }
@@ -284,11 +321,41 @@ struct CompileTimeValueEvaluator {
         return current
     }
 
+    private func evaluateStringCall(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        let suffix = ".character"
+        guard name.hasSuffix(suffix),
+            let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
+            case .string(let value) = source,
+            arguments.count == 1,
+            arguments[0].label == "index",
+            case .integer(let index) = evaluate(arguments[0].value, locals: locals),
+            index >= 0,
+            index < value.count
+        else {
+            return nil
+        }
+
+        let stringIndex = value.index(value.startIndex, offsetBy: index)
+        return .string(String(value[stringIndex]))
+    }
+
     private func evaluateObjectConstruction(
         name: String,
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
+        if let primitive = evaluatePrimitiveConstruction(
+            name: name,
+            arguments: arguments,
+            locals: locals
+        ) {
+            return primitive
+        }
+
         if name == "Array" || name.hasPrefix("Array<") {
             guard arguments.count == 1,
                 arguments[0].label == nil,
@@ -306,6 +373,7 @@ struct CompileTimeValueEvaluator {
             "ValueGeneric", "GraphIdentity", "Macro.Application", "Macro.Declaration", "Macro.Target",
             "Marker", "Marker.Application", "Marker.Effect", "Void", "RangeGraphIdentity", "GraphDeclaration", "GraphApplication", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
+            "WrittenExpression",
             "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
@@ -317,6 +385,26 @@ struct CompileTimeValueEvaluator {
                 fields[label] = value
             }
             return .object(typeName: name, fields: fields)
+        default:
+            return nil
+        }
+    }
+
+    private func evaluatePrimitiveConstruction(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        guard arguments.count == 1,
+            arguments[0].label == nil,
+            let value = evaluate(arguments[0].value, locals: locals)
+        else {
+            return nil
+        }
+
+        switch (name, value) {
+        case ("String", .string), ("Int", .integer), ("Bool", .boolean), ("Float", .double):
+            return value
         default:
             return nil
         }

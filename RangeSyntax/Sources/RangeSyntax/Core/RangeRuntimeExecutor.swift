@@ -5,6 +5,7 @@ public indirect enum RangeRuntimeValue: CustomStringConvertible, Equatable {
     case integer(Int)
     case double(Double)
     case boolean(Bool)
+    case nilValue
     case array([RangeRuntimeValue])
     case object(typeName: String, fields: [String: RangeRuntimeValue])
 
@@ -18,6 +19,8 @@ public indirect enum RangeRuntimeValue: CustomStringConvertible, Equatable {
             return String(value)
         case .boolean(let value):
             return value ? "true" : "false"
+        case .nilValue:
+            return "nil"
         case .array(let values):
             return "[" + values.map(\.description).joined(separator: ", ") + "]"
         case .object(let typeName, let fields):
@@ -164,6 +167,8 @@ private extension RangeRuntimeValue {
             self = .double(value)
         case .boolean(let value):
             self = .boolean(value)
+        case .nilValue:
+            self = .nilValue
         case .array(let values):
             self = .array(values.map(RangeRuntimeValue.init))
         case .object(let typeName, let fields):

@@ -716,7 +716,7 @@ extension ApplicationGraphValidator {
             )
         }
 
-        let pattern = normalizedDataTypeLiteral(dataType.argumentClause ?? "")
+        let pattern = normalizedDataTypeLiteral(dataTypePatternArgument(dataType.argumentClause ?? ""))
         let patternSegments = try dataTypeSegments(
             pattern,
             description: "#DataType pattern on \(name)"
@@ -778,6 +778,13 @@ extension ApplicationGraphValidator {
             return trimmed
         }
         return String(trimmed.dropFirst().dropLast())
+    }
+
+    func dataTypePatternArgument(_ argumentClause: String) -> String {
+        argumentClause.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
+            .first
+            .map(String.init)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     func dataTypeSegments(_ value: String, description: String) throws -> [String] {

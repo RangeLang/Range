@@ -1,3 +1,46 @@
-marker DataType(_ pattern: String): Construct -> String {
-    return pattern
+open marker DataType(@capture _ pattern: Expression, delimiter: String?): Construct { target, diagnostics in
+    let source: String(pattern.written.text)
+    state index: Int(0)
+    state delimiterCount: Int(0)
+    state previousWasDelimiter: Bool(false)
+
+    if delimiter == nil {
+        diagnostics.error("#DataType delimiter is required.")
+    }
+
+    if source.count == 0 {
+        diagnostics.error("#DataType pattern must use dot-delimited slots.")
+    }
+
+    while index < source.count {
+        let character: String(source.character(index: index))
+        state isDelimiter: Bool(true)
+
+        if character != delimiter {
+            set isDelimiter   false
+        }
+
+        if isDelimiter {
+            delimiterCount += 1
+
+            if index == 0 {
+                diagnostics.error("#DataType pattern must not start with '.'.")
+            }
+
+            if previousWasDelimiter {
+                diagnostics.error("#DataType pattern must contain non-empty dot-delimited slots.")
+            }
+        }
+
+        set previousWasDelimiter   isDelimiter
+        index += 1
+    }
+
+    if delimiterCount == 0 {
+        diagnostics.error("#DataType pattern must contain at least one dot delimiter.")
+    }
+
+    if previousWasDelimiter {
+        diagnostics.error("#DataType pattern must not end with delimiter.")
+    }
 }

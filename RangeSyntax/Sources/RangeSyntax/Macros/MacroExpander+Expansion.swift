@@ -685,7 +685,7 @@ extension MacroExpander {
                             "Marker #\(application.name) targeting \(marker.target.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                         )
                     }
-                    _ = try parseMarkerArgumentBindings(
+                    let argumentBindings = try parseMarkerArgumentBindings(
                         for: marker,
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
@@ -698,7 +698,8 @@ extension MacroExpander {
                         from: marker.body,
                         marker: marker,
                         targetValue: targetValue,
-                        context: context
+                        context: context,
+                        localBindings: argumentBindings
                     )
                     if marker.valueType.isMarkerEffect {
                         continue
@@ -1867,7 +1868,8 @@ extension MacroExpander {
         from statements: [Statement],
         marker: MarkerDeclaration,
         targetValue: CompileTimeValue? = nil,
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        localBindings: [String: Expression] = [:]
     ) throws {
         guard let bindings = marker.bindings else {
             return
@@ -1877,7 +1879,8 @@ extension MacroExpander {
             diagnosticOwnerName: marker.name,
             bindings: bindings,
             targetValue: targetValue,
-            context: context
+            context: context,
+            localBindings: localBindings
         )
     }
 
@@ -1886,7 +1889,8 @@ extension MacroExpander {
         diagnosticOwnerName: String,
         bindings: MacroBindings,
         targetValue: CompileTimeValue?,
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        localBindings: [String: Expression] = [:]
     ) throws {
         let diagnostics = try macroDiagnostics(
             in: statements,
@@ -1896,7 +1900,7 @@ extension MacroExpander {
             targetValue: targetValue,
             graphBinding: bindings.graph,
             context: context,
-            localBindings: [:]
+            localBindings: localBindings
         )
         for diagnostic in diagnostics {
             switch diagnostic.severity {
@@ -1922,6 +1926,28 @@ extension MacroExpander {
         context: MacroExpansionContext,
         localBindings: [String: Expression]
     ) throws -> [RangeDiagnostic] {
+        try macroDiagnosticsAndLocals(
+            in: statements,
+            diagnosticOwnerName: diagnosticOwnerName,
+            diagnosticsBinding: diagnosticsBinding,
+            targetBinding: targetBinding,
+            targetValue: targetValue,
+            graphBinding: graphBinding,
+            context: context,
+            localBindings: localBindings
+        ).diagnostics
+    }
+
+    private static func macroDiagnosticsAndLocals(
+        in statements: [Statement],
+        diagnosticOwnerName: String,
+        diagnosticsBinding: String,
+        targetBinding: String,
+        targetValue: CompileTimeValue?,
+        graphBinding: String?,
+        context: MacroExpansionContext,
+        localBindings: [String: Expression]
+    ) throws -> (diagnostics: [RangeDiagnostic], locals: [String: Expression]) {
         var diagnostics: [RangeDiagnostic] = []
         var locals = localBindings
 
@@ -1957,23 +1983,38 @@ extension MacroExpander {
                             continue
                         }
                     }
-                    diagnostics.append(
-                        contentsOf: try macroDiagnostics(
-                            in: branch.body,
-                            diagnosticOwnerName: diagnosticOwnerName,
-                            diagnosticsBinding: diagnosticsBinding,
-                            targetBinding: targetBinding,
-                            targetValue: targetValue,
-                            graphBinding: graphBinding,
-                            context: context,
-                            localBindings: locals
-                        )
+                    let branchResult = try macroDiagnosticsAndLocals(
+                        in: branch.body,
+                        diagnosticOwnerName: diagnosticOwnerName,
+                        diagnosticsBinding: diagnosticsBinding,
+                        targetBinding: targetBinding,
+                        targetValue: targetValue,
+                        graphBinding: graphBinding,
+                        context: context,
+                        localBindings: locals
                     )
+                    diagnostics.append(contentsOf: branchResult.diagnostics)
+                    locals = branchResult.locals
                     break
                 }
-            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
-                diagnostics.append(
-                    contentsOf: try macroDiagnostics(
+            case .whileLoop(let condition, let body):
+                var iterationCount = 0
+                while true {
+                    let evaluator = CompileTimeValueEvaluator(
+                        targetBinding: targetBinding,
+                        targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
+                        graphBinding: graphBinding,
+                        localBindings: locals,
+                        macroDeclarationsByName: context.macroDeclarationsByName,
+                        context: context
+                    )
+                    guard case .boolean(true) = evaluator.evaluate(condition, with: locals) else {
+                        break
+                    }
+                    guard iterationCount < 10_000 else {
+                        throw ParseError("Macro #\(diagnosticOwnerName) diagnostic loop exceeded 10000 iterations.")
+                    }
+                    let bodyResult = try macroDiagnosticsAndLocals(
                         in: body,
                         diagnosticOwnerName: diagnosticOwnerName,
                         diagnosticsBinding: diagnosticsBinding,
@@ -1983,82 +2024,144 @@ extension MacroExpander {
                         context: context,
                         localBindings: locals
                     )
+                    diagnostics.append(contentsOf: bodyResult.diagnostics)
+                    locals = bodyResult.locals
+                    iterationCount += 1
+                }
+            case .forEach(_, _, let body), .derived(_, _, let body):
+                let bodyResult = try macroDiagnosticsAndLocals(
+                    in: body,
+                    diagnosticOwnerName: diagnosticOwnerName,
+                    diagnosticsBinding: diagnosticsBinding,
+                    targetBinding: targetBinding,
+                    targetValue: targetValue,
+                    graphBinding: graphBinding,
+                    context: context,
+                    localBindings: locals
                 )
+                diagnostics.append(contentsOf: bodyResult.diagnostics)
+                locals = bodyResult.locals
             case .background(let background):
-                diagnostics.append(
-                    contentsOf: try macroDiagnostics(
-                        in: background.body,
-                        diagnosticOwnerName: diagnosticOwnerName,
-                        diagnosticsBinding: diagnosticsBinding,
-                        targetBinding: targetBinding,
-                        targetValue: targetValue,
-                        graphBinding: graphBinding,
-                        context: context,
-                        localBindings: locals
-                    )
+                let bodyResult = try macroDiagnosticsAndLocals(
+                    in: background.body,
+                    diagnosticOwnerName: diagnosticOwnerName,
+                    diagnosticsBinding: diagnosticsBinding,
+                    targetBinding: targetBinding,
+                    targetValue: targetValue,
+                    graphBinding: graphBinding,
+                    context: context,
+                    localBindings: locals
                 )
+                diagnostics.append(contentsOf: bodyResult.diagnostics)
+                locals = bodyResult.locals
             case .deferBlock(let deferred):
-                diagnostics.append(
-                    contentsOf: try macroDiagnostics(
-                        in: deferred.body,
-                        diagnosticOwnerName: diagnosticOwnerName,
-                        diagnosticsBinding: diagnosticsBinding,
-                        targetBinding: targetBinding,
-                        targetValue: targetValue,
-                        graphBinding: graphBinding,
-                        context: context,
-                        localBindings: locals
-                    )
+                let bodyResult = try macroDiagnosticsAndLocals(
+                    in: deferred.body,
+                    diagnosticOwnerName: diagnosticOwnerName,
+                    diagnosticsBinding: diagnosticsBinding,
+                    targetBinding: targetBinding,
+                    targetValue: targetValue,
+                    graphBinding: graphBinding,
+                    context: context,
+                    localBindings: locals
                 )
+                diagnostics.append(contentsOf: bodyResult.diagnostics)
+                locals = bodyResult.locals
             case .localCallable(let declaration):
-                diagnostics.append(
-                    contentsOf: try macroDiagnostics(
-                        in: declaration.body,
-                        diagnosticOwnerName: diagnosticOwnerName,
-                        diagnosticsBinding: diagnosticsBinding,
-                        targetBinding: targetBinding,
-                        targetValue: targetValue,
-                        graphBinding: graphBinding,
-                        context: context,
-                        localBindings: locals
-                    )
+                let bodyResult = try macroDiagnosticsAndLocals(
+                    in: declaration.body,
+                    diagnosticOwnerName: diagnosticOwnerName,
+                    diagnosticsBinding: diagnosticsBinding,
+                    targetBinding: targetBinding,
+                    targetValue: targetValue,
+                    graphBinding: graphBinding,
+                    context: context,
+                    localBindings: locals
                 )
+                diagnostics.append(contentsOf: bodyResult.diagnostics)
+                locals = bodyResult.locals
             case .switchStatement(_, let cases, let defaultBody):
                 for switchCase in cases {
-                    diagnostics.append(
-                        contentsOf: try macroDiagnostics(
-                            in: switchCase.body,
-                            diagnosticOwnerName: diagnosticOwnerName,
-                            diagnosticsBinding: diagnosticsBinding,
-                            targetBinding: targetBinding,
-                            targetValue: targetValue,
-                            graphBinding: graphBinding,
-                            context: context,
-                            localBindings: locals
-                        )
+                    let caseResult = try macroDiagnosticsAndLocals(
+                        in: switchCase.body,
+                        diagnosticOwnerName: diagnosticOwnerName,
+                        diagnosticsBinding: diagnosticsBinding,
+                        targetBinding: targetBinding,
+                        targetValue: targetValue,
+                        graphBinding: graphBinding,
+                        context: context,
+                        localBindings: locals
                     )
+                    diagnostics.append(contentsOf: caseResult.diagnostics)
+                    locals = caseResult.locals
                 }
                 if let defaultBody {
-                    diagnostics.append(
-                        contentsOf: try macroDiagnostics(
-                            in: defaultBody,
-                            diagnosticOwnerName: diagnosticOwnerName,
-                            diagnosticsBinding: diagnosticsBinding,
-                            targetBinding: targetBinding,
-                            targetValue: targetValue,
-                            graphBinding: graphBinding,
-                            context: context,
-                            localBindings: locals
-                        )
+                    let defaultResult = try macroDiagnosticsAndLocals(
+                        in: defaultBody,
+                        diagnosticOwnerName: diagnosticOwnerName,
+                        diagnosticsBinding: diagnosticsBinding,
+                        targetBinding: targetBinding,
+                        targetValue: targetValue,
+                        graphBinding: graphBinding,
+                        context: context,
+                        localBindings: locals
                     )
+                    diagnostics.append(contentsOf: defaultResult.diagnostics)
+                    locals = defaultResult.locals
                 }
-            case .expand, .macroInvocation, .assignment, .compoundAssignment, .return,
-                .break, .continue:
+            case .assignment(let target, let expression):
+                guard let name = diagnosticMutableBindingName(target) else {
+                    continue
+                }
+                let evaluator = CompileTimeValueEvaluator(
+                    targetBinding: targetBinding,
+                    targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
+                    graphBinding: graphBinding,
+                    localBindings: locals,
+                    macroDeclarationsByName: context.macroDeclarationsByName,
+                    context: context
+                )
+                locals[name] = evaluator.evaluate(expression, with: locals)?.expression ?? expression
+            case .compoundAssignment(let target, .plusEquals, let expression):
+                guard let name = diagnosticMutableBindingName(target),
+                    let currentExpression = locals[name]
+                else {
+                    continue
+                }
+                let evaluator = CompileTimeValueEvaluator(
+                    targetBinding: targetBinding,
+                    targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
+                    graphBinding: graphBinding,
+                    localBindings: locals,
+                    macroDeclarationsByName: context.macroDeclarationsByName,
+                    context: context
+                )
+                switch (
+                    evaluator.evaluate(currentExpression, with: locals),
+                    evaluator.evaluate(expression, with: locals)
+                ) {
+                case (.integer(let current)?, .integer(let increment)?):
+                    locals[name] = .integer(current + increment)
+                case (.string(let current)?, .string(let suffix)?):
+                    locals[name] = .string(current + suffix)
+                default:
+                    continue
+                }
+            case .expand, .macroInvocation, .return, .break, .continue:
                 continue
             }
         }
 
-        return diagnostics
+        return (diagnostics, locals)
+    }
+
+    private static func diagnosticMutableBindingName(_ target: AssignmentTarget) -> String? {
+        switch target {
+        case .local(let name), .state(let name):
+            return name
+        case .binding, .member:
+            return nil
+        }
     }
 
     static func macroDiagnostic(

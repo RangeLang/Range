@@ -435,6 +435,10 @@ struct MacroTargetValueBuilder {
             return true
         case (.object("Void", _), .named("Void")):
             return true
+        case (.nilValue, .optional):
+            return true
+        case (let value, .optional(let wrapped)):
+            return markerValue(value, matches: wrapped)
         case (.object(let typeName, _), .named(let name)):
             return typeName == name
         default:

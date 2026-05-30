@@ -5,6 +5,7 @@ indirect enum CompileTimeValue {
     case integer(Int)
     case double(Double)
     case boolean(Bool)
+    case nilValue
     case array([CompileTimeValue])
     case object(typeName: String, fields: [String: CompileTimeValue])
 
@@ -28,6 +29,8 @@ indirect enum CompileTimeValue {
             return .double(value)
         case .boolean(let value):
             return .boolean(value)
+        case .nilValue:
+            return .nilLiteral
         case .array(let values):
             let elements = values.compactMap(\.expression)
             guard elements.count == values.count else {

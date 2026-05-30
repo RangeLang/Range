@@ -1,0 +1,7 @@
+@syntax
+construct WrittenExpression: Expression {
+    let type: TypeReference?
+    let written: WrittenSyntax
+
+    function replace(with replacement: Expression): Expression
+}

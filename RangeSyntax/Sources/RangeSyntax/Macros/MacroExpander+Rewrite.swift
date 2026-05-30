@@ -451,7 +451,7 @@ extension MacroExpander {
                             "Marker #\(application.name) is used on a construct but targets \(marker.target.displayName)."
                         )
                     }
-                    _ = try parseMarkerArgumentBindings(
+                    let argumentBindings = try parseMarkerArgumentBindings(
                         for: marker,
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
@@ -461,7 +461,8 @@ extension MacroExpander {
                         from: marker.body,
                         marker: marker,
                         targetValue: targetValue,
-                        context: context
+                        context: context,
+                        localBindings: argumentBindings
                     )
                     if marker.valueType.isMarkerEffect {
                         continue

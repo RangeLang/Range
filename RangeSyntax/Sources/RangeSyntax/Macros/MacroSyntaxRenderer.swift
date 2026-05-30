@@ -498,6 +498,13 @@ struct MacroSyntaxRenderer {
                 return "."
             }
             return ".\(identifier)"
+        case .object(let typeName, let fields) where typeName == "WrittenExpression":
+            guard case .object("WrittenSyntax", let writtenFields)? = fields["written"],
+                case .string(let text)? = writtenFields["text"]
+            else {
+                return ""
+            }
+            return text
         default:
             guard let expression = value.expression else {
                 return ""

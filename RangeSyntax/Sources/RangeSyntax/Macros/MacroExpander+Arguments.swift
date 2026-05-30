@@ -92,8 +92,13 @@ extension MacroExpander {
                 arguments: []
             )
         }
-        if parameters.count == 1, parameters[0].capturesSyntax {
-            return [parameters[0].localName: .string(normalizedArgumentClause)]
+        if let firstParameter = parameters.first, firstParameter.capturesSyntax {
+            return try capturedMarkerArgumentBindings(
+                kind: "Marker",
+                name: marker.name,
+                parameters: parameters,
+                argumentClause: normalizedArgumentClause
+            )
         }
 
         var parser = try Parser(source: "marker(\(normalizedArgumentClause))")
@@ -107,6 +112,107 @@ extension MacroExpander {
             parameters: parameters,
             arguments: arguments
         )
+    }
+
+    private static func capturedMarkerArgumentBindings(
+        kind: String,
+        name: String,
+        parameters: [RangeFunctionParameter],
+        argumentClause: String
+    ) throws -> [String: Expression] {
+        let firstParameter = parameters[0]
+        let remainingParameters = Array(parameters.dropFirst())
+        let (capturedSource, remainingSource) = splitCapturedArgument(argumentClause)
+        var bindings = [
+            firstParameter.localName: capturedSyntaxValue(capturedSource, for: firstParameter)
+        ]
+
+        if !remainingParameters.isEmpty {
+            let remainingArguments: [CallArgument]
+            if let remainingSource, !remainingSource.isEmpty {
+                var parser = try Parser(source: "marker(\(remainingSource))")
+                _ = try parser.consumeCallableName()
+                remainingArguments = try parser.parseInvocationArgumentsIfPresent()
+                try parser.consume(Token.eof)
+            } else {
+                remainingArguments = []
+            }
+
+            let remainingBindings = try argumentBindings(
+                kind: kind,
+                name: name,
+                parameters: remainingParameters,
+                arguments: remainingArguments
+            )
+            for (key, value) in remainingBindings {
+                bindings[key] = value
+            }
+        }
+
+        return bindings
+    }
+
+    private static func capturedSyntaxValue(
+        _ source: String,
+        for parameter: RangeFunctionParameter
+    ) -> Expression {
+        let captureType = parameter.captureMetadataType ?? parameter.typeReference
+        guard captureType?.displayName == "Expression" else {
+            return .string(source)
+        }
+
+        return .call(
+            name: "WrittenExpression",
+            arguments: [
+                CallArgument(label: "type", value: .nilLiteral),
+                CallArgument(
+                    label: "written",
+                    value: .call(
+                        name: "WrittenSyntax",
+                        arguments: [
+                            CallArgument(label: "text", value: .string(source)),
+                            CallArgument(label: "range", value: .nilLiteral)
+                        ]
+                    )
+                )
+            ]
+        )
+    }
+
+    private static func splitCapturedArgument(_ source: String) -> (captured: String, remaining: String?) {
+        var depth = 0
+        var inString = false
+        var previousWasEscape = false
+
+        for (offset, character) in source.enumerated() {
+            if inString {
+                if character == "\"" && !previousWasEscape {
+                    inString = false
+                }
+                previousWasEscape = character == "\\" && !previousWasEscape
+                continue
+            }
+
+            switch character {
+            case "\"":
+                inString = true
+                previousWasEscape = false
+            case "(", "[", "{":
+                depth += 1
+            case ")", "]", "}":
+                depth = max(0, depth - 1)
+            case "," where depth == 0:
+                let index = source.index(source.startIndex, offsetBy: offset)
+                let captured = source[..<index].trimmingCharacters(in: .whitespacesAndNewlines)
+                let remainingStart = source.index(after: index)
+                let remaining = source[remainingStart...].trimmingCharacters(in: .whitespacesAndNewlines)
+                return (captured, remaining.isEmpty ? nil : String(remaining))
+            default:
+                break
+            }
+        }
+
+        return (source.trimmingCharacters(in: .whitespacesAndNewlines), nil)
     }
 
     private static func argumentBindings(
@@ -151,10 +257,15 @@ extension MacroExpander {
         }
 
         for parameter in parameters.dropFirst(arguments.count) {
-            guard let defaultValue = parameter.defaultValue else {
-                throw ParseError("\(kind) #\(name) requires argument \(parameter.localName).")
+            if let defaultValue = parameter.defaultValue {
+                bindings[parameter.localName] = defaultValue
+                continue
             }
-            bindings[parameter.localName] = defaultValue
+            if parameter.typeReference?.isOptionalReference == true {
+                bindings[parameter.localName] = .nilLiteral
+                continue
+            }
+            throw ParseError("\(kind) #\(name) requires argument \(parameter.localName).")
         }
 
         return bindings
@@ -182,5 +293,14 @@ extension MacroExpander {
 
     static func macroArgumentLabel(for parameter: RangeFunctionParameter) -> String? {
         parameter.externalLabel
+    }
+}
+
+private extension TypeReference {
+    var isOptionalReference: Bool {
+        guard case .optional = self else {
+            return false
+        }
+        return true
     }
 }

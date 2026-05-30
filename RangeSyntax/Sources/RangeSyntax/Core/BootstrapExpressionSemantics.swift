@@ -786,6 +786,21 @@ public enum ExpressionTypeSemantics {
             return nil
         }
 
+        if baseReference.displayName == "Expression", memberName == "written" {
+            return .named("WrittenSyntax")
+        }
+
+        if baseReference.displayName == "WrittenSyntax" {
+            switch memberName {
+            case "text":
+                return .named("String")
+            case "range":
+                return .optional(.named("SourceRange"))
+            default:
+                break
+            }
+        }
+
         if let memberType = memberResolver.memberType(
             baseType: baseReference,
             memberName: memberName
@@ -905,6 +920,21 @@ public enum ExpressionTypeSemantics {
             )
         else {
             return nil
+        }
+
+        if baseReference.displayName == "Expression", memberName == "written" {
+            return .named("WrittenSyntax")
+        }
+
+        if baseReference.displayName == "WrittenSyntax" {
+            switch memberName {
+            case "text":
+                return .named("String")
+            case "range":
+                return .optional(.named("SourceRange"))
+            default:
+                break
+            }
         }
 
         if let graphMemberType = memberResolver.memberType(

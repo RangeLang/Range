@@ -1,4 +1,4 @@
-#DataType(0.0.0)
+#DataType(0.0.0, delimiter: ".")
 construct Version {
     state major: Int<.unsigned>
     state minor: Int<.unsigned>
