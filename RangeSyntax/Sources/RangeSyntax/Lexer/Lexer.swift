@@ -1,6 +1,6 @@
 import Foundation
 
-// Boundary rule: lexer behavior belongs in RangeCore/Syntax/Lexing/*.range.
+// Boundary rule: lexer behavior belongs in RangeCompiler/Core/Syntax/Lexing/*.range.
 // This Swift file adapts the parser to the Range-authored bootstrap projection.
 
 struct LexerForeignBody {
@@ -34,7 +34,7 @@ struct Lexer {
     }
 }
 
-// Bootstrap projection of RangeCore/Syntax/Lexing/Lexer.range.
+// Bootstrap projection of RangeCompiler/Core/Syntax/Lexing/Lexer.range.
 struct RangeAuthoredLexer {
     func tokenize(
         source: String,

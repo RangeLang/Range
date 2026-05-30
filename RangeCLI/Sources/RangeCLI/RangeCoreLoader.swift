@@ -15,7 +15,7 @@ enum RangeCoreLoader {
         }
 
         throw ValidationError(
-            "Missing RangeCore sources. Checked: \(candidates.map(\.path).joined(separator: ", "))"
+            "Missing Range compiler core sources. Checked: \(candidates.map(\.path).joined(separator: ", "))"
         )
     }
 
@@ -27,17 +27,30 @@ enum RangeCoreLoader {
 
         let executableURL = installedExecutableURL()
         let executableDirectory = executableURL.deletingLastPathComponent()
-        let installRoot = executableDirectory
+        let installedCompilerCoreRoot = executableDirectory
+            .appendingPathComponent("RangeCompiler", isDirectory: true)
+            .appendingPathComponent("Core", isDirectory: true)
+        let installedCoreRoot = executableDirectory
             .appendingPathComponent("RangeCore", isDirectory: true)
 
-        let sourceRoot = URL(fileURLWithPath: #filePath)
+        let repositoryRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+        let sourceCompilerCoreRoot = repositoryRoot
+            .appendingPathComponent("RangeCompiler", isDirectory: true)
+            .appendingPathComponent("Core", isDirectory: true)
+        let sourceCoreRoot = repositoryRoot
             .appendingPathComponent("RangeCore", isDirectory: true)
 
-        return [explicitPath, installRoot, sourceRoot].compactMap(\.self)
+        return [
+            explicitPath,
+            installedCompilerCoreRoot,
+            installedCoreRoot,
+            sourceCompilerCoreRoot,
+            sourceCoreRoot,
+        ].compactMap(\.self)
     }
 
     private static func installedExecutableURL() -> URL {
@@ -90,7 +103,7 @@ enum RangeCoreLoader {
                 options: [.skipsHiddenFiles]
             )
         else {
-            throw ValidationError("Could not inspect RangeCore sources at \(coreRoot.path)")
+            throw ValidationError("Could not inspect Range compiler core sources at \(coreRoot.path)")
         }
 
         var files: [URL] = []
@@ -98,7 +111,7 @@ enum RangeCoreLoader {
             let isDirectory =
                 (try? fileURL.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
             if isDirectory, fileURL.lastPathComponent == "Exploration",
-                fileURL.path.contains("/RangeCore/")
+                isCorePath(fileURL.path)
             {
                 enumerator.skipDescendants()
                 continue
@@ -122,10 +135,14 @@ enum RangeCoreLoader {
                 )
             } catch {
                 throw ValidationError(
-                    "Failed to read RangeCore file \(fileURL.lastPathComponent): \(ErrorDescription.message(for: error))"
+                    "Failed to read Range compiler core file \(fileURL.lastPathComponent): \(ErrorDescription.message(for: error))"
                 )
             }
         }
+    }
+
+    static func isCorePath(_ path: String) -> Bool {
+        path.contains("/RangeCore/") || path.contains("/RangeCompiler/Core/")
     }
 
     static func compiledProgram() throws -> CompiledProgram {

@@ -275,15 +275,15 @@ struct SwiftBackendProgramBuilder {
             || rangeProgramUsesSyntaxLexingSupport(compiledProgram)
         let coreUnits = compiledProgram.expandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
             guard compiledProgram.sourceRole(forPath: parsedFile.path) == .core,
-                parsedFile.path.contains("/RangeCore/Encoding/")
+                isCorePath(parsedFile.path, containing: "Encoding/")
                     || (includeSyntaxLexingSupport
-                        && parsedFile.path.contains("/RangeCore/Syntax/Lexing/"))
+                        && isCorePath(parsedFile.path, containing: "Syntax/Lexing/"))
                     || (includeSyntaxLexingSupport
-                        && parsedFile.path.contains("/RangeCore/Syntax/Identifier.range"))
+                        && isCorePath(parsedFile.path, containing: "Syntax/Identifier.range"))
                     || (includeSyntaxLexingSupport
-                        && parsedFile.path.contains("/RangeCore/Macros/CoreMacro/SyntaxEmittable.range"))
-                    || parsedFile.path.contains("/RangeCore/Syntax/Program/")
-                    || parsedFile.path.contains("/RangeCore/System/File/")
+                        && isCorePath(parsedFile.path, containing: "Macros/CoreMacro/SyntaxEmittable.range"))
+                    || isCorePath(parsedFile.path, containing: "Syntax/Program/")
+                    || isCorePath(parsedFile.path, containing: "System/File/")
             else {
                 return nil
             }
@@ -386,7 +386,7 @@ struct SwiftBackendProgramBuilder {
     private func rangeProgramUsesSyntaxLexingSupport(_ compiledProgram: CompiledProgram) -> Bool {
         compiledProgram.expandedFiles.contains { parsedFile in
             compiledProgram.sourceRole(forPath: parsedFile.path) == .core
-                && parsedFile.path.contains("/RangeCore/Syntax/Program/")
+                && isCorePath(parsedFile.path, containing: "Syntax/Program/")
                 && parsedFile.source?.contains("LexicalToken") == true
         }
     }
@@ -395,12 +395,16 @@ struct SwiftBackendProgramBuilder {
         _ declaration: ConstructDeclaration,
         in path: String
     ) -> Bool {
-        guard path.contains("/RangeCore/System/File/") else {
+        guard isCorePath(path, containing: "System/File/") else {
             return true
         }
 
         return declaration.name != "HostFileSystem"
             && declaration.name != "FileManager"
             && declaration.name != "UTF8"
+    }
+
+    private func isCorePath(_ path: String, containing suffix: String) -> Bool {
+        path.contains("/RangeCore/\(suffix)") || path.contains("/RangeCompiler/Core/\(suffix)")
     }
 }
