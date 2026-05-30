@@ -2507,13 +2507,16 @@ private func fixtureFile(in suite: String, path: String) throws -> URL {
 }
 
 private func rangeCoreInputs() throws -> [SourceInput] {
-    try rangeFiles(
-        in: try repositoryRoot()
-            .appendingPathComponent("RangeCompiler", isDirectory: true)
-            .appendingPathComponent("Core", isDirectory: true),
+    let root = try repositoryRoot().appendingPathComponent("RangeCompiler", isDirectory: true)
+    let files = try rangeFiles(
+        in: root.appendingPathComponent("Core", isDirectory: true),
+        excludingExploration: true
+    ) + rangeFiles(
+        in: root.appendingPathComponent("Lexer", isDirectory: true),
         excludingExploration: true
     )
-    .map { file in
+
+    return try files.map { file in
         SourceInput(
             path: file.path,
             source: try String(contentsOf: file, encoding: .utf8),

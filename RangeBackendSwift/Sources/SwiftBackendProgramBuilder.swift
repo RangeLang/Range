@@ -279,9 +279,11 @@ struct SwiftBackendProgramBuilder {
                     || (includeSyntaxLexingSupport
                         && isCorePath(parsedFile.path, containing: "Syntax/Lexing/"))
                     || (includeSyntaxLexingSupport
+                        && parsedFile.path.contains("/RangeCompiler/Lexer/"))
+                    || (includeSyntaxLexingSupport
                         && isCorePath(parsedFile.path, containing: "Syntax/Identifier.range"))
                     || (includeSyntaxLexingSupport
-                        && isCorePath(parsedFile.path, containing: "Macros/CoreMacro/SyntaxEmittable.range"))
+                        && isCorePath(parsedFile.path, containing: "Macro/SyntaxEmittable.range"))
                     || isCorePath(parsedFile.path, containing: "Syntax/Program/")
                     || isCorePath(parsedFile.path, containing: "System/File/")
             else {
@@ -378,6 +380,7 @@ struct SwiftBackendProgramBuilder {
         compiledProgram.projectExpandedFiles.contains { parsedFile in
             parsedFile.path.contains("/Syntax/")
                 || parsedFile.source?.contains("Lexer") == true
+                || parsedFile.source?.contains("Lexing") == true
                 || parsedFile.source?.contains("LexicalToken") == true
                 || parsedFile.source?.contains("rangeLexer") == true
         }

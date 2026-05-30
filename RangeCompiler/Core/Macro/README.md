@@ -1,9 +1,9 @@
 # Macros
 
-Current macro surface is split into:
+Current macro surface lives in `RangeCompiler/Core/Macro`.
 
-- `CoreMacro`
-- `Implementations`
+Shipped macro implementations live in `RangeCompiler/Foundation/Macros`. They
+are bundled with the compiler, but kept outside the core package surface.
 
 Compiler-owned syntax surfaces now live in `RangeCompiler/Core/Syntax`:
 
@@ -12,9 +12,6 @@ Compiler-owned syntax surfaces now live in `RangeCompiler/Core/Syntax`:
 - `Expressions`
 - `Types`
 - `Declarations`
-
-`Implementations/README.md` is the index of active bootstrap macro coverage and
-the current implementation status of each macro target kind.
 
 `RangeSyntax/Sources/RangeSyntax/Macros/Macros.Context.md` documents the current
 target-surface model, including declaration-side and application-side macro

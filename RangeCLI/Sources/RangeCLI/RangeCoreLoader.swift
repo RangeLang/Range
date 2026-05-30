@@ -19,6 +19,36 @@ enum RangeCoreLoader {
         )
     }
 
+    static func coreRoots() throws -> [URL] {
+        let primaryRoot = try coreRoot()
+        var roots = [primaryRoot]
+
+        if primaryRoot.lastPathComponent == "Core" {
+            let compilerRoot = primaryRoot.deletingLastPathComponent()
+            let foundationRoot = compilerRoot
+                .appendingPathComponent("Foundation", isDirectory: true)
+                .standardizedFileURL
+            if isExistingDirectory(foundationRoot) {
+                roots.append(foundationRoot)
+            }
+
+            let lexerRoot = compilerRoot
+                .appendingPathComponent("Lexer", isDirectory: true)
+                .standardizedFileURL
+            if isExistingDirectory(lexerRoot) {
+                roots.append(lexerRoot)
+            }
+        }
+
+        return roots
+    }
+
+    private static func isExistingDirectory(_ url: URL) -> Bool {
+        var isDirectory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+            && isDirectory.boolValue
+    }
+
     private static func coreRootCandidates() -> [URL] {
         let environment = ProcessInfo.processInfo.environment
         let explicitPath = environment["RANGE_CORE_PATH"].map {
@@ -88,14 +118,23 @@ enum RangeCoreLoader {
     }
 
     static func isCoreFile(_ fileURL: URL) throws -> Bool {
-        let coreRootPath = try coreRoot().path
         let filePath = fileURL.standardizedFileURL.path
-        return filePath == coreRootPath || filePath.hasPrefix(coreRootPath + "/")
+        return try coreRoots().contains { coreRoot in
+            let coreRootPath = coreRoot.path
+            return filePath == coreRootPath || filePath.hasPrefix(coreRootPath + "/")
+        }
     }
 
     static func coreFiles() throws -> [URL] {
-        let coreRoot = try coreRoot()
+        var files: [URL] = []
+        for coreRoot in try coreRoots() {
+            files.append(contentsOf: try coreFiles(in: coreRoot))
+        }
 
+        return files.sorted { $0.path < $1.path }
+    }
+
+    private static func coreFiles(in coreRoot: URL) throws -> [URL] {
         guard
             let enumerator = FileManager.default.enumerator(
                 at: coreRoot,
@@ -142,7 +181,10 @@ enum RangeCoreLoader {
     }
 
     static func isCorePath(_ path: String) -> Bool {
-        path.contains("/RangeCore/") || path.contains("/RangeCompiler/Core/")
+        path.contains("/RangeCore/")
+            || path.contains("/RangeCompiler/Core/")
+            || path.contains("/RangeCompiler/Foundation/")
+            || path.contains("/RangeCompiler/Lexer/")
     }
 
     static func compiledProgram() throws -> CompiledProgram {

@@ -39,11 +39,16 @@ The intended language-owned home for explicit operator and precedence declaratio
 
 This is where Range's operator model is being documented as it moves out of compiler bootstrap logic and toward source-defined language rules.
 
-### `Macros/Exploration`
+### `Macro`
 
-Exploratory macro and metaprogramming material.
+The compiler-facing macro surface, including macro declarations, markers,
+diagnostics, and syntax rewrite/expansion protocols.
 
-This directory is intentionally excluded from normal core loading. It is a staging area for experiments, not part of the active bootstrap surface.
+### `../Foundation/Macros`
+
+Compiler-bundled macro implementations are shipped from Foundation rather than
+Core. They are available by default, but are not part of the minimal core
+surface.
 
 ## Current Design Rules
 
