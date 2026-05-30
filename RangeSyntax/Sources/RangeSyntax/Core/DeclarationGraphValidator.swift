@@ -702,14 +702,15 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     }
 
     private func markerUsages(in declaration: ConstructDeclaration) -> [MarkerUsage] {
-        [MarkerUsage(macros: declaration.macros, declarationName: declaration.name)]
-            + declaration.values.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.states.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.bindings.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.deriveds.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.initializers.flatMap(markerUsages(in:))
-            + declaration.callables.flatMap(markerUsages(in:))
-            + declaration.constructs.flatMap(markerUsages(in:))
+        var usages = [MarkerUsage(macros: declaration.macros, declarationName: declaration.name)]
+        usages += declaration.values.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+        usages += declaration.states.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+        usages += declaration.bindings.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+        usages += declaration.deriveds.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+        usages += declaration.initializers.flatMap(markerUsages(in:))
+        usages += declaration.callables.flatMap(markerUsages(in:))
+        usages += declaration.constructs.flatMap(markerUsages(in:))
+        return usages
     }
 
     private func markerUsages(in declaration: NamespaceDeclaration) -> [MarkerUsage] {
@@ -730,13 +731,14 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     }
 
     private func markerUsages(in declaration: ExtensionDeclaration) -> [MarkerUsage] {
-        [MarkerUsage(macros: declaration.macros, declarationName: declaration.targetName)]
-            + declaration.initializers.flatMap(markerUsages(in:))
-            + declaration.callables.flatMap(markerUsages(in:))
-            + declaration.constructs.flatMap(markerUsages(in:))
-            + declaration.namespaces.flatMap(markerUsages(in:))
-            + declaration.enumerations.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.protocols.flatMap(markerUsages(in:))
+        var usages = [MarkerUsage(macros: declaration.macros, declarationName: declaration.targetName)]
+        usages += declaration.initializers.flatMap(markerUsages(in:))
+        usages += declaration.callables.flatMap(markerUsages(in:))
+        usages += declaration.constructs.flatMap(markerUsages(in:))
+        usages += declaration.namespaces.flatMap(markerUsages(in:))
+        usages += declaration.enumerations.map { MarkerUsage(macros: $0.macros, declarationName: $0.name) }
+        usages += declaration.protocols.flatMap(markerUsages(in:))
+        return usages
     }
 
     private func markerUsages(in declaration: PackageSpaceDeclaration) -> [MarkerUsage] {

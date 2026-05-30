@@ -845,9 +845,16 @@ struct SwiftBackendEmitter {
                 let day: Int
 
                 init() {
-                    self.year = 1970
-                    self.month = 1
-                    self.day = 1
+                    self.init(posixTime: time(nil))
+                }
+
+                init(posixTime: time_t) {
+                    var rawTime = posixTime
+                    var utc = tm()
+                    gmtime_r(&rawTime, &utc)
+                    self.year = Int(utc.tm_year + 1900)
+                    self.month = Int(utc.tm_mon + 1)
+                    self.day = Int(utc.tm_mday)
                 }
 
                 init(iso8601String: String) throws {
@@ -866,7 +873,7 @@ struct SwiftBackendEmitter {
                 }
 
                 var description: String {
-                    "\\(year)-\\(month)-\\(day)"
+                    "\\(Self.padded(year, width: 4))-\\(Self.padded(month, width: 2))-\\(Self.padded(day, width: 2))"
                 }
 
                 static func < (lhs: Self, rhs: Self) -> Bool {
@@ -880,13 +887,34 @@ struct SwiftBackendEmitter {
                         return .failure(cause: .failed)
                     }
                 }
+
+                private static func padded(_ value: Int, width: Int) -> String {
+                    let string = String(value)
+                    if string.count >= width {
+                        return string
+                    }
+                    return String(repeating: "0", count: width - string.count) + string
+                }
             }
 
             struct __RangeDateTime: Hashable, Comparable, CustomStringConvertible, Sendable {
                 let storage: String
 
                 init() {
-                    self.storage = "1970-01-01T00:00:00Z"
+                    self.init(posixTime: time(nil))
+                }
+
+                init(posixTime: time_t) {
+                    var rawTime = posixTime
+                    var utc = tm()
+                    gmtime_r(&rawTime, &utc)
+                    let year = Self.padded(Int(utc.tm_year + 1900), width: 4)
+                    let month = Self.padded(Int(utc.tm_mon + 1), width: 2)
+                    let day = Self.padded(Int(utc.tm_mday), width: 2)
+                    let hour = Self.padded(Int(utc.tm_hour), width: 2)
+                    let minute = Self.padded(Int(utc.tm_min), width: 2)
+                    let second = Self.padded(Int(utc.tm_sec), width: 2)
+                    self.storage = "\\(year)-\\(month)-\\(day)T\\(hour):\\(minute):\\(second)Z"
                 }
 
                 init(iso8601String: String) throws {
@@ -907,6 +935,14 @@ struct SwiftBackendEmitter {
                     } catch {
                         return .failure(cause: .failed)
                     }
+                }
+
+                private static func padded(_ value: Int, width: Int) -> String {
+                    let string = String(value)
+                    if string.count >= width {
+                        return string
+                    }
+                    return String(repeating: "0", count: width - string.count) + string
                 }
             }
 
@@ -3829,6 +3865,9 @@ struct SwiftBackendEmitter {
             guard let string = singleArgument(label: "iso8601String") else { return nil }
             return "__rangeDate(iso8601String: \(try emitExpression(string, scope: scope)))"
         case "Date":
+            if arguments.isEmpty {
+                return "__RangeDateOnly()"
+            }
             if let storage = singleArgument(label: "storage") {
                 return try emitExpression(storage, scope: scope)
             }
@@ -3841,6 +3880,9 @@ struct SwiftBackendEmitter {
             guard let string = singleArgument(label: "iso8601String") else { return nil }
             return "__rangeDateTime(iso8601String: \(try emitExpression(string, scope: scope)))"
         case "DateTime":
+            if arguments.isEmpty {
+                return "__RangeDateTime()"
+            }
             if let storage = singleArgument(label: "storage") {
                 return try emitExpression(storage, scope: scope)
             }

@@ -465,6 +465,17 @@ public struct DeclarationGraph {
         onConstruct named: String
     ) -> [DeclaredInitializerSurface] {
         var surfaces: [DeclaredInitializerSurface] = []
+        if Self.hasCoreRuntimeDefaultInitializer(named) {
+            surfaces.append(
+                DeclaredInitializerSurface(
+                    ownerConstructName: named,
+                    labels: [],
+                    parameterTypeNames: [],
+                    parameters: [],
+                    returnTypeName: nil
+                )
+            )
+        }
         if let construct = constructsByName[named] {
             let parameters = directConstructApplicationParameters(for: construct)
             if !parameters.isEmpty || construct.initializers.isEmpty {
@@ -493,6 +504,10 @@ public struct DeclarationGraph {
             )
         })
         return surfaces
+    }
+
+    private static func hasCoreRuntimeDefaultInitializer(_ constructName: String) -> Bool {
+        constructName == "Date" || constructName == "DateTime"
     }
 
     public func directConstructApplicationParameters(
