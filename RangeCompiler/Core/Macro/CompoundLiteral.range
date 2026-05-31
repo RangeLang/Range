@@ -43,4 +43,22 @@ open marker CompoundLiteral<let value: TypeReference, let delimiter: String?>(@c
     if previousWasDelimiter {
         diagnostics.error("#CompoundLiteral pattern must not end with delimiter.")
     }
+
+    let fields: Array<State>(target.declaration.states)
+    let slotCount: Int(delimiterCount + 1)
+
+    if fields.count != slotCount {
+        diagnostics.error("#CompoundLiteral pattern slot count must match the construct's stored state count.")
+    }
+
+    state fieldIndex: Int(0)
+    while fieldIndex < fields.count {
+        let field: State(fields.element(index: fieldIndex))
+
+        if field.type != value {
+            diagnostics.error("#CompoundLiteral stored state type must match the literal value type.")
+        }
+
+        fieldIndex += 1
+    }
 }

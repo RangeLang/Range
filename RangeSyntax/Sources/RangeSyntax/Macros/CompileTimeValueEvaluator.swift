@@ -366,6 +366,13 @@ struct CompileTimeValueEvaluator {
             return evaluate(arguments[0].value, locals: locals)
         }
 
+        if arguments.count == 1,
+            arguments[0].label == nil,
+            case .object(name, _) = evaluate(arguments[0].value, locals: locals)
+        {
+            return evaluate(arguments[0].value, locals: locals)
+        }
+
         switch name {
         case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
@@ -582,6 +589,18 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
+        if name.hasSuffix(".element"),
+            let source = evaluatePath(String(name.dropLast(".element".count)), locals: locals),
+            case .array(let elements) = source,
+            arguments.count == 1,
+            arguments[0].label == "index",
+            case .integer(let index) = evaluate(arguments[0].value, locals: locals),
+            index >= 0,
+            index < elements.count
+        {
+            return elements[index]
+        }
+
         let suffix = ".first"
         guard name.hasSuffix(suffix),
             let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),

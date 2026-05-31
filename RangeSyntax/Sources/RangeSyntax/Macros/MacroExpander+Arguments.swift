@@ -298,9 +298,12 @@ extension MacroExpander {
                 positionalIndex += 1
             case .value(let name, let typeReference, let defaultValue):
                 if let argument = labeledArguments[name] {
-                    bindings[name] = expression(forGenericArgument: argument)
+                    bindings[name] = expression(forGenericArgument: argument, expectedType: typeReference)
                 } else if positionalIndex < positionalArguments.count {
-                    bindings[name] = expression(forGenericArgument: positionalArguments[positionalIndex])
+                    bindings[name] = expression(
+                        forGenericArgument: positionalArguments[positionalIndex],
+                        expectedType: typeReference
+                    )
                     positionalIndex += 1
                 } else if let defaultValue {
                     bindings[name] = defaultValue
@@ -330,8 +333,17 @@ extension MacroExpander {
         return (label, .named(String(rawValue)))
     }
 
-    private static func expression(forGenericArgument argument: TypeReference) -> Expression {
+    private static func expression(
+        forGenericArgument argument: TypeReference,
+        expectedType: TypeReference
+    ) -> Expression {
         let displayName = argument.displayName
+        if expectedType.isTypeReferenceValue {
+            return .call(
+                name: "NamedTypeReference",
+                arguments: [CallArgument(label: "name", value: .string(displayName))]
+            )
+        }
         if displayName.hasPrefix("\""), displayName.hasSuffix("\""), displayName.count >= 2 {
             return .string(String(displayName.dropFirst().dropLast()))
         }
@@ -381,5 +393,16 @@ private extension TypeReference {
             return false
         }
         return true
+    }
+
+    var isTypeReferenceValue: Bool {
+        switch self {
+        case .named("TypeReference"):
+            return true
+        case .optional(let wrapped):
+            return wrapped.isTypeReferenceValue
+        default:
+            return false
+        }
     }
 }
