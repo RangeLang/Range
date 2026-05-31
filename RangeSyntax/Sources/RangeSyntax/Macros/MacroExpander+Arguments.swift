@@ -296,7 +296,7 @@ extension MacroExpander {
                 }
                 bindings[name] = .identifier(positionalArguments[positionalIndex].displayName)
                 positionalIndex += 1
-            case .value(let name, _, let defaultValue):
+            case .value(let name, let typeReference, let defaultValue):
                 if let argument = labeledArguments[name] {
                     bindings[name] = expression(forGenericArgument: argument)
                 } else if positionalIndex < positionalArguments.count {
@@ -304,6 +304,8 @@ extension MacroExpander {
                     positionalIndex += 1
                 } else if let defaultValue {
                     bindings[name] = defaultValue
+                } else if typeReference.isOptionalReference {
+                    bindings[name] = .nilLiteral
                 }
             }
         }

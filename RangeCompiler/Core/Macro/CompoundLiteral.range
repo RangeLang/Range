@@ -1,11 +1,15 @@
-open marker DataType<Value, let delimiter: String>(@capture _ pattern: Expression): Construct { target, diagnostics in
+open marker CompoundLiteral<let value: TypeReference, let delimiter: String?>(@capture _ pattern: Expression): Construct { target, diagnostics in
     let source: String(pattern.written.text)
     state index: Int(0)
     state delimiterCount: Int(0)
     state previousWasDelimiter: Bool(false)
 
+    if delimiter == nil {
+        diagnostics.error("#CompoundLiteral delimiter is required.")
+    }
+
     if source.count == 0 {
-        diagnostics.error("#DataType pattern must use dot-delimited slots.")
+        diagnostics.error("#CompoundLiteral pattern must use dot-delimited slots.")
     }
 
     while index < source.count {
@@ -20,11 +24,11 @@ open marker DataType<Value, let delimiter: String>(@capture _ pattern: Expressio
             delimiterCount += 1
 
             if index == 0 {
-                diagnostics.error("#DataType pattern must not start with '.'.")
+                diagnostics.error("#CompoundLiteral pattern must not start with '.'.")
             }
 
             if previousWasDelimiter {
-                diagnostics.error("#DataType pattern must contain non-empty dot-delimited slots.")
+                diagnostics.error("#CompoundLiteral pattern must contain non-empty dot-delimited slots.")
             }
         }
 
@@ -33,10 +37,10 @@ open marker DataType<Value, let delimiter: String>(@capture _ pattern: Expressio
     }
 
     if delimiterCount == 0 {
-        diagnostics.error("#DataType pattern must contain at least one dot delimiter.")
+        diagnostics.error("#CompoundLiteral pattern must contain at least one dot delimiter.")
     }
 
     if previousWasDelimiter {
-        diagnostics.error("#DataType pattern must not end with delimiter.")
+        diagnostics.error("#CompoundLiteral pattern must not end with delimiter.")
     }
 }

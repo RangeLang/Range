@@ -624,13 +624,13 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
-    @Test("DataType marker validates dotted unsigned integer initializer")
-    func dataTypeMarkerValidatesDottedUnsignedIntegerInitializer() throws {
+    @Test("CompoundLiteral marker validates dotted unsigned integer initializer")
+    func compoundLiteralMarkerValidatesDottedUnsignedIntegerInitializer() throws {
         let inputs = [
             SourceInput(
-                path: "/tmp/DataTypeVersion.range",
+                path: "/tmp/CompoundLiteralVersion.range",
                 source: """
-                marker DataType(_ pattern: String): Construct -> String {
+                marker CompoundLiteral(_ pattern: String): Construct -> String {
                     return pattern
                 }
 
@@ -640,7 +640,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
                 construct Int<let signedness: Signedness> {}
 
-                #DataType(0.0.0)
+                #CompoundLiteral(0.0.0)
                 construct Version {
                     state major: Int<.unsigned>
                     state minor: Int<.unsigned>
@@ -658,13 +658,13 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
-    @Test("DataType marker rejects non matching version initializer")
-    func dataTypeMarkerRejectsNonMatchingVersionInitializer() throws {
+    @Test("CompoundLiteral marker rejects non matching version initializer")
+    func compoundLiteralMarkerRejectsNonMatchingVersionInitializer() throws {
         let inputs = [
             SourceInput(
-                path: "/tmp/DataTypeInvalidVersion.range",
+                path: "/tmp/CompoundLiteralInvalidVersion.range",
                 source: """
-                marker DataType(_ pattern: String): Construct -> String {
+                marker CompoundLiteral(_ pattern: String): Construct -> String {
                     return pattern
                 }
 
@@ -674,7 +674,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
                 construct Int<let signedness: Signedness> {}
 
-                #DataType(0.0.0)
+                #CompoundLiteral(0.0.0)
                 construct Version {
                     state major: Int<.unsigned>
                     state minor: Int<.unsigned>
@@ -691,7 +691,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
         do {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
-            Issue.record("Expected invalid DataType initializer to fail validation.")
+            Issue.record("Expected invalid CompoundLiteral initializer to fail validation.")
         } catch let error as SemanticValidationError {
             #expect(error.description.contains("has 2 segment(s)"))
         }

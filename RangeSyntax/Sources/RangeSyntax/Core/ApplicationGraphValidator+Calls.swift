@@ -381,7 +381,7 @@ extension ApplicationGraphValidator {
     ) throws {
         switch expression {
         case .call(let name, let arguments):
-            if try validateDataTypeConstructCallIfPresent(
+            if try validateCompoundLiteralConstructCallIfPresent(
                 name: name,
                 arguments: arguments,
                 environment: environment,
@@ -698,70 +698,70 @@ extension ApplicationGraphValidator {
         return matched
     }
 
-    func validateDataTypeConstructCallIfPresent(
+    func validateCompoundLiteralConstructCallIfPresent(
         name: String,
         arguments: [CallArgument],
         environment: CallLabelValidationEnvironment,
         fileName: String
     ) throws -> Bool {
         guard let construct = environment.declarationGraph.construct(named: name),
-            let dataType = construct.macros.first(where: { $0.name == "DataType" })
+            let compoundLiteral = construct.macros.first(where: { $0.name == "CompoundLiteral" })
         else {
             return false
         }
 
         guard arguments.count == 1, arguments[0].label == nil else {
             throw SemanticValidationError(
-                "DataType initializer \(name)(\(renderCallArguments(arguments))) in \(fileName) expects one unlabeled value matching #DataType(\(dataType.argumentClause ?? ""))."
+                "CompoundLiteral initializer \(name)(\(renderCallArguments(arguments))) in \(fileName) expects one unlabeled value matching #CompoundLiteral(\(compoundLiteral.argumentClause ?? ""))."
             )
         }
 
-        let pattern = normalizedDataTypeLiteral(dataTypePatternArgument(dataType.argumentClause ?? ""))
-        let patternSegments = try dataTypeSegments(
+        let pattern = normalizedCompoundLiteralPattern(compoundLiteralPatternArgument(compoundLiteral.argumentClause ?? ""))
+        let patternSegments = try compoundLiteralSegments(
             pattern,
-            description: "#DataType pattern on \(name)"
+            description: "#CompoundLiteral pattern on \(name)"
         )
         guard patternSegments.allSatisfy({ $0 == "0" }) else {
             throw SemanticValidationError(
-                "#DataType pattern on \(name) currently supports only unsigned integer slots written as 0."
+                "#CompoundLiteral pattern on \(name) currently supports only unsigned integer slots written as 0."
             )
         }
 
         let parameters = environment.declarationGraph.directConstructApplicationParameters(for: construct)
         guard patternSegments.count == parameters.count else {
             throw SemanticValidationError(
-                "#DataType pattern on \(name) declares \(patternSegments.count) slot(s), but \(name) has \(parameters.count) initializer field(s)."
+                "#CompoundLiteral pattern on \(name) declares \(patternSegments.count) slot(s), but \(name) has \(parameters.count) initializer field(s)."
             )
         }
 
         for parameter in parameters {
             guard let type = parameter.typeReference, isUnsignedIntegerType(type) else {
                 throw SemanticValidationError(
-                    "#DataType pattern on \(name) can only map to unsigned Int fields. Field \(parameter.localName) has type \(parameter.typeReference?.displayName ?? "unknown")."
+                    "#CompoundLiteral pattern on \(name) can only map to unsigned Int fields. Field \(parameter.localName) has type \(parameter.typeReference?.displayName ?? "unknown")."
                 )
             }
         }
 
         guard case .string(let rawValue) = arguments[0].value else {
             throw SemanticValidationError(
-                "DataType initializer \(name)(\(renderCallArguments(arguments))) in \(fileName) expects a dotted unsigned integer literal."
+                "CompoundLiteral initializer \(name)(\(renderCallArguments(arguments))) in \(fileName) expects a dotted unsigned integer literal."
             )
         }
 
-        let valueSegments = try dataTypeSegments(
+        let valueSegments = try compoundLiteralSegments(
             rawValue,
-            description: "DataType initializer \(name)(\(rawValue))"
+            description: "CompoundLiteral initializer \(name)(\(rawValue))"
         )
         guard valueSegments.count == patternSegments.count else {
             throw SemanticValidationError(
-                "DataType initializer \(name)(\(rawValue)) in \(fileName) has \(valueSegments.count) segment(s), but #DataType(\(pattern)) expects \(patternSegments.count)."
+                "CompoundLiteral initializer \(name)(\(rawValue)) in \(fileName) has \(valueSegments.count) segment(s), but #CompoundLiteral(\(pattern)) expects \(patternSegments.count)."
             )
         }
 
         for segment in valueSegments {
             guard isUnsignedIntegerLiteral(segment) else {
                 throw SemanticValidationError(
-                    "DataType initializer \(name)(\(rawValue)) in \(fileName) contains invalid unsigned integer segment '\(segment)'."
+                    "CompoundLiteral initializer \(name)(\(rawValue)) in \(fileName) contains invalid unsigned integer segment '\(segment)'."
                 )
             }
         }
@@ -769,7 +769,7 @@ extension ApplicationGraphValidator {
         return true
     }
 
-    func normalizedDataTypeLiteral(_ value: String) -> String {
+    func normalizedCompoundLiteralPattern(_ value: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2,
             trimmed.first == "\"",
@@ -780,14 +780,14 @@ extension ApplicationGraphValidator {
         return String(trimmed.dropFirst().dropLast())
     }
 
-    func dataTypePatternArgument(_ argumentClause: String) -> String {
+    func compoundLiteralPatternArgument(_ argumentClause: String) -> String {
         argumentClause.split(separator: ",", maxSplits: 1, omittingEmptySubsequences: false)
             .first
             .map(String.init)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    func dataTypeSegments(_ value: String, description: String) throws -> [String] {
+    func compoundLiteralSegments(_ value: String, description: String) throws -> [String] {
         let segments = value.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
         guard !segments.isEmpty, !segments.contains(where: \.isEmpty) else {
             throw SemanticValidationError("\(description) must contain non-empty dot-separated segments.")

@@ -1,4 +1,4 @@
-#DataType<Int<.unsigned>, delimiter: ".">(0.0.0)
+#CompoundLiteral<Int<.unsigned>, delimiter: ".">(0.0.0)
 construct Version {
     state major: Int<.unsigned>
     state minor: Int<.unsigned>
