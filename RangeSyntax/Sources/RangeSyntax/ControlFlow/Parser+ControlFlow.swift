@@ -15,10 +15,6 @@ extension Parser {
             return try parseTargetExpandStatement(targetPath: targetPath)
         }
 
-        if isRequireStatementStart() {
-            return try parseRequireStatement()
-        }
-
         if isMacroApplicationStart() {
             return .expression(try parseExpression())
         }
@@ -105,69 +101,6 @@ extension Parser {
         default:
             throw ParseError("Expected assignment operator (`+=`) or `set` statement in action block.")
         }
-    }
-
-    func isRequireStatementStart() -> Bool {
-        guard case .hashAttribute(let name) = peek(), name == "Require" else {
-            return false
-        }
-        return peek(offset: 1) == .leftParen
-    }
-
-    mutating func parseRequireStatement() throws -> Statement {
-        guard case .hashAttribute(let name) = peek(), name == "Require" else {
-            throw ParseError("Expected #Require statement.")
-        }
-        _ = name
-        advance()
-        try consume(.leftParen)
-        let target = try parseExpression(terminatingAt: [.rightParen])
-        try consume(.rightParen)
-        try consume(.leftBrace)
-        var members: [RequirementMember] = []
-        while peek() != .rightBrace {
-            members.append(try parseRequirementMember())
-        }
-        try consume(.rightBrace)
-        return .require(target: target, members: members)
-    }
-
-    mutating func parseRequirementMember() throws -> RequirementMember {
-        switch peek() {
-        case .keyword(RangeSyntax.Keyword.let.rawValue):
-            advance()
-            return try parseRequiredProperty(kind: .let)
-        case .keyword(RangeSyntax.Keyword.state.rawValue):
-            advance()
-            return try parseRequiredProperty(kind: .state)
-        case .keyword(RangeSyntax.Keyword.binding.rawValue):
-            advance()
-            return try parseRequiredProperty(kind: .binding)
-        case .keyword(RangeSyntax.Keyword.derived.rawValue):
-            advance()
-            return try parseRequiredProperty(kind: .derived)
-        case .keyword(RangeSyntax.Keyword.function.rawValue):
-            advance()
-            let name = try consumeCallableName()
-            let parameters = peek() == .leftParen ? try parseFunctionParameters() : []
-            let returnType: TypeReference?
-            if peek() == .arrow || peek() == .colon {
-                advance()
-                returnType = try parseTypeReferenceNode()
-            } else {
-                returnType = nil
-            }
-            return .function(name: name, parameters: parameters, returnType: returnType)
-        default:
-            throw ParseError("#Require blocks can require let, state, binding, derived, or function members.")
-        }
-    }
-
-    mutating func parseRequiredProperty(kind: RequirementPropertyKind) throws -> RequirementMember {
-        let name = try consumeIdentifier()
-        try consume(.colon)
-        let type = try parseTypeReferenceNode()
-        return .property(kind: kind, name: name, type: type)
     }
 
     func targetExpandStatementPath() -> String? {

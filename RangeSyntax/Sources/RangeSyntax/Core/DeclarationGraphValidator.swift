@@ -785,7 +785,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return expressionMacroUsages(in: deferred.body, declarationName: declarationName)
         case .localCallable(let declaration):
             return expressionMacroUsages(in: declaration.body, declarationName: declaration.name)
-        case .macroInvocation, .require, .expand, .derived, .return(nil), .break, .continue:
+        case .macroInvocation, .expand, .derived, .return(nil), .break, .continue:
             return []
         }
     }

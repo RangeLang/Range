@@ -1657,7 +1657,7 @@ struct SwiftBackendEmitter {
         var expressions: [RangeExpression] = []
         for statement in statements {
             switch statement {
-            case .expand, .require:
+            case .expand:
                 continue
             case .expression(let expression):
                 expressions.append(expression)
@@ -2462,7 +2462,7 @@ struct SwiftBackendEmitter {
             return statementsReferenceInstanceSelf(declaration.body)
         case .macroInvocation(_, _, let body):
             return statementsReferenceInstanceSelf(body)
-            case .expand, .require, .break, .continue:
+            case .expand, .break, .continue:
                 return false
         }
     }
@@ -2526,7 +2526,7 @@ struct SwiftBackendEmitter {
             switch statement {
             case .assignment, .compoundAssignment:
                 return true
-            case .expand, .require:
+            case .expand:
                 continue
             case .macroInvocation(_, _, let body),
                 .forEach(_, _, let body),
@@ -2615,8 +2615,6 @@ struct SwiftBackendEmitter {
                 if statementsCallKnownMutatingMember(body) {
                     return true
                 }
-            case .require:
-                continue
             case .localCallable, .macroInvocation, .expand, .return(nil), .break, .continue:
                 continue
             }
@@ -2925,8 +2923,6 @@ struct SwiftBackendEmitter {
             throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
         case .expand:
             throw SwiftBackendError("Macro expansion statements must be expanded before Swift emission.")
-        case .require:
-            throw SwiftBackendError("#Require statements must be consumed before Swift emission.")
         case .background(let background):
             let bodyText = try emitStatements(
                 background.body,
@@ -3597,8 +3593,6 @@ struct SwiftBackendEmitter {
             throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
         case .expand:
             throw SwiftBackendError("Macro expansion statements must be expanded before Swift emission.")
-        case .require:
-            throw SwiftBackendError("#Require statements must be consumed before Swift emission.")
         case .background(let background):
             let bodyText = try emitStatements(
                 background.body,

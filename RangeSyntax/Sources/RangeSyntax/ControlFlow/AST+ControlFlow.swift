@@ -2,7 +2,6 @@ import Foundation
 
 public indirect enum Statement {
     case macroInvocation(name: String, argumentClause: String?, body: [Statement])
-    case require(target: Expression, members: [RequirementMember])
     case expand(targetPath: String?, block: EmittedCodeBlock)
     case background(Background)
     case deferBlock(DeferredBlock)
@@ -27,18 +26,6 @@ public indirect enum Statement {
         cases: [SwitchCase],
         defaultBody: [Statement]?
     )
-}
-
-public enum RequirementMember {
-    case property(kind: RequirementPropertyKind, name: String, type: TypeReference)
-    case function(name: String, parameters: [RangeFunctionParameter], returnType: TypeReference?)
-}
-
-public enum RequirementPropertyKind: String {
-    case `let`
-    case state
-    case binding
-    case derived
 }
 
 public struct Background {

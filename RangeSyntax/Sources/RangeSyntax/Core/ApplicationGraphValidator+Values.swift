@@ -119,7 +119,7 @@ extension ApplicationGraphValidator {
     ) throws {
         for statement in statements {
             switch statement {
-            case .expand, .require:
+            case .expand:
                 continue
             case .macroInvocation(_, _, let body):
                 try validateValueDeclarations(
