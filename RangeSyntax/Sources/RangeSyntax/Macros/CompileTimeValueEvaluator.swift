@@ -100,6 +100,16 @@ struct CompileTimeValueEvaluator {
             {
                 return enumCaseValue(named: String(name[name.index(after: dot)...]))
             }
+            if let context,
+                let rewritten = try? MacroExpander.applyInitMacroRewritesIfNeeded(
+                    callName: name,
+                    callArguments: arguments,
+                    macros: macroDeclarationsByName,
+                    context: context
+                )
+            {
+                return evaluate(rewritten, locals: locals)
+            }
             if let graphValue = evaluateGraphCall(
                 name: name,
                 arguments: arguments,

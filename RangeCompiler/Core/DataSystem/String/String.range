@@ -1,4 +1,4 @@
-#language
+@language
 construct String {
     let storage: StringStorage
 
@@ -38,7 +38,7 @@ extension String: Comparable {
 
 extension String: Decodable {
     function decode(from decoder: Decoder): Result<Self, DecodingError> {
-        let container   decoder.singleValueContainer()
+        let container: decoder.singleValueContainer()
         switch container.decode(String.self) {
         case .success(let value):
             return .success(result: value)
@@ -50,7 +50,7 @@ extension String: Decodable {
 
 extension String: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        let container   encoder.singleValueContainer()
+        let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }

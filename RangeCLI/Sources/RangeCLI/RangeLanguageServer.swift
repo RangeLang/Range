@@ -619,7 +619,7 @@ struct RangeLanguageServer {
 
     private func attributeCompletions() -> [[String: Any]] {
         let builtinAttributes = [
-            "@main", "#Project", "#package", "#syntax", "@background", "@language",
+            "@main", "@Project", "@package", "@syntax", "@background", "@language",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
 
         return uniqueCompletionItems(builtinAttributes)
@@ -1320,7 +1320,7 @@ private struct DocumentIndex {
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
         let macroTokenPattern = #"([@#][a-z_][A-Za-z0-9_]*)\b"#
-        let metadataTokenPattern = #"(#Project|#package|#syntax)\b"#
+        let metadataTokenPattern = #"(@Project|@package|@syntax)\b"#
         let attributeKeywordPattern = #"@(main|background|defer|language|[A-Z][A-Za-z0-9_]*)\b"#
         let enumCaseDeclarationPattern = #"^\s*case\s+([a-z_][A-Za-z0-9_]*)\b"#
         let argumentValuePattern = #"(?:\(\s*|,\s*|:\s*)([a-z_][A-Za-z0-9_]*)\s*(?=[,)])"#

@@ -111,7 +111,7 @@ public struct CompilerPipeline {
         let discoveredCoreCallableReturnTypes = collectCallableReturnTypes(
             from: discoveredCoreDeclarationFiles
         )
-        let discoveredCoreMacrosByName = MacroExpander.collectMacros(
+        let discoveredCoreMacrosByName = MacroExpander.collectMacroDeclarations(
             from: discoveredCoreDeclarationFiles
         )
         let discoveredCoreMacroMetadataByName = MacroExpander.collectMacroMetadata(
@@ -143,7 +143,7 @@ public struct CompilerPipeline {
             results: &runtimeHookResults
         )
 
-        let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
+        let coreMacrosByName = MacroExpander.collectMacroDeclarations(from: parsedCoreFiles)
         let coreMacroMetadataByName = MacroExpander.collectMacroMetadata(from: parsedCoreFiles)
         let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(from: parsedCoreFiles)
         let discoveredProjectDeclarationFiles = try discoverProjectDeclarationFiles(
@@ -166,7 +166,7 @@ public struct CompilerPipeline {
         let discoveredProjectCallableReturnTypes = collectCallableReturnTypes(
             from: discoveredProjectDeclarationFiles
         )
-        let discoveredProjectMacrosByName = MacroExpander.collectMacros(
+        let discoveredProjectMacrosByName = MacroExpander.collectMacroDeclarations(
             from: discoveredProjectDeclarationFiles
         )
         let discoveredProjectMacroMetadataByName = MacroExpander.collectMacroMetadata(
@@ -352,7 +352,7 @@ public struct CompilerPipeline {
 
             parsedFiles.append(parsedFile)
 
-            let discoveredMacros = MacroExpander.collectMacros(from: [parsedFile])
+            let discoveredMacros = MacroExpander.collectMacroDeclarations(from: [parsedFile])
             if !discoveredMacros.isEmpty {
                 currentMacrosByName.merge(discoveredMacros) { _, new in new }
                 currentMacroExpansionResolver = DeclarationMacroExpansionResolver(
@@ -447,7 +447,7 @@ public struct CompilerPipeline {
                 source: input.source,
                 sourceFile: sourceFile
             )
-            let discoveredMacros = MacroExpander.collectMacros(from: [parsedFile])
+            let discoveredMacros = MacroExpander.collectMacroDeclarations(from: [parsedFile])
             if !discoveredMacros.isEmpty {
                 macrosByName.merge(discoveredMacros) { _, new in new }
             }

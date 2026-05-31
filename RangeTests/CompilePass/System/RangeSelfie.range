@@ -88,8 +88,8 @@ function tokenKindName(kind: TokenKind): String {
 }
 
 function renderTokens(tokens: [LexicalToken]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < tokens.count {
         let token: LexicalToken(tokens.element(index: index))

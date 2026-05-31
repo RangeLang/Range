@@ -1,4 +1,4 @@
-#language
+@language
 construct Float<let width: FloatingPointWidth> {
     let storage: FloatStorage
 
@@ -18,7 +18,7 @@ extension Float: Comparable {
 
 extension Float: Decodable {
     function decode(from decoder: Decoder): Result<Self, DecodingError> {
-        let container   decoder.singleValueContainer()
+        let container: decoder.singleValueContainer()
         switch container.decode(Float.self) {
         case .success(let value):
             return .success(result: value)
@@ -30,7 +30,7 @@ extension Float: Decodable {
 
 extension Float: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        let container   encoder.singleValueContainer()
+        let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }

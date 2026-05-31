@@ -1,4 +1,4 @@
-#language
+@language
 construct Range<Bound: Comparable> {
     let lowerBound: Bound
     let upperBound: Bound

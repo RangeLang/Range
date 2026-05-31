@@ -358,7 +358,7 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Documented package syntax emits semantic tokens")
     func documentedPackageSyntaxEmitsSemanticTokens() {
         let source = """
-        #package
+        @package
         construct Project {
             let name: Title("Example")
             let version: Version(0.1.0)
@@ -376,7 +376,7 @@ struct RangeLanguageServerSemanticTokenTests {
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsExactToken(tokens, text: "#package", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "@package", type: .keyword, modifiers: []))
         #expect(containsExactToken(tokens, text: "Title", type: .type, modifiers: []))
         #expect(containsExactToken(tokens, text: "Version", type: .type, modifiers: []))
         #expect(containsExactToken(tokens, text: "Optional", type: .type, modifiers: []))
@@ -403,7 +403,7 @@ struct RangeLanguageServerSemanticTokenTests {
     @Test("Formatting indents documented metadata syntax without counting string braces")
     func formattingIndentsDocumentedMetadataSyntaxWithoutCountingStringBraces() {
         let source = """
-        #package
+        @package
         construct Project {
         let name: Title("Example {")
         let version: Version(0.1.0) // )
@@ -416,7 +416,7 @@ struct RangeLanguageServerSemanticTokenTests {
         let formatted = RangeLanguageServer.debugFormattedDocument(source)
 
         #expect(formatted == """
-        #package
+        @package
         construct Project {
           let name: Title("Example {")
           let version: Version(0.1.0) // )

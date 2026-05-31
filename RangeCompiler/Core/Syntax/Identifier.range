@@ -1,4 +1,13 @@
+macro identifierSyntaxName(): Init { target, diagnostics in
+    target.application.replace(with:
+        target.declaration.expression(arguments: [
+            String(target.application.arguments[0].expression)
+        ])
+    )
+}
+
 @syntax
+@identifierSyntaxName
 construct Identifier: SyntaxEmittable {
     let name: String
 }

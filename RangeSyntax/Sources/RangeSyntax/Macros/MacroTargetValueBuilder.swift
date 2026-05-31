@@ -329,7 +329,7 @@ struct MacroTargetValueBuilder {
             let value: CompileTimeValue = .string(application.rawBody ?? "")
             guard macroMetadataValue(value, matches: metadata.valueType) else {
                 throw ParseError(
-                    "Macro #\(metadata.name) raw body value does not match \(metadata.valueType.displayName)."
+                    "Macro @\(metadata.name) raw body value does not match \(metadata.valueType.displayName)."
                 )
             }
             return value
@@ -367,12 +367,12 @@ struct MacroTargetValueBuilder {
         }
 
         guard let value else {
-            throw ParseError("Macro #\(metadata.name) body could not be evaluated at compile time.")
+            throw ParseError("Macro @\(metadata.name) body could not be evaluated at compile time.")
         }
 
         guard macroMetadataValue(value, matches: metadata.valueType) else {
             throw ParseError(
-                "Macro #\(metadata.name) evaluated value does not match \(metadata.valueType.displayName)."
+                "Macro @\(metadata.name) evaluated value does not match \(metadata.valueType.displayName)."
             )
         }
 

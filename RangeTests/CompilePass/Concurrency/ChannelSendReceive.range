@@ -7,7 +7,7 @@ function fetchUserName(id: Int): String {
 }
 
 @main {
-    let output   Channel<String>()
+    let output: Channel<String>()
 
     @background {
         let name: String(fetchUserName(id: 1))

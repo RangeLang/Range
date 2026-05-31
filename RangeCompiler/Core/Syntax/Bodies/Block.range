@@ -1,4 +1,4 @@
 @syntax
 construct Block {
-    let statements: [#Statement]
+    let statements: [@Statement]
 }

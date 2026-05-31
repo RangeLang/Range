@@ -6,7 +6,6 @@ enum RangeSyntax {
         case background = "background"
         case `defer` = "defer"
         case core = "core"
-        case package = "package"
         case expand = "expand"
     }
 

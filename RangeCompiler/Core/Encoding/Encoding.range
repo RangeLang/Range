@@ -1,6 +1,6 @@
 macro encoding(): Construct -> Void { target, diagnostics in
 }
 
-#encoding
+@encoding
 construct Encoding {
 }

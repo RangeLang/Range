@@ -22,7 +22,7 @@ extension MacroExpander {
         let normalizedArgumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !parameters.isEmpty || normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
-            throw ParseError("Macro #\(macro.name) requires arguments.")
+            throw ParseError("Macro @\(macro.name) requires arguments.")
         }
         guard !parameters.isEmpty else {
             return [:]
@@ -69,17 +69,17 @@ extension MacroExpander {
 
         if let rawBody {
             guard normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
-                throw ParseError("Macro #\(metadata.name) cannot mix arguments with a raw body.")
+                throw ParseError("Macro @\(metadata.name) cannot mix arguments with a raw body.")
             }
             guard metadata.foreignBodyLanguage != nil else {
-                throw ParseError("Macro #\(metadata.name) does not accept a foreign body.")
+                throw ParseError("Macro @\(metadata.name) does not accept a foreign body.")
             }
             let parameter = parameters[0]
             return [parameter.localName: .string(rawBody)]
         }
 
         guard !parameters.isEmpty || normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
-            throw ParseError("Macro #\(metadata.name) requires arguments.")
+            throw ParseError("Macro @\(metadata.name) requires arguments.")
         }
         guard !parameters.isEmpty else {
             return [:]

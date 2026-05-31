@@ -22,9 +22,9 @@ function server(requests: Channel<Request>) {
 }
 
 @main {
-    let requests   Channel<Request>(storage: ChannelStorage<Request>(capacity: 2))
-    let replyA   Channel<String>()
-    let replyB   Channel<String>()
+    let requests: Channel<Request>(storage: ChannelStorage<Request>(capacity: 2))
+    let replyA: Channel<String>()
+    let replyB: Channel<String>()
     let requestA: Request(id: 0, replyTo: replyA)
     let requestB: Request(id: 1, replyTo: replyB)
 

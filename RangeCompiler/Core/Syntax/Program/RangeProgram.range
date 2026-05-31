@@ -1,9 +1,9 @@
-#language
+@language
 construct RangeProgram {
     let graph: ProgramGraph
 }
 
-#language
+@language
 construct ProgramGraph {
     let files: [FileTreeNode]
     let sources: [ProgramSourceFile]
@@ -13,64 +13,64 @@ construct ProgramGraph {
     let syntax: [GraphSyntax]
 }
 
-#language
+@language
 construct ProgramSourceFile {
     let path: String
     let text: String
 }
 
-#language
+@language
 construct ProgramLexedSource {
     let path: String
     let tokens: [LexicalToken]
 }
 
-#language
+@language
 construct ProgramArtifact {
     let path: String
     let text: String
 }
 
-#language
+@language
 construct RangeGraph {
     let nodes: [RangeGraphNode]
     let relationships: [RangeGraphRelationship]
 }
 
-#language
+@language
 construct RangeGraphNode {
     let identity: RangeGraphIdentity
     let sourcePath: String
     let labels: [String]
 }
 
-#language
+@language
 construct RangeGraphRelationship {
     let origin: RangeGraphIdentity
     let destination: RangeGraphIdentity
     let kind: String
 }
 
-#language
+@language
 construct GraphSyntax {
     let identity: RangeGraphIdentity
-    let declarations: [#GraphDeclaration]
-    let applications: [#GraphApplication]
+    let declarations: [@GraphDeclaration]
+    let applications: [@GraphApplication]
 }
 
-#language
+@language
 construct RangeGraphIdentity {
     let id: String
     let kind: String
     let name: String
 }
 
-#language
+@language
 construct GraphDeclaration {
     let identity: RangeGraphIdentity
 }
 
-#language
+@language
 construct GraphApplication {
     let identity: RangeGraphIdentity
 }

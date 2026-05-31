@@ -36,7 +36,7 @@ construct AdditionalTypedExpandFixture {
 }
 
 @main {
-    let fixture   AdditionalTypedExpandFixture()
+    let fixture: AdditionalTypedExpandFixture()
     fixture.typedTargetFunction(input: 1)
     GeneratedTypedExpandNamespace.message()
 }

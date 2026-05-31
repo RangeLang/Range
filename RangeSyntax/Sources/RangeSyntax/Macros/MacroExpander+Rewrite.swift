@@ -113,7 +113,7 @@ extension MacroExpander {
             guard
                 let rewritten = try executeInitMacroRewrite(
                     macroName: macroApplication.name,
-                    initTarget: target.initTarget,
+                    initTarget: target.rewriteInitTarget,
                     applicationArguments: currentArguments,
                     macros: macros,
                     context: context
@@ -263,20 +263,15 @@ extension MacroExpander {
         }
 
         let rewrittenArguments: [CallArgument] = values.enumerated().compactMap { index, value in
-            guard
-                let argument = resolveInitApplicationArgumentReference(
-                    value,
-                    targetBinding: targetBinding,
-                    applicationArguments: applicationArguments
-                )
-            else {
+            guard let expression = interpretInitRewriteArgument(
+                value,
+                targetBinding: targetBinding,
+                applicationArguments: applicationArguments
+            ) else {
                 return nil
             }
 
-            return CallArgument(
-                label: argument.label ?? initTarget.parameterLabels[index],
-                value: argument.value
-            )
+            return CallArgument(label: initTarget.parameterLabels[index], value: expression)
         }
 
         guard rewrittenArguments.count == values.count else {
@@ -287,6 +282,37 @@ extension MacroExpander {
             name: initTarget.constructName,
             arguments: rewrittenArguments
         )
+    }
+
+    static func interpretInitRewriteArgument(
+        _ expression: Expression,
+        targetBinding: String,
+        applicationArguments: [CallArgument]
+    ) -> Expression? {
+        if let argument = resolveInitApplicationArgumentReference(
+            expression,
+            targetBinding: targetBinding,
+            applicationArguments: applicationArguments
+        ) {
+            return argument.value
+        }
+
+        switch expression {
+        case .string:
+            return expression
+        case .call(let name, let arguments)
+            where name == "String" && arguments.count == 1 && arguments[0].label == nil:
+            guard let argument = resolveInitApplicationArgumentReference(
+                arguments[0].value,
+                targetBinding: targetBinding,
+                applicationArguments: applicationArguments
+            ) else {
+                return nil
+            }
+            return .string(renderExpressionForStringify(argument.value))
+        default:
+            return nil
+        }
     }
 
     static func resolveInitApplicationArgumentReference(
@@ -448,7 +474,7 @@ extension MacroExpander {
                 if let metadata = context.macroMetadataByName[application.name] {
                     guard macroTargetAllows(metadata.target, kind: .construct) else {
                         throw ParseError(
-                            "Macro #\(application.name) is used on a construct but targets \(metadata.target.displayName)."
+                            "Macro @\(application.name) is used on a construct but targets \(metadata.target.displayName)."
                         )
                     }
                     let argumentBindings = try parseMacroMetadataArgumentBindings(
@@ -481,9 +507,15 @@ extension MacroExpander {
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
+            if macroTargetAllows(macro.target!, kind: .initializer) {
+                if !macroOperationExpressions(in: macro.body).isEmpty {
+                    _ = try resolvedRewriteCalls(for: macro, context: context)
+                }
+                continue
+            }
             guard macroTargetAllows(macro.target!, kind: .construct) else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on a construct but targets \(macro.target!.displayName)."
+                    "Macro @\(application.name) is used on a construct but targets \(macro.target!.displayName)."
                 )
             }
             try emitMacroDiagnostics(
@@ -512,7 +544,7 @@ extension MacroExpander {
                 if let metadata = context.macroMetadataByName[application.name] {
                     guard macroTargetAllows(metadata.target, kind: .typeExtension) else {
                         throw ParseError(
-                            "Macro #\(application.name) is used on an extension but targets \(metadata.target.displayName)."
+                            "Macro @\(application.name) is used on an extension but targets \(metadata.target.displayName)."
                         )
                     }
                     _ = try parseMacroMetadataArgumentBindings(
@@ -538,7 +570,7 @@ extension MacroExpander {
             }
             guard macroTargetAllows(macro.target!, kind: .typeExtension) else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on an extension but targets \(macro.target!.displayName)."
+                    "Macro @\(application.name) is used on an extension but targets \(macro.target!.displayName)."
                 )
             }
             try emitMacroDiagnostics(from: macro.body, macro: macro, context: context)
@@ -759,13 +791,13 @@ extension MacroExpander {
 
             guard let closure = closureComponents(from: arguments[0].value) else {
                 throw ParseError(
-                    "Macro #\(macro.name) \(name)(...) must receive a closure."
+                    "Macro @\(macro.name) \(name)(...) must receive a closure."
                 )
             }
 
             guard closure.parameters.count == 1 else {
                 throw ParseError(
-                    "Macro #\(macro.name) \(name)(...) must receive a single-parameter closure."
+                    "Macro @\(macro.name) \(name)(...) must receive a single-parameter closure."
                 )
             }
 
@@ -794,7 +826,7 @@ extension MacroExpander {
     ) throws -> Expression {
         guard statements.count == 1 else {
             throw ParseError(
-                "Macro #\(macroName) \(hookName)(...) closure must contain exactly one expression."
+                "Macro @\(macroName) \(hookName)(...) closure must contain exactly one expression."
             )
         }
 
@@ -805,7 +837,7 @@ extension MacroExpander {
             return expression
         default:
             throw ParseError(
-                "Macro #\(macroName) \(hookName)(...) closure must evaluate to an expression."
+                "Macro @\(macroName) \(hookName)(...) closure must evaluate to an expression."
             )
         }
     }
@@ -821,7 +853,7 @@ extension MacroExpander {
         {
             guard case .block(let body) = rewrite.payload else {
                 throw ParseError(
-                    "Macro #\(macro.name) target.replace(with: ...) must receive a block expression."
+                    "Macro @\(macro.name) target.replace(with: ...) must receive a block expression."
                 )
             }
             rewriteCalls.append(body)
@@ -829,12 +861,12 @@ extension MacroExpander {
 
         guard let rewriteBody = rewriteCalls.first else {
             throw ParseError(
-                "Macro #\(macro.name) must call \(macro.bindings!.target).replace(with: ...) with a block expression."
+                "Macro @\(macro.name) must call \(macro.bindings!.target).replace(with: ...) with a block expression."
             )
         }
 
         if rewriteCalls.count > 1 {
-            throw ParseError("Macro #\(macro.name) can only rewrite once in this bootstrap pass.")
+            throw ParseError("Macro @\(macro.name) can only rewrite once in this bootstrap pass.")
         }
 
         return rewriteBody
@@ -854,12 +886,12 @@ extension MacroExpander {
 
         guard let rewriteExpression = rewriteExpressions.first else {
             throw ParseError(
-                "Macro #\(macro.name) must call \(macro.bindings!.target).replace(with: ...) with an expression."
+                "Macro @\(macro.name) must call \(macro.bindings!.target).replace(with: ...) with an expression."
             )
         }
 
         if rewriteExpressions.count > 1 {
-            throw ParseError("Macro #\(macro.name) can only rewrite once in this bootstrap pass.")
+            throw ParseError("Macro @\(macro.name) can only rewrite once in this bootstrap pass.")
         }
 
         return rewriteExpression

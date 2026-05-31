@@ -50,22 +50,22 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
             if tokenApplications.isEmpty {
                 throw SemanticValidationError(
-                    "@lexer requires #Token metadata on \(declaration.name)."
+                    "@lexer requires @Token metadata on \(declaration.name)."
                 )
             }
             if tokenApplications.count > 1 {
                 throw SemanticValidationError(
-                    "@lexer found multiple #Token macro metadata on \(declaration.name)."
+                    "@lexer found multiple @Token macro metadata on \(declaration.name)."
                 )
             }
             if delimiterApplications.count > 1 {
                 throw SemanticValidationError(
-                    "@lexer found multiple #Delimiter macro metadata on \(declaration.name)."
+                    "@lexer found multiple @Delimiter macro metadata on \(declaration.name)."
                 )
             }
             if operatorApplications.count > 1 {
                 throw SemanticValidationError(
-                    "@lexer found multiple #Operator macro metadata on \(declaration.name)."
+                    "@lexer found multiple @Operator macro metadata on \(declaration.name)."
                 )
             }
             if lexerApplications.count > 1 {
@@ -84,12 +84,12 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             let tokenApplications = declaration.macros.filter { $0.name == "Token" }
             if tokenApplications.isEmpty {
                 throw SemanticValidationError(
-                    "#Operator requires #Token metadata on \(declaration.name)."
+                    "@Operator requires @Token metadata on \(declaration.name)."
                 )
             }
             if operatorApplications.count > 1 {
                 throw SemanticValidationError(
-                    "Duplicate #Operator macro on \(declaration.name)."
+                    "Duplicate @Operator macro on \(declaration.name)."
                 )
             }
         }
@@ -616,7 +616,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
         guard RangeSyntax.attributeIdentifiers.contains(attribute.name) else {
             throw SemanticValidationError(
-                "Unknown attribute @\(attribute.name) in \(lastPathComponent(of: filePath)). Use @ for macros and built-in attribute surfaces; use # for macro metadata."
+                "Unknown attribute @\(attribute.name) in \(lastPathComponent(of: filePath)). Use @ for macros and built-in attribute surfaces."
             )
         }
     }
@@ -628,7 +628,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     ) throws {
         if macros.contains(where: { $0.name == "syntax" }) {
             throw SemanticValidationError(
-                "#syntax can only be used in RangeCore. Remove #syntax from \(declarationName) in \(lastPathComponent(of: filePath))."
+                "@syntax can only be used in RangeCore. Remove @syntax from \(declarationName) in \(lastPathComponent(of: filePath))."
             )
         }
     }
@@ -647,7 +647,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     continue
                 }
                 throw SemanticValidationError(
-                    "Closed macro #\(macro.name) can only be used inside its declaring package. Remove #\(macro.name) from \(usage.declarationName) in \(lastPathComponent(of: parsedFile.path))."
+                    "Closed macro @\(macro.name) can only be used inside its declaring package. Remove #\(macro.name) from \(usage.declarationName) in \(lastPathComponent(of: parsedFile.path))."
                 )
             }
         }
@@ -667,7 +667,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     continue
                 }
                 throw SemanticValidationError(
-                    "Closed macro #\(macro.name) can only be used inside its declaring package. Remove #\(macro.name) from \(usage.declarationName) in \(lastPathComponent(of: parsedFile.path))."
+                    "Closed macro @\(macro.name) can only be used inside its declaring package. Remove #\(macro.name) from \(usage.declarationName) in \(lastPathComponent(of: parsedFile.path))."
                 )
             }
         }

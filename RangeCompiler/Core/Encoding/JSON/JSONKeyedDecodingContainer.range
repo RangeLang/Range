@@ -4,7 +4,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
     function decode(_ type: Bool.Type, forKey key: String): Result<Bool, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):
-            let container   JSONSingleValueDecodingContainer(value: value)
+            let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(Bool.self)
         case .failure(let error):
             return .failure(cause: error)
@@ -14,7 +14,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
     function decode(_ type: Date.Type, forKey key: String): Result<Date, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):
-            let container   JSONSingleValueDecodingContainer(value: value)
+            let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(Date.self)
         case .failure(let error):
             return .failure(cause: error)
@@ -24,7 +24,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
     function decode(_ type: DateTime.Type, forKey key: String): Result<DateTime, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):
-            let container   JSONSingleValueDecodingContainer(value: value)
+            let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(DateTime.self)
         case .failure(let error):
             return .failure(cause: error)
@@ -34,7 +34,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
     function decode(_ type: Float.Type, forKey key: String): Result<Float, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):
-            let container   JSONSingleValueDecodingContainer(value: value)
+            let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(Float.self)
         case .failure(let error):
             return .failure(cause: error)
@@ -44,7 +44,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
     function decode(_ type: Int.Type, forKey key: String): Result<Int, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):
-            let container   JSONSingleValueDecodingContainer(value: value)
+            let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(Int.self)
         case .failure(let error):
             return .failure(cause: error)
@@ -54,7 +54,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
     function decode(_ type: String.Type, forKey key: String): Result<String, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):
-            let container   JSONSingleValueDecodingContainer(value: value)
+            let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(String.self)
         case .failure(let error):
             return .failure(cause: error)
@@ -64,7 +64,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
     function decode(_ type: UUID.Type, forKey key: String): Result<UUID, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):
-            let container   JSONSingleValueDecodingContainer(value: value)
+            let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(UUID.self)
         case .failure(let error):
             return .failure(cause: error)
@@ -74,7 +74,7 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
     function decode<T: Decodable>(_ type: T.Type, forKey key: String): Result<T, DecodingError> {
         switch value(forKey: key) {
         case .success(let value):
-            let decoder   JSONDecoder(value: value)
+            let decoder: JSONDecoder(value: value)
             return T.decode(from: decoder)
         case .failure(let error):
             return .failure(cause: error)

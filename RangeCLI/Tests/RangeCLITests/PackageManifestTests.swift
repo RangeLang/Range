@@ -12,7 +12,7 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
         try """
-            #package
+            @package
             construct Fixture {
                 let name: Title("Fixture")
                 let version: Version(1.2.3)
@@ -45,7 +45,7 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
         try """
-            #package
+            @package
             construct Fixture {
                 let name: Title("Fixture")
                 let version: Int(1)
@@ -71,7 +71,7 @@ struct PackageManifestTests {
 
         let packageFile = root.appendingPathComponent("Package.range", isDirectory: false)
         try """
-            #package
+            @package
             construct Fixture {
                 let name: Title("Fixture")
                 let version: Version(1.2.3)

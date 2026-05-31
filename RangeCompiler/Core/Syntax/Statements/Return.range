@@ -1,4 +1,4 @@
-#Statement
+@Statement
 @syntax
 construct Return {
     let expression: Expression?

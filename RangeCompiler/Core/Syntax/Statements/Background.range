@@ -1,4 +1,4 @@
-#Statement
+@Statement
 @syntax
 construct Background {
     let body: Block

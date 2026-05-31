@@ -1,4 +1,4 @@
-#GraphDeclaration
+@GraphDeclaration
 construct ProgramFileGraphNode { }
 
 function renderProgram(program: RangeProgram): String {
@@ -10,8 +10,8 @@ function renderIdentity(identity: RangeGraphIdentity): String {
 }
 
 function renderFiles(files: [FileTreeNode]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < files.count {
         let file: FileTreeNode(files.element(index: index))
@@ -27,8 +27,8 @@ function renderRangeGraph(graph: RangeGraph): String {
 }
 
 function renderRangeGraphNodes(nodes: [RangeGraphNode]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < nodes.count {
         let node: RangeGraphNode(nodes.element(index: index))
@@ -40,8 +40,8 @@ function renderRangeGraphNodes(nodes: [RangeGraphNode]): String {
 }
 
 function renderRangeGraphRelationships(relationships: [RangeGraphRelationship]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < relationships.count {
         let relationship: RangeGraphRelationship(relationships.element(index: index))
@@ -53,8 +53,8 @@ function renderRangeGraphRelationships(relationships: [RangeGraphRelationship]):
 }
 
 function renderSyntaxItems(items: [GraphSyntax]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < items.count {
         let item: GraphSyntax(items.element(index: index))
@@ -68,8 +68,8 @@ function renderSyntaxItems(items: [GraphSyntax]): String {
 }
 
 function countDeclarations(graph: ProgramGraph): Int {
-    state count   0
-    state index   0
+    state count: 0
+    state index: 0
 
     while index < graph.syntax.count {
         let syntax: GraphSyntax(graph.syntax.element(index: index))
@@ -81,8 +81,8 @@ function countDeclarations(graph: ProgramGraph): Int {
 }
 
 function countApplications(graph: ProgramGraph): Int {
-    state count   0
-    state index   0
+    state count: 0
+    state index: 0
 
     while index < graph.syntax.count {
         let syntax: GraphSyntax(graph.syntax.element(index: index))

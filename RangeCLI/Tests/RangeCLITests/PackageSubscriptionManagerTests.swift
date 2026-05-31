@@ -77,7 +77,7 @@ struct PackageSubscriptionManagerTests {
             withIntermediateDirectories: true
         )
         try """
-            #package
+            @package
             construct Project {
                 let name: Title("\(name)")
                 let version: Version(0.1.0)

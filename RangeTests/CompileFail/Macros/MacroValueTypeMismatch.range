@@ -3,6 +3,6 @@ macro badKey<T>(_ value: Int): Let<T> -> String {
 }
 
 construct MacroValueTypeMismatchFixture {
-    #badKey(1)
+    @badKey(1)
     let id: Int
 }

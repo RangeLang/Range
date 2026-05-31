@@ -4,11 +4,11 @@ construct ChainInferenceBox {
     init(values: [Int]) {
         set self.values   values
 
-        let count   self.values.count
-        let first   self.values.element(index: 0)
+        let count: self.values.count
+        let first: self.values.element(index: 0)
     }
 }
 
 @main {
-    let box   ChainInferenceBox(values: [1, 2, 3])
+    let box: ChainInferenceBox(values: [1, 2, 3])
 }

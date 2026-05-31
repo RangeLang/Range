@@ -48,5 +48,5 @@ construct UserView {
 }
 
 @main {
-    let view   UserView(id: 1)
+    let view: UserView(id: 1)
 }

@@ -66,7 +66,7 @@ struct ProjectBinaryLinkerTests {
             .appendingPathComponent("range-binary-link-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            #package
+            @package
             construct Project {
                 let name: Title("Linked")
                 let version: Version(0.1.0)

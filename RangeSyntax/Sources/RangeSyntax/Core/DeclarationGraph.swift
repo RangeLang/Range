@@ -107,7 +107,10 @@ public struct DeclarationGraph {
         self.sourceTextByPath = sourceTextByPath
         self.sourceLocations = Self.collectSourceLocations(from: files)
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
-        self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(from: constructs)
+        self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(
+            from: constructs,
+            macrosByName: macros
+        )
         self.programGraph = Self.collectProgramGraph(from: files)
     }
 
@@ -1037,10 +1040,11 @@ public struct DeclarationGraph {
     }
 
     static func collectRealizedInitMacroTargets(
-        from constructs: [String: ConstructDeclaration]
+        from constructs: [String: ConstructDeclaration],
+        macrosByName: [String: MacroDeclaration]
     ) -> [RealizedInitMacroTarget] {
         constructs.values.flatMap { construct in
-            construct.initializers.compactMap { initializer in
+            var targets = construct.initializers.compactMap { initializer -> RealizedInitMacroTarget? in
                 guard !initializer.macros.isEmpty else {
                     return nil
                 }
@@ -1054,6 +1058,41 @@ public struct DeclarationGraph {
                     macros: initializer.macros
                 )
             }
+
+            let constructInitMacros = construct.macros.filter { application in
+                guard let macro = macrosByName[application.name], let target = macro.target else {
+                    return false
+                }
+                return macroTargetAllows(target, kind: .initializer)
+            }
+
+            if !constructInitMacros.isEmpty {
+                let parameters = directConstructApplicationParameters(
+                    for: construct,
+                    constructsByName: constructs,
+                    macrosByName: macrosByName,
+                    activeConstructs: []
+                )
+                let rewriteLabels = parameters.map(\.externalLabel)
+                let applicationLabels: [String?] = parameters.count == 1 ? [nil] : rewriteLabels
+                targets.append(
+                    RealizedInitMacroTarget(
+                        initTarget: RealizedInitTarget(
+                            constructName: construct.name,
+                            parameterLabels: applicationLabels,
+                            isCore: construct.isCore
+                        ),
+                        rewriteInitTarget: RealizedInitTarget(
+                            constructName: construct.name,
+                            parameterLabels: rewriteLabels,
+                            isCore: construct.isCore
+                        ),
+                        macros: constructInitMacros
+                    )
+                )
+            }
+
+            return targets
         }
     }
 
@@ -1336,7 +1375,7 @@ private struct SemanticGraphCollector {
 
     private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
         let constructID = "\(parentID)/construct:\(declaration.name)"
-        let label = declaration.isCore ? "#language \(declaration.name)" : declaration.name
+        let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
         addEntity(id: constructID, kind: .construct, label: label)
         addRelation(from: parentID, to: constructID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: constructID)
@@ -1375,7 +1414,7 @@ private struct SemanticGraphCollector {
 
     private mutating func addProtocol(_ declaration: ProtocolDeclaration, parentID: String) {
         let protocolID = "\(parentID)/protocol:\(declaration.name)"
-        let label = declaration.isCore ? "#language \(declaration.name)" : declaration.name
+        let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
         addEntity(id: protocolID, kind: .protocolDefinition, label: label)
         addRelation(from: parentID, to: protocolID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: protocolID)
@@ -1486,7 +1525,7 @@ private struct SemanticGraphCollector {
     private mutating func addMacroApplications(_ macros: [MacroApplication], parentID: String) {
         for macro in macros {
             let macroID = "\(parentID)/macro-application:#\(macro.name)"
-            addEntity(id: macroID, kind: .macroApplication, label: "#\(macro.name)")
+            addEntity(id: macroID, kind: .macroApplication, label: "@\(macro.name)")
             addRelation(from: parentID, to: macroID, kind: .appliesMacro)
         }
     }

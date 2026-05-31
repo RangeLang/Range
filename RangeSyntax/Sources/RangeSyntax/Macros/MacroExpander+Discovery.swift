@@ -14,6 +14,16 @@ extension MacroExpander {
         return registry
     }
 
+    public static func collectMacroDeclarations(from files: [ParsedSourceFile]) -> [String: MacroDeclaration] {
+        var registry: [String: MacroDeclaration] = [:]
+        for parsedFile in files {
+            for macro in self.macros(in: parsedFile.sourceFile) {
+                registry[macro.name] = macro
+            }
+        }
+        return registry
+    }
+
     public static func collectMacroExpansionTypes(from files: [ParsedSourceFile])
         -> [String: TypeReference]
     {
@@ -32,14 +42,14 @@ extension MacroExpander {
                 guard syntaxResolver.typeConformsToSyntax(parameter.typeReference) else {
                     if parameter.capturesSyntax {
                         throw ParseError(
-                            "Macro #\(macro.name) parameter \(parameter.localName) uses @capture with non-syntax type \(parameter.typeReference?.displayName ?? "unknown")."
+                            "Macro @\(macro.name) parameter \(parameter.localName) uses @capture with non-syntax type \(parameter.typeReference?.displayName ?? "unknown")."
                         )
                     }
                     continue
                 }
                 guard parameter.capturesSyntax else {
                     throw ParseError(
-                        "Macro #\(macro.name) parameter \(parameter.localName) must use @capture<\(parameter.typeReference?.displayName ?? "Syntax")> to bind syntax."
+                        "Macro @\(macro.name) parameter \(parameter.localName) must use @capture<\(parameter.typeReference?.displayName ?? "Syntax")> to bind syntax."
                     )
                 }
             }

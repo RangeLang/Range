@@ -40,7 +40,7 @@ public enum ExpressionTypeSemantics {
                 return .typed(.named("#\(name)"))
             }
             throw ParseError(
-                "Expression macro #\(name) must be expanded before inference."
+                "Expression macro @\(name) must be expanded before inference."
             )
         case .block:
             throw ParseError(

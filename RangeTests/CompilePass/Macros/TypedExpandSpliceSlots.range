@@ -16,6 +16,6 @@ construct TypedExpandSpliceFixture {
 }
 
 @main {
-    let value   TypedExpandSpliceFixture()
+    let value: TypedExpandSpliceFixture()
     value.generatedName()
 }

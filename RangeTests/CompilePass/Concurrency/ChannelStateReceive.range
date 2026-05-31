@@ -3,12 +3,12 @@ enum LoadError {
 }
 
 @main {
-    let output   Channel<String>()
+    let output: Channel<String>()
 
     @background {
         output.send("george")
     }
 
-    state received   output.receive()
+    state received: output.receive()
     Logger.info(received)
 }

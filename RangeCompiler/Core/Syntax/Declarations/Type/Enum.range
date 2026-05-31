@@ -2,7 +2,7 @@
 construct Enum {
     let declaration: Declaration
 
-    #GraphDeclaration
+    @GraphDeclaration
     construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
         let self: NominalTypeReference
         let generics: [Generic]
@@ -11,7 +11,7 @@ construct Enum {
         function expand(_ expansion: () -> [Syntax])
     }
 
-    #GraphDeclaration
+    @GraphDeclaration
     construct Case: SyntaxEmittable {
         let identifier: Identifier
         let associatedValues: [AssociatedValue]

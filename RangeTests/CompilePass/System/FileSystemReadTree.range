@@ -8,8 +8,8 @@ function entryKindName(kind: FileSystemEntryKind): String {
 }
 
 function renderTree(node: FileTreeNode, indent: String): String {
-    state output   "\(indent)\(entryKindName(kind: node.kind)) \(node.path)\n"
-    state index   0
+    state output: "\(indent)\(entryKindName(kind: node.kind)) \(node.path)\n"
+    state index: 0
 
     while index < node.children.count {
         output += renderTree(node: node.children.element(index: index), indent: "\(indent)  ")

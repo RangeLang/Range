@@ -36,7 +36,7 @@ function rangeLexer(): Lexer {
             LexerRule(name: "percent", pattern: "%", token: "percent", priority: 20),
             LexerRule(name: "pipe", pattern: "|", token: "pipe", priority: 20),
             LexerRule(name: "stringLiteral", pattern: "quotedString", token: "stringLiteral", priority: 40),
-            LexerRule(name: "hashAttribute", pattern: "#identifier", token: "hashAttribute", priority: 40),
+            LexerRule(name: "hashAttribute", pattern: "@identifier", token: "hashAttribute", priority: 40),
             LexerRule(name: "hash", pattern: "#(", token: "hash", priority: 50),
             LexerRule(name: "macroAttribute", pattern: "@identifier", token: "macroAttribute", priority: 40),
             LexerRule(name: "escapedIdentifier", pattern: "`identifier`", token: "identifier", priority: 40),

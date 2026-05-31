@@ -1,11 +1,11 @@
 function encodeNilOptional(): Result<String, EncodingError> {
-    let encoder   JSONEncoder()
+    let encoder: JSONEncoder()
     let value: Optional<Int>(nil)
     return encoder.encode(value)
 }
 
 function encodeSomeOptional(): Result<String, EncodingError> {
-    let encoder   JSONEncoder()
+    let encoder: JSONEncoder()
     let value: Optional<Int>(42)
     return encoder.encode(value)
 }

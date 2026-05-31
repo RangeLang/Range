@@ -53,7 +53,13 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("#Project macro requires a single project declaration")
+    @Test("Identifier init macro stringifies bare syntax")
+    func identifierInitMacroStringifiesBareSyntax() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/IdentifierInitMacro.range")
+        _ = try compile(fixture: fixture, expectedRole: .pass)
+    }
+
+    @Test("@Project macro requires a single project declaration")
     func projectMacroRequiresSingleProjectDeclaration() throws {
         let inputs = [
             SourceInput(
@@ -66,7 +72,7 @@ struct CompilerFixtureTests {
                         }
                     )
                     if projectMacros.count > 1 {
-                        diagnostics.error("A second #Project conflicts with the project already declared in this Range project.")
+                        diagnostics.error("A second @Project conflicts with the project already declared in this Range project.")
                     }
                 }
 
@@ -74,11 +80,11 @@ struct CompilerFixtureTests {
                     let name: String
                 }
 
-                #Project
+                @Project
                 construct FirstProject {
                 }
 
-                #Project
+                @Project
                 construct SecondProject {
                 }
                 """,
@@ -90,7 +96,7 @@ struct CompilerFixtureTests {
             diagnostics.contains {
                 $0.severity == .error
                     && $0.source == "range-macro"
-                    && $0.message.contains("A second #Project conflicts")
+                    && $0.message.contains("A second @Project conflicts")
             }
         )
     }
@@ -186,9 +192,9 @@ struct CompilerFixtureTests {
     @Test("Macro metadata queries graph through identities")
     func macroMetadataQueriesGraphThroughIdentities() throws {
         let source = """
-        #tracked("root")
+        @tracked("root")
         construct User {
-            #tracked("name")
+            @tracked("name")
             let name: String
             let age: Int
 
@@ -372,7 +378,7 @@ struct CompilerFixtureTests {
                     }
                 }
 
-                #graphNamed
+                @graphNamed
                 construct User {
                     let name: String
                 }
@@ -396,7 +402,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/WrittenSyntaxMacro.range",
                 source: """
-                #WrittenSyntax {
+                @WrittenSyntax {
                 function this is not parsed -> nope
                 @@@ raw ascii stays isolated
                 }
@@ -425,7 +431,7 @@ struct CompilerFixtureTests {
                     return declaration.self.name
                 }
 
-                #graphName
+                @graphName
                 construct User {
                     let name: String
                 }
@@ -452,7 +458,7 @@ struct CompilerFixtureTests {
                     let name: String
                 }
 
-                #extensionTargetName
+                @extensionTargetName
                 extension User {
                     function displayName(): String {
                         return name
@@ -485,7 +491,7 @@ struct CompilerFixtureTests {
                     let name: String
                 }
 
-                #constructOnly
+                @constructOnly
                 extension User {
                     function displayName(): String {
                         return name
@@ -607,7 +613,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 }
 
                 @main {
-                    let user   User(id: 1, name: "George")
+                    let user: User(id: 1, name: "George")
                 }
                 """,
                 role: .project
@@ -633,7 +639,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
                 construct Int<let signedness: Signedness> {}
 
-                #CompoundLiteral(0.0.0)
+                @CompoundLiteral(0.0.0)
                 construct Version {
                     state major: Int<.unsigned>
                     state minor: Int<.unsigned>
@@ -641,7 +647,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 }
 
                 @main {
-                    let current   Version(0.1.0)
+                    let current: Version(0.1.0)
                 }
                 """,
                 role: .project
@@ -667,7 +673,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
                 construct Int<let signedness: Signedness> {}
 
-                #CompoundLiteral(0.0.0)
+                @CompoundLiteral(0.0.0)
                 construct Version {
                     state major: Int<.unsigned>
                     state minor: Int<.unsigned>
@@ -675,7 +681,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 }
 
                 @main {
-                    let current   Version("0.1")
+                    let current: Version("0.1")
                 }
                 """,
                 role: .project
@@ -804,6 +810,31 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         )
     }
 
+    @Test("Local declarations require colon before initializer")
+    func localDeclarationsRequireColonBeforeInitializer() throws {
+        let projectPath = "/tmp/LocalDeclarationMissingColon.range"
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: projectPath,
+                source: """
+                @main {
+                    state cursor   LexerCursor(source: "", foreignBodies: [], rules: [])
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+        #expect(
+            diagnostics.contains {
+                $0.path == projectPath
+                    && $0.message.contains("state 'cursor' expects typed construction")
+            }
+        )
+    }
+
     @Test("Construct applications reject labels with no stored declaration")
     func constructApplicationsRejectLabelsWithNoStoredDeclaration() throws {
         let projectPath = "/tmp/DirectConstructApplicationBadLabel.range"
@@ -818,7 +849,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 }
 
                 @main {
-                    let user   User(identifier: 1, name: "George")
+                    let user: User(identifier: 1, name: "George")
                 }
                 """,
                 role: .project
@@ -844,7 +875,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 macro styling(): Construct -> Void { target, diagnostics in
                 }
 
-                #styling
+                @styling
                 construct Panel {
                     let title: String
                 }
@@ -869,7 +900,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 macro persisted(_ prefix: String): Construct -> Void { target, diagnostics in
                 }
 
-                #persisted("settings")
+                @persisted("settings")
                 construct Profile {
                     let displayName: String
                 }
@@ -891,7 +922,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/PackageManifest.range",
                 source: """
-                #package
+                @package
                 construct Project {
                     let name: Title("Example")
                     let version: Version(0.1.0)
@@ -929,7 +960,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
             Issue.record("Expected @Missing to be rejected.")
         } catch {
-            #expect(String(describing: error).contains("Unknown attribute @Missing"))
+            #expect(String(describing: error).contains("Unknown attached macro @Missing"))
         }
     }
 
@@ -952,7 +983,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 path: "/tmp/ProjectMain.range",
                 source: """
                 @main {
-                    let text   @captureText(1 + 2)
+                    let text: @captureText(1 + 2)
                 }
                 """,
                 role: .project
@@ -970,8 +1001,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 path: "/tmp/ForwardDeclarations.range",
                 source: """
                 @main {
-                    let messageText   message()
-                    let captured   @captureText(1 + 2)
+                    let messageText: message()
+                    let captured: @captureText(1 + 2)
                 }
 
                 function message(): String {
@@ -1380,7 +1411,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/DeclarationGraphRegistrySnapshot.range",
                 source: """
-                #package
+                @package
                 construct Project {
                     let packageName: String("Registry Snapshot")
                     let modules: ["acme/registry-snapshot"]
@@ -1410,7 +1441,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     let street: String
                 }
 
-                #styling
+                @styling
                 construct Panel: Renderable {
                     state count: Int(0)
                     binding selected: Bool {
@@ -1449,7 +1480,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     }
                 }
 
-                #hostSpace
+                @hostSpace
                 construct Routes {
                     function home(): String {
                         return "home"
@@ -1600,7 +1631,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 macro semantic(): Construct -> Void { target, diagnostics in
                 }
 
-                #semantic
+                @semantic
                 construct Language {
                     let defaultLocale: String("en")
 
@@ -1641,7 +1672,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 macro hostSpace(): Construct -> Void { target, diagnostics in
                 }
 
-                #hostSpace
+                @hostSpace
                 construct Client {
                     function route(): String {
                         return "home"
@@ -2260,7 +2291,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
             Issue.record("Expected closed macro use outside its package to fail.")
         } catch {
-            #expect(String(describing: error).contains("Closed macro #coreOnly can only be used inside its declaring package"))
+            #expect(String(describing: error).contains("Closed macro @coreOnly can only be used inside its declaring package"))
         }
     }
 

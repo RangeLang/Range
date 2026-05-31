@@ -299,7 +299,7 @@ struct ProjectScaffolder {
 
     private func renderProgramPackage(name: String) -> String {
         return """
-            #Project
+            @Project
             construct Project {
                 let name: Title("\(escapedStringLiteral(name))")
                 let version: Version(0.1.0)

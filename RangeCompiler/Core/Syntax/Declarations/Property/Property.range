@@ -1,4 +1,4 @@
-#GraphDeclaration
+@GraphDeclaration
 @syntax
 protocol Property {
     let identity: GraphIdentity
@@ -8,7 +8,7 @@ protocol Property {
     let type: TypeReference
 }
 
-#GraphDeclaration
+@GraphDeclaration
 @syntax
 protocol StoredProperty: Property {
     let value: Expression?

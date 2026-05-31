@@ -204,6 +204,13 @@ struct RewriteSurfaceView {
         targetBinding: String,
         targetType: TypeReference
     ) -> Set<String> {
+        if macroTargetKind(for: targetType) == .initializer {
+            return [
+                "\(targetBinding).application.replace",
+                "\(targetBinding).application.arguments[].expression.replace",
+            ]
+        }
+
         guard let targetName = syntaxResolver.nominalName(of: targetType) else {
             return []
         }
@@ -304,6 +311,11 @@ struct RewriteSurfaceView {
         targetBinding: String,
         targetType: TypeReference
     ) -> Bool {
+        if macroTargetKind(for: targetType) == .initializer {
+            return normalizedPath == "\(targetBinding).application.replace"
+                || normalizedPath == "\(targetBinding).application.arguments[].expression.replace"
+        }
+
         guard let targetName = syntaxResolver.nominalName(of: targetType) else {
             return false
         }
@@ -659,7 +671,7 @@ struct MacroExpansionContext {
                 allowedDescription = allowedPaths.sorted().joined(separator: ", ")
             }
             throw ParseError(
-                "Macro #\(macro.name) targeting \(macro.target!.displayName) uses unsupported replace site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
+                "Macro @\(macro.name) targeting \(macro.target!.displayName) uses unsupported replace site '\(invalidPaths[0])'. Allowed: \(allowedDescription)."
             )
         }
     }
@@ -674,7 +686,7 @@ struct MacroExpansionContext {
             targetType: macro.target!.typeReference
         ) else {
             throw ParseError(
-                "Macro #\(macro.name) targeting \(macro.target!.displayName) uses unsupported expand site '\(path).expand'."
+                "Macro @\(macro.name) targeting \(macro.target!.displayName) uses unsupported expand site '\(path).expand'."
             )
         }
     }

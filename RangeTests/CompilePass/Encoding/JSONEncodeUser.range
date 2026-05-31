@@ -5,15 +5,15 @@ construct User {
 
 extension User: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        state container   encoder.keyedContainer()
+        state container: encoder.keyedContainer()
         container.encode(id, forKey: "id")
         return container.encode(name, forKey: "name")
     }
 }
 
 function encodeUser(): Result<String, EncodingError> {
-    state encoder   JSONEncoder()
-    let user   User(id: 1, name: "George")
+    state encoder: JSONEncoder()
+    let user: User(id: 1, name: "George")
     return encoder.encode(user)
 }
 

@@ -660,7 +660,7 @@ extension MacroExpander {
                     guard macroTargetAllowsAny(metadata.target, kinds: allowedMacroTargetKinds(for: propertyKind))
                     else {
                         throw ParseError(
-                            "Macro #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(metadata.target.displayName)."
+                            "Macro @\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(metadata.target.displayName)."
                         )
                     }
                     guard context.propertyMacroMetadataTargetMatches(
@@ -669,7 +669,7 @@ extension MacroExpander {
                         propertyValueType: propertyValueType
                     ) else {
                         throw ParseError(
-                            "Macro #\(application.name) targeting \(metadata.target.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
+                            "Macro @\(application.name) targeting \(metadata.target.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                         )
                     }
                     let argumentBindings = try parseMacroMetadataArgumentBindings(
@@ -710,7 +710,7 @@ extension MacroExpander {
             }
             guard macroTargetAllowsAny(macro.target!, kinds: allowedMacroTargetKinds(for: propertyKind)) else {
                 throw ParseError(
-                    "Macro #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target!.displayName)."
+                    "Macro @\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target!.displayName)."
                 )
             }
             guard context.propertyMacroTargetMatches(
@@ -719,7 +719,7 @@ extension MacroExpander {
                 propertyValueType: propertyValueType
             ) else {
                 throw ParseError(
-                    "Macro #\(application.name) targeting \(macro.target!.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
+                    "Macro @\(application.name) targeting \(macro.target!.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                 )
             }
 
@@ -736,7 +736,7 @@ extension MacroExpander {
             for registration in try propertyTransformRegistrations(for: macro) {
                 guard supportedHooks(for: propertyKind).contains(registration.hook) else {
                     throw ParseError(
-                        "Macro #\(application.name) uses unsupported \(propertyHookName(registration.hook)) hook on \(propertyKindDescription(propertyKind)) \(name)."
+                        "Macro @\(application.name) uses unsupported \(propertyHookName(registration.hook)) hook on \(propertyKindDescription(propertyKind)) \(name)."
                     )
                 }
 
@@ -1445,7 +1445,8 @@ extension MacroExpander {
             return .call(name: name, arguments: callArguments)
         case .macroInvocation(let name, let arguments):
             guard let macro = macros[name],
-                macroTargetAllows(macro.target!, kind: .expression)
+                let target = macro.target,
+                macroTargetAllows(target, kind: .expression)
             else {
                 let rewrittenArguments = try arguments.map { argument in
                     CallArgument(
@@ -2002,7 +2003,7 @@ extension MacroExpander {
                         break
                     }
                     guard iterationCount < 10_000 else {
-                        throw ParseError("Macro #\(diagnosticOwnerName) diagnostic loop exceeded 10000 iterations.")
+                        throw ParseError("Macro @\(diagnosticOwnerName) diagnostic loop exceeded 10000 iterations.")
                     }
                     let bodyResult = try macroDiagnosticsAndLocals(
                         in: body,
@@ -2170,7 +2171,7 @@ extension MacroExpander {
         }
 
         guard let firstArgument = arguments.first(where: { $0.label == nil })?.value else {
-            throw ParseError("Macro #\(diagnosticOwnerName) \(name)(...) requires a message.")
+            throw ParseError("Macro @\(diagnosticOwnerName) \(name)(...) requires a message.")
         }
 
         let evaluator = CompileTimeValueEvaluator(
@@ -2182,7 +2183,7 @@ extension MacroExpander {
             context: context
         )
         guard case .string(let message) = evaluator.evaluate(firstArgument) else {
-            throw ParseError("Macro #\(diagnosticOwnerName) \(name)(...) message must evaluate to String.")
+            throw ParseError("Macro @\(diagnosticOwnerName) \(name)(...) message must evaluate to String.")
         }
 
         switch name {
@@ -2260,7 +2261,7 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws -> String {
         guard let bindings = macro.bindings, let target = macro.target else {
-            throw ParseError("Macro #\(macro.name) cannot render an attached expansion block without a target.")
+            throw ParseError("Macro @\(macro.name) cannot render an attached expansion block without a target.")
         }
         let targetDeclarationName = MacroTargetValueBuilder().declarationName(for: targetValue)
         let targetSurface = MacroTargetSurface(
@@ -2306,14 +2307,14 @@ extension MacroExpander {
                         context: context
                     )
                 else {
-                    throw ParseError("Unknown syntax macro #\(name).")
+                    throw ParseError("Unknown syntax macro @\(name).")
                 }
                 let renderer = MacroSyntaxRenderer(
                     localBindings: localBindings,
                     renderedTargetPath: { targetSurface.renderedTargetPath($0) }
                 )
                 guard let rendered = renderer.renderSyntax(value) else {
-                    throw ParseError("Syntax macro #\(name) did not produce renderable syntax.")
+                    throw ParseError("Syntax macro @\(name) did not produce renderable syntax.")
                 }
                 return rendered
             }
@@ -2493,7 +2494,7 @@ extension MacroExpander {
                     ),
                     let rendered = renderer.renderSyntax(value)
                 else {
-                    throw ParseError("Could not render syntax macro #\(name).")
+                    throw ParseError("Could not render syntax macro @\(name).")
                 }
                 return rendered
             }
@@ -2983,7 +2984,7 @@ extension MacroExpander {
         let root = name.split(separator: ".", maxSplits: 1).first.map(String.init) ?? name
         guard allowedIdentifiers.contains(root) || localIdentifiers.contains(root) else {
             throw ParseError(
-                "Syntax macro #\(macroName) references unknown template identifier '\(root)'. Pass it as a macro parameter or splice it explicitly."
+                "Syntax macro @\(macroName) references unknown template identifier '\(root)'. Pass it as a macro parameter or splice it explicitly."
             )
         }
     }
@@ -2995,15 +2996,16 @@ extension MacroExpander {
             var localBindings: [String: LocalBindingSymbol] = [:]
             var values: [CompileTimeValue] = []
             while parser.peek() != .eof {
-                if elementType.displayName == "Expression" {
+                let elementName = syntaxMacroTypeName(elementType)
+                if elementName == "Expression" {
                     values.append(expressionSyntaxValue(try parser.parseExpression()))
                 } else {
                     let statement = try parser.parseStatement(localBindings: &localBindings)
-                    if elementType.displayName == "Switch", case .switchStatement = statement {
+                    if elementName == "Switch", case .switchStatement = statement {
                         values.append(try statementSyntaxValue(statement))
-                    } else if elementType.displayName == "If", case .conditional = statement {
+                    } else if elementName == "If", case .conditional = statement {
                         values.append(try statementSyntaxValue(statement))
-                    } else if elementType.displayName == "Statement" {
+                    } else if elementName == "Statement" {
                         values.append(try statementSyntaxValue(statement))
                     } else {
                         throw ParseError("Unsupported syntax macro return type \(type.displayName).")
@@ -3013,7 +3015,7 @@ extension MacroExpander {
             return .array(values)
         }
 
-        switch type.displayName {
+        switch syntaxMacroTypeName(type) {
         case "Expression":
             var parser = try Parser(source: source)
             let expression = try parser.parseExpression()
@@ -3061,6 +3063,14 @@ extension MacroExpander {
         default:
             throw ParseError("Unsupported syntax macro return type \(type.displayName).")
         }
+    }
+
+    static func syntaxMacroTypeName(_ type: TypeReference) -> String {
+        let name = type.displayName
+        if name.hasPrefix("@") || name.hasPrefix("#") {
+            return String(name.dropFirst())
+        }
+        return name
     }
 
     static func statementSyntaxValue(_ statement: Statement) throws -> CompileTimeValue {

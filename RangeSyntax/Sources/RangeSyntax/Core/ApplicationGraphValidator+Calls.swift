@@ -659,32 +659,32 @@ extension ApplicationGraphValidator {
 
         guard arguments.count == 1, arguments[0].label == nil else {
             throw SemanticValidationError(
-                "CompoundLiteral initializer \(name)(\(renderCallArguments(arguments))) in \(fileName) expects one unlabeled value matching #CompoundLiteral(\(compoundLiteral.argumentClause ?? ""))."
+                "CompoundLiteral initializer \(name)(\(renderCallArguments(arguments))) in \(fileName) expects one unlabeled value matching @CompoundLiteral(\(compoundLiteral.argumentClause ?? ""))."
             )
         }
 
         let pattern = normalizedCompoundLiteralPattern(compoundLiteralPatternArgument(compoundLiteral.argumentClause ?? ""))
         let patternSegments = try compoundLiteralSegments(
             pattern,
-            description: "#CompoundLiteral pattern on \(name)"
+            description: "@CompoundLiteral pattern on \(name)"
         )
         guard patternSegments.allSatisfy({ $0 == "0" }) else {
             throw SemanticValidationError(
-                "#CompoundLiteral pattern on \(name) currently supports only unsigned integer slots written as 0."
+                "@CompoundLiteral pattern on \(name) currently supports only unsigned integer slots written as 0."
             )
         }
 
         let parameters = environment.declarationGraph.directConstructApplicationParameters(for: construct)
         guard patternSegments.count == parameters.count else {
             throw SemanticValidationError(
-                "#CompoundLiteral pattern on \(name) declares \(patternSegments.count) slot(s), but \(name) has \(parameters.count) initializer field(s)."
+                "@CompoundLiteral pattern on \(name) declares \(patternSegments.count) slot(s), but \(name) has \(parameters.count) initializer field(s)."
             )
         }
 
         for parameter in parameters {
             guard let type = parameter.typeReference, isUnsignedIntegerType(type) else {
                 throw SemanticValidationError(
-                    "#CompoundLiteral pattern on \(name) can only map to unsigned Int fields. Field \(parameter.localName) has type \(parameter.typeReference?.displayName ?? "unknown")."
+                    "@CompoundLiteral pattern on \(name) can only map to unsigned Int fields. Field \(parameter.localName) has type \(parameter.typeReference?.displayName ?? "unknown")."
                 )
             }
         }
@@ -701,7 +701,7 @@ extension ApplicationGraphValidator {
         )
         guard valueSegments.count == patternSegments.count else {
             throw SemanticValidationError(
-                "CompoundLiteral initializer \(name)(\(rawValue)) in \(fileName) has \(valueSegments.count) segment(s), but #CompoundLiteral(\(pattern)) expects \(patternSegments.count)."
+                "CompoundLiteral initializer \(name)(\(rawValue)) in \(fileName) has \(valueSegments.count) segment(s), but @CompoundLiteral(\(pattern)) expects \(patternSegments.count)."
             )
         }
 

@@ -48,7 +48,7 @@ function gatherProgramFiles(path: String, program: RangeProgram): Result<RangePr
 function lexProgramSources(program: RangeProgram): Result<RangeProgram, LexingError> {
     state lexedSources: [ProgramLexedSource](program.graph.lexedSources)
     let lexer: Lexer(rangeLexer())
-    state index   0
+    state index: 0
 
     while index < program.graph.sources.count {
         let source: ProgramSourceFile(program.graph.sources.element(index: index))
@@ -89,14 +89,14 @@ function gatherProgramSources(node: FileTreeNode, sources: [ProgramSourceFile]):
             }
         }
     case .directory:
-        state index   0
+        state index: 0
 
         while index < node.children.count {
             let child: FileTreeNode(node.children.element(index: index))
 
             switch gatherProgramSources(node: child, sources: []) {
             case .success(let childSources):
-                state childIndex   0
+                state childIndex: 0
 
                 while childIndex < childSources.count {
                     gathered.append(element: childSources.element(index: childIndex))
@@ -114,7 +114,7 @@ function gatherProgramSources(node: FileTreeNode, sources: [ProgramSourceFile]):
 }
 
 function isRangeSourceFile(name: String): Bool {
-    let suffix   ".range"
+    let suffix: ".range"
 
     if name.count < suffix.count {
         return false
@@ -124,7 +124,7 @@ function isRangeSourceFile(name: String): Bool {
 }
 
 function artifactRelativePath(path: String): String {
-    let pathPrefix   "../../../../../../"
+    let pathPrefix: "../../../../../../"
 
     if startsWith(text: path, leadingText: pathPrefix) {
         return path.substring(start: pathPrefix.count, end: path.count)
@@ -143,7 +143,7 @@ function startsWith(text: String, leadingText: String): Bool {
 
 function buildProgramArtifacts(program: RangeProgram): RangeProgram {
     state artifacts: [ProgramArtifact](program.graph.artifacts)
-    state sourceIndex   0
+    state sourceIndex: 0
 
     while sourceIndex < program.graph.sources.count {
         let source: ProgramSourceFile(program.graph.sources.element(index: sourceIndex))
@@ -157,7 +157,7 @@ function buildProgramArtifacts(program: RangeProgram): RangeProgram {
         sourceIndex += 1
     }
 
-    state lexedIndex   0
+    state lexedIndex: 0
 
     while lexedIndex < program.graph.lexedSources.count {
         let source: ProgramLexedSource(program.graph.lexedSources.element(index: lexedIndex))
@@ -192,7 +192,7 @@ function buildProgramArtifacts(program: RangeProgram): RangeProgram {
 }
 
 function emitProgramArtifacts(artifacts: [ProgramArtifact]): Result<Void, FileWriteError> {
-    state index   0
+    state index: 0
 
     while index < artifacts.count {
         let artifact: ProgramArtifact(artifacts.element(index: index))
@@ -219,8 +219,8 @@ function renderRangeProgram(program: RangeProgram): String {
 }
 
 function renderProgramFiles(files: [FileTreeNode]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < files.count {
         let file: FileTreeNode(files.element(index: index))
@@ -232,8 +232,8 @@ function renderProgramFiles(files: [FileTreeNode]): String {
 }
 
 function renderProgramSources(sources: [ProgramSourceFile]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < sources.count {
         let source: ProgramSourceFile(sources.element(index: index))
@@ -245,8 +245,8 @@ function renderProgramSources(sources: [ProgramSourceFile]): String {
 }
 
 function renderProgramLexedSources(lexedSources: [ProgramLexedSource]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < lexedSources.count {
         let source: ProgramLexedSource(lexedSources.element(index: index))
@@ -347,8 +347,8 @@ function tokenKindName(kind: TokenKind): String {
 }
 
 function renderTokens(tokens: [LexicalToken]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < tokens.count {
         let token: LexicalToken(tokens.element(index: index))

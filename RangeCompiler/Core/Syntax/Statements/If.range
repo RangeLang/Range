@@ -1,4 +1,4 @@
-#Statement
+@Statement
 @syntax
 construct If {
     let condition: Expression

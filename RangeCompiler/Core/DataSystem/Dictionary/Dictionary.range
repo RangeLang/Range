@@ -1,4 +1,4 @@
-#language
+@language
 construct Dictionary<Key: Hashable, Value> {
     state storage: DictionaryStorage<Key, Value>()
 
@@ -50,9 +50,9 @@ construct Dictionary<Key: Hashable, Value> {
 
 extension Dictionary<String, Value: Encodable>: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        state container   encoder.keyedContainer()
+        state container: encoder.keyedContainer()
         let values: Array<DictionaryEntry<String, Value>>(entries())
-        state index   0
+        state index: 0
 
         while index < values.count {
             let entry: DictionaryEntry<String, Value>(values.element(index: index))

@@ -2,10 +2,10 @@
     state maybeCount: Optional<Int>(nil)
 
     if maybeCount == nil {
-        let fallback   0
+        let fallback: 0
     }
 
     if maybeCount != nil {
-        let resolved   maybeCount ?? 0
+        let resolved: maybeCount ?? 0
     }
 }

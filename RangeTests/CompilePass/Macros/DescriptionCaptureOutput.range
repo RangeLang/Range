@@ -21,7 +21,7 @@ macro exposeDescription(): Construct { target, diagnostics in
     }
 }
 
-#Description(1 + 2)
+@Description(1 + 2)
 @exposeDescription
 construct DescriptionCaptureOutputFixture {
     let value: Int

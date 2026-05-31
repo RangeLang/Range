@@ -38,17 +38,6 @@ extension Parser {
             throw ParseError(
                 "state '\(name)' expects one initializer after ':'. Use typed construction, for example `state \(name): \(explicitType!.displayName)(value)`."
             )
-        } else if explicitType == nil, typedInitializer == nil, canStartInlineExpression() {
-            let initialValue = try parseExpression()
-            inferredType = try inferInitializedBindingType(
-                name: name,
-                explicitType: explicitType,
-                expression: initialValue,
-                accessibleTypes: accessibleContextTypes(),
-                bindingKindDescription: "state",
-                allowPromiseResolution: false
-            )
-            storage = .stored(initialValue)
         } else if let typedInitializer {
             inferredType = try inferInitializedBindingType(
                 name: name,

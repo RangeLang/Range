@@ -8,7 +8,7 @@ construct Metadata {
 }
 
 construct PointWithMetadata {
-    #initForwarded
+    @initForwarded
     state point: Point
 
     let somethingElse: Metadata

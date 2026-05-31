@@ -1,4 +1,4 @@
-#language
+@language
 construct StringStorage {
     derived count: Int
     derived isEmpty: Bool

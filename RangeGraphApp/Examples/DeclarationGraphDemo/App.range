@@ -1,6 +1,6 @@
 function makeTheme(): Theme {
   let background: ColorToken(name: "Canvas", hex: "#111318")
-  let foreground: ColorToken(name: "Text", hex: "#F2F5F7")
+  let foreground: ColorToken(name: "Text", hex: "@F2F5F7")
   let titleFont: TypographyToken(name: "Title", size: 16, weight: "semibold")
   let bodyFont: TypographyToken(name: "Body", size: 13, weight: "regular")
   let spacing: SpacingScale(name: "Base", unit: 8)

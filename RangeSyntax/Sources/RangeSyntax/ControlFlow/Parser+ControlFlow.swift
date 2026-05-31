@@ -310,8 +310,6 @@ extension Parser {
             throw ParseError(
                 "\(kind == .constant ? "let" : "state") '\(name)' expects one initializer after ':'. Use typed construction, for example `\(kind == .constant ? "let" : "state") \(name): \(explicitType!.displayName)(value)`."
             )
-        } else if explicitType == nil, typedInitializer == nil, canStartInlineExpression() {
-            expression = try parseExpression()
         } else if let typedInitializer {
             expression = typedInitializer
         } else if let explicitType {

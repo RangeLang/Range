@@ -10,7 +10,7 @@ function refreshUser(id: Int) {
     Logger.info("before background work")
 
     @background {
-        let username   fetchUsername(id: id)
+        let username: fetchUsername(id: id)
         Logger.info(username)
     }
 

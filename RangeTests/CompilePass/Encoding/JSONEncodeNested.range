@@ -5,7 +5,7 @@ construct Address {
 
 extension Address: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        state container   encoder.keyedContainer()
+        state container: encoder.keyedContainer()
 
         switch container.encode(city, forKey: "city") {
         case .success:
@@ -26,7 +26,7 @@ construct User {
 
 extension User: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        state container   encoder.keyedContainer()
+        state container: encoder.keyedContainer()
 
         switch container.encode(name, forKey: "name") {
         case .success:
@@ -45,9 +45,9 @@ extension User: Encodable {
 }
 
 function encodeNested(): Result<String, EncodingError> {
-    let encoder   JSONEncoder()
-    let address   Address(city: "Tbilisi", zip: 1000)
-    let user   User(name: "George", address: address, scores: [1, 2, 3])
+    let encoder: JSONEncoder()
+    let address: Address(city: "Tbilisi", zip: 1000)
+    let user: User(name: "George", address: address, scores: [1, 2, 3])
     return encoder.encode(user)
 }
 

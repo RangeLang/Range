@@ -1,4 +1,4 @@
-#language
+@language
 construct Set<Element: Hashable> {
     state storage: SetStorage<Element>()
 
@@ -46,9 +46,9 @@ construct Set<Element: Hashable> {
 
 extension Set<Element: Encodable>: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        state container   encoder.unkeyedContainer()
+        state container: encoder.unkeyedContainer()
         let values: Array<Element>(elements())
-        state index   0
+        state index: 0
 
         while index < values.count {
             switch container.encode(values.element(index: index)) {

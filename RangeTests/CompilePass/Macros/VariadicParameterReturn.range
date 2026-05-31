@@ -3,5 +3,5 @@ function takeMany(@variadic values: Int): [Int] {
 }
 
 @main {
-    let values   takeMany(1, 2, 3)
+    let values: takeMany(1, 2, 3)
 }

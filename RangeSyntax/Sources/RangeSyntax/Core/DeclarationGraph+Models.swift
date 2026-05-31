@@ -46,13 +46,16 @@ public struct RealizedLiteralBridge: Hashable, Sendable {
 
 public struct RealizedInitMacroTarget {
     public let initTarget: RealizedInitTarget
+    public let rewriteInitTarget: RealizedInitTarget
     public let macros: [MacroApplication]
 
     public init(
         initTarget: RealizedInitTarget,
+        rewriteInitTarget: RealizedInitTarget? = nil,
         macros: [MacroApplication]
     ) {
         self.initTarget = initTarget
+        self.rewriteInitTarget = rewriteInitTarget ?? initTarget
         self.macros = macros
     }
 

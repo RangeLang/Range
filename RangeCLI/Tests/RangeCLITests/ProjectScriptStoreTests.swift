@@ -53,7 +53,7 @@ struct ProjectScriptStoreTests {
             .appendingPathComponent("range-script-store-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         try """
-            #package
+            @package
             construct Project {
                 let name: Title("Scripts")
                 let version: Version(0.1.0)

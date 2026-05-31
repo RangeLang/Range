@@ -6,6 +6,6 @@ open macro Project(): Construct -> Void { target, diagnostics, graph in
     )
 
     if projectMacros.count > 1 {
-        diagnostics.error("A second #Project conflicts with the project already declared in this Range project.")
+        diagnostics.error("A second @Project conflicts with the project already declared in this Range project.")
     }
 }

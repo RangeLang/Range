@@ -1,4 +1,4 @@
-#Statement
+@Statement
 @syntax
 protocol Expression: SyntaxReplaceable<Expression> {
     let type: TypeReference?

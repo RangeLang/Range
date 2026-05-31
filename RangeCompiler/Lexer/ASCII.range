@@ -3,290 +3,290 @@ construct ASCIILiteral {
     let value: String
 }
 
-#Token(" ")
+@Token(" ")
 @lexer<.skip>
 @syntax
 construct Whitespace {
     let value: String
 }
 
-#Token(",")
+@Token(",")
 @lexer<.emit>
 @syntax
 construct Comma {
 }
 
-#Token(".")
+@Token(".")
 @lexer<.emit>
 @syntax
 construct Dot {
 }
 
-#Token("{")
+@Token("{")
 @lexer<.emit>
-#Delimiter<.prefix>(RightBrace)
+@Delimiter<.prefix>(RightBrace)
 @syntax
 construct LeftBrace {
 }
 
-#Token("}")
+@Token("}")
 @lexer<.emit>
-#Delimiter<.postfix>(LeftBrace)
+@Delimiter<.postfix>(LeftBrace)
 @syntax
 construct RightBrace {
 }
 
-#Token("(")
+@Token("(")
 @lexer<.emit>
-#Delimiter<.prefix>(RightParen)
+@Delimiter<.prefix>(RightParen)
 @syntax
 construct LeftParen {
 }
 
-#Token(")")
+@Token(")")
 @lexer<.emit>
-#Delimiter<.postfix>(LeftParen)
+@Delimiter<.postfix>(LeftParen)
 @syntax
 construct RightParen {
 }
 
-#Token("[")
+@Token("[")
 @lexer<.emit>
-#Delimiter<.prefix>(RightBracket)
+@Delimiter<.prefix>(RightBracket)
 @syntax
 construct LeftBracket {
 }
 
-#Token("]")
+@Token("]")
 @lexer<.emit>
-#Delimiter<.postfix>(LeftBracket)
+@Delimiter<.postfix>(LeftBracket)
 @syntax
 construct RightBracket {
 }
 
-#Token(":")
+@Token(":")
 @lexer<.emit>
 @syntax
 construct Colon {
 }
 
-#Token("*")
+@Token("*")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
 @syntax
 construct Asterisk {
 }
 
-#Token("/")
+@Token("/")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
 @syntax
 construct Slash {
 }
 
-#Token("$")
+@Token("$")
 @lexer<.emit>
 @syntax
 construct Dollar {
 }
 
-#Token("%")
+@Token("%")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 70, upper: 80), associativity: .left)
 @syntax
 construct Percent {
 }
 
-#Token("#")
+@Token("#")
 @lexer<.emit>
 @syntax
 construct Hash {
 }
 
-#Token("...")
+@Token("...")
 @lexer<.emit>
-#Operator<.postfix>(binding: OperatorBindingRange(lower: 90, upper: 100))
+@Operator<.postfix>(binding: OperatorBindingRange(lower: 90, upper: 100))
 @syntax
 construct Ellipsis {
 }
 
-#Token("->")
+@Token("->")
 @lexer<.emit>
 @syntax
 construct Arrow {
 }
 
-#Token("-")
+@Token("-")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 60, upper: 70), associativity: .left)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 60, upper: 70), associativity: .left)
 @syntax
 construct Minus {
 }
 
-#Token("!")
+@Token("!")
 @lexer<.emit>
-#Operator<.prefix>(binding: OperatorBindingRange(lower: 90, upper: 100))
+@Operator<.prefix>(binding: OperatorBindingRange(lower: 90, upper: 100))
 @syntax
 construct Bang {
 }
 
-#Token("!=")
+@Token("!=")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 @syntax
 construct BangEqual {
 }
 
-#Token("=")
+@Token("=")
 @lexer<.emit>
 @syntax
 construct Equal {
 }
 
-#Token("==")
+@Token("==")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 @syntax
 construct EqualEqual {
 }
 
-#Token("<")
+@Token("<")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 @syntax
 construct Less {
 }
 
-#Token("<=")
+@Token("<=")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 @syntax
 construct LessEqual {
 }
 
-#Token(">")
+@Token(">")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 @syntax
 construct Greater {
 }
 
-#Token(">=")
+@Token(">=")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 40, upper: 50), associativity: .none)
 @syntax
 construct GreaterEqual {
 }
 
-#Token("+")
+@Token("+")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 60, upper: 70), associativity: .left)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 60, upper: 70), associativity: .left)
 @syntax
 construct Plus {
 }
 
-#Token("+=")
+@Token("+=")
 @lexer<.emit>
 @syntax
 construct PlusEqual {
 }
 
-#Token("&")
+@Token("&")
 @lexer<.emit>
 @syntax
 construct Ampersand {
 }
 
-#Token("&&")
+@Token("&&")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 30, upper: 40), associativity: .left)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 30, upper: 40), associativity: .left)
 @syntax
 construct AndAnd {
 }
 
-#Token("|")
+@Token("|")
 @lexer<.emit>
 @syntax
 construct Pipe {
 }
 
-#Token("||")
+@Token("||")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 20, upper: 30), associativity: .left)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 20, upper: 30), associativity: .left)
 @syntax
 construct OrOr {
 }
 
-#Token("?")
+@Token("?")
 @lexer<.emit>
 @syntax
 construct Question {
 }
 
-#Token("??")
+@Token("??")
 @lexer<.emit>
-#Operator<.infix>(binding: OperatorBindingRange(lower: 50, upper: 60), associativity: .right)
+@Operator<.infix>(binding: OperatorBindingRange(lower: 50, upper: 60), associativity: .right)
 @syntax
 construct QuestionQuestion {
 }
 
-#Token("identifier")
+@Token("identifier")
 @lexer<.emit>
 @syntax
 construct IdentifierToken {
     let value: String
 }
 
-#Token("keywordIdentifier")
+@Token("keywordIdentifier")
 @lexer<.emit>
 @syntax
 construct Keyword {
     let value: String
 }
 
-#Token("`identifier`")
+@Token("`identifier`")
 @lexer<.emit>
 @syntax
 construct EscapedIdentifier {
     let value: String
 }
 
-#Token("quotedString")
+@Token("quotedString")
 @lexer<.emit>
 @syntax
 construct StringLiteralToken {
     let value: String
 }
 
-#Token("digits")
+@Token("digits")
 @lexer<.emit>
 @syntax
 construct IntegerLiteral {
     let value: String
 }
 
-#Token("digits.digits")
+@Token("digits.digits")
 @lexer<.emit>
 @syntax
 construct DoubleLiteral {
     let value: String
 }
 
-#Token("#identifier")
+@Token("@identifier")
 @lexer<.emit>
 @syntax
 construct HashDirective {
     let value: String
 }
 
-#Token("@identifier")
+@Token("@identifier")
 @lexer<.emit>
 @syntax
 construct AtAttribute {
     let name: String
 }
 
-#Token("foreignBody")
+@Token("foreignBody")
 @lexer<.emit>
 @syntax
 construct ForeignBody {
@@ -294,7 +294,7 @@ construct ForeignBody {
     let text: String
 }
 
-#Token("end")
+@Token("end")
 @lexer<.emit>
 @syntax
 construct EOF {

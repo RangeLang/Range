@@ -1,4 +1,4 @@
-#language
+@language
 construct Array<Element> {
     state storage: ArrayStorage<Element>()
 
@@ -78,8 +78,8 @@ construct Array<Element> {
 
 extension Array: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        state container   encoder.unkeyedContainer()
-        state index   0
+        state container: encoder.unkeyedContainer()
+        state index: 0
 
         while index < count {
             switch container.encode(element(index: index)) {

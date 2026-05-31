@@ -1,4 +1,4 @@
-#language
+@language
 construct Data {
     let storage: DataStorage
 }
@@ -9,7 +9,7 @@ extension Data: Equatable {
 
 extension Data: Encodable {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
-        let container   encoder.singleValueContainer()
+        let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }

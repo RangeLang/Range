@@ -4,7 +4,7 @@ construct Lexer {
     binding tokens: Array<@lexer>
 
     function tokenize(source: String): Result<[LexicalToken], LexingError> {
-        state cursor   LexerCursor(source: source, foreignBodies: [], rules: rules)
+        state cursor: LexerCursor(source: source, foreignBodies: [], rules: rules)
         return cursor.tokenize()
     }
 
@@ -12,7 +12,7 @@ construct Lexer {
         source: String,
         foreignBodies: [LexerForeignBody]
     ): Result<[LexicalToken], LexingError> {
-        state cursor   LexerCursor(source: source, foreignBodies: foreignBodies, rules: rules)
+        state cursor: LexerCursor(source: source, foreignBodies: foreignBodies, rules: rules)
         return cursor.tokenize()
     }
 }
@@ -50,8 +50,8 @@ construct LexerCursor {
                 continue
             }
 
-            let start   currentPosition()
-            let character   currentCharacter()
+            let start: currentPosition()
+            let character: currentCharacter()
 
             if matchLexerRuleLiteral(start: start) {
                 continue
@@ -74,11 +74,11 @@ construct LexerCursor {
                         if language != "" {
                             skipWhitespace()
                             if !isAtEnd() && currentCharacter() == "{" {
-                                let braceStart   currentPosition()
+                                let braceStart: currentPosition()
                                 advance()
                                 emit(kind: .leftBrace, start: braceStart)
 
-                                let bodyStart   currentPosition()
+                                let bodyStart: currentPosition()
                                 switch readForeignBodyBlock(language: language, start: bodyStart) {
                                 case .success(let body):
                                     emit(kind: .foreignBody(language: language, text: body), start: bodyStart)
@@ -86,7 +86,7 @@ construct LexerCursor {
                                     return .failure(cause: error)
                                 }
 
-                                let closeStart   currentPosition()
+                                let closeStart: currentPosition()
                                 if !match("}") {
                                     return failure(
                                         message: "Unterminated #\(identifier) \(language) block.",
@@ -115,10 +115,10 @@ construct LexerCursor {
                     return .failure(cause: error)
                 }
             } else if isDigit(character) {
-                let token   readNumberLiteral(start: start)
+                let token: readNumberLiteral(start: start)
                 emit(kind: token, start: start)
             } else if isIdentifierStart(character) {
-                let identifier   readIdentifier()
+                let identifier: readIdentifier()
                 if isKeyword(identifier) {
                     emit(kind: .keyword(value: identifier), start: start)
                 } else {
@@ -129,13 +129,13 @@ construct LexerCursor {
             }
         }
 
-        let eof   currentPosition()
+        let eof: currentPosition()
         emit(kind: .eof, start: eof)
         return .success(result: tokens)
     }
 
     function matchLexerRuleLiteral(start: LexerPosition): Bool {
-        state ruleIndex   0
+        state ruleIndex: 0
         while ruleIndex < rules.count {
             let rule: LexerRule(rules.element(index: ruleIndex))
             if isLiteralLexerRule(rule) && hasPrefix(rule.pattern) {
@@ -266,7 +266,7 @@ construct LexerCursor {
     }
 
     function advancePattern(_ pattern: String) {
-        state remaining   pattern.count
+        state remaining: pattern.count
         while remaining > 0 {
             advance()
             set remaining   remaining - 1
@@ -283,7 +283,7 @@ construct LexerCursor {
     }
 
     function hasCharacter(offset: Int, value: String): Bool {
-        let position   index + offset
+        let position: index + offset
         if position >= source.count {
             return false
         }
@@ -292,7 +292,7 @@ construct LexerCursor {
     }
 
     function advance(): String {
-        let value   currentCharacter()
+        let value: currentCharacter()
         index += 1
         if value == "\n" {
             line += 1
@@ -353,7 +353,7 @@ construct LexerCursor {
     }
 
     function readIdentifier(): String {
-        let start   index
+        let start: index
         while !isAtEnd() && isIdentifierPart(currentCharacter()) {
             advance()
         }
@@ -367,7 +367,7 @@ construct LexerCursor {
             return .failure(cause: lexicalFailure(message: "Expected identifier after `.", start: start))
         }
 
-        let identifier   readIdentifier()
+        let identifier: readIdentifier()
 
         if !match("`") {
             return .failure(cause: lexicalFailure(message: "Unterminated escaped identifier.", start: start))
@@ -441,11 +441,11 @@ construct LexerCursor {
 
     function readString(start: LexerPosition): Result<String, LexingError> {
         advance()
-        state result   ""
-        state interpolationDepth   0
+        state result: ""
+        state interpolationDepth: 0
 
         while !isAtEnd() {
-            let character   currentCharacter()
+            let character: currentCharacter()
 
             if character == "\"" && interpolationDepth == 0 {
                 advance()
@@ -462,7 +462,7 @@ construct LexerCursor {
                         )
                     )
                 }
-                let escaped   advance()
+                let escaped: advance()
                 set result   result + "\\" + escaped
                 if escaped == "(" {
                     interpolationDepth += 1
@@ -496,11 +496,11 @@ construct LexerCursor {
     }
 
     function readInterpolatedStringLiteral(start: LexerPosition): Result<String, LexingError> {
-        state result   "\""
+        state result: "\""
         advance()
 
         while !isAtEnd() {
-            let character   currentCharacter()
+            let character: currentCharacter()
             set result   result + character
             advance()
 
@@ -513,7 +513,7 @@ construct LexerCursor {
                         )
                     )
                 }
-                let escaped   advance()
+                let escaped: advance()
                 set result   result + escaped
                 continue
             }
@@ -532,7 +532,7 @@ construct LexerCursor {
         language: String,
         start: LexerPosition
     ): Result<String, LexingError> {
-        state result   ""
+        state result: ""
 
         if !isAtEnd() && currentCharacter() == "\n" {
             advance()
@@ -551,7 +551,7 @@ construct LexerCursor {
     }
 
     function isOnlyWhitespaceBeforeCurrentPositionOnLine(): Bool {
-        state position   index - 1
+        state position: index - 1
         while position >= 0 {
             let character: String(source.character(index: position))
             if character == "\n" {
@@ -566,8 +566,8 @@ construct LexerCursor {
     }
 
     function trimNewlines(_ text: String): String {
-        state start   0
-        state end   text.count
+        state start: 0
+        state end: text.count
 
         while start < end && isNewlineAt(text: text, index: start) {
             start += 1
@@ -581,7 +581,7 @@ construct LexerCursor {
     }
 
     function foreignBodyLanguage(directive: String): String {
-        state bodyIndex   0
+        state bodyIndex: 0
         while bodyIndex < foreignBodies.count {
             let body: LexerForeignBody(foreignBodies.element(index: bodyIndex))
             if body.directive == directive {
@@ -593,7 +593,7 @@ construct LexerCursor {
     }
 
     function hasDigit(offset: Int): Bool {
-        let position   index + offset
+        let position: index + offset
         if position >= source.count {
             return false
         }

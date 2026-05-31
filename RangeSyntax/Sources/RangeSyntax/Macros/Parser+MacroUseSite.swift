@@ -111,12 +111,7 @@ extension Parser {
         guard !RangeSyntax.attributeIdentifiers.contains(name) else {
             return false
         }
-        switch peek(offset: offset + 1) {
-        case .less, .leftParen, .identifier:
-            return true
-        default:
-            return false
-        }
+        return true
     }
 
     mutating func parseMacroGenericArgumentsIfPresent() throws -> [TypeReference] {

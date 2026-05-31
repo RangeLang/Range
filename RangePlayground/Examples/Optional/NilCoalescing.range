@@ -4,5 +4,5 @@ function fallback(): Int {
 
 @main {
     state current: Optional<Int>(nil)
-    state resolved   current ?? fallback()
+    state resolved: current ?? fallback()
 }

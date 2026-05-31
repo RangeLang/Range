@@ -17,6 +17,6 @@ construct TargetDeclarationExpandFixture {
 }
 
 @main {
-    let value   TargetDeclarationExpandFixture()
+    let value: TargetDeclarationExpandFixture()
     value.generatedByTargetDeclarationExpand()
 }

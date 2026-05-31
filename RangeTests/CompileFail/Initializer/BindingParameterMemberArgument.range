@@ -11,5 +11,5 @@ construct Counter {
 }
 
 @main {
-    let counter   Counter()
+    let counter: Counter()
 }

@@ -22,11 +22,11 @@ enum PackageManifestLoader {
         let sourceFile = try parser.parseSourceFile()
         switch sourceFile {
         case .mainBlock:
-            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
+            throw ValidationError("Project.range must declare @Project construct Name { ... }.")
         case .extensions:
-            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
+            throw ValidationError("Project.range must declare @Project construct Name { ... }.")
         case .module:
-            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
+            throw ValidationError("Project.range must declare @Project construct Name { ... }.")
         case .construct(let declaration):
             guard declaration.attribute == nil else {
                 throw ValidationError("Project.range cannot use declaration attributes.")
@@ -35,7 +35,7 @@ enum PackageManifestLoader {
             let usesPackageMacro = declaration.macros.contains { $0.name == "package" }
             guard usesProjectMacroMetadata || usesPackageMacro else {
                 throw ValidationError(
-                    "Project.range must declare #Project construct Name { ... }.")
+                    "Project.range must declare @Project construct Name { ... }.")
             }
 
             let name =
@@ -59,11 +59,11 @@ enum PackageManifestLoader {
                 declaration: declaration
             )
         case .enumeration:
-            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
+            throw ValidationError("Project.range must declare @Project construct Name { ... }.")
         case .protocolDefinition:
-            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
+            throw ValidationError("Project.range must declare @Project construct Name { ... }.")
         case .macro:
-            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
+            throw ValidationError("Project.range must declare @Project construct Name { ... }.")
         }
     }
 
