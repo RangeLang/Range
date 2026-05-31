@@ -4,8 +4,6 @@ function tokenKindName(kind: TokenKind): String {
         return "hash"
     case .identifier:
         return "identifier"
-    case .hashAttribute:
-        return "hashAttribute"
     case .foreignBody:
         return "foreignBody"
     case .stringLiteral:

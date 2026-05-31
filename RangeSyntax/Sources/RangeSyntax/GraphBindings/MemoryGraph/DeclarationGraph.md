@@ -88,7 +88,7 @@ From the declaration graph, the compiler can derive that `Int` accepts `IntLiter
 
 - Default literal resolution should also be derived after declaration-graph realization.
 
-If a literal has no contextual type, the semantic phase may choose a preferred destination such as an `#language` bridge. That is still part of Range semantics, not backend behavior.
+If a literal has no contextual type, the semantic phase may choose a preferred destination such as an `` bridge. That is still part of Range semantics, not backend behavior.
 
 - The declaration graph precedes the memory graph.
 
@@ -134,7 +134,7 @@ That semantic result is settled before any backend runs.
 - Derived protocol semantics also belong in the declaration graph.
 
 ```range
-#equatable
+
 protocol Equatable {
     function ==(lhs: Self, rhs: Self): Bool
 }
@@ -149,10 +149,10 @@ The graph should represent that `Point` conforms to `Equatable` and inherits the
 
 For inherited protocols, carried macro semantics should compose through the
 protocol graph rather than being reimplemented by each derived macro. For
-example, `Hashable: Equatable` means a future protocol-carried `#hashable`
+example, `Hashable: Equatable` means a future protocol-carried ``
 macro should synthesize only the hash witness, while the inherited
-`Equatable` conformance realizes the protocol-carried `#equatable` macro for
-the equality witness. Any current `#hashable` implementation that emits
+`Equatable` conformance realizes the protocol-carried `` macro for
+the equality witness. Any current `` implementation that emits
 equality directly is a bootstrap bridge until protocol-carried macro
 realization handles inherited conformances.
 

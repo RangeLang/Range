@@ -2572,8 +2572,6 @@ extension MacroExpander {
             return "#"
         case .identifier(let value):
             return value
-        case .hashAttribute(let value):
-            return "#\(value)"
         case .foreignBody(_, let value):
             return value
         case .stringLiteral(let value):

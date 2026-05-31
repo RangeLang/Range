@@ -27,13 +27,13 @@ For `literal`, the generic argument must be a compiler-recognized literal carrie
 A protocol can also carry macros targeted at declaration kinds that conform to it, such as constructs or enums.
 
 ```range
-#equatable
+
 protocol Equatable {
     function ==(lhs: Self, rhs: Self): Bool
 }
 ```
 
-`#equatable` does not expand on the protocol body itself. It is carried by the protocol and expands when a conforming declaration of the matching kind is realized.
+`` does not expand on the protocol body itself. It is carried by the protocol and expands when a conforming declaration of the matching kind is realized.
 
 ## Rule
 Macros attached to protocol requirements or protocols themselves are part of that protocol's semantics. They expand when those semantics are realized by a concrete conforming declaration of the matching kind.

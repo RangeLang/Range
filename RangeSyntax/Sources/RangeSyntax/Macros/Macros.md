@@ -96,4 +96,4 @@ Range treats these as macro-system problems rather than separate baked-in langua
   rewrite the declaration surface they are attached to.
 - For `: Init`, direct attachment to a concrete initializer is the base model.
   Protocol requirements may carry the same macro onto satisfying initializers.
-- The macro system is meant to replace one-off compiler markers with one unified transformation model.
+- The macro system is meant to replace one-off compiler hooks with one unified transformation model.

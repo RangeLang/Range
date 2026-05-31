@@ -306,11 +306,6 @@ extension Parser {
                         )
                     )
                 )
-            case .hashAttribute(let name):
-                flushText()
-                advance()
-                let arguments = try parseInvocationArgumentsIfPresent()
-                parts.append(.syntaxMacroInvocation(name: name, arguments: arguments))
             case .macroAttribute(let name, _) where isMacroApplicationAttribute(name):
                 flushText()
                 advance()

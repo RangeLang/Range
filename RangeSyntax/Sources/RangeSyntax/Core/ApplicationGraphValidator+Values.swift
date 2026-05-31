@@ -236,5 +236,5 @@ extension ApplicationGraphValidator {
 }
 
 private func isMetadataBinding(_ binding: BindingDeclaration) -> Bool {
-    binding.typeName.contains("@") || binding.typeName.contains("#")
+    binding.typeName.contains("@")
 }

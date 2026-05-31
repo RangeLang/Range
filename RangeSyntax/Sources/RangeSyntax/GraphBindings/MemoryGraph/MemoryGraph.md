@@ -140,18 +140,18 @@ construct Book {
 
 `author: Author` is surface syntax. In the memory graph, construct-to-construct relationships are tracked through compiler-synthesized identity rather than literal nested containment.
 
-- `#language construct` references stay plain type composition in the graph.
+- ` construct` references stay plain type composition in the graph.
 
 ```range
-#language
+
 construct IntLiteral { }
 
-#language
+
 construct IntStorage {
     function storage(literal: IntLiteral): Self
 }
 
-#language
+
 construct Int {
     let storage: IntStorage
 }
@@ -162,10 +162,10 @@ construct Int {
 - Wrapper types may delegate representation to dedicated storage primitives.
 
 ```range
-#language
+
 construct ArrayStorage<Element> { }
 
-#language
+
 construct Array<Element> {
     state storage: ArrayStorage<Element>
 }
@@ -319,4 +319,4 @@ The memory graph for this code includes:
 - The graph is intended to be solvable from Range's constrained storage model without general-purpose borrow annotations.
 - This document defines the memory-side model only. It does not yet specify the separate reactive invalidation view in detail.
 - `binding` is the explicit shared-reference mechanism in Range. It is pointer-like in role, but compiler-tracked and constrained by the storage system.
-- Copy-on-write may be used by `#language` collections and other suitable implementations to preserve value semantics without eager copying.
+- Copy-on-write may be used by `` collections and other suitable implementations to preserve value semantics without eager copying.

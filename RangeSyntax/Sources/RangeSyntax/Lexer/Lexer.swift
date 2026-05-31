@@ -122,46 +122,41 @@ struct RangeAuthoredLexerCursor {
                     _ = advance()
                     emit(kind: .hash, start: start)
                 } else {
-                    switch readHashIdentifier(start: start) {
-                    case .success(let identifier):
-                        emit(kind: .hashAttribute(value: identifier), start: start)
-                        let language = foreignBodyLanguage(directive: identifier)
-                        if language != "" {
-                            skipWhitespace()
-                            if !isAtEnd() && currentCharacter() == "{" {
-                                let braceStart = currentPosition()
-                                _ = advance()
-                                emit(kind: .leftBrace, start: braceStart)
-
-                                let bodyStart = currentPosition()
-                                switch readForeignBodyBlock(language: language, start: bodyStart) {
-                                case .success(let body):
-                                    emit(
-                                        kind: .foreignBody(language: language, text: body),
-                                        start: bodyStart
-                                    )
-                                case .failure(let error):
-                                    return .failure(error)
-                                }
-
-                                let closeStart = currentPosition()
-                                if !match("}") {
-                                    return failure(
-                                        message: "Unterminated #\(identifier) \(language) block.",
-                                        start: start
-                                    )
-                                }
-                                emit(kind: .rightBrace, start: closeStart)
-                            }
-                        }
-                    case .failure(let error):
-                        return .failure(error)
-                    }
+                    return failure(message: "Expected '(' after #.", start: start)
                 }
             } else if character == "@" {
                 switch readSigilIdentifier(start: start) {
                 case .success(let identifier):
                     emit(kind: .macroAttribute(name: identifier, argument: nil), start: start)
+                    let language = foreignBodyLanguage(directive: identifier)
+                    if language != "" {
+                        skipWhitespace()
+                        if !isAtEnd() && currentCharacter() == "{" {
+                            let braceStart = currentPosition()
+                            _ = advance()
+                            emit(kind: .leftBrace, start: braceStart)
+
+                            let bodyStart = currentPosition()
+                            switch readForeignBodyBlock(language: language, start: bodyStart) {
+                            case .success(let body):
+                                emit(
+                                    kind: .foreignBody(language: language, text: body),
+                                    start: bodyStart
+                                )
+                            case .failure(let error):
+                                return .failure(error)
+                            }
+
+                            let closeStart = currentPosition()
+                            if !match("}") {
+                                return failure(
+                                    message: "Unterminated @\(identifier) \(language) block.",
+                                    start: start
+                                )
+                            }
+                            emit(kind: .rightBrace, start: closeStart)
+                        }
+                    }
                 case .failure(let error):
                     return .failure(error)
                 }
@@ -425,25 +420,6 @@ struct RangeAuthoredLexerCursor {
 
         if !isASCIILetter(currentCharacter()) {
             return .failure(lexicalFailure(message: "Expected identifier after @.", start: start))
-        }
-
-        return .success(readIdentifier())
-    }
-
-    mutating func readHashIdentifier(
-        start: RangeAuthoredLexerPosition
-    ) -> Result<String, RangeAuthoredLexingError> {
-        _ = advance()
-        if isAtEnd() {
-            return .failure(lexicalFailure(message: "Expected identifier after #.", start: start))
-        }
-
-        if currentCharacter() == "`" {
-            return readEscapedIdentifier(start: start)
-        }
-
-        if !isASCIILetter(currentCharacter()) {
-            return .failure(lexicalFailure(message: "Expected identifier after #.", start: start))
         }
 
         return .success(readIdentifier())

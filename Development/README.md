@@ -20,29 +20,29 @@ implementation tracking surface.
 - [x] Validation is staged through `ProgramGraphValidator`,
       `DeclarationGraphValidator`, and `ApplicationGraphValidator`.
 - [x] `DeclarationGraph` has first-class registries or query views for
-      constructs, protocols, enums, macros, markers, extensions, namespaces,
+      constructs, protocols, enums, macros, extensions, namespaces,
       package spaces, top-level callables, operators, top-level states,
       construct states, bindings, deriveds, values,
       initializers, and parameters.
 - [x] Namespace-backed attribute facts are graph-owned through
       namespace attribute names and attachments.
-- [x] Namespace-shaped configuration can be declared through `#namespace`
-      constructs and through registered marker applications.
+- [x] Namespace-shaped configuration can be declared through `@namespace`
+      constructs and registered macro applications.
 - [x] Direct construct application surfaces are declaration-backed and tested.
 - [x] Project source cannot declare explicit `init`; construction is still
       modeled from stored declarations and allowed core/bootstrap surfaces.
 - [x] Macro diagnostics feed the compiler diagnostic channel.
-- [x] Macros and construct-applied markers can receive graph access through
+- [x] Macros can receive graph access through
       `target`, `diagnostics`, and `graph` bindings.
 - [x] Macro graph access uses `Graph.Identity` for nested members, avoiding
       recursive declaration expansion by default.
 - [x] Syntax-producing macros exist, including syntax templates, splices, and
       macro-to-macro invocation.
-- [x] `#codable` uses string-keyed encode/decode generation and marker metadata.
+- [x] `@codable` uses string-keyed encode/decode generation and macro metadata.
 - [x] Protocol-carried initializer macro behavior exists for realized init
       macro targets.
 - [x] LSP semantic tokens cover types, functions, variables, parameters,
-      members, macros, markers, nil, enum cases, package syntax, and namespace
+      members, macros, nil, enum cases, package syntax, and namespace
       syntax.
 
 ### Partially Implemented, Still Architectural Debt
@@ -154,21 +154,20 @@ implementation tracking surface.
 
 ### 7. Keep Macro And Metadata Work Honest
 
-- [ ] Harden generic marker access without adding one-off fields like
+- [x] Collapse legacy metadata access into macro applications without adding one-off fields like
       `property.codingKey`.
-- [ ] Make property marker targets owner-qualified in graph identity, so
-      `let`, `state`, `binding`, and `derived` marker graph access has the same
-      fidelity as construct marker graph access.
-- [ ] Decide and implement the operational `@macro` vs descriptive `#marker`
-      surface. Current implementation still accepts macro applications through
-      the older `#` path in several places.
+- [x] Keep property macro targets owner-qualified in graph identity, so
+      `let`, `state`, `binding`, and `derived` macro graph access has the same
+      fidelity as construct macro graph access.
+- [x] Use `@` as the single authored macro surface. `#` is reserved for syntax
+      splices such as `#(...)`.
 - [ ] Keep config, sharing, and sensitive-value design at the property
-      marker/macro layer, without committing to concrete `@provided` or
-      `#secret` spellings yet.
+      macro layer, without committing to concrete `@provided` or
+      `@secret` spellings yet.
 - [ ] Expand syntax-producing macro coverage for function bodies, initializer
       bodies, blocks, switches, assignments, and declaration lists.
 - [ ] Decide the syntax block story around future `# { ... }` blocks.
-- [ ] Move marker value handling beyond primitive-only checks when rich marker
+- [ ] Move macro value handling beyond primitive-only checks when rich macro
       values become necessary.
 - [ ] Replace renderer/parser-loop syntax production with structural syntax
       builders only when the current approach becomes a real blocker.
@@ -179,7 +178,7 @@ implementation tracking surface.
 
 - [ ] Add `Sequence` and `Collection` protocols before broadening
       collection-like APIs across storage types.
-- [ ] Keep namespace-shaped domain surfaces as `#namespace construct ...` when
+- [ ] Keep namespace-shaped domain surfaces as `@namespace construct ...` when
       they carry namespace behavior or configuration.
 - [ ] Keep representation/storage constructs ordinary unless they are actually
       namespace-shaped.
@@ -220,7 +219,7 @@ implementation tracking surface.
 
 ## Immediate Next Slice
 
-1. Make property marker targets owner-qualified in graph identity.
+1. Keep fixtures honest after the metadata-to-macro collapse.
 2. Introduce the uniform declaration descriptor surface on top of the existing
    registries.
 3. Promote one missing relation to a first-class graph fact, starting with

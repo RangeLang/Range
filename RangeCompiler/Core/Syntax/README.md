@@ -82,13 +82,13 @@ ExpressionStatement
 
 The broad protocols still matter. `Array.Expression` can conform to
 `Expression`, and `Array.TypeReference` can conform to `StructuralTypeReference`.
-The `` marker marks compiler-visible syntax surfaces. The nested
+The `@syntax` macro marks compiler-visible syntax surfaces. The nested
 name records semantic ownership, while capability protocol conformance records
 how the broader compiler pipeline can consume it.
 
 The graph role does not have to be the nested type name. `Function.Call` is a
 function application in the graph, but it should still use the domain word
-`Call` at the syntax surface. `#GraphDeclaration` and `#GraphApplication` carry
+`Call` at the syntax surface. `@GraphDeclaration` and `@GraphApplication` carry
 that semantic role without forcing every syntax owner to name its children
 `Declaration` and `Application`.
 

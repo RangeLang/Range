@@ -259,7 +259,7 @@ extension Parser {
 
     func isExpressionStatementStart() -> Bool {
         switch peek() {
-        case .identifier, .integer, .double, .stringLiteral, .hashAttribute, .leftBracket,
+        case .identifier, .integer, .double, .stringLiteral, .leftBracket,
             .leftParen, .dollar, .dot, .bang:
             return true
         default:
@@ -340,8 +340,8 @@ extension Parser {
 
     func canStartExpression(_ token: Token) -> Bool {
         switch token {
-        case .identifier, .integer, .double, .stringLiteral, .hashAttribute,
-            .macroAttribute, .leftBracket, .leftParen, .leftBrace, .dollar, .dot, .bang:
+        case .identifier, .integer, .double, .stringLiteral, .macroAttribute,
+            .leftBracket, .leftParen, .leftBrace, .dollar, .dot, .bang:
             return true
         case .keyword(let value):
             return !RangeSyntax.keywordIdentifiers.contains(value)

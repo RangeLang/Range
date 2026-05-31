@@ -53,10 +53,10 @@ surface.
 ## Current Design Rules
 
 - `construct` is the normal identity-bearing modeling form.
-- `#language construct` is compiler-recognized, non-identity-bearing, and intended for plain structural/bootstrap data.
-- Members inside a `#language construct` may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how semantic boundary types such as `ArrayStorage`, `DictionaryStorage`, `SetStorage`, and scalar storage types describe operations whose implementation is not written in Range yet.
-- Top-level `#language function` declarations may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how primitive operator signatures can live in `RangeCore` without recursively implementing themselves in Range.
-- `#language protocol` declarations define compiler-recognized semantic categories. `#language` does not cascade through protocol conformance; each language declaration must be explicitly marked.
+- `@language construct` is compiler-recognized, non-identity-bearing, and intended for plain structural/bootstrap data.
+- Members inside an `@language construct` may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how semantic boundary types such as `ArrayStorage`, `DictionaryStorage`, `SetStorage`, and scalar storage types describe operations whose implementation is not written in Range yet.
+- Top-level `@language function` declarations may omit bodies when the operation is backed by compiler, runtime, or backend behavior. This is how primitive operator signatures can live in `RangeCore` without recursively implementing themselves in Range.
+- `@language protocol` declarations define compiler-recognized semantic categories. `@language` does not cascade through protocol conformance; each language declaration must be explicitly marked.
 - The memory graph is foundational and always generated.
 - Reactivity is an optional exposed layer derived from the memory graph, not a separate base system.
 - Literal bridging is defined by `@literal<T>` on a concrete `literal(literal: T)` function, where `T` is a compiler-recognized literal carrier type.

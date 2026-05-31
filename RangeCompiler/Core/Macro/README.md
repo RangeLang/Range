@@ -27,7 +27,7 @@ Current bootstrap rules:
   result types are resolved from macro argument types where possible.
 - Macro parameters can use `@capture` to request call-site syntax capture for
   surfaces such as `Expression`. Plain `Expression` is not syntax capture.
-- `@capture` is currently a bootstrap `Parameter` macro marker. The parser
+- `@capture` is currently a bootstrap `Parameter` macro. The parser
   records it on the parameter as syntax-capture metadata; it does not rewrite
   the parameter application expression itself.
 - Parameter-targeted macros operate through explicit declaration/application facets on `Parameter`, for example `target.declaration.type.rewrite(...)` and nested application-side expression rewrite paths such as `target.application.expression.rewrite(...)`.

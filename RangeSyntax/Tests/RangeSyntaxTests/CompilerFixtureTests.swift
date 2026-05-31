@@ -529,7 +529,7 @@ struct CompilerFixtureTests {
         let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
         let diagnostic = try #require(
             diagnostics.first {
-                $0.message == "Expected identifier after #."
+                $0.message == "Expected '(' after #."
                     && $0.source == "range-parser"
                     && $0.path == projectPath
             }
@@ -538,7 +538,7 @@ struct CompilerFixtureTests {
         #expect(diagnostic.range?.start.line == 1)
         #expect(diagnostic.range?.start.character == 16)
         #expect(diagnostic.range?.end.line == 1)
-        #expect(diagnostic.range?.end.character == 17)
+        #expect(diagnostic.range?.end.character == 16)
     }
 
 @Test("Function declarations reject arrow return syntax")
@@ -2310,7 +2310,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(artifact.contains("Lexer("))
         #expect(artifact.contains("LexerRule("))
         #expect(artifact.contains("whitespace"))
-        #expect(artifact.contains("hashAttribute"))
+        #expect(!artifact.contains("hashAttribute"))
     }
 
     @Test("FileManager readFile surface validates")

@@ -40,10 +40,10 @@ function add(left: Int, right: Int): Int {
 }
 ```
 
-- May be marked `#language` at the top level and omit a body when the operation is supplied by compiler, runtime, or backend behavior
+- May be marked `` at the top level and omit a body when the operation is supplied by compiler, runtime, or backend behavior
 
 ```range
-#language
+
 function +(lhs: Int, rhs: Int): Int
 ```
 
@@ -89,10 +89,10 @@ construct User {
 }
 ```
 
-- May omit a body inside `#language construct` declarations when the operation is supplied by compiler, runtime, or backend behavior
+- May omit a body inside ` construct` declarations when the operation is supplied by compiler, runtime, or backend behavior
 
 ```range
-#language
+
 construct ArrayStorage<Element> {
     function append(element: Element)
     function element(index: Int): Element
