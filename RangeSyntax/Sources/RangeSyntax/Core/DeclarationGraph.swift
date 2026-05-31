@@ -218,6 +218,12 @@ public struct DeclarationGraph {
         return baseConformances + extensionConformances
     }
 
+    public func enumCases(onEnum named: String) -> [EnumCaseDeclaration] {
+        let baseCases = enumsByName[named]?.cases ?? []
+        let extensionCases = extensionsByTargetName[named, default: []].flatMap(\.enumCases)
+        return baseCases + extensionCases
+    }
+
     public func construct(named name: String) -> ConstructDeclaration? {
         constructsByName[name]
     }

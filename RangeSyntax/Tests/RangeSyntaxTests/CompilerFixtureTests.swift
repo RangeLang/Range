@@ -53,6 +53,34 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Open enum extension cases validate")
+    func openEnumExtensionCasesValidate() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "System/OpenEnumExtensionCases.range")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+
+        let cases = program.declarationGraph.enumCases(onEnum: "EncodingFormat").map(\.name)
+        #expect(cases == ["json", "binary", "urlForm"])
+    }
+
+    @Test("Closed enum extension cases fail")
+    func closedEnumExtensionCasesFail() throws {
+        let fixtures = [
+            ("System/ClosedEnumExtensionCases.range", "Closed enum ClosedEncodingFormat"),
+            ("System/ExplicitClosedEnumExtensionCases.range", "Closed enum ExplicitClosedEncodingFormat"),
+        ]
+
+        for (path, expectedMessage) in fixtures {
+            let fixture = try fixtureFile(in: "CompileFail", path: path)
+
+            do {
+                _ = try compile(fixture: fixture, expectedRole: .fail)
+                Issue.record("Expected closed enum extension cases to fail validation.")
+            } catch {
+                #expect(String(describing: error).contains(expectedMessage))
+            }
+        }
+    }
+
     @Test("Identifier init macro stringifies bare syntax")
     func identifierInitMacroStringifiesBareSyntax() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/IdentifierInitMacro.range")

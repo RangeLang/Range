@@ -15,6 +15,7 @@ extension Parser {
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
+        var enumCases: [EnumCaseDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         if peek() == .leftBrace {
             try consume(.leftBrace)
@@ -27,6 +28,7 @@ extension Parser {
                 || isConstructDeclarationStart()
                 || isBuilderDeclarationStart()
                 || isEnumDeclarationStart()
+                || isCaseDeclarationStart()
                 || isProtocolDeclarationStart()
             {
                 if isCallableStart() {
@@ -45,6 +47,10 @@ extension Parser {
                     enumerations.append(try parseEnumDeclaration(requiresEOF: false))
                     continue
                 }
+                if isCaseDeclarationStart() {
+                    enumCases.append(contentsOf: try parseEnumCaseLine())
+                    continue
+                }
                 protocols.append(try parseProtocolDeclaration(requiresEOF: false))
             }
             currentSelfAvailable = outerSelfAvailable
@@ -61,6 +67,7 @@ extension Parser {
             callables: callables,
             constructs: constructs,
             enumerations: enumerations,
+            enumCases: enumCases,
             protocols: protocols
         )
     }
@@ -74,6 +81,7 @@ extension Parser {
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
+        var enumCases: [EnumCaseDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         if peek() == .leftBrace {
             try consume(.leftBrace)
@@ -94,6 +102,10 @@ extension Parser {
                     enumerations.append(try parseEnumDeclaration(requiresEOF: false))
                     continue
                 }
+                if isCaseDeclarationStart() {
+                    enumCases.append(contentsOf: try parseEnumCaseLine())
+                    continue
+                }
                 if isProtocolDeclarationStart() {
                     protocols.append(try parseProtocolDeclaration(requiresEOF: false))
                     continue
@@ -111,6 +123,7 @@ extension Parser {
             callables: callables,
             constructs: constructs,
             enumerations: enumerations,
+            enumCases: enumCases,
             protocols: protocols
         )
     }

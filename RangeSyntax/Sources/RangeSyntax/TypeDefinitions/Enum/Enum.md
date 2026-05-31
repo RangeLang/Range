@@ -2,15 +2,18 @@
 
 ## Definition
 
-An enum is a sum type with a fixed set of cases.
+An enum is a sum type with a fixed set of cases unless it is explicitly
+declared open.
 
 ## Role
 
-`enum` models a closed set of possibilities.
+`enum` models a closed set of possibilities by default. `open enum` allows
+cases to be added later from extensions.
 
 ## Mental Model
 
-- `enum` = fixed set of cases
+- `enum` / `closed enum` = fixed set of cases
+- `open enum` = case set can grow through extensions
 - `construct` = identity-bearing thing
 
 ## Properties
@@ -30,6 +33,16 @@ enum Direction {
     case south
     case east
     case west
+}
+```
+
+```range
+open enum EncodingFormat {
+    case json
+}
+
+extension EncodingFormat {
+    case binary
 }
 ```
 

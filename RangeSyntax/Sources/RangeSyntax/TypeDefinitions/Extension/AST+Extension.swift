@@ -14,6 +14,7 @@ public struct ExtensionDeclaration {
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]
     public let enumerations: [EnumDeclaration]
+    public let enumCases: [EnumCaseDeclaration]
     public let protocols: [ProtocolDeclaration]
 
     public init(
@@ -25,6 +26,7 @@ public struct ExtensionDeclaration {
         callables: [CallableDeclaration],
         constructs: [ConstructDeclaration],
         enumerations: [EnumDeclaration],
+        enumCases: [EnumCaseDeclaration] = [],
         protocols: [ProtocolDeclaration]
     ) {
         self.macros = macros
@@ -35,6 +37,7 @@ public struct ExtensionDeclaration {
         self.callables = callables
         self.constructs = constructs
         self.enumerations = enumerations
+        self.enumCases = enumCases
         self.protocols = protocols
     }
 

@@ -3,20 +3,34 @@ import Foundation
 extension Parser {
     func isEnumDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        switch peek(offset: offset) {
-        case .keyword(RangeSyntax.Keyword.enumeration.rawValue):
+        if peek(offset: offset) == .keyword(RangeSyntax.Keyword.enumeration.rawValue) {
             return true
-        case .macroAttribute:
-            return peek(offset: offset + 1) == .keyword(RangeSyntax.Keyword.enumeration.rawValue)
-        default:
-            return false
         }
+        if case .macroAttribute = peek(offset: offset) {
+            return peek(offset: offset + 1) == .keyword(RangeSyntax.Keyword.enumeration.rawValue)
+        }
+        if peek(offset: offset) == .keyword(RangeSyntax.Keyword.open.rawValue)
+            || peek(offset: offset) == .keyword(RangeSyntax.Keyword.closed.rawValue)
+        {
+            return peek(offset: offset + 1) == .keyword(RangeSyntax.Keyword.enumeration.rawValue)
+        }
+        return false
     }
 
     public mutating func parseEnumDeclaration(requiresEOF: Bool = true) throws
         -> EnumDeclaration
     {
         let macros = try parseMacroApplicationsIfPresent()
+        let extensibility: EnumExtensibility
+        if peek() == .keyword(RangeSyntax.Keyword.open.rawValue) {
+            try consumeKeyword(.open)
+            extensibility = .open
+        } else if peek() == .keyword(RangeSyntax.Keyword.closed.rawValue) {
+            try consumeKeyword(.closed)
+            extensibility = .closed
+        } else {
+            extensibility = .closed
+        }
         let attribute = parseAttributeIfPresent(before: .enumeration)
 
         try consumeKeyword(.enumeration)
@@ -39,6 +53,7 @@ extension Parser {
 
         return EnumDeclaration(
             macros: macros,
+            extensibility: extensibility,
             attribute: attribute,
             name: name,
             genericParameters: genericParameters,

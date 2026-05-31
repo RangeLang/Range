@@ -915,7 +915,9 @@ public struct DeclarationMemberResolver: Sendable {
                         }
                     }
                 )
-            for enumCase in declaration.cases {
+            let declaredCases = declaration.cases
+                + extensionsByTargetName[enumName, default: []].flatMap(\.enumCases)
+            for enumCase in declaredCases {
                 let signature = EnumCaseSignature(
                     enumType: enumType,
                     parameters: enumCase.associatedValues.map { associatedValue in

@@ -32,9 +32,38 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             closedMacroNames: closedCoreMacroNames
         )
         try validateLexerRepresentationMetadata(in: program.declarationGraph)
+        try validateEnumExtensionCases(in: program.declarationGraph)
         try validatePrimaryDeclarations(in: program.parsedFiles)
         try validateTopLevelStates(in: program.parsedFiles)
         try validateProtocolConformances(in: program.declarationGraph)
+    }
+
+    private func validateEnumExtensionCases(in declarationGraph: DeclarationGraph) throws {
+        for (targetName, extensions) in declarationGraph.extensionsByTargetName {
+            let extensionCases = extensions.flatMap(\.enumCases)
+            guard !extensionCases.isEmpty else {
+                continue
+            }
+            guard let enumeration = declarationGraph.enumsByName[targetName] else {
+                throw SemanticValidationError(
+                    "Extension cases can only target an enum. \(targetName) is not an enum."
+                )
+            }
+            guard enumeration.extensibility == .open else {
+                throw SemanticValidationError(
+                    "Closed enum \(targetName) cannot be extended with new cases. Declare open enum \(targetName) to allow extension cases."
+                )
+            }
+
+            var seenCases = Set<String>()
+            for enumCase in declarationGraph.enumCases(onEnum: targetName) {
+                guard seenCases.insert(enumCase.name).inserted else {
+                    throw SemanticValidationError(
+                        "Duplicate enum case \(targetName).\(enumCase.name)."
+                    )
+                }
+            }
+        }
     }
 
     private func validateLexerRepresentationMetadata(in declarationGraph: DeclarationGraph) throws {

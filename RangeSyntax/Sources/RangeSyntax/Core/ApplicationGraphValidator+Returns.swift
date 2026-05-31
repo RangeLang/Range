@@ -545,7 +545,7 @@ extension ApplicationGraphValidator {
             return false
         }
 
-        let declaredCases = Set(enumeration.cases.map(\.name))
+        let declaredCases = Set(declarationGraph.enumCases(onEnum: enumeration.name).map(\.name))
         let coveredCases = Set(cases.compactMap { switchCase -> String? in
             guard case .enumCase(let name, _) = switchCase.pattern else {
                 return nil

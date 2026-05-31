@@ -64,12 +64,24 @@ struct SwiftBackendProgramBuilder {
             let moduleDeclarations = module.constructs.filter {
                 $0.kind == .declaration || $0.kind == .entry
             }
+            let extendedCasesByEnumName = Dictionary(
+                grouping: module.extensions.flatMap { extensionDeclaration in
+                    extensionDeclaration.enumCases.map { (extensionDeclaration.targetName, $0) }
+                },
+                by: \.0
+            ).mapValues { entries in
+                entries.map(\.1)
+            }
+            let moduleEnumerations = mergeExtendedEnumCases(
+                into: module.enumerations,
+                extendedCasesByEnumName: extendedCasesByEnumName
+            )
 
             return .init(
                 macrosByName: compiledProgram.declarationGraph.macrosByName,
                 callables: module.callables,
                 protocols: supportUnits.flatMap(\.protocols) + module.protocols,
-                enumerations: module.enumerations,
+                enumerations: moduleEnumerations,
                 declarations: supportUnits.flatMap(\.declarations) + moduleDeclarations,
                 extensions: supportUnits.flatMap(\.extensions) + module.extensions,
                 mainBlock: mainBlock,
@@ -77,7 +89,7 @@ struct SwiftBackendProgramBuilder {
                     .init(
                         outputFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
                         protocols: module.protocols,
-                        enumerations: module.enumerations,
+                        enumerations: moduleEnumerations,
                         declarations: moduleDeclarations,
                         extensions: module.extensions,
                         callables: module.callables,
@@ -236,16 +248,65 @@ struct SwiftBackendProgramBuilder {
             throw SwiftBackendError("Missing @main block while generating Swift.")
         }
 
+        let extendedCasesByEnumName = Dictionary(
+            grouping: extensions.flatMap { extensionDeclaration in
+                extensionDeclaration.enumCases.map { (extensionDeclaration.targetName, $0) }
+            },
+            by: \.0
+        ).mapValues { entries in
+            entries.map(\.1)
+        }
+        let loweredEnumerations = mergeExtendedEnumCases(
+            into: enumerations,
+            extendedCasesByEnumName: extendedCasesByEnumName
+        )
+        let loweredUnits = units.map { unit in
+            LoweredSourceUnit(
+                outputFileName: unit.outputFileName,
+                protocols: unit.protocols,
+                enumerations: mergeExtendedEnumCases(
+                    into: unit.enumerations,
+                    extendedCasesByEnumName: extendedCasesByEnumName
+                ),
+                declarations: unit.declarations,
+                extensions: unit.extensions,
+                callables: unit.callables,
+                mainBlock: unit.mainBlock
+            )
+        }
+
         return .init(
             macrosByName: compiledProgram.declarationGraph.macrosByName,
             callables: callables,
             protocols: protocols,
-            enumerations: enumerations,
+            enumerations: loweredEnumerations,
             declarations: declarations,
             extensions: extensions,
             mainBlock: mainBlock,
-            units: units
+            units: loweredUnits
         )
+    }
+
+    private func mergeExtendedEnumCases(
+        into enumerations: [EnumDeclaration],
+        extendedCasesByEnumName: [String: [EnumCaseDeclaration]]
+    ) -> [EnumDeclaration] {
+        enumerations.map { declaration in
+            guard let extensionCases = extendedCasesByEnumName[declaration.name],
+                !extensionCases.isEmpty
+            else {
+                return declaration
+            }
+            return EnumDeclaration(
+                macros: declaration.macros,
+                extensibility: declaration.extensibility,
+                attribute: declaration.attribute,
+                name: declaration.name,
+                genericParameters: declaration.genericParameters,
+                conformances: declaration.conformances,
+                cases: declaration.cases + extensionCases
+            )
+        }
     }
 
     private func coreSupportDeclarations(in compiledProgram: CompiledProgram) -> [ConstructDeclaration] {
