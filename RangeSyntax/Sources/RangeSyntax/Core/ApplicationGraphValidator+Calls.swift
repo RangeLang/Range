@@ -20,12 +20,6 @@ extension ApplicationGraphValidator {
                     environment: environment,
                     fileName: fileName
                 )
-            case .namespace(let declaration):
-                try validateCallArgumentLabels(
-                    in: declaration,
-                    environment: environment,
-                    fileName: fileName
-                )
             case .module(let module):
                 if let mainBlock = module.mainBlock {
                     try validateCallArgumentLabels(
@@ -64,13 +58,6 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-                for declaration in module.namespaces {
-                    try validateCallArgumentLabels(
-                        in: declaration,
-                        environment: environment,
-                        fileName: fileName
-                    )
-                }
             case .mainBlock(let mainBlock):
                 try validateCallArgumentLabels(
                     in: mainBlock.body,
@@ -87,46 +74,6 @@ extension ApplicationGraphValidator {
             }
         }
     }
-
-    func validateCallArgumentLabels(
-        in declaration: NamespaceDeclaration,
-        environment: CallLabelValidationEnvironment,
-        fileName: String
-    ) throws {
-        for callable in declaration.callables {
-            guard let body = callable.body else { continue }
-            try validateCallArgumentLabels(
-                in: body,
-                environment: environment,
-                context: CallLabelValidationContext(
-                    currentConstructName: nil,
-                    localCallablesByName: localCallableMap([callable]),
-                    accessibleConstructTypesByName: parameterConstructTypes(
-                        callable.parameters,
-                        declarationGraph: environment.declarationGraph
-                    )
-                ),
-                fileName: fileName
-            )
-        }
-
-        for construct in declaration.constructs {
-            try validateCallArgumentLabels(
-                in: construct,
-                environment: environment,
-                fileName: fileName
-            )
-        }
-
-        for namespace in declaration.namespaces {
-            try validateCallArgumentLabels(
-                in: namespace,
-                environment: environment,
-                fileName: fileName
-            )
-        }
-    }
-
     func validateCallArgumentLabels(
         in declaration: ConstructDeclaration,
         environment: CallLabelValidationEnvironment,

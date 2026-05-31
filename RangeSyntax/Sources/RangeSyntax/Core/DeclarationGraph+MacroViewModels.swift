@@ -910,8 +910,6 @@ struct MacroGraphContext {
                 if graph.protocolsByName[location.name] != nil { values["protocol:\(location.name)"] = written }
             case .function:
                 values["function:\(location.name)"] = written
-            case .namespace:
-                values["namespace:\(location.name)"] = written
             case .macro:
                 values["macro:\(location.name)"] = written
             }

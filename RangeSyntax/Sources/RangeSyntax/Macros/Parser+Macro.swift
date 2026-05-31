@@ -345,7 +345,6 @@ extension Parser {
         case .keyword(RangeSyntax.Keyword.construct.rawValue),
             .keyword(RangeSyntax.Keyword.enumeration.rawValue),
             .keyword(RangeSyntax.Keyword.protocolDefinition.rawValue),
-            .keyword(RangeSyntax.Keyword.namespace.rawValue),
             .keyword(RangeSyntax.Keyword.caseBranch.rawValue):
             return .declaration
         case .keyword(RangeSyntax.Keyword.typeExtension.rawValue):

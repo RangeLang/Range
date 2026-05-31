@@ -516,13 +516,6 @@ public struct CompilerPipeline {
             for callable in module.callables {
                 collectCallableReturnType(callable, into: &returnTypes)
             }
-            for namespace in module.namespaces {
-                collectCallableReturnTypes(
-                    in: namespace,
-                    qualifiedPrefix: namespace.name,
-                    into: &returnTypes
-                )
-            }
             for declaration in module.extensions {
                 collectCallableReturnTypes(
                     in: declaration,
@@ -530,12 +523,6 @@ public struct CompilerPipeline {
                     into: &returnTypes
                 )
             }
-        case .namespace(let namespace):
-            collectCallableReturnTypes(
-                in: namespace,
-                qualifiedPrefix: namespace.name,
-                into: &returnTypes
-            )
         case .extensions(let declarations):
             for declaration in declarations {
                 collectCallableReturnTypes(
@@ -546,30 +533,6 @@ public struct CompilerPipeline {
             }
         default:
             break
-        }
-    }
-
-    private func collectCallableReturnTypes(
-        in namespace: NamespaceDeclaration,
-        qualifiedPrefix: String,
-        into returnTypes: inout [String: TypeReference]
-    ) {
-        for callable in namespace.callables {
-            guard let returnType = callable.returnType else {
-                continue
-            }
-            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
-            returnTypes[qualifiedName] = returnType
-            if let targetType = callable.targetType {
-                returnTypes["\(targetType.displayName).\(qualifiedName)"] = returnType
-            }
-        }
-        for nested in namespace.namespaces {
-            collectCallableReturnTypes(
-                in: nested,
-                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)",
-                into: &returnTypes
-            )
         }
     }
 
@@ -587,13 +550,6 @@ public struct CompilerPipeline {
             if let targetType = callable.targetType {
                 returnTypes["\(targetType.displayName).\(qualifiedName)"] = returnType
             }
-        }
-        for namespace in declaration.namespaces {
-            collectCallableReturnTypes(
-                in: namespace,
-                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
-                into: &returnTypes
-            )
         }
     }
 

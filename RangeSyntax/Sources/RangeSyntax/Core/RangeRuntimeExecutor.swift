@@ -96,8 +96,6 @@ public struct RangeRuntimeExecutor {
         switch sourceFile {
         case .module(let module):
             return module.callables
-        case .namespace(let namespace):
-            return namespace.callables
         case .construct(let construct):
             return construct.callables
         case .extensions(let extensions):

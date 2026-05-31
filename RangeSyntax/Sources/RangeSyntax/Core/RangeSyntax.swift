@@ -11,7 +11,6 @@ enum RangeSyntax {
     }
 
     enum Keyword: String {
-        case namespace = "namespace"
         case `let` = "let"
         case state = "state"
         case binding = "binding"

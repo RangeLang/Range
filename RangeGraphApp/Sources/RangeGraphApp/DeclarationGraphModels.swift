@@ -94,7 +94,6 @@ enum DeclarationGraphDisplayMode: String, CaseIterable, Identifiable {
 enum DeclarationGraphPalette {
     static let nodeFillByKind: [SemanticGraphEntityKind: Color] = [
         .file: Color(red: 0.30, green: 0.43, blue: 0.55),
-        .namespace: Color(red: 0.23, green: 0.54, blue: 0.54),
         .construct: Color(red: 0.74, green: 0.28, blue: 0.22),
         .enumeration: Color(red: 0.60, green: 0.37, blue: 0.24),
         .protocolDefinition: Color(red: 0.39, green: 0.32, blue: 0.48),

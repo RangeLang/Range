@@ -978,8 +978,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(program.declarationGraph.packageValues(named: "author").count == 1)
     }
 
-    @Test("Unknown attributes reject non-macro spelling")
-    func unknownAttributesRequireMatchingNamespaces() throws {
+    @Test("Unknown attributes reject non-built-in spelling")
+    func unknownAttributesRejectNonBuiltinSpelling() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
@@ -1541,11 +1541,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(registry.hasMacro(named: "decorate"))
         #expect(graph.macroMetadataByName["hostSpace"]?.hasMetadataSlotEffect == true)
         #expect(registry.hasExtensions(targeting: "Panel"))
-        #expect(graph.hasNamespace(named: "Styling") == false)
-        #expect(graph.hasNamespace(named: "Routes") == false)
-        #expect(graph.hasNamespaceAttribute(named: "Styling") == false)
-        #expect(graph.hasNamespaceAttribute(named: "Routes") == false)
-
         #expect(graph.packageValues(named: "packageName").count == 1)
         #expect(graph.topLevelStates(inFilePath: "/tmp/DeclarationGraphRegistrySnapshot.range")
             .map(\.name) == ["globalCount"])
@@ -1640,7 +1635,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/Namespaces.range",
+                path: "/tmp/NestedConstructs.range",
                 source: """
                 construct System {
                     construct Math {
@@ -1695,8 +1690,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let graph = program.declarationGraph
 
-        #expect(graph.hasNamespace(named: "Language") == false)
-        #expect(graph.hasNamespaceAttribute(named: "Language") == false)
         #expect(graph.constructsByName["Language"] != nil)
         #expect(graph.constructsByName["Language.Token"] != nil)
         #expect(graph.constructsByName["Language"]?.callables.map(\.name) == ["identifier"])
@@ -1732,8 +1725,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         let graph = program.declarationGraph
 
         #expect(graph.macroMetadataByName["hostSpace"]?.hasMetadataSlotEffect == true)
-        #expect(graph.hasNamespace(named: "Client") == false)
-        #expect(graph.hasNamespaceAttribute(named: "Client") == false)
         #expect(graph.constructsByName["Client"] != nil)
         #expect(graph.constructsByName["Client"]?.callables.map(\.name) == ["route"])
     }
@@ -1756,7 +1747,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/NamespaceExtension.range",
+                path: "/tmp/ConstructExtension.range",
                 source: """
                 extension Math {
                     function twice(value: Int): Int {

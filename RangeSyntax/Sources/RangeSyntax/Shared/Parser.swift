@@ -239,10 +239,6 @@ public struct Parser {
         macroMetadataByName[application.name]?.hasMetadataSlotEffect == true
     }
 
-    func isNamespaceShaped(_ declaration: ConstructDeclaration) -> Bool {
-        false
-    }
-
     func isCurrentExpressionTerminator(_ token: Token) -> Bool {
         currentExpressionTerminators.contains(where: { $0 == token })
     }
@@ -255,7 +251,6 @@ public struct Parser {
         var topLevelStates: [StateDeclaration] = []
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
-        var namespaces: [NamespaceDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         var macros: [MacroDeclaration] = []
@@ -286,11 +281,6 @@ public struct Parser {
 
             if isCallableStart() {
                 topLevelCallables.append(try parseCallableDeclaration())
-                continue
-            }
-
-            if isNamespaceDeclarationStart() {
-                namespaces.append(try parseNamespaceDeclaration(requiresEOF: false))
                 continue
             }
 
@@ -343,7 +333,6 @@ public struct Parser {
             topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
             protocols.isEmpty,
             constructs.isEmpty,
-            namespaces.isEmpty,
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
@@ -356,7 +345,6 @@ public struct Parser {
             enumerations.isEmpty,
             protocols.isEmpty,
             constructs.count == 1,
-            namespaces.isEmpty,
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
@@ -366,7 +354,6 @@ public struct Parser {
         }
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            namespaces.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
             precedenceGroups.isEmpty,
@@ -377,7 +364,6 @@ public struct Parser {
         }
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            namespaces.isEmpty,
             enumerations.isEmpty,
             protocols.count == 1,
             macros.isEmpty,
@@ -389,7 +375,6 @@ public struct Parser {
         }
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            namespaces.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.count == 1,
@@ -401,7 +386,6 @@ public struct Parser {
         }
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            namespaces.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
@@ -415,13 +399,11 @@ public struct Parser {
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
             protocols.isEmpty,
-            namespaces.count == 1,
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
             extensions.isEmpty
         {
-            return .namespace(namespaces[0])
         }
 
         return .module(
@@ -430,7 +412,6 @@ public struct Parser {
                 states: topLevelStates,
                 callables: topLevelCallables,
                 constructs: constructs,
-                namespaces: namespaces,
                 enumerations: enumerations,
                 protocols: protocols,
                 macros: macros,
@@ -446,7 +427,6 @@ public struct Parser {
         currentCallableReturnTypes = [:]
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
-        var namespaces: [NamespaceDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
@@ -474,11 +454,6 @@ public struct Parser {
                 let declaration = try parseMacroDeclaration(signatureOnly: true)
                 macros.append(declaration)
                 registerMacroDeclaration(declaration)
-                continue
-            }
-
-            if isNamespaceDeclarationStart() {
-                namespaces.append(try parseNamespaceDeclarationForDeclarationDiscovery())
                 continue
             }
 
@@ -527,7 +502,6 @@ public struct Parser {
                 states: [],
                 callables: topLevelCallables,
                 constructs: constructs,
-                namespaces: namespaces,
                 enumerations: enumerations,
                 protocols: protocols,
                 macros: macros,

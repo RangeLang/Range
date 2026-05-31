@@ -16,12 +16,6 @@ extension ApplicationGraphValidator {
                     declarationGraph: declarationGraph,
                     fileName: fileName
                 )
-            case .namespace(let declaration):
-                try validateBindingReferences(
-                    in: declaration,
-                    declarationGraph: declarationGraph,
-                    fileName: fileName
-                )
             case .module(let module):
                 let topLevelMutable = Set(
                     registryView.topLevelStates(inFilePath: parsedFile.path).map(\.name)
@@ -59,13 +53,6 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-                for declaration in module.namespaces {
-                    try validateBindingReferences(
-                        in: declaration,
-                        declarationGraph: declarationGraph,
-                        fileName: fileName
-                    )
-                }
             case .mainBlock(let mainBlock):
                 try validateBindingReferences(
                     in: mainBlock.body,
@@ -80,41 +67,6 @@ extension ApplicationGraphValidator {
             case .enumeration, .protocolDefinition, .macro, .extensions:
                 break
             }
-        }
-    }
-
-    func validateBindingReferences(
-        in declaration: NamespaceDeclaration,
-        declarationGraph: DeclarationGraph,
-        fileName: String
-    ) throws {
-        for callable in declaration.callables {
-            guard let body = callable.body else { continue }
-            try validateBindingReferences(
-                in: body,
-                declarationGraph: declarationGraph,
-                context: bindingReferenceContext(
-                    mutableNames: [],
-                    selfAvailable: false,
-                    currentConstructName: nil,
-                    parameters: callable.parameters
-                ),
-                fileName: fileName
-            )
-        }
-        for construct in declaration.constructs {
-            try validateBindingReferences(
-                in: construct,
-                declarationGraph: declarationGraph,
-                fileName: fileName
-            )
-        }
-        for namespace in declaration.namespaces {
-            try validateBindingReferences(
-                in: namespace,
-                declarationGraph: declarationGraph,
-                fileName: fileName
-            )
         }
     }
 

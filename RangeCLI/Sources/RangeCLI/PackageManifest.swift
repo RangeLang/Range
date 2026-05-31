@@ -27,8 +27,6 @@ enum PackageManifestLoader {
             throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .module:
             throw ValidationError("Project.range must declare #Project construct Name { ... }.")
-        case .namespace:
-            throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .construct(let declaration):
             guard declaration.attribute == nil else {
                 throw ValidationError("Project.range cannot use declaration attributes.")

@@ -24,16 +24,6 @@ extension ApplicationGraphValidator {
                     typeCompatibilityResolver: typeCompatibilityResolver,
                     fileName: fileName
                 )
-            case .namespace(let declaration):
-                try validateCallableReturnSemantics(
-                    in: declaration,
-                    declarationGraph: declarationGraph,
-                    resolver: resolver,
-                    memberResolver: memberResolver,
-                    operatorResolver: operatorResolver,
-                    typeCompatibilityResolver: typeCompatibilityResolver,
-                    fileName: fileName
-                )
             case .module(let module):
                 let topLevelAccessibleTypes = Dictionary(
                     uniqueKeysWithValues: registryView.topLevelStates(inFilePath: parsedFile.path).map {
@@ -65,70 +55,11 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-                for declaration in module.namespaces {
-                    try validateCallableReturnSemantics(
-                        in: declaration,
-                        declarationGraph: declarationGraph,
-                        resolver: resolver,
-                        memberResolver: memberResolver,
-                        operatorResolver: operatorResolver,
-                        typeCompatibilityResolver: typeCompatibilityResolver,
-                        fileName: fileName
-                    )
-                }
             case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
                 break
             }
         }
     }
-
-    func validateCallableReturnSemantics(
-        in declaration: NamespaceDeclaration,
-        declarationGraph: DeclarationGraph,
-        resolver: LiteralBridgeResolver,
-        memberResolver: DeclarationMemberResolver,
-        operatorResolver: DeclarationOperatorResolver,
-        typeCompatibilityResolver: DeclarationTypeCompatibilityResolver,
-        fileName: String
-    ) throws {
-        for callable in declaration.callables {
-            try validateCallableReturnSemantics(
-                callable,
-                accessibleTypes: [:],
-                declarationGraph: declarationGraph,
-                resolver: resolver,
-                memberResolver: memberResolver,
-                operatorResolver: operatorResolver,
-                typeCompatibilityResolver: typeCompatibilityResolver,
-                fileName: fileName
-            )
-        }
-
-        for construct in declaration.constructs {
-            try validateCallableReturnSemantics(
-                in: construct,
-                declarationGraph: declarationGraph,
-                resolver: resolver,
-                memberResolver: memberResolver,
-                operatorResolver: operatorResolver,
-                typeCompatibilityResolver: typeCompatibilityResolver,
-                fileName: fileName
-            )
-        }
-
-        for namespace in declaration.namespaces {
-            try validateCallableReturnSemantics(
-                in: namespace,
-                declarationGraph: declarationGraph,
-                resolver: resolver,
-                memberResolver: memberResolver,
-                operatorResolver: operatorResolver,
-                typeCompatibilityResolver: typeCompatibilityResolver,
-                fileName: fileName
-            )
-        }
-    }
-
     func validateCallableReturnSemantics(
         in declaration: ConstructDeclaration,
         declarationGraph: DeclarationGraph,

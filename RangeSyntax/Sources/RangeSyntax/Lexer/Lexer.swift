@@ -675,8 +675,7 @@ struct RangeAuthoredLexerCursor {
     }
 
     func isKeyword(_ value: String) -> Bool {
-        value == "namespace"
-            || value == "let"
+        value == "let"
             || value == "state"
             || value == "binding"
             || value == "derived"

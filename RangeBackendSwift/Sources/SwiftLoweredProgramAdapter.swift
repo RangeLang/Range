@@ -61,7 +61,6 @@ struct SwiftLoweredProgramAdapter {
             initializers: declaration.initializers.map(lower(initializer:)),
             callables: declaration.callables.map(lower(callable:)),
             constructs: declaration.constructs.map(lower(construct:)),
-            namespaces: declaration.namespaces,
             enumerations: declaration.enumerations,
             protocols: declaration.protocols
         )

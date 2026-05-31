@@ -76,10 +76,8 @@ extension ApplicationGraphValidator {
         switch sourceFile {
         case .construct(let declaration):
             return [declaration]
-        case .namespace(let declaration):
-            return declaration.constructs + declaration.namespaces.flatMap { declarations(in: .namespace($0)) }
         case .module(let module):
-            return module.constructs + module.namespaces.flatMap { declarations(in: .namespace($0)) }
+            return module.constructs
         case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
             return []
         }

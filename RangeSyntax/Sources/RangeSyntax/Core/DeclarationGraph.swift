@@ -2,7 +2,6 @@ import Foundation
 
 public enum DeclarationSourceKind: Hashable {
     case type
-    case namespace
     case macro
     case function
 }
@@ -29,9 +28,6 @@ public struct DeclarationSourceLocation {
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
     public let packageValues: [ValueDeclaration]
-    public let namespacesByName: [String: NamespaceDeclaration]
-    public let namespaceAttributeNames: Set<String>
-    public let namespaceAttributeAttachments: [NamespaceAttributeAttachment]
     public let constructsByName: [String: ConstructDeclaration]
     public let enumsByName: [String: EnumDeclaration]
     public let macrosByName: [String: MacroDeclaration]
@@ -64,18 +60,6 @@ public struct DeclarationGraph {
         let protocols = Self.collectProtocols(from: files)
         let macroMetadata = Self.collectMacroMetadata(from: files)
         let metadataSlotMacros = Self.metadataSlotMacroNames(in: macroMetadata)
-        let namespaces = Self.collectNamespaces(
-            from: files,
-            metadataSlotMacros: metadataSlotMacros
-        )
-        let namespaceAttributeNames = Self.collectNamespaceAttributeNames(
-            from: files,
-            metadataSlotMacros: metadataSlotMacros
-        )
-        let namespaceAttributeAttachments = Self.collectNamespaceAttributeAttachments(
-            from: files,
-            namespacesByName: namespaces
-        )
         let extensions = Self.collectExtensions(from: files)
         let constructs = Self.collectConstructs(
             from: files,
@@ -104,9 +88,6 @@ public struct DeclarationGraph {
 
         self.protocolsByName = protocols
         self.packageValues = packageValues
-        self.namespacesByName = namespaces
-        self.namespaceAttributeNames = namespaceAttributeNames
-        self.namespaceAttributeAttachments = namespaceAttributeAttachments
         self.constructsByName = constructs
         self.enumsByName = enumerations
         self.macrosByName = macros
@@ -238,10 +219,6 @@ public struct DeclarationGraph {
         constructsByName[name]
     }
 
-    public func namespace(named name: String) -> NamespaceDeclaration? {
-        namespacesByName[name]
-    }
-
     public func sourceLocation(
         named name: String,
         kinds: Set<DeclarationSourceKind>
@@ -253,33 +230,8 @@ public struct DeclarationGraph {
         constructsByName[name] != nil
     }
 
-    public func hasNamespace(named name: String) -> Bool {
-        namespacesByName[name] != nil
-    }
-
-    public func hasNamespaceAttribute(named name: String) -> Bool {
-        namespaceAttributeNames.contains(name)
-    }
-
     public func macroApplicationHasMetadataSlotEffect(_ application: MacroApplication) -> Bool {
         macroMetadataByName[application.name]?.hasMetadataSlotEffect == true
-    }
-
-    public func isNamespaceShaped(_ declaration: ConstructDeclaration) -> Bool {
-        false
-    }
-
-    public func namespaceDeclaration(from construct: ConstructDeclaration) -> NamespaceDeclaration {
-        Self.namespaceDeclaration(
-            from: construct,
-            metadataSlotMacros: Self.metadataSlotMacroNames(in: macroMetadataByName)
-        )
-    }
-
-    public func namespaceAttributeAttachments(
-        onDeclarationNamed name: String
-    ) -> [NamespaceAttributeAttachment] {
-        namespaceAttributeAttachments.filter { $0.declarationName == name }
     }
 
     public func isCoreConstruct(named name: String) -> Bool {
@@ -681,11 +633,6 @@ public struct DeclarationGraph {
         metadataSlotMacros: Set<String>
     ) -> [String: ConstructDeclaration] {
         var registry: [String: ConstructDeclaration] = [:]
-        let namespaceRegistry = collectNamespaces(
-            from: files,
-            metadataSlotMacros: metadataSlotMacros
-        )
-        let extensions = collectExtensions(from: files)
         for parsedFile in files {
             for declaration in constructs(
                 in: parsedFile.sourceFile,
@@ -698,81 +645,8 @@ public struct DeclarationGraph {
                     protocols: protocols
                 )
             }
-            for namespace in namespaces(
-                in: parsedFile.sourceFile,
-                metadataSlotMacros: metadataSlotMacros
-            ) {
-                collectNamespaceConstructs(
-                    in: namespace,
-                    qualifiedPrefix: namespace.name,
-                    into: &registry,
-                    protocols: protocols
-                )
-            }
-        }
-        for (targetName, declarations) in extensions where namespaceRegistry[targetName] != nil {
-            for declaration in declarations {
-                collectNamespaceExtensionConstructs(
-                    from: declaration,
-                    qualifiedPrefix: targetName,
-                    into: &registry,
-                    protocols: protocols
-                )
-            }
         }
         return registry
-    }
-
-    static func collectNamespaces(
-        from files: [ParsedSourceFile],
-        metadataSlotMacros: Set<String>
-    ) -> [String: NamespaceDeclaration] {
-        var registry: [String: NamespaceDeclaration] = [:]
-        for parsedFile in files {
-            for declaration in namespaces(
-                in: parsedFile.sourceFile,
-                metadataSlotMacros: metadataSlotMacros
-            ) {
-                collectNamespace(
-                    declaration,
-                    qualifiedName: declaration.name,
-                    into: &registry
-                )
-            }
-        }
-        return registry
-    }
-
-    static func collectNamespaceAttributeNames(
-        from files: [ParsedSourceFile],
-        metadataSlotMacros: Set<String>
-    ) -> Set<String> {
-        var names: Set<String> = []
-        for parsedFile in files {
-            for declaration in namespaces(
-                in: parsedFile.sourceFile,
-                metadataSlotMacros: metadataSlotMacros
-            ) {
-                collectNamespaceAttributeName(declaration, into: &names)
-            }
-            for declaration in extensions(in: parsedFile.sourceFile) {
-                collectNamespaceAttributeNames(in: declaration, into: &names)
-            }
-        }
-        return names
-    }
-
-    static func collectNamespaceAttributeAttachments(
-        from files: [ParsedSourceFile],
-        namespacesByName: [String: NamespaceDeclaration]
-    ) -> [NamespaceAttributeAttachment] {
-        files.flatMap { parsedFile in
-            namespaceAttributeAttachments(
-                in: parsedFile.sourceFile,
-                filePath: parsedFile.path,
-                namespacesByName: namespacesByName
-            )
-        }
     }
 
     static func collectEnums(from files: [ParsedSourceFile]) -> [String: EnumDeclaration] {
@@ -832,15 +706,6 @@ public struct DeclarationGraph {
                     path: path,
                     pattern: #"\b(?:construct|protocol|enum)\s+([A-Z][A-Za-z0-9_]*)"#,
                     kind: .type
-                )
-            )
-            result.append(
-                contentsOf: declarationSourceLocations(
-                    in: line,
-                    lineIndex: lineIndex,
-                    path: path,
-                    pattern: #"\bnamespace\s+([A-Z][A-Za-z0-9_]*)"#,
-                    kind: .namespace
                 )
             )
             result.append(
@@ -986,14 +851,6 @@ public struct DeclarationGraph {
         from files: [ParsedSourceFile]
     ) -> [String: [RangeFunctionParameter]] {
         var registry: [String: [RangeFunctionParameter]] = [:]
-        let metadataSlotMacros = metadataSlotMacroNames(
-            in: collectMacroMetadata(from: files)
-        )
-        let namespaceRegistry = collectNamespaces(
-            from: files,
-            metadataSlotMacros: metadataSlotMacros
-        )
-        let extensions = collectExtensions(from: files)
 
         for parsedFile in files {
             switch parsedFile.sourceFile {
@@ -1005,77 +862,21 @@ public struct DeclarationGraph {
                     )
                     registry[identity] = callable.parameters
                 }
-                for construct in module.constructs
-                where !isNamespaceShaped(
-                    construct,
-                    metadataSlotMacros: metadataSlotMacros
-                ) {
+                for construct in module.constructs {
                     collectCallableParameters(
                         in: construct,
                         registry: &registry,
                         ownerName: construct.name
-                    )
-                }
-                let namespaceConstructs = (module.constructs)
-                    .filter {
-                        isNamespaceShaped(
-                            $0,
-                            metadataSlotMacros: metadataSlotMacros
-                        )
-                    }
-                    .map {
-                        namespaceDeclaration(
-                            from: $0,
-                            metadataSlotMacros: metadataSlotMacros
-                        )
-                    }
-                for namespace in module.namespaces
-                    + namespaceConstructs
-                {
-                    collectNamespaceCallableParameters(
-                        in: namespace,
-                        registry: &registry,
-                        qualifiedPrefix: namespace.name
                     )
                 }
             case .construct(let construct):
-                if isNamespaceShaped(
-                    construct,
-                    metadataSlotMacros: metadataSlotMacros
-                ) {
-                    let namespace = namespaceDeclaration(
-                        from: construct,
-                        metadataSlotMacros: metadataSlotMacros
-                    )
-                    collectNamespaceCallableParameters(
-                        in: namespace,
-                        registry: &registry,
-                        qualifiedPrefix: namespace.name
-                    )
-                } else {
-                    collectCallableParameters(
-                        in: construct,
-                        registry: &registry,
-                        ownerName: construct.name
-                    )
-                }
-            case .namespace(let namespace):
-                collectNamespaceCallableParameters(
-                    in: namespace,
+                collectCallableParameters(
+                    in: construct,
                     registry: &registry,
-                    qualifiedPrefix: namespace.name
+                    ownerName: construct.name
                 )
             case .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
                 continue
-            }
-        }
-        for (targetName, declarations) in extensions where namespaceRegistry[targetName] != nil {
-            for declaration in declarations {
-                collectNamespaceExtensionCallableParameters(
-                    from: declaration,
-                    registry: &registry,
-                    qualifiedPrefix: targetName
-                )
             }
         }
 
@@ -1174,36 +975,9 @@ public struct DeclarationGraph {
     static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]]
     {
         var registry: [String: [CallableDeclaration]] = [:]
-        let metadataSlotMacros = metadataSlotMacroNames(
-            in: collectMacroMetadata(from: files)
-        )
-        let namespaceRegistry = collectNamespaces(
-            from: files,
-            metadataSlotMacros: metadataSlotMacros
-        )
-        let extensions = collectExtensions(from: files)
         for parsedFile in files {
             for declaration in callables(in: parsedFile.sourceFile) {
                 registry[declaration.name, default: []].append(declaration)
-            }
-            for namespace in namespaces(
-                in: parsedFile.sourceFile,
-                metadataSlotMacros: metadataSlotMacros
-            ) {
-                collectNamespaceCallables(
-                    in: namespace,
-                    qualifiedPrefix: namespace.name,
-                    into: &registry
-                )
-            }
-        }
-        for (targetName, declarations) in extensions where namespaceRegistry[targetName] != nil {
-            for declaration in declarations {
-                collectNamespaceExtensionCallables(
-                    from: declaration,
-                    qualifiedPrefix: targetName,
-                    into: &registry
-                )
             }
         }
         return registry
@@ -1234,423 +1008,6 @@ public struct DeclarationGraph {
         )
     }
 
-    private static func collectNamespaceConstructs(
-        in namespace: NamespaceDeclaration,
-        qualifiedPrefix: String,
-        into registry: inout [String: ConstructDeclaration],
-        protocols: [String: ProtocolDeclaration]
-    ) {
-        for declaration in namespace.constructs {
-            collectConstruct(
-                declaration,
-                qualifiedName: "\(qualifiedPrefix).\(declaration.name)",
-                into: &registry,
-                protocols: protocols
-            )
-        }
-        for nested in namespace.namespaces {
-            collectNamespaceConstructs(
-                in: nested,
-                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)",
-                into: &registry,
-                protocols: protocols
-            )
-        }
-    }
-
-    private static func collectNamespace(
-        _ declaration: NamespaceDeclaration,
-        qualifiedName: String,
-        into registry: inout [String: NamespaceDeclaration]
-    ) {
-        let qualifiedChildren = declaration.namespaces.map { child in
-            NamespaceDeclaration(
-                name: "\(qualifiedName).\(child.name)",
-                values: child.values,
-                callables: child.callables,
-                constructs: child.constructs,
-                namespaces: child.namespaces
-            )
-        }
-
-        registry[qualifiedName] = NamespaceDeclaration(
-            name: qualifiedName,
-            values: declaration.values,
-            callables: declaration.callables,
-            constructs: declaration.constructs,
-            namespaces: qualifiedChildren
-        )
-
-        for child in declaration.namespaces {
-            collectNamespace(
-                child,
-                qualifiedName: "\(qualifiedName).\(child.name)",
-                into: &registry
-            )
-        }
-    }
-
-    private static func collectNamespaceAttributeName(
-        _ declaration: NamespaceDeclaration,
-        into names: inout Set<String>
-    ) {
-        names.insert(declaration.name)
-        for child in declaration.namespaces {
-            collectNamespaceAttributeName(child, into: &names)
-        }
-    }
-
-    private static func collectNamespaceAttributeNames(
-        in declaration: ExtensionDeclaration,
-        into names: inout Set<String>
-    ) {
-        for namespace in declaration.namespaces {
-            collectNamespaceAttributeName(namespace, into: &names)
-        }
-    }
-
-    private static func namespaceAttributeAttachments(
-        in sourceFile: SourceFileNode,
-        filePath: String,
-        namespacesByName: [String: NamespaceDeclaration]
-    ) -> [NamespaceAttributeAttachment] {
-        switch sourceFile {
-        case .construct(let declaration):
-            return namespaceAttributeAttachments(
-                in: declaration,
-                qualifiedName: declaration.name,
-                filePath: filePath,
-                namespacesByName: namespacesByName
-            )
-        case .module(let module):
-            var attachments: [NamespaceAttributeAttachment] = []
-            for declaration in module.constructs {
-                attachments.append(
-                    contentsOf: namespaceAttributeAttachments(
-                        in: declaration,
-                        qualifiedName: declaration.name,
-                        filePath: filePath,
-                        namespacesByName: namespacesByName
-                    )
-                )
-            }
-            attachments.append(
-                contentsOf: (module.protocols).compactMap {
-                    namespaceAttributeAttachment(
-                        declarationName: $0.name,
-                        declarationKind: .type,
-                        attribute: $0.attribute,
-                        filePath: filePath,
-                        namespacesByName: namespacesByName
-                    )
-                }
-            )
-            attachments.append(
-                contentsOf: (module.enumerations).compactMap {
-                    namespaceAttributeAttachment(
-                        declarationName: $0.name,
-                        declarationKind: .type,
-                        attribute: $0.attribute,
-                        filePath: filePath,
-                        namespacesByName: namespacesByName
-                    )
-                }
-            )
-            for namespace in module.namespaces {
-                attachments.append(
-                    contentsOf: namespaceAttributeAttachments(
-                        in: namespace,
-                        qualifiedPrefix: namespace.name,
-                        filePath: filePath,
-                        namespacesByName: namespacesByName
-                    )
-                )
-            }
-            for declaration in module.extensions {
-                attachments.append(
-                    contentsOf: namespaceAttributeAttachments(
-                        in: declaration,
-                        qualifiedPrefix: declaration.targetName,
-                        filePath: filePath,
-                        namespacesByName: namespacesByName
-                    )
-                )
-            }
-            return attachments
-        case .namespace(let declaration):
-            return namespaceAttributeAttachments(
-                in: declaration,
-                qualifiedPrefix: declaration.name,
-                filePath: filePath,
-                namespacesByName: namespacesByName
-            )
-        case .protocolDefinition(let declaration):
-            return namespaceAttributeAttachment(
-                declarationName: declaration.name,
-                declarationKind: .type,
-                attribute: declaration.attribute,
-                filePath: filePath,
-                namespacesByName: namespacesByName
-            ).map { [$0] } ?? []
-        case .enumeration(let declaration):
-            return namespaceAttributeAttachment(
-                declarationName: declaration.name,
-                declarationKind: .type,
-                attribute: declaration.attribute,
-                filePath: filePath,
-                namespacesByName: namespacesByName
-            ).map { [$0] } ?? []
-        case .extensions(let declarations):
-            return declarations.flatMap {
-                namespaceAttributeAttachments(
-                    in: $0,
-                    qualifiedPrefix: $0.targetName,
-                    filePath: filePath,
-                    namespacesByName: namespacesByName
-                )
-            }
-        case .mainBlock, .macro:
-            return []
-        }
-    }
-
-    private static func namespaceAttributeAttachments(
-        in declaration: ConstructDeclaration,
-        qualifiedName: String,
-        filePath: String,
-        namespacesByName: [String: NamespaceDeclaration]
-    ) -> [NamespaceAttributeAttachment] {
-        var attachments: [NamespaceAttributeAttachment] = []
-        if let attachment = namespaceAttributeAttachment(
-            declarationName: qualifiedName,
-            declarationKind: .type,
-            attribute: declaration.attribute,
-            filePath: filePath,
-            namespacesByName: namespacesByName
-        ) {
-            attachments.append(attachment)
-        }
-        for child in declaration.constructs {
-            attachments.append(
-                contentsOf: namespaceAttributeAttachments(
-                    in: child,
-                    qualifiedName: "\(qualifiedName).\(child.name)",
-                    filePath: filePath,
-                    namespacesByName: namespacesByName
-                )
-            )
-        }
-        return attachments
-    }
-
-    private static func namespaceAttributeAttachments(
-        in declaration: NamespaceDeclaration,
-        qualifiedPrefix: String,
-        filePath: String,
-        namespacesByName: [String: NamespaceDeclaration]
-    ) -> [NamespaceAttributeAttachment] {
-        var attachments: [NamespaceAttributeAttachment] = []
-        for construct in declaration.constructs {
-            attachments.append(
-                contentsOf: namespaceAttributeAttachments(
-                    in: construct,
-                    qualifiedName: "\(qualifiedPrefix).\(construct.name)",
-                    filePath: filePath,
-                    namespacesByName: namespacesByName
-                )
-            )
-        }
-        for namespace in declaration.namespaces {
-            attachments.append(
-                contentsOf: namespaceAttributeAttachments(
-                    in: namespace,
-                    qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
-                    filePath: filePath,
-                    namespacesByName: namespacesByName
-                )
-            )
-        }
-        return attachments
-    }
-
-    private static func namespaceAttributeAttachments(
-        in declaration: ExtensionDeclaration,
-        qualifiedPrefix: String,
-        filePath: String,
-        namespacesByName: [String: NamespaceDeclaration]
-    ) -> [NamespaceAttributeAttachment] {
-        var attachments: [NamespaceAttributeAttachment] = []
-        for construct in declaration.constructs {
-            attachments.append(
-                contentsOf: namespaceAttributeAttachments(
-                    in: construct,
-                    qualifiedName: "\(qualifiedPrefix).\(construct.name)",
-                    filePath: filePath,
-                    namespacesByName: namespacesByName
-                )
-            )
-        }
-        for namespace in declaration.namespaces {
-            attachments.append(
-                contentsOf: namespaceAttributeAttachments(
-                    in: namespace,
-                    qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
-                    filePath: filePath,
-                    namespacesByName: namespacesByName
-                )
-            )
-        }
-        return attachments
-    }
-
-    private static func namespaceAttributeAttachment(
-        declarationName: String,
-        declarationKind: DeclarationSourceKind,
-        attribute: AttributeApplication?,
-        filePath: String,
-        namespacesByName: [String: NamespaceDeclaration]
-    ) -> NamespaceAttributeAttachment? {
-        guard
-            let attribute,
-            !RangeSyntax.attributeIdentifiers.contains(attribute.name),
-            let namespace = namespacesByName[attribute.name]
-        else {
-            return nil
-        }
-
-        return NamespaceAttributeAttachment(
-            declarationName: declarationName,
-            declarationKind: declarationKind,
-            attribute: attribute,
-            namespace: namespace,
-            filePath: filePath
-        )
-    }
-
-    private static func collectNamespaceExtensionConstructs(
-        from declaration: ExtensionDeclaration,
-        qualifiedPrefix: String,
-        into registry: inout [String: ConstructDeclaration],
-        protocols: [String: ProtocolDeclaration]
-    ) {
-        for construct in declaration.constructs {
-            collectConstruct(
-                construct,
-                qualifiedName: "\(qualifiedPrefix).\(construct.name)",
-                into: &registry,
-                protocols: protocols
-            )
-        }
-        for namespace in declaration.namespaces {
-            collectNamespaceConstructs(
-                in: namespace,
-                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
-                into: &registry,
-                protocols: protocols
-            )
-        }
-    }
-
-    private static func collectNamespaceCallables(
-        in namespace: NamespaceDeclaration,
-        qualifiedPrefix: String,
-        into registry: inout [String: [CallableDeclaration]]
-    ) {
-        for callable in namespace.callables {
-            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
-            registry[qualifiedName, default: []].append(
-                CallableDeclaration(
-                    macros: callable.macros,
-                    attribute: callable.attribute,
-                    targetType: callable.targetType,
-                    receiverType: callable.receiverType,
-                    name: qualifiedName,
-                    genericParameters: callable.genericParameters,
-                    hasExplicitParameterClause: callable.hasExplicitParameterClause,
-                    parameters: callable.parameters,
-                    returnType: callable.returnType,
-                    body: callable.body
-                )
-            )
-        }
-        for nested in namespace.namespaces {
-            collectNamespaceCallables(
-                in: nested,
-                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)",
-                into: &registry
-            )
-        }
-    }
-
-    private static func collectNamespaceExtensionCallables(
-        from declaration: ExtensionDeclaration,
-        qualifiedPrefix: String,
-        into registry: inout [String: [CallableDeclaration]]
-    ) {
-        for callable in declaration.callables {
-            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
-            registry[qualifiedName, default: []].append(
-                CallableDeclaration(
-                    macros: callable.macros,
-                    attribute: callable.attribute,
-                    targetType: callable.targetType,
-                    receiverType: callable.receiverType,
-                    name: qualifiedName,
-                    genericParameters: callable.genericParameters,
-                    hasExplicitParameterClause: callable.hasExplicitParameterClause,
-                    parameters: callable.parameters,
-                    returnType: callable.returnType,
-                    body: callable.body
-                )
-            )
-        }
-        for namespace in declaration.namespaces {
-            collectNamespaceCallables(
-                in: namespace,
-                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)",
-                into: &registry
-            )
-        }
-    }
-
-    private static func collectNamespaceCallableParameters(
-        in namespace: NamespaceDeclaration,
-        registry: inout [String: [RangeFunctionParameter]],
-        qualifiedPrefix: String
-    ) {
-        for callable in namespace.callables {
-            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
-            let qualifiedCallable = CallableDeclaration(
-                macros: callable.macros,
-                attribute: callable.attribute,
-                targetType: callable.targetType,
-                receiverType: callable.receiverType,
-                name: qualifiedName,
-                genericParameters: callable.genericParameters,
-                hasExplicitParameterClause: callable.hasExplicitParameterClause,
-                parameters: callable.parameters,
-                returnType: callable.returnType,
-                body: callable.body
-            )
-            registry[callableIdentity(ownerName: nil, declaration: qualifiedCallable)] =
-                callable.parameters
-        }
-        for construct in namespace.constructs {
-            collectCallableParameters(
-                in: construct,
-                registry: &registry,
-                ownerName: "\(qualifiedPrefix).\(construct.name)"
-            )
-        }
-        for nested in namespace.namespaces {
-            collectNamespaceCallableParameters(
-                in: nested,
-                registry: &registry,
-                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)"
-            )
-        }
-    }
-
     static func collectRealizedLiteralBridges(
         from constructs: [String: ConstructDeclaration]
     ) -> [RealizedLiteralBridge] {
@@ -1676,37 +1033,6 @@ public struct DeclarationGraph {
                     carrierTypeName: literalMacro.genericArguments[0].displayName
                 )
             }
-        }
-    }
-
-    private static func collectNamespaceExtensionCallableParameters(
-        from declaration: ExtensionDeclaration,
-        registry: inout [String: [RangeFunctionParameter]],
-        qualifiedPrefix: String
-    ) {
-        for callable in declaration.callables {
-            let qualifiedName = "\(qualifiedPrefix).\(callable.name)"
-            let qualifiedCallable = CallableDeclaration(
-                macros: callable.macros,
-                attribute: callable.attribute,
-                targetType: callable.targetType,
-                receiverType: callable.receiverType,
-                name: qualifiedName,
-                genericParameters: callable.genericParameters,
-                hasExplicitParameterClause: callable.hasExplicitParameterClause,
-                parameters: callable.parameters,
-                returnType: callable.returnType,
-                body: callable.body
-            )
-            registry[callableIdentity(ownerName: nil, declaration: qualifiedCallable)] =
-                callable.parameters
-        }
-        for namespace in declaration.namespaces {
-            collectNamespaceCallableParameters(
-                in: namespace,
-                registry: &registry,
-                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)"
-            )
         }
     }
 
@@ -1737,7 +1063,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.protocols
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -1748,86 +1074,12 @@ public struct DeclarationGraph {
     ) -> [ConstructDeclaration] {
         switch sourceFile {
         case .construct(let declaration):
-            return isNamespaceShaped(
-                declaration,
-                metadataSlotMacros: metadataSlotMacros
-            ) ? [] : [declaration]
-        case .module(let module):
-            return (module.constructs)
-                .filter {
-                    !isNamespaceShaped(
-                        $0,
-                        metadataSlotMacros: metadataSlotMacros
-                    )
-                }
-        case .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
-            return []
-        }
-    }
-
-    static func namespaces(
-        in sourceFile: SourceFileNode,
-        metadataSlotMacros: Set<String>
-    ) -> [NamespaceDeclaration] {
-        switch sourceFile {
-        case .namespace(let declaration):
             return [declaration]
         case .module(let module):
-            let namespaceConstructs = (module.constructs)
-                .filter {
-                    isNamespaceShaped(
-                        $0,
-                        metadataSlotMacros: metadataSlotMacros
-                    )
-                }
-                .map {
-                    namespaceDeclaration(
-                        from: $0,
-                        metadataSlotMacros: metadataSlotMacros
-                    )
-                }
-            return module.namespaces + namespaceConstructs
-        case .construct(let declaration):
-            return isNamespaceShaped(
-                declaration,
-                metadataSlotMacros: metadataSlotMacros
-            )
-                ? [
-                    namespaceDeclaration(
-                        from: declaration,
-                        metadataSlotMacros: metadataSlotMacros
-                    )
-                ] : []
+            return module.constructs
         case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
-    }
-
-    static func namespaceDeclaration(
-        from construct: ConstructDeclaration,
-        metadataSlotMacros: Set<String>
-    ) -> NamespaceDeclaration {
-        NamespaceDeclaration(
-            name: construct.name,
-            values: construct.values,
-            callables: construct.callables,
-            constructs: construct.constructs.filter {
-                !isNamespaceShaped($0, metadataSlotMacros: metadataSlotMacros)
-            },
-            namespaces: construct.constructs
-                .filter {
-                    isNamespaceShaped(
-                        $0,
-                        metadataSlotMacros: metadataSlotMacros
-                    )
-                }
-                .map {
-                    namespaceDeclaration(
-                        from: $0,
-                        metadataSlotMacros: metadataSlotMacros
-                    )
-                }
-        )
     }
 
     static func metadataSlotMacroNames(
@@ -1836,18 +1088,11 @@ public struct DeclarationGraph {
         Set(macroMetadata.values.filter(\.hasMetadataSlotEffect).map(\.name))
     }
 
-    static func isNamespaceShaped(
-        _ declaration: ConstructDeclaration,
-        metadataSlotMacros: Set<String>
-    ) -> Bool {
-        false
-    }
-
     static func topLevelStates(in sourceFile: SourceFileNode) -> [StateDeclaration] {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+        case .construct, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
             return []
         }
     }
@@ -1858,7 +1103,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.enumerations
-        case .construct, .namespace, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1869,7 +1114,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .namespace, .enumeration, .mainBlock, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1880,7 +1125,7 @@ public struct DeclarationGraph {
             return declarations
         case .module(let module):
             return module.extensions
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition:
+        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition:
             return []
         }
     }
@@ -1889,7 +1134,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.operators
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1898,7 +1143,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.precedenceGroups
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1907,8 +1152,6 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.callables
-        case .namespace(let declaration):
-            return declaration.callables
         case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
@@ -2047,8 +1290,6 @@ private struct SemanticGraphCollector {
         switch parsedFile.sourceFile {
         case .construct(let declaration):
             addConstruct(declaration, parentID: fileID)
-        case .namespace(let declaration):
-            addNamespace(declaration, parentID: fileID)
         case .enumeration(let declaration):
             addEnumeration(declaration, parentID: fileID)
         case .protocolDefinition(let declaration):
@@ -2074,9 +1315,6 @@ private struct SemanticGraphCollector {
             for declaration in module.constructs {
                 addConstruct(declaration, parentID: fileID)
             }
-            for declaration in module.namespaces {
-                addNamespace(declaration, parentID: fileID)
-            }
             for declaration in module.enumerations {
                 addEnumeration(declaration, parentID: fileID)
             }
@@ -2093,25 +1331,6 @@ private struct SemanticGraphCollector {
             let mainID = "\(fileID)/main"
             addEntity(id: mainID, kind: .mainBlock, label: "@main")
             addRelation(from: fileID, to: mainID, kind: .contains)
-        }
-    }
-
-    private mutating func addNamespace(_ declaration: NamespaceDeclaration, parentID: String) {
-        let namespaceID = "\(parentID)/namespace:\(declaration.name)"
-        addEntity(id: namespaceID, kind: .namespace, label: declaration.name)
-        addRelation(from: parentID, to: namespaceID, kind: .contains)
-
-        for value in declaration.values {
-            addValue(value, parentID: namespaceID)
-        }
-        for callable in declaration.callables {
-            addCallable(callable, parentID: namespaceID)
-        }
-        for construct in declaration.constructs {
-            addConstruct(construct, parentID: namespaceID)
-        }
-        for namespace in declaration.namespaces {
-            addNamespace(namespace, parentID: namespaceID)
         }
     }
 

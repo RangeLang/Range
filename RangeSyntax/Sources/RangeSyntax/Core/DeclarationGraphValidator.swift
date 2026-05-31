@@ -614,9 +614,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             )
         }
 
-        guard RangeSyntax.attributeIdentifiers.contains(attribute.name)
-            || declarationGraph.hasNamespaceAttribute(named: attribute.name)
-        else {
+        guard RangeSyntax.attributeIdentifiers.contains(attribute.name) else {
             throw SemanticValidationError(
                 "Unknown attribute @\(attribute.name) in \(lastPathComponent(of: filePath)). Use @ for macros and built-in attribute surfaces; use # for macro metadata."
             )
@@ -679,8 +677,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         switch sourceFile {
         case .construct(let declaration):
             return attachedMacroUsages(in: declaration)
-        case .namespace(let declaration):
-            return attachedMacroUsages(in: declaration)
         case .enumeration(let declaration):
             return [AttachedMacroUsage(macros: declaration.macros, declarationName: declaration.name)]
         case .protocolDefinition(let declaration):
@@ -691,7 +687,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return module.states.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
                 + module.callables.flatMap(attachedMacroUsages(in:))
                 + module.constructs.flatMap(attachedMacroUsages(in:))
-                + module.namespaces.flatMap(attachedMacroUsages(in:))
                 + module.enumerations.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
                 + module.protocols.flatMap(attachedMacroUsages(in:))
                 + module.extensions.flatMap(attachedMacroUsages(in:))
@@ -712,13 +707,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         return usages
     }
 
-    private func attachedMacroUsages(in declaration: NamespaceDeclaration) -> [AttachedMacroUsage] {
-        declaration.values.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.callables.flatMap(attachedMacroUsages(in:))
-            + declaration.constructs.flatMap(attachedMacroUsages(in:))
-            + declaration.namespaces.flatMap(attachedMacroUsages(in:))
-    }
-
     private func attachedMacroUsages(in declaration: ProtocolDeclaration) -> [AttachedMacroUsage] {
         [AttachedMacroUsage(macros: declaration.macros, declarationName: declaration.name)]
             + declaration.values.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
@@ -734,7 +722,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         usages += declaration.initializers.flatMap(attachedMacroUsages(in:))
         usages += declaration.callables.flatMap(attachedMacroUsages(in:))
         usages += declaration.constructs.flatMap(attachedMacroUsages(in:))
-        usages += declaration.namespaces.flatMap(attachedMacroUsages(in:))
         usages += declaration.enumerations.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
         usages += declaration.protocols.flatMap(attachedMacroUsages(in:))
         return usages
@@ -839,7 +826,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .namespace, .enumeration, .protocolDefinition, .mainBlock, .extensions:
+        case .construct, .enumeration, .protocolDefinition, .mainBlock, .extensions:
             return []
         }
     }
@@ -850,12 +837,8 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return [declaration] + declaration.constructs.flatMap {
                 attributedConstructs(in: .construct($0))
             }
-        case .namespace(let declaration):
-            return declaration.constructs.flatMap { attributedConstructs(in: .construct($0)) }
-                + declaration.namespaces.flatMap { attributedConstructs(in: .namespace($0)) }
         case .module(let module):
             return module.constructs.flatMap { attributedConstructs(in: .construct($0)) }
-                + module.namespaces.flatMap { attributedConstructs(in: .namespace($0)) }
                 + module.extensions.flatMap { attributedConstructs(in: $0) }
         case .extensions(let declarations):
             return declarations.flatMap { attributedConstructs(in: $0) }
@@ -866,38 +849,31 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
     private func attributedConstructs(in declaration: ExtensionDeclaration) -> [ConstructDeclaration] {
         declaration.constructs.flatMap { attributedConstructs(in: .construct($0)) }
-            + declaration.namespaces.flatMap { attributedConstructs(in: .namespace($0)) }
     }
 
     private func declarations(in declaration: ExtensionDeclaration) -> [ConstructDeclaration] {
         declaration.constructs + declaration.constructs.flatMap { declarations(in: .construct($0)) }
-            + declaration.namespaces.flatMap { declarations(in: .namespace($0)) }
     }
 
     private func callables(in declaration: ExtensionDeclaration) -> [CallableDeclaration] {
         declaration.callables
             + declaration.constructs.flatMap { $0.callables }
-            + declaration.namespaces.flatMap { callables(in: .namespace($0)) }
     }
 
     private func protocols(in declaration: ExtensionDeclaration) -> [ProtocolDeclaration] {
         declaration.protocols
-            + declaration.namespaces.flatMap { protocols(in: .namespace($0)) }
     }
 
     private func enumerations(in declaration: ExtensionDeclaration) -> [EnumDeclaration] {
         declaration.enumerations
-            + declaration.namespaces.flatMap { enumerations(in: .namespace($0)) }
     }
 
     private func declarations(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
         switch sourceFile {
         case .construct(let declaration):
             return [declaration]
-        case .namespace(let declaration):
-            return declaration.constructs + declaration.namespaces.flatMap { declarations(in: .namespace($0)) }
         case .module(let module):
-            return module.constructs + module.namespaces.flatMap { declarations(in: .namespace($0)) }
+            return module.constructs
         case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
             return []
         }
@@ -907,7 +883,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .namespace, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
+        case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
             return []
         }
     }
@@ -915,12 +891,9 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     private func callables(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
         switch sourceFile {
         case .module(let module):
-            return module.callables + module.namespaces.flatMap { callables(in: .namespace($0)) }
+            return module.callables
                 + module.constructs.flatMap { callables(in: .construct($0)) }
                 + module.extensions.flatMap { callables(in: $0) }
-        case .namespace(let declaration):
-            return declaration.callables + declaration.namespaces.flatMap { callables(in: .namespace($0)) }
-                + declaration.constructs.flatMap { callables(in: .construct($0)) }
         case .construct(let declaration):
             return declaration.callables + declaration.constructs.flatMap { callables(in: .construct($0)) }
         case .extensions(let declarations):
@@ -938,7 +911,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return module.protocols + module.extensions.flatMap { protocols(in: $0) }
         case .extensions(let declarations):
             return declarations.flatMap { protocols(in: $0) }
-        case .construct, .namespace, .mainBlock, .enumeration, .macro:
+        case .construct, .mainBlock, .enumeration, .macro:
             return []
         }
     }
@@ -951,7 +924,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return module.enumerations + module.extensions.flatMap { enumerations(in: $0) }
         case .extensions(let declarations):
             return declarations.flatMap { enumerations(in: $0) }
-        case .construct, .namespace, .mainBlock, .protocolDefinition, .macro:
+        case .construct, .mainBlock, .protocolDefinition, .macro:
             return []
         }
     }

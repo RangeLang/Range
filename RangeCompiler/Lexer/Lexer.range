@@ -631,8 +631,7 @@ construct LexerCursor {
     }
 
     function isKeyword(_ value: String): Bool {
-        return value == "namespace"
-            || value == "let"
+        return value == "let"
             || value == "state"
             || value == "binding"
             || value == "derived"

@@ -613,7 +613,7 @@ struct RangeLanguageServer {
     private func keywordCompletions() -> [[String: Any]] {
         [
             "case", "construct", "derived", "enum", "extension", "macro",
-            "namespace", "protocol", "state", "switch", "let",
+            "protocol", "state", "switch", "let",
         ].map { completionItem(label: $0, kind: 14, detail: "keyword") }
     }
 
@@ -621,12 +621,8 @@ struct RangeLanguageServer {
         let builtinAttributes = [
             "@main", "#Project", "#package", "#syntax", "@background", "@language",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
-        let namespaceAttributes = documents.values
-            .flatMap(\.symbols)
-            .filter { $0.kind == .declaration && $0.detail == "namespace" }
-            .map { completionItem(label: "@\($0.name)", kind: 14, detail: "namespace attribute") }
 
-        return uniqueCompletionItems(builtinAttributes + namespaceAttributes)
+        return uniqueCompletionItems(builtinAttributes)
     }
 
     private func macroCompletions() -> [[String: Any]] {
@@ -1160,22 +1156,6 @@ private struct DocumentIndex {
                 continue
             }
 
-            if let match = firstMatch(in: line, pattern: #"\bnamespace\s+([A-Z][A-Za-z0-9_]*)\s*\{"#) {
-                let name = match[1]
-                let symbolRange = range(in: line, line: lineIndex, value: name)
-                symbols.append(
-                    Symbol(
-                        name: name,
-                        kind: .declaration,
-                        detail: "namespace",
-                        uri: uri,
-                        range: symbolRange,
-                        selectionRange: symbolRange
-                    )
-                )
-                continue
-            }
-
             if let match = firstMatch(
                 in: line,
                 pattern: #"\blet\s+([a-z_][A-Za-z0-9_]*)\s*:\s*([A-Z][A-Za-z0-9_.]*)\s*\{"#
@@ -1326,7 +1306,6 @@ private struct DocumentIndex {
 
         let declarationPatterns: [String] = [
             #"\bconstruct\s+([A-Z][A-Za-z0-9_]*)"#,
-            #"\bnamespace\s+([A-Z][A-Za-z0-9_]*)"#,
             #"\bprotocol\s+([A-Z][A-Za-z0-9_]*)"#,
             #"\benum\s+([A-Z][A-Za-z0-9_]*)"#,
             #"\*builder\s+([A-Z][A-Za-z0-9_]*)"#,
@@ -1341,7 +1320,7 @@ private struct DocumentIndex {
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
         let macroTokenPattern = #"([@#][a-z_][A-Za-z0-9_]*)\b"#
-        let metadataTokenPattern = #"(#namespace|#Project|#package|#syntax)\b"#
+        let metadataTokenPattern = #"(#Project|#package|#syntax)\b"#
         let attributeKeywordPattern = #"@(main|background|defer|language|[A-Z][A-Za-z0-9_]*)\b"#
         let enumCaseDeclarationPattern = #"^\s*case\s+([a-z_][A-Za-z0-9_]*)\b"#
         let argumentValuePattern = #"(?:\(\s*|,\s*|:\s*)([a-z_][A-Za-z0-9_]*)\s*(?=[,)])"#
@@ -1365,7 +1344,7 @@ private struct DocumentIndex {
             "background", "binding", "break", "builder", "capture", "case", "construct",
             "continue", "core", "default", "derived", "else", "enum",
             "extension", "for", "function", "get", "if", "in", "infix", "init",
-            "macro", "main", "namespace", "nil", "on", "operator", "postfix", "precedencegroup",
+            "macro", "main", "nil", "on", "operator", "postfix", "precedencegroup",
             "prefix", "protocol", "return", "self", "set", "state", "switch", "let", "var",
             "while",
         ]
@@ -1374,7 +1353,7 @@ private struct DocumentIndex {
         )
         let identifierKeywordExclusions: Set<String> = [
             "if", "for", "while", "switch", "return", "macro", "function", "init",
-            "construct", "namespace", "enum", "protocol", "extension", "background", "state",
+            "construct", "enum", "protocol", "extension", "background", "state",
             "binding", "derived", "let", "var", "case", "default", "break",
             "continue", "true", "false", "nil", "self",
         ]
@@ -2428,9 +2407,8 @@ private struct ProjectNavigationIndex {
             if declarationGraph.registryView.hasConstruct(named: word)
                 || declarationGraph.registryView.hasProtocol(named: word)
                 || declarationGraph.registryView.hasEnumeration(named: word)
-                || declarationGraph.hasNamespace(named: word)
             {
-                return definitionLocation(named: word, kinds: [.type, .namespace])
+                return definitionLocation(named: word, kinds: [.type])
             }
         }
 

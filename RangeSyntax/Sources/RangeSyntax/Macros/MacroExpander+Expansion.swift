@@ -3,7 +3,6 @@ extension MacroExpander {
         var states: [StateDeclaration] = []
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
-        var namespaces: [NamespaceDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
@@ -12,7 +11,6 @@ extension MacroExpander {
             states.isEmpty
                 && callables.isEmpty
                 && constructs.isEmpty
-                && namespaces.isEmpty
                 && enumerations.isEmpty
                 && protocols.isEmpty
                 && extensions.isEmpty
@@ -22,7 +20,6 @@ extension MacroExpander {
             states.append(contentsOf: other.states)
             callables.append(contentsOf: other.callables)
             constructs.append(contentsOf: other.constructs)
-            namespaces.append(contentsOf: other.namespaces)
             enumerations.append(contentsOf: other.enumerations)
             protocols.append(contentsOf: other.protocols)
             extensions.append(contentsOf: other.extensions)
@@ -118,7 +115,6 @@ extension MacroExpander {
                         )
                     } + emittedDeclarationBundles.flatMap(\.callables),
                     constructs: expandedConstructs + emittedDeclarationBundles.flatMap(\.constructs),
-                    namespaces: module.namespaces + emittedDeclarationBundles.flatMap(\.namespaces),
                     enumerations: module.enumerations + emittedDeclarationBundles.flatMap(\.enumerations),
                     protocols: module.protocols + emittedDeclarationBundles.flatMap(\.protocols),
                     macros: module.macros,
@@ -145,7 +141,6 @@ extension MacroExpander {
                 !emittedBundle.states.isEmpty
                     || !emittedBundle.callables.isEmpty
                     || !emittedBundle.constructs.isEmpty
-                    || !emittedBundle.namespaces.isEmpty
                     || !emittedBundle.enumerations.isEmpty
                     || !emittedBundle.protocols.isEmpty
                     || !emittedBundle.extensions.isEmpty
@@ -158,7 +153,6 @@ extension MacroExpander {
                     states: emittedBundle.states,
                     callables: emittedBundle.callables,
                     constructs: [expandedConstruct] + emittedBundle.constructs,
-                    namespaces: emittedBundle.namespaces,
                     enumerations: emittedBundle.enumerations,
                     protocols: emittedBundle.protocols,
                     macros: [],
@@ -182,7 +176,6 @@ extension MacroExpander {
                     states: emittedBundle.states,
                     callables: emittedBundle.callables,
                     constructs: emittedBundle.constructs,
-                    namespaces: emittedBundle.namespaces,
                     enumerations: [declaration] + emittedBundle.enumerations,
                     protocols: emittedBundle.protocols,
                     macros: [],
@@ -206,7 +199,6 @@ extension MacroExpander {
                     states: emittedBundle.states,
                     callables: emittedBundle.callables,
                     constructs: emittedBundle.constructs,
-                    namespaces: emittedBundle.namespaces,
                     enumerations: emittedBundle.enumerations,
                     protocols: [declaration] + emittedBundle.protocols,
                     macros: [],
@@ -221,7 +213,7 @@ extension MacroExpander {
                     try expand(extensionDeclaration: $0, macros: macros, context: context)
                 }
             )
-        case .namespace, .macro:
+        case .macro:
             return sourceFile
         }
     }
@@ -1687,7 +1679,6 @@ extension MacroExpander {
             )
             guard
                 nestedEmitted.states.isEmpty
-                    && nestedEmitted.namespaces.isEmpty
                     && nestedEmitted.enumerations.isEmpty
                     && nestedEmitted.protocols.isEmpty
                     && nestedEmitted.extensions.isEmpty
@@ -3392,8 +3383,6 @@ extension MacroExpander {
         switch sourceFile {
         case .construct(let declaration):
             return EmittedDeclarationBundle(constructs: [declaration])
-        case .namespace(let declaration):
-            return EmittedDeclarationBundle(namespaces: [declaration])
         case .enumeration(let declaration):
             return EmittedDeclarationBundle(enumerations: [declaration])
         case .protocolDefinition(let declaration):
@@ -3405,7 +3394,6 @@ extension MacroExpander {
                 states: module.states,
                 callables: module.callables,
                 constructs: module.constructs,
-                namespaces: module.namespaces,
                 enumerations: module.enumerations,
                 protocols: module.protocols,
                 extensions: module.extensions

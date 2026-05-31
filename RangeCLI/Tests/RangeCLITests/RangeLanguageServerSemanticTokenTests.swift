@@ -355,24 +355,19 @@ struct RangeLanguageServerSemanticTokenTests {
         #expect(containsExactToken(tokens, text: "failed", type: .enumMember, modifiers: [.declaration]))
     }
 
-    @Test("Documented package and namespace syntax emits semantic tokens")
-    func documentedPackageAndNamespaceSyntaxEmitsSemanticTokens() {
+    @Test("Documented package syntax emits semantic tokens")
+    func documentedPackageSyntaxEmitsSemanticTokens() {
         let source = """
-        namespace Styling {
-        }
-
         #package
         construct Project {
             let name: Title("Example")
             let version: Version(0.1.0)
         }
 
-        #namespace
         construct Language {
             let defaultLocale: String("en")
         }
 
-        @Styling
         construct Panel {
             let count: Optional<Int>(5)
             let value: Optional<Int>
@@ -381,11 +376,7 @@ struct RangeLanguageServerSemanticTokenTests {
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsExactToken(tokens, text: "namespace", type: .keyword, modifiers: []))
-        #expect(containsToken(tokens, text: "Styling", type: .type, modifiers: [.declaration]))
         #expect(containsExactToken(tokens, text: "#package", type: .keyword, modifiers: []))
-        #expect(containsExactToken(tokens, text: "#namespace", type: .keyword, modifiers: []))
-        #expect(containsExactToken(tokens, text: "@Styling", type: .keyword, modifiers: []))
         #expect(containsExactToken(tokens, text: "Title", type: .type, modifiers: []))
         #expect(containsExactToken(tokens, text: "Version", type: .type, modifiers: []))
         #expect(containsExactToken(tokens, text: "Optional", type: .type, modifiers: []))
@@ -417,10 +408,8 @@ struct RangeLanguageServerSemanticTokenTests {
         let name: Title("Example {")
         let version: Version(0.1.0) // )
         }
-        namespace Styling {
         construct Panel {
         let title: String
-        }
         }
         """
 
@@ -432,10 +421,8 @@ struct RangeLanguageServerSemanticTokenTests {
           let name: Title("Example {")
           let version: Version(0.1.0) // )
         }
-        namespace Styling {
-          construct Panel {
-            let title: String
-          }
+        construct Panel {
+          let title: String
         }
         """)
     }

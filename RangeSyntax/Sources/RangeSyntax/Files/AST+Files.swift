@@ -2,7 +2,6 @@ import Foundation
 
 public enum SourceFileNode {
     case construct(ConstructDeclaration)
-    case namespace(NamespaceDeclaration)
     case enumeration(EnumDeclaration)
     case protocolDefinition(ProtocolDeclaration)
     case macro(MacroDeclaration)
@@ -24,7 +23,6 @@ public struct ModuleFileNode {
     public let states: [StateDeclaration]
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]
-    public let namespaces: [NamespaceDeclaration]
     public let enumerations: [EnumDeclaration]
     public let protocols: [ProtocolDeclaration]
     public let macros: [MacroDeclaration]
@@ -37,7 +35,6 @@ public struct ModuleFileNode {
         states: [StateDeclaration],
         callables: [CallableDeclaration],
         constructs: [ConstructDeclaration],
-        namespaces: [NamespaceDeclaration],
         enumerations: [EnumDeclaration],
         protocols: [ProtocolDeclaration],
         macros: [MacroDeclaration],
@@ -49,7 +46,6 @@ public struct ModuleFileNode {
         self.states = states
         self.callables = callables
         self.constructs = constructs
-        self.namespaces = namespaces
         self.enumerations = enumerations
         self.protocols = protocols
         self.macros = macros

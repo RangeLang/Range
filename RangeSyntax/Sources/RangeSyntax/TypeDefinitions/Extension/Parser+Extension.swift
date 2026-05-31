@@ -14,7 +14,6 @@ extension Parser {
         var initializers: [InitializerDeclaration] = []
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
-        var namespaces: [NamespaceDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         if peek() == .leftBrace {
@@ -27,7 +26,6 @@ extension Parser {
                 || isInitializerDeclarationStart()
                 || isConstructDeclarationStart()
                 || isBuilderDeclarationStart()
-                || isNamespaceDeclarationStart()
                 || isEnumDeclarationStart()
                 || isProtocolDeclarationStart()
             {
@@ -41,10 +39,6 @@ extension Parser {
                 }
                 if isConstructDeclarationStart() || isBuilderDeclarationStart() {
                     constructs.append(try parseConstructDeclaration(requiresEOF: false))
-                    continue
-                }
-                if isNamespaceDeclarationStart() {
-                    namespaces.append(try parseNamespaceDeclaration(requiresEOF: false))
                     continue
                 }
                 if isEnumDeclarationStart() {
@@ -66,7 +60,6 @@ extension Parser {
             initializers: initializers,
             callables: callables,
             constructs: constructs,
-            namespaces: namespaces,
             enumerations: enumerations,
             protocols: protocols
         )
@@ -80,7 +73,6 @@ extension Parser {
         var initializers: [InitializerDeclaration] = []
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
-        var namespaces: [NamespaceDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         if peek() == .leftBrace {
@@ -96,10 +88,6 @@ extension Parser {
                 }
                 if isConstructDeclarationStart() || isBuilderDeclarationStart() {
                     constructs.append(try parseConstructDeclarationForDeclarationDiscovery())
-                    continue
-                }
-                if isNamespaceDeclarationStart() {
-                    namespaces.append(try parseNamespaceDeclarationForDeclarationDiscovery())
                     continue
                 }
                 if isEnumDeclarationStart() {
@@ -122,7 +110,6 @@ extension Parser {
             initializers: initializers,
             callables: callables,
             constructs: constructs,
-            namespaces: namespaces,
             enumerations: enumerations,
             protocols: protocols
         )

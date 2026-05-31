@@ -53,57 +53,18 @@ struct GraphCollector {
 
         switch parsedFile.sourceFile {
         case .construct(let declaration):
-            if declarationGraph.isNamespaceShaped(declaration) {
-                let namespace = declarationGraph.namespaceDeclaration(from: declaration)
-                analyzeNamespaceDeclaration(
-                    namespace,
-                    parentID: fileID,
-                    qualifiedPrefix: namespace.name
-                )
-            } else {
-                analyzeConstructDeclaration(declaration, parentID: fileID)
-            }
-        case .namespace(let declaration):
-            analyzeNamespaceDeclaration(
-                declaration,
-                parentID: fileID,
-                qualifiedPrefix: declaration.name
-            )
+            analyzeConstructDeclaration(declaration, parentID: fileID)
         case .enumeration, .protocolDefinition, .macro:
             return
-        case .extensions(let declarations):
-            for declaration in declarations where declarationGraph.hasNamespace(named: declaration.targetName) {
-                analyzeNamespaceExtension(
-                    declaration,
-                    parentID: fileID,
-                    qualifiedPrefix: declaration.targetName
-                )
-            }
+        case .extensions:
             return
         case .module(let module):
             let topLevelStates = declarationGraph.topLevelStates(inFilePath: parsedFile.path)
             for state in topLevelStates {
                 analyzeStateDeclaration(state, parentID: fileID)
             }
-            for declaration in module.constructs where !declarationGraph.isNamespaceShaped(declaration) {
+            for declaration in module.constructs {
                 analyzeConstructDeclaration(declaration, parentID: fileID)
-            }
-            let namespaceConstructs = module.constructs
-                .filter(declarationGraph.isNamespaceShaped)
-                .map(declarationGraph.namespaceDeclaration(from:))
-            for declaration in module.namespaces + namespaceConstructs {
-                analyzeNamespaceDeclaration(
-                    declaration,
-                    parentID: fileID,
-                    qualifiedPrefix: declaration.name
-                )
-            }
-            for declaration in module.extensions where declarationGraph.hasNamespace(named: declaration.targetName) {
-                analyzeNamespaceExtension(
-                    declaration,
-                    parentID: fileID,
-                    qualifiedPrefix: declaration.targetName
-                )
             }
             let moduleScope = MemoryScope(
                 symbols: Dictionary(uniqueKeysWithValues: topLevelStates.map { state in
@@ -123,69 +84,6 @@ struct GraphCollector {
             }
         case .mainBlock(let mainBlock):
             analyzeMainBlock(mainBlock, parentID: fileID, topLevelStates: [])
-        }
-    }
-
-    private mutating func analyzeNamespaceDeclaration(
-        _ declaration: NamespaceDeclaration,
-        parentID: String,
-        qualifiedPrefix: String
-    ) {
-        let namespaceID = "\(parentID)/namespace:\(declaration.name)"
-        let valueSymbols = Dictionary(uniqueKeysWithValues: declaration.values.map { value in
-            (value.name, "\(namespaceID)/value:\(value.name)")
-        })
-        let scope = MemoryScope(symbols: valueSymbols)
-
-        for callable in declaration.callables {
-            analyzeCallableDeclaration(
-                qualified(callable, withPrefix: qualifiedPrefix),
-                parentID: namespaceID,
-                scope: scope
-            )
-        }
-        for construct in declaration.constructs {
-            analyzeConstructDeclaration(
-                qualified(construct, withPrefix: qualifiedPrefix),
-                parentID: namespaceID
-            )
-        }
-        for nested in declaration.namespaces {
-            analyzeNamespaceDeclaration(
-                nested,
-                parentID: namespaceID,
-                qualifiedPrefix: "\(qualifiedPrefix).\(nested.name)"
-            )
-        }
-    }
-
-    private mutating func analyzeNamespaceExtension(
-        _ declaration: ExtensionDeclaration,
-        parentID: String,
-        qualifiedPrefix: String
-    ) {
-        let namespaceID = "\(parentID)/extension:\(declaration.targetType.displayName)"
-        let scope = MemoryScope(symbols: [:])
-
-        for callable in declaration.callables {
-            analyzeCallableDeclaration(
-                qualified(callable, withPrefix: qualifiedPrefix),
-                parentID: namespaceID,
-                scope: scope
-            )
-        }
-        for construct in declaration.constructs {
-            analyzeConstructDeclaration(
-                qualified(construct, withPrefix: qualifiedPrefix),
-                parentID: namespaceID
-            )
-        }
-        for namespace in declaration.namespaces {
-            analyzeNamespaceDeclaration(
-                namespace,
-                parentID: namespaceID,
-                qualifiedPrefix: "\(qualifiedPrefix).\(namespace.name)"
-            )
         }
     }
 
@@ -383,7 +281,6 @@ struct GraphCollector {
     private static func applicationNodeKind(for kind: SemanticGraphEntityKind) -> ApplicationGraphNodeKind? {
         switch kind {
         case .file: return .file
-        case .namespace: return .namespace
         case .construct: return .construct
         case .enumeration: return .enumeration
         case .protocolDefinition: return .protocolDefinition

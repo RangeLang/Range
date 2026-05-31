@@ -29,13 +29,6 @@ extension ApplicationGraphValidator {
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )
-            case .namespace(let declaration):
-                try validateValueBindings(
-                    in: declaration,
-                    declarationGraph: declarationGraph,
-                    bindingConstructNames: bindingConstructNames,
-                    fileName: fileName
-                )
             case .module(let module):
                 for declaration in module.constructs {
                     try validateValueBindings(
@@ -61,14 +54,6 @@ extension ApplicationGraphValidator {
                         )
                     }
                 }
-                for declaration in module.namespaces {
-                    try validateValueBindings(
-                        in: declaration,
-                        declarationGraph: declarationGraph,
-                        bindingConstructNames: bindingConstructNames,
-                        fileName: fileName
-                    )
-                }
             case .mainBlock(let mainBlock):
                 try validateValueDeclarations(
                     in: mainBlock.body,
@@ -80,38 +65,6 @@ extension ApplicationGraphValidator {
             }
         }
     }
-
-    func validateValueBindings(
-        in declaration: NamespaceDeclaration,
-        declarationGraph: DeclarationGraph,
-        bindingConstructNames: Set<String>,
-        fileName: String
-    ) throws {
-        for callable in declaration.callables where callable.body != nil {
-            try validateValueDeclarations(
-                in: callable.body ?? [],
-                bindingConstructNames: bindingConstructNames,
-                fileName: fileName
-            )
-        }
-        for construct in declaration.constructs {
-            try validateValueBindings(
-                in: construct,
-                declarationGraph: declarationGraph,
-                bindingConstructNames: bindingConstructNames,
-                fileName: fileName
-            )
-        }
-        for namespace in declaration.namespaces {
-            try validateValueBindings(
-                in: namespace,
-                declarationGraph: declarationGraph,
-                bindingConstructNames: bindingConstructNames,
-                fileName: fileName
-            )
-        }
-    }
-
     func validateValueBindings(
         in declaration: ConstructDeclaration,
         declarationGraph: DeclarationGraph,

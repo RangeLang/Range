@@ -147,25 +147,3 @@ public struct DeclaredInitializerSurface {
         "\(ownerConstructName)::init(\(labels.map { $0 ?? "_" }.joined(separator: ",")))"
     }
 }
-
-public struct NamespaceAttributeAttachment {
-    public let declarationName: String
-    public let declarationKind: DeclarationSourceKind
-    public let attribute: AttributeApplication
-    public let namespace: NamespaceDeclaration
-    public let filePath: String
-
-    public init(
-        declarationName: String,
-        declarationKind: DeclarationSourceKind,
-        attribute: AttributeApplication,
-        namespace: NamespaceDeclaration,
-        filePath: String
-    ) {
-        self.declarationName = declarationName
-        self.declarationKind = declarationKind
-        self.attribute = attribute
-        self.namespace = namespace
-        self.filePath = filePath
-    }
-}
