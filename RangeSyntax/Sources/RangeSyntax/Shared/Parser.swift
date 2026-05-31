@@ -260,7 +260,7 @@ public struct Parser {
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         var macros: [MacroDeclaration] = []
-        var markers: [MarkerDeclaration] = []
+        let markers: [MarkerDeclaration] = []
         var precedenceGroups: [PrecedenceGroupDeclaration] = []
         var operators: [OperatorDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
@@ -318,13 +318,6 @@ public struct Parser {
                 continue
             }
 
-            if isMarkerDeclarationStart() {
-                let declaration = try parseMarkerDeclaration()
-                markers.append(declaration)
-                registerMarkerDeclaration(declaration)
-                continue
-            }
-
             if isPrecedenceGroupDeclarationStart() {
                 let declaration = try parsePrecedenceGroupDeclaration(requiresEOF: false)
                 precedenceGroups.append(declaration)
@@ -345,7 +338,7 @@ public struct Parser {
             }
 
             throw ParseError(
-                "Expected top-level state, extension, enum, protocol, macro, marker, precedencegroup, operator declaration, or declaration."
+                "Expected top-level state, extension, enum, protocol, macro, precedencegroup, operator declaration, or declaration."
             )
         }
 
@@ -424,19 +417,6 @@ public struct Parser {
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
-            markers.count == 1,
-            precedenceGroups.isEmpty,
-            operators.isEmpty,
-            extensions.isEmpty
-        {
-            return .marker(markers[0])
-        }
-
-        if mainBlock == nil, topLevelStates.isEmpty, packageSpaces.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            namespaces.isEmpty,
-            enumerations.isEmpty,
-            protocols.isEmpty,
-            macros.isEmpty,
             markers.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
@@ -489,7 +469,7 @@ public struct Parser {
         var protocols: [ProtocolDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
         var macros: [MacroDeclaration] = []
-        var markers: [MarkerDeclaration] = []
+        let markers: [MarkerDeclaration] = []
         var precedenceGroups: [PrecedenceGroupDeclaration] = []
         var operators: [OperatorDeclaration] = []
 
@@ -518,13 +498,6 @@ public struct Parser {
                 let declaration = try parseMacroDeclaration(signatureOnly: true)
                 macros.append(declaration)
                 registerMacroDeclaration(declaration)
-                continue
-            }
-
-            if isMarkerDeclarationStart() {
-                let declaration = try parseMarkerDeclaration(signatureOnly: true)
-                markers.append(declaration)
-                registerMarkerDeclaration(declaration)
                 continue
             }
 

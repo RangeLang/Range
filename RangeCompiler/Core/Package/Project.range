@@ -1,4 +1,4 @@
-open marker Project(): Construct { target, diagnostics, graph in
+open macro Project(): Construct -> Void { target, diagnostics, graph in
     let projectMarkers: Array<Marker>(
         graph.markers.where { entry in
             entry.application.identifier.name == "Project"

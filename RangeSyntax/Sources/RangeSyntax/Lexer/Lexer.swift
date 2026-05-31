@@ -696,7 +696,6 @@ struct RangeAuthoredLexerCursor {
             || value == "protocol"
             || value == "construct"
             || value == "macro"
-            || value == "marker"
             || value == "open"
             || value == "closed"
             || value == "function"

@@ -810,6 +810,12 @@ public struct DeclarationGraph {
             for declaration in markers(in: parsedFile.sourceFile) {
                 registry[declaration.name] = declaration
             }
+            for declaration in macros(in: parsedFile.sourceFile) {
+                guard let metadata = MacroExpander.metadataDeclaration(from: declaration) else {
+                    continue
+                }
+                registry[metadata.name] = metadata
+            }
         }
         return registry
     }

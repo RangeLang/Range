@@ -59,7 +59,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/DuplicateProjects.range",
                 source: """
-                open marker Project(): Construct { target, diagnostics, graph in
+                open macro Project(): Construct -> Void { target, diagnostics, graph in
                     let projectMarkers: Array<Marker>(
                         graph.markers.where { entry in
                             entry.application.identifier.name == "Project"
@@ -108,7 +108,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/RequireShape.range",
                 source: """
-                open marker RequiresShape(): Construct { target, diagnostics in
+                open macro RequiresShape(): Construct -> Void { target, diagnostics in
                     #Require(target) {
                         let identity: GraphIdentity
                         let value: Expression?
@@ -141,7 +141,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/RequireMissingShape.range",
                 source: """
-                open marker RequiresShape(): Construct { target, diagnostics in
+                open macro RequiresShape(): Construct -> Void { target, diagnostics in
                     #Require(target) {
                         let identity: GraphIdentity
                         let value: Expression?
@@ -496,7 +496,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/MarkerGraphIdentity.range",
                 source: """
-                marker graphName(): Construct -> String { target, diagnostics, graph in
+                macro graphName(): Construct -> String { target, diagnostics, graph in
                     let declaration: Construct.Declaration(graph.declaration(target.identity))
                     return declaration.self.name
                 }
@@ -520,7 +520,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ExtensionMarker.range",
                 source: """
-                marker extensionTargetName(): Extension -> String { target, diagnostics in
+                macro extensionTargetName(): Extension -> String { target, diagnostics in
                     return target.target.name
                 }
 
@@ -553,7 +553,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/InvalidExtensionMarker.range",
                 source: """
-                marker constructOnly(): Construct -> String { target, diagnostics in
+                macro constructOnly(): Construct -> String { target, diagnostics in
                     return target.declaration.self.name
                 }
 
@@ -699,7 +699,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/CompoundLiteralVersion.range",
                 source: """
-                marker CompoundLiteral(_ pattern: String): Construct -> String {
+                macro CompoundLiteral(_ pattern: String): Construct -> String { target, diagnostics in
                     return pattern
                 }
 
@@ -733,7 +733,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/CompoundLiteralInvalidVersion.range",
                 source: """
-                marker CompoundLiteral(_ pattern: String): Construct -> String {
+                macro CompoundLiteral(_ pattern: String): Construct -> String { target, diagnostics in
                     return pattern
                 }
 
@@ -917,7 +917,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MetadataSlot.range",
                 source: """
-                marker styling(): Construct
+                macro styling(): Construct -> Void { target, diagnostics in
+                }
 
                 #styling
                 construct Panel {
@@ -941,7 +942,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MetadataSlotTarget.range",
                 source: """
-                marker persisted(_ prefix: String): Construct
+                macro persisted(_ prefix: String): Construct -> Void { target, diagnostics in
+                }
 
                 #persisted("settings")
                 construct Profile {
@@ -1423,7 +1425,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         macro codable(): Construct { target, diagnostics in
         }
 
-        marker codingKey<T>(_ value: String): Let<T> -> String {
+        macro codingKey<T>(_ value: String): Let<T> -> String { target, diagnostics in
             return value
         }
 
@@ -1441,14 +1443,14 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
         let construct = graph.sourceLocation(named: "User", kinds: [.type])
         let macro = graph.sourceLocation(named: "codable", kinds: [.macro])
-        let marker = graph.sourceLocation(named: "codingKey", kinds: [.marker])
+        let codingKeyMacro = graph.sourceLocation(named: "codingKey", kinds: [.macro])
         let function = graph.sourceLocation(named: "makeUser", kinds: [.function])
 
         #expect(construct?.path == "/tmp/GraphLocations.range")
         #expect(construct?.range.start.line == 7)
         #expect(construct?.range.start.character == 10)
         #expect(macro?.range.start.line == 0)
-        #expect(marker?.range.start.line == 3)
+        #expect(codingKeyMacro?.range.start.line == 3)
         #expect(function?.range.start.line == 10)
     }
 
@@ -1465,9 +1467,11 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     let modules: ["acme/registry-snapshot"]
                 }
 
-                marker styling(): Construct
+                macro styling(): Construct -> Void { target, diagnostics in
+                }
 
-                marker hostSpace(): Construct
+                macro hostSpace(): Construct -> Void { target, diagnostics in
+                }
 
                 macro decorate(): Construct { target, diagnostics in
                 }
@@ -1679,7 +1683,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MetadataSlotConstruct.range",
                 source: """
-                marker semantic(): Construct
+                macro semantic(): Construct -> Void { target, diagnostics in
+                }
 
                 #semantic
                 construct Language {
@@ -1721,7 +1726,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/RegisteredConstructMarker.range",
                 source: """
-                marker hostSpace(): Construct
+                macro hostSpace(): Construct -> Void { target, diagnostics in
+                }
 
                 #hostSpace
                 construct Client {

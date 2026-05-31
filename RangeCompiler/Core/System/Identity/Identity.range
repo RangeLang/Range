@@ -1,6 +1,6 @@
 construct Identity {
 }
 
-marker identity(): Construct -> String {
+macro identity(): Construct -> String { target, diagnostics in
     return "identity"
 }

@@ -1,4 +1,4 @@
-marker Operator<let fixity: OperatorFixity>(
+macro Operator<let fixity: OperatorFixity>(
     binding: OperatorBindingRange,
     associativity: OperatorAssociativity = .none
 ): Construct -> OperatorBinding { target, diagnostics in

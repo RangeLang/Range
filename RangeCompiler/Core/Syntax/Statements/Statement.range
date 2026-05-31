@@ -1,1 +1,2 @@
-open marker Statement(): @syntax
+open macro Statement(): @syntax -> Void { target, diagnostics in
+}

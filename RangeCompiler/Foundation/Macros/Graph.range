@@ -1,4 +1,4 @@
-marker GraphDeclaration(): @syntax -> GraphDeclaration {
+macro GraphDeclaration(): @syntax -> GraphDeclaration { target, diagnostics in
     return GraphDeclaration(
         identity: RangeGraphIdentity(
             id: "",
@@ -8,7 +8,7 @@ marker GraphDeclaration(): @syntax -> GraphDeclaration {
     )
 }
 
-marker GraphApplication(): @syntax -> GraphApplication {
+macro GraphApplication(): @syntax -> GraphApplication { target, diagnostics in
     return GraphApplication(
         identity: RangeGraphIdentity(
             id: "",

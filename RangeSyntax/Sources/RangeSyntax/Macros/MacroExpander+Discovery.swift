@@ -5,6 +5,9 @@ extension MacroExpander {
         var registry: [String: MacroDeclaration] = [:]
         for parsedFile in files {
             for macro in self.macros(in: parsedFile.sourceFile) {
+                if metadataDeclaration(from: macro) != nil {
+                    continue
+                }
                 registry[macro.name] = macro
             }
         }
@@ -60,6 +63,12 @@ extension MacroExpander {
             for marker in self.markers(in: parsedFile.sourceFile) {
                 registry[marker.name] = marker
             }
+            for macro in self.macros(in: parsedFile.sourceFile) {
+                guard let metadata = metadataDeclaration(from: macro) else {
+                    continue
+                }
+                registry[metadata.name] = metadata
+            }
         }
         return registry
     }
@@ -72,6 +81,103 @@ extension MacroExpander {
             return module.markers
         case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
             return []
+        }
+    }
+
+    static func metadataDeclaration(from macro: MacroDeclaration) -> MarkerDeclaration? {
+        guard let firstTarget = macro.target else {
+            return nil
+        }
+        guard macro.expansionType != nil else {
+            return nil
+        }
+        guard !macro.body.contains(where: containsMacroRewrite) else {
+            return nil
+        }
+        let firstType = firstTarget.typeReference
+        let target: MacroTarget
+        let valueType: TypeReference
+        if let expansionType = macro.expansionType {
+            target = firstTarget
+            valueType = expansionType
+        } else if let effectTarget = firstType.markerEffectTarget {
+            target = .syntax(effectTarget)
+            valueType = firstType
+        } else {
+            return nil
+        }
+
+        return MarkerDeclaration(
+            packageVisibility: macro.packageVisibility,
+            name: macro.name,
+            genericParameters: macro.genericParameters,
+            parameters: macro.parameters,
+            target: target,
+            valueType: valueType,
+            bindings: macro.bindings,
+            body: macro.body
+        )
+    }
+
+    private static func containsMacroRewrite(_ statement: Statement) -> Bool {
+        switch statement {
+        case .expand:
+            return true
+        case .expression(let expression), .return(let expression?):
+            return expressionContainsMacroRewrite(expression)
+        case .macroInvocation(_, _, let body),
+            .derived(_, _, let body),
+            .forEach(_, _, let body),
+            .whileLoop(_, let body):
+            return body.contains(where: containsMacroRewrite)
+        case .background(let block):
+            return block.body.contains(where: containsMacroRewrite)
+        case .deferBlock(let block):
+            return block.body.contains(where: containsMacroRewrite)
+        case .localCallable(let declaration):
+            return declaration.body.contains(where: containsMacroRewrite)
+        case .conditional(let branches):
+            return branches.contains { $0.body.contains(where: containsMacroRewrite) }
+        case .switchStatement(_, let cases, let defaultBody):
+            return cases.contains { $0.body.contains(where: containsMacroRewrite) }
+                || (defaultBody?.contains(where: containsMacroRewrite) ?? false)
+        case .localBinding, .assignment, .compoundAssignment, .require, .return, .break, .continue:
+            return false
+        }
+    }
+
+    private static func expressionContainsMacroRewrite(_ expression: Expression) -> Bool {
+        switch expression {
+        case .call(let name, let arguments):
+            return name.hasSuffix(".replace")
+                || arguments.contains { expressionContainsMacroRewrite($0.value) }
+        case .macroInvocation(_, let arguments):
+            return arguments.contains { expressionContainsMacroRewrite($0.value) }
+        case .block(let statements):
+            return statements.contains(where: containsMacroRewrite)
+        case .interpolatedString(let string):
+            return string.segments.contains { segment in
+                if case .expression(let expression) = segment {
+                    return expressionContainsMacroRewrite(expression)
+                }
+                return false
+            }
+        case .array(let values):
+            return values.contains(where: expressionContainsMacroRewrite)
+        case .dictionary(let elements):
+            return elements.contains {
+                expressionContainsMacroRewrite($0.key) || expressionContainsMacroRewrite($0.value)
+            }
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return expressionContainsMacroRewrite(condition)
+                || expressionContainsMacroRewrite(trueExpression)
+                || expressionContainsMacroRewrite(falseExpression)
+        case .unary(_, let expression):
+            return expressionContainsMacroRewrite(expression)
+        case .binary(let lhs, _, let rhs):
+            return expressionContainsMacroRewrite(lhs) || expressionContainsMacroRewrite(rhs)
+        case .integer, .double, .string, .boolean, .nilLiteral, .identifier, .bindingReference:
+            return false
         }
     }
 

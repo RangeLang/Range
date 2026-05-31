@@ -13,18 +13,6 @@ extension Parser {
         return false
     }
 
-    func isMarkerDeclarationStart() -> Bool {
-        if peek() == .keyword(RangeSyntax.Keyword.marker.rawValue) {
-            return true
-        }
-        if peek() == .keyword(RangeSyntax.Keyword.open.rawValue)
-            || peek() == .keyword(RangeSyntax.Keyword.closed.rawValue)
-        {
-            return peek(offset: 1) == .keyword(RangeSyntax.Keyword.marker.rawValue)
-        }
-        return false
-    }
-
     mutating func parseMacroDeclaration(signatureOnly: Bool = false) throws -> MacroDeclaration {
         let packageVisibility: PackageVisibility
         if peek() == .keyword(RangeSyntax.Keyword.closed.rawValue) {
@@ -157,95 +145,6 @@ extension Parser {
         return .syntax(try parseTypeReferenceNode())
     }
 
-
-    mutating func parseMarkerDeclaration(signatureOnly: Bool = false) throws -> MarkerDeclaration {
-        let packageVisibility: PackageVisibility
-        if peek() == .keyword(RangeSyntax.Keyword.closed.rawValue) {
-            try consumeKeyword(.closed)
-            packageVisibility = .closed
-        } else if peek() == .keyword(RangeSyntax.Keyword.open.rawValue) {
-            try consumeKeyword(.open)
-            packageVisibility = .open
-        } else {
-            packageVisibility = .open
-        }
-        try consumeKeyword(.marker)
-
-        let name = try consumeCallableName()
-        let genericParameters = try parseGenericParameterClauseIfPresent()
-        guard peek() == .leftParen else {
-            throw ParseError(
-                "Marker declarations must declare an explicit parameter clause. Use () for zero-argument markers."
-            )
-        }
-        let parameters = try parseFunctionParameters(
-            allowSyntaxCapture: true,
-            allowOmittedLocalName: true
-        )
-
-        try consume(.colon)
-        let firstTarget = try parseMacroTarget()
-        let firstType = firstTarget.typeReference
-        let target: MacroTarget
-        let valueType: TypeReference
-        if peek() == .arrow {
-            target = firstTarget
-            try consume(.arrow)
-            valueType = try parseTypeReferenceNode()
-        } else if let effectTarget = firstType.markerEffectTarget {
-            target = .syntax(effectTarget)
-            valueType = firstType
-        } else if parameters.count == 1,
-            let parameterType = parameters[0].typeReference,
-            parameters[0].localName.hasPrefix("__anonymous")
-        {
-            target = firstTarget
-            valueType = parameterType
-        } else {
-            target = firstTarget
-            valueType = .named("Void")
-        }
-        let bindings: MacroBindings?
-        let body: [Statement]
-        if signatureOnly {
-            guard peek() == .leftBrace else {
-                body = []
-                return MarkerDeclaration(
-                    packageVisibility: packageVisibility,
-                    name: name,
-                    genericParameters: genericParameters,
-                    parameters: parameters,
-                    target: target,
-                    valueType: valueType,
-                    bindings: nil,
-                    body: body
-                )
-            }
-            try consume(.leftBrace)
-            _ = try parseMarkerBodyBindingsIfPresent()
-            try skipUnknownBlockBody()
-            try consume(.rightBrace)
-            bindings = nil
-            body = []
-        } else if peek() == .leftBrace {
-            (bindings, body) = try parseMarkerBody(parameters: parameters, target: target)
-        } else {
-            bindings = nil
-            body = []
-        }
-
-        return MarkerDeclaration(
-            packageVisibility: packageVisibility,
-            name: name,
-            genericParameters: genericParameters,
-            parameters: parameters,
-            target: target,
-            valueType: valueType,
-            bindings: bindings,
-            body: body
-        )
-    }
-
     mutating func parseFreestandingMacroValueBody(parameters: [RangeFunctionParameter]) throws
         -> [Statement]
     {
@@ -264,47 +163,6 @@ extension Parser {
         try consume(.rightBrace)
         return statements
     }
-
-    mutating func parseMarkerBody(parameters: [RangeFunctionParameter], target: MacroTarget) throws -> (
-        bindings: MacroBindings?,
-        body: [Statement]
-    ) {
-        try consume(.leftBrace)
-        let bindings = try parseMarkerBodyBindingsIfPresent()
-        var localBindings = Dictionary(
-            uniqueKeysWithValues: parameters.map {
-                (
-                    $0.localName,
-                    LocalBindingSymbol(kind: .constant, type: $0.typeReference ?? .named("Unknown"))
-                )
-            }
-        )
-        if let bindings {
-            localBindings[bindings.target] = .init(kind: .constant, type: target.typeReference)
-            localBindings[bindings.diagnostics] = .init(kind: .constant, type: .named("MacroDiagnostics"))
-            if let graph = bindings.graph {
-                localBindings[graph] = .init(kind: .constant, type: .named("GraphContext"))
-            }
-        }
-        var statements: [Statement] = []
-        while peek() != .rightBrace {
-            statements.append(try parseStatement(localBindings: &localBindings))
-        }
-        try consume(.rightBrace)
-        return (bindings, statements)
-    }
-
-    mutating func parseMarkerBodyBindingsIfPresent() throws -> MacroBindings? {
-        guard case .identifier = peek(),
-            peek(offset: 1) == .comma,
-            case .identifier = peek(offset: 2)
-        else {
-            return nil
-        }
-
-        return try parseMacroBodyBindings()
-    }
-
     mutating func parseMacroBody() throws -> (bindings: MacroBindings, body: [Statement]) {
         try consume(.leftBrace)
 

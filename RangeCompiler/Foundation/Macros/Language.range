@@ -1,1 +1,2 @@
-marker language(): Language<Construct>
+macro language(): Construct -> Language<Construct> { target, diagnostics in
+}

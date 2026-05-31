@@ -1,4 +1,5 @@
-marker encoding(): Construct
+macro encoding(): Construct -> Void { target, diagnostics in
+}
 
 #encoding
 construct Encoding {

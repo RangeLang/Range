@@ -1,4 +1,4 @@
-open marker CompoundLiteral<let value: TypeReference, let delimiter: String?>(@capture _ pattern: Expression): Construct { target, diagnostics in
+open macro CompoundLiteral<let value: TypeReference, let delimiter: String?>(@capture _ pattern: Expression): Construct -> Void { target, diagnostics in
     let source: String(pattern.written.text)
     state index: Int(0)
     state delimiterCount: Int(0)
