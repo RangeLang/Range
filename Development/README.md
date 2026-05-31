@@ -234,7 +234,7 @@ implementation tracking surface.
 Last reviewed on 2026-05-19.
 
 - `RangeSyntax`: `swift test` passed with 43 tests.
-- `RangeCLI`: `swift test` passed with 36 tests.
+- `CLI`: `swift test` passed with 36 tests.
 - `RangeBackendSwift`: `swift test` builds, but exits with `no tests found`
   because the package has no test target.
 - Fixture inventory at review time:

@@ -568,18 +568,18 @@ def main() -> int:
 
     BUILD.mkdir(parents=True, exist_ok=True)
     range_env = embedded_swift_env()
-    range_cli = ROOT / "RangeCLI" / ".build" / "release" / "RangeCLI"
+    range_cli = ROOT / "CLI" / ".build" / "release" / "CLI"
 
     print(f"base iterations: {ITERATIONS}")
     print(f"runs: {RUNS}")
     print()
 
     if not timed_setup(
-        "Range CLI",
-        ["swift", "build", "-c", "release", "--package-path", "RangeCLI", "--product", "RangeCLI"],
+        "CLI",
+        ["swift", "build", "-c", "release", "--package-path", "CLI", "--product", "CLI"],
         env=range_env,
     ):
-        raise SystemExit("Range CLI setup failed")
+        raise SystemExit("CLI setup failed")
 
     results: dict[str, list[tuple[str, float, float, str]]] = {}
 

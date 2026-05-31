@@ -29,7 +29,7 @@ if (-not (Test-Path $coreSources)) {
     throw "Missing RangeCore sources: $coreSources"
 }
 
-Write-Host "Range CLI installer"
+Write-Host "CLI installer"
 Write-Host ""
 Write-Host "Will install Range $version"
 Write-Host "stored in:"

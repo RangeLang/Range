@@ -29,7 +29,7 @@ else
   remove_target="$current_target"
 fi
 
-echo "Range CLI uninstaller"
+echo "CLI uninstaller"
 echo
 echo "Will remove:"
 echo "  $remove_target"
@@ -52,4 +52,4 @@ if [[ -d "$current_target" ]] && ! find "$current_target" -mindepth 1 -maxdepth 
   rmdir "$current_target" 2>/dev/null || true
 fi
 
-echo "Removed Range CLI."
+echo "Removed CLI."

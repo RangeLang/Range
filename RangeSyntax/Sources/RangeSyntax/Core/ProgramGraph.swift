@@ -61,11 +61,32 @@ public struct SemanticGraphRelation: Hashable, Sendable {
     }
 }
 
+public struct ProgramGraphSyntax: Hashable, Sendable {
+    public let identity: SemanticGraphEntity
+    public let declarations: [SemanticGraphEntity]
+    public let applications: [SemanticGraphEntity]
+
+    public init(
+        identity: SemanticGraphEntity,
+        declarations: [SemanticGraphEntity],
+        applications: [SemanticGraphEntity]
+    ) {
+        self.identity = identity
+        self.declarations = declarations.sorted { $0.id < $1.id }
+        self.applications = applications.sorted { $0.id < $1.id }
+    }
+}
+
 public struct ProgramGraph: Sendable {
     public let entities: [SemanticGraphEntity]
     public let relations: [SemanticGraphRelation]
+    public let syntax: [ProgramGraphSyntax]
 
-    public init(entities: [SemanticGraphEntity], relations: [SemanticGraphRelation]) {
+    public init(
+        entities: [SemanticGraphEntity],
+        relations: [SemanticGraphRelation],
+        syntax: [ProgramGraphSyntax] = []
+    ) {
         self.entities = entities.sorted {
             if $0.kind.rawValue != $1.kind.rawValue {
                 return $0.kind.rawValue < $1.kind.rawValue
@@ -80,6 +101,12 @@ public struct ProgramGraph: Sendable {
                 return $0.kind.rawValue < $1.kind.rawValue
             }
             return $0.targetID < $1.targetID
+        }
+        self.syntax = syntax.sorted {
+            if $0.identity.kind.rawValue != $1.identity.kind.rawValue {
+                return $0.identity.kind.rawValue < $1.identity.kind.rawValue
+            }
+            return $0.identity.id < $1.identity.id
         }
     }
 }

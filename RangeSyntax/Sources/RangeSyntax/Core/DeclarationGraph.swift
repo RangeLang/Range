@@ -1313,11 +1313,13 @@ public struct DeclarationGraph {
 private struct SemanticGraphCollector {
     private var entitiesByID: [String: SemanticGraphEntity] = [:]
     private var relations: Set<SemanticGraphRelation> = []
+    private var syntaxByID: [String: SyntaxProjectionAccumulator] = [:]
 
     mutating func build() -> ProgramGraph {
         ProgramGraph(
             entities: Array(entitiesByID.values),
-            relations: Array(relations)
+            relations: Array(relations),
+            syntax: syntaxByID.values.map(\.syntax)
         )
     }
 
@@ -1370,16 +1372,37 @@ private struct SemanticGraphCollector {
             let mainID = "\(fileID)/main"
             addEntity(id: mainID, kind: .mainBlock, label: "@main")
             addRelation(from: fileID, to: mainID, kind: .contains)
-        }
     }
+}
+
+private struct SyntaxProjectionAccumulator {
+    let identity: SemanticGraphEntity
+    let declarations: [SemanticGraphEntity]
+    let applications: [SemanticGraphEntity]
+
+    var syntax: ProgramGraphSyntax {
+        ProgramGraphSyntax(
+            identity: identity,
+            declarations: declarations,
+            applications: applications
+        )
+    }
+}
 
     private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
         let constructID = "\(parentID)/construct:\(declaration.name)"
         let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
-        addEntity(id: constructID, kind: .construct, label: label)
+        let entity = SemanticGraphEntity(id: constructID, kind: .construct, label: label)
+        addEntity(entity)
         addRelation(from: parentID, to: constructID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: constructID)
         addTypeReferences(declaration.conformances, from: constructID, kind: .conformsTo)
+        collectSyntaxProjection(
+            identity: entity,
+            macros: declaration.macros,
+            nestedConstructs: declaration.constructs,
+            ownerID: constructID
+        )
 
         for state in declaration.states {
             addState(state, parentID: constructID)
@@ -1415,10 +1438,17 @@ private struct SemanticGraphCollector {
     private mutating func addProtocol(_ declaration: ProtocolDeclaration, parentID: String) {
         let protocolID = "\(parentID)/protocol:\(declaration.name)"
         let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
-        addEntity(id: protocolID, kind: .protocolDefinition, label: label)
+        let entity = SemanticGraphEntity(id: protocolID, kind: .protocolDefinition, label: label)
+        addEntity(entity)
         addRelation(from: parentID, to: protocolID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: protocolID)
         addTypeReferences(declaration.conformances, from: protocolID, kind: .conformsTo)
+        collectSyntaxProjection(
+            identity: entity,
+            macros: declaration.macros,
+            nestedConstructs: [],
+            ownerID: protocolID
+        )
     }
 
     private mutating func addMacroDeclaration(_ declaration: MacroDeclaration, parentID: String) {
@@ -1555,7 +1585,59 @@ private struct SemanticGraphCollector {
         kind: SemanticGraphEntityKind,
         label: String
     ) {
-        entitiesByID[id] = SemanticGraphEntity(id: id, kind: kind, label: label)
+        addEntity(SemanticGraphEntity(id: id, kind: kind, label: label))
+    }
+
+    private mutating func addEntity(_ entity: SemanticGraphEntity) {
+        entitiesByID[entity.id] = entity
+    }
+
+    private mutating func collectSyntaxProjection(
+        identity: SemanticGraphEntity,
+        macros: [MacroApplication],
+        nestedConstructs: [ConstructDeclaration],
+        ownerID: String
+    ) {
+        guard hasMacro("syntax", in: macros) else { return }
+
+        var declarations: [SemanticGraphEntity] = []
+        var applications: [SemanticGraphEntity] = []
+
+        if hasMacro("GraphDeclaration", in: macros) {
+            declarations.append(identity)
+        }
+        if hasMacro("GraphApplication", in: macros) {
+            applications.append(identity)
+        }
+
+        for nested in nestedConstructs {
+            let nestedID = "\(ownerID)/construct:\(nested.name)"
+            let nestedLabel = nested.isCore ? "@language \(nested.name)" : nested.name
+            let nestedEntity = SemanticGraphEntity(
+                id: nestedID,
+                kind: .construct,
+                label: nestedLabel
+            )
+
+            if hasMacro("GraphDeclaration", in: nested.macros) {
+                declarations.append(nestedEntity)
+            }
+            if hasMacro("GraphApplication", in: nested.macros) {
+                applications.append(nestedEntity)
+            }
+        }
+
+        guard !declarations.isEmpty || !applications.isEmpty else { return }
+
+        syntaxByID[identity.id] = SyntaxProjectionAccumulator(
+            identity: identity,
+            declarations: declarations,
+            applications: applications
+        )
+    }
+
+    private func hasMacro(_ name: String, in macros: [MacroApplication]) -> Bool {
+        macros.contains { $0.name == name }
     }
 
     private mutating func addRelation(

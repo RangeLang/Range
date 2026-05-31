@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`RangeSyntax` should own Range's compiler pipeline. `RangeCLI` should supply files, load `RangeCore`, choose commands and backends, and report results, but it should not assemble semantic compiler stages ad hoc.
+`RangeSyntax` should own Range's compiler pipeline. `CLI` should supply files, load `RangeCore`, choose commands and backends, and report results, but it should not assemble semantic compiler stages ad hoc.
 
 ## Pipeline
 
@@ -49,17 +49,17 @@ The intended pipeline is:
 - `Emission`
   prints or writes target output
 
-## Boundary Between RangeSyntax And RangeCLI
+## Boundary Between RangeSyntax And CLI
 
 The split should be:
 
 - `RangeSyntax`
   owns lexing, parsing, AST construction, declaration-graph construction, semantic resolution, and later graph derivation
 
-- `RangeCLI`
+- `CLI`
   discovers project files, loads `RangeCore`, chooses commands, invokes backends, reports diagnostics, and writes output
 
-That means `RangeCLI` should request a semantic artifact from `RangeSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.
+That means `CLI` should request a semantic artifact from `RangeSyntax` rather than manually rebuilding semantic pipeline steps from raw parsed files.
 
 ## Minimal First SemanticProgram
 

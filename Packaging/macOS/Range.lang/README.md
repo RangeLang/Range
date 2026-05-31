@@ -7,7 +7,7 @@ points `~/.range/current/<version>` at the active installed release.
 
 ## Contents
 
-- `range`: the Range CLI executable
+- `range`: the CLI executable
 - `RangeCore`: language core sources used by the CLI
 - `install.sh`: installs this release under `~/.range/releases`
 - `uninstall.sh`: removes the active `~/.range/current/<version>` selection

@@ -1082,6 +1082,24 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
     }
 
+    @Test("@syntax graph projection contains declaration and application surfaces")
+    func syntaxGraphProjectionContainsDeclarationAndApplicationSurfaces() throws {
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
+        let syntax = program.programGraph.syntax
+
+        let constructSyntax = try #require(
+            syntax.first { $0.identity.label == "@language Construct" }
+        )
+        #expect(constructSyntax.declarations.map(\.label) == ["Declaration"])
+        #expect(constructSyntax.applications.map(\.label) == ["Application"])
+
+        let propertySyntax = try #require(
+            syntax.first { $0.identity.label == "@language Property" }
+        )
+        #expect(propertySyntax.declarations.map(\.label) == ["@language Property"])
+        #expect(propertySyntax.applications.isEmpty)
+    }
+
     @Test("@syntax declarations are syntax-facing without Syntax conformance")
     func syntaxDeclarationsAreSyntaxFacingWithoutSyntaxConformance() throws {
         let program = try CompilerPipeline().build(inputs: rangeCoreInputs())

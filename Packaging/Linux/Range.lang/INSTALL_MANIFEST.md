@@ -1,6 +1,6 @@
 # Install Manifest
 
-Package: Range CLI
+Package: CLI
 
 This package stores one executable and the bundled RangeCore sources required
 by the CLI in a versioned Range-owned directory:

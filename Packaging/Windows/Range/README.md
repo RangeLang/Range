@@ -7,7 +7,7 @@ and points `%USERPROFILE%\.range\current\<version>` at the active installed rele
 
 ## Contents
 
-- `range.exe`: the Range CLI executable
+- `range.exe`: the CLI executable
 - `RangeCore`: language core sources used by the CLI
 - `install.ps1`: installs this release under `%USERPROFILE%\.range\releases`
 - `VERSION`: the release version packaged by GitHub Actions

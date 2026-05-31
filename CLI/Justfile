@@ -1,0 +1,23 @@
+set shell := ["zsh", "-cu"]
+
+default:
+  @just --list
+
+build:
+  swift build -c release --product CLI
+
+install:
+  ./scripts/install-range.sh
+
+install-local:
+  ./scripts/install-range.sh --local
+
+uninstall:
+  ./scripts/install-range.sh --uninstall
+
+reinstall *args:
+  bash ./scripts/reinstall-range.sh {{args}}
+
+preview:
+  bash ./scripts/reinstall-range.sh ../RangeExample --yes
+  range run ../RangeExample

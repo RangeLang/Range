@@ -1,8 +1,0 @@
-RangeProgram
-files: 1
-sources: 196
-lexed sources: 196
-artifacts: 393
-graph nodes: 0
-graph relationships: 0
-syntax: 0

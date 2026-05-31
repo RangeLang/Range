@@ -28,7 +28,7 @@ if [[ ! -x "$binary" ]]; then
   exit 1
 fi
 
-echo "Range CLI installer"
+echo "CLI installer"
 echo
 echo "Will install Range $version"
 echo "stored in:"
