@@ -1,5 +1,6 @@
+#Statement
 @syntax
-construct For: Statement {
+construct For {
     let pattern: Expression
     let sequence: Expression
     let body: Block

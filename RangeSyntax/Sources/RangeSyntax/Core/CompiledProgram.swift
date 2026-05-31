@@ -336,10 +336,18 @@ public struct CompilerPipeline {
                 macroExpansionTypes: currentMacroExpansionTypes,
                 allowInitializerDeclarations: false
             )
+            let sourceFile: SourceFileNode
+            do {
+                sourceFile = try parser.parseSourceFile()
+            } catch let error as ParseError {
+                throw ParseError(input.path + ": " + error.message)
+            } catch {
+                throw ParseError(input.path + ": parse failed")
+            }
             let parsedFile = ParsedSourceFile(
                 path: input.path,
                 source: input.source,
-                sourceFile: try parser.parseSourceFile()
+                sourceFile: sourceFile
             )
 
             parsedFiles.append(parsedFile)
@@ -393,10 +401,18 @@ public struct CompilerPipeline {
                 markerDeclarationsByName: markersByName,
                 allowInitializerDeclarations: false
             )
+            let sourceFile: SourceFileNode
+            do {
+                sourceFile = try parser.parseSourceFileForDeclarationDiscovery()
+            } catch let error as ParseError {
+                throw ParseError(input.path + ": " + error.message)
+            } catch {
+                throw ParseError(input.path + ": parse failed")
+            }
             let parsedFile = ParsedSourceFile(
                 path: input.path,
                 source: input.source,
-                sourceFile: try parser.parseSourceFileForDeclarationDiscovery()
+                sourceFile: sourceFile
             )
             parsedFiles.append(parsedFile)
         }
@@ -418,10 +434,18 @@ public struct CompilerPipeline {
                 markerDeclarationsByName: markerDeclarationsByName,
                 allowInitializerDeclarations: false
             )
+            let sourceFile: SourceFileNode
+            do {
+                sourceFile = try parser.parseSourceFileForDeclarationDiscovery()
+            } catch let error as ParseError {
+                throw ParseError(input.path + ": " + error.message)
+            } catch {
+                throw ParseError(input.path + ": parse failed")
+            }
             let parsedFile = ParsedSourceFile(
                 path: input.path,
                 source: input.source,
-                sourceFile: try parser.parseSourceFileForDeclarationDiscovery()
+                sourceFile: sourceFile
             )
             let discoveredMacros = MacroExpander.collectMacros(from: [parsedFile])
             if !discoveredMacros.isEmpty {
@@ -446,10 +470,18 @@ public struct CompilerPipeline {
                 markerDeclarationsByName: markersByName,
                 allowInitializerDeclarations: false
             )
+            let sourceFile: SourceFileNode
+            do {
+                sourceFile = try parser.parseSourceFileForDeclarationDiscovery()
+            } catch let error as ParseError {
+                throw ParseError(input.path + ": " + error.message)
+            } catch {
+                throw ParseError(input.path + ": parse failed")
+            }
             let parsedFile = ParsedSourceFile(
                 path: input.path,
                 source: input.source,
-                sourceFile: try parser.parseSourceFileForDeclarationDiscovery()
+                sourceFile: sourceFile
             )
             let discoveredMarkers = MacroExpander.collectMarkers(from: [parsedFile])
             if !discoveredMarkers.isEmpty {

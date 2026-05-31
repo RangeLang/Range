@@ -1,2 +1,1 @@
-@syntax
-protocol Statement {}
+open marker Statement(): @syntax

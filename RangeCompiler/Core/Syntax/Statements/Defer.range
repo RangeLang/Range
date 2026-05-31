@@ -1,4 +1,5 @@
+#Statement
 @syntax
-construct Defer: Statement {
+construct Defer {
     let body: Block
 }

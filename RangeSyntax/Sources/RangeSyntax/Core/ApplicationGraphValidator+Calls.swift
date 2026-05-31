@@ -202,7 +202,7 @@ extension ApplicationGraphValidator {
 
         for statement in statements {
             switch statement {
-            case .expand:
+            case .expand, .require:
                 continue
             case .macroInvocation(_, _, let body):
                 try validateCallArgumentLabels(

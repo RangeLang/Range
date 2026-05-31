@@ -641,10 +641,29 @@ struct MacroTargetValueBuilder {
         case .macroInvocation(let name, let argumentClause, let body):
             let arguments = argumentClause.map { "(\($0))" } ?? ""
             return "#\(name)\(arguments) { \(renderStatements(body)) }"
+        case .require(let target, let members):
+            let targetText = MacroExpander.renderExpressionForStringify(target)
+            let body = members.map(renderRequirementMember).joined(separator: "\n")
+            return "#Require(\(targetText)) { \(body) }"
         case .expand(let targetPath, _):
             return [targetPath, "expand"].compactMap { $0 }.joined(separator: ".")
         default:
             return String(describing: statement)
+        }
+    }
+
+    private func renderRequirementMember(_ member: RequirementMember) -> String {
+        switch member {
+        case .property(let kind, let name, let type):
+            return "\(kind.rawValue) \(name): \(type.displayName)"
+        case .function(let name, let parameters, let returnType):
+            let parameterText = parameters.map { parameter in
+                let label = parameter.externalLabel.map { "\($0) " } ?? ""
+                let type = parameter.typeReference?.displayName ?? "Unknown"
+                return "\(label)\(parameter.localName): \(type)"
+            }.joined(separator: ", ")
+            let returnText = returnType.map { " -> \($0.displayName)" } ?? ""
+            return "function \(name)(\(parameterText))\(returnText)"
         }
     }
 

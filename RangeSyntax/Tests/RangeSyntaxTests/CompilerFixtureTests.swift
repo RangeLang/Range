@@ -102,6 +102,75 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("#Require validates marker target stored properties and functions")
+    func requireValidatesMarkerTargetStoredPropertiesAndFunctions() throws {
+        let inputs = [
+            SourceInput(
+                path: "/tmp/RequireShape.range",
+                source: """
+                open marker RequiresShape(): Construct { target, diagnostics in
+                    #Require(target) {
+                        let identity: GraphIdentity
+                        let value: Expression?
+                        function getter(transform: Function)
+                    }
+                }
+
+                construct GraphIdentity {}
+                protocol Expression {}
+                construct Function {}
+
+                #RequiresShape
+                construct PropertyShape {
+                    let identity: GraphIdentity
+                    let value: Expression?
+
+                    function getter(transform: Function)
+                }
+                """,
+                role: .project
+            )
+        ]
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
+    @Test("#Require emits diagnostics for missing marker target members")
+    func requireEmitsDiagnosticsForMissingMarkerTargetMembers() throws {
+        let inputs = [
+            SourceInput(
+                path: "/tmp/RequireMissingShape.range",
+                source: """
+                open marker RequiresShape(): Construct { target, diagnostics in
+                    #Require(target) {
+                        let identity: GraphIdentity
+                        let value: Expression?
+                    }
+                }
+
+                construct GraphIdentity {}
+                protocol Expression {}
+
+                #RequiresShape
+                construct PropertyShape {
+                    let identity: GraphIdentity
+                }
+                """,
+                role: .project
+            )
+        ]
+
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+
+        #expect(
+            diagnostics.contains {
+                $0.severity == .error
+                    && $0.code == "macro.require.error"
+                    && $0.message == "#Require target is missing required let 'value'."
+            }
+        )
+    }
+
     @Test("Construct macro target carries localized syntax body")
     func constructMacroTargetCarriesLocalizedSyntaxBody() throws {
         let projectPath = "/tmp/MacroTargetWrittenSource.range"
@@ -2621,6 +2690,9 @@ private func rangeCoreInputs() throws -> [SourceInput] {
     let root = try repositoryRoot().appendingPathComponent("RangeCompiler", isDirectory: true)
     let files = try rangeFiles(
         in: root.appendingPathComponent("Core", isDirectory: true),
+        excludingExploration: true
+    ) + rangeFiles(
+        in: root.appendingPathComponent("Foundation/Macros", isDirectory: true),
         excludingExploration: true
     ) + rangeFiles(
         in: root.appendingPathComponent("Lexer", isDirectory: true),

@@ -1,5 +1,6 @@
+#Statement
 @syntax
-construct LocalBinding: Statement {
+construct LocalBinding {
     let mutable: Bool
     let identifier: Identifier
     let type: TypeReference

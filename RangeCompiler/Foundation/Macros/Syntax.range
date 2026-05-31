@@ -1,2 +1,2 @@
-closed macro syntax(): Syntax { target, diagnostics in
+closed macro syntax(): @syntax { target, diagnostics in
 }

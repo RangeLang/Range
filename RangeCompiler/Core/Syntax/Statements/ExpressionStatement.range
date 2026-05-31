@@ -1,4 +1,5 @@
+#Statement
 @syntax
-construct ExpressionStatement: Statement {
+construct ExpressionStatement {
     let expression: Expression
 }

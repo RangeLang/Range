@@ -1,4 +1,5 @@
+#Statement
 @syntax
-construct Return: Statement {
+construct Return {
     let expression: Expression?
 }

@@ -42,6 +42,11 @@ extension MacroExpander {
                     }
                 )
             )
+        case .require(let target, let members):
+            return .require(
+                target: substituteMacroBindings(in: target, bindings: bindings),
+                members: members
+            )
         case .localBinding(let declaration):
             return .localBinding(
                 LocalBindingDeclaration(

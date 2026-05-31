@@ -1,5 +1,6 @@
+#Statement
 @syntax
-construct If: Statement {
+construct If {
     let condition: Expression
     let thenBody: Block
     let elseBody: Block?

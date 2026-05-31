@@ -1,8 +1,8 @@
-macro hashProperty(hasher: Hasher, value: Identifier) -> Statement {
+macro hashProperty(hasher: Hasher, value: Identifier) -> #Statement {
     hasher.combine(#(value))
 }
 
-macro hashableBody(hasher: Hasher, properties: [Let]) -> [Statement] {
+macro hashableBody(hasher: Hasher, properties: [Let]) -> [#Statement] {
     #(properties.map { property in
         @hashProperty(hasher: hasher, value: property.identifier)
     })

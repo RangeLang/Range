@@ -1,5 +1,5 @@
-@syntax
 #GraphDeclaration
+@syntax
 protocol Property {
     let identity: GraphIdentity
     let parent: GraphIdentity?
@@ -9,8 +9,8 @@ protocol Property {
     let type: TypeReference
 }
 
-@syntax
 #GraphDeclaration
+@syntax
 protocol StoredProperty: Property {
     let value: Expression?
 }

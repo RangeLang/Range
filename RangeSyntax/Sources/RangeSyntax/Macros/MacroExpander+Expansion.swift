@@ -996,6 +996,8 @@ extension MacroExpander {
         switch statement {
         case .expand:
             return []
+        case .require:
+            return []
         case .macroInvocation(let name, let argumentClause, let body):
             _ = argumentClause
             _ = body
@@ -1841,7 +1843,7 @@ extension MacroExpander {
                 if let defaultBody {
                     blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
                 }
-            case .macroInvocation, .assignment, .compoundAssignment, .expression,
+            case .macroInvocation, .require, .assignment, .compoundAssignment, .expression,
                 .return, .break, .continue:
                 continue
             }
@@ -1972,6 +1974,17 @@ extension MacroExpander {
                 ) {
                     diagnostics.append(diagnostic)
                 }
+            case .require(let target, let members):
+                diagnostics.append(contentsOf: try requireDiagnostics(
+                    target: target,
+                    members: members,
+                    diagnosticOwnerName: diagnosticOwnerName,
+                    targetBinding: targetBinding,
+                    targetValue: targetValue,
+                    graphBinding: graphBinding,
+                    context: context,
+                    localBindings: locals
+                ))
             case .conditional(let branches):
                 let evaluator = CompileTimeValueEvaluator(
                     targetBinding: targetBinding,
@@ -2157,6 +2170,151 @@ extension MacroExpander {
         }
 
         return (diagnostics, locals)
+    }
+
+    private static func requireDiagnostics(
+        target: Expression,
+        members: [RequirementMember],
+        diagnosticOwnerName: String,
+        targetBinding: String,
+        targetValue: CompileTimeValue?,
+        graphBinding: String?,
+        context: MacroExpansionContext,
+        localBindings: [String: Expression]
+    ) throws -> [RangeDiagnostic] {
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: targetBinding,
+            targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
+            graphBinding: graphBinding,
+            localBindings: localBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            context: context
+        )
+        guard let requiredTarget = evaluator.evaluate(target, with: localBindings) else {
+            throw ParseError("Macro #\(diagnosticOwnerName) #Require target could not be evaluated.")
+        }
+        guard let declaration = requiredTarget.field("declaration") else {
+            throw ParseError("Macro #\(diagnosticOwnerName) #Require target has no declaration.")
+        }
+
+        return members.compactMap { member in
+            switch member {
+            case .property(let kind, let name, let type):
+                return requirePropertyDiagnostic(
+                    declaration: declaration,
+                    kind: kind,
+                    name: name,
+                    type: type
+                )
+            case .function(let name, let parameters, let returnType):
+                return requireFunctionDiagnostic(
+                    declaration: declaration,
+                    name: name,
+                    parameters: parameters,
+                    returnType: returnType
+                )
+            }
+        }
+    }
+
+    private static func requirePropertyDiagnostic(
+        declaration: CompileTimeValue,
+        kind: RequirementPropertyKind,
+        name: String,
+        type: TypeReference
+    ) -> RangeDiagnostic? {
+        let collectionName: String
+        switch kind {
+        case .let:
+            collectionName = "lets"
+        case .state:
+            collectionName = "states"
+        case .binding:
+            collectionName = "bindings"
+        case .derived:
+            collectionName = "deriveds"
+        }
+        guard case .array(let members)? = declaration.field(collectionName) else {
+            return requireError("#Require target declaration has no \(collectionName) collection.")
+        }
+        guard let member = members.first(where: { identifierName(in: $0) == name }) else {
+            return requireError("#Require target is missing required \(kind.rawValue) '\(name)'.")
+        }
+        guard typeName(in: member.field("type")) == type.displayName else {
+            return requireError(
+                "#Require target \(kind.rawValue) '\(name)' must have type \(type.displayName)."
+            )
+        }
+        return nil
+    }
+
+    private static func requireFunctionDiagnostic(
+        declaration: CompileTimeValue,
+        name: String,
+        parameters: [RangeFunctionParameter],
+        returnType: TypeReference?
+    ) -> RangeDiagnostic? {
+        guard case .array(let functions)? = declaration.field("functions") else {
+            return requireError("#Require target declaration has no functions collection.")
+        }
+        guard let function = functions.first(where: { identifierName(in: $0) == name }) else {
+            return requireError("#Require target is missing required function '\(name)'.")
+        }
+        if let returnType,
+            typeName(in: function.field("returnType")) != returnType.displayName
+        {
+            return requireError(
+                "#Require target function '\(name)' must return \(returnType.displayName)."
+            )
+        }
+        guard case .array(let actualParameters)? = function.field("parameters") else {
+            return requireError("#Require target function '\(name)' has no parameter collection.")
+        }
+        if actualParameters.count != parameters.count {
+            return requireError(
+                "#Require target function '\(name)' must have \(parameters.count) parameters."
+            )
+        }
+        for (actual, expected) in zip(actualParameters, parameters) {
+            guard let expectedType = expected.typeReference else {
+                continue
+            }
+            if typeName(in: actual.field("type")) != expectedType.displayName {
+                return requireError(
+                    "#Require target function '\(name)' parameter '\(expected.localName)' must have type \(expectedType.displayName)."
+                )
+            }
+        }
+        return nil
+    }
+
+    private static func requireError(_ message: String) -> RangeDiagnostic {
+        RangeDiagnostic(
+            severity: .error,
+            message: message,
+            source: "range-macro",
+            code: "macro.require.error"
+        )
+    }
+
+    private static func identifierName(in value: CompileTimeValue) -> String? {
+        stringField("name", in: value.field("identifier"))
+    }
+
+    private static func typeName(in value: CompileTimeValue?) -> String? {
+        if case .string(let name)? = value {
+            return name
+        }
+        return stringField("name", in: value)
+    }
+
+    private static func stringField(_ name: String, in value: CompileTimeValue?) -> String? {
+        guard case .object(_, let fields)? = value,
+            case .string(let string)? = fields[name]
+        else {
+            return nil
+        }
+        return string
     }
 
     private static func diagnosticMutableBindingName(_ target: AssignmentTarget) -> String? {

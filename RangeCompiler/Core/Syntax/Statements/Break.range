@@ -1,3 +1,4 @@
+#Statement
 @syntax
-construct Break: Statement {
+construct Break {
 }
