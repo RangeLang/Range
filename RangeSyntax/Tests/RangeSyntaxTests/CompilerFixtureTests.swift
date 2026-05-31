@@ -2051,12 +2051,12 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             }
         )
 
-        let snakeCase = try #require(
-            module.extensions.first(where: { $0.targetName == "SnakeCaseCodableMacroFixture" })
+        let object = try #require(
+            module.extensions.first(where: { $0.targetName == "ObjectCodableMacroFixture" })
         )
-        #expect(snakeCase.conformances.map(\.displayName) == ["Codable"])
-        #expect(encodeKeys(in: snakeCase) == ["userId": "user_id", "displayName": "display_name"])
-        #expect(decodeKeys(in: snakeCase) == ["userId": "user_id", "displayName": "display_name"])
+        #expect(object.conformances.map(\.displayName) == ["Codable"])
+        #expect(encodeKeys(in: object) == ["userId": "userId", "displayName": "displayName"])
+        #expect(decodeKeys(in: object) == ["userId": "userId", "displayName": "displayName"])
 
         let identity = try #require(
             module.extensions.first(where: { $0.targetName == "IdentityCodableMacroFixture" })

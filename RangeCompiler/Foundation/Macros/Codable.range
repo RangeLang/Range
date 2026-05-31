@@ -7,7 +7,7 @@ macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: 
     }
 }
 
-macro encodeBody(container: KeyedEncodingContainer, properties: [Let], strategy: CodingKeyStrategy) -> [Switch] {
+macro encodeBody(container: KeyedEncodingContainer, properties: [Let]) -> [Switch] {
     #(properties.map { property in
         let codingKeyMacros: Array<Macro.Application>(
             property.macros.filter { application in
@@ -19,7 +19,7 @@ macro encodeBody(container: KeyedEncodingContainer, properties: [Let], strategy:
             application.value
             }
         )
-        let key: codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
+        let key: codingKeyValues.first(default: property.identifier.name)
 
         @encodeProperty(
             container: container,
@@ -38,7 +38,7 @@ macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, val
     }
 }
 
-macro decodeBody(container: KeyedDecodingContainer, properties: [Let], strategy: CodingKeyStrategy) -> [Switch] {
+macro decodeBody(container: KeyedDecodingContainer, properties: [Let]) -> [Switch] {
     #(properties.map { property in
         let codingKeyMacros: Array<Macro.Application>(
             property.macros.filter { application in
@@ -50,7 +50,7 @@ macro decodeBody(container: KeyedDecodingContainer, properties: [Let], strategy:
             application.value
             }
         )
-        let key: codingKeyValues.first(default: strategy == .snakeCase ? property.identifier.name.snakeCase() : property.identifier.name)
+        let key: codingKeyValues.first(default: property.identifier.name)
 
         @decodeProperty(
             container: container,
@@ -61,15 +61,20 @@ macro decodeBody(container: KeyedDecodingContainer, properties: [Let], strategy:
     })
 }
 
-macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, diagnostics in
+macro codable<let shape: CodingShape = .object>(): Construct { target, diagnostics in
+    if shape != .object {
+        diagnostics.error("@codable currently supports object coding only.")
+    }
+
+    let properties: [Let](target.declaration.lets)
+
     target.declaration.expand {
         extension #(target.declaration.self): Codable {
             function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
                 @encodeBody(
                     container: container,
-                    properties: target.declaration.lets,
-                    strategy: strategy
+                    properties: properties
                 )
                 return .success(result: Void())
             }
@@ -78,8 +83,7 @@ macro codable(_ strategy: CodingKeyStrategy = .identity): Construct { target, di
                 let container: KeyedDecodingContainer(decoder.keyedContainer())
                 @decodeBody(
                     container: container,
-                    properties: target.declaration.lets,
-                    strategy: strategy
+                    properties: properties
                 )
                 return .success(result: self)
             }

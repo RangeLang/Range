@@ -1,15 +1,15 @@
-@codable(.snakeCase)
-construct SnakeCaseCodableMacroFixture {
+@codable<.object>
+construct ObjectCodableMacroFixture {
     let userId: Int
     let displayName: String
 }
 
-@codable
+@codable<.object>
 construct IdentityCodableMacroFixture {
     let displayName: String
 }
 
-@codable(.snakeCase)
+@codable<.object>
 construct MacroOverrideCodableMacroFixture {
     @codingKey("id")
     let userId: Int

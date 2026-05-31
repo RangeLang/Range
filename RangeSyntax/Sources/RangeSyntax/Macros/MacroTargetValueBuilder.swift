@@ -164,9 +164,9 @@ struct MacroTargetValueBuilder {
                 }),
                 "storedProperties": .array(
                     declaration.values.map {
-                        value(for: $0, ownerConstructName: qualifiedName)
+                        storedPropertyValue(for: $0, ownerConstructName: qualifiedName)
                     } + declaration.states.map {
-                        value(for: $0, ownerConstructName: qualifiedName)
+                        storedPropertyValue(for: $0, ownerConstructName: qualifiedName)
                     }
                 ),
                 "bindings": .array(declaration.bindings.map {
@@ -188,6 +188,29 @@ struct MacroTargetValueBuilder {
 
     func value(for declaration: ValueDeclaration) -> CompileTimeValue {
         value(for: declaration, ownerConstructName: nil)
+    }
+
+    func storedPropertyValue(
+        for declaration: ValueDeclaration,
+        ownerConstructName: String?
+    ) -> CompileTimeValue {
+        var fields: [String: CompileTimeValue] = [
+            "macros": .array(declaration.macros.map(value(for:))),
+            "identifier": identifier(declaration.name),
+            "type": typeReferenceValue(declaration.typeName),
+            "typeName": .string(declaration.typeName),
+            "value": .nilValue,
+        ]
+        addPropertyGraphFields(
+            to: &fields,
+            kind: "let",
+            name: declaration.name,
+            ownerConstructName: ownerConstructName
+        )
+        return .object(
+            typeName: "StoredProperty",
+            fields: fields
+        )
     }
 
     func value(
@@ -214,6 +237,37 @@ struct MacroTargetValueBuilder {
 
     func value(for declaration: StateDeclaration) -> CompileTimeValue {
         value(for: declaration, ownerConstructName: nil)
+    }
+
+    func storedPropertyValue(
+        for declaration: StateDeclaration,
+        ownerConstructName: String?
+    ) -> CompileTimeValue {
+        var fields: [String: CompileTimeValue] = [
+            "macros": .array(declaration.macros.map(value(for:))),
+            "identifier": identifier(declaration.name),
+            "type": typeReferenceValue(declaration.type.displayName),
+            "value": storedStateValue(for: declaration.storage),
+        ]
+        addPropertyGraphFields(
+            to: &fields,
+            kind: "state",
+            name: declaration.name,
+            ownerConstructName: ownerConstructName
+        )
+        return .object(
+            typeName: "StoredProperty",
+            fields: fields
+        )
+    }
+
+    func storedStateValue(for storage: StateStorage) -> CompileTimeValue {
+        switch storage {
+        case .stored(let expression):
+            return value(for: expression) ?? .nilValue
+        case .declared:
+            return .nilValue
+        }
     }
 
     func value(
