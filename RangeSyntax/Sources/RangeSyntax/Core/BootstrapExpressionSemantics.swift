@@ -801,6 +801,13 @@ public enum ExpressionTypeSemantics {
             }
         }
 
+        if let syntaxMemberType = inferKnownSyntaxMemberIdentifierType(
+            baseType: baseReference,
+            memberName: memberName
+        ) {
+            return syntaxMemberType
+        }
+
         if let memberType = memberResolver.memberType(
             baseType: baseReference,
             memberName: memberName
@@ -937,6 +944,13 @@ public enum ExpressionTypeSemantics {
             }
         }
 
+        if let syntaxMemberType = inferKnownSyntaxMemberIdentifierType(
+            baseType: baseReference,
+            memberName: memberName
+        ) {
+            return syntaxMemberType
+        }
+
         if let graphMemberType = memberResolver.memberType(
             baseType: baseReference,
             memberName: memberName
@@ -1063,6 +1077,26 @@ public enum ExpressionTypeSemantics {
             return .named("Int")
         case "isEmpty":
             return .named("Bool")
+        default:
+            return nil
+        }
+    }
+
+    private static func inferKnownSyntaxMemberIdentifierType(
+        baseType: TypeReference,
+        memberName: String
+    ) -> TypeReference? {
+        switch (baseType.displayName, memberName) {
+        case ("Construct", "declaration"):
+            return .named("Construct.Declaration")
+        case ("Construct.Declaration", "lets"):
+            return .array(.named("Let"))
+        case ("Construct.Declaration", "states"):
+            return .array(.named("State"))
+        case ("Construct.Declaration", "storedProperties"):
+            return .array(.named("StoredProperty"))
+        case ("StoredProperty", "type"), ("State", "type"), ("Let", "type"):
+            return .named("TypeReference")
         default:
             return nil
         }

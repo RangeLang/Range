@@ -12,6 +12,7 @@ construct Construct {
         let conformances: [NominalTypeReference]
         let lets: [Let]
         let states: [State]
+        let storedProperties: [StoredProperty]
         let bindings: [Binding]
         let deriveds: [Derived]
         let functions: [Function.Declaration]

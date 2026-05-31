@@ -165,6 +165,13 @@ struct MacroTargetValueBuilder {
                 "states": .array(declaration.states.map {
                     value(for: $0, ownerConstructName: qualifiedName)
                 }),
+                "storedProperties": .array(
+                    declaration.values.map {
+                        value(for: $0, ownerConstructName: qualifiedName)
+                    } + declaration.states.map {
+                        value(for: $0, ownerConstructName: qualifiedName)
+                    }
+                ),
                 "bindings": .array(declaration.bindings.map {
                     value(for: $0, ownerConstructName: qualifiedName)
                 }),

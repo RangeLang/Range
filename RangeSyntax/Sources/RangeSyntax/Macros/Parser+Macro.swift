@@ -228,7 +228,7 @@ extension Parser {
             bindings = nil
             body = []
         } else if peek() == .leftBrace {
-            (bindings, body) = try parseMarkerBody(parameters: parameters)
+            (bindings, body) = try parseMarkerBody(parameters: parameters, target: target)
         } else {
             bindings = nil
             body = []
@@ -265,7 +265,7 @@ extension Parser {
         return statements
     }
 
-    mutating func parseMarkerBody(parameters: [RangeFunctionParameter]) throws -> (
+    mutating func parseMarkerBody(parameters: [RangeFunctionParameter], target: MacroTarget) throws -> (
         bindings: MacroBindings?,
         body: [Statement]
     ) {
@@ -280,7 +280,7 @@ extension Parser {
             }
         )
         if let bindings {
-            localBindings[bindings.target] = .init(kind: .constant, type: .named("MacroTarget"))
+            localBindings[bindings.target] = .init(kind: .constant, type: target.typeReference)
             localBindings[bindings.diagnostics] = .init(kind: .constant, type: .named("MacroDiagnostics"))
             if let graph = bindings.graph {
                 localBindings[graph] = .init(kind: .constant, type: .named("GraphContext"))

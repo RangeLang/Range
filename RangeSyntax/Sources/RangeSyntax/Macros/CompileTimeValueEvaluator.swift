@@ -231,6 +231,11 @@ struct CompileTimeValueEvaluator {
             return left == right
         case (.nilValue, .nilValue):
             return true
+        case (.array(let left), .array(let right)):
+            guard left.count == right.count else {
+                return false
+            }
+            return zip(left, right).allSatisfy(valuesEqual)
         case (.object("Enum.Case", let left), .object("Enum.Case", let right)):
             guard let leftName = enumCaseName(left),
                 let rightName = enumCaseName(right)
@@ -238,6 +243,16 @@ struct CompileTimeValueEvaluator {
                 return false
             }
             return leftName == rightName
+        case (.object(let leftType, let leftFields), .object(let rightType, let rightFields)):
+            guard leftType == rightType, Set(leftFields.keys) == Set(rightFields.keys) else {
+                return false
+            }
+            return leftFields.allSatisfy { key, leftValue in
+                guard let rightValue = rightFields[key] else {
+                    return false
+                }
+                return valuesEqual(leftValue, rightValue)
+            }
         default:
             return false
         }
@@ -368,14 +383,17 @@ struct CompileTimeValueEvaluator {
 
         if arguments.count == 1,
             arguments[0].label == nil,
-            case .object(name, _) = evaluate(arguments[0].value, locals: locals)
+            let value = evaluate(arguments[0].value, locals: locals),
+            case .object(let typeName, _) = value
         {
-            return evaluate(arguments[0].value, locals: locals)
+            if typeName == name || objectType(typeName, conformsTo: name) {
+                return value
+            }
         }
 
         switch name {
         case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
-            "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
+            "MemberTypeReference", "ArrayTypeReference", "Property", "StoredProperty", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
             "ValueGeneric", "GraphIdentity", "Macro.Application", "Macro.Declaration", "Macro.Target",
             "Marker", "Marker.Application", "Marker.Effect", "Void", "RangeGraphIdentity", "GraphDeclaration", "GraphApplication", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
@@ -414,6 +432,17 @@ struct CompileTimeValueEvaluator {
             return value
         default:
             return nil
+        }
+    }
+
+    private func objectType(_ typeName: String, conformsTo protocolName: String) -> Bool {
+        switch protocolName {
+        case "StoredProperty":
+            return typeName == "Let" || typeName == "State"
+        case "Property":
+            return typeName == "Let" || typeName == "State" || typeName == "Binding" || typeName == "Derived"
+        default:
+            return false
         }
     }
 
