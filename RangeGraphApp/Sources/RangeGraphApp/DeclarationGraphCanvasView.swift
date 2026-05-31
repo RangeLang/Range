@@ -1889,8 +1889,6 @@ final class QuartzDeclarationGraphView: NSView {
     private func nodeColor(_ kind: SemanticGraphEntityKind) -> NSColor {
         switch kind {
         case .file: return NSColor(calibratedRed: 0.30, green: 0.43, blue: 0.55, alpha: 1)
-        case .packageSpace: return NSColor(calibratedRed: 0.49, green: 0.38, blue: 0.64, alpha: 1)
-        case .packageEntry: return NSColor(calibratedRed: 0.63, green: 0.47, blue: 0.70, alpha: 1)
         case .namespace: return NSColor(calibratedRed: 0.23, green: 0.54, blue: 0.54, alpha: 1)
         case .construct: return NSColor(calibratedRed: 0.74, green: 0.28, blue: 0.22, alpha: 1)
         case .enumeration: return NSColor(calibratedRed: 0.60, green: 0.37, blue: 0.24, alpha: 1)
@@ -2018,9 +2016,9 @@ private enum DeclarationNodeMetrics {
             return 54
         case .typeReference:
             return 18
-        case .parameter, .member, .macroApplication, .packageEntry, .localSymbol:
+        case .parameter, .member, .macroApplication, .localSymbol:
             return 22
-        case .macro, .packageSpace:
+        case .macro:
             return 40
         case .unresolved:
             return 16
@@ -2741,8 +2739,6 @@ struct ForceDirectedDeclarationLayout {
 
     private static let diagramStandaloneNodeKinds: Set<SemanticGraphEntityKind> = [
         .file,
-        .packageSpace,
-        .packageEntry,
         .namespace,
         .construct,
         .enumeration,

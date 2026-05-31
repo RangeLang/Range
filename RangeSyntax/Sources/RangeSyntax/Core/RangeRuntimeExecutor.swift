@@ -95,7 +95,7 @@ public struct RangeRuntimeExecutor {
     private func callables(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
         switch sourceFile {
         case .module(let module):
-            return module.callables + module.packageSpaces.flatMap(\.callables)
+            return module.callables
         case .namespace(let namespace):
             return namespace.callables
         case .construct(let construct):

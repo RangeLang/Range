@@ -958,7 +958,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/PackageSpace.range",
+                path: "/tmp/PackageManifest.range",
                 source: """
                 #package
                 construct Project {

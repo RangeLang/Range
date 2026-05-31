@@ -14,8 +14,6 @@ public struct ParsedSourceFile {
 
 public enum ApplicationGraphNodeKind: String, Sendable {
     case file
-    case packageSpace
-    case packageEntry
     case namespace
     case construct
     case enumeration
@@ -37,8 +35,6 @@ public enum ApplicationGraphNodeKind: String, Sendable {
     public var semanticKind: SemanticGraphEntityKind {
         switch self {
         case .file: return .file
-        case .packageSpace: return .packageSpace
-        case .packageEntry: return .packageEntry
         case .namespace: return .namespace
         case .construct: return .construct
         case .enumeration: return .enumeration

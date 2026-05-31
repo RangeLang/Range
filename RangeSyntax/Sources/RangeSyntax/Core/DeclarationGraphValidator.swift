@@ -694,7 +694,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 + module.namespaces.flatMap(attachedMacroUsages(in:))
                 + module.enumerations.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
                 + module.protocols.flatMap(attachedMacroUsages(in:))
-                + module.packageSpaces.flatMap(attachedMacroUsages(in:))
                 + module.extensions.flatMap(attachedMacroUsages(in:))
         case .mainBlock, .macro:
             return []
@@ -739,15 +738,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         usages += declaration.enumerations.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
         usages += declaration.protocols.flatMap(attachedMacroUsages(in:))
         return usages
-    }
-
-    private func attachedMacroUsages(in declaration: PackageSpaceDeclaration) -> [AttachedMacroUsage] {
-        declaration.values.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.callables.flatMap(attachedMacroUsages(in:))
-            + declaration.constructs.flatMap(attachedMacroUsages(in:))
-            + declaration.namespaces.flatMap(attachedMacroUsages(in:))
-            + declaration.enumerations.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.protocols.flatMap(attachedMacroUsages(in:))
     }
 
     private func attachedMacroUsages(in declaration: InitializerDeclaration) -> [AttachedMacroUsage] {

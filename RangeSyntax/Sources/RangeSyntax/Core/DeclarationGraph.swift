@@ -28,7 +28,6 @@ public struct DeclarationSourceLocation {
 
 public struct DeclarationGraph {
     public let protocolsByName: [String: ProtocolDeclaration]
-    public let packageSpaces: [PackageSpaceDeclaration]
     public let packageValues: [ValueDeclaration]
     public let namespacesByName: [String: NamespaceDeclaration]
     public let namespaceAttributeNames: Set<String>
@@ -61,9 +60,7 @@ public struct DeclarationGraph {
                 file.source.map { (file.path, $0) }
             }
         )
-        let packageSpaces = Self.collectPackageSpaces(from: files)
-        let packageValues = packageSpaces.flatMap(\.values)
-            + Self.collectPackageManifestValues(from: files)
+        let packageValues = Self.collectPackageManifestValues(from: files)
         let protocols = Self.collectProtocols(from: files)
         let macroMetadata = Self.collectMacroMetadata(from: files)
         let metadataSlotMacros = Self.metadataSlotMacroNames(in: macroMetadata)
@@ -106,7 +103,6 @@ public struct DeclarationGraph {
         )
 
         self.protocolsByName = protocols
-        self.packageSpaces = packageSpaces
         self.packageValues = packageValues
         self.namespacesByName = namespaces
         self.namespaceAttributeNames = namespaceAttributeNames
@@ -671,10 +667,6 @@ public struct DeclarationGraph {
         return registry
     }
 
-    static func collectPackageSpaces(from files: [ParsedSourceFile]) -> [PackageSpaceDeclaration] {
-        files.flatMap { packageSpaces(in: $0.sourceFile) }
-    }
-
     static func collectPackageManifestValues(from files: [ParsedSourceFile]) -> [ValueDeclaration] {
         files.flatMap { parsedFile in
             constructs(in: parsedFile.sourceFile, metadataSlotMacros: [])
@@ -1006,14 +998,14 @@ public struct DeclarationGraph {
         for parsedFile in files {
             switch parsedFile.sourceFile {
             case .module(let module):
-                for callable in module.callables + module.packageSpaces.flatMap(\.callables) {
+                for callable in module.callables {
                     let identity = callableIdentity(
                         ownerName: nil,
                         declaration: callable
                     )
                     registry[identity] = callable.parameters
                 }
-                for construct in module.constructs + module.packageSpaces.flatMap(\.constructs)
+                for construct in module.constructs
                 where !isNamespaceShaped(
                     construct,
                     metadataSlotMacros: metadataSlotMacros
@@ -1024,7 +1016,7 @@ public struct DeclarationGraph {
                         ownerName: construct.name
                     )
                 }
-                let namespaceConstructs = (module.constructs + module.packageSpaces.flatMap(\.constructs))
+                let namespaceConstructs = (module.constructs)
                     .filter {
                         isNamespaceShaped(
                             $0,
@@ -1037,7 +1029,7 @@ public struct DeclarationGraph {
                             metadataSlotMacros: metadataSlotMacros
                         )
                     }
-                for namespace in module.namespaces + module.packageSpaces.flatMap(\.namespaces)
+                for namespace in module.namespaces
                     + namespaceConstructs
                 {
                     collectNamespaceCallableParameters(
@@ -1332,7 +1324,7 @@ public struct DeclarationGraph {
             )
         case .module(let module):
             var attachments: [NamespaceAttributeAttachment] = []
-            for declaration in module.constructs + module.packageSpaces.flatMap(\.constructs) {
+            for declaration in module.constructs {
                 attachments.append(
                     contentsOf: namespaceAttributeAttachments(
                         in: declaration,
@@ -1343,7 +1335,7 @@ public struct DeclarationGraph {
                 )
             }
             attachments.append(
-                contentsOf: (module.protocols + module.packageSpaces.flatMap(\.protocols)).compactMap {
+                contentsOf: (module.protocols).compactMap {
                     namespaceAttributeAttachment(
                         declarationName: $0.name,
                         declarationKind: .type,
@@ -1354,7 +1346,7 @@ public struct DeclarationGraph {
                 }
             )
             attachments.append(
-                contentsOf: (module.enumerations + module.packageSpaces.flatMap(\.enumerations)).compactMap {
+                contentsOf: (module.enumerations).compactMap {
                     namespaceAttributeAttachment(
                         declarationName: $0.name,
                         declarationKind: .type,
@@ -1364,7 +1356,7 @@ public struct DeclarationGraph {
                     )
                 }
             )
-            for namespace in module.namespaces + module.packageSpaces.flatMap(\.namespaces) {
+            for namespace in module.namespaces {
                 attachments.append(
                     contentsOf: namespaceAttributeAttachments(
                         in: namespace,
@@ -1744,17 +1736,8 @@ public struct DeclarationGraph {
         case .protocolDefinition(let declaration):
             return [declaration]
         case .module(let module):
-            return module.protocols + module.packageSpaces.flatMap(\.protocols)
+            return module.protocols
         case .construct, .namespace, .enumeration, .mainBlock, .macro, .extensions:
-            return []
-        }
-    }
-
-    static func packageSpaces(in sourceFile: SourceFileNode) -> [PackageSpaceDeclaration] {
-        switch sourceFile {
-        case .module(let module):
-            return module.packageSpaces
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1770,7 +1753,7 @@ public struct DeclarationGraph {
                 metadataSlotMacros: metadataSlotMacros
             ) ? [] : [declaration]
         case .module(let module):
-            return (module.constructs + module.packageSpaces.flatMap(\.constructs))
+            return (module.constructs)
                 .filter {
                     !isNamespaceShaped(
                         $0,
@@ -1790,7 +1773,7 @@ public struct DeclarationGraph {
         case .namespace(let declaration):
             return [declaration]
         case .module(let module):
-            let namespaceConstructs = (module.constructs + module.packageSpaces.flatMap(\.constructs))
+            let namespaceConstructs = (module.constructs)
                 .filter {
                     isNamespaceShaped(
                         $0,
@@ -1803,7 +1786,7 @@ public struct DeclarationGraph {
                         metadataSlotMacros: metadataSlotMacros
                     )
                 }
-            return module.namespaces + module.packageSpaces.flatMap(\.namespaces) + namespaceConstructs
+            return module.namespaces + namespaceConstructs
         case .construct(let declaration):
             return isNamespaceShaped(
                 declaration,
@@ -1874,7 +1857,7 @@ public struct DeclarationGraph {
         case .enumeration(let declaration):
             return [declaration]
         case .module(let module):
-            return module.enumerations + module.packageSpaces.flatMap(\.enumerations)
+            return module.enumerations
         case .construct, .namespace, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
@@ -1923,7 +1906,7 @@ public struct DeclarationGraph {
     static func callables(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
         switch sourceFile {
         case .module(let module):
-            return module.callables + module.packageSpaces.flatMap(\.callables)
+            return module.callables
         case .namespace(let declaration):
             return declaration.callables
         case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
@@ -2085,9 +2068,6 @@ private struct SemanticGraphCollector {
             for state in module.states {
                 addState(state, parentID: fileID)
             }
-            for (index, declaration) in module.packageSpaces.enumerated() {
-                addPackageSpace(declaration, parentID: fileID, index: index)
-            }
             for callable in module.callables {
                 addCallable(callable, parentID: fileID)
             }
@@ -2113,60 +2093,6 @@ private struct SemanticGraphCollector {
             let mainID = "\(fileID)/main"
             addEntity(id: mainID, kind: .mainBlock, label: "@main")
             addRelation(from: fileID, to: mainID, kind: .contains)
-        }
-    }
-
-    private mutating func addPackageSpace(
-        _ declaration: PackageSpaceDeclaration,
-        parentID: String,
-        index: Int
-    ) {
-        let packageID = "\(parentID)/package:\(index)"
-        addEntity(id: packageID, kind: .packageSpace, label: "#package")
-        addRelation(from: parentID, to: packageID, kind: .contains)
-
-        for value in declaration.values {
-            addValue(value, parentID: packageID)
-        }
-        for (index, entry) in declaration.entries.enumerated() {
-            addPackageEntry(entry, parentID: packageID, index: index)
-        }
-        for callable in declaration.callables {
-            addCallable(callable, parentID: packageID)
-        }
-        for construct in declaration.constructs {
-            addConstruct(construct, parentID: packageID)
-        }
-        for namespace in declaration.namespaces {
-            addNamespace(namespace, parentID: packageID)
-        }
-        for declaration in declaration.enumerations {
-            addEnumeration(declaration, parentID: packageID)
-        }
-        for declaration in declaration.protocols {
-            addProtocol(declaration, parentID: packageID)
-        }
-    }
-
-    private mutating func addPackageEntry(_ entry: Expression, parentID: String, index: Int) {
-        let entryID = "\(parentID)/entry:\(index)"
-        addEntity(id: entryID, kind: .packageEntry, label: packageEntryLabel(entry))
-        addRelation(from: parentID, to: entryID, kind: .contains)
-    }
-
-    private func packageEntryLabel(_ entry: Expression) -> String {
-        switch entry {
-        case .call(let name, let arguments):
-            if arguments.count == 1, arguments[0].label == nil,
-                case .string(let value) = arguments[0].value
-            {
-                return "\(name)(\"\(value)\")"
-            }
-            return "\(name)(...)"
-        case .identifier(let name):
-            return name
-        default:
-            return "package entry"
         }
     }
 

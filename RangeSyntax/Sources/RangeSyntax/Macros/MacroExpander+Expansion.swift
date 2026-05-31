@@ -106,7 +106,6 @@ extension MacroExpander {
                             context: context
                         )
                     } + emittedDeclarationBundles.flatMap(\.states),
-                    packageSpaces: module.packageSpaces,
                     callables: try module.callables.map {
                         try expand(
                             callable: $0,
