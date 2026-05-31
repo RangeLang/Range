@@ -456,13 +456,17 @@ extension MacroExpander {
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
                     )
+                    let genericBindings = markerGenericArgumentBindings(
+                        for: marker,
+                        application: application
+                    )
                     let targetValue = MacroTargetValueBuilder().targetValue(for: construct)
                     try emitMarkerDiagnostics(
                         from: marker.body,
                         marker: marker,
                         targetValue: targetValue,
                         context: context,
-                        localBindings: argumentBindings
+                        localBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
                     )
                     if marker.valueType.isMarkerEffect {
                         continue

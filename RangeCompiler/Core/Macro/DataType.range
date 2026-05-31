@@ -1,12 +1,8 @@
-open marker DataType(@capture _ pattern: Expression, delimiter: String?): Construct { target, diagnostics in
+open marker DataType<Value, let delimiter: String>(@capture _ pattern: Expression): Construct { target, diagnostics in
     let source: String(pattern.written.text)
     state index: Int(0)
     state delimiterCount: Int(0)
     state previousWasDelimiter: Bool(false)
-
-    if delimiter == nil {
-        diagnostics.error("#DataType delimiter is required.")
-    }
 
     if source.count == 0 {
         diagnostics.error("#DataType pattern must use dot-delimited slots.")

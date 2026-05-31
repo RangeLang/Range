@@ -125,13 +125,30 @@ extension Parser {
         }
 
         try consume(.less)
-        var arguments: [TypeReference] = [try parseGenericArgumentReferenceNode()]
+        var arguments: [TypeReference] = [try parseMacroGenericArgumentReference()]
         while peek() == .comma {
             advance()
-            arguments.append(try parseGenericArgumentReferenceNode())
+            arguments.append(try parseMacroGenericArgumentReference())
         }
         try consume(.greater)
         return arguments
+    }
+
+    mutating func parseMacroGenericArgumentReference() throws -> TypeReference {
+        switch peek() {
+        case .identifier(let label) where peek(offset: 1) == .colon:
+            advance()
+            try consume(.colon)
+            let value = try parseExpression(terminatingAt: [.comma, .greater])
+            return .named("\(label): \(MacroExpander.renderExpressionForStringify(value))")
+        case .keyword(let label) where peek(offset: 1) == .colon:
+            advance()
+            try consume(.colon)
+            let value = try parseExpression(terminatingAt: [.comma, .greater])
+            return .named("\(label): \(MacroExpander.renderExpressionForStringify(value))")
+        default:
+            return try parseGenericArgumentReferenceNode()
+        }
     }
 
     mutating func parseMacroArgumentClauseIfPresent() throws -> String? {

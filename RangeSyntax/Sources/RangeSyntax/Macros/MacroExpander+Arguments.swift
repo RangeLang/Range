@@ -271,6 +271,83 @@ extension MacroExpander {
         return bindings
     }
 
+    static func markerGenericArgumentBindings(
+        for marker: MarkerDeclaration,
+        application: MacroApplication
+    ) -> [String: Expression] {
+        var bindings: [String: Expression] = [:]
+        var positionalArguments = application.genericArguments
+        var labeledArguments: [String: TypeReference] = [:]
+
+        for argument in application.genericArguments {
+            guard let labeled = labeledGenericArgument(argument) else {
+                continue
+            }
+            labeledArguments[labeled.label] = labeled.value
+            positionalArguments.removeAll { $0 == argument }
+        }
+
+        var positionalIndex = 0
+        for parameter in marker.genericParameters {
+            switch parameter {
+            case .type(let name, _, _):
+                guard positionalIndex < positionalArguments.count else {
+                    continue
+                }
+                bindings[name] = .identifier(positionalArguments[positionalIndex].displayName)
+                positionalIndex += 1
+            case .value(let name, _, let defaultValue):
+                if let argument = labeledArguments[name] {
+                    bindings[name] = expression(forGenericArgument: argument)
+                } else if positionalIndex < positionalArguments.count {
+                    bindings[name] = expression(forGenericArgument: positionalArguments[positionalIndex])
+                    positionalIndex += 1
+                } else if let defaultValue {
+                    bindings[name] = defaultValue
+                }
+            }
+        }
+
+        return bindings
+    }
+
+    private static func labeledGenericArgument(_ argument: TypeReference) -> (label: String, value: TypeReference)? {
+        guard case .named(let displayName) = argument,
+            let colon = displayName.firstIndex(of: ":")
+        else {
+            return nil
+        }
+
+        let label = displayName[..<colon].trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawValueStart = displayName.index(after: colon)
+        let rawValue = displayName[rawValueStart...].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty, !rawValue.isEmpty else {
+            return nil
+        }
+
+        return (label, .named(String(rawValue)))
+    }
+
+    private static func expression(forGenericArgument argument: TypeReference) -> Expression {
+        let displayName = argument.displayName
+        if displayName.hasPrefix("\""), displayName.hasSuffix("\""), displayName.count >= 2 {
+            return .string(String(displayName.dropFirst().dropLast()))
+        }
+        if displayName == "true" {
+            return .boolean(true)
+        }
+        if displayName == "false" {
+            return .boolean(false)
+        }
+        if let value = Int(displayName) {
+            return .integer(value)
+        }
+        if let value = Double(displayName) {
+            return .double(value)
+        }
+        return .identifier(displayName)
+    }
+
     private static func normalizedArgumentValue(
         _ value: Expression,
         for parameter: RangeFunctionParameter,

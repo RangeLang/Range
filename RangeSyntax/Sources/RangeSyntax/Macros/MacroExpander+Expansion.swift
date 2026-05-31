@@ -690,6 +690,10 @@ extension MacroExpander {
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
                     )
+                    let genericBindings = markerGenericArgumentBindings(
+                        for: marker,
+                        application: application
+                    )
                     let targetValue = markerTargetValue(
                         kind: propertyKindDescription(propertyKind),
                         name: name
@@ -699,7 +703,7 @@ extension MacroExpander {
                         marker: marker,
                         targetValue: targetValue,
                         context: context,
-                        localBindings: argumentBindings
+                        localBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
                     )
                     if marker.valueType.isMarkerEffect {
                         continue
