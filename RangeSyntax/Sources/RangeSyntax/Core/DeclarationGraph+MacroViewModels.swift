@@ -557,7 +557,7 @@ struct MacroExpansionContext {
     let rewriteSurfaceView: RewriteSurfaceView
     let graphContext: MacroGraphContext
     let macroDeclarationsByName: [String: MacroDeclaration]
-    let markerDeclarationsByName: [String: MarkerDeclaration]
+    let macroMetadataByName: [String: MacroMetadataDeclaration]
     let diagnosticEngine: RangeDiagnosticEngine?
     let currentPath: String?
 
@@ -567,7 +567,7 @@ struct MacroExpansionContext {
             rewriteSurfaceView: rewriteSurfaceView,
             graphContext: graphContext,
             macroDeclarationsByName: macroDeclarationsByName,
-            markerDeclarationsByName: markerDeclarationsByName,
+            macroMetadataByName: macroMetadataByName,
             diagnosticEngine: diagnosticEngine,
             currentPath: path
         )
@@ -594,8 +594,8 @@ struct MacroExpansionContext {
         )
     }
 
-    func propertyMarkerTargetMatches(
-        _ marker: MarkerDeclaration,
+    func propertyMacroMetadataTargetMatches(
+        _ metadata: MacroMetadataDeclaration,
         propertyTypeName: String,
         propertyValueType: TypeReference
     ) -> Bool {
@@ -606,12 +606,12 @@ struct MacroExpansionContext {
 
         let matcher = MacroTargetTypeMatcher(
             syntaxResolver: rewriteSurfaceView.syntaxResolver,
-            genericParameters: marker.genericParameters
+            genericParameters: metadata.genericParameters
         )
 
         return matcher.matches(
             actual: actualTargetType,
-            expected: marker.target
+            expected: metadata.target
         )
     }
 
@@ -758,8 +758,6 @@ struct MacroGraphContext {
     let declarationsByID: [String: CompileTimeValue]
     let membersByID: [String: [CompileTimeValue]]
     let parentByID: [String: CompileTimeValue]
-    let markersByID: [String: [CompileTimeValue]]
-    let markersByName: [String: [CompileTimeValue]]
     let macrosByID: [String: [CompileTimeValue]]
     let macrosByName: [String: [CompileTimeValue]]
     let writtenSyntaxByID: [String: CompileTimeValue]
@@ -767,31 +765,19 @@ struct MacroGraphContext {
     init(
         declarationGraph: DeclarationGraph,
         macroDeclarationsByName: [String: MacroDeclaration],
-        markerDeclarationsByName: [String: MarkerDeclaration]
+        macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration]
     ) {
         let writtenSyntaxByID = Self.writtenSyntaxByID(for: declarationGraph)
         let builder = MacroTargetValueBuilder(
             macroDeclarationsByName: macroDeclarationsByName,
-            markerDeclarationsByName: markerDeclarationsByName,
+            macroMetadataByName: macroMetadataDeclarationsByName,
             writtenSyntaxByID: writtenSyntaxByID
         )
         var declarationsByID: [String: CompileTimeValue] = [:]
         var membersByID: [String: [CompileTimeValue]] = [:]
         var parentByID: [String: CompileTimeValue] = [:]
-        var markersByID: [String: [CompileTimeValue]] = [:]
-        var markersByName: [String: [CompileTimeValue]] = [:]
         var macrosByID: [String: [CompileTimeValue]] = [:]
         var macrosByName: [String: [CompileTimeValue]] = [:]
-
-        func recordMarkers(_ markers: [CompileTimeValue], id: String) {
-            markersByID[id] = markers
-            for marker in markers {
-                guard let name = Self.markerApplicationIdentifierName(marker) else {
-                    continue
-                }
-                markersByName[name, default: []].append(marker)
-            }
-        }
 
         func recordMacros(_ macros: [CompileTimeValue], id: String) {
             macrosByID[id] = macros
@@ -805,21 +791,8 @@ struct MacroGraphContext {
 
         for construct in declarationGraph.constructsByName.values {
             let constructID = "construct:\(construct.name)"
-            let constructValue = builder.declarationValue(
-                for: construct,
-                qualifiedName: construct.name
-            )
+            let constructValue = builder.declarationValue(for: construct, qualifiedName: construct.name)
             declarationsByID[constructID] = constructValue
-            let evaluatedMarkers = Self.markerValues(from: constructValue)
-            let evaluatedMarkerNames = Set(evaluatedMarkers.compactMap(Self.markerApplicationIdentifierName))
-            recordMarkers(
-                evaluatedMarkers
-                    + Self.markerValues(
-                        from: construct.macros.filter { !evaluatedMarkerNames.contains($0.name) },
-                        declarations: markerDeclarationsByName
-                    ),
-                id: constructID
-            )
             recordMacros(Self.macroValues(from: constructValue), id: constructID)
 
             var members: [CompileTimeValue] = []
@@ -829,7 +802,6 @@ struct MacroGraphContext {
                 let valueValue = builder.value(for: value, ownerConstructName: construct.name)
                 declarationsByID[id] = valueValue
                 parentByID[id] = constructIdentity
-                recordMarkers(Self.markerValues(from: valueValue), id: id)
                 recordMacros(Self.macroValues(from: valueValue), id: id)
                 members.append(builder.graphIdentity(kind: "let", name: "\(construct.name).\(value.name)"))
             }
@@ -838,7 +810,6 @@ struct MacroGraphContext {
                 let stateValue = builder.value(for: state, ownerConstructName: construct.name)
                 declarationsByID[id] = stateValue
                 parentByID[id] = constructIdentity
-                recordMarkers(Self.markerValues(from: stateValue), id: id)
                 recordMacros(Self.macroValues(from: stateValue), id: id)
                 members.append(builder.graphIdentity(kind: "state", name: "\(construct.name).\(state.name)"))
             }
@@ -847,7 +818,6 @@ struct MacroGraphContext {
                 let bindingValue = builder.value(for: binding, ownerConstructName: construct.name)
                 declarationsByID[id] = bindingValue
                 parentByID[id] = constructIdentity
-                recordMarkers(Self.markerValues(from: bindingValue), id: id)
                 recordMacros(Self.macroValues(from: bindingValue), id: id)
                 members.append(builder.graphIdentity(kind: "binding", name: "\(construct.name).\(binding.name)"))
             }
@@ -856,7 +826,6 @@ struct MacroGraphContext {
                 let derivedValue = builder.value(for: derived, ownerConstructName: construct.name)
                 declarationsByID[id] = derivedValue
                 parentByID[id] = constructIdentity
-                recordMarkers(Self.markerValues(from: derivedValue), id: id)
                 recordMacros(Self.macroValues(from: derivedValue), id: id)
                 members.append(builder.graphIdentity(kind: "derived", name: "\(construct.name).\(derived.name)"))
             }
@@ -885,15 +854,12 @@ struct MacroGraphContext {
             let extensionID = "extension:\(extensionDeclaration.targetType.displayName)"
             let extensionValue = builder.value(for: extensionDeclaration)
             declarationsByID[extensionID] = extensionValue
-            recordMarkers(Self.markerValues(from: extensionValue), id: extensionID)
             recordMacros(Self.macroValues(from: extensionValue), id: extensionID)
         }
 
         self.declarationsByID = declarationsByID
         self.membersByID = membersByID
         self.parentByID = parentByID
-        self.markersByID = markersByID
-        self.markersByName = markersByName
         self.macrosByID = macrosByID
         self.macrosByName = macrosByName
         self.writtenSyntaxByID = writtenSyntaxByID
@@ -914,22 +880,13 @@ struct MacroGraphContext {
         return parentByID[id]
     }
 
-    func markers(on identity: CompileTimeValue) -> CompileTimeValue? {
-        guard let id = identityID(identity) else { return nil }
-        return .array(markersByID[id, default: []])
-    }
-
-    func markers() -> CompileTimeValue {
-        .array(markersByName.values.flatMap { $0 }.map(Self.markerRecord))
-    }
-
-    func markers(named name: String) -> CompileTimeValue {
-        .array(markersByName[name, default: []])
-    }
-
     func macros(on identity: CompileTimeValue) -> CompileTimeValue? {
         guard let id = identityID(identity) else { return nil }
         return .array(macrosByID[id, default: []])
+    }
+
+    func macros() -> CompileTimeValue {
+        .array(macrosByName.values.flatMap { $0 })
     }
 
     func macros(named name: String) -> CompileTimeValue {
@@ -948,23 +905,15 @@ struct MacroGraphContext {
             let written = builder.writtenSyntax(text)
             switch location.kind {
             case .type:
-                if graph.constructsByName[location.name] != nil {
-                    values["construct:\(location.name)"] = written
-                }
-                if graph.enumsByName[location.name] != nil {
-                    values["enum:\(location.name)"] = written
-                }
-                if graph.protocolsByName[location.name] != nil {
-                    values["protocol:\(location.name)"] = written
-                }
+                if graph.constructsByName[location.name] != nil { values["construct:\(location.name)"] = written }
+                if graph.enumsByName[location.name] != nil { values["enum:\(location.name)"] = written }
+                if graph.protocolsByName[location.name] != nil { values["protocol:\(location.name)"] = written }
             case .function:
                 values["function:\(location.name)"] = written
             case .namespace:
                 values["namespace:\(location.name)"] = written
             case .macro:
                 values["macro:\(location.name)"] = written
-            case .marker:
-                values["marker:\(location.name)"] = written
             }
         }
 
@@ -973,63 +922,37 @@ struct MacroGraphContext {
 
     private static func declarationText(in source: String, startingAt line: Int) -> String {
         let lines = source.components(separatedBy: .newlines)
-        guard line >= 0, line < lines.count else {
-            return ""
-        }
-
+        guard line >= 0, line < lines.count else { return "" }
         var start = line
         while start > 0 {
             let previous = lines[start - 1].trimmingCharacters(in: .whitespaces)
-            guard previous.hasPrefix("#") || previous.hasPrefix("@") else {
-                break
-            }
+            guard previous.hasPrefix("#") || previous.hasPrefix("@") else { break }
             start -= 1
         }
-
         var end = line
         var balance = 0
         var sawBrace = false
         for index in line..<lines.count {
             for character in lines[index] {
-                if character == "{" {
-                    sawBrace = true
-                    balance += 1
-                } else if character == "}" {
-                    balance -= 1
-                }
+                if character == "{" { sawBrace = true; balance += 1 }
+                else if character == "}" { balance -= 1 }
             }
             end = index
-            if sawBrace && balance <= 0 {
-                break
-            }
-            if !sawBrace {
-                break
-            }
+            if sawBrace && balance <= 0 { break }
+            if !sawBrace { break }
         }
-
         return lines[start...end].joined(separator: "\n")
     }
 
     private func identityID(_ identity: CompileTimeValue) -> String? {
         guard case .object("GraphIdentity", let fields) = identity,
             case .string(let id)? = fields["id"]
-        else {
-            return nil
-        }
+        else { return nil }
         return id
     }
 
-    private static func markerValues(from value: CompileTimeValue) -> [CompileTimeValue] {
-        guard case .array(let markers)? = value.field("markers") else {
-            return []
-        }
-        return markers
-    }
-
     private static func macroValues(from value: CompileTimeValue) -> [CompileTimeValue] {
-        guard case .array(let macros)? = value.field("macros") else {
-            return []
-        }
+        guard case .array(let macros)? = value.field("macros") else { return [] }
         return macros
     }
 
@@ -1037,50 +960,8 @@ struct MacroGraphContext {
         guard case .object("Macro.Application", let fields) = value,
             case .object(_, let identifierFields)? = fields["identifier"],
             case .string(let name)? = identifierFields["name"]
-        else {
-            return nil
-        }
+        else { return nil }
         return name
-    }
-
-    private static func markerApplicationIdentifierName(_ value: CompileTimeValue) -> String? {
-        guard case .object("Marker.Application", let fields) = value,
-            case .object(_, let identifierFields)? = fields["identifier"],
-            case .string(let name)? = identifierFields["name"]
-        else {
-            return nil
-        }
-        return name
-    }
-
-    private static func markerValues(
-        from applications: [MacroApplication],
-        declarations: [String: MarkerDeclaration]
-    ) -> [CompileTimeValue] {
-        applications.compactMap { application in
-            guard declarations[application.name] != nil else {
-                return nil
-            }
-            return .object(
-                typeName: "Marker.Application",
-                fields: [
-                    "identifier": .object(
-                        typeName: "Identifier",
-                        fields: ["name": .string(application.name)]
-                    ),
-                    "value": .object(typeName: "Void", fields: [:]),
-                ]
-            )
-        }
-    }
-
-    private static func markerRecord(for application: CompileTimeValue) -> CompileTimeValue {
-        .object(
-            typeName: "Marker",
-            fields: [
-                "application": application
-            ]
-        )
     }
 }
 

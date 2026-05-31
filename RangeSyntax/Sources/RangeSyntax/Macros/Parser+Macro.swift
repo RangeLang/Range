@@ -306,7 +306,7 @@ extension Parser {
                         )
                     )
                 )
-            case .markerAttribute(let name):
+            case .hashAttribute(let name):
                 flushText()
                 advance()
                 let arguments = try parseInvocationArgumentsIfPresent()

@@ -10,7 +10,7 @@ construct IdentityCodableMacroFixture {
 }
 
 @codable(.snakeCase)
-construct MarkerOverrideCodableMacroFixture {
+construct MacroOverrideCodableMacroFixture {
     #codingKey("id")
     let userId: Int
 }

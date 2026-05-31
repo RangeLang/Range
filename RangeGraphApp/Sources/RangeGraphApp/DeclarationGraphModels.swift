@@ -101,7 +101,6 @@ enum DeclarationGraphPalette {
         .enumeration: Color(red: 0.60, green: 0.37, blue: 0.24),
         .protocolDefinition: Color(red: 0.39, green: 0.32, blue: 0.48),
         .macro: Color(red: 0.18, green: 0.32, blue: 0.44),
-        .marker: Color(red: 0.35, green: 0.48, blue: 0.38),
         .typeExtension: Color(red: 0.30, green: 0.57, blue: 0.55),
         .mainBlock: Color(red: 0.86, green: 0.66, blue: 0.22),
         .state: Color(red: 0.70, green: 0.35, blue: 0.15),

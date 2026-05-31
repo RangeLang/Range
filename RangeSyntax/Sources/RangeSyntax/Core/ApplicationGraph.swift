@@ -69,7 +69,7 @@ struct GraphCollector {
                 parentID: fileID,
                 qualifiedPrefix: declaration.name
             )
-        case .enumeration, .protocolDefinition, .macro, .marker:
+        case .enumeration, .protocolDefinition, .macro:
             return
         case .extensions(let declarations):
             for declaration in declarations where declarationGraph.hasNamespace(named: declaration.targetName) {
@@ -390,7 +390,6 @@ struct GraphCollector {
         case .enumeration: return .enumeration
         case .protocolDefinition: return .protocolDefinition
         case .macro: return .macro
-        case .marker: return .marker
         case .typeExtension: return .typeExtension
         case .mainBlock: return .mainBlock
         case .state: return .state
@@ -430,7 +429,7 @@ struct GraphCollector {
         label: String
     ) {
         switch kind {
-        case .construct, .enumeration, .protocolDefinition, .macro, .marker:
+        case .construct, .enumeration, .protocolDefinition, .macro:
             let name = declarationName(for: entityID, fallbackLabel: label)
             resolutionIndex.declarationProjectionNodeIDsByName[name, default: []].insert(entityID)
         case .function:

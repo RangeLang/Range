@@ -33,23 +33,23 @@ enum PackageManifestLoader {
             guard declaration.attribute == nil else {
                 throw ValidationError("Project.range cannot use declaration attributes.")
             }
-            let usesProjectMarker = declaration.macros.contains { $0.name == "Project" }
+            let usesProjectMacroMetadata = declaration.macros.contains { $0.name == "Project" }
             let usesPackageMacro = declaration.macros.contains { $0.name == "package" }
-            guard usesProjectMarker || usesPackageMacro else {
+            guard usesProjectMacroMetadata || usesPackageMacro else {
                 throw ValidationError(
                     "Project.range must declare #Project construct Name { ... }.")
             }
 
             let name =
                 try titleValue(named: "name", in: declaration.values)
-                ?? (usesProjectMarker || usesPackageMacro ? declaration.name : nil)
+                ?? (usesProjectMacroMetadata || usesPackageMacro ? declaration.name : nil)
                 ?? requiredTitleValue(named: "name", in: declaration.values)
             let version = try requiredVersionValue(named: "version", in: declaration.values)
             let author = try requiredStringValue(named: "author", in: declaration.values)
             let remote = stringValue(named: "remote", in: declaration.values)
             let remoteURLs = remoteURLs(remote: remote, in: declaration.values)
             let resolvedRemoteURLs =
-                remoteURLs.isEmpty && (usesProjectMarker || usesPackageMacro)
+                remoteURLs.isEmpty && (usesProjectMacroMetadata || usesPackageMacro)
                 ? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
                 : remoteURLs
             return PackageManifest(
@@ -64,7 +64,7 @@ enum PackageManifestLoader {
             throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         case .protocolDefinition:
             throw ValidationError("Project.range must declare #Project construct Name { ... }.")
-        case .macro, .marker:
+        case .macro:
             throw ValidationError("Project.range must declare #Project construct Name { ... }.")
         }
     }

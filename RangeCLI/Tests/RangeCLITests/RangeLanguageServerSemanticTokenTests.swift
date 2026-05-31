@@ -313,17 +313,17 @@ struct RangeLanguageServerSemanticTokenTests {
         #expect(!interpolationIdentifierHasSemanticToken)
     }
 
-    @Test("Marker declarations emit semantic tokens")
-    func markerDeclarationsEmitSemanticTokens() {
+    @Test("Macro declarations emit semantic tokens")
+    func macroDeclarationsEmitSemanticTokens() {
         let source = """
-        marker codingKey<T>(_ value: String): Let<T> -> String {
+        macro codingKey<T>(_ value: String): Let<T> -> String {
             return value
         }
         """
 
         let tokens = RangeLanguageServer.debugSemanticTokenSnapshots(in: source)
 
-        #expect(containsExactToken(tokens, text: "marker", type: .keyword, modifiers: []))
+        #expect(containsExactToken(tokens, text: "macro", type: .keyword, modifiers: []))
         #expect(containsToken(tokens, text: "codingKey", type: .macro, modifiers: [.declaration]))
         #expect(containsExactToken(tokens, text: "_", type: .label, modifiers: [.declaration]))
         #expect(!containsExactToken(tokens, text: "value", type: .parameter, modifiers: [.declaration]))

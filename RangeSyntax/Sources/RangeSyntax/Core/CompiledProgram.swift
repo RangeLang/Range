@@ -114,7 +114,7 @@ public struct CompilerPipeline {
         let discoveredCoreMacrosByName = MacroExpander.collectMacros(
             from: discoveredCoreDeclarationFiles
         )
-        let discoveredCoreMarkersByName = MacroExpander.collectMarkers(
+        let discoveredCoreMacroMetadataByName = MacroExpander.collectMacroMetadata(
             from: discoveredCoreDeclarationFiles
         )
         let discoveredCoreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
@@ -130,7 +130,7 @@ public struct CompilerPipeline {
             ),
             discoveredCallableReturnTypes: discoveredCoreCallableReturnTypes,
             macroDeclarationsByName: discoveredCoreMacrosByName,
-            markerDeclarationsByName: discoveredCoreMarkersByName,
+            macroMetadataDeclarationsByName: discoveredCoreMacroMetadataByName,
             macroExpansionTypes: discoveredCoreMacroExpansionTypes
         )
 
@@ -144,12 +144,12 @@ public struct CompilerPipeline {
         )
 
         let coreMacrosByName = MacroExpander.collectMacros(from: parsedCoreFiles)
-        let coreMarkersByName = MacroExpander.collectMarkers(from: parsedCoreFiles)
+        let coreMacroMetadataByName = MacroExpander.collectMacroMetadata(from: parsedCoreFiles)
         let coreMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(from: parsedCoreFiles)
         let discoveredProjectDeclarationFiles = try discoverProjectDeclarationFiles(
             inputs: projectInputs,
             macroDeclarationsByName: coreMacrosByName,
-            markerDeclarationsByName: coreMarkersByName
+            macroMetadataDeclarationsByName: coreMacroMetadataByName
         )
         try runRuntimeHooks(
             runtimeHooks,
@@ -169,7 +169,7 @@ public struct CompilerPipeline {
         let discoveredProjectMacrosByName = MacroExpander.collectMacros(
             from: discoveredProjectDeclarationFiles
         )
-        let discoveredProjectMarkersByName = MacroExpander.collectMarkers(
+        let discoveredProjectMacroMetadataByName = MacroExpander.collectMacroMetadata(
             from: discoveredProjectDeclarationFiles
         )
         let discoveredProjectMacroExpansionTypes = MacroExpander.collectMacroExpansionTypes(
@@ -178,7 +178,7 @@ public struct CompilerPipeline {
         let projectMacrosByName = coreMacrosByName.merging(discoveredProjectMacrosByName) { _, new in
             new
         }
-        let projectMarkersByName = coreMarkersByName.merging(discoveredProjectMarkersByName) {
+        let projectMacroMetadataByName = coreMacroMetadataByName.merging(discoveredProjectMacroMetadataByName) {
             _, new in new
         }
         let parsedProjectFiles = try parse(
@@ -191,7 +191,7 @@ public struct CompilerPipeline {
             ),
             discoveredCallableReturnTypes: discoveredProjectCallableReturnTypes,
             macroDeclarationsByName: projectMacrosByName,
-            markerDeclarationsByName: projectMarkersByName,
+            macroMetadataDeclarationsByName: projectMacroMetadataByName,
             macroExpansionTypes: coreMacroExpansionTypes.merging(
                 discoveredProjectMacroExpansionTypes
             ) { _, new in new }
@@ -314,11 +314,11 @@ public struct CompilerPipeline {
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
         discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
-        markerDeclarationsByName: [String: MarkerDeclaration] = [:],
+        macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:]
     ) throws -> [ParsedSourceFile] {
         var currentMacrosByName = macroDeclarationsByName
-        var currentMarkersByName = markerDeclarationsByName
+        var currentMacroMetadataByName = macroMetadataDeclarationsByName
         var currentMacroExpansionResolver = declarationMacroExpansionResolver
         var currentMacroExpansionTypes = macroExpansionTypes
         var parsedFiles: [ParsedSourceFile] = []
@@ -332,7 +332,7 @@ public struct CompilerPipeline {
                 declarationMacroExpansionResolver: currentMacroExpansionResolver,
                 discoveredCallableReturnTypes: discoveredCallableReturnTypes,
                 macroDeclarationsByName: currentMacrosByName,
-                markerDeclarationsByName: currentMarkersByName,
+                macroMetadataByName: currentMacroMetadataByName,
                 macroExpansionTypes: currentMacroExpansionTypes,
                 allowInitializerDeclarations: false
             )
@@ -362,9 +362,9 @@ public struct CompilerPipeline {
                     MacroExpander.collectMacroExpansionTypes(from: [parsedFile])
                 ) { _, new in new }
             }
-            let discoveredMarkers = MacroExpander.collectMarkers(from: [parsedFile])
-            if !discoveredMarkers.isEmpty {
-                currentMarkersByName.merge(discoveredMarkers) { _, new in new }
+            let discoveredMacroMetadata = MacroExpander.collectMacroMetadata(from: [parsedFile])
+            if !discoveredMacroMetadata.isEmpty {
+                currentMacroMetadataByName.merge(discoveredMacroMetadata) { _, new in new }
             }
         }
 
@@ -374,22 +374,22 @@ public struct CompilerPipeline {
     private func discoverProjectDeclarationFiles(
         inputs: [SourceInput],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
-        markerDeclarationsByName: [String: MarkerDeclaration] = [:]
+        macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration] = [:]
     ) throws -> [ParsedSourceFile] {
         let discoveredMacrosByName = try discoverMacroDeclarations(
             inputs: inputs,
             macroDeclarationsByName: macroDeclarationsByName,
-            markerDeclarationsByName: markerDeclarationsByName
+            macroMetadataDeclarationsByName: macroMetadataDeclarationsByName
         )
         let macrosByName = macroDeclarationsByName.merging(discoveredMacrosByName) {
             _, new in new
         }
-        let discoveredMarkersByName = try discoverMarkerDeclarations(
+        let discoveredMacroMetadataByName = try discoverMacroMetadataDeclarations(
             inputs: inputs,
             macroDeclarationsByName: macrosByName,
-            markerDeclarationsByName: markerDeclarationsByName
+            macroMetadataDeclarationsByName: macroMetadataDeclarationsByName
         )
-        let markersByName = markerDeclarationsByName.merging(discoveredMarkersByName) {
+        let macroMetadataByName = macroMetadataDeclarationsByName.merging(discoveredMacroMetadataByName) {
             _, new in new
         }
         var parsedFiles: [ParsedSourceFile] = []
@@ -398,7 +398,7 @@ public struct CompilerPipeline {
             var parser = try Parser(
                 source: input.source,
                 macroDeclarationsByName: macrosByName,
-                markerDeclarationsByName: markersByName,
+                macroMetadataByName: macroMetadataByName,
                 allowInitializerDeclarations: false
             )
             let sourceFile: SourceFileNode
@@ -423,7 +423,7 @@ public struct CompilerPipeline {
     private func discoverMacroDeclarations(
         inputs: [SourceInput],
         macroDeclarationsByName: [String: MacroDeclaration],
-        markerDeclarationsByName: [String: MarkerDeclaration]
+        macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration]
     ) throws -> [String: MacroDeclaration] {
         var macrosByName = macroDeclarationsByName
 
@@ -431,7 +431,7 @@ public struct CompilerPipeline {
             var parser = try Parser(
                 source: input.source,
                 macroDeclarationsByName: macrosByName,
-                markerDeclarationsByName: markerDeclarationsByName,
+                macroMetadataByName: macroMetadataDeclarationsByName,
                 allowInitializerDeclarations: false
             )
             let sourceFile: SourceFileNode
@@ -456,18 +456,18 @@ public struct CompilerPipeline {
         return macrosByName
     }
 
-    private func discoverMarkerDeclarations(
+    private func discoverMacroMetadataDeclarations(
         inputs: [SourceInput],
         macroDeclarationsByName: [String: MacroDeclaration],
-        markerDeclarationsByName: [String: MarkerDeclaration]
-    ) throws -> [String: MarkerDeclaration] {
-        var markersByName = markerDeclarationsByName
+        macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration]
+    ) throws -> [String: MacroMetadataDeclaration] {
+        var macroMetadataByName = macroMetadataDeclarationsByName
 
         for input in inputs {
             var parser = try Parser(
                 source: input.source,
                 macroDeclarationsByName: macroDeclarationsByName,
-                markerDeclarationsByName: markersByName,
+                macroMetadataByName: macroMetadataDeclarationsByName,
                 allowInitializerDeclarations: false
             )
             let sourceFile: SourceFileNode
@@ -483,13 +483,13 @@ public struct CompilerPipeline {
                 source: input.source,
                 sourceFile: sourceFile
             )
-            let discoveredMarkers = MacroExpander.collectMarkers(from: [parsedFile])
-            if !discoveredMarkers.isEmpty {
-                markersByName.merge(discoveredMarkers) { _, new in new }
+            let discoveredMacroMetadata = MacroExpander.collectMacroMetadata(from: [parsedFile])
+            if !discoveredMacroMetadata.isEmpty {
+                macroMetadataByName.merge(discoveredMacroMetadata) { _, new in new }
             }
         }
 
-        return markersByName
+        return macroMetadataByName
     }
 
     private func collectCallableReturnTypes(

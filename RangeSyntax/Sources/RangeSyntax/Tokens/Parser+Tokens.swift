@@ -190,7 +190,7 @@ extension Parser {
         case .identifier(let value) where value.first?.isUppercase == true,
             .keyword(let value) where value.first?.isUppercase == true:
             offset += 1
-        case .markerAttribute, .macroAttribute:
+        case .hashAttribute, .macroAttribute:
             offset += 1
         default:
             return false
@@ -328,7 +328,7 @@ extension Parser {
 
         let baseName: String
         switch peek() {
-        case .markerAttribute(let name):
+        case .hashAttribute(let name):
             advance()
             baseName = "#\(name)"
         case .macroAttribute(let name, nil):

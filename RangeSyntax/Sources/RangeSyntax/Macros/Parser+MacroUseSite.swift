@@ -2,7 +2,7 @@ import Foundation
 
 extension Parser {
     func isMacroApplicationStart() -> Bool {
-        if case .markerAttribute = peek() {
+        if case .hashAttribute = peek() {
             return true
         }
         if case .macroAttribute(let name, _) = peek(), isMacroApplicationAttribute(name) {
@@ -95,7 +95,7 @@ extension Parser {
 
     func macroApplicationName(at offset: Int) -> String? {
         switch peek(offset: offset) {
-        case .markerAttribute(let name):
+        case .hashAttribute(let name):
             return name
         case .macroAttribute(let name, _) where isMacroApplicationAttribute(name, offset: offset):
             return name
@@ -201,7 +201,7 @@ extension Parser {
             return "#"
         case .identifier(let value):
             return value
-        case .markerAttribute(let value):
+        case .hashAttribute(let value):
             return "#\(value)"
         case .foreignBody(_, let value):
             return value

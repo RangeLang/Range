@@ -7,7 +7,6 @@ construct Construct {
     construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType>, SyntaxEmittable {
         let self: SelfType
         let macros: [Macro.Application]
-        let markers: [Marker.Application]
         let generics: [Generic]
         let conformances: [NominalTypeReference]
         let lets: [Let]

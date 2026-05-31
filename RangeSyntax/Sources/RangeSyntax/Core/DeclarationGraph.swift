@@ -4,7 +4,6 @@ public enum DeclarationSourceKind: Hashable {
     case type
     case namespace
     case macro
-    case marker
     case function
 }
 
@@ -37,7 +36,7 @@ public struct DeclarationGraph {
     public let constructsByName: [String: ConstructDeclaration]
     public let enumsByName: [String: EnumDeclaration]
     public let macrosByName: [String: MacroDeclaration]
-    public let markersByName: [String: MarkerDeclaration]
+    public let macroMetadataByName: [String: MacroMetadataDeclaration]
     public let extensionsByTargetName: [String: [ExtensionDeclaration]]
     public let topLevelStatesByFilePath: [String: [StateDeclaration]]
     public let statesByConstructName: [String: [StateDeclaration]]
@@ -66,15 +65,15 @@ public struct DeclarationGraph {
         let packageValues = packageSpaces.flatMap(\.values)
             + Self.collectPackageManifestValues(from: files)
         let protocols = Self.collectProtocols(from: files)
-        let markers = Self.collectMarkers(from: files)
-        let metadataSlotMarkers = Self.metadataSlotMarkerNames(in: markers)
+        let macroMetadata = Self.collectMacroMetadata(from: files)
+        let metadataSlotMacros = Self.metadataSlotMacroNames(in: macroMetadata)
         let namespaces = Self.collectNamespaces(
             from: files,
-            metadataSlotMarkers: metadataSlotMarkers
+            metadataSlotMacros: metadataSlotMacros
         )
         let namespaceAttributeNames = Self.collectNamespaceAttributeNames(
             from: files,
-            metadataSlotMarkers: metadataSlotMarkers
+            metadataSlotMacros: metadataSlotMacros
         )
         let namespaceAttributeAttachments = Self.collectNamespaceAttributeAttachments(
             from: files,
@@ -84,7 +83,7 @@ public struct DeclarationGraph {
         let constructs = Self.collectConstructs(
             from: files,
             protocols: protocols,
-            metadataSlotMarkers: metadataSlotMarkers
+            metadataSlotMacros: metadataSlotMacros
         )
         let enumerations = Self.collectEnums(from: files)
         let macros = Self.collectMacros(from: files)
@@ -115,7 +114,7 @@ public struct DeclarationGraph {
         self.constructsByName = constructs
         self.enumsByName = enumerations
         self.macrosByName = macros
-        self.markersByName = markers
+        self.macroMetadataByName = macroMetadata
         self.extensionsByTargetName = extensions
         self.topLevelStatesByFilePath = topLevelStates
         self.statesByConstructName = statesByConstructName
@@ -266,8 +265,8 @@ public struct DeclarationGraph {
         namespaceAttributeNames.contains(name)
     }
 
-    public func markerApplicationHasMetadataSlotEffect(_ application: MacroApplication) -> Bool {
-        markersByName[application.name]?.hasMetadataSlotEffect == true
+    public func macroApplicationHasMetadataSlotEffect(_ application: MacroApplication) -> Bool {
+        macroMetadataByName[application.name]?.hasMetadataSlotEffect == true
     }
 
     public func isNamespaceShaped(_ declaration: ConstructDeclaration) -> Bool {
@@ -277,7 +276,7 @@ public struct DeclarationGraph {
     public func namespaceDeclaration(from construct: ConstructDeclaration) -> NamespaceDeclaration {
         Self.namespaceDeclaration(
             from: construct,
-            metadataSlotMarkers: Self.metadataSlotMarkerNames(in: markersByName)
+            metadataSlotMacros: Self.metadataSlotMacroNames(in: macroMetadataByName)
         )
     }
 
@@ -678,7 +677,7 @@ public struct DeclarationGraph {
 
     static func collectPackageManifestValues(from files: [ParsedSourceFile]) -> [ValueDeclaration] {
         files.flatMap { parsedFile in
-            constructs(in: parsedFile.sourceFile, metadataSlotMarkers: [])
+            constructs(in: parsedFile.sourceFile, metadataSlotMacros: [])
                 .filter { $0.macros.contains { $0.name == "package" } }
                 .flatMap(\.values)
         }
@@ -687,18 +686,18 @@ public struct DeclarationGraph {
     static func collectConstructs(
         from files: [ParsedSourceFile],
         protocols: [String: ProtocolDeclaration],
-        metadataSlotMarkers: Set<String>
+        metadataSlotMacros: Set<String>
     ) -> [String: ConstructDeclaration] {
         var registry: [String: ConstructDeclaration] = [:]
         let namespaceRegistry = collectNamespaces(
             from: files,
-            metadataSlotMarkers: metadataSlotMarkers
+            metadataSlotMacros: metadataSlotMacros
         )
         let extensions = collectExtensions(from: files)
         for parsedFile in files {
             for declaration in constructs(
                 in: parsedFile.sourceFile,
-                metadataSlotMarkers: metadataSlotMarkers
+                metadataSlotMacros: metadataSlotMacros
             ) {
                 collectConstruct(
                     declaration,
@@ -709,7 +708,7 @@ public struct DeclarationGraph {
             }
             for namespace in namespaces(
                 in: parsedFile.sourceFile,
-                metadataSlotMarkers: metadataSlotMarkers
+                metadataSlotMacros: metadataSlotMacros
             ) {
                 collectNamespaceConstructs(
                     in: namespace,
@@ -734,13 +733,13 @@ public struct DeclarationGraph {
 
     static func collectNamespaces(
         from files: [ParsedSourceFile],
-        metadataSlotMarkers: Set<String>
+        metadataSlotMacros: Set<String>
     ) -> [String: NamespaceDeclaration] {
         var registry: [String: NamespaceDeclaration] = [:]
         for parsedFile in files {
             for declaration in namespaces(
                 in: parsedFile.sourceFile,
-                metadataSlotMarkers: metadataSlotMarkers
+                metadataSlotMacros: metadataSlotMacros
             ) {
                 collectNamespace(
                     declaration,
@@ -754,13 +753,13 @@ public struct DeclarationGraph {
 
     static func collectNamespaceAttributeNames(
         from files: [ParsedSourceFile],
-        metadataSlotMarkers: Set<String>
+        metadataSlotMacros: Set<String>
     ) -> Set<String> {
         var names: Set<String> = []
         for parsedFile in files {
             for declaration in namespaces(
                 in: parsedFile.sourceFile,
-                metadataSlotMarkers: metadataSlotMarkers
+                metadataSlotMacros: metadataSlotMacros
             ) {
                 collectNamespaceAttributeName(declaration, into: &names)
             }
@@ -804,12 +803,9 @@ public struct DeclarationGraph {
         return registry
     }
 
-    static func collectMarkers(from files: [ParsedSourceFile]) -> [String: MarkerDeclaration] {
-        var registry: [String: MarkerDeclaration] = [:]
+    static func collectMacroMetadata(from files: [ParsedSourceFile]) -> [String: MacroMetadataDeclaration] {
+        var registry: [String: MacroMetadataDeclaration] = [:]
         for parsedFile in files {
-            for declaration in markers(in: parsedFile.sourceFile) {
-                registry[declaration.name] = declaration
-            }
             for declaration in macros(in: parsedFile.sourceFile) {
                 guard let metadata = MacroExpander.metadataDeclaration(from: declaration) else {
                     continue
@@ -862,15 +858,6 @@ public struct DeclarationGraph {
                     path: path,
                     pattern: #"\bmacro\s+([A-Za-z_][A-Za-z0-9_]*)"#,
                     kind: .macro
-                )
-            )
-            result.append(
-                contentsOf: declarationSourceLocations(
-                    in: line,
-                    lineIndex: lineIndex,
-                    path: path,
-                    pattern: #"\bmarker\s+([A-Za-z_][A-Za-z0-9_]*)"#,
-                    kind: .marker
                 )
             )
             result.append(
@@ -1007,12 +994,12 @@ public struct DeclarationGraph {
         from files: [ParsedSourceFile]
     ) -> [String: [RangeFunctionParameter]] {
         var registry: [String: [RangeFunctionParameter]] = [:]
-        let metadataSlotMarkers = metadataSlotMarkerNames(
-            in: collectMarkers(from: files)
+        let metadataSlotMacros = metadataSlotMacroNames(
+            in: collectMacroMetadata(from: files)
         )
         let namespaceRegistry = collectNamespaces(
             from: files,
-            metadataSlotMarkers: metadataSlotMarkers
+            metadataSlotMacros: metadataSlotMacros
         )
         let extensions = collectExtensions(from: files)
 
@@ -1029,7 +1016,7 @@ public struct DeclarationGraph {
                 for construct in module.constructs + module.packageSpaces.flatMap(\.constructs)
                 where !isNamespaceShaped(
                     construct,
-                    metadataSlotMarkers: metadataSlotMarkers
+                    metadataSlotMacros: metadataSlotMacros
                 ) {
                     collectCallableParameters(
                         in: construct,
@@ -1041,13 +1028,13 @@ public struct DeclarationGraph {
                     .filter {
                         isNamespaceShaped(
                             $0,
-                            metadataSlotMarkers: metadataSlotMarkers
+                            metadataSlotMacros: metadataSlotMacros
                         )
                     }
                     .map {
                         namespaceDeclaration(
                             from: $0,
-                            metadataSlotMarkers: metadataSlotMarkers
+                            metadataSlotMacros: metadataSlotMacros
                         )
                     }
                 for namespace in module.namespaces + module.packageSpaces.flatMap(\.namespaces)
@@ -1062,11 +1049,11 @@ public struct DeclarationGraph {
             case .construct(let construct):
                 if isNamespaceShaped(
                     construct,
-                    metadataSlotMarkers: metadataSlotMarkers
+                    metadataSlotMacros: metadataSlotMacros
                 ) {
                     let namespace = namespaceDeclaration(
                         from: construct,
-                        metadataSlotMarkers: metadataSlotMarkers
+                        metadataSlotMacros: metadataSlotMacros
                     )
                     collectNamespaceCallableParameters(
                         in: namespace,
@@ -1086,7 +1073,7 @@ public struct DeclarationGraph {
                     registry: &registry,
                     qualifiedPrefix: namespace.name
                 )
-            case .enumeration, .protocolDefinition, .macro, .marker, .mainBlock, .extensions:
+            case .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
                 continue
             }
         }
@@ -1195,12 +1182,12 @@ public struct DeclarationGraph {
     static func collectCallables(from files: [ParsedSourceFile]) -> [String: [CallableDeclaration]]
     {
         var registry: [String: [CallableDeclaration]] = [:]
-        let metadataSlotMarkers = metadataSlotMarkerNames(
-            in: collectMarkers(from: files)
+        let metadataSlotMacros = metadataSlotMacroNames(
+            in: collectMacroMetadata(from: files)
         )
         let namespaceRegistry = collectNamespaces(
             from: files,
-            metadataSlotMarkers: metadataSlotMarkers
+            metadataSlotMacros: metadataSlotMacros
         )
         let extensions = collectExtensions(from: files)
         for parsedFile in files {
@@ -1209,7 +1196,7 @@ public struct DeclarationGraph {
             }
             for namespace in namespaces(
                 in: parsedFile.sourceFile,
-                metadataSlotMarkers: metadataSlotMarkers
+                metadataSlotMacros: metadataSlotMacros
             ) {
                 collectNamespaceCallables(
                     in: namespace,
@@ -1430,7 +1417,7 @@ public struct DeclarationGraph {
                     namespacesByName: namespacesByName
                 )
             }
-        case .mainBlock, .macro, .marker:
+        case .mainBlock, .macro:
             return []
         }
     }
@@ -1758,7 +1745,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.protocols + module.packageSpaces.flatMap(\.protocols)
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -1767,37 +1754,37 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.packageSpaces
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
 
     static func constructs(
         in sourceFile: SourceFileNode,
-        metadataSlotMarkers: Set<String>
+        metadataSlotMacros: Set<String>
     ) -> [ConstructDeclaration] {
         switch sourceFile {
         case .construct(let declaration):
             return isNamespaceShaped(
                 declaration,
-                metadataSlotMarkers: metadataSlotMarkers
+                metadataSlotMacros: metadataSlotMacros
             ) ? [] : [declaration]
         case .module(let module):
             return (module.constructs + module.packageSpaces.flatMap(\.constructs))
                 .filter {
                     !isNamespaceShaped(
                         $0,
-                        metadataSlotMarkers: metadataSlotMarkers
+                        metadataSlotMacros: metadataSlotMacros
                     )
                 }
-        case .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+        case .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
 
     static func namespaces(
         in sourceFile: SourceFileNode,
-        metadataSlotMarkers: Set<String>
+        metadataSlotMacros: Set<String>
     ) -> [NamespaceDeclaration] {
         switch sourceFile {
         case .namespace(let declaration):
@@ -1807,68 +1794,68 @@ public struct DeclarationGraph {
                 .filter {
                     isNamespaceShaped(
                         $0,
-                        metadataSlotMarkers: metadataSlotMarkers
+                        metadataSlotMacros: metadataSlotMacros
                     )
                 }
                 .map {
                     namespaceDeclaration(
                         from: $0,
-                        metadataSlotMarkers: metadataSlotMarkers
+                        metadataSlotMacros: metadataSlotMacros
                     )
                 }
             return module.namespaces + module.packageSpaces.flatMap(\.namespaces) + namespaceConstructs
         case .construct(let declaration):
             return isNamespaceShaped(
                 declaration,
-                metadataSlotMarkers: metadataSlotMarkers
+                metadataSlotMacros: metadataSlotMacros
             )
                 ? [
                     namespaceDeclaration(
                         from: declaration,
-                        metadataSlotMarkers: metadataSlotMarkers
+                        metadataSlotMacros: metadataSlotMacros
                     )
                 ] : []
-        case .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+        case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
 
     static func namespaceDeclaration(
         from construct: ConstructDeclaration,
-        metadataSlotMarkers: Set<String>
+        metadataSlotMacros: Set<String>
     ) -> NamespaceDeclaration {
         NamespaceDeclaration(
             name: construct.name,
             values: construct.values,
             callables: construct.callables,
             constructs: construct.constructs.filter {
-                !isNamespaceShaped($0, metadataSlotMarkers: metadataSlotMarkers)
+                !isNamespaceShaped($0, metadataSlotMacros: metadataSlotMacros)
             },
             namespaces: construct.constructs
                 .filter {
                     isNamespaceShaped(
                         $0,
-                        metadataSlotMarkers: metadataSlotMarkers
+                        metadataSlotMacros: metadataSlotMacros
                     )
                 }
                 .map {
                     namespaceDeclaration(
                         from: $0,
-                        metadataSlotMarkers: metadataSlotMarkers
+                        metadataSlotMacros: metadataSlotMacros
                     )
                 }
         )
     }
 
-    static func metadataSlotMarkerNames(
-        in markers: [String: MarkerDeclaration]
+    static func metadataSlotMacroNames(
+        in macroMetadata: [String: MacroMetadataDeclaration]
     ) -> Set<String> {
-        Set(markers.values.filter(\.hasMetadataSlotEffect).map(\.name))
+        Set(macroMetadata.values.filter(\.hasMetadataSlotEffect).map(\.name))
     }
 
     static func isNamespaceShaped(
         _ declaration: ConstructDeclaration,
-        metadataSlotMarkers: Set<String>
+        metadataSlotMacros: Set<String>
     ) -> Bool {
         false
     }
@@ -1877,7 +1864,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .marker, .mainBlock, .extensions:
+        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
             return []
         }
     }
@@ -1888,7 +1875,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.enumerations + module.packageSpaces.flatMap(\.enumerations)
-        case .construct, .namespace, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+        case .construct, .namespace, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1899,18 +1886,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .namespace, .enumeration, .mainBlock, .protocolDefinition, .marker, .extensions:
-            return []
-        }
-    }
-
-    static func markers(in sourceFile: SourceFileNode) -> [MarkerDeclaration] {
-        switch sourceFile {
-        case .marker(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.markers
-        case .construct, .namespace, .enumeration, .mainBlock, .protocolDefinition, .macro, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1921,7 +1897,7 @@ public struct DeclarationGraph {
             return declarations
         case .module(let module):
             return module.extensions
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition:
             return []
         }
     }
@@ -1930,7 +1906,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.operators
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1939,7 +1915,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.precedenceGroups
-        case .construct, .namespace, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+        case .construct, .namespace, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -1950,7 +1926,7 @@ public struct DeclarationGraph {
             return module.callables + module.packageSpaces.flatMap(\.callables)
         case .namespace(let declaration):
             return declaration.callables
-        case .construct, .enumeration, .mainBlock, .macro, .marker, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
             return []
         }
     }
@@ -2096,8 +2072,6 @@ private struct SemanticGraphCollector {
             addProtocol(declaration, parentID: fileID)
         case .macro(let declaration):
             addMacroDeclaration(declaration, parentID: fileID)
-        case .marker(let declaration):
-            addMarkerDeclaration(declaration, parentID: fileID)
         case .extensions(let declarations):
             for declaration in declarations {
                 addExtension(declaration, parentID: fileID)
@@ -2131,9 +2105,6 @@ private struct SemanticGraphCollector {
             }
             for declaration in module.macros {
                 addMacroDeclaration(declaration, parentID: fileID)
-            }
-            for declaration in module.markers {
-                addMarkerDeclaration(declaration, parentID: fileID)
             }
             for declaration in module.extensions {
                 addExtension(declaration, parentID: fileID)
@@ -2276,14 +2247,6 @@ private struct SemanticGraphCollector {
         if let expansionType = declaration.expansionType {
             addTypeReference(expansionType, from: macroID, kind: .referencesType)
         }
-    }
-
-    private mutating func addMarkerDeclaration(_ declaration: MarkerDeclaration, parentID: String) {
-        let markerID = "\(parentID)/marker:\(declaration.name)"
-        addEntity(id: markerID, kind: .marker, label: declaration.name)
-        addRelation(from: parentID, to: markerID, kind: .contains)
-        addTypeReferences(declaration.target.typeReferences, from: markerID, kind: .targetsMacro)
-        addTypeReference(declaration.valueType, from: markerID, kind: .referencesType)
     }
 
     private mutating func addExtension(_ declaration: ExtensionDeclaration, parentID: String) {

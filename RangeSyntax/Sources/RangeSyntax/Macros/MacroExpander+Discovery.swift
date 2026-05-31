@@ -52,17 +52,14 @@ extension MacroExpander {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .namespace, .enumeration, .protocolDefinition, .marker, .mainBlock, .extensions:
+        case .construct, .namespace, .enumeration, .protocolDefinition, .mainBlock, .extensions:
             return []
         }
     }
 
-    public static func collectMarkers(from files: [ParsedSourceFile]) -> [String: MarkerDeclaration] {
-        var registry: [String: MarkerDeclaration] = [:]
+    public static func collectMacroMetadata(from files: [ParsedSourceFile]) -> [String: MacroMetadataDeclaration] {
+        var registry: [String: MacroMetadataDeclaration] = [:]
         for parsedFile in files {
-            for marker in self.markers(in: parsedFile.sourceFile) {
-                registry[marker.name] = marker
-            }
             for macro in self.macros(in: parsedFile.sourceFile) {
                 guard let metadata = metadataDeclaration(from: macro) else {
                     continue
@@ -73,18 +70,7 @@ extension MacroExpander {
         return registry
     }
 
-    static func markers(in sourceFile: SourceFileNode) -> [MarkerDeclaration] {
-        switch sourceFile {
-        case .marker(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.markers
-        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
-            return []
-        }
-    }
-
-    static func metadataDeclaration(from macro: MacroDeclaration) -> MarkerDeclaration? {
+    static func metadataDeclaration(from macro: MacroDeclaration) -> MacroMetadataDeclaration? {
         guard let firstTarget = macro.target else {
             return nil
         }
@@ -100,14 +86,14 @@ extension MacroExpander {
         if let expansionType = macro.expansionType {
             target = firstTarget
             valueType = expansionType
-        } else if let effectTarget = firstType.markerEffectTarget {
+        } else if let effectTarget = firstType.macroMetadataEffectTarget {
             target = .syntax(effectTarget)
             valueType = firstType
         } else {
             return nil
         }
 
-        return MarkerDeclaration(
+        return MacroMetadataDeclaration(
             packageVisibility: macro.packageVisibility,
             name: macro.name,
             genericParameters: macro.genericParameters,

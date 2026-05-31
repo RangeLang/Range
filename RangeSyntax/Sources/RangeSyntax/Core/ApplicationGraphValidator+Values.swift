@@ -75,7 +75,7 @@ extension ApplicationGraphValidator {
                     bindingConstructNames: bindingConstructNames,
                     fileName: fileName
                 )
-            case .enumeration, .protocolDefinition, .macro, .marker, .extensions:
+            case .enumeration, .protocolDefinition, .macro, .extensions:
                 break
             }
         }

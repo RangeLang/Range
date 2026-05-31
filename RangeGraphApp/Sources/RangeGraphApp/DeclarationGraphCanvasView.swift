@@ -1896,7 +1896,6 @@ final class QuartzDeclarationGraphView: NSView {
         case .enumeration: return NSColor(calibratedRed: 0.60, green: 0.37, blue: 0.24, alpha: 1)
         case .protocolDefinition: return NSColor(calibratedRed: 0.39, green: 0.32, blue: 0.48, alpha: 1)
         case .macro: return NSColor(calibratedRed: 0.18, green: 0.32, blue: 0.44, alpha: 1)
-        case .marker: return NSColor(calibratedRed: 0.35, green: 0.48, blue: 0.38, alpha: 1)
         case .typeExtension: return NSColor(calibratedRed: 0.30, green: 0.57, blue: 0.55, alpha: 1)
         case .mainBlock: return NSColor(calibratedRed: 0.86, green: 0.66, blue: 0.22, alpha: 1)
         case .state: return NSColor(calibratedRed: 0.70, green: 0.35, blue: 0.15, alpha: 1)
@@ -2021,7 +2020,7 @@ private enum DeclarationNodeMetrics {
             return 18
         case .parameter, .member, .macroApplication, .packageEntry, .localSymbol:
             return 22
-        case .macro, .marker, .packageSpace:
+        case .macro, .packageSpace:
             return 40
         case .unresolved:
             return 16
@@ -2735,7 +2734,6 @@ struct ForceDirectedDeclarationLayout {
         .protocolDefinition,
         .namespace,
         .macro,
-        .marker,
         .typeExtension,
         .mainBlock,
         .function,
@@ -2750,7 +2748,6 @@ struct ForceDirectedDeclarationLayout {
         .enumeration,
         .protocolDefinition,
         .macro,
-        .marker,
         .typeExtension,
         .mainBlock,
         .function,

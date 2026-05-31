@@ -124,7 +124,7 @@ struct RangeAuthoredLexerCursor {
                 } else {
                     switch readHashIdentifier(start: start) {
                     case .success(let identifier):
-                        emit(kind: .markerAttribute(value: identifier), start: start)
+                        emit(kind: .hashAttribute(value: identifier), start: start)
                         let language = foreignBodyLanguage(directive: identifier)
                         if language != "" {
                             skipWhitespace()

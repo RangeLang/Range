@@ -53,27 +53,20 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("#Project marker requires a single project declaration")
-    func projectMarkerRequiresSingleProjectDeclaration() throws {
+    @Test("#Project macro requires a single project declaration")
+    func projectMacroRequiresSingleProjectDeclaration() throws {
         let inputs = [
             SourceInput(
                 path: "/tmp/DuplicateProjects.range",
                 source: """
                 open macro Project(): Construct -> Void { target, diagnostics, graph in
-                    let projectMarkers: Array<Marker>(
-                        graph.markers.where { entry in
-                            entry.application.identifier.name == "Project"
+                    let projectMacros: Array<Macro.Application>(
+                        graph.macros.where { entry in
+                            entry.identifier.name == "Project"
                         }
                     )
-                    if projectMarkers.count > 1 {
+                    if projectMacros.count > 1 {
                         diagnostics.error("A second #Project conflicts with the project already declared in this Range project.")
-                    }
-                }
-
-                construct Marker {
-                    construct Application<Value> {
-                        let identifier: Identifier
-                        let value: Value
                     }
                 }
 
@@ -102,8 +95,8 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("#Require validates marker target stored properties and functions")
-    func requireValidatesMarkerTargetStoredPropertiesAndFunctions() throws {
+    @Test("#Require validates macro target stored properties and functions")
+    func requireValidatesMacroTargetStoredPropertiesAndFunctions() throws {
         let inputs = [
             SourceInput(
                 path: "/tmp/RequireShape.range",
@@ -135,8 +128,8 @@ struct CompilerFixtureTests {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
-    @Test("#Require emits diagnostics for missing marker target members")
-    func requireEmitsDiagnosticsForMissingMarkerTargetMembers() throws {
+    @Test("#Require emits diagnostics for missing macro target members")
+    func requireEmitsDiagnosticsForMissingMacroTargetMembers() throws {
         let inputs = [
             SourceInput(
                 path: "/tmp/RequireMissingShape.range",
@@ -259,8 +252,8 @@ struct CompilerFixtureTests {
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 
-    @Test("Macros query graph through identities")
-    func macrosQueryGraphThroughIdentities() throws {
+    @Test("Macro metadata queries graph through identities")
+    func macroMetadataQueriesGraphThroughIdentities() throws {
         let source = """
         #tracked("root")
         construct User {
@@ -465,12 +458,12 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("WrittenSyntax marker isolates raw ASCII body")
-    func writtenSyntaxMarkerIsolatesRawASCIIBody() throws {
+    @Test("WrittenSyntax macro isolates raw ASCII body")
+    func writtenSyntaxMacroIsolatesRawASCIIBody() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/WrittenSyntaxMarker.range",
+                path: "/tmp/WrittenSyntaxMacro.range",
                 source: """
                 #WrittenSyntax {
                 function this is not parsed -> nope
@@ -489,12 +482,12 @@ struct CompilerFixtureTests {
         #expect(construct.macros.map(\.name) == ["WrittenSyntax"])
     }
 
-    @Test("Markers query graph through identities")
-    func markersQueryGraphThroughIdentities() throws {
+    @Test("Macros query graph through identities")
+    func macrosQueryGraphThroughIdentities() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/MarkerGraphIdentity.range",
+                path: "/tmp/MacroGraphIdentity.range",
                 source: """
                 macro graphName(): Construct -> String { target, diagnostics, graph in
                     let declaration: Construct.Declaration(graph.declaration(target.identity))
@@ -513,12 +506,12 @@ struct CompilerFixtureTests {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
-    @Test("Extension markers evaluate against extension target")
-    func extensionMarkersEvaluateAgainstExtensionTarget() throws {
+    @Test("Extension macros evaluate against extension target")
+    func extensionMacrosEvaluateAgainstExtensionTarget() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/ExtensionMarker.range",
+                path: "/tmp/ExtensionMacro.range",
                 source: """
                 macro extensionTargetName(): Extension -> String { target, diagnostics in
                     return target.target.name
@@ -546,12 +539,12 @@ struct CompilerFixtureTests {
         #expect(extensionDeclaration.macros.map(\.name) == ["extensionTargetName"])
     }
 
-    @Test("Extension markers reject non-extension targets")
-    func extensionMarkersRejectNonExtensionTargets() throws {
+    @Test("Extension macros reject non-extension targets")
+    func extensionMacrosRejectNonExtensionTargets() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/InvalidExtensionMarker.range",
+                path: "/tmp/InvalidExtensionMacro.range",
                 source: """
                 macro constructOnly(): Construct -> String { target, diagnostics in
                     return target.declaration.self.name
@@ -574,7 +567,7 @@ struct CompilerFixtureTests {
 
         do {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
-            Issue.record("Expected construct marker on extension to fail validation.")
+            Issue.record("Expected construct macro on extension to fail validation.")
         } catch {
             #expect(String(describing: error).contains("used on an extension but targets Construct"))
         }
@@ -693,8 +686,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
-    @Test("CompoundLiteral marker validates dotted unsigned integer initializer")
-    func compoundLiteralMarkerValidatesDottedUnsignedIntegerInitializer() throws {
+    @Test("CompoundLiteral macro validates dotted unsigned integer initializer")
+    func compoundLiteralMacroValidatesDottedUnsignedIntegerInitializer() throws {
         let inputs = [
             SourceInput(
                 path: "/tmp/CompoundLiteralVersion.range",
@@ -727,8 +720,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
-    @Test("CompoundLiteral marker rejects non matching version initializer")
-    func compoundLiteralMarkerRejectsNonMatchingVersionInitializer() throws {
+    @Test("CompoundLiteral macro rejects non matching version initializer")
+    func compoundLiteralMacroRejectsNonMatchingVersionInitializer() throws {
         let inputs = [
             SourceInput(
                 path: "/tmp/CompoundLiteralInvalidVersion.range",
@@ -910,8 +903,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         )
     }
 
-    @Test("Metadata slot markers declare semantic slots")
-    func metadataSlotMarkersDeclareSemanticSlots() throws {
+    @Test("Metadata slot macros declare semantic slots")
+    func metadataSlotMacrosDeclareSemanticSlots() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
@@ -931,12 +924,12 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let graph = program.declarationGraph
-        #expect(graph.markersByName["styling"]?.hasMetadataSlotEffect == true)
+        #expect(graph.macroMetadataByName["styling"]?.hasMetadataSlotEffect == true)
         #expect(graph.constructsByName["Panel"]?.macros.contains { $0.name == "styling" } == true)
     }
 
-    @Test("Metadata slot markers keep targets as declarations")
-    func metadataSlotMarkersKeepTargetsAsDeclarations() throws {
+    @Test("Metadata slot macros keep targets as declarations")
+    func metadataSlotMacrosKeepTargetsAsDeclarations() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
@@ -1125,11 +1118,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "GraphDeclaration" } == true)
         #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "syntax" } == false)
         #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
-        #expect(graph.constructsByName["Marker"]?.macros.contains { $0.name == "syntax" } == true)
-        #expect(graph.constructsByName["Marker.Declaration"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Marker.Declaration"]?.macros.contains { $0.name == "GraphDeclaration" } == true)
-        #expect(graph.constructsByName["Marker.Application"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Marker.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
     }
 
     @Test("@syntax declarations are syntax-facing without Syntax conformance")
@@ -1142,8 +1130,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.syntaxResolver.typeConformsToSyntax(.named("Expression")))
     }
 
-    @Test("Token metadata reads delimiter markers")
-    func tokenMetadataReadsDelimiterMarkers() throws {
+    @Test("Token metadata reads delimiter macros")
+    func tokenMetadataReadsDelimiterMacros() throws {
         let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
         let tokens = program.declarationGraph.tokenMetadataConcepts
         let delimiters = program.declarationGraph.tokenDelimiterConcepts
@@ -1551,7 +1539,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(registry.hasProtocol(named: "Renderable"))
         #expect(registry.hasEnumeration(named: "DisplayMode"))
         #expect(registry.hasMacro(named: "decorate"))
-        #expect(graph.markersByName["hostSpace"]?.hasMetadataSlotEffect == true)
+        #expect(graph.macroMetadataByName["hostSpace"]?.hasMetadataSlotEffect == true)
         #expect(registry.hasExtensions(targeting: "Panel"))
         #expect(graph.hasNamespace(named: "Styling") == false)
         #expect(graph.hasNamespace(named: "Routes") == false)
@@ -1676,8 +1664,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(program.declarationGraph.constructsByName["System.Math.Box"] != nil)
     }
 
-    @Test("Metadata slot marker keeps target as construct")
-    func metadataSlotMarkerKeepsTargetAsConstruct() throws {
+    @Test("Metadata slot macro keeps target as construct")
+    func metadataSlotMacroKeepsTargetAsConstruct() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
@@ -1719,12 +1707,12 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         )
     }
 
-    @Test("Construct marker declares construct metadata slot")
-    func metadataSlotMarkerDeclaresConstructMetadataSlot() throws {
+    @Test("Construct macro declares construct metadata slot")
+    func metadataSlotMacroDeclaresConstructMetadataSlot() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/tmp/RegisteredConstructMarker.range",
+                path: "/tmp/RegisteredConstructMacro.range",
                 source: """
                 macro hostSpace(): Construct -> Void { target, diagnostics in
                 }
@@ -1743,7 +1731,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let graph = program.declarationGraph
 
-        #expect(graph.markersByName["hostSpace"]?.hasMetadataSlotEffect == true)
+        #expect(graph.macroMetadataByName["hostSpace"]?.hasMetadataSlotEffect == true)
         #expect(graph.hasNamespace(named: "Client") == false)
         #expect(graph.hasNamespaceAttribute(named: "Client") == false)
         #expect(graph.constructsByName["Client"] != nil)
@@ -2105,11 +2093,11 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(encodeKeys(in: identity) == ["displayName": "displayName"])
         #expect(decodeKeys(in: identity) == ["displayName": "displayName"])
 
-        let markerOverride = try #require(
-            module.extensions.first(where: { $0.targetName == "MarkerOverrideCodableMacroFixture" })
+        let macroOverride = try #require(
+            module.extensions.first(where: { $0.targetName == "MacroOverrideCodableMacroFixture" })
         )
-        #expect(encodeKeys(in: markerOverride) == ["userId": "id"])
-        #expect(decodeKeys(in: markerOverride) == ["userId": "id"])
+        #expect(encodeKeys(in: macroOverride) == ["userId": "id"])
+        #expect(decodeKeys(in: macroOverride) == ["userId": "id"])
     }
 
     @Test("Equatable macro synthesizes field comparisons")
@@ -2369,7 +2357,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(artifact.contains("Lexer("))
         #expect(artifact.contains("LexerRule("))
         #expect(artifact.contains("whitespace"))
-        #expect(artifact.contains("markerAttribute"))
+        #expect(artifact.contains("hashAttribute"))
     }
 
     @Test("FileManager readFile surface validates")

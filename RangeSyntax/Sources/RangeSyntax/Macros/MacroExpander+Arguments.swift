@@ -59,62 +59,62 @@ extension MacroExpander {
         }
     }
 
-    static func parseMarkerArgumentBindings(
-        for marker: MarkerDeclaration,
+    static func parseMacroMetadataArgumentBindings(
+        for metadata: MacroMetadataDeclaration,
         argumentClause: String?,
         rawBody: String? = nil
     ) throws -> [String: Expression] {
-        let parameters = marker.parameters
+        let parameters = metadata.parameters
         let normalizedArgumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let rawBody {
             guard normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
-                throw ParseError("Marker #\(marker.name) cannot mix arguments with a raw body.")
+                throw ParseError("Macro #\(metadata.name) cannot mix arguments with a raw body.")
             }
-            guard marker.foreignBodyLanguage != nil else {
-                throw ParseError("Marker #\(marker.name) does not accept a foreign body.")
+            guard metadata.foreignBodyLanguage != nil else {
+                throw ParseError("Macro #\(metadata.name) does not accept a foreign body.")
             }
             let parameter = parameters[0]
             return [parameter.localName: .string(rawBody)]
         }
 
         guard !parameters.isEmpty || normalizedArgumentClause == nil || normalizedArgumentClause == "" else {
-            throw ParseError("Marker #\(marker.name) requires arguments.")
+            throw ParseError("Macro #\(metadata.name) requires arguments.")
         }
         guard !parameters.isEmpty else {
             return [:]
         }
         guard let normalizedArgumentClause, !normalizedArgumentClause.isEmpty else {
             return try argumentBindings(
-                kind: "Marker",
-                name: marker.name,
+                kind: "MacroMetadata",
+                name: metadata.name,
                 parameters: parameters,
                 arguments: []
             )
         }
         if let firstParameter = parameters.first, firstParameter.capturesSyntax {
-            return try capturedMarkerArgumentBindings(
-                kind: "Marker",
-                name: marker.name,
+            return try capturedMacroMetadataArgumentBindings(
+                kind: "MacroMetadata",
+                name: metadata.name,
                 parameters: parameters,
                 argumentClause: normalizedArgumentClause
             )
         }
 
-        var parser = try Parser(source: "marker(\(normalizedArgumentClause))")
+        var parser = try Parser(source: "metadata(\(normalizedArgumentClause))")
         _ = try parser.consumeCallableName()
         let arguments = try parser.parseInvocationArgumentsIfPresent()
         try parser.consume(Token.eof)
 
         return try argumentBindings(
-            kind: "Marker",
-            name: marker.name,
+            kind: "MacroMetadata",
+            name: metadata.name,
             parameters: parameters,
             arguments: arguments
         )
     }
 
-    private static func capturedMarkerArgumentBindings(
+    private static func capturedMacroMetadataArgumentBindings(
         kind: String,
         name: String,
         parameters: [RangeFunctionParameter],
@@ -130,7 +130,7 @@ extension MacroExpander {
         if !remainingParameters.isEmpty {
             let remainingArguments: [CallArgument]
             if let remainingSource, !remainingSource.isEmpty {
-                var parser = try Parser(source: "marker(\(remainingSource))")
+                var parser = try Parser(source: "metadata(\(remainingSource))")
                 _ = try parser.consumeCallableName()
                 remainingArguments = try parser.parseInvocationArgumentsIfPresent()
                 try parser.consume(Token.eof)
@@ -233,7 +233,7 @@ extension MacroExpander {
             let actualLabel = argument.label
 
             if actualLabel == nil, expectedLabel == nil {
-                // Unlabeled macro and marker arguments require an explicit `_` label erasure.
+                // Unlabeled macro and macro metadata arguments require an explicit `_` label erasure.
             } else if let expectedLabel, let actualLabel, expectedLabel == actualLabel {
                 // Label matched.
             } else if let expectedLabel, actualLabel == nil {
@@ -271,8 +271,8 @@ extension MacroExpander {
         return bindings
     }
 
-    static func markerGenericArgumentBindings(
-        for marker: MarkerDeclaration,
+    static func macroMetadataGenericArgumentBindings(
+        for metadata: MacroMetadataDeclaration,
         application: MacroApplication
     ) -> [String: Expression] {
         var bindings: [String: Expression] = [:]
@@ -288,7 +288,7 @@ extension MacroExpander {
         }
 
         var positionalIndex = 0
-        for parameter in marker.genericParameters {
+        for parameter in metadata.genericParameters {
             switch parameter {
             case .type(let name, _, _):
                 guard positionalIndex < positionalArguments.count else {
@@ -367,7 +367,7 @@ extension MacroExpander {
         for parameter: RangeFunctionParameter,
         kind: String
     ) -> Expression {
-        guard kind == "Marker" else {
+        guard kind == "MacroMetadata" else {
             return value
         }
         guard case .named("Identifier") = parameter.typeReference,

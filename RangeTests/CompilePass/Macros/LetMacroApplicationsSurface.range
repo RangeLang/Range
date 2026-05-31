@@ -3,8 +3,8 @@ macro codingKeyCases(): Construct { target, diagnostics in
         self: NamedTypeReference(name: "GeneratedKeys"),
         generics: [],
         cases: target.declaration.lets.flatMap { property in
-            property.markers.map { marker in
-                Enum.Case(identifier: Identifier(name: marker.value), associatedValues: [])
+            property.macros.map { macro in
+                Enum.Case(identifier: Identifier(name: macro.value), associatedValues: [])
             }
         }
     )

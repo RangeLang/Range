@@ -122,7 +122,7 @@ extension Parser {
                 return .interpolatedString(parseInterpolatedString(value))
             }
             return .string(value)
-        case .markerAttribute(let name):
+        case .hashAttribute(let name):
             advance()
             return .macroInvocation(
                 name: name,
@@ -486,7 +486,7 @@ extension Parser {
                 .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .ampersand, .andAnd, .pipe, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
-            case .hash, .markerAttribute, .foreignBody, .macroAttribute, .dollar, .percent, .bang:
+            case .hash, .hashAttribute, .foreignBody, .macroAttribute, .dollar, .percent, .bang:
                 return false
             case .identifier, .keyword, .stringLiteral, .integer, .double, .leftBracket,
                 .leftParen, .asterisk, .dot, .ellipsis, .question, .comma:

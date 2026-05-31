@@ -86,7 +86,7 @@ struct SwiftBackendProgramBuilder {
                 ] + supportUnits
             )
 
-        case .construct, .namespace, .enumeration, .protocolDefinition, .macro, .marker:
+        case .construct, .namespace, .enumeration, .protocolDefinition, .macro:
             throw SwiftBackendError(
                 "Swift backend requires a file with @main { ... } when compiling a single file."
             )
@@ -227,7 +227,7 @@ struct SwiftBackendProgramBuilder {
                     )
                 )
 
-            case .namespace, .macro, .marker:
+            case .namespace, .macro:
                 continue
             }
         }
@@ -353,7 +353,7 @@ struct SwiftBackendProgramBuilder {
                     callables: module.callables,
                     mainBlock: nil
                 )
-            case .mainBlock, .namespace, .macro, .marker:
+            case .mainBlock, .namespace, .macro:
                 return nil
             }
         }

@@ -3,7 +3,7 @@ import Foundation
 enum Token: Equatable {
     case hash
     case identifier(String)
-    case markerAttribute(String)
+    case hashAttribute(String)
     case foreignBody(language: String, text: String)
     case stringLiteral(String)
     case integer(Int)

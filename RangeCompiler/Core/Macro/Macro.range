@@ -22,12 +22,15 @@ construct Macro {
     }
 
     #GraphApplication
-    construct Application {
+    construct Application<Value> {
         let identifier: Identifier
         let genericArguments: [TypeReference]
         let argumentClause: String
         let arguments: [Expression]
         let rawBody: WrittenSyntax
         let declaration: Declaration?
+        let packageVisibility: String
+        let valueType: TypeReference
+        let value: Value
     }
 }

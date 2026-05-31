@@ -2,16 +2,16 @@ import Foundation
 
 struct MacroTargetValueBuilder {
     let macroDeclarationsByName: [String: MacroDeclaration]
-    let markerDeclarationsByName: [String: MarkerDeclaration]
+    let macroMetadataByName: [String: MacroMetadataDeclaration]
     let writtenSyntaxByID: [String: CompileTimeValue]
 
     init(
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
-        markerDeclarationsByName: [String: MarkerDeclaration] = [:],
+        macroMetadataByName: [String: MacroMetadataDeclaration] = [:],
         writtenSyntaxByID: [String: CompileTimeValue] = [:]
     ) {
         self.macroDeclarationsByName = macroDeclarationsByName
-        self.markerDeclarationsByName = markerDeclarationsByName
+        self.macroMetadataByName = macroMetadataByName
         self.writtenSyntaxByID = writtenSyntaxByID
     }
 
@@ -93,7 +93,6 @@ struct MacroTargetValueBuilder {
                 "written": writtenSyntaxByID["extension:\(extensionDeclaration.targetType.displayName)"] ?? writtenSyntax(""),
                 "target": target,
                 "declaration": declaration,
-                "markers": .array(markerValues(for: extensionDeclaration.macros)),
                 "protocols": .array(protocols),
                 "inits": .array(initializers),
                 "functions": .array(functions),
@@ -127,7 +126,6 @@ struct MacroTargetValueBuilder {
                 ),
                 "target": target,
                 "conformances": .array(conformances),
-                "markers": .array(markerValues(for: declaration.macros)),
                 "protocols": .array(protocols),
                 "inits": .array(initializers),
                 "functions": .array(functions),
@@ -155,7 +153,6 @@ struct MacroTargetValueBuilder {
                 "identity": graphIdentity(kind: "construct", name: qualifiedName),
                 "self": nominalTypeReference(qualifiedName),
                 "macros": .array(declaration.macros.map(value(for:))),
-                "markers": .array(markerValues(for: declaration.macros)),
                 "generics": .array(declaration.genericParameters.map(value(for:))),
                 "conformances": .array(declaration.conformances.map(typeReferenceValue)),
                 "inits": .array(declaration.initializers.map(value(for:))),
@@ -199,7 +196,6 @@ struct MacroTargetValueBuilder {
     ) -> CompileTimeValue {
         var fields: [String: CompileTimeValue] = [
             "macros": .array(declaration.macros.map(value(for:))),
-            "markers": .array(markerValues(for: declaration.macros)),
             "identifier": identifier(declaration.name),
             "type": typeReferenceValue(declaration.typeName),
             "typeName": .string(declaration.typeName),
@@ -226,7 +222,6 @@ struct MacroTargetValueBuilder {
     ) -> CompileTimeValue {
         var fields: [String: CompileTimeValue] = [
             "macros": .array(declaration.macros.map(value(for:))),
-            "markers": .array(markerValues(for: declaration.macros)),
             "identifier": identifier(declaration.name),
             "type": typeReferenceValue(declaration.type.displayName),
         ]
@@ -252,7 +247,6 @@ struct MacroTargetValueBuilder {
     ) -> CompileTimeValue {
         var fields: [String: CompileTimeValue] = [
             "macros": .array(declaration.macros.map(value(for:))),
-            "markers": .array(markerValues(for: declaration.macros)),
             "identifier": identifier(declaration.name),
             "type": typeReferenceValue(declaration.typeName),
         ]
@@ -278,7 +272,6 @@ struct MacroTargetValueBuilder {
     ) -> CompileTimeValue {
         var fields: [String: CompileTimeValue] = [
             "macros": .array(declaration.macros.map(value(for:))),
-            "markers": .array(markerValues(for: declaration.macros)),
             "identifier": identifier(declaration.name),
             "type": typeReferenceValue(declaration.typeName),
         ]
@@ -307,34 +300,6 @@ struct MacroTargetValueBuilder {
         fields["parent"] = graphIdentity(kind: "construct", name: ownerConstructName)
     }
 
-    private func markerValues(for applications: [MacroApplication]) -> [CompileTimeValue] {
-        applications.compactMap { application in
-            guard let marker = markerDeclarationsByName[application.name] else {
-                return nil
-            }
-            let value: CompileTimeValue
-            if marker.valueType.isMarkerEffect {
-                value = .object(typeName: "Marker.Effect", fields: [:])
-            } else if marker.valueType == .named("Void") {
-                value = .object(typeName: "Void", fields: [:])
-            } else if let evaluatedValue = try? Self.evaluateMarkerValue(for: application, marker: marker) {
-                value = evaluatedValue
-            } else {
-                return nil
-            }
-            return .object(
-                typeName: "Marker.Application",
-                fields: [
-                    "identifier": identifier(application.name),
-                    "packageVisibility": .string(packageVisibilityName(for: marker.packageVisibility)),
-                    "valueType": typeReferenceValue(marker.valueType),
-                    "valueTypeName": .string(marker.valueType.displayName),
-                    "value": value,
-                ]
-            )
-        }
-    }
-
     private func packageVisibilityName(for packageVisibility: PackageVisibility) -> String {
         switch packageVisibility {
         case .open:
@@ -344,44 +309,44 @@ struct MacroTargetValueBuilder {
         }
     }
 
-    static func evaluateMarkerValue(
+    static func evaluateMacroMetadataValue(
         for application: MacroApplication,
-        marker: MarkerDeclaration,
-        targetValue: CompileTimeValue = .object(typeName: "Marker.Target", fields: [:]),
+        metadata: MacroMetadataDeclaration,
+        targetValue: CompileTimeValue = .object(typeName: "Macro.Target", fields: [:]),
         context: MacroExpansionContext? = nil
     ) throws -> CompileTimeValue {
-        let bindings = try MacroExpander.parseMarkerArgumentBindings(
-            for: marker,
+        let bindings = try MacroExpander.parseMacroMetadataArgumentBindings(
+            for: metadata,
             argumentClause: application.argumentClause,
             rawBody: application.rawBody
         )
-        let genericBindings = MacroExpander.markerGenericArgumentBindings(
-            for: marker,
+        let genericBindings = MacroExpander.macroMetadataGenericArgumentBindings(
+            for: metadata,
             application: application
         )
         let initialBindings = bindings.merging(genericBindings) { _, generic in generic }
-        if marker.body.isEmpty, marker.foreignBodyLanguage != nil {
+        if metadata.body.isEmpty, metadata.foreignBodyLanguage != nil {
             let value: CompileTimeValue = .string(application.rawBody ?? "")
-            guard markerValue(value, matches: marker.valueType) else {
+            guard macroMetadataValue(value, matches: metadata.valueType) else {
                 throw ParseError(
-                    "Marker #\(marker.name) raw body value does not match \(marker.valueType.displayName)."
+                    "Macro #\(metadata.name) raw body value does not match \(metadata.valueType.displayName)."
                 )
             }
             return value
         }
-        let markerBindings = marker.bindings
+        let metadataBindings = metadata.bindings
 
         let evaluator = CompileTimeValueEvaluator(
-            targetBinding: markerBindings?.target ?? "__marker_target__",
+            targetBinding: metadataBindings?.target ?? "__metadata_target__",
             targetValue: targetValue,
-            graphBinding: markerBindings?.graph,
+            graphBinding: metadataBindings?.graph,
             localBindings: initialBindings,
             context: context
         )
 
         var localBindings = initialBindings
         var value: CompileTimeValue?
-        for statement in marker.body {
+        for statement in metadata.body {
             switch statement {
             case .localBinding(let declaration):
                 localBindings[declaration.name] = declaration.expression
@@ -397,24 +362,24 @@ struct MacroTargetValueBuilder {
             }
         }
 
-        if marker.valueType == .named("Void") {
+        if metadata.valueType == .named("Void") {
             return .object(typeName: "Void", fields: [:])
         }
 
         guard let value else {
-            throw ParseError("Marker #\(marker.name) body could not be evaluated at compile time.")
+            throw ParseError("Macro #\(metadata.name) body could not be evaluated at compile time.")
         }
 
-        guard markerValue(value, matches: marker.valueType) else {
+        guard macroMetadataValue(value, matches: metadata.valueType) else {
             throw ParseError(
-                "Marker #\(marker.name) evaluated value does not match \(marker.valueType.displayName)."
+                "Macro #\(metadata.name) evaluated value does not match \(metadata.valueType.displayName)."
             )
         }
 
         return value
     }
 
-    private static func markerValue(_ value: CompileTimeValue, matches type: TypeReference) -> Bool {
+    private static func macroMetadataValue(_ value: CompileTimeValue, matches type: TypeReference) -> Bool {
         switch (value, type) {
         case (.string, .named("String")):
             return true
@@ -431,7 +396,7 @@ struct MacroTargetValueBuilder {
         case (.nilValue, .optional):
             return true
         case (let value, .optional(let wrapped)):
-            return markerValue(value, matches: wrapped)
+            return macroMetadataValue(value, matches: wrapped)
         case (.object(let typeName, _), .named(let name)):
             return typeName == name
         default:
@@ -453,6 +418,18 @@ struct MacroTargetValueBuilder {
 
         if let declaration = macroDeclarationsByName[application.name] {
             fields["declaration"] = value(for: declaration)
+        }
+        if let metadata = macroMetadataByName[application.name] {
+            fields["packageVisibility"] = .string(packageVisibilityName(for: metadata.packageVisibility))
+            fields["valueType"] = typeReferenceValue(metadata.valueType)
+            fields["valueTypeName"] = .string(metadata.valueType.displayName)
+            if metadata.valueType.isMacroMetadataEffect {
+                fields["value"] = .object(typeName: "Macro.Effect", fields: [:])
+            } else if metadata.valueType == .named("Void") {
+                fields["value"] = .object(typeName: "Void", fields: [:])
+            } else if let evaluatedValue = try? Self.evaluateMacroMetadataValue(for: application, metadata: metadata) {
+                fields["value"] = evaluatedValue
+            }
         }
 
         return .object(

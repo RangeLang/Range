@@ -281,7 +281,12 @@ struct CompileTimeValueEvaluator {
         if root == targetBinding {
             value = targetValue
         } else if root == graphBinding {
-            value = .object(typeName: "GraphContext", fields: [:])
+            value = .object(
+                typeName: "GraphContext",
+                fields: [
+                    "macros": context?.graphContext.macros() ?? .array([])
+                ]
+            )
         } else if let local = locals[root] {
             if case .identifier(root) = local {
                 return nil
@@ -296,11 +301,6 @@ struct CompileTimeValueEvaluator {
         }
 
         for component in components.dropFirst() {
-            if case .object("GraphContext", _) = current, component == "markers", let context {
-                current = context.graphContext.markers()
-                continue
-            }
-
             if case .array(let values) = current {
                 switch component {
                 case "count":
@@ -396,7 +396,7 @@ struct CompileTimeValueEvaluator {
             "MemberTypeReference", "ArrayTypeReference", "Property", "StoredProperty", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
             "ValueGeneric", "GraphIdentity", "Macro.Application", "Macro.Declaration", "Macro.Target",
-            "Marker", "Marker.Application", "Marker.Effect", "Void", "RangeGraphIdentity", "GraphDeclaration", "GraphApplication", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
+            "Void", "RangeGraphIdentity", "GraphDeclaration", "GraphApplication", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
             "WrittenExpression",
             "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
@@ -482,22 +482,6 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return context.graphContext.members(of: identity)
-        case "\(graphBinding).markers":
-            guard arguments.count == 1
-            else {
-                return nil
-            }
-            if arguments[0].label == "on",
-                let identity = evaluate(arguments[0].value, locals: locals)
-            {
-                return context.graphContext.markers(on: identity)
-            }
-            if arguments[0].label == "named",
-                case .string(let name)? = evaluate(arguments[0].value, locals: locals)
-            {
-                return context.graphContext.markers(named: name)
-            }
-            return nil
         case "\(graphBinding).macros":
             guard arguments.count == 1 else {
                 return nil

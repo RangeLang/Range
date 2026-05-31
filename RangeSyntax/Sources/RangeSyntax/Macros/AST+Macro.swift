@@ -17,7 +17,7 @@ public enum PackageVisibility {
     case closed
 }
 
-public struct MarkerDeclaration {
+public struct MacroMetadataDeclaration {
     public let packageVisibility: PackageVisibility
     public let name: String
     public let genericParameters: [GenericParameter]
@@ -157,17 +157,17 @@ public struct MacroBindings {
 }
 
 extension TypeReference {
-    var markerEffectTarget: TypeReference? {
+    var macroMetadataEffectTarget: TypeReference? {
         guard case .generic(_, let arguments) = self,
             arguments.count == 1,
-            markerEffectName == "Language"
+            macroMetadataEffectName == "Language"
         else {
             return nil
         }
         return arguments[0]
     }
 
-    var markerEffectName: String? {
+    var macroMetadataEffectName: String? {
         guard case .generic(let base, _) = self,
             case .named(let name) = base
         else {
@@ -176,8 +176,8 @@ extension TypeReference {
         return name
     }
 
-    var isMarkerEffect: Bool {
-        markerEffectTarget != nil
+    var isMacroMetadataEffect: Bool {
+        macroMetadataEffectTarget != nil
     }
 
     var metadataSlotEffectTarget: TypeReference? {
@@ -189,10 +189,10 @@ extension TypeReference {
     }
 
     var languageEffectTarget: TypeReference? {
-        guard markerEffectName == "Language" else {
+        guard macroMetadataEffectName == "Language" else {
             return nil
         }
-        return markerEffectTarget
+        return macroMetadataEffectTarget
     }
 
     var isLanguageEffect: Bool {

@@ -1,11 +1,11 @@
 macro exposeDescription(): Construct { target, diagnostics in
-    let descriptionMarkers: Array<Marker.Application>(
-        target.declaration.markers.filter { application in
+    let descriptionMacros: Array<Macro.Application>(
+        target.declaration.macros.filter { application in
             application.identifier.name == "Description"
         }
     )
     let descriptionValues: Array<String>(
-        descriptionMarkers.map { application in
+        descriptionMacros.map { application in
             application.value
         }
     )

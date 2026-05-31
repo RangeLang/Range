@@ -3,7 +3,6 @@ construct State<T>: StoredProperty {
     let identity: GraphIdentity
     let parent: GraphIdentity?
     let macros: [Macro.Application]
-    let markers: [Marker.Application]
     let identifier: Identifier
     let type: TypeReference
     let value: Expression?

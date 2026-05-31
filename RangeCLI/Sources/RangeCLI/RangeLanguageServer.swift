@@ -1338,8 +1338,6 @@ private struct DocumentIndex {
             #"\bfunction\s+([a-z_][A-Za-z0-9_]*|[!%&*+\-./<=>?^|~]+)(?:<[^>\n]+>)?\s*\("#
         let macroDeclarationPattern =
             #"\bmacro\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
-        let markerDeclarationPattern =
-            #"\bmarker\s+([a-z_][A-Za-z0-9_]*)(?:<[^>\n]+>)?\s*\("#
         let localCallPattern = #"\b([a-z_][A-Za-z0-9_]*)\s*\("#
         let memberPattern = #"(?:\b[A-Za-z_][A-Za-z0-9_]*|\])\.([a-z_][A-Za-z0-9_]*)\b"#
         let macroTokenPattern = #"([@#][a-z_][A-Za-z0-9_]*)\b"#
@@ -1367,7 +1365,7 @@ private struct DocumentIndex {
             "background", "binding", "break", "builder", "capture", "case", "construct",
             "continue", "core", "default", "derived", "else", "enum",
             "extension", "for", "function", "get", "if", "in", "infix", "init",
-            "macro", "main", "marker", "namespace", "nil", "on", "operator", "postfix", "precedencegroup",
+            "macro", "main", "namespace", "nil", "on", "operator", "postfix", "precedencegroup",
             "prefix", "protocol", "return", "self", "set", "state", "switch", "let", "var",
             "while",
         ]
@@ -1375,7 +1373,7 @@ private struct DocumentIndex {
             keywordNames
         )
         let identifierKeywordExclusions: Set<String> = [
-            "if", "for", "while", "switch", "return", "macro", "marker", "function", "init",
+            "if", "for", "while", "switch", "return", "macro", "function", "init",
             "construct", "namespace", "enum", "protocol", "extension", "background", "state",
             "binding", "derived", "let", "var", "case", "default", "break",
             "continue", "true", "false", "nil", "self",
@@ -1465,16 +1463,6 @@ private struct DocumentIndex {
             }
 
             if let match = firstMatch(in: line, pattern: macroDeclarationPattern), match.count > 1 {
-                let name = match[1]
-                record(
-                    line: lineIndex,
-                    range: nsRange(in: line, value: name),
-                    type: .macro,
-                    modifiers: [.declaration]
-                )
-            }
-
-            if let match = firstMatch(in: line, pattern: markerDeclarationPattern), match.count > 1 {
                 let name = match[1]
                 record(
                     line: lineIndex,
@@ -1982,7 +1970,6 @@ private struct DocumentIndex {
         let declarationPatterns = [
             #"\bfunction\s+(?:[a-z_][A-Za-z0-9_]*|[!%&*+\-./<=>?^|~]+)(?:<[^>\n]+>)?\s*$"#,
             #"\bmacro\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
-            #"\bmarker\s+[a-z_][A-Za-z0-9_]*(?:<[^>\n]+>)?\s*$"#,
         ]
 
         return declarationPatterns.contains { pattern in
@@ -2449,9 +2436,9 @@ private struct ProjectNavigationIndex {
 
         if occurrence?.type == .macro
             || declarationGraph.registryView.hasMacro(named: word)
-            || declarationGraph.markersByName[word] != nil
+
         {
-            return definitionLocation(named: word, kinds: [.macro, .marker])
+            return definitionLocation(named: word, kinds: [.macro])
         }
 
         if occurrence?.type == .function || occurrence?.type == .method {

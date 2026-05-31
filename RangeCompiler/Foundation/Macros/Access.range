@@ -6,13 +6,6 @@ macro access(_ accessTarget: AccessTarget): Construct { target, diagnostics in
             Enum.Case(identifier: field.identifier, associatedValues: [])
         }
     )
-    let accessibleMarkers: Enum.Declaration(
-        self: NamedTypeReference(name: "AccessibleMarkers"),
-        generics: [],
-        cases: target.declaration.markers.map { marker in
-            Enum.Case(identifier: marker.identifier, associatedValues: [])
-        }
-    )
     let accessibleMacros: Enum.Declaration(
         self: NamedTypeReference(name: "AccessibleMacros"),
         generics: [],
@@ -31,7 +24,7 @@ macro access(_ accessTarget: AccessTarget): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
             #(accessibleFields)
-            #(accessibleMarkers)
+            #(accessibleMacros)
             #(accessibleMacros)
             #(accessibleConstructs)
         }

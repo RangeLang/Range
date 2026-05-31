@@ -651,7 +651,6 @@ struct DeclarationGraphWorkspaceView: View {
         .protocolDefinition,
         .namespace,
         .macro,
-        .marker,
         .typeExtension,
         .mainBlock,
     ]

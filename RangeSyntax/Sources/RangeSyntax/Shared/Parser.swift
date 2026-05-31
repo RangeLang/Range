@@ -181,7 +181,7 @@ public struct Parser {
     var declarationMacroExpansionResolver: DeclarationMacroExpansionResolver
     var discoveredCallableReturnTypes: [String: TypeReference]
     var macroDeclarationsByName: [String: MacroDeclaration]
-    var markerDeclarationsByName: [String: MarkerDeclaration]
+    var macroMetadataByName: [String: MacroMetadataDeclaration]
     var macroExpansionTypes: [String: TypeReference] = [:]
     var allowInitializerDeclarations: Bool
     var currentMacroBodyDepth: Int = 0
@@ -195,15 +195,15 @@ public struct Parser {
         declarationMacroExpansionResolver: DeclarationMacroExpansionResolver = .empty,
         discoveredCallableReturnTypes: [String: TypeReference] = [:],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
-        markerDeclarationsByName: [String: MarkerDeclaration] = [:],
+        macroMetadataByName: [String: MacroMetadataDeclaration] = [:],
         macroExpansionTypes: [String: TypeReference] = [:],
         allowInitializerDeclarations: Bool = false
     ) throws {
-        let foreignBodies = markerDeclarationsByName.values.compactMap { marker -> LexerForeignBody? in
-            guard let language = marker.foreignBodyLanguage else {
+        let foreignBodies = macroMetadataByName.values.compactMap { metadata -> LexerForeignBody? in
+            guard let language = metadata.foreignBodyLanguage else {
                 return nil
             }
-            return LexerForeignBody(directive: marker.name, language: language)
+            return LexerForeignBody(directive: metadata.name, language: language)
         }
         var lexer = Lexer(source: source, foreignBodies: foreignBodies)
         self.tokens = try lexer.tokenize()
@@ -214,7 +214,7 @@ public struct Parser {
         self.declarationMacroExpansionResolver = declarationMacroExpansionResolver
         self.discoveredCallableReturnTypes = discoveredCallableReturnTypes
         self.macroDeclarationsByName = macroDeclarationsByName
-        self.markerDeclarationsByName = markerDeclarationsByName
+        self.macroMetadataByName = macroMetadataByName
         self.macroExpansionTypes = macroExpansionTypes
         self.allowInitializerDeclarations = allowInitializerDeclarations
     }
@@ -231,12 +231,12 @@ public struct Parser {
         }
     }
 
-    mutating func registerMarkerDeclaration(_ declaration: MarkerDeclaration) {
-        markerDeclarationsByName[declaration.name] = declaration
+    mutating func registerMacroMetadataDeclaration(_ declaration: MacroMetadataDeclaration) {
+        macroMetadataByName[declaration.name] = declaration
     }
 
-    func markerApplicationHasMetadataSlotEffect(_ application: MacroApplication) -> Bool {
-        markerDeclarationsByName[application.name]?.hasMetadataSlotEffect == true
+    func macroApplicationHasMetadataSlotEffect(_ application: MacroApplication) -> Bool {
+        macroMetadataByName[application.name]?.hasMetadataSlotEffect == true
     }
 
     func isNamespaceShaped(_ declaration: ConstructDeclaration) -> Bool {
@@ -260,7 +260,6 @@ public struct Parser {
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
         var macros: [MacroDeclaration] = []
-        let markers: [MarkerDeclaration] = []
         var precedenceGroups: [PrecedenceGroupDeclaration] = []
         var operators: [OperatorDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
@@ -352,7 +351,6 @@ public struct Parser {
             constructs.isEmpty,
             namespaces.isEmpty,
             macros.isEmpty,
-            markers.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
             extensions.isEmpty
@@ -366,7 +364,6 @@ public struct Parser {
             constructs.count == 1,
             namespaces.isEmpty,
             macros.isEmpty,
-            markers.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
             extensions.isEmpty
@@ -378,7 +375,6 @@ public struct Parser {
             namespaces.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
-            markers.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
             enumerations.count == 1, extensions.isEmpty
@@ -391,7 +387,6 @@ public struct Parser {
             enumerations.isEmpty,
             protocols.count == 1,
             macros.isEmpty,
-            markers.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
             extensions.isEmpty
@@ -404,7 +399,6 @@ public struct Parser {
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.count == 1,
-            markers.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
             extensions.isEmpty
@@ -417,7 +411,6 @@ public struct Parser {
             enumerations.isEmpty,
             protocols.isEmpty,
             macros.isEmpty,
-            markers.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
             !extensions.isEmpty
@@ -430,7 +423,6 @@ public struct Parser {
             protocols.isEmpty,
             namespaces.count == 1,
             macros.isEmpty,
-            markers.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
             extensions.isEmpty
@@ -449,7 +441,6 @@ public struct Parser {
                 enumerations: enumerations,
                 protocols: protocols,
                 macros: macros,
-                markers: markers,
                 precedenceGroups: precedenceGroups,
                 operators: operators,
                 extensions: extensions
@@ -469,7 +460,6 @@ public struct Parser {
         var protocols: [ProtocolDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
         var macros: [MacroDeclaration] = []
-        let markers: [MarkerDeclaration] = []
         var precedenceGroups: [PrecedenceGroupDeclaration] = []
         var operators: [OperatorDeclaration] = []
 
@@ -556,7 +546,6 @@ public struct Parser {
                 enumerations: enumerations,
                 protocols: protocols,
                 macros: macros,
-                markers: markers,
                 precedenceGroups: precedenceGroups,
                 operators: operators,
                 extensions: extensions

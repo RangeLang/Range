@@ -3,7 +3,7 @@ import Foundation
 extension DeclarationGraph {
     func macroExpansionContext(
         macrosByName: [String: MacroDeclaration],
-        markersByName: [String: MarkerDeclaration] = [:],
+        macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration] = [:],
         diagnosticEngine: RangeDiagnosticEngine? = nil
     ) -> MacroExpansionContext {
         MacroExpansionContext(
@@ -12,10 +12,10 @@ extension DeclarationGraph {
             graphContext: MacroGraphContext(
                 declarationGraph: self,
                 macroDeclarationsByName: macrosByName,
-                markerDeclarationsByName: markersByName
+                macroMetadataDeclarationsByName: macroMetadataDeclarationsByName
             ),
             macroDeclarationsByName: macrosByName,
-            markerDeclarationsByName: markersByName,
+            macroMetadataByName: macroMetadataDeclarationsByName,
             diagnosticEngine: diagnosticEngine,
             currentPath: nil
         )

@@ -1,8 +1,0 @@
-marker badKey<T>(_ value: Int): Let<T> -> String {
-    return value
-}
-
-construct MarkerValueTypeMismatchFixture {
-    #badKey(1)
-    let id: Int
-}

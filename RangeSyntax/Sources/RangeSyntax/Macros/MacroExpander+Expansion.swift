@@ -123,7 +123,6 @@ extension MacroExpander {
                     enumerations: module.enumerations + emittedDeclarationBundles.flatMap(\.enumerations),
                     protocols: module.protocols + emittedDeclarationBundles.flatMap(\.protocols),
                     macros: module.macros,
-                    markers: module.markers,
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
                     extensions: expandedExtensions + emittedDeclarationBundles.flatMap(\.extensions)
@@ -164,7 +163,6 @@ extension MacroExpander {
                     enumerations: emittedBundle.enumerations,
                     protocols: emittedBundle.protocols,
                     macros: [],
-                    markers: [],
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
@@ -189,7 +187,6 @@ extension MacroExpander {
                     enumerations: [declaration] + emittedBundle.enumerations,
                     protocols: emittedBundle.protocols,
                     macros: [],
-                    markers: [],
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
@@ -214,7 +211,6 @@ extension MacroExpander {
                     enumerations: emittedBundle.enumerations,
                     protocols: [declaration] + emittedBundle.protocols,
                     macros: [],
-                    markers: [],
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
@@ -226,7 +222,7 @@ extension MacroExpander {
                     try expand(extensionDeclaration: $0, macros: macros, context: context)
                 }
             )
-        case .namespace, .macro, .marker:
+        case .namespace, .macro:
             return sourceFile
         }
     }
@@ -669,48 +665,48 @@ extension MacroExpander {
 
         for application in applications {
             guard let macro = macros[application.name] else {
-                if let marker = context.markerDeclarationsByName[application.name] {
-                    guard macroTargetAllowsAny(marker.target, kinds: allowedMacroTargetKinds(for: propertyKind))
+                if let metadata = context.macroMetadataByName[application.name] {
+                    guard macroTargetAllowsAny(metadata.target, kinds: allowedMacroTargetKinds(for: propertyKind))
                     else {
                         throw ParseError(
-                            "Marker #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(marker.target.displayName)."
+                            "Macro #\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(metadata.target.displayName)."
                         )
                     }
-                    guard context.propertyMarkerTargetMatches(
-                        marker,
+                    guard context.propertyMacroMetadataTargetMatches(
+                        metadata,
                         propertyTypeName: propertyTypeName,
                         propertyValueType: propertyValueType
                     ) else {
                         throw ParseError(
-                            "Marker #\(application.name) targeting \(marker.target.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
+                            "Macro #\(application.name) targeting \(metadata.target.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                         )
                     }
-                    let argumentBindings = try parseMarkerArgumentBindings(
-                        for: marker,
+                    let argumentBindings = try parseMacroMetadataArgumentBindings(
+                        for: metadata,
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
                     )
-                    let genericBindings = markerGenericArgumentBindings(
-                        for: marker,
+                    let genericBindings = macroMetadataGenericArgumentBindings(
+                        for: metadata,
                         application: application
                     )
-                    let targetValue = markerTargetValue(
+                    let targetValue = macroMetadataTargetValue(
                         kind: propertyKindDescription(propertyKind),
                         name: name
                     )
-                    try emitMarkerDiagnostics(
-                        from: marker.body,
-                        marker: marker,
+                    try emitMacroMetadataDiagnostics(
+                        from: metadata.body,
+                        metadata: metadata,
                         targetValue: targetValue,
                         context: context,
                         localBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
                     )
-                    if marker.valueType.isMarkerEffect {
+                    if metadata.valueType.isMacroMetadataEffect {
                         continue
                     }
-                    _ = try MacroTargetValueBuilder.evaluateMarkerValue(
+                    _ = try MacroTargetValueBuilder.evaluateMacroMetadataValue(
                         for: application,
-                        marker: marker,
+                        metadata: metadata,
                         targetValue: targetValue,
                         context: context
                     )
@@ -869,9 +865,9 @@ extension MacroExpander {
         }
     }
 
-    static func markerTargetValue(kind: String, name: String) -> CompileTimeValue {
+    static func macroMetadataTargetValue(kind: String, name: String) -> CompileTimeValue {
         .object(
-            typeName: "Marker.Target",
+            typeName: "Macro.Target",
             fields: [
                 "identity": MacroTargetValueBuilder().graphIdentity(kind: kind, name: name)
             ]
@@ -1723,7 +1719,7 @@ extension MacroExpander {
                 try emittedDeclarations(
                     from: macro,
                     targetValue: MacroTargetValueBuilder(
-                        markerDeclarationsByName: context.markerDeclarationsByName,
+                        macroMetadataByName: context.macroMetadataByName,
                         writtenSyntaxByID: context.graphContext.writtenSyntaxByID
                     ).targetValue(for: enumeration),
                     context: context
@@ -1752,7 +1748,7 @@ extension MacroExpander {
                 try emittedDeclarations(
                     from: macro,
                     targetValue: MacroTargetValueBuilder(
-                        markerDeclarationsByName: context.markerDeclarationsByName,
+                        macroMetadataByName: context.macroMetadataByName,
                         writtenSyntaxByID: context.graphContext.writtenSyntaxByID
                     ).targetValue(for: protocolDeclaration),
                     context: context
@@ -1772,7 +1768,7 @@ extension MacroExpander {
         try emittedDeclarations(
             from: macro,
             targetValue: MacroTargetValueBuilder(
-                markerDeclarationsByName: context.markerDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
                 writtenSyntaxByID: context.graphContext.writtenSyntaxByID
             ).targetValue(for: construct),
             context: context,
@@ -1870,19 +1866,19 @@ extension MacroExpander {
         )
     }
 
-    static func emitMarkerDiagnostics(
+    static func emitMacroMetadataDiagnostics(
         from statements: [Statement],
-        marker: MarkerDeclaration,
+        metadata: MacroMetadataDeclaration,
         targetValue: CompileTimeValue? = nil,
         context: MacroExpansionContext,
         localBindings: [String: Expression] = [:]
     ) throws {
-        guard let bindings = marker.bindings else {
+        guard let bindings = metadata.bindings else {
             return
         }
         try emitDiagnostics(
             from: statements,
-            diagnosticOwnerName: marker.name,
+            diagnosticOwnerName: metadata.name,
             bindings: bindings,
             targetValue: targetValue,
             context: context,
@@ -2744,7 +2740,7 @@ extension MacroExpander {
             return "#"
         case .identifier(let value):
             return value
-        case .markerAttribute(let value):
+        case .hashAttribute(let value):
             return "#\(value)"
         case .foreignBody(_, let value):
             return value
@@ -3417,7 +3413,7 @@ extension MacroExpander {
             )
         case .mainBlock:
             throw ParseError("Macros cannot emit @main blocks.")
-        case .macro, .marker:
+        case .macro:
             throw ParseError("Macros cannot emit macro declarations.")
         }
     }

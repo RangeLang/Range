@@ -445,35 +445,35 @@ extension MacroExpander {
                 continue
             }
             guard let macro = macros[application.name] else {
-                if let marker = context.markerDeclarationsByName[application.name] {
-                    guard macroTargetAllows(marker.target, kind: .construct) else {
+                if let metadata = context.macroMetadataByName[application.name] {
+                    guard macroTargetAllows(metadata.target, kind: .construct) else {
                         throw ParseError(
-                            "Marker #\(application.name) is used on a construct but targets \(marker.target.displayName)."
+                            "Macro #\(application.name) is used on a construct but targets \(metadata.target.displayName)."
                         )
                     }
-                    let argumentBindings = try parseMarkerArgumentBindings(
-                        for: marker,
+                    let argumentBindings = try parseMacroMetadataArgumentBindings(
+                        for: metadata,
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
                     )
-                    let genericBindings = markerGenericArgumentBindings(
-                        for: marker,
+                    let genericBindings = macroMetadataGenericArgumentBindings(
+                        for: metadata,
                         application: application
                     )
                     let targetValue = MacroTargetValueBuilder().targetValue(for: construct)
-                    try emitMarkerDiagnostics(
-                        from: marker.body,
-                        marker: marker,
+                    try emitMacroMetadataDiagnostics(
+                        from: metadata.body,
+                        metadata: metadata,
                         targetValue: targetValue,
                         context: context,
                         localBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
                     )
-                    if marker.valueType.isMarkerEffect {
+                    if metadata.valueType.isMacroMetadataEffect {
                         continue
                     }
-                    _ = try MacroTargetValueBuilder.evaluateMarkerValue(
+                    _ = try MacroTargetValueBuilder.evaluateMacroMetadataValue(
                         for: application,
-                        marker: marker,
+                        metadata: metadata,
                         targetValue: targetValue,
                         context: context
                     )
@@ -491,7 +491,7 @@ extension MacroExpander {
                 macro: macro,
                 targetValue: MacroTargetValueBuilder(
                     macroDeclarationsByName: context.macroDeclarationsByName,
-                    markerDeclarationsByName: context.markerDeclarationsByName
+                    macroMetadataByName: context.macroMetadataByName
                 ).targetValue(for: construct),
                 context: context
             )
@@ -509,25 +509,25 @@ extension MacroExpander {
     ) throws {
         for application in applications {
             guard let macro = macros[application.name] else {
-                if let marker = context.markerDeclarationsByName[application.name] {
-                    guard macroTargetAllows(marker.target, kind: .typeExtension) else {
+                if let metadata = context.macroMetadataByName[application.name] {
+                    guard macroTargetAllows(metadata.target, kind: .typeExtension) else {
                         throw ParseError(
-                            "Marker #\(application.name) is used on an extension but targets \(marker.target.displayName)."
+                            "Macro #\(application.name) is used on an extension but targets \(metadata.target.displayName)."
                         )
                     }
-                    _ = try parseMarkerArgumentBindings(
-                        for: marker,
+                    _ = try parseMacroMetadataArgumentBindings(
+                        for: metadata,
                         argumentClause: application.argumentClause,
                         rawBody: application.rawBody
                     )
-                    if marker.valueType.isMarkerEffect {
+                    if metadata.valueType.isMacroMetadataEffect {
                         continue
                     }
-                    _ = try MacroTargetValueBuilder.evaluateMarkerValue(
+                    _ = try MacroTargetValueBuilder.evaluateMacroMetadataValue(
                         for: application,
-                        marker: marker,
+                        metadata: metadata,
                         targetValue: MacroTargetValueBuilder(
-                            markerDeclarationsByName: context.markerDeclarationsByName,
+                            macroMetadataByName: context.macroMetadataByName,
                             writtenSyntaxByID: context.graphContext.writtenSyntaxByID
                         ).targetValue(for: extensionDeclaration),
                         context: context

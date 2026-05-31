@@ -1,4 +1,4 @@
-#Description(FixtureConstruct carries marker source)
+#Description(FixtureConstruct carries macro source)
 construct FixtureConstruct {
     let number: Int
 }

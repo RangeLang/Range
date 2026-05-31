@@ -7,7 +7,7 @@ import Foundation
 enum RangeAuthoredTokenKind {
     case hash
     case identifier(value: String)
-    case markerAttribute(value: String)
+    case hashAttribute(value: String)
     case foreignBody(language: String, text: String)
     case stringLiteral(value: String)
     case integer(value: String)
@@ -57,8 +57,8 @@ extension Lexer {
             parserToken = .hash
         case .identifier(let value):
             parserToken = .identifier(value)
-        case .markerAttribute(let value):
-            parserToken = .markerAttribute(value)
+        case .hashAttribute(let value):
+            parserToken = .hashAttribute(value)
         case .foreignBody(let language, let text):
             parserToken = .foreignBody(language: language, text: text)
         case .stringLiteral(let value):
@@ -184,7 +184,7 @@ extension RangeAuthoredLexer {
         RangeAuthoredLexerRule(name: "percent", pattern: "%", token: "percent", priority: 20),
         RangeAuthoredLexerRule(name: "pipe", pattern: "|", token: "pipe", priority: 20),
         RangeAuthoredLexerRule(name: "stringLiteral", pattern: "quotedString", token: "stringLiteral", priority: 40),
-        RangeAuthoredLexerRule(name: "markerAttribute", pattern: "#identifier", token: "markerAttribute", priority: 40),
+        RangeAuthoredLexerRule(name: "hashAttribute", pattern: "#identifier", token: "hashAttribute", priority: 40),
         RangeAuthoredLexerRule(name: "hash", pattern: "#(", token: "hash", priority: 50),
         RangeAuthoredLexerRule(name: "macroAttribute", pattern: "@identifier", token: "macroAttribute", priority: 40),
         RangeAuthoredLexerRule(name: "escapedIdentifier", pattern: "`identifier`", token: "identifier", priority: 40),

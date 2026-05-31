@@ -9,7 +9,6 @@ public enum SemanticGraphEntityKind: String, Sendable {
     case enumeration
     case protocolDefinition
     case macro
-    case marker
     case typeExtension
     case mainBlock
     case state

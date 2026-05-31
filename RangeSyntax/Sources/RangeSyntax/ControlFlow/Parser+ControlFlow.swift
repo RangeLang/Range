@@ -108,14 +108,14 @@ extension Parser {
     }
 
     func isRequireStatementStart() -> Bool {
-        guard case .markerAttribute(let name) = peek(), name == "Require" else {
+        guard case .hashAttribute(let name) = peek(), name == "Require" else {
             return false
         }
         return peek(offset: 1) == .leftParen
     }
 
     mutating func parseRequireStatement() throws -> Statement {
-        guard case .markerAttribute(let name) = peek(), name == "Require" else {
+        guard case .hashAttribute(let name) = peek(), name == "Require" else {
             throw ParseError("Expected #Require statement.")
         }
         _ = name
@@ -326,7 +326,7 @@ extension Parser {
 
     func isExpressionStatementStart() -> Bool {
         switch peek() {
-        case .identifier, .integer, .double, .stringLiteral, .markerAttribute, .leftBracket,
+        case .identifier, .integer, .double, .stringLiteral, .hashAttribute, .leftBracket,
             .leftParen, .dollar, .dot, .bang:
             return true
         default:
@@ -409,7 +409,7 @@ extension Parser {
 
     func canStartExpression(_ token: Token) -> Bool {
         switch token {
-        case .identifier, .integer, .double, .stringLiteral, .markerAttribute,
+        case .identifier, .integer, .double, .stringLiteral, .hashAttribute,
             .macroAttribute, .leftBracket, .leftParen, .leftBrace, .dollar, .dot, .bang:
             return true
         case .keyword(let value):

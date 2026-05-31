@@ -11,7 +11,7 @@ public enum MacroExpander {
         defer { expansionLock.unlock() }
 
         let registry = collectMacros(from: files)
-        let markerRegistry = collectMarkers(from: files)
+        let macroMetadataRegistry = collectMacroMetadata(from: files)
         let declarationGraph = DeclarationGraph(files: files)
         let protocols = declarationGraph.protocolsByName
         let graphViews = declarationGraph.views
@@ -21,7 +21,7 @@ public enum MacroExpander {
         )
         let context = declarationGraph.macroExpansionContext(
             macrosByName: registry,
-            markersByName: markerRegistry,
+            macroMetadataDeclarationsByName: macroMetadataRegistry,
             diagnosticEngine: diagnosticEngine
         )
         return try files.map { parsedFile in

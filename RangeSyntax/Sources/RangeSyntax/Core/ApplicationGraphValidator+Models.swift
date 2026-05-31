@@ -80,7 +80,7 @@ extension ApplicationGraphValidator {
             return declaration.constructs + declaration.namespaces.flatMap { declarations(in: .namespace($0)) }
         case .module(let module):
             return module.constructs + module.namespaces.flatMap { declarations(in: .namespace($0)) }
-        case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro, .marker:
+        case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
             return []
         }
     }
