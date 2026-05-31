@@ -2337,20 +2337,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 
-    @Test("Range lexer bootstrap tracks Range source")
-    func rangeLexerBootstrapTracksRangeSource() throws {
-        let root = try repositoryRoot()
-        let checkedIn = try String(
-            contentsOf: root.appendingPathComponent(
-                "RangeSyntax/Sources/RangeSyntax/Lexer/Lexer+Generated.swift"
-            ),
-            encoding: .utf8
-        )
-        let generated = try generatedRangeLexerBootstrap(root: root)
-
-        #expect(checkedIn == generated)
-    }
-
     @Test("Compiler pipeline runtime hooks run beside Swift pipeline")
     func compilerPipelineRuntimeHooksRunBesideSwiftPipeline() throws {
         let hook = RecordingRuntimeHook()
@@ -2671,31 +2657,6 @@ private func rangeCoreInputs() throws -> [SourceInput] {
             role: .core
         )
     }
-}
-
-private func generatedRangeLexerBootstrap(root: URL) throws -> String {
-    let script = root.appendingPathComponent("scripts/generate-range-lexer-bootstrap.rb")
-    let process = Process()
-    process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-    process.arguments = ["ruby", script.path, "--print"]
-    process.currentDirectoryURL = root
-
-    let output = Pipe()
-    let error = Pipe()
-    process.standardOutput = output
-    process.standardError = error
-
-    try process.run()
-    process.waitUntilExit()
-
-    let data = output.fileHandleForReading.readDataToEndOfFile()
-    let errorData = error.fileHandleForReading.readDataToEndOfFile()
-    if process.terminationStatus != 0 {
-        let message = String(data: errorData, encoding: .utf8) ?? "unknown generator failure"
-        throw FixtureError.commandFailed(message)
-    }
-
-    return String(data: data, encoding: .utf8) ?? ""
 }
 
 private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL] {

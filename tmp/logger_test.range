@@ -1,5 +1,0 @@
-@main {
-  Logger.info("hello")
-  Logger.warning("watch")
-  Logger.error("boom")
-}

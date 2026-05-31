@@ -8,8 +8,8 @@ INSTALL_PREFIX="${RANGE_INSTALL_PREFIX:-${HOME}/.range}"
 ACTION="install"
 
 case "$(uname -s)" in
-  Darwin) PACKAGE_TEMPLATE="${ROOT_DIR}/Packaging/macOS/Range.lang" ;;
-  Linux) PACKAGE_TEMPLATE="${ROOT_DIR}/Packaging/Linux/Range.lang" ;;
+  Darwin) PACKAGE_TEMPLATE="${ROOT_DIR}/Releases/macOS/Range.lang" ;;
+  Linux) PACKAGE_TEMPLATE="${ROOT_DIR}/Releases/Linux/Range.lang" ;;
   *)
     echo "Unsupported OS: $(uname -s)" >&2
     exit 1
