@@ -1,8 +1,0 @@
-0: macroAttribute "@syntax" @ 0:0-0:7
-1: keyword "protocol" @ 1:0-1:8
-2: identifier "NominalTypeReference" @ 1:9-1:29
-3: colon ":" @ 1:29-1:30
-4: identifier "TypeReference" @ 1:31-1:44
-5: leftBrace "{" @ 1:45-1:46
-6: rightBrace "}" @ 1:46-1:47
-7: eof "" @ 2:0-2:0

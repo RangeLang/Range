@@ -1,3 +1,0 @@
-marker Description(@capture markdown: Expression): Construct -> String {
-    return markdown
-}

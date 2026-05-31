@@ -83,7 +83,7 @@ implementation tracking surface.
 - [ ] Add focused tests for any existing graph behavior that is only covered
       indirectly by broad compile fixtures.
 - [x] Add a small declaration graph snapshot test for current registry/query
-      coverage: enums, macros, markers, extensions, states, values,
+      coverage: enums, macros, extensions, states, values,
       initializers, parameters, namespace attributes, and package spaces.
 - [ ] Add an application graph snapshot test that proves declaration projection
       plus application edges stay downstream from the declaration graph.
@@ -92,13 +92,13 @@ implementation tracking surface.
 
 - [ ] Introduce one declaration descriptor/query surface that can represent:
       kind, name, core/project role, container, source location, declared type,
-      signature shape, and relevant attributes/markers/macros.
+      signature shape, and relevant attributes/macros.
 - [ ] Back the descriptor with existing `DeclarationGraph` registries first,
       without redesigning storage.
 - [ ] Replace category-specific source-location and kind lookups with the new
       descriptor where it reduces duplication.
 - [ ] Add tests proving the descriptor works for constructs, enums, protocols,
-      macros, markers, extensions, callables, initializers, parameters, and
+      macros, extensions, callables, initializers, parameters, and
       properties.
 
 ### 3. Promote Missing Relations To Graph Facts
@@ -215,7 +215,7 @@ implementation tracking surface.
       articles, examples, and language-design notes.
 - [ ] Treat `.env` as only one local provider for typed config/secret
       declarations. The source of truth should be graph-visible declarations
-      with property metadata and behavior attached through markers/macros.
+      with property metadata and behavior attached through macros.
 
 ## Immediate Next Slice
 

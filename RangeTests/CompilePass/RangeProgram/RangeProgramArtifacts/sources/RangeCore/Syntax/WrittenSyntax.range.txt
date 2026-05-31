@@ -1,5 +1,0 @@
-@syntax
-construct WrittenSyntax {
-    let text: String
-    let range: SourceRange?
-}

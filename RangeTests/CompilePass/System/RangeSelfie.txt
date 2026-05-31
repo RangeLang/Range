@@ -4,8 +4,6 @@ function tokenKindName(kind: TokenKind): String {
         return "hash"
     case .identifier:
         return "identifier"
-    case .markerAttribute:
-        return "markerAttribute"
     case .foreignBody:
         return "foreignBody"
     case .stringLiteral:
@@ -88,8 +86,8 @@ function tokenKindName(kind: TokenKind): String {
 }
 
 function renderTokens(tokens: [LexicalToken]): String {
-    state output   ""
-    state index   0
+    state output: ""
+    state index: 0
 
     while index < tokens.count {
         let token: LexicalToken(tokens.element(index: index))

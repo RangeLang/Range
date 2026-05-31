@@ -1,3 +1,0 @@
-marker codingKey<T>(_ value: String): Let<T> -> String {
-    return value
-}

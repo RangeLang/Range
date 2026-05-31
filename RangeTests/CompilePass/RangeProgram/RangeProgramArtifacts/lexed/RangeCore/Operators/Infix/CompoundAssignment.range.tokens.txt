@@ -1,6 +1,0 @@
-0: keyword "infix" @ 0:0-0:5
-1: keyword "operator" @ 0:6-0:14
-2: plusEqual "+=" @ 0:15-0:17
-3: colon ":" @ 0:17-0:18
-4: identifier "AssignmentPrecedence" @ 0:19-0:39
-5: eof "" @ 1:0-1:0

@@ -2,17 +2,17 @@
 
 Metatypes should not only point at runtime types. They should be able to carry language surfaces.
 
-Range already wants declarations, macros, markers, syntax, packages, and files to participate in the same graph. That means the type system needs a way to talk about type-shaped things that are not ordinary values.
+Range already wants declarations, macros, syntax, packages, and files to participate in the same graph. That means the type system needs a way to talk about type-shaped things that are not ordinary values.
 
-## Macro And Marker Surfaces
+## Macro Surfaces
 
-`@syntax` and `#Token` are not queries.
+`@syntax` and `@Token` are not queries.
 
 They are surfaces.
 
 ```range
 let syntax: Array<@syntax>()
-let tokens: Array<#Token>()
+let tokens: Array<@Token>()
 ```
 
 This has the same shape as an existential collection:
@@ -27,14 +27,14 @@ For Range, the spelling can stay explicit:
 
 ```range
 Array<@syntax>()
-Array<#Token>()
+Array<@Token>()
 ```
 
-`@syntax` means the element satisfies the syntax macro surface. `#Token` means the element satisfies the token marker surface. The compiler may derive or populate those arrays from graph facts, but the type meaning is ordinary: a homogeneous collection of values that share one metatype surface.
+`@syntax` means the element satisfies the syntax macro surface. `@Token` means the element satisfies the token macro surface. The compiler may derive or populate those arrays from graph facts, but the type meaning is ordinary: a homogeneous collection of values that share one metatype surface.
 
 ## Target Algebra
 
-Macro and marker attachment targets should compose like metatypes.
+Macro attachment targets should compose like metatypes.
 
 ```range
 open macro capture(): Parameter, Construct, Construct & Enum, Construct | Enum {
@@ -85,16 +85,16 @@ A Range file should be understood as a transform between program states.
 Program<A> -> Program<B>
 ```
 
-A file can declare syntax, attach markers, run macros, add graph facts, validate requirements, and expose runtime behavior. That makes a file a typed graph transform, not just text waiting for a compiler.
+A file can declare syntax, attach macros, add graph facts, validate requirements, and expose runtime behavior. That makes a file a typed graph transform, not just text waiting for a compiler.
 
 This is why metatype extras matter. The compiler needs to describe the surfaces that a file consumes and produces:
 
 ```range
 let input: Program<@syntax>
-let output: Program<@syntax, #Token>
+let output: Program<@syntax, @Token>
 ```
 
-The exact spelling can evolve, but the direction is important: macro and marker surfaces are type-level facts, and files compose through those facts.
+The exact spelling can evolve, but the direction is important: macro surfaces are type-level facts, and files compose through those facts.
 
 ## Why This Matters
 
@@ -103,7 +103,6 @@ Without metatype extras, every new compiler axis becomes a special case:
 - syntax boundary
 - token declaration
 - macro target
-- marker proof
 - captured argument
 - file transform
 

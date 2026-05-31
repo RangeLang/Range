@@ -1,8 +1,0 @@
-0: macroAttribute "@syntax" @ 0:0-0:7
-1: keyword "construct" @ 1:0-1:9
-2: identifier "Break" @ 1:10-1:15
-3: colon ":" @ 1:15-1:16
-4: identifier "Statement" @ 1:17-1:26
-5: leftBrace "{" @ 1:27-1:28
-6: rightBrace "}" @ 2:0-2:1
-7: eof "" @ 3:0-3:0

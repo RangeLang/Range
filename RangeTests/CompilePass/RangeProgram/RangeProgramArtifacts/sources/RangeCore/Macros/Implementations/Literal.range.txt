@@ -1,7 +1,0 @@
-macro literal<T>(): Function { target, diagnostics in
-    if target.call.arguments.count == 1 && target.call.arguments[0].type == T.self {
-        target.call.replace(with:
-            target.call.arguments[0].expression
-        )
-    }
-}

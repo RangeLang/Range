@@ -1,4 +1,0 @@
-#language
-construct DateTimeStorage {
-    function parse(iso8601String: String): Result<Self, DecodingError>
-}

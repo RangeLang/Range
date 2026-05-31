@@ -1,5 +1,0 @@
-@syntax
-construct Switch: Statement {
-    let expression: Expression
-    let cases: [SwitchCase]
-}

@@ -1,4 +1,0 @@
-@syntax
-construct Defer: Statement {
-    let body: Block
-}

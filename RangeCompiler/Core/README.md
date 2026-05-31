@@ -41,7 +41,7 @@ This is where Range's operator model is being documented as it moves out of comp
 
 ### `Macro`
 
-The compiler-facing macro surface, including macro declarations, markers,
+The compiler-facing macro surface, including macro declarations,
 diagnostics, and syntax rewrite/expansion protocols.
 
 ### `../Foundation/Macros`

@@ -21,7 +21,7 @@ The compiler should recognize literals and `@core` declarations, while `RangeCor
 ## Phase 3: Resolve Against `@core`
 
 - Make type checking resolve literal and return compatibility against `@core` declarations and literal bridge protocols in `RangeCore`.
-- Treat `@core` as the semantic marker for compiler-recognized structural constructs.
+- Treat `@core` as the semantic macro for compiler-recognized structural constructs.
 - Reduce ad hoc scalar-name checks in parser validation.
 
 ## Phase 4: Shrink Compiler Special Cases

@@ -1,4 +1,0 @@
-0: keyword "prefix" @ 0:0-0:6
-1: keyword "operator" @ 0:7-0:15
-2: bang "!" @ 0:16-0:17
-3: eof "" @ 1:0-1:0

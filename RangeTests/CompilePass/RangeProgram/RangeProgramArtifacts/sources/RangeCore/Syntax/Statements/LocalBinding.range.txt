@@ -1,7 +1,0 @@
-@syntax
-construct LocalBinding: Statement {
-    let mutable: Bool
-    let identifier: Identifier
-    let type: TypeReference
-    let expression: WrittenSyntax
-}

@@ -1,6 +1,0 @@
-0: markerAttribute "#language" @ 0:0-0:9
-1: keyword "construct" @ 1:0-1:9
-2: identifier "DataStorage" @ 1:10-1:21
-3: leftBrace "{" @ 1:22-1:23
-4: rightBrace "}" @ 2:0-2:1
-5: eof "" @ 3:0-3:0

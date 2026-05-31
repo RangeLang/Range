@@ -1,5 +1,0 @@
-0: keyword "protocol" @ 0:0-0:8
-1: identifier "SyntaxEmittable" @ 0:9-0:24
-2: leftBrace "{" @ 0:25-0:26
-3: rightBrace "}" @ 1:0-1:1
-4: eof "" @ 2:0-2:0

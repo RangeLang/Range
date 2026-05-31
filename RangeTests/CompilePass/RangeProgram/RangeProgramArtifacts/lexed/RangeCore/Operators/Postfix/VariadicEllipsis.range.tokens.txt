@@ -1,4 +1,0 @@
-0: keyword "postfix" @ 0:0-0:7
-1: keyword "operator" @ 0:8-0:16
-2: ellipsis "..." @ 0:17-0:20
-3: eof "" @ 1:0-1:0

@@ -1,5 +1,0 @@
-0: keyword "construct" @ 0:0-0:9
-1: identifier "Text" @ 0:10-0:14
-2: leftBrace "{" @ 0:15-0:16
-3: rightBrace "}" @ 1:0-1:1
-4: eof "" @ 2:0-2:0

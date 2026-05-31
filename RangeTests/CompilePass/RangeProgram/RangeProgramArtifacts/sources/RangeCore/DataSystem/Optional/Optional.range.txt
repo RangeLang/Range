@@ -1,5 +1,0 @@
-#language
-construct Optional<Wrapped> {
-    @literal<NilLiteral>
-    function literal(literal: NilLiteral): Self
-}

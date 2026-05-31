@@ -1,6 +1,0 @@
-0: markerAttribute "#language" @ 0:0-0:9
-1: keyword "enum" @ 1:0-1:4
-2: identifier "Never" @ 1:5-1:10
-3: leftBrace "{" @ 1:11-1:12
-4: rightBrace "}" @ 1:12-1:13
-5: eof "" @ 2:0-2:0

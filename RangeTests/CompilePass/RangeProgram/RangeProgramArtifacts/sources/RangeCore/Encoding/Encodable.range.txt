@@ -1,3 +1,0 @@
-protocol Encodable {
-    function encode(to encoder: Encoder): Result<Void, EncodingError>
-}

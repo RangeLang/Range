@@ -1,9 +1,0 @@
-#language
-construct Logger {
-    function log(_ message: String)
-    function debug(_ message: String)
-    function info(_ message: String)
-    function success(_ message: String)
-    function warning(_ message: String)
-    function error(_ message: String)
-}

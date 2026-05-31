@@ -1,6 +1,0 @@
-@syntax
-construct GraphIdentity {
-    let id: String
-    let kind: String
-    let name: String
-}

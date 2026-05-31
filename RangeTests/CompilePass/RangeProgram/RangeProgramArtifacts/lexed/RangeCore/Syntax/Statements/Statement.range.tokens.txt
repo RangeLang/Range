@@ -1,6 +1,0 @@
-0: macroAttribute "@syntax" @ 0:0-0:7
-1: keyword "protocol" @ 1:0-1:8
-2: identifier "Statement" @ 1:9-1:18
-3: leftBrace "{" @ 1:19-1:20
-4: rightBrace "}" @ 1:20-1:21
-5: eof "" @ 2:0-2:0

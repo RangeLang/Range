@@ -1,3 +1,0 @@
-protocol Equatable {
-    function ==(lhs: Self, rhs: Self): Bool
-}

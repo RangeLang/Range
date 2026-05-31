@@ -1,4 +1,0 @@
-@syntax
-construct Block {
-    let statements: [Statement]
-}

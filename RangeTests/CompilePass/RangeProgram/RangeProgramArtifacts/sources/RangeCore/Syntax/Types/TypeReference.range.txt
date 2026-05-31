@@ -1,2 +1,0 @@
-@syntax
-protocol TypeReference: SyntaxReplaceable<TypeReference> {}
