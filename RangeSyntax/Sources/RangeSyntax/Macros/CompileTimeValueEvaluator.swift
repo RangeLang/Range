@@ -351,6 +351,14 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
+        if let value = evaluateStringSourceCall(
+            name: name,
+            arguments: arguments,
+            locals: locals
+        ) {
+            return value
+        }
+
         let suffix = ".character"
         guard name.hasSuffix(suffix),
             let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
@@ -366,6 +374,53 @@ struct CompileTimeValueEvaluator {
 
         let stringIndex = value.index(value.startIndex, offsetBy: index)
         return .string(String(value[stringIndex]))
+    }
+
+    private func evaluateStringSourceCall(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        let supportedSuffixes = [".count", ".hasPrefix", ".hasSuffix", ".containsRepeated"]
+        guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
+            let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
+            case .string(let value) = source,
+            arguments.count == 1
+        else {
+            return nil
+        }
+
+        let argument = arguments[0]
+        guard case .string(let needle) = evaluate(argument.value, locals: locals) else {
+            return nil
+        }
+
+        switch suffix {
+        case ".count":
+            guard argument.label == "of" else { return nil }
+            guard !needle.isEmpty else { return .integer(0) }
+            var count = 0
+            var searchStart = value.startIndex
+            while searchStart < value.endIndex,
+                let range = value.range(of: needle, range: searchStart..<value.endIndex)
+            {
+                count += 1
+                searchStart = range.upperBound
+            }
+            return .integer(count)
+        case ".hasPrefix":
+            guard argument.label == nil else { return nil }
+            return .boolean(value.hasPrefix(needle))
+        case ".hasSuffix":
+            guard argument.label == nil else { return nil }
+            return .boolean(value.hasSuffix(needle))
+        case ".containsRepeated":
+            guard argument.label == "delimiter" else { return nil }
+            guard !needle.isEmpty else { return .boolean(false) }
+            return .boolean(value.contains("\(needle)\(needle)"))
+        default:
+            return nil
+        }
     }
 
     private func evaluateObjectConstruction(

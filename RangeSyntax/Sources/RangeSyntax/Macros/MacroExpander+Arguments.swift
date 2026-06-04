@@ -275,6 +275,26 @@ extension MacroExpander {
         for metadata: MacroMetadataDeclaration,
         application: MacroApplication
     ) -> [String: Expression] {
+        genericArgumentBindings(
+            genericParameters: metadata.genericParameters,
+            application: application
+        )
+    }
+
+    static func macroGenericArgumentBindings(
+        for macro: MacroDeclaration,
+        application: MacroApplication
+    ) -> [String: Expression] {
+        genericArgumentBindings(
+            genericParameters: macro.genericParameters,
+            application: application
+        )
+    }
+
+    private static func genericArgumentBindings(
+        genericParameters: [GenericParameter],
+        application: MacroApplication
+    ) -> [String: Expression] {
         var bindings: [String: Expression] = [:]
         var positionalArguments = application.genericArguments
         var labeledArguments: [String: TypeReference] = [:]
@@ -288,7 +308,7 @@ extension MacroExpander {
         }
 
         var positionalIndex = 0
-        for parameter in metadata.genericParameters {
+        for parameter in genericParameters {
             switch parameter {
             case .type(let name, _, _):
                 guard positionalIndex < positionalArguments.count else {

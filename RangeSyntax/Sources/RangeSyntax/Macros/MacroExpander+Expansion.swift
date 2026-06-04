@@ -727,10 +727,16 @@ extension MacroExpander {
                 for: macro,
                 argumentClause: application.argumentClause
             )
+            let genericBindings = macroGenericArgumentBindings(
+                for: macro,
+                application: application
+            )
+            let localBindings = argumentBindings.merging(genericBindings) { _, generic in generic }
             try emitMacroDiagnostics(
-                from: substituteMacroBindings(in: macro.body, bindings: argumentBindings),
+                from: substituteMacroBindings(in: macro.body, bindings: localBindings),
                 macro: macro,
-                context: context
+                context: context,
+                localBindings: localBindings
             )
 
             for registration in try propertyTransformRegistrations(for: macro) {
@@ -1660,12 +1666,16 @@ extension MacroExpander {
                 for: macro,
                 argumentClause: application.argumentClause
             )
+            let genericBindings = macroGenericArgumentBindings(
+                for: macro,
+                application: application
+            )
             emitted.merge(
                 try emittedDeclarations(
                     from: macro,
                     construct: construct,
                     context: context,
-                    argumentBindings: argumentBindings
+                    argumentBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
                 )
             )
         }
@@ -1841,7 +1851,8 @@ extension MacroExpander {
         from statements: [Statement],
         macro: MacroDeclaration,
         targetValue: CompileTimeValue? = nil,
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        localBindings: [String: Expression] = [:]
     ) throws {
         guard let bindings = macro.bindings else {
             return
@@ -1851,7 +1862,8 @@ extension MacroExpander {
             diagnosticOwnerName: macro.name,
             bindings: bindings,
             targetValue: targetValue,
-            context: context
+            context: context,
+            localBindings: localBindings
         )
     }
 

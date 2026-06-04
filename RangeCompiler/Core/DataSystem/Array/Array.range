@@ -1,5 +1,6 @@
 @language
 @literal
+@syntax
 construct Array<Element> {
     state storage: ArrayStorage<Element>()
 

@@ -1,4 +1,64 @@
-macro init<T, let delimiter: String? = nil>(
-    _ pattern: String = ""
+macro init<let value: TypeReference, let delimiter: String? = nil>(
+    @capture _ pattern: Expression
 ): Construct { target, diagnostics in
+    let source: String(pattern.written.text)
+    state delimiterCount: Int(0)
+
+    if delimiter == nil {
+        diagnostics.error("@init delimiter is required.")
+    }
+    let actualDelimiter: String(delimiter ?? "")
+
+    if source.count == 0 {
+        diagnostics.error("@init pattern must use delimited slots.")
+    }
+
+    set delimiterCount   source.count(of: actualDelimiter)
+
+    if delimiterCount == 0 {
+        diagnostics.error("@init pattern must contain at least one delimiter.")
+    }
+
+    if source.hasPrefix(actualDelimiter) {
+        diagnostics.error("@init pattern must not start with delimiter.")
+    }
+
+    if source.hasSuffix(actualDelimiter) {
+        diagnostics.error("@init pattern must not end with delimiter.")
+    }
+
+    if source.containsRepeated(delimiter: actualDelimiter) {
+        diagnostics.error("@init pattern must contain non-empty delimited slots.")
+    }
+
+    let slotCount: Int(delimiterCount + 1)
+    let lets: [Let](target.declaration.lets)
+    let states: [State](target.declaration.states)
+    let fieldCount: Int(lets.count + states.count)
+
+    if fieldCount != slotCount {
+        diagnostics.error("@init pattern slot count must match the construct field count.")
+    }
+
+    state letIndex: Int(0)
+    while letIndex < lets.count {
+        let field: Let(lets.element(index: letIndex))
+
+        if field.type != value {
+            diagnostics.error("@init field type must match the literal value type.")
+        }
+
+        letIndex += 1
+    }
+
+    state stateIndex: Int(0)
+    while stateIndex < states.count {
+        let field: State(states.element(index: stateIndex))
+
+        if field.type != value {
+            diagnostics.error("@init field type must match the literal value type.")
+        }
+
+        stateIndex += 1
+    }
 }

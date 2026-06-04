@@ -514,14 +514,24 @@ extension MacroExpander {
                     "Macro @\(application.name) is used on a construct but targets \(macro.target!.displayName)."
                 )
             }
+            let argumentBindings = try parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: application.argumentClause
+            )
+            let genericBindings = macroGenericArgumentBindings(
+                for: macro,
+                application: application
+            )
+            let localBindings = argumentBindings.merging(genericBindings) { _, generic in generic }
             try emitMacroDiagnostics(
-                from: macro.body,
+                from: substituteMacroBindings(in: macro.body, bindings: localBindings),
                 macro: macro,
                 targetValue: MacroTargetValueBuilder(
                     macroDeclarationsByName: context.macroDeclarationsByName,
                     macroMetadataByName: context.macroMetadataByName
                 ).targetValue(for: construct),
-                context: context
+                context: context,
+                localBindings: localBindings
             )
             if application.name == "literal" {
                 continue
