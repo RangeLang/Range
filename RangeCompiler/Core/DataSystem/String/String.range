@@ -2,7 +2,6 @@
 construct String {
     let storage: StringStorage
 
-    @literal<StringLiteral>
     function literal(literal: StringLiteral): Self {
         return Self(storage: literal.storage())
     }

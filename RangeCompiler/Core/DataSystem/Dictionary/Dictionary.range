@@ -1,11 +1,7 @@
 @language
+@literal
 construct Dictionary<Key: Hashable, Value> {
     state storage: DictionaryStorage<Key, Value>()
-
-    @literal<DictionaryLiteral>
-    function literal(literal: DictionaryLiteral): Self {
-        return Self(storage: literal.storage())
-    }
 
     derived count: Int {
         storage.count

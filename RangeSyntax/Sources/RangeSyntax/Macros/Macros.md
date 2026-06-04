@@ -37,7 +37,7 @@ macro lock(): Block { }
 macro codable(): Construct { }
 macro clamped(min: Int, max: Int): State { }
 macro lock(): Block { }
-macro literal<T>(): Function { }
+macro literal(): Construct { }
 macro stringify(@capture<Expression> _ value: Expression): Expression -> String { }
 ```
 

@@ -1,4 +1,0 @@
-@language
-construct SetLiteral {
-    function storage<Element: Hashable>(): SetStorage<Element>
-}

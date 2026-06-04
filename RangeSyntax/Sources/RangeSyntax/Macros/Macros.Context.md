@@ -221,10 +221,7 @@ macro clamped(min: Int, max: Int): State { target, diagnostics in
   facets rather than one flat bag of members
 
 ```range
-macro literal<T>(): Function { target, diagnostics in
-    let declaration = target.declaration
-    let call = target.call
-}
+macro literal(): Construct { target, diagnostics in }
 ```
 
 ```range
@@ -266,4 +263,4 @@ Function
   bootstrap surface;
   `Function` now uses declaration plus call facets authoritatively for
   `literal`.
-- `@literal<T>` is the canonical literal bridge macro annotation form, with `T` constrained to compiler-recognized literal carrier types.
+- `@literal` is the canonical base literal annotation form; primitive bridge functions consume literal carrier constructs without carrying the macro themselves, while collection constructs can carry `@literal` directly.

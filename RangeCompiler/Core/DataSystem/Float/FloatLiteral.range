@@ -1,4 +1,5 @@
 @language
+@literal
 construct FloatLiteral { }
 
 extension FloatLiteral {

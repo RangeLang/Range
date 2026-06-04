@@ -1,11 +1,7 @@
 @language
+@literal
 construct Array<Element> {
     state storage: ArrayStorage<Element>()
-
-    @literal<ArrayLiteral>
-    function literal(literal: ArrayLiteral): Self {
-        return Self(storage: literal.storage())
-    }
 
     derived count: Int {
         storage.count

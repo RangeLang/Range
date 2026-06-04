@@ -1,11 +1,7 @@
 @language
+@literal
 construct Set<Element: Hashable> {
     state storage: SetStorage<Element>()
-
-    @literal<SetLiteral>
-    function literal(literal: SetLiteral): Self {
-        return Self(storage: literal.storage())
-    }
 
     derived count: Int {
         storage.count

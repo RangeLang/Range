@@ -26,21 +26,17 @@ extension MacroExpander {
             return expression
         }
 
-        guard
-            let rewritten = try executeInitMacroRewrite(
-                macroName: "literal",
-                initTarget: bridge.initTarget,
-                applicationArguments: [
-                    CallArgument(
-                        label: bridge.initTarget.parameterLabels.first ?? nil, value: expression)
-                ],
-                macros: macros,
-                context: context
-            )
-        else {
-            throw ParseError(
-                "Literal macro @literal for \(bridge.initTarget.constructName) could not be interpreted through declaration/call rewrite semantics."
-            )
+        guard let rewritten = try executeInitMacroRewrite(
+            macroName: "literal",
+            initTarget: bridge.initTarget,
+            applicationArguments: [
+                CallArgument(
+                    label: bridge.initTarget.parameterLabels.first ?? nil, value: expression)
+            ],
+            macros: macros,
+            context: context
+        ) else {
+            return expression
         }
 
         return rewritten

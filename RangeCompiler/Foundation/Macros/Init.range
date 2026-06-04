@@ -1,0 +1,4 @@
+macro init<T, let delimiter: String? = nil>(
+    _ pattern: String = ""
+): Construct { target, diagnostics in
+}

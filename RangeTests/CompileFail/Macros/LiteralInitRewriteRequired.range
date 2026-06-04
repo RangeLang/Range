@@ -1,10 +1,6 @@
-macro literal<T>(): Init { target, diagnostics in
-}
-
 construct FixtureInt {
     let storage: IntStorage
 
-    @literal<IntLiteral>
     init(literal: IntLiteral) {
         set self.storage   literal.storage()
     }

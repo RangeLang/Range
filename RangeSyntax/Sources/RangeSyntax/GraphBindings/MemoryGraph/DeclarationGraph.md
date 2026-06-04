@@ -57,18 +57,19 @@ It also precedes backend adaptation:
 
 ```range
 construct Int {
-    @literal<IntLiteral>
     function literal(literal: IntLiteral): Self
 }
 
-macro literal<T>(): Function { target, diagnostics in }
+@literal
+construct IntLiteral { }
+
+macro literal(): Construct { target, diagnostics in }
 ```
 
 - Literal bridge macros are first-class declaration facts.
 
 ```range
 construct Int {
-    @literal<IntLiteral>
     function literal(literal: IntLiteral): Self
 }
 ```
@@ -79,7 +80,6 @@ The graph records that `Int.literal(literal:)` accepts `IntLiteral`.
 
 ```range
 construct Int {
-    @literal<IntLiteral>
     function literal(literal: IntLiteral): Self { }
 }
 ```
@@ -106,7 +106,6 @@ The compiler should know that `Int` is a valid declaration-level type before it 
 
 ```range
 construct String {
-    @literal<StringLiteral>
     function literal(literal: StringLiteral): Self { }
 }
 ```
@@ -114,7 +113,7 @@ construct String {
 The relevant graph facts are:
 
 - `String` declares a concrete literal bridge function
-- that function carries `<StringLiteral>`
+- that function consumes the `StringLiteral` carrier
 - therefore `String` accepts `StringLiteral`
 
 If source contains:

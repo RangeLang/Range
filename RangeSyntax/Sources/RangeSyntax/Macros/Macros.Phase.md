@@ -10,18 +10,20 @@ state count: Int = 0
 
 `#clamped` expands on that `state` declaration itself.
 
-The same base rule applies to literal bridge functions:
+The same base rule applies to literal carrier constructs:
 
 ```range
+@literal
+construct IntLiteral { }
+
 construct Int {
-    @literal<IntLiteral>
     function literal(literal: IntLiteral): Self { }
 }
 ```
 
-Here `@literal<IntLiteral>` belongs to that concrete function directly.
+Here `@literal` belongs to the carrier construct, not the bridge function.
 
-For `literal`, the generic argument must be a compiler-recognized literal carrier type such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, `NilLiteral`, `ArrayLiteral`, `DictionaryLiteral`, or `SetLiteral`.
+For primitive literal bridging, the bridge function parameter must use a compiler-recognized literal carrier construct such as `IntLiteral`, `StringLiteral`, `BoolLiteral`, `FloatLiteral`, or `NilLiteral`. Collection constructs such as `Array`, `Dictionary`, and `Set` can carry `@literal` directly.
 
 ## Deferred Conformance Macros
 A protocol can also carry macros targeted at declaration kinds that conform to it, such as constructs or enums.
@@ -40,10 +42,10 @@ Macros attached to protocol requirements or protocols themselves are part of tha
 
 For literal bridging specifically:
 
-- `@literal<T>` is the canonical form.
-- `T` is a literal carrier type recognized by the compiler.
+- `@literal` is the canonical carrier form.
+- The literal bridge function parameter type is a carrier construct recognized by the compiler.
 - The compiler recognizes literal categories and carrier types.
-- A concrete literal function carries `@literal<T>` directly.
+- A concrete carrier construct carries `@literal` directly.
 - The macro model rewrites concrete use sites through the realized literal function.
 - This rewrite is part of Range semantic correctness, not backend adaptation.
 - A semantic rewrite such as `5 -> Int.literal(literal: 5)` is the correct Range result even if a backend later chooses a different target-specific representation.

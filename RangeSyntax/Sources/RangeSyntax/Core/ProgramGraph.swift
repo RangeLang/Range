@@ -8,6 +8,7 @@ public enum SemanticGraphEntityKind: String, Sendable {
     case macro
     case typeExtension
     case mainBlock
+    case field
     case state
     case binding
     case derived

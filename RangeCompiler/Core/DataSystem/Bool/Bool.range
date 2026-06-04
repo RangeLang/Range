@@ -2,7 +2,6 @@
 construct Bool {
     let storage: BoolStorage
 
-    @literal<BoolLiteral>
     function literal(literal: BoolLiteral): Self {
         return Self(storage: literal.storage())
     }

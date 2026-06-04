@@ -1627,6 +1627,11 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 $0.kind == .value && $0.label == "defaultLocale"
             }
         )
+        #expect(
+            graph.programGraph.entities.contains {
+                $0.kind == .field && $0.label == "defaultLocale"
+            }
+        )
     }
 
     @Test("Construct macro declares construct metadata slot")

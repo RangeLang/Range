@@ -1020,15 +1020,18 @@ public struct DeclarationGraph {
     static func collectRealizedLiteralBridges(
         from constructs: [String: ConstructDeclaration]
     ) -> [RealizedLiteralBridge] {
-        constructs.values.flatMap { construct in
-            construct.callables.compactMap { callable in
-                guard callable.parameters.count == 1 else {
-                    return nil
-                }
+        let literalCarrierNames = Set(
+            constructs.values
+                .filter { $0.macros.contains(where: { $0.name == "literal" }) }
+                .map(\.name)
+        )
 
-                guard
-                    let literalMacro = callable.macros.first(where: { $0.name == "literal" }),
-                    literalMacro.genericArguments.count == 1
+        return constructs.values.flatMap { construct -> [RealizedLiteralBridge] in
+            construct.callables.compactMap { callable -> RealizedLiteralBridge? in
+                guard callable.name == "literal",
+                    callable.parameters.count == 1,
+                    let carrierType = callable.parameters[0].typeReference,
+                    literalCarrierNames.contains(carrierType.displayName)
                 else {
                     return nil
                 }
@@ -1039,7 +1042,7 @@ public struct DeclarationGraph {
                         parameterLabels: callable.parameters.map(\.externalLabel),
                         isCore: construct.isCore
                     ),
-                    carrierTypeName: literalMacro.genericArguments[0].displayName
+                    carrierTypeName: carrierType.displayName
                 )
             }
         }
@@ -1480,6 +1483,13 @@ private struct SyntaxProjectionAccumulator {
 
     private mutating func addState(_ declaration: StateDeclaration, parentID: String) {
         let stateID = "\(parentID)/state:\(declaration.name)"
+        addField(
+            name: declaration.name,
+            macros: declaration.macros,
+            typeReference: declaration.type,
+            parentID: parentID,
+            declarationID: stateID
+        )
         addEntity(id: stateID, kind: .state, label: declaration.name)
         addRelation(from: parentID, to: stateID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: stateID)
@@ -1488,6 +1498,13 @@ private struct SyntaxProjectionAccumulator {
 
     private mutating func addBinding(_ declaration: BindingDeclaration, parentID: String) {
         let bindingID = "\(parentID)/binding:\(declaration.name)"
+        addField(
+            name: declaration.name,
+            macros: declaration.macros,
+            typeReference: .named(declaration.typeName),
+            parentID: parentID,
+            declarationID: bindingID
+        )
         addEntity(id: bindingID, kind: .binding, label: declaration.name)
         addRelation(from: parentID, to: bindingID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: bindingID)
@@ -1496,6 +1513,13 @@ private struct SyntaxProjectionAccumulator {
 
     private mutating func addDerived(_ declaration: DerivedDeclaration, parentID: String) {
         let derivedID = "\(parentID)/derived:\(declaration.name)"
+        addField(
+            name: declaration.name,
+            macros: declaration.macros,
+            typeReference: .named(declaration.typeName),
+            parentID: parentID,
+            declarationID: derivedID
+        )
         addEntity(id: derivedID, kind: .derived, label: declaration.name)
         addRelation(from: parentID, to: derivedID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: derivedID)
@@ -1507,10 +1531,32 @@ private struct SyntaxProjectionAccumulator {
 
     private mutating func addValue(_ declaration: ValueDeclaration, parentID: String) {
         let valueID = "\(parentID)/value:\(declaration.name)"
+        addField(
+            name: declaration.name,
+            macros: declaration.macros,
+            typeReference: .named(declaration.typeName),
+            parentID: parentID,
+            declarationID: valueID
+        )
         addEntity(id: valueID, kind: .value, label: declaration.name)
         addRelation(from: parentID, to: valueID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: valueID)
         addStorageTypeReference(.named(declaration.typeName), from: valueID)
+    }
+
+    private mutating func addField(
+        name: String,
+        macros: [MacroApplication],
+        typeReference: TypeReference,
+        parentID: String,
+        declarationID: String
+    ) {
+        let fieldID = "\(parentID)/field:\(name)"
+        addEntity(id: fieldID, kind: .field, label: name)
+        addRelation(from: parentID, to: fieldID, kind: .contains)
+        addRelation(from: fieldID, to: declarationID, kind: .resolvesTo)
+        addMacroApplications(macros, parentID: fieldID)
+        addStorageTypeReference(typeReference, from: fieldID)
     }
 
     private mutating func addInitializer(_ declaration: InitializerDeclaration, parentID: String) {

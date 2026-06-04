@@ -31,9 +31,9 @@ Current bootstrap rules:
   records it on the parameter as syntax-capture metadata; it does not rewrite
   the parameter application expression itself.
 - Parameter-targeted macros operate through explicit declaration/application facets on `Parameter`, for example `target.declaration.type.rewrite(...)` and nested application-side expression rewrite paths such as `target.application.expression.rewrite(...)`.
-- Function-targeted macros are graph-driven declaration macros. Concrete literal bridge functions carry `@literal<T>` directly.
-- For literal bridging, the base form is `@literal<T>` on `function literal(literal: T): Self`, where `T` is a compiler-recognized literal carrier type.
-- The compiler recognizes carrier types and literal categories; the macro model defines how the bridge is realized on concrete literal functions.
+- Function-targeted macros are graph-driven declaration macros.
+- For literal carriers, the base form is `@literal` on the carrier construct. Concrete `literal(literal: T): Self` functions consume those carriers without carrying `@literal`.
+- The compiler recognizes carrier types and literal categories from carrier constructs.
 - Macro closures currently use only `target` and `diagnostics`; bootstrap work should not add extra bindings.
 - Local bindings inside macro bodies are syntactically valid, for example
   `value declaration = target.declaration`, but bootstrap rewrite execution is
@@ -50,15 +50,15 @@ Current bootstrap rules:
 
 Current function-targeted literal status:
 
-- Concrete `@literal<T>` attachment already participates in graph-backed literal bridge realization.
+- Concrete construct-level `@literal` attachment already participates in graph-backed literal bridge realization.
 - Protocol init requirements are parsed and keep their carried macros.
 - Conforming initializers inherit carried init macros through conformance matching.
 - The `Function` surface models `target.declaration` and `target.call`,
   and `literal` is written in that shape in RangeCore.
-- Literal bridge lowering now executes through the authoritative `Function`
-  declaration/call rewrite path for `literal`, with an explicit
-  diagnostic if that rewrite cannot be interpreted.
+- Literal bridge lowering can execute through the authoritative `Function`
+  declaration/call rewrite path for `literal`; while `literal` is empty, a
+  missing rewrite is treated as no-op.
 - Full generalized `Init` macro execution for arbitrary init-targeted macros is
-  separate from the function-targeted literal bridge.
+  separate from literal bridge realization.
 
 This is a temporary bootstrap shape. The surface is being promoted out of `Exploration` only when the model is settled enough to support real compiler behavior.

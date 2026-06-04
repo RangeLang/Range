@@ -287,6 +287,7 @@ struct GraphCollector {
         case .macro: return .macro
         case .typeExtension: return .typeExtension
         case .mainBlock: return .mainBlock
+        case .field: return .field
         case .state: return .state
         case .binding: return .binding
         case .derived: return .derived
