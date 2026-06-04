@@ -1100,14 +1100,14 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.syntaxResolver.declaration(named: "Construct.Application", conformsTo: "SyntaxReplaceable"))
         #expect(graph.constructsByName["Construct"]?.macros.contains { $0.name == "syntax" } == true)
         #expect(graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "GraphDeclaration" } == true)
+        #expect(graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "graph" && $0.argumentClause == ". declaration" } == true)
         #expect(graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
+        #expect(graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "graph" && $0.argumentClause == ". application" } == true)
         #expect(graph.constructsByName["Macro"]?.macros.contains { $0.name == "syntax" } == true)
         #expect(graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "GraphDeclaration" } == true)
+        #expect(graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "graph" && $0.argumentClause == ". declaration" } == true)
         #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "GraphApplication" } == true)
+        #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "graph" && $0.argumentClause == ". application" } == true)
     }
 
     @Test("@syntax graph projection contains declaration and application surfaces")

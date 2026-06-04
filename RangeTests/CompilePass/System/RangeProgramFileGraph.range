@@ -1,4 +1,4 @@
-@GraphDeclaration
+@graph(.declaration)
 construct ProgramFileGraphNode { }
 
 function renderProgram(program: RangeProgram): String {
@@ -147,7 +147,7 @@ function countApplications(graph: ProgramGraph): Int {
                             name: "ProgramFileGraphNode"
                         ),
                         declarations: [
-                            GraphDeclaration(
+                            GraphEntry(
                                 identity: RangeGraphIdentity(
                                     id: "ProgramFileGraphNode",
                                     kind: "construct",
@@ -156,7 +156,7 @@ function countApplications(graph: ProgramGraph): Int {
                             )
                         ],
                         applications: [
-                            GraphApplication(
+                            GraphEntry(
                                 identity: RangeGraphIdentity(
                                     id: "FileTree.read",
                                     kind: "function",

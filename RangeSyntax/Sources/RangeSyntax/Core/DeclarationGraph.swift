@@ -1609,10 +1609,10 @@ private struct SyntaxProjectionAccumulator {
         var declarations: [SemanticGraphEntity] = []
         var applications: [SemanticGraphEntity] = []
 
-        if hasMacro("GraphDeclaration", in: macros) {
+        if hasGraphRole(.declaration, in: macros) {
             declarations.append(identity)
         }
-        if hasMacro("GraphApplication", in: macros) {
+        if hasGraphRole(.application, in: macros) {
             applications.append(identity)
         }
 
@@ -1625,10 +1625,10 @@ private struct SyntaxProjectionAccumulator {
                 label: nestedLabel
             )
 
-            if hasMacro("GraphDeclaration", in: nested.macros) {
+            if hasGraphRole(.declaration, in: nested.macros) {
                 declarations.append(nestedEntity)
             }
-            if hasMacro("GraphApplication", in: nested.macros) {
+            if hasGraphRole(.application, in: nested.macros) {
                 applications.append(nestedEntity)
             }
         }
@@ -1644,6 +1644,20 @@ private struct SyntaxProjectionAccumulator {
 
     private func hasMacro(_ name: String, in macros: [MacroApplication]) -> Bool {
         macros.contains { $0.name == name }
+    }
+
+    private enum GraphRoleMarker {
+        case declaration
+        case application
+    }
+
+    private func hasGraphRole(_ role: GraphRoleMarker, in macros: [MacroApplication]) -> Bool {
+        let expected = role == .declaration ? ".declaration" : ".application"
+        return macros.contains { macro in
+            guard macro.name == "graph" else { return false }
+            let clause = macro.argumentClause?.replacingOccurrences(of: " ", with: "")
+            return clause == expected
+        }
     }
 
     private mutating func addRelation(

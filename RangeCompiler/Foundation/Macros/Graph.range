@@ -1,15 +1,5 @@
-macro GraphDeclaration(): @syntax -> GraphDeclaration { target, diagnostics in
-    return GraphDeclaration(
-        identity: RangeGraphIdentity(
-            id: "",
-            kind: "syntax",
-            name: ""
-        )
-    )
-}
-
-macro GraphApplication(): @syntax -> GraphApplication { target, diagnostics in
-    return GraphApplication(
+macro graph(_ role: GraphRole): @syntax -> GraphEntry { target, diagnostics in
+    return GraphEntry(
         identity: RangeGraphIdentity(
             id: "",
             kind: "syntax",

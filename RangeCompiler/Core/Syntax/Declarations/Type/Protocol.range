@@ -3,7 +3,7 @@ construct Protocol {
     let declaration: Declaration
     let application: Application
 
-    @GraphDeclaration
+    @graph(.declaration)
     construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
         let self: NominalTypeReference
         let generics: [Generic]
@@ -12,7 +12,7 @@ construct Protocol {
         function expand(_ expansion: () -> [Syntax])
     }
 
-    @GraphApplication
+    @graph(.application)
     construct Application<Conformer> {
         let self: NominalTypeReference
         let conformer: Conformer

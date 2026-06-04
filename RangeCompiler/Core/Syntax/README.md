@@ -88,7 +88,7 @@ how the broader compiler pipeline can consume it.
 
 The graph role does not have to be the nested type name. `Function.Call` is a
 function application in the graph, but it should still use the domain word
-`Call` at the syntax surface. `@GraphDeclaration` and `@GraphApplication` carry
+`Call` at the syntax surface. `@graph(.declaration)` and `@graph(.application)` carry
 that semantic role without forcing every syntax owner to name its children
 `Declaration` and `Application`.
 

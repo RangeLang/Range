@@ -8,7 +8,7 @@ construct Macro {
         let written: WrittenSyntax
     }
 
-    @GraphDeclaration
+    @graph(.declaration)
     construct Declaration {
         let identifier: Identifier
         let parameters: [Parameter.Declaration]
@@ -21,7 +21,7 @@ construct Macro {
         let syntaxBody: String
     }
 
-    @GraphApplication
+    @graph(.application)
     construct Application<Value> {
         let identifier: Identifier
         let genericArguments: [TypeReference]

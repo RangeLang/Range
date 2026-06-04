@@ -3,7 +3,7 @@ construct Parameter {
     let declaration: Declaration
     let application: Application
 
-    @GraphDeclaration
+    @graph(.declaration)
     construct Declaration {
         let externalName: String?
         let localName: String
@@ -12,7 +12,7 @@ construct Parameter {
         let defaultValue: Expression?
     }
 
-    @GraphApplication
+    @graph(.application)
     construct Application {
         let label: String?
         let type: TypeReference

@@ -54,8 +54,14 @@ construct RangeGraphRelationship {
 @language
 construct GraphSyntax {
     let identity: RangeGraphIdentity
-    let declarations: [@GraphDeclaration]
-    let applications: [@GraphApplication]
+    let declarations: [GraphEntry]
+    let applications: [GraphEntry]
+}
+
+@language
+enum GraphRole {
+    case declaration
+    case application
 }
 
 @language
@@ -66,11 +72,6 @@ construct RangeGraphIdentity {
 }
 
 @language
-construct GraphDeclaration {
-    let identity: RangeGraphIdentity
-}
-
-@language
-construct GraphApplication {
+construct GraphEntry {
     let identity: RangeGraphIdentity
 }
