@@ -1,5 +1,5 @@
 @syntax
-construct State<T>: StoredProperty {
+construct State<T> {
     let identity: GraphIdentity
     let parent: GraphIdentity?
     let macros: [Macro.Application]

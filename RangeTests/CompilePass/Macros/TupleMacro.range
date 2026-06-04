@@ -1,0 +1,5 @@
+@tuple
+construct Point {
+    binding x: String
+    binding y: String
+}

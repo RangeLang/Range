@@ -1093,9 +1093,7 @@ public enum ExpressionTypeSemantics {
             return .array(.named("Let"))
         case ("Construct.Declaration", "states"):
             return .array(.named("State"))
-        case ("Construct.Declaration", "storedProperties"):
-            return .array(.named("StoredProperty"))
-        case ("StoredProperty", "type"), ("State", "type"), ("Let", "type"):
+        case ("State", "type"), ("Let", "type"):
             return .named("TypeReference")
         default:
             return nil

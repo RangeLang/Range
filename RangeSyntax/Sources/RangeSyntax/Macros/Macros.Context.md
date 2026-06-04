@@ -210,7 +210,7 @@ macro lock(): Block { target, diagnostics in
 - Declaration targets are declaration-aware
 
 ```range
-macro clamped(min: Int, max: Int): Property { target, diagnostics in
+macro clamped(min: Int, max: Int): State { target, diagnostics in
     target.bindingKind
     target.declaration.type
     target.owner
@@ -243,7 +243,10 @@ Construct
 Enum
 Protocol
 Extension
-Property
+Let
+State
+Binding
+Derived
 Parameter
 Init
 Function

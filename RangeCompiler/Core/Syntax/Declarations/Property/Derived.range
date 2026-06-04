@@ -1,5 +1,5 @@
 @syntax
-construct Derived<T>: Property {
+construct Derived<T> {
     let identity: GraphIdentity
     let parent: GraphIdentity?
     let macros: [Macro.Application]

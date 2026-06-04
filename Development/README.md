@@ -209,6 +209,27 @@ implementation tracking surface.
 - [ ] Add documentation comment and documentation markup token categories once
       doc comments are formalized.
 
+### 10a. Experimental Syntax Notes
+
+- Range declarations should remain line-scoped: one declaration begins on one
+      physical line, with wrapping reserved for the declaration's continued
+      header, argument lists, generic clauses, conformances, or body. This keeps
+      code prediction and editor wrapping deterministic because a formatter or
+      language server can tell whether a line starts a new declaration or
+      continues the current one.
+- Freestanding expansion syntax should use `@expand { ... }` blocks directly:
+      `@expand { construct Generated { ... } }`. Macro authors should not need
+      to write `target.declaration.expand { ... }` for normal declaration
+      emission. `@expand` blocks are graph-visible children of the surrounding
+      context, including macro declarations. A macro with no `@expand` children
+      is a valid equilibrium state, not a diagnostic.
+- An `@expand` block should also create a background compiler processing unit
+      for the block contents. That unit runs with reduced enforcement and no
+      required emission path: its first job is validation and feedback. This lets
+      the compiler report back on expansion candidates, for example "hey, this
+      generated construct is malformed", without forcing the block to become
+      emitted program syntax immediately.
+
 ### 11. Product And Publishing
 
 - [ ] Decide whether RangeCloud is a real product direction for packages,

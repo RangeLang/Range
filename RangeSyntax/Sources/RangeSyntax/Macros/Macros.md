@@ -44,7 +44,7 @@ macro stringify(@capture<Expression> _ value: Expression): Expression -> String 
 - Support composition through the existing type system
 
 ```range
-macro observable(): Property { }
+macro observable(): State { }
 ```
 
 - Run as syntax rewrites before semantic validation trusts their result

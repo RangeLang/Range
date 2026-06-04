@@ -54,7 +54,7 @@ This document maps each macro target concept to the language-level structure it 
 - the target being extended
 - the declarations introduced by the extension
 
-### Property exposes
+### Let, State, Binding, and Derived expose
 
 - its name
 - its binding kind

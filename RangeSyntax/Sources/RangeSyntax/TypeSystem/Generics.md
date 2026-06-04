@@ -72,7 +72,7 @@ construct Group<each Child: View> {
 - Protocol composition can be used in generic constraints
 
 ```range
-Property & Parameter
+View & Identifiable
 ```
 
 ## Notes

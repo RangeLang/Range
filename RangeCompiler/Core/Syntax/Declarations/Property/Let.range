@@ -1,5 +1,5 @@
 @syntax
-construct Let<T>: StoredProperty, SyntaxEmittable {
+construct Let<T>: SyntaxEmittable {
   let identity: GraphIdentity
   let parent: GraphIdentity?
   let macros: [Macro.Application]

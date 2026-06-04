@@ -82,8 +82,6 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
         return .binding
     case "Derived":
         return .derived
-    case "Property":
-        return .property
     case "Function":
         return .function
     case "Construct":

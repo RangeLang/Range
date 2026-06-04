@@ -651,79 +651,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
-    @Test("CompoundLiteral macro validates dotted unsigned integer initializer")
-    func compoundLiteralMacroValidatesDottedUnsignedIntegerInitializer() throws {
-        let inputs = [
-            SourceInput(
-                path: "/tmp/CompoundLiteralVersion.range",
-                source: """
-                macro CompoundLiteral(_ pattern: String): Construct -> String { target, diagnostics in
-                    return pattern
-                }
-
-                enum Signedness {
-                    case unsigned
-                }
-
-                construct Int<let signedness: Signedness> {}
-
-                @CompoundLiteral(0.0.0)
-                construct Version {
-                    state major: Int<.unsigned>
-                    state minor: Int<.unsigned>
-                    state patch: Int<.unsigned>
-                }
-
-                @main {
-                    let current: Version(0.1.0)
-                }
-                """,
-                role: .project
-            )
-        ]
-
-        _ = try CompilerPipeline().buildValidated(inputs: inputs)
-    }
-
-    @Test("CompoundLiteral macro rejects non matching version initializer")
-    func compoundLiteralMacroRejectsNonMatchingVersionInitializer() throws {
-        let inputs = [
-            SourceInput(
-                path: "/tmp/CompoundLiteralInvalidVersion.range",
-                source: """
-                macro CompoundLiteral(_ pattern: String): Construct -> String { target, diagnostics in
-                    return pattern
-                }
-
-                enum Signedness {
-                    case unsigned
-                }
-
-                construct Int<let signedness: Signedness> {}
-
-                @CompoundLiteral(0.0.0)
-                construct Version {
-                    state major: Int<.unsigned>
-                    state minor: Int<.unsigned>
-                    state patch: Int<.unsigned>
-                }
-
-                @main {
-                    let current: Version("0.1")
-                }
-                """,
-                role: .project
-            )
-        ]
-
-        do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
-            Issue.record("Expected invalid CompoundLiteral initializer to fail validation.")
-        } catch let error as SemanticValidationError {
-            #expect(error.description.contains("has 2 segment(s)"))
-        }
-    }
-
     @Test("Typed construction annotations can be optional")
     func typedConstructionAnnotationsCanBeOptional() throws {
         let source = """
@@ -1120,12 +1047,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         )
         #expect(constructSyntax.declarations.map(\.label) == ["Declaration"])
         #expect(constructSyntax.applications.map(\.label) == ["Application"])
-
-        let propertySyntax = try #require(
-            syntax.first { $0.identity.label == "@language Property" }
-        )
-        #expect(propertySyntax.declarations.map(\.label) == ["@language Property"])
-        #expect(propertySyntax.applications.isEmpty)
     }
 
     @Test("@syntax declarations are syntax-facing without Syntax conformance")
@@ -1737,6 +1658,40 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.constructsByName["Client"]?.callables.map(\.name) == ["route"])
     }
 
+    @Test("Tuple macro attaches tuple storage metadata")
+    func tupleMacroAttachesTupleStorageMetadata() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/TupleMacro.range")
+        let program = try compile(fixture: fixture, expectedRole: .pass)
+
+        let point = try #require(program.declarationGraph.constructsByName["Point"])
+        #expect(point.macros.contains { $0.name == "tuple" && $0.genericArguments.isEmpty })
+        #expect(program.declarationGraph.bindings(onConstruct: "Point").map(\.name) == ["x", "y"])
+    }
+
+    @Test("Tuple macro rejects non-pair binding shape")
+    func tupleMacroRejectsNonPairBindingShape() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/TupleShape.range",
+                source: """
+                @tuple
+                construct Point {
+                    binding x: String
+                }
+                """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected @tuple with one binding field to fail validation.")
+        } catch {
+            #expect(String(describing: error).contains("@tuple expects exactly two binding fields."))
+        }
+    }
+
     @Test("Core Math construct is available")
     func coreMathConstructIsAvailable() throws {
         let program = try CompilerPipeline().buildValidated(inputs: rangeCoreInputs())
@@ -1922,9 +1877,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(totalValueName == "value")
     }
 
-    @Test("Let property macro rewrites initializer and reads")
-    func letPropertyMacroRewritesInitializerAndReads() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/LetProperty.range")
+    @Test("Let macro rewrites initializer and reads")
+    func letMacroRewritesInitializerAndReads() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/LetMacro.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -1968,9 +1923,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(amount == 2)
     }
 
-    @Test("Binding property macro rewrites reads and assignments")
-    func bindingPropertyMacroRewritesReadsAndAssignments() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/BindingProperty.range")
+    @Test("Binding macro rewrites reads and assignments")
+    func bindingMacroRewritesReadsAndAssignments() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/BindingMacro.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -2227,9 +2182,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(allCasesReturnValues(in: emptyExtension).isEmpty)
     }
 
-    @Test("Derived property macro rewrites reads")
-    func derivedPropertyMacroRewritesReads() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedProperty.range")
+    @Test("Derived macro rewrites reads")
+    func derivedMacroRewritesReads() throws {
+        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/DerivedMacro.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })

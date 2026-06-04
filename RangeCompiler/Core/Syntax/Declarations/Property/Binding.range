@@ -1,5 +1,5 @@
 @syntax
-construct Binding<T>: Property {
+construct Binding<T> {
     let identity: GraphIdentity
     let parent: GraphIdentity?
     let macros: [Macro.Application]

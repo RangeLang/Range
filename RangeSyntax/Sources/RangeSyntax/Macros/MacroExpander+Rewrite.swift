@@ -527,6 +527,9 @@ extension MacroExpander {
                 ).targetValue(for: construct),
                 context: context
             )
+            if application.name == "literal" {
+                continue
+            }
             if !macroOperationExpressions(in: macro.body).isEmpty {
                 _ = try resolvedRewriteCalls(for: macro, context: context)
             }

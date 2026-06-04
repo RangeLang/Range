@@ -403,7 +403,7 @@ struct CompileTimeValueEvaluator {
 
         switch name {
         case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
-            "MemberTypeReference", "ArrayTypeReference", "Property", "StoredProperty", "Let", "State", "Binding", "Derived", "Init.Declaration",
+            "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
             "ValueGeneric", "GraphIdentity", "Macro.Application", "Macro.Declaration", "Macro.Target",
             "Void", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
@@ -447,10 +447,6 @@ struct CompileTimeValueEvaluator {
 
     private func objectType(_ typeName: String, conformsTo protocolName: String) -> Bool {
         switch protocolName {
-        case "StoredProperty":
-            return typeName == "Let" || typeName == "State"
-        case "Property":
-            return typeName == "Let" || typeName == "State" || typeName == "Binding" || typeName == "Derived"
         default:
             return false
         }
