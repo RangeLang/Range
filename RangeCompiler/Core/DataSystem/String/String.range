@@ -1,4 +1,5 @@
 @language
+@init<Expression, wrapper: "\"">
 construct String {
     let storage: StringStorage
 

@@ -381,22 +381,21 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        let supportedSuffixes = [".count", ".hasPrefix", ".hasSuffix", ".containsRepeated"]
+        let supportedSuffixes = [".count", ".hasPrefix", ".hasSuffix", ".containsRepeated", ".segment"]
         guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
             let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
-            case .string(let value) = source,
-            arguments.count == 1
+            case .string(let value) = source
         else {
-            return nil
-        }
-
-        let argument = arguments[0]
-        guard case .string(let needle) = evaluate(argument.value, locals: locals) else {
             return nil
         }
 
         switch suffix {
         case ".count":
+            guard arguments.count == 1 else { return nil }
+            let argument = arguments[0]
+            guard case .string(let needle) = evaluate(argument.value, locals: locals) else {
+                return nil
+            }
             guard argument.label == "of" else { return nil }
             guard !needle.isEmpty else { return .integer(0) }
             var count = 0
@@ -409,15 +408,46 @@ struct CompileTimeValueEvaluator {
             }
             return .integer(count)
         case ".hasPrefix":
+            guard arguments.count == 1 else { return nil }
+            let argument = arguments[0]
+            guard case .string(let needle) = evaluate(argument.value, locals: locals) else {
+                return nil
+            }
             guard argument.label == nil else { return nil }
             return .boolean(value.hasPrefix(needle))
         case ".hasSuffix":
+            guard arguments.count == 1 else { return nil }
+            let argument = arguments[0]
+            guard case .string(let needle) = evaluate(argument.value, locals: locals) else {
+                return nil
+            }
             guard argument.label == nil else { return nil }
             return .boolean(value.hasSuffix(needle))
         case ".containsRepeated":
+            guard arguments.count == 1 else { return nil }
+            let argument = arguments[0]
+            guard case .string(let needle) = evaluate(argument.value, locals: locals) else {
+                return nil
+            }
             guard argument.label == "delimiter" else { return nil }
             guard !needle.isEmpty else { return .boolean(false) }
             return .boolean(value.contains("\(needle)\(needle)"))
+        case ".segment":
+            guard arguments.count == 2,
+                let indexArgument = arguments.first(where: { $0.label == "index" }),
+                let delimiterArgument = arguments.first(where: { $0.label == "delimiter" }),
+                case .integer(let index) = evaluate(indexArgument.value, locals: locals),
+                case .string(let delimiter) = evaluate(delimiterArgument.value, locals: locals),
+                index >= 0,
+                !delimiter.isEmpty
+            else {
+                return nil
+            }
+            let segments = value.components(separatedBy: delimiter)
+            guard index < segments.count else {
+                return nil
+            }
+            return .string(segments[index])
         default:
             return nil
         }

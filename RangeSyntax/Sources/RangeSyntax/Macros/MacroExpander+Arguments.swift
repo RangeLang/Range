@@ -28,6 +28,9 @@ extension MacroExpander {
             return [:]
         }
         guard let normalizedArgumentClause, !normalizedArgumentClause.isEmpty else {
+            if parameters.count == 1, parameters[0].capturesSyntax {
+                return [parameters[0].localName: .string("")]
+            }
             return try argumentBindings(
                 kind: "Macro",
                 name: macro.name,
