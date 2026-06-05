@@ -36,8 +36,14 @@ extension MacroExpander {
     ) throws -> SourceFileNode {
         switch sourceFile {
         case .mainBlock(let mainBlock):
+            try emitMainBlockMacroDiagnostics(
+                mainBlock,
+                macros: macros,
+                context: context
+            )
             return .mainBlock(
                 MainBlockNode(
+                    macros: mainBlock.macros,
                     body: try expand(
                         statements: mainBlock.body,
                         expectedReturnType: nil,
@@ -82,7 +88,13 @@ extension MacroExpander {
             return .module(
                 ModuleFileNode(
                     mainBlock: try module.mainBlock.map {
-                        MainBlockNode(
+                        try emitMainBlockMacroDiagnostics(
+                            $0,
+                            macros: macros,
+                            context: context
+                        )
+                        return MainBlockNode(
+                            macros: $0.macros,
                             body: try expand(
                                 statements: $0.body,
                                 expectedReturnType: nil,
@@ -215,6 +227,33 @@ extension MacroExpander {
             )
         case .macro:
             return sourceFile
+        }
+    }
+
+    static func emitMainBlockMacroDiagnostics(
+        _ mainBlock: MainBlockNode,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) throws {
+        let targetValue = CompileTimeValue.object(
+            typeName: "Block",
+            fields: ["statements": .array([])]
+        )
+        for application in mainBlock.macros {
+            guard let macro = macros[application.name] else {
+                throw ParseError("Unknown attached macro @\(application.name).")
+            }
+            guard macroTargetAllows(macro.target!, kind: .block) else {
+                throw ParseError(
+                    "Macro @\(application.name) is used on @main block but targets \(macro.target!.displayName)."
+                )
+            }
+            try emitMacroDiagnostics(
+                from: macro.body,
+                macro: macro,
+                targetValue: targetValue,
+                context: context
+            )
         }
     }
 
@@ -1976,6 +2015,7 @@ extension MacroExpander {
                     targetBinding: targetBinding,
                     targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
                     graphBinding: graphBinding,
+                    selfValue: macroSelfValue(named: diagnosticOwnerName),
                     localBindings: locals,
                     macroDeclarationsByName: context.macroDeclarationsByName,
                     context: context
@@ -2007,6 +2047,7 @@ extension MacroExpander {
                         targetBinding: targetBinding,
                         targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
                         graphBinding: graphBinding,
+                        selfValue: macroSelfValue(named: diagnosticOwnerName),
                         localBindings: locals,
                         macroDeclarationsByName: context.macroDeclarationsByName,
                         context: context
@@ -2120,6 +2161,7 @@ extension MacroExpander {
                     targetBinding: targetBinding,
                     targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
                     graphBinding: graphBinding,
+                    selfValue: macroSelfValue(named: diagnosticOwnerName),
                     localBindings: locals,
                     macroDeclarationsByName: context.macroDeclarationsByName,
                     context: context
@@ -2135,6 +2177,7 @@ extension MacroExpander {
                     targetBinding: targetBinding,
                     targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
                     graphBinding: graphBinding,
+                    selfValue: macroSelfValue(named: diagnosticOwnerName),
                     localBindings: locals,
                     macroDeclarationsByName: context.macroDeclarationsByName,
                     context: context
@@ -2166,6 +2209,19 @@ extension MacroExpander {
         }
     }
 
+    private static func macroSelfValue(named name: String) -> CompileTimeValue {
+        .object(
+            typeName: "Macro.Declaration",
+            fields: [
+                "name": .string(name),
+                "identifier": .object(
+                    typeName: "Identifier",
+                    fields: ["name": .string(name)]
+                ),
+            ]
+        )
+    }
+
     static func macroDiagnostic(
         from expression: Expression,
         diagnosticOwnerName: String,
@@ -2190,6 +2246,7 @@ extension MacroExpander {
             targetBinding: targetBinding,
             targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
             graphBinding: graphBinding,
+            selfValue: macroSelfValue(named: diagnosticOwnerName),
             localBindings: localBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
             context: context

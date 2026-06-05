@@ -4,6 +4,7 @@ struct CompileTimeValueEvaluator {
     let targetBinding: String
     let targetValue: CompileTimeValue
     let graphBinding: String?
+    let selfValue: CompileTimeValue?
     let localBindings: [String: Expression]
     let macroDeclarationsByName: [String: MacroDeclaration]
     let context: MacroExpansionContext?
@@ -12,6 +13,7 @@ struct CompileTimeValueEvaluator {
         targetBinding: String,
         targetValue: CompileTimeValue,
         graphBinding: String? = nil,
+        selfValue: CompileTimeValue? = nil,
         localBindings: [String: Expression],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         context: MacroExpansionContext? = nil
@@ -19,6 +21,7 @@ struct CompileTimeValueEvaluator {
         self.targetBinding = targetBinding
         self.targetValue = targetValue
         self.graphBinding = graphBinding
+        self.selfValue = selfValue
         self.localBindings = localBindings
         self.macroDeclarationsByName = macroDeclarationsByName
         self.context = context
@@ -116,6 +119,13 @@ struct CompileTimeValueEvaluator {
                 locals: locals
             ) {
                 return graphValue
+            }
+            if let fileSystemValue = evaluateFileSystemCall(
+                name: name,
+                arguments: arguments,
+                locals: locals
+            ) {
+                return fileSystemValue
             }
             if let stringValue = evaluateStringTransform(
                 name: name,
@@ -290,6 +300,8 @@ struct CompileTimeValueEvaluator {
         let value: CompileTimeValue?
         if root == targetBinding {
             value = targetValue
+        } else if root == "self" {
+            value = selfValue
         } else if root == graphBinding {
             value = .object(
                 typeName: "GraphContext",
@@ -573,6 +585,22 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return context.graphContext.members(of: identity)
+        case "\(graphBinding).sourcePath":
+            guard arguments.count == 1,
+                arguments[0].label == "of",
+                let identity = evaluate(arguments[0].value, locals: locals)
+            else {
+                return nil
+            }
+            return context.graphContext.sourcePath(of: identity)
+        case "\(graphBinding).sourceDirectory":
+            guard arguments.count == 1,
+                arguments[0].label == "of",
+                let identity = evaluate(arguments[0].value, locals: locals)
+            else {
+                return nil
+            }
+            return context.graphContext.sourceDirectory(of: identity)
         case "\(graphBinding).macros":
             guard arguments.count == 1 else {
                 return nil
@@ -591,6 +619,45 @@ struct CompileTimeValueEvaluator {
         default:
             return nil
         }
+    }
+
+    private func evaluateFileSystemCall(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        guard name == "FileTree.rangeFiles",
+            arguments.count == 1,
+            arguments[0].label == "path",
+            case .string(let path) = evaluate(arguments[0].value, locals: locals)
+        else {
+            return nil
+        }
+
+        let root = URL(fileURLWithPath: path, isDirectory: true)
+        let fileManager = FileManager.default
+        guard let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return .array([])
+        }
+
+        var files: [CompileTimeValue] = []
+        for case let url as URL in enumerator {
+            guard url.pathExtension == "range" else { continue }
+            let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
+            guard values?.isRegularFile == true else { continue }
+            files.append(.string(url.path))
+        }
+
+        return .array(files.sorted {
+            guard case .string(let left) = $0, case .string(let right) = $1 else {
+                return false
+            }
+            return left < right
+        })
     }
 
     private func evaluateStringTransform(

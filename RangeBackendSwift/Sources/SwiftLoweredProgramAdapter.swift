@@ -31,7 +31,7 @@ struct SwiftLoweredProgramAdapter {
     }
 
     private func lower(mainBlock: MainBlockNode) -> MainBlockNode {
-        MainBlockNode(body: lower(statements: mainBlock.body))
+        MainBlockNode(macros: mainBlock.macros, body: lower(statements: mainBlock.body))
     }
 
     private func lower(construct: ConstructDeclaration) -> ConstructDeclaration {

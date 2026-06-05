@@ -33,6 +33,7 @@ public struct DeclarationGraph {
     public let macrosByName: [String: MacroDeclaration]
     public let macroMetadataByName: [String: MacroMetadataDeclaration]
     public let extensionsByTargetName: [String: [ExtensionDeclaration]]
+    public let mainBlockMacros: [MacroApplication]
     public let topLevelStatesByFilePath: [String: [StateDeclaration]]
     public let statesByConstructName: [String: [StateDeclaration]]
     public let bindingsByConstructName: [String: [BindingDeclaration]]
@@ -61,6 +62,7 @@ public struct DeclarationGraph {
         let macroMetadata = Self.collectMacroMetadata(from: files)
         let metadataSlotMacros = Self.metadataSlotMacroNames(in: macroMetadata)
         let extensions = Self.collectExtensions(from: files)
+        let mainBlockMacros = Self.collectMainBlockMacros(from: files)
         let constructs = Self.collectConstructs(
             from: files,
             protocols: protocols,
@@ -93,6 +95,7 @@ public struct DeclarationGraph {
         self.macrosByName = macros
         self.macroMetadataByName = macroMetadata
         self.extensionsByTargetName = extensions
+        self.mainBlockMacros = mainBlockMacros
         self.topLevelStatesByFilePath = topLevelStates
         self.statesByConstructName = statesByConstructName
         self.bindingsByConstructName = bindingsByConstructName
@@ -799,6 +802,19 @@ public struct DeclarationGraph {
         return registry.filter { !$0.value.isEmpty }
     }
 
+    static func collectMainBlockMacros(from files: [ParsedSourceFile]) -> [MacroApplication] {
+        files.flatMap { parsedFile -> [MacroApplication] in
+            switch parsedFile.sourceFile {
+            case .mainBlock(let mainBlock):
+                return mainBlock.macros
+            case .module(let module):
+                return module.mainBlock?.macros ?? []
+            default:
+                return []
+            }
+        }
+    }
+
     static func collectStatesByConstructName(
         from constructs: [String: ConstructDeclaration]
     ) -> [String: [StateDeclaration]] {
@@ -1355,6 +1371,7 @@ private struct SemanticGraphCollector {
                 let mainID = "\(fileID)/main"
                 addEntity(id: mainID, kind: .mainBlock, label: "@main")
                 addRelation(from: fileID, to: mainID, kind: .contains)
+                addMacroApplications(module.mainBlock?.macros ?? [], parentID: mainID)
             }
             for state in module.states {
                 addState(state, parentID: fileID)
@@ -1381,8 +1398,11 @@ private struct SemanticGraphCollector {
             let mainID = "\(fileID)/main"
             addEntity(id: mainID, kind: .mainBlock, label: "@main")
             addRelation(from: fileID, to: mainID, kind: .contains)
+            if case .mainBlock(let mainBlock) = parsedFile.sourceFile {
+                addMacroApplications(mainBlock.macros, parentID: mainID)
+            }
+        }
     }
-}
 
 private struct SyntaxProjectionAccumulator {
     let identity: SemanticGraphEntity

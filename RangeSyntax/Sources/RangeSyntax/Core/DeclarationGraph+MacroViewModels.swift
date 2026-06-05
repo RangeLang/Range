@@ -21,6 +21,7 @@ enum MacroTargetKind: Hashable {
     case binding
     case derived
     case property
+    case block
     case function
     case construct
     case enumeration
@@ -46,6 +47,7 @@ func syntaxSurfaceTargetKinds() -> Set<MacroTargetKind> {
         .binding,
         .derived,
         .property,
+        .block,
         .function,
         .construct,
         .enumeration,
@@ -84,6 +86,8 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
         return .derived
     case "Function":
         return .function
+    case "Block":
+        return .block
     case "Construct":
         return .construct
     case "Enum":
@@ -771,6 +775,8 @@ struct MacroGraphContext {
     let macrosByID: [String: [CompileTimeValue]]
     let macrosByName: [String: [CompileTimeValue]]
     let writtenSyntaxByID: [String: CompileTimeValue]
+    let sourcePathByID: [String: String]
+    let sourceDirectoryByID: [String: String]
 
     init(
         declarationGraph: DeclarationGraph,
@@ -778,6 +784,8 @@ struct MacroGraphContext {
         macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration]
     ) {
         let writtenSyntaxByID = Self.writtenSyntaxByID(for: declarationGraph)
+        let sourcePathByID = Self.sourcePathByID(for: declarationGraph)
+        let sourceDirectoryByID = sourcePathByID.mapValues(Self.directoryPath(for:))
         let builder = MacroTargetValueBuilder(
             macroDeclarationsByName: macroDeclarationsByName,
             macroMetadataByName: macroMetadataDeclarationsByName,
@@ -867,12 +875,18 @@ struct MacroGraphContext {
             recordMacros(Self.macroValues(from: extensionValue), id: extensionID)
         }
 
+        for (index, application) in declarationGraph.mainBlockMacros.enumerated() {
+            recordMacros([builder.value(for: application)], id: "mainBlock:\(index)")
+        }
+
         self.declarationsByID = declarationsByID
         self.membersByID = membersByID
         self.parentByID = parentByID
         self.macrosByID = macrosByID
         self.macrosByName = macrosByName
         self.writtenSyntaxByID = writtenSyntaxByID
+        self.sourcePathByID = sourcePathByID
+        self.sourceDirectoryByID = sourceDirectoryByID
     }
 
     func declaration(for identity: CompileTimeValue) -> CompileTimeValue? {
@@ -903,6 +917,16 @@ struct MacroGraphContext {
         .array(macrosByName[name, default: []])
     }
 
+    func sourcePath(of identity: CompileTimeValue) -> CompileTimeValue? {
+        guard let id = identityID(identity), let path = sourcePathByID[id] else { return nil }
+        return .string(path)
+    }
+
+    func sourceDirectory(of identity: CompileTimeValue) -> CompileTimeValue? {
+        guard let id = identityID(identity), let path = sourceDirectoryByID[id] else { return nil }
+        return .string(path)
+    }
+
     private static func writtenSyntaxByID(for graph: DeclarationGraph) -> [String: CompileTimeValue] {
         let builder = MacroTargetValueBuilder()
         var values: [String: CompileTimeValue] = [:]
@@ -926,6 +950,29 @@ struct MacroGraphContext {
         }
 
         return values
+    }
+
+    private static func sourcePathByID(for graph: DeclarationGraph) -> [String: String] {
+        var values: [String: String] = [:]
+
+        for location in graph.sourceLocations {
+            switch location.kind {
+            case .type:
+                if graph.constructsByName[location.name] != nil { values["construct:\(location.name)"] = location.path }
+                if graph.enumsByName[location.name] != nil { values["enum:\(location.name)"] = location.path }
+                if graph.protocolsByName[location.name] != nil { values["protocol:\(location.name)"] = location.path }
+            case .function:
+                values["function:\(location.name)"] = location.path
+            case .macro:
+                values["macro:\(location.name)"] = location.path
+            }
+        }
+
+        return values
+    }
+
+    private static func directoryPath(for path: String) -> String {
+        URL(fileURLWithPath: path).deletingLastPathComponent().path
     }
 
     private static func declarationText(in source: String, startingAt line: Int) -> String {
@@ -1220,7 +1267,7 @@ extension RewriteSurfaceView {
             default:
                 return nil
             }
-        case .expression, .state, .immutable, .binding, .derived, .property, .construct,
+        case .expression, .state, .immutable, .binding, .derived, .property, .block, .construct,
             .enumeration, .protocolDefinition, .typeExtension, .other:
             return nil
         }

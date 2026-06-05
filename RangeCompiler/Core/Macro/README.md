@@ -47,6 +47,12 @@ Current bootstrap rules:
   target kinds such as `Init`, with nested `Declaration` and `Application`
   constructs defining those facet types.
 - Callable and array type shapes now use concrete type-reference constructs, for example `FunctionTypeReference(...)` and `ArrayTypeReference(...)`; `Closure` remains the expression/value form.
+- `@compiler` is the planned construct-level marker for compiler units. Its
+  runtime behavior is graph-backed: attach to a construct, resolve the
+  construct's source directory, read `.range` files from that filesystem scope,
+  and validate that only one compiler unit exists in the graph. The remaining
+  bootstrap piece is feeding those gathered files back into a reduced compiler
+  processing unit that can parse and report a derived `RangeGraph`.
 
 Current function-targeted literal status:
 

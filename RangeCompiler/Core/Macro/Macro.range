@@ -10,6 +10,7 @@ construct Macro {
 
     @graph(.declaration)
     construct Declaration {
+        let name: String
         let identifier: Identifier
         let parameters: [Parameter.Declaration]
         let target: String

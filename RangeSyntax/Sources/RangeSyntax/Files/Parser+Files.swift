@@ -17,6 +17,9 @@ extension Parser {
         if requiresEOF {
             try consume(.eof)
         }
-        return MainBlockNode(body: body)
+        return MainBlockNode(
+            macros: [MacroApplication(name: name, genericArguments: [], argumentClause: nil)],
+            body: body
+        )
     }
 }

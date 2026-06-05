@@ -169,6 +169,7 @@ extension Parser {
         let bindings = try parseMacroBodyBindings()
 
         var localBindings: [String: LocalBindingSymbol] = [
+            "self": .init(kind: .constant, type: .named("Macro.Declaration")),
             bindings.target: .init(kind: .constant, type: .named("MacroTarget")),
             bindings.diagnostics: .init(kind: .constant, type: .named("MacroDiagnostics")),
         ]

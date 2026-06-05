@@ -1,4 +1,5 @@
 @Project
+@compiler
 construct RangeCompiler {
     let name: Title("RangeCompiler")
     let version: Version(0.1.0)

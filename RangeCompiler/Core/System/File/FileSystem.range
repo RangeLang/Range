@@ -41,6 +41,21 @@ construct FileManager {
 
 @language
 construct FileTree {
+    function rangeFiles(path: String): [String] {
+        state files: [String]([])
+
+        switch read(path: path) {
+        case .success(let tree):
+            collectRangeFiles(node: tree, files: files)
+        case .failure:
+            return files
+        }
+
+        return files
+    }
+
+    function collectRangeFiles(node: FileTreeNode, files: [String])
+
     function read(path: String): Result<FileTreeNode, FileReadError> {
         switch FileManager.listEntries(path: path) {
         case .success(let entries):

@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Syntactic Graph vs Semantic Graph</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --ink: #15181f;
+      --muted: #8a92a0;
+      --line: #d7dce4;
+      --syntax: #5b6472;
+      --semantic: #21a66f;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 32px;
+    }
+
+    .report {
+      width: min(1120px, 100%);
+      display: grid;
+      gap: 26px;
+    }
+
+    .heading {
+      display: grid;
+      gap: 10px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 46px;
+      font-weight: 750;
+      letter-spacing: 0;
+      line-height: 1.05;
+    }
+
+    .meta {
+      max-width: 780px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+      font-weight: 550;
+      line-height: 1.45;
+    }
+
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    .panel {
+      display: grid;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .panel-header {
+      display: grid;
+      gap: 6px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .caption {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      font-weight: 550;
+      line-height: 1.45;
+    }
+
+    .caption strong {
+      color: var(--ink);
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .edge {
+      fill: none;
+      stroke: var(--syntax);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.2;
+    }
+
+    .edge-dashed {
+    }
+
+    .semantic-edge {
+      fill: none;
+      stroke: var(--semantic);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-width: 2.2;
+    }
+
+    .weak-edge {
+      opacity: 0.48;
+    }
+
+    .node {
+      fill: var(--syntax);
+      stroke: var(--syntax);
+      stroke-width: 0;
+    }
+
+    .semantic-node {
+      fill: var(--semantic);
+      stroke: var(--semantic);
+      stroke-width: 0;
+    }
+
+    .vignette {
+      pointer-events: none;
+    }
+
+    .note {
+      fill: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    @media (max-width: 880px) {
+      main {
+        place-items: start;
+        padding: 20px;
+      }
+
+      h1 {
+        font-size: 34px;
+      }
+
+      .compare {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="report" aria-label="Syntactic graph and semantic graph comparison">
+      <header class="heading">
+        <h1>Syntactic Graph vs Semantic Graph</h1>
+        <p class="meta">Both graphs follow structure. They make different shapes because syntax and meaning organize the same program differently.</p>
+      </header>
+
+      <section class="compare">
+        <article class="panel" aria-label="Syntactic graph">
+          <header class="panel-header">
+            <h2>Syntactic Graph</h2>
+            <p class="caption"> - <strong>Syntax:</strong> structure arranged by form.</p>
+          </header>
+
+          <svg viewBox="0 0 540 430" role="img" aria-labelledby="syntax-title syntax-desc">
+            <title id="syntax-title">Syntactic graph</title>
+            <desc id="syntax-desc">An evenly spaced triangular lattice showing syntax-only relationships.</desc>
+            <defs>
+              <linearGradient id="syntax-vignette-top" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
+                <stop offset="16%" stop-color="#ffffff" stop-opacity="0.72"></stop>
+                <stop offset="34%" stop-color="#ffffff" stop-opacity="0.34"></stop>
+                <stop offset="58%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+              </linearGradient>
+              <linearGradient id="syntax-vignette-right" x1="1" y1="0" x2="0" y2="0">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
+                <stop offset="16%" stop-color="#ffffff" stop-opacity="0.72"></stop>
+                <stop offset="34%" stop-color="#ffffff" stop-opacity="0.34"></stop>
+                <stop offset="58%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+              </linearGradient>
+              <linearGradient id="syntax-vignette-bottom" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
+                <stop offset="16%" stop-color="#ffffff" stop-opacity="0.72"></stop>
+                <stop offset="34%" stop-color="#ffffff" stop-opacity="0.34"></stop>
+                <stop offset="58%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+              </linearGradient>
+              <linearGradient id="syntax-vignette-left" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
+                <stop offset="16%" stop-color="#ffffff" stop-opacity="0.72"></stop>
+                <stop offset="34%" stop-color="#ffffff" stop-opacity="0.34"></stop>
+                <stop offset="58%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+              </linearGradient>
+            </defs>
+            <g id="syntax-graph-field"></g>
+            <rect class="vignette" x="40" y="46" width="460" height="64" fill="url(#syntax-vignette-top)"></rect>
+            <rect class="vignette" x="436" y="46" width="64" height="286" fill="url(#syntax-vignette-right)"></rect>
+            <rect class="vignette" x="40" y="268" width="460" height="64" fill="url(#syntax-vignette-bottom)"></rect>
+            <rect class="vignette" x="40" y="46" width="64" height="286" fill="url(#syntax-vignette-left)"></rect>
+
+          </svg>
+        </article>
+
+        <article class="panel" aria-label="Semantic graph">
+          <header class="panel-header">
+            <h2>Semantic Graph</h2>
+            <p class="caption"> - <strong>Semantics:</strong> structure arranged by meaning.</p>
+          </header>
+
+          <svg viewBox="0 0 540 430" role="img" aria-labelledby="semantic-title semantic-desc">
+            <title id="semantic-title">Semantic graph</title>
+            <desc id="semantic-desc">A skewed graph showing the same program nodes arranged by semantic relationships.</desc>
+            <defs>
+              <linearGradient id="semantic-vignette-top" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
+                <stop offset="16%" stop-color="#ffffff" stop-opacity="0.72"></stop>
+                <stop offset="34%" stop-color="#ffffff" stop-opacity="0.34"></stop>
+                <stop offset="58%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+              </linearGradient>
+              <linearGradient id="semantic-vignette-right" x1="1" y1="0" x2="0" y2="0">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
+                <stop offset="16%" stop-color="#ffffff" stop-opacity="0.72"></stop>
+                <stop offset="34%" stop-color="#ffffff" stop-opacity="0.34"></stop>
+                <stop offset="58%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+              </linearGradient>
+              <linearGradient id="semantic-vignette-bottom" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
+                <stop offset="16%" stop-color="#ffffff" stop-opacity="0.72"></stop>
+                <stop offset="34%" stop-color="#ffffff" stop-opacity="0.34"></stop>
+                <stop offset="58%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+              </linearGradient>
+              <linearGradient id="semantic-vignette-left" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#ffffff" stop-opacity="1"></stop>
+                <stop offset="16%" stop-color="#ffffff" stop-opacity="0.72"></stop>
+                <stop offset="34%" stop-color="#ffffff" stop-opacity="0.34"></stop>
+                <stop offset="58%" stop-color="#ffffff" stop-opacity="0.10"></stop>
+                <stop offset="100%" stop-color="#ffffff" stop-opacity="0"></stop>
+              </linearGradient>
+            </defs>
+            <g id="semantic-graph-field"></g>
+            <rect class="vignette" x="40" y="46" width="460" height="64" fill="url(#semantic-vignette-top)"></rect>
+            <rect class="vignette" x="436" y="46" width="64" height="286" fill="url(#semantic-vignette-right)"></rect>
+            <rect class="vignette" x="40" y="268" width="460" height="64" fill="url(#semantic-vignette-bottom)"></rect>
+            <rect class="vignette" x="40" y="46" width="64" height="286" fill="url(#semantic-vignette-left)"></rect>
+
+          </svg>
+        </article>
+      </section>
+    </section>
+  </main>
+  <script>
+    const svgNamespace = "http://www.w3.org/2000/svg";
+
+    const graphFields = {
+      syntax: {
+        target: "syntax-graph-field",
+        viewport: { x: 40, y: 46, width: 460, height: 286, radius: 28 },
+        field: { x: -20, y: -10, width: 580, height: 410 },
+        spacing: 38,
+        nodeRadius: 2.7,
+        edgeClass: "edge",
+        dashedEdgeClass: "edge edge-dashed",
+        dashSlots: 3,
+        dashFill: 0.46,
+        nodeClass: "node"
+      },
+      semantic: {
+        target: "semantic-graph-field",
+        viewport: { x: 40, y: 46, width: 460, height: 286, radius: 28 },
+        field: { x: -20, y: -10, width: 580, height: 410 },
+        spacing: { x: 46, y: 46 },
+        jitter: 0,
+        nodeRadius: 2.7,
+        edgeClass: "semantic-edge",
+        weakEdgeClass: "semantic-edge weak-edge",
+        dashSlots: 3,
+        dashFill: 0.44,
+        nodeClass: "semantic-node"
+      }
+    };
+
+    function drawLine(layer, from, to, className) {
+      const line = document.createElementNS(svgNamespace, "line");
+      line.setAttribute("class", className);
+      line.setAttribute("x1", from.x.toFixed(2));
+      line.setAttribute("y1", from.y.toFixed(2));
+      line.setAttribute("x2", to.x.toFixed(2));
+      line.setAttribute("y2", to.y.toFixed(2));
+      layer.appendChild(line);
+    }
+
+    function interpolate(from, to, ratio) {
+      return {
+        x: from.x + (to.x - from.x) * ratio,
+        y: from.y + (to.y - from.y) * ratio
+      };
+    }
+
+    function drawDashedLine(layer, from, to, className, slots, fillRatio) {
+      const dashLength = fillRatio / slots;
+      const inset = (1 / slots - dashLength) / 2;
+
+      for (let slot = 0; slot < slots; slot += 1) {
+        const start = slot / slots + inset;
+        const end = start + dashLength;
+        drawLine(
+          layer,
+          interpolate(from, to, start),
+          interpolate(from, to, end),
+          className
+        );
+      }
+    }
+
+    function drawDot(layer, point, radius, className) {
+      const circle = document.createElementNS(svgNamespace, "circle");
+      circle.setAttribute("class", className);
+      circle.setAttribute("cx", point.x.toFixed(2));
+      circle.setAttribute("cy", point.y.toFixed(2));
+      circle.setAttribute("r", radius);
+      layer.appendChild(circle);
+    }
+
+    function applyViewportClip(layer, viewport) {
+      const svg = layer.ownerSVGElement;
+      const clipID = `${layer.id}-viewport`;
+      let defs = svg.querySelector("defs");
+
+      if (!defs) {
+        defs = document.createElementNS(svgNamespace, "defs");
+        svg.insertBefore(defs, svg.firstChild);
+      }
+
+      defs.querySelector(`#${clipID}`)?.remove();
+
+      const clipPath = document.createElementNS(svgNamespace, "clipPath");
+      clipPath.setAttribute("id", clipID);
+
+      const rect = document.createElementNS(svgNamespace, "rect");
+      rect.setAttribute("x", viewport.x);
+      rect.setAttribute("y", viewport.y);
+      rect.setAttribute("width", viewport.width);
+      rect.setAttribute("height", viewport.height);
+      rect.setAttribute("rx", viewport.radius ?? 0);
+      rect.setAttribute("ry", viewport.radius ?? 0);
+
+      clipPath.appendChild(rect);
+      defs.appendChild(clipPath);
+      layer.setAttribute("clip-path", `url(#${clipID})`);
+    }
+
+    function boundsFor(config) {
+      return config.field ?? config.viewport;
+    }
+
+    function nodeVisible(bounds, point, radius) {
+      return point.x >= bounds.x - radius
+        && point.x <= bounds.x + bounds.width + radius
+        && point.y >= bounds.y - radius
+        && point.y <= bounds.y + bounds.height + radius;
+    }
+
+    function edgeVisible(bounds, from, to, radius) {
+      return nodeVisible(bounds, from, radius) && nodeVisible(bounds, to, radius);
+    }
+
+    function drawTriangularField(config) {
+      const layer = document.getElementById(config.target);
+      const bounds = boundsFor(config);
+      const dy = config.spacing * Math.sqrt(3) / 2;
+      const rows = Math.ceil(bounds.height / dy) + 2;
+      const cols = Math.ceil(bounds.width / config.spacing) + 2;
+      const points = [];
+
+      layer.replaceChildren();
+      applyViewportClip(layer, config.viewport);
+
+      for (let row = 0; row < rows; row += 1) {
+        points[row] = [];
+        const y = bounds.y + row * dy;
+        const offset = row % 2 === 0 ? 0 : config.spacing / 2;
+
+        for (let col = 0; col < cols; col += 1) {
+          points[row][col] = {
+            x: bounds.x + col * config.spacing + offset,
+            y
+          };
+        }
+      }
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const point = points[row][col];
+          const candidates = [
+            ["horizontal", points[row]?.[col + 1]],
+            ["downLeft", points[row + 1]?.[col]],
+            ["downRight", row % 2 === 0 ? points[row + 1]?.[col - 1] : points[row + 1]?.[col + 1]]
+          ].filter((candidate) => candidate[1]);
+
+          for (const [direction, next] of candidates) {
+            const isSolidAxis = direction !== "horizontal" && next.x < point.x;
+            const className = isSolidAxis
+              ? config.edgeClass
+              : config.dashedEdgeClass;
+
+            if (edgeVisible(bounds, point, next, config.nodeRadius)) {
+              if (isSolidAxis) {
+                drawLine(layer, point, next, className);
+              } else {
+                drawDashedLine(
+                  layer,
+                  point,
+                  next,
+                  className,
+                  config.dashSlots,
+                  config.dashFill
+                );
+              }
+            }
+          }
+        }
+      }
+
+      for (const row of points) {
+        for (const point of row) {
+          if (nodeVisible(bounds, point, config.nodeRadius)) {
+            drawDot(layer, point, config.nodeRadius, config.nodeClass);
+          }
+        }
+      }
+    }
+
+    function semanticPoint(config, col, row) {
+      const bounds = boundsFor(config);
+      const x = bounds.x + col * config.spacing.x;
+      const y = bounds.y + row * config.spacing.y;
+      const waveX = Math.sin(row * 1.31 + col * 0.73);
+      const waveY = Math.cos(col * 1.07 - row * 0.61);
+
+      return {
+        x: x + waveX * config.jitter,
+        y: y + waveY * config.jitter * 0.74
+      };
+    }
+
+    function semanticEdgeClass(config, from, to, row, col, direction) {
+      return direction === "right" || direction === "down"
+        ? config.edgeClass
+        : config.weakEdgeClass;
+    }
+
+    function drawSemanticField(config) {
+      const layer = document.getElementById(config.target);
+      const bounds = boundsFor(config);
+      const cols = Math.ceil(bounds.width / config.spacing.x) + 3;
+      const rows = Math.ceil(bounds.height / config.spacing.y) + 3;
+      const points = [];
+
+      layer.replaceChildren();
+      applyViewportClip(layer, config.viewport);
+
+      for (let row = 0; row < rows; row += 1) {
+        points[row] = [];
+
+        for (let col = 0; col < cols; col += 1) {
+          points[row][col] = semanticPoint(config, col, row);
+        }
+      }
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const point = points[row][col];
+          const diagonals = [
+            points[row + 1]?.[col + 1],
+            points[row - 1]?.[col + 1]
+          ].filter(Boolean);
+
+          for (const next of diagonals) {
+            if (edgeVisible(bounds, point, next, config.nodeRadius)) {
+              drawDashedLine(
+                layer,
+                point,
+                next,
+                config.weakEdgeClass,
+                config.dashSlots,
+                config.dashFill
+              );
+            }
+          }
+        }
+      }
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const point = points[row][col];
+          const rectangleConnections = [
+            points[row]?.[col + 1],
+            points[row + 1]?.[col]
+          ].filter(Boolean);
+
+          for (const next of rectangleConnections) {
+            if (edgeVisible(bounds, point, next, config.nodeRadius)) {
+              drawLine(layer, point, next, config.edgeClass);
+            }
+          }
+        }
+      }
+
+      for (const row of points) {
+        for (const point of row) {
+          if (nodeVisible(bounds, point, config.nodeRadius)) {
+            drawDot(layer, point, config.nodeRadius, config.nodeClass);
+          }
+        }
+      }
+    }
+
+    drawTriangularField(graphFields.syntax);
+    drawSemanticField(graphFields.semantic);
+  </script>
+</body>
+</html>

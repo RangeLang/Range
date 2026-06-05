@@ -2,7 +2,7 @@
 construct ProgramFileGraphNode { }
 
 function renderProgram(program: RangeProgram): String {
-    return "RangeProgram\nfiles: \(program.graph.files.count)\n\(renderFiles(files: program.graph.files))graph nodes: \(program.graph.rangeGraph.nodes.count)\ngraph relationships: \(program.graph.rangeGraph.relationships.count)\n\(renderRangeGraph(graph: program.graph.rangeGraph))syntax: \(program.graph.syntax.count)\ndeclarations: \(countDeclarations(graph: program.graph))\napplications: \(countApplications(graph: program.graph))\n\(renderSyntaxItems(items: program.graph.syntax))"
+    return "RangeProgram\nfiles: \(program.graph.files.count)\n\(renderFiles(files: program.graph.files))graph nodes: \(program.graph.topology.nodes.count)\ngraph relationships: \(program.graph.topology.relationships.count)\n\(renderRangeGraphTopology(graph: program.graph.topology))syntax: \(program.graph.syntax.count)\ndeclarations: \(countDeclarations(graph: program.graph))\napplications: \(countApplications(graph: program.graph))\n\(renderSyntaxItems(items: program.graph.syntax))"
 }
 
 function renderIdentity(identity: RangeGraphIdentity): String {
@@ -22,7 +22,7 @@ function renderFiles(files: [FileTreeNode]): String {
     return output
 }
 
-function renderRangeGraph(graph: RangeGraph): String {
+function renderRangeGraphTopology(graph: RangeGraphTopology): String {
     return "\(renderRangeGraphNodes(nodes: graph.nodes))\(renderRangeGraphRelationships(relationships: graph.relationships))"
 }
 
@@ -67,7 +67,7 @@ function renderSyntaxItems(items: [GraphSyntax]): String {
     return output
 }
 
-function countDeclarations(graph: ProgramGraph): Int {
+function countDeclarations(graph: RangeGraph): Int {
     state count: 0
     state index: 0
 
@@ -80,7 +80,7 @@ function countDeclarations(graph: ProgramGraph): Int {
     return count
 }
 
-function countApplications(graph: ProgramGraph): Int {
+function countApplications(graph: RangeGraph): Int {
     state count: 0
     state index: 0
 
@@ -97,12 +97,12 @@ function countApplications(graph: ProgramGraph): Int {
     switch FileTree.read(path: "../../../") {
     case .success(let tree):
         let program: RangeProgram(
-            graph: ProgramGraph(
+            graph: RangeGraph(
                 files: [tree],
                 sources: [],
                 lexedSources: [],
                 artifacts: [],
-                rangeGraph: RangeGraph(
+                topology: RangeGraphTopology(
                     nodes: [
                         RangeGraphNode(
                             identity: RangeGraphIdentity(

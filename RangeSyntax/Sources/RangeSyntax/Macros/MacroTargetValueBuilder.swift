@@ -406,7 +406,7 @@ struct MacroTargetValueBuilder {
         }
     }
 
-    private func value(for application: MacroApplication) -> CompileTimeValue {
+    func value(for application: MacroApplication) -> CompileTimeValue {
         let rawBody = application.rawBody ?? ""
         var fields: [String: CompileTimeValue] = [
             "identifier": identifier(application.name),
@@ -445,6 +445,7 @@ struct MacroTargetValueBuilder {
         return .object(
             typeName: "Macro.Declaration",
             fields: [
+                "name": .string(declaration.name),
                 "identifier": identifier(declaration.name),
                 "packageVisibility": .string(packageVisibilityName(for: declaration.packageVisibility)),
                 "target": .string(declaration.target?.displayName ?? ""),

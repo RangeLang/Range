@@ -11,9 +11,11 @@ public enum SourceFileNode {
 }
 
 public struct MainBlockNode {
+    public let macros: [MacroApplication]
     public let body: [Statement]
 
-    public init(body: [Statement]) {
+    public init(macros: [MacroApplication], body: [Statement]) {
+        self.macros = macros
         self.body = body
     }
 }

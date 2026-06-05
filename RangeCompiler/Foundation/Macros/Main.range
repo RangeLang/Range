@@ -1,0 +1,7 @@
+macro main(): Block & @syntax { target, diagnostics, graph in
+    let mainMacros: Array<Macro.Application>(graph.macros(named: self.name))
+
+    if mainMacros.count > 1 {
+        diagnostics.error("A second @main conflicts with the main block already declared in this Range project.")
+    }
+}

@@ -1,16 +1,16 @@
 @language
 construct RangeProgram {
-    let graph: ProgramGraph
+    let graph: RangeGraph
 }
 
 @language
-construct ProgramGraph {
+construct RangeGraph {
     let files: [FileTreeNode]
     let sources: [ProgramSourceFile]
     let lexedSources: [ProgramLexedSource]
     let artifacts: [ProgramArtifact]
-    let rangeGraph: RangeGraph
-    let syntax: [GraphSyntax]
+    let topology: RangeGraphTopology
+    state syntax: [@syntax]
 }
 
 @language
@@ -32,7 +32,7 @@ construct ProgramArtifact {
 }
 
 @language
-construct RangeGraph {
+construct RangeGraphTopology {
     let nodes: [RangeGraphNode]
     let relationships: [RangeGraphRelationship]
 }

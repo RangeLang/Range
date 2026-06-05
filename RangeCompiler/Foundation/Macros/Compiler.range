@@ -1,0 +1,14 @@
+macro compiler(): Construct & @syntax { target, diagnostics, graph in
+    let compilerMacros: Array<Macro.Application>(graph.macros(named: self.name))
+
+    if compilerMacros.count > 1 {
+        diagnostics.error("A second @compiler conflicts with the compiler already declared in this Range project.")
+    }
+
+    let sourceDirectory: String(graph.sourceDirectory(of: target.identity))
+    let rangeFiles: Array<String>(FileTree.rangeFiles(path: sourceDirectory))
+
+    if rangeFiles.count == 0 {
+        diagnostics.error("@compiler could not find any .range files in its source directory.")
+    }
+}

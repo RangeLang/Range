@@ -713,13 +713,19 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         case .extensions(let declarations):
             return declarations.flatMap(attachedMacroUsages(in:))
         case .module(let module):
-            return module.states.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
+            let mainBlockUsages = module.mainBlock.map {
+                [AttachedMacroUsage(macros: $0.macros, declarationName: "@main")]
+            } ?? []
+            return mainBlockUsages
+                + module.states.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
                 + module.callables.flatMap(attachedMacroUsages(in:))
                 + module.constructs.flatMap(attachedMacroUsages(in:))
                 + module.enumerations.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
                 + module.protocols.flatMap(attachedMacroUsages(in:))
                 + module.extensions.flatMap(attachedMacroUsages(in:))
-        case .mainBlock, .macro:
+        case .mainBlock(let mainBlock):
+            return [AttachedMacroUsage(macros: mainBlock.macros, declarationName: "@main")]
+        case .macro:
             return []
         }
     }
