@@ -12,6 +12,8 @@ construct Macro {
     construct Declaration {
         let name: String
         let identifier: Identifier
+        let packageVisibility: String
+        let generics: [Generic]
         let parameters: [Parameter.Declaration]
         let target: String
         let targetSyntax: Target?
@@ -24,6 +26,7 @@ construct Macro {
 
     @graph(.application)
     construct Application<Value> {
+        let name: String
         let identifier: Identifier
         let genericArguments: [TypeReference]
         let argumentClause: String

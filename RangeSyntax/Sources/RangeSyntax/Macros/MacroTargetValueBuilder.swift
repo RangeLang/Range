@@ -388,6 +388,7 @@ struct MacroTargetValueBuilder {
     func value(for application: MacroApplication) -> CompileTimeValue {
         let rawBody = application.rawBody ?? ""
         var fields: [String: CompileTimeValue] = [
+            "name": .string(application.name),
             "identifier": identifier(application.name),
             "genericArguments": .array(application.genericArguments.map(typeReferenceValue)),
             "argumentClause": .string(application.argumentClause ?? ""),

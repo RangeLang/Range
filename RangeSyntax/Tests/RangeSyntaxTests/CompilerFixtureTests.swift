@@ -890,8 +890,13 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                     let graphApplications: Array<Macro.Application>(
                         graph.macros(named: self.name)
                     )
-                    let ownApplications: Array<Macro.Application>(
+                    let namedApplications: Array<Macro.Application>(
                         graphApplications.filter { application in
+                            application.name == self.name
+                        }
+                    )
+                    let ownApplications: Array<Macro.Application>(
+                        namedApplications.filter { application in
                             application.identifier == self.identifier
                         }
                     )
