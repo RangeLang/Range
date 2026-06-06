@@ -1,3 +1,0 @@
-construct Hashable {
-    function hash(into hasher: Hasher)
-}

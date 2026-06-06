@@ -1,3 +1,4 @@
+@equatable
 @comparable
 construct ComparableMacroFixture {
     let major: Int
@@ -5,6 +6,7 @@ construct ComparableMacroFixture {
     let patch: Int
 }
 
+@equatable
 @comparable
 construct EmptyComparableMacroFixture {
 }

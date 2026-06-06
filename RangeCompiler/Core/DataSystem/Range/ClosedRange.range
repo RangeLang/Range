@@ -1,4 +1,6 @@
 @language
+@equatable
+@hashable
 construct ClosedRange<Bound> {
     let lowerBound: Bound
     let upperBound: Bound
@@ -13,18 +15,5 @@ construct ClosedRange<Bound> {
 
     derived isEmpty: Bool {
         return upperBound < lowerBound
-    }
-}
-
-extension ClosedRange {
-    function ==(lhs: Self, rhs: Self): Bool {
-        return lhs.lowerBound == rhs.lowerBound && lhs.upperBound == rhs.upperBound
-    }
-}
-
-extension ClosedRange {
-    function hash(into hasher: Hasher) {
-        hasher.combine(lowerBound)
-        hasher.combine(upperBound)
     }
 }

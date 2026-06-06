@@ -1,3 +1,0 @@
-construct Comparable {
-    function <(lhs: Self, rhs: Self): Bool
-}

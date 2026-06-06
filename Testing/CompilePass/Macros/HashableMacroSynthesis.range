@@ -1,3 +1,4 @@
+@equatable
 @hashable
 construct HashableMacroFixture {
     let id: Int
@@ -5,6 +6,7 @@ construct HashableMacroFixture {
     let active: Bool
 }
 
+@equatable
 @hashable
 construct EmptyHashableMacroFixture {
 }

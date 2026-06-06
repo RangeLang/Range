@@ -1,3 +1,0 @@
-construct Decodable {
-    function decode(from decoder: Decoder): Result<Self, DecodingError>
-}
