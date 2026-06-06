@@ -1,4 +1,5 @@
 @syntax
+@field
 construct Derived<T> {
     let identity: GraphIdentity
     let parent: GraphIdentity?

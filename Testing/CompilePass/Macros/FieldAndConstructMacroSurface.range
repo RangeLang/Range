@@ -1,0 +1,10 @@
+construct FieldAndConstructMacroSurfaceFixture {
+    let id: Int
+
+    state count: Int(0)
+}
+
+@field
+construct FieldMacroSurfaceMarkerFixture {
+    let id: Int
+}

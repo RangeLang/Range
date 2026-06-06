@@ -1,4 +1,5 @@
 @syntax
+@field
 construct Let<T> {
   let identity: GraphIdentity
   let parent: GraphIdentity?

@@ -139,7 +139,7 @@ func macroTargetKinds(
             return [.construct]
         }
         if name == "field" {
-            return [.immutable, .state, .binding, .derived, .property]
+            return [.immutable, .state, .binding, .derived, .property, .function, .construct]
         }
         return [macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver)]
     case .anyOf(let targets), .allOf(let targets):
@@ -163,7 +163,7 @@ func macroTargetAllows(
             return kind == .construct
         }
         if name == "field" {
-            return [.immutable, .state, .binding, .derived, .property].contains(kind)
+            return [.immutable, .state, .binding, .derived, .property, .function, .construct].contains(kind)
         }
         return macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver) == kind
     case .anyOf(let targets):
@@ -956,13 +956,16 @@ struct MacroGraphContext {
             }
             for callable in construct.callables {
                 let id = "function:\(construct.name).\(callable.name)"
-                let callableValue = builder.value(for: callable)
+                let callableValue = builder.value(for: callable, ownerConstructName: construct.name)
                 declarationsByID[id] = callableValue
+                parentByID[id] = constructIdentity
                 recordMacros(Self.macroValues(from: callableValue), id: id)
                 members.append(builder.graphIdentity(kind: "function", name: "\(construct.name).\(callable.name)"))
             }
             for nested in construct.constructs {
-                members.append(builder.graphIdentity(kind: "construct", name: "\(construct.name).\(nested.name)"))
+                let nestedName = builder.qualifiedNestedName(owner: construct.name, member: nested.name)
+                parentByID["construct:\(nestedName)"] = constructIdentity
+                members.append(builder.graphIdentity(kind: "construct", name: nestedName))
             }
             membersByID[constructID] = members
         }

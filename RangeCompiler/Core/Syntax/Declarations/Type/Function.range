@@ -4,7 +4,10 @@ construct Function {
     let call: Call
 
     @graph(.declaration)
+    @field
     construct Declaration {
+        let identity: GraphIdentity
+        let parent: GraphIdentity?
         let identifier: Identifier
         let generics: [Generic]
         let parameters: [Parameter.Declaration]

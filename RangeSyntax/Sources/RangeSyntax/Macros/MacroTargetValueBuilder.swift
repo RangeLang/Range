@@ -121,7 +121,21 @@ struct MacroTargetValueBuilder {
     }
 
     func declarationValue(for declaration: ConstructDeclaration, qualifiedName: String) -> CompileTimeValue {
-        .object(
+        let fieldIdentities = declaration.values.map {
+            graphIdentity(kind: "let", name: "\(qualifiedName).\($0.name)")
+        } + declaration.states.map {
+            graphIdentity(kind: "state", name: "\(qualifiedName).\($0.name)")
+        } + declaration.bindings.map {
+            graphIdentity(kind: "binding", name: "\(qualifiedName).\($0.name)")
+        } + declaration.deriveds.map {
+            graphIdentity(kind: "derived", name: "\(qualifiedName).\($0.name)")
+        } + declaration.callables.map {
+            graphIdentity(kind: "function", name: "\(qualifiedName).\($0.name)")
+        } + declaration.constructs.map {
+            graphIdentity(kind: "construct", name: qualifiedNestedName(owner: qualifiedName, member: $0.name))
+        }
+
+        return .object(
             typeName: "Construct.Declaration",
             fields: [
                 "identity": graphIdentity(kind: "construct", name: qualifiedName),
@@ -143,10 +157,16 @@ struct MacroTargetValueBuilder {
                 "deriveds": .array(declaration.deriveds.map {
                     value(for: $0, ownerConstructName: qualifiedName)
                 }),
-                "functions": .array(declaration.callables.map(value(for:))),
+                "fields": .array(fieldIdentities),
+                "functions": .array(declaration.callables.map {
+                    value(for: $0, ownerConstructName: qualifiedName)
+                }),
                 "constructs": .array(
                     declaration.constructs.map {
-                        graphIdentity(kind: "construct", name: "\(qualifiedName).\($0.name)")
+                        declarationValue(
+                            for: $0,
+                            qualifiedName: qualifiedNestedName(owner: qualifiedName, member: $0.name)
+                        )
                     }
                 ),
                 "extensions": .array([]),
@@ -275,6 +295,10 @@ struct MacroTargetValueBuilder {
         }
         fields["identity"] = graphIdentity(kind: kind, name: "\(ownerConstructName).\(name)")
         fields["parent"] = graphIdentity(kind: "construct", name: ownerConstructName)
+    }
+
+    func qualifiedNestedName(owner: String, member: String) -> String {
+        member.hasPrefix("\(owner).") ? member : "\(owner).\(member)"
     }
 
     private func packageVisibilityName(for packageVisibility: PackageVisibility) -> String {
@@ -702,14 +726,26 @@ struct MacroTargetValueBuilder {
     }
 
     func value(for declaration: CallableDeclaration) -> CompileTimeValue {
-        .object(
+        value(for: declaration, ownerConstructName: nil)
+    }
+
+    func value(
+        for declaration: CallableDeclaration,
+        ownerConstructName: String?
+    ) -> CompileTimeValue {
+        var fields: [String: CompileTimeValue] = [
+            "identifier": identifier(declaration.name),
+            "generics": .array(declaration.genericParameters.map(value(for:))),
+            "parameters": .array(declaration.parameters.map(value(for:))),
+            "returnType": declaration.returnType.map(typeReferenceValue) ?? .string("Void"),
+        ]
+        if let ownerConstructName {
+            fields["identity"] = graphIdentity(kind: "function", name: "\(ownerConstructName).\(declaration.name)")
+            fields["parent"] = graphIdentity(kind: "construct", name: ownerConstructName)
+        }
+        return .object(
             typeName: "Function.Declaration",
-            fields: [
-                "identifier": identifier(declaration.name),
-                "generics": .array(declaration.genericParameters.map(value(for:))),
-                "parameters": .array(declaration.parameters.map(value(for:))),
-                "returnType": declaration.returnType.map(typeReferenceValue) ?? .string("Void"),
-            ]
+            fields: fields
         )
     }
 

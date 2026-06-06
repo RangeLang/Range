@@ -226,6 +226,10 @@ struct CompilerFixtureTests {
             let name: String
             let age: Int
 
+            function displayName(): String {
+                return name
+            }
+
             construct Nested {
                 let value: Int
             }
@@ -258,6 +262,12 @@ struct CompilerFixtureTests {
             syntaxBody: nil
         )
         let context = graph.macroExpansionContext(macrosByName: ["tracked": trackedMacro])
+        let fieldTargetKinds = macroTargetKinds(
+            for: .macroSurface("field"),
+            syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+        )
+        #expect(fieldTargetKinds.contains(.function))
+        #expect(fieldTargetKinds.contains(.construct))
         let target = MacroTargetValueBuilder().targetValue(for: construct)
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",
@@ -288,7 +298,7 @@ struct CompilerFixtureTests {
             Issue.record("Expected graph.members(of:) to return identity array.")
             return
         }
-        #expect(memberIdentities.count == 3)
+        #expect(memberIdentities.count == 4)
         guard case .object("GraphIdentity", let firstMemberFields)? = memberIdentities.first,
             case .string("let:User.name")? = firstMemberFields["id"]
         else {
@@ -362,6 +372,53 @@ struct CompilerFixtureTests {
             return
         }
         #expect(statements.count == 1)
+
+        let targetDeclaration = try #require(target.field("declaration"))
+        guard case .array(let fieldIdentities)? = targetDeclaration.field("fields") else {
+            Issue.record("Expected construct declaration to expose unified fields.")
+            return
+        }
+        #expect(fieldIdentities.count == 4)
+        let fieldIDs: [String] = fieldIdentities.compactMap {
+            guard case .object("GraphIdentity", let fields) = $0,
+                case .string(let id)? = fields["id"]
+            else {
+                return nil
+            }
+            return id
+        }
+        #expect(fieldIDs == [
+            "let:User.name",
+            "let:User.age",
+            "function:User.displayName",
+            "construct:User.Nested",
+        ])
+
+        let functionDeclaration = try #require(
+            evaluator.evaluate(
+                Expression.call(
+                    name: "graph.declaration",
+                    arguments: [CallArgument(label: nil, value: fieldIdentities[2].expression!)]
+                )
+            )
+        )
+        #expect(functionDeclaration.field("identifier") != nil)
+        #expect(functionDeclaration.field("parent") != nil)
+
+        let nestedParent = try #require(
+            evaluator.evaluate(
+                Expression.call(
+                    name: "graph.parent",
+                    arguments: [CallArgument(label: "of", value: fieldIdentities[3].expression!)]
+                )
+            )
+        )
+        guard case .object("GraphIdentity", let nestedParentFields) = nestedParent,
+            case .string("construct:User")? = nestedParentFields["id"]
+        else {
+            Issue.record("Expected graph.parent(of:) to resolve nested construct fields.")
+            return
+        }
 
         let namedMacros = try #require(
             evaluator.evaluate(
