@@ -1,5 +1,5 @@
 @syntax
-construct Closure: Expression {
+construct Closure {
     let type: TypeReference?
     let parameters: Array<Parameter.Declaration>()
     let body: Block

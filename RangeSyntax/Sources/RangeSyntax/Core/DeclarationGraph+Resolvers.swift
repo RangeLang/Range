@@ -523,6 +523,7 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
     }
 
     private let protocolNames: Set<String>
+    private let constructMemberNamesByName: [String: Set<String>]
     private let conformancesByNominalName: [String: [NominalConformance]]
 
     public init(
@@ -532,6 +533,9 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
         self.protocolNames = Set(protocolsByName.keys)
+        self.constructMemberNamesByName = constructsByName.mapValues {
+            Set($0.values.map(\.name)).union($0.callables.map(\.name))
+        }
 
         var conformances: [String: [NominalConformance]] = [:]
         for construct in constructsByName.values {
@@ -610,11 +614,54 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
             return true
         }
 
+        if structurallyAssignable(actual: actual, expected: expected) {
+            return true
+        }
+
         guard isKnownProtocol(expected) else {
             return false
         }
 
         return conforms(actual: actual, expectedProtocol: expected, visited: [])
+    }
+
+    private func structurallyAssignable(actual: TypeReference, expected: TypeReference) -> Bool {
+        guard
+            let actualContext = typeContext(for: actual),
+            let expectedContext = typeContext(for: expected)
+        else {
+            return false
+        }
+
+        switch expectedContext.name {
+        case "TypeReference":
+            return actualContext.name.hasSuffix("TypeReference")
+        case "NominalTypeReference":
+            return ["NominalTypeReference", "NamedTypeReference", "MemberTypeReference", "GenericTypeReference"]
+                .contains(actualContext.name)
+        case "StructuralTypeReference":
+            return ["StructuralTypeReference", "ArrayTypeReference", "FunctionTypeReference", "OptionalTypeReference", "VariadicTypeReference"]
+                .contains(actualContext.name)
+        case "Expression":
+            return actualContext.name == "Expression"
+                || actualContext.name.hasSuffix("Expression")
+                || ["Closure", "Function.Call", "Construct.Application"].contains(actualContext.name)
+        default:
+            break
+        }
+
+        guard
+            let actualMemberNames = constructMemberNamesByName[actualContext.name],
+            let expectedMemberNames = constructMemberNamesByName[expectedContext.name]
+        else {
+            return false
+        }
+
+        guard !expectedMemberNames.isEmpty else {
+            return false
+        }
+
+        return expectedMemberNames.isSubset(of: actualMemberNames)
     }
 
     private func conforms(

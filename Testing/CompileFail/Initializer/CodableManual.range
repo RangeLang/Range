@@ -3,7 +3,7 @@ construct CodableManualUser {
     let name: String
 }
 
-extension CodableManualUser: Codable {
+extension CodableManualUser {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.keyedContainer()
         container.encode(id, forKey: "id")

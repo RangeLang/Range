@@ -4,7 +4,7 @@ construct Function {
     let call: Call
 
     @graph(.declaration)
-    construct Declaration: SyntaxEmittable {
+    construct Declaration {
         let identifier: Identifier
         let generics: [Generic]
         let parameters: [Parameter.Declaration]
@@ -13,7 +13,7 @@ construct Function {
     }
 
     @graph(.application)
-    construct Call: SyntaxEmittable, SyntaxReplaceable<Expression> {
+    construct Call {
         let identifier: Identifier
         let arguments: [Parameter.Application]
 

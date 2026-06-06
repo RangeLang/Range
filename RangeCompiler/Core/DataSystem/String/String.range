@@ -28,15 +28,15 @@ construct String {
     }
 }
 
-extension String: Equatable {
+extension String {
     function ==(lhs: Self, rhs: Self): Bool
 }
 
-extension String: Comparable {
+extension String {
     function <(lhs: Self, rhs: Self): Bool
 }
 
-extension String: Decodable {
+extension String {
     function decode(from decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(String.self) {
@@ -48,14 +48,14 @@ extension String: Decodable {
     }
 }
 
-extension String: Encodable {
+extension String {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
-extension String: Hashable {
+extension String {
     function hash(into hasher: Hasher) {
         hasher.combineStorage(storage)
     }

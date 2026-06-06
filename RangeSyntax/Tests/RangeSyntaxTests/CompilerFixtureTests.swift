@@ -1054,7 +1054,7 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
         let graph = program.declarationGraph
 
-        #expect(graph.protocolsByName["Expression"]?.isCore == true)
+        #expect(graph.constructsByName["Expression"]?.isCore == true)
         #expect(!graph.syntaxResolver.declaration(named: "Expression", conformsTo: "Syntax"))
         #expect(graph.syntaxResolver.typeConformsToSyntax(.named("Expression")))
         #expect(graph.syntaxResolver.syntaxTypeName(forSurface: "block") == "Block")

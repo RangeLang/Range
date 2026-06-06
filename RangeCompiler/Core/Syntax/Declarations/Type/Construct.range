@@ -4,9 +4,9 @@ construct Construct {
     let application: Application
 
     @graph(.declaration)
-    construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType>, SyntaxEmittable {
+    construct Declaration {
         let identifier: Identifier
-        let self: SelfType
+        let self: NominalTypeReference
         let macros: [Macro.Application]
         let generics: [Generic]
         let conformances: [NominalTypeReference]
@@ -16,13 +16,13 @@ construct Construct {
         let deriveds: [Derived]
         let functions: [Function.Declaration]
         let constructs: [Construct.Declaration]
-        let extensions: [Extension<SelfType>]
+        let extensions: [Extension]
 
         function expand(_ expansion: () -> [@syntax])
     }
 
     @graph(.application)
-    construct Application: SyntaxReplaceable<Expression> {
+    construct Application {
         let type: TypeReference
         let arguments: [Parameter.Application]
 

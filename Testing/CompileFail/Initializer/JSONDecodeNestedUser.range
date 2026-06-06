@@ -2,7 +2,7 @@ construct NestedAddress {
     let city: String
 }
 
-extension NestedAddress: Decodable {
+extension NestedAddress {
     init(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container: decoder.keyedContainer()
 
@@ -22,7 +22,7 @@ construct NestedDecodedUser {
     let address: NestedAddress
 }
 
-extension NestedDecodedUser: Decodable {
+extension NestedDecodedUser {
     init(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container: decoder.keyedContainer()
 

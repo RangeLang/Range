@@ -1,5 +1,5 @@
 @syntax
-construct GenericTypeReference: NominalTypeReference {
+construct GenericTypeReference {
     let base: NominalTypeReference
     let arguments: [TypeReference]
 

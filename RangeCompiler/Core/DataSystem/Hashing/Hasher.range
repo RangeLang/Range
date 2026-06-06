@@ -2,7 +2,7 @@
 construct Hasher {
     state storage: HasherStorage()
 
-    function combine<T: Hashable>(_ value: T) {
+    function combine<T>(_ value: T) {
         value.hash(into: self)
     }
 

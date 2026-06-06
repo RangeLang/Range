@@ -1,2 +1,2 @@
 @syntax
-protocol StructuralTypeReference: TypeReference {}
+construct StructuralTypeReference {}

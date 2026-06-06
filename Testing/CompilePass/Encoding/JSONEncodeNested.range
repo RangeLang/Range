@@ -3,7 +3,7 @@ construct Address {
     let zip: Int
 }
 
-extension Address: Encodable {
+extension Address {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.keyedContainer()
 
@@ -24,7 +24,7 @@ construct User {
     let scores: [Int]
 }
 
-extension User: Encodable {
+extension User {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.keyedContainer()
 

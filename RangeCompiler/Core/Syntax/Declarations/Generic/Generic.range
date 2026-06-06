@@ -1,4 +1,4 @@
 @syntax
-protocol Generic {
+construct Generic {
     let identifier: Identifier
 }

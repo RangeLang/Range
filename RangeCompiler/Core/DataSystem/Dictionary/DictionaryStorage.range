@@ -1,5 +1,5 @@
 @language
-construct DictionaryStorage<Key: Hashable, Value> {
+construct DictionaryStorage<Key, Value> {
     derived count: Int
     derived isEmpty: Bool
     function value(key: Key): Value?

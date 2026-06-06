@@ -1,5 +1,5 @@
 @syntax
-construct TypeGeneric: Generic {
+construct TypeGeneric {
     let identifier: Identifier
     let constraint: TypeReference?
     let default: TypeReference?

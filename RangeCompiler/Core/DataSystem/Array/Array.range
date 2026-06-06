@@ -73,7 +73,7 @@ construct Array<Element> {
     }
 }
 
-extension Array: Encodable {
+extension Array {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.unkeyedContainer()
         state index: 0

@@ -3,7 +3,7 @@ construct Enum {
     let declaration: Declaration
 
     @graph(.declaration)
-    construct Declaration: SyntaxExpandable<NominalTypeReference>, SyntaxEmittable {
+    construct Declaration {
         let self: NominalTypeReference
         let generics: [Generic]
         let cases: [Case]
@@ -12,7 +12,7 @@ construct Enum {
     }
 
     @graph(.declaration)
-    construct Case: SyntaxEmittable {
+    construct Case {
         let identifier: Identifier
         let associatedValues: [AssociatedValue]
     }

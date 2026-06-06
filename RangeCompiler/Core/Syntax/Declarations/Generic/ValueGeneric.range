@@ -1,5 +1,5 @@
 @syntax
-construct ValueGeneric: Generic {
+construct ValueGeneric {
     let identifier: Identifier
     let type: TypeReference
     let default: Expression?

@@ -1,5 +1,5 @@
 @syntax
-construct ArrayExpression: Expression {
+construct ArrayExpression {
     let type: TypeReference?
     let elements: [Expression]
 

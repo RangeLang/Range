@@ -9,7 +9,7 @@ macro identifierContainerSwitch(container: Identifier, value: Identifier, key: S
 
 macro emitIdentifierContainerSwitch(): Construct { target, diagnostics in
     target.declaration.expand {
-        extension #(target.declaration.self): Encodable {
+        extension #(target.declaration.self) {
             function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
                 @identifierContainerSwitch(

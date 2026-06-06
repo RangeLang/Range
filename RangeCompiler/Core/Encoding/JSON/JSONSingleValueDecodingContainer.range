@@ -1,4 +1,4 @@
-construct JSONSingleValueDecodingContainer: SingleValueDecodingContainer {
+construct JSONSingleValueDecodingContainer {
     let value: JSONValue
 
     function decode(_ type: Bool.Type): Result<Bool, DecodingError> {

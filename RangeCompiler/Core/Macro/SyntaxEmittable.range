@@ -1,2 +1,2 @@
-protocol SyntaxEmittable {
+construct SyntaxEmittable {
 }

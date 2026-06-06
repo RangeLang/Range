@@ -265,7 +265,7 @@ struct RewriteSurfaceView {
         var paths: Set<String> = []
 
         func supportsRewrite(_ typeName: String) -> Bool {
-            syntaxResolver.declaration(named: typeName, conformsTo: "SyntaxReplaceable")
+            declarationSupportsRewrite(typeName)
         }
 
         func resolvedValueType(
@@ -295,9 +295,9 @@ struct RewriteSurfaceView {
             }
 
             if syntaxResolver.declarationIsSyntaxBoundary(named: text)
-                || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
-                || syntaxResolver.declaration(named: text, conformsTo: "SyntaxExpandable")
-                || syntaxResolver.declaration(named: text, conformsTo: "SyntaxOmittable")
+                || declarationSupportsRewrite(text)
+                || declarationSupportsExpansion(text)
+                || constructsByName[text] != nil
             {
                 return (text, isArray)
             }
@@ -374,7 +374,7 @@ struct RewriteSurfaceView {
 
         let directPath = "\(targetBinding).replace"
         if normalizedPath == directPath {
-            return syntaxResolver.declaration(named: targetName, conformsTo: "SyntaxReplaceable")
+            return declarationSupportsRewrite(targetName)
         }
 
         let prefix = "\(targetBinding)."
@@ -416,7 +416,7 @@ struct RewriteSurfaceView {
             currentTypeName = resolvedType.typeName
         }
 
-        return syntaxResolver.declaration(named: currentTypeName, conformsTo: "SyntaxReplaceable")
+        return declarationSupportsRewrite(currentTypeName)
     }
 
     func declaredExpansionPathExists(
@@ -435,7 +435,7 @@ struct RewriteSurfaceView {
             return false
         }
 
-        return syntaxResolver.declaration(named: semanticName, conformsTo: "SyntaxExpandable")
+        return declarationSupportsExpansion(semanticName)
     }
 
     private func resolvedDeclaredValueType(
@@ -465,9 +465,9 @@ struct RewriteSurfaceView {
         }
 
         if syntaxResolver.declarationIsSyntaxBoundary(named: text)
-            || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
-            || syntaxResolver.declaration(named: text, conformsTo: "SyntaxExpandable")
-            || syntaxResolver.declaration(named: text, conformsTo: "SyntaxOmittable")
+            || declarationSupportsRewrite(text)
+            || declarationSupportsExpansion(text)
+            || constructsByName[text] != nil
         {
             return (text, isArray)
         }
@@ -586,28 +586,38 @@ struct RewriteSurfaceView {
         }
 
         if semanticName == "NominalTypeReference"
-            || syntaxResolver.declaration(named: semanticName, conformsTo: "NominalTypeReference")
+            || semanticName == "NamedTypeReference"
+            || semanticName == "MemberTypeReference"
+            || semanticName == "GenericTypeReference"
         {
             return [.nominalTypeReference, .typeReference]
         }
 
-        if semanticName == "TypeReference"
-            || syntaxResolver.declaration(named: semanticName, conformsTo: "TypeReference")
-        {
+        if semanticName == "TypeReference" || semanticName.hasSuffix("TypeReference") {
             return [.typeReference]
         }
 
-        if semanticName == "Expression"
-            || syntaxResolver.declaration(named: semanticName, conformsTo: "Expression")
-        {
+        if semanticName == "Expression" || semanticName.hasSuffix("Expression") {
             return [.expression]
         }
 
-        if syntaxResolver.declaration(named: semanticName, conformsTo: "SyntaxEmittable") {
+        if declarationCanEmitSyntax(semanticName) {
             return [.declaration]
         }
 
         return [.expression]
+    }
+
+    private func declarationSupportsRewrite(_ name: String) -> Bool {
+        constructsByName[name]?.callables.contains { $0.name == "replace" } == true
+    }
+
+    private func declarationSupportsExpansion(_ name: String) -> Bool {
+        constructsByName[name]?.callables.contains { $0.name == "expand" } == true
+    }
+
+    private func declarationCanEmitSyntax(_ name: String) -> Bool {
+        syntaxResolver.declarationIsSyntaxBoundary(named: name) || constructsByName[name] != nil
     }
 }
 

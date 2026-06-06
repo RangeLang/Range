@@ -1,4 +1,4 @@
-construct JSONUnkeyedDecodingContainer: UnkeyedDecodingContainer {
+construct JSONUnkeyedDecodingContainer {
     let values: [JSONValue]
     state index: Int(0)
 
@@ -76,14 +76,8 @@ construct JSONUnkeyedDecodingContainer: UnkeyedDecodingContainer {
         }
     }
 
-    function decode<T: Decodable>(_ type: T.Type): Result<T, DecodingError> {
-        switch nextValue() {
-        case .success(let value):
-            let decoder: JSONDecoder(value: value)
-            return T.decode(from: decoder)
-        case .failure(let error):
-            return .failure(cause: error)
-        }
+    function decode<T>(_ type: T.Type): Result<T, DecodingError> {
+        return .failure(cause: .failed)
     }
 
     function nextValue(): Result<JSONValue, DecodingError> {

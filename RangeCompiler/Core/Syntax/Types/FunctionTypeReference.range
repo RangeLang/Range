@@ -1,5 +1,5 @@
 @syntax
-construct FunctionTypeReference: StructuralTypeReference {
+construct FunctionTypeReference {
     let parameters: [TypeReference]
     let returnType: TypeReference
 

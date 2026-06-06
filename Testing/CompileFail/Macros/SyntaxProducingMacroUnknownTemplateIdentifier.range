@@ -9,7 +9,7 @@ macro invalidEncodeSwitch(value: Identifier, key: String) -> Switch {
 
 macro emitInvalidEncodingSwitch(): Construct { target, diagnostics in
     target.declaration.expand {
-        extension #(target.declaration.self): Encodable {
+        extension #(target.declaration.self) {
             function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
                 @invalidEncodeSwitch(

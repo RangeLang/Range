@@ -14,15 +14,15 @@ construct DateTime {
     }
 }
 
-extension DateTime: Equatable {
+extension DateTime {
     function ==(lhs: Self, rhs: Self): Bool
 }
 
-extension DateTime: Comparable {
+extension DateTime {
     function <(lhs: Self, rhs: Self): Bool
 }
 
-extension DateTime: Decodable {
+extension DateTime {
     function decode(from decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(DateTime.self) {
@@ -34,14 +34,14 @@ extension DateTime: Decodable {
     }
 }
 
-extension DateTime: Encodable {
+extension DateTime {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
-extension DateTime: Hashable {
+extension DateTime {
     function hash(into hasher: Hasher) {
         hasher.combineStorage(storage)
     }

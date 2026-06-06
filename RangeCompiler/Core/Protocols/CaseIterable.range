@@ -1,3 +1,3 @@
-protocol CaseIterable {
+construct CaseIterable {
     function allCases(): [Self]
 }

@@ -1,5 +1,5 @@
 @language
-construct SetStorage<Element: Hashable> {
+construct SetStorage<Element> {
     derived count: Int
     derived isEmpty: Bool
     function contains(element: Element): Bool

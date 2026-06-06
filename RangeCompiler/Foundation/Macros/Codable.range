@@ -69,7 +69,7 @@ macro codable<let shape: CodingShape = .object>(): Construct { target, diagnosti
     let properties: [Let](target.declaration.lets)
 
     target.declaration.expand {
-        extension #(target.declaration.self): Codable {
+        extension #(target.declaration.self) {
             function encode(to encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
                 @encodeBody(

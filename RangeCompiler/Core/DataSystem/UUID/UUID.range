@@ -15,11 +15,11 @@ construct UUID {
     }
 }
 
-extension UUID: Equatable {
+extension UUID {
     function ==(lhs: Self, rhs: Self): Bool
 }
 
-extension UUID: Decodable {
+extension UUID {
     function decode(from decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(UUID.self) {
@@ -31,14 +31,14 @@ extension UUID: Decodable {
     }
 }
 
-extension UUID: Encodable {
+extension UUID {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
-extension UUID: Hashable {
+extension UUID {
     function hash(into hasher: Hasher) {
         hasher.combineStorage(storage)
     }

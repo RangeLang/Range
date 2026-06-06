@@ -1,5 +1,5 @@
 @syntax
-construct WrittenExpression: Expression {
+construct WrittenExpression {
     let type: TypeReference?
     let written: WrittenSyntax
 

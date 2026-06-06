@@ -7,15 +7,15 @@ construct Int<let bits: IntLiteral, let signedness: Signedness = .signed> {
     }
 }
 
-extension Int: Equatable {
+extension Int {
     function ==(lhs: Self, rhs: Self): Bool
 }
 
-extension Int: Comparable {
+extension Int {
     function <(lhs: Self, rhs: Self): Bool
 }
 
-extension Int: Decodable {
+extension Int {
     function decode(from decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(Int.self) {
@@ -27,14 +27,14 @@ extension Int: Decodable {
     }
 }
 
-extension Int: Encodable {
+extension Int {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
-extension Int: Hashable {
+extension Int {
     function hash(into hasher: Hasher) {
         hasher.combineStorage(storage)
     }

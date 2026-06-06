@@ -1,5 +1,5 @@
 @syntax
-construct MemberTypeReference: NominalTypeReference {
+construct MemberTypeReference {
     let base: NominalTypeReference
     let name: String
 

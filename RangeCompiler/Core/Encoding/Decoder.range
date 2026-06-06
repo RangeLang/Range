@@ -1,4 +1,4 @@
-protocol Decoder {
+construct Decoder {
     function keyedContainer(): KeyedDecodingContainer
 
     function unkeyedContainer(): UnkeyedDecodingContainer

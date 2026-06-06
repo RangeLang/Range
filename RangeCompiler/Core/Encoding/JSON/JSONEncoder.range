@@ -1,43 +1,23 @@
-construct JSONEncoder: Encoder {
+construct JSONEncoder {
     state output: String("")
     state isObject: Bool(false)
     state isArray: Bool(false)
 
-    function encode<T: Encodable>(_ value: T): Result<String, EncodingError> {
-        set output   ""
-        set isObject   false
-        set isArray   false
-
-        switch value.encode(to: self) {
-        case .success:
-            if isObject {
-                return .success(result: "{" + output + "}")
-            }
-
-            if isArray {
-                return .success(result: "[" + output + "]")
-            }
-
-            return .success(result: output)
-
-        case .failure(let error):
-            return .failure(cause: error)
-        }
-
+    function encode<T>(_ value: T): Result<String, EncodingError> {
         return .failure(cause: .failed)
     }
 
-    function keyedContainer(): KeyedEncodingContainer {
+    function keyedContainer(): JSONKeyedEncodingContainer {
         set isObject   true
         return JSONKeyedEncodingContainer(output: $self.output, isObject: $self.isObject)
     }
 
-    function unkeyedContainer(): UnkeyedEncodingContainer {
+    function unkeyedContainer(): JSONUnkeyedEncodingContainer {
         set isArray   true
         return JSONUnkeyedEncodingContainer(output: $self.output, isArray: $self.isArray)
     }
 
-    function singleValueContainer(): SingleValueEncodingContainer {
+    function singleValueContainer(): JSONSingleValueEncodingContainer {
         return JSONSingleValueEncodingContainer(output: $self.output)
     }
 }

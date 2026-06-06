@@ -1,9 +1,9 @@
-protocol TypedExpandSpliceProtocol {
+construct TypedExpandSpliceProtocol {
 }
 
 macro typedExpandSpliceSlots(): Construct { target, diagnostics in
     target.declaration.expand {
-        extension #(target.declaration.self): #(TypedExpandSpliceProtocol) {
+        extension #(target.declaration.self) {
             function #(Identifier(name: "generatedName"))(): #(target.declaration.self) {
                 return self
             }

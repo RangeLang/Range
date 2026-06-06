@@ -1,4 +1,4 @@
-construct JSONSingleValueEncodingContainer: SingleValueEncodingContainer {
+construct JSONSingleValueEncodingContainer {
     binding output: String
 
     function encodeNil(): Result<Void, EncodingError> {
@@ -45,7 +45,7 @@ construct JSONSingleValueEncodingContainer: SingleValueEncodingContainer {
         return .success(result: Void())
     }
 
-    function encode<T: Encodable>(_ value: T): Result<Void, EncodingError> {
+    function encode<T>(_ value: T): Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }
 }

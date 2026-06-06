@@ -1,6 +1,6 @@
 @language
 @literal
-construct Set<Element: Hashable> {
+construct Set<Element> {
     state storage: SetStorage<Element>()
 
     derived count: Int {
@@ -40,7 +40,7 @@ construct Set<Element: Hashable> {
     }
 }
 
-extension Set<Element: Encodable>: Encodable {
+extension Set<Element> {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.unkeyedContainer()
         let values: Array<Element>(elements())

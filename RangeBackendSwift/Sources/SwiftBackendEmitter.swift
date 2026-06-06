@@ -1664,6 +1664,7 @@ struct SwiftBackendEmitter {
         )
         let methods = try declaration.callables
             .filter { $0.targetType == nil }
+            .filter { $0.body != nil }
             .map {
                 try emitMethod(
                     $0,
@@ -1928,7 +1929,7 @@ struct SwiftBackendEmitter {
                 scope: EmissionScope().adding(extensionConstraints: declaration.genericArgumentConstraints)
             )
         }.joined(separator: "\n\n")
-        let methods = try declaration.callables.map {
+        let methods = try declaration.callables.filter { $0.body != nil }.map {
             try emitMethod(
                 $0,
                 inheritedScope: EmissionScope().adding(extensionConstraints: declaration.genericArgumentConstraints)

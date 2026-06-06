@@ -1,10 +1,10 @@
-protocol BaseProtocol {
+construct BaseProtocol {
 }
 
-protocol DerivedProtocol: BaseProtocol {
+construct DerivedProtocol {
 }
 
-construct DerivedImplementation: DerivedProtocol {
+construct DerivedImplementation {
 }
 
 function makeBase(): BaseProtocol {

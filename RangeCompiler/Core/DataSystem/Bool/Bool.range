@@ -7,11 +7,11 @@ construct Bool {
     }
 }
 
-extension Bool: Equatable {
+extension Bool {
     function ==(lhs: Self, rhs: Self): Bool
 }
 
-extension Bool: Decodable {
+extension Bool {
     function decode(from decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(Bool.self) {
@@ -23,14 +23,14 @@ extension Bool: Decodable {
     }
 }
 
-extension Bool: Encodable {
+extension Bool {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
-extension Bool: Hashable {
+extension Bool {
     function hash(into hasher: Hasher) {
         hasher.combineStorage(storage)
     }

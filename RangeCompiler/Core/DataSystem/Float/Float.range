@@ -1,5 +1,5 @@
 @language
-construct Float<let width: FloatingPointWidth> {
+construct Float<let width: IntLiteral> {
     let storage: FloatStorage
 
     function literal(literal: FloatLiteral): Self {
@@ -7,15 +7,15 @@ construct Float<let width: FloatingPointWidth> {
     }
 }
 
-extension Float: Equatable {
+extension Float {
     function ==(lhs: Self, rhs: Self): Bool
 }
 
-extension Float: Comparable {
+extension Float {
     function <(lhs: Self, rhs: Self): Bool
 }
 
-extension Float: Decodable {
+extension Float {
     function decode(from decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(Float.self) {
@@ -27,14 +27,14 @@ extension Float: Decodable {
     }
 }
 
-extension Float: Encodable {
+extension Float {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
-extension Float: Hashable {
+extension Float {
     function hash(into hasher: Hasher) {
         hasher.combineStorage(storage)
     }

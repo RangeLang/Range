@@ -3,7 +3,7 @@ construct User {
     let name: String
 }
 
-extension User: Encodable {
+extension User {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.keyedContainer()
         container.encode(id, forKey: "id")

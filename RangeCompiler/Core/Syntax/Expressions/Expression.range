@@ -1,5 +1,5 @@
 @Statement
 @syntax
-protocol Expression: SyntaxReplaceable<Expression> {
+construct Expression {
     let type: TypeReference?
 }

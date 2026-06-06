@@ -1,4 +1,4 @@
-construct FixtureSingleValueEncodingContainer: SingleValueEncodingContainer {
+construct FixtureSingleValueEncodingContainer {
     function encodeNil(): Result<Void, EncodingError> {
         return .success(result: Void())
     }
@@ -35,12 +35,12 @@ construct FixtureSingleValueEncodingContainer: SingleValueEncodingContainer {
         return .success(result: Void())
     }
 
-    function encode<T: Encodable>(_ value: T): Result<Void, EncodingError> {
+    function encode<T>(_ value: T): Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }
 }
 
-construct FixtureKeyedEncodingContainer: KeyedEncodingContainer {
+construct FixtureKeyedEncodingContainer {
     function encode(_ value: Bool, forKey key: String): Result<Void, EncodingError> {
         return .success(result: Void())
     }
@@ -73,7 +73,7 @@ construct FixtureKeyedEncodingContainer: KeyedEncodingContainer {
         return .success(result: Void())
     }
 
-    function encode<T: Encodable>(_ value: T, forKey key: String): Result<Void, EncodingError> {
+    function encode<T>(_ value: T, forKey key: String): Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }
 }

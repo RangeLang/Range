@@ -1,2 +1,2 @@
 @syntax
-protocol NominalTypeReference: TypeReference {}
+construct NominalTypeReference {}

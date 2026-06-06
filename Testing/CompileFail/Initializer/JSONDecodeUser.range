@@ -3,7 +3,7 @@ construct DecodedUser {
     let name: String
 }
 
-extension DecodedUser: Decodable {
+extension DecodedUser {
     init(from decoder: Decoder) -> Result<Self, DecodingError> {
         let container: decoder.keyedContainer()
 

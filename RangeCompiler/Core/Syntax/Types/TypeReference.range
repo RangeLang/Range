@@ -1,2 +1,2 @@
 @syntax
-protocol TypeReference: SyntaxReplaceable<TypeReference> {}
+construct TypeReference {}

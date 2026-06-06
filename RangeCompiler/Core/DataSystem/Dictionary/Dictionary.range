@@ -1,6 +1,6 @@
 @language
 @literal
-construct Dictionary<Key: Hashable, Value> {
+construct Dictionary<Key, Value> {
     state storage: DictionaryStorage<Key, Value>()
 
     derived count: Int {
@@ -44,7 +44,7 @@ construct Dictionary<Key: Hashable, Value> {
     }
 }
 
-extension Dictionary<String, Value: Encodable>: Encodable {
+extension Dictionary<String, Value> {
     function encode(to encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.keyedContainer()
         let values: Array<DictionaryEntry<String, Value>>(entries())

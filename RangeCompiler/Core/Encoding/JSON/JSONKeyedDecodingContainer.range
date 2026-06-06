@@ -1,4 +1,4 @@
-construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
+construct JSONKeyedDecodingContainer {
     let fields: [JSONField]
 
     function decode(_ type: Bool.Type, forKey key: String): Result<Bool, DecodingError> {
@@ -71,14 +71,8 @@ construct JSONKeyedDecodingContainer: KeyedDecodingContainer {
         }
     }
 
-    function decode<T: Decodable>(_ type: T.Type, forKey key: String): Result<T, DecodingError> {
-        switch value(forKey: key) {
-        case .success(let value):
-            let decoder: JSONDecoder(value: value)
-            return T.decode(from: decoder)
-        case .failure(let error):
-            return .failure(cause: error)
-        }
+    function decode<T>(_ type: T.Type, forKey key: String): Result<T, DecodingError> {
+        return .failure(cause: .failed)
     }
 
     function value(forKey key: String): Result<JSONValue, DecodingError> {

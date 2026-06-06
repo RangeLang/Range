@@ -8,6 +8,6 @@ macro identifierSyntaxName(): Init { target, diagnostics in
 
 @syntax
 @identifierSyntaxName
-construct Identifier: SyntaxEmittable {
+construct Identifier {
     let name: String
 }

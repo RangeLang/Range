@@ -1,5 +1,5 @@
 @syntax
-construct NamedTypeReference: NominalTypeReference {
+construct NamedTypeReference {
     let name: String
 
     function replace(with replacement: TypeReference): TypeReference

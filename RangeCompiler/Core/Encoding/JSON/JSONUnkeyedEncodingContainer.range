@@ -1,4 +1,4 @@
-construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
+construct JSONUnkeyedEncodingContainer {
     binding output: String
     binding isArray: Bool
     state wroteValue: Bool(false)
@@ -42,17 +42,7 @@ construct JSONUnkeyedEncodingContainer: UnkeyedEncodingContainer {
         return .success(result: Void())
     }
 
-    function encode<T: Encodable>(_ value: T): Result<Void, EncodingError> {
-        let encoder: JSONEncoder()
-
-        switch encoder.encode(value) {
-        case .success(let encoded):
-            appendValue(value: encoded)
-            return .success(result: Void())
-        case .failure(let error):
-            return .failure(cause: error)
-        }
-
+    function encode<T>(_ value: T): Result<Void, EncodingError> {
         return .failure(cause: .failed)
     }
 

@@ -1,9 +1,9 @@
-protocol AdditionalTypedExpandProtocol {
+construct AdditionalTypedExpandProtocol {
 }
 
 macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
     target.declaration.expand {
-        enum #(Identifier(name: "GeneratedTypedExpandEnum")): #(AdditionalTypedExpandProtocol) {
+        enum #(Identifier(name: "GeneratedTypedExpandEnum")) {
             case #(Identifier(name: "payload"))(value: #(Int))
         }
 
@@ -14,7 +14,7 @@ macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
             }
         }
 
-        construct #(Identifier(name: "GeneratedTypedExpandConstruct"))<Wrapped: #(AdditionalTypedExpandProtocol), let count: #(Int)>: #(AdditionalTypedExpandProtocol) {
+        construct #(Identifier(name: "GeneratedTypedExpandConstruct"))<Wrapped, let count: #(Int)> {
             let label: #(String)
             binding amount: #(Int)
             let externalText: #(String)

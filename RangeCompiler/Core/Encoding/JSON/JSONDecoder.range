@@ -1,27 +1,27 @@
-construct JSONDecoder: Decoder {
+construct JSONDecoder {
     let value: JSONValue
 
     function decode(_ type: Bool.Type, from value: JSONValue): Result<Bool, DecodingError> {
-        let decoder: JSONDecoder(value: value)
-        return Bool.decode(from: decoder)
+        let container: JSONSingleValueDecodingContainer(value: value)
+        return container.decode(Bool.self)
     }
 
     function decode(_ type: Float.Type, from value: JSONValue): Result<Float, DecodingError> {
-        let decoder: JSONDecoder(value: value)
-        return Float.decode(from: decoder)
+        let container: JSONSingleValueDecodingContainer(value: value)
+        return container.decode(Float.self)
     }
 
     function decode(_ type: Int.Type, from value: JSONValue): Result<Int, DecodingError> {
-        let decoder: JSONDecoder(value: value)
-        return Int.decode(from: decoder)
+        let container: JSONSingleValueDecodingContainer(value: value)
+        return container.decode(Int.self)
     }
 
     function decode(_ type: String.Type, from value: JSONValue): Result<String, DecodingError> {
-        let decoder: JSONDecoder(value: value)
-        return String.decode(from: decoder)
+        let container: JSONSingleValueDecodingContainer(value: value)
+        return container.decode(String.self)
     }
 
-    function keyedContainer(): KeyedDecodingContainer {
+    function keyedContainer(): JSONKeyedDecodingContainer {
         switch value {
         case .object(let fields):
             return JSONKeyedDecodingContainer(fields: fields)
@@ -30,11 +30,11 @@ construct JSONDecoder: Decoder {
         }
     }
 
-    function singleValueContainer(): SingleValueDecodingContainer {
+    function singleValueContainer(): JSONSingleValueDecodingContainer {
         return JSONSingleValueDecodingContainer(value: value)
     }
 
-    function unkeyedContainer(): UnkeyedDecodingContainer {
+    function unkeyedContainer(): JSONUnkeyedDecodingContainer {
         switch value {
         case .array(let values):
             return JSONUnkeyedDecodingContainer(values: values)

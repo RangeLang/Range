@@ -2,11 +2,11 @@ enum ParseError {
     case failed
 }
 
-protocol StringDecodable {
+construct StringDecodable {
     init(value: String) -> Result<Self, ParseError>
 }
 
-construct User: StringDecodable {
+construct User {
     let name: String
 
     init(value: String) -> Result<Self, ParseError> {
