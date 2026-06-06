@@ -855,6 +855,19 @@ extension MacroExpander {
         for macro: MacroDeclaration,
         context: MacroExpansionContext
     ) throws -> [Statement] {
+        guard let rewriteBody = try optionalRewriteBody(for: macro, context: context) else {
+            throw ParseError(
+                "Macro @\(macro.name) must call \(macro.bindings!.target).replace(with: ...) with a block expression."
+            )
+        }
+
+        return rewriteBody
+    }
+
+    static func optionalRewriteBody(
+        for macro: MacroDeclaration,
+        context: MacroExpansionContext
+    ) throws -> [Statement]? {
         var rewriteCalls: [[Statement]] = []
 
         for rewrite in try resolvedRewriteCalls(for: macro, context: context)
@@ -869,9 +882,7 @@ extension MacroExpander {
         }
 
         guard let rewriteBody = rewriteCalls.first else {
-            throw ParseError(
-                "Macro @\(macro.name) must call \(macro.bindings!.target).replace(with: ...) with a block expression."
-            )
+            return nil
         }
 
         if rewriteCalls.count > 1 {

@@ -255,8 +255,12 @@ extension MacroExpander {
             return expandedBody
         }
 
+        guard let rewriteBody = try optionalRewriteBody(for: macro, context: context) else {
+            return expandedBody
+        }
+
         let rewritten = substituteMacroTargetCalls(
-            in: try rewriteBody(for: macro, context: context),
+            in: rewriteBody,
             targetBinding: bindings.target,
             targetBlock: expandedBody
         )

@@ -4,10 +4,4 @@ macro main(): Block { target, diagnostics, graph in
     if mainMacros.count > 1 {
         diagnostics.error("A second @main conflicts with the main block already declared in this Range project.")
     }
-
-    let main: Optional<Macro.Application>(graph.main)
-
-    target.replace(with: {
-        @block(statements: target.declaration.statements)
-    })
 }
