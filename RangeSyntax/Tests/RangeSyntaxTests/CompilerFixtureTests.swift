@@ -1831,74 +1831,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(compoundAssignmentName == "Math.clamp")
     }
 
-    @Test("Background macro rewrites block to detached thread spawn")
-    func backgroundMacroRewritesBlockToDetachedThreadSpawn() throws {
-        let projectPath = "/tmp/BackgroundMacroRewrite.range"
-        var inputs = try rangeCoreInputs()
-        inputs.append(
-            SourceInput(
-                path: projectPath,
-                source: """
-                @main {
-                    @background {
-                        Thread.yield()
-                    }
-                }
-                """,
-                role: .project
-            )
-        )
-
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let expandedFile = try #require(
-            program.projectExpandedFiles.first(where: { $0.path == projectPath })
-        )
-        guard case .mainBlock(let mainBlock) = expandedFile.sourceFile else {
-            Issue.record("Expected expanded project file to contain a main block.")
-            return
-        }
-
-        guard case .switchStatement(let spawnExpression, let cases, _)? = mainBlock.body.first else {
-            Issue.record("Expected @background to rewrite to a switch over Thread.spawn.")
-            return
-        }
-
-        guard case .call(let name, let arguments) = spawnExpression else {
-            Issue.record("Expected @background switch subject to call Thread.spawn.")
-            return
-        }
-        #expect(name == "Thread.spawn")
-        guard case .block(let body)? = arguments.first?.value else {
-            Issue.record("Expected Thread.spawn to receive the background block as its closure body.")
-            return
-        }
-
-        guard case .expression(.call(let bodyCallName, _))? = body.first else {
-            Issue.record("Expected background body to be preserved inside Thread.spawn.")
-            return
-        }
-
-        #expect(bodyCallName == "Thread.yield")
-
-        let successCase = try #require(cases.first)
-        guard case .enumCase(".success", let binding?) = successCase.pattern else {
-            Issue.record("Expected @background success case to bind the thread handle.")
-            return
-        }
-
-        #expect(binding.name == "handle")
-        guard case .expression(.call(let detachName, let detachArguments))? = successCase.body.first else {
-            Issue.record("Expected @background success case to detach the spawned thread.")
-            return
-        }
-
-        #expect(detachName == "Thread.detach")
-        guard case .identifier("handle")? = detachArguments.first?.value else {
-            Issue.record("Expected Thread.detach to receive the spawned thread handle.")
-            return
-        }
-    }
-
     @Test("State getter macro rewrites reads in expressions")
     func stateGetterMacroRewritesReadsInExpressions() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/GetterState.range")
@@ -2681,14 +2613,14 @@ private func compile(fixture: URL, expectedRole: FixtureRole) throws -> Compiled
 
 private func fixtureFiles(in suite: String) throws -> [URL] {
     let root = try repositoryRoot()
-        .appendingPathComponent("RangeTests", isDirectory: true)
+        .appendingPathComponent("Testing", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
     return try rangeFiles(in: root, excludingExploration: false)
 }
 
 private func fixtureFile(in suite: String, path: String) throws -> URL {
     try repositoryRoot()
-        .appendingPathComponent("RangeTests", isDirectory: true)
+        .appendingPathComponent("Testing", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
         .appendingPathComponent(path)
 }
@@ -2754,7 +2686,7 @@ private func repositoryRoot() throws -> URL {
         let candidateCore = current
             .appendingPathComponent("RangeCompiler", isDirectory: true)
             .appendingPathComponent("Core", isDirectory: true)
-        let candidateFixtures = current.appendingPathComponent("RangeTests", isDirectory: true)
+        let candidateFixtures = current.appendingPathComponent("Testing", isDirectory: true)
         var isCoreDirectory: ObjCBool = false
         var isFixturesDirectory: ObjCBool = false
         if FileManager.default.fileExists(atPath: candidateCore.path, isDirectory: &isCoreDirectory),

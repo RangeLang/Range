@@ -30,6 +30,12 @@ extension MacroExpander {
         case .identifier(let name):
             return name
         case .call(let name, let arguments):
+            if name == "__syntaxSplice",
+                arguments.count == 1,
+                arguments[0].label == nil
+            {
+                return "#(\(renderExpressionForStringify(arguments[0].value)))"
+            }
             return "\(name)(\(renderArgumentsForStringify(arguments)))"
         case .bindingReference(let name):
             return "$\(name)"

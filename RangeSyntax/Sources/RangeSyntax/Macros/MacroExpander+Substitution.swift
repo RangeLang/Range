@@ -399,6 +399,13 @@ extension MacroExpander {
         where name == targetBinding && arguments.isEmpty:
             _ = arguments
             return targetBlock
+        case .expression(.macroInvocation(let name, let arguments))
+        where isTargetBlockSpliceMacro(
+            name: name,
+            arguments: arguments,
+            targetBinding: targetBinding
+        ):
+            return targetBlock
         case .expression(let expression):
             return [
                 .expression(
@@ -616,11 +623,30 @@ extension MacroExpander {
             sequenceName == "\(targetBinding).declaration.statements"
                 || sequenceName == "\(targetBinding).statements",
             body.count == 1,
-            case .expression(.identifier(loopBinding)) = body[0]
+            case .expression(.call("__syntaxSplice", let arguments)) = body[0],
+            arguments.count == 1,
+            arguments[0].label == nil,
+            case .identifier(loopBinding) = arguments[0].value
         else {
             return false
         }
         return true
+    }
+
+    static func isTargetBlockSpliceMacro(
+        name: String,
+        arguments: [CallArgument],
+        targetBinding: String
+    ) -> Bool {
+        guard name == "block",
+            arguments.count == 1,
+            arguments[0].label == "statements",
+            case .identifier(let sequenceName) = arguments[0].value
+        else {
+            return false
+        }
+        return sequenceName == "\(targetBinding).declaration.statements"
+            || sequenceName == "\(targetBinding).statements"
     }
 
     static func substituteMacroTargetCalls(

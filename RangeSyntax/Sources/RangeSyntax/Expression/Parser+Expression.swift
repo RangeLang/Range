@@ -130,6 +130,15 @@ extension Parser {
                 name: name,
                 arguments: try parseInvocationArgumentsIfPresent()
             )
+        case .hash where peek(offset: 1) == .leftParen:
+            try consume(.hash)
+            try consume(.leftParen)
+            let expression = try parseExpression(terminatingAt: [.rightParen])
+            try consume(.rightParen)
+            return .call(
+                name: "__syntaxSplice",
+                arguments: [CallArgument(label: nil, value: expression)]
+            )
         case .identifier(let name), .keyword(let name):
             advance()
             if name == "true" {

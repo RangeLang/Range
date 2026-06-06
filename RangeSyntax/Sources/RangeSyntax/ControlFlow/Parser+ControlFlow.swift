@@ -267,6 +267,8 @@ extension Parser {
         case .identifier, .integer, .double, .stringLiteral, .leftBracket,
             .leftParen, .dollar, .dot, .bang:
             return true
+        case .hash where peek(offset: 1) == .leftParen:
+            return true
         default:
             return false
         }
