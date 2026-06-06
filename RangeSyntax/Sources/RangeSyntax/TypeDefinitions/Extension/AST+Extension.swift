@@ -15,7 +15,6 @@ public struct ExtensionDeclaration {
     public let constructs: [ConstructDeclaration]
     public let enumerations: [EnumDeclaration]
     public let enumCases: [EnumCaseDeclaration]
-    public let protocols: [ProtocolDeclaration]
 
     public init(
         macros: [MacroApplication],
@@ -26,8 +25,7 @@ public struct ExtensionDeclaration {
         callables: [CallableDeclaration],
         constructs: [ConstructDeclaration],
         enumerations: [EnumDeclaration],
-        enumCases: [EnumCaseDeclaration] = [],
-        protocols: [ProtocolDeclaration]
+        enumCases: [EnumCaseDeclaration] = []
     ) {
         self.macros = macros
         self.targetType = targetType
@@ -38,7 +36,6 @@ public struct ExtensionDeclaration {
         self.constructs = constructs
         self.enumerations = enumerations
         self.enumCases = enumCases
-        self.protocols = protocols
     }
 
     public var usesSpecializedTarget: Bool {

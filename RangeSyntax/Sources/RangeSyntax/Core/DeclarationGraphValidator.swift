@@ -758,7 +758,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         usages += declaration.callables.flatMap(attachedMacroUsages(in:))
         usages += declaration.constructs.flatMap(attachedMacroUsages(in:))
         usages += declaration.enumerations.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-        usages += declaration.protocols.flatMap(attachedMacroUsages(in:))
         return usages
     }
 
@@ -895,10 +894,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             + declaration.constructs.flatMap { $0.callables }
     }
 
-    private func protocols(in declaration: ExtensionDeclaration) -> [ProtocolDeclaration] {
-        declaration.protocols
-    }
-
     private func enumerations(in declaration: ExtensionDeclaration) -> [EnumDeclaration] {
         declaration.enumerations
     }
@@ -943,10 +938,8 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         case .protocolDefinition(let declaration):
             return [declaration]
         case .module(let module):
-            return module.protocols + module.extensions.flatMap { protocols(in: $0) }
-        case .extensions(let declarations):
-            return declarations.flatMap { protocols(in: $0) }
-        case .construct, .mainBlock, .enumeration, .macro:
+            return module.protocols
+        case .construct, .mainBlock, .enumeration, .macro, .extensions:
             return []
         }
     }

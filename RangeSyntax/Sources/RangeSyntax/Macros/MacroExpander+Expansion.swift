@@ -4,7 +4,6 @@ extension MacroExpander {
         var callables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
-        var protocols: [ProtocolDeclaration] = []
         var macros: [MacroDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
 
@@ -13,7 +12,6 @@ extension MacroExpander {
                 && callables.isEmpty
                 && constructs.isEmpty
                 && enumerations.isEmpty
-                && protocols.isEmpty
                 && macros.isEmpty
                 && extensions.isEmpty
         }
@@ -23,7 +21,6 @@ extension MacroExpander {
             callables.append(contentsOf: other.callables)
             constructs.append(contentsOf: other.constructs)
             enumerations.append(contentsOf: other.enumerations)
-            protocols.append(contentsOf: other.protocols)
             macros.append(contentsOf: other.macros)
             extensions.append(contentsOf: other.extensions)
         }
@@ -118,7 +115,7 @@ extension MacroExpander {
                     } + emittedDeclarationBundles.flatMap(\.callables),
                     constructs: expandedConstructs + emittedDeclarationBundles.flatMap(\.constructs),
                     enumerations: module.enumerations + emittedDeclarationBundles.flatMap(\.enumerations),
-                    protocols: module.protocols + emittedDeclarationBundles.flatMap(\.protocols),
+                    protocols: module.protocols,
                     macros: module.macros + emittedDeclarationBundles.flatMap(\.macros),
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
@@ -144,7 +141,6 @@ extension MacroExpander {
                     || !emittedBundle.callables.isEmpty
                     || !emittedBundle.constructs.isEmpty
                     || !emittedBundle.enumerations.isEmpty
-                    || !emittedBundle.protocols.isEmpty
                     || !emittedBundle.macros.isEmpty
                     || !emittedBundle.extensions.isEmpty
             else {
@@ -157,7 +153,7 @@ extension MacroExpander {
                     callables: emittedBundle.callables,
                     constructs: [expandedConstruct] + emittedBundle.constructs,
                     enumerations: emittedBundle.enumerations,
-                    protocols: emittedBundle.protocols,
+                    protocols: [],
                     macros: emittedBundle.macros,
                     precedenceGroups: [],
                     operators: [],
@@ -180,7 +176,7 @@ extension MacroExpander {
                     callables: emittedBundle.callables,
                     constructs: emittedBundle.constructs,
                     enumerations: [declaration] + emittedBundle.enumerations,
-                    protocols: emittedBundle.protocols,
+                    protocols: [],
                     macros: emittedBundle.macros,
                     precedenceGroups: [],
                     operators: [],
@@ -1835,7 +1831,6 @@ extension MacroExpander {
             guard
                 nestedEmitted.states.isEmpty
                     && nestedEmitted.enumerations.isEmpty
-                    && nestedEmitted.protocols.isEmpty
                     && nestedEmitted.extensions.isEmpty
             else {
                 throw ParseError(
@@ -3391,12 +3386,14 @@ extension MacroExpander {
         case .extensions(let declarations):
             return EmittedDeclarationBundle(extensions: declarations)
         case .module(let module):
+            guard module.protocols.isEmpty else {
+                throw ParseError("Macros cannot emit protocol declarations.")
+            }
             return EmittedDeclarationBundle(
                 states: module.states,
                 callables: module.callables,
                 constructs: module.constructs,
                 enumerations: module.enumerations,
-                protocols: module.protocols,
                 macros: module.macros,
                 extensions: module.extensions
             )

@@ -16,7 +16,6 @@ extension Parser {
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var enumCases: [EnumCaseDeclaration] = []
-        var protocols: [ProtocolDeclaration] = []
         if peek() == .leftBrace {
             try consume(.leftBrace)
             let outerSelfAvailable = currentSelfAvailable
@@ -29,7 +28,6 @@ extension Parser {
                 || isBuilderDeclarationStart()
                 || isEnumDeclarationStart()
                 || isCaseDeclarationStart()
-                || isProtocolDeclarationStart()
             {
                 if isCallableStart() {
                     callables.append(try parseCallableDeclaration())
@@ -51,7 +49,6 @@ extension Parser {
                     enumCases.append(contentsOf: try parseEnumCaseLine())
                     continue
                 }
-                protocols.append(try parseProtocolDeclaration(requiresEOF: false))
             }
             currentSelfAvailable = outerSelfAvailable
             currentSelfType = outerSelfType
@@ -67,8 +64,7 @@ extension Parser {
             callables: callables,
             constructs: constructs,
             enumerations: enumerations,
-            enumCases: enumCases,
-            protocols: protocols
+            enumCases: enumCases
         )
     }
 
@@ -82,7 +78,6 @@ extension Parser {
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var enumCases: [EnumCaseDeclaration] = []
-        var protocols: [ProtocolDeclaration] = []
         if peek() == .leftBrace {
             try consume(.leftBrace)
             while peek() != .rightBrace {
@@ -106,10 +101,6 @@ extension Parser {
                     enumCases.append(contentsOf: try parseEnumCaseLine())
                     continue
                 }
-                if isProtocolDeclarationStart() {
-                    protocols.append(try parseProtocolDeclaration(requiresEOF: false))
-                    continue
-                }
                 advance()
             }
             try consume(.rightBrace)
@@ -123,8 +114,7 @@ extension Parser {
             callables: callables,
             constructs: constructs,
             enumerations: enumerations,
-            enumCases: enumCases,
-            protocols: protocols
+            enumCases: enumCases
         )
     }
 

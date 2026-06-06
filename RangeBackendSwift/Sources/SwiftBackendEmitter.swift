@@ -1919,7 +1919,6 @@ struct SwiftBackendEmitter {
         let extensionHeader = emitExtensionHeader(declaration)
         let nestedEnumerations = try declaration.enumerations.map(emitEnum).joined(separator: "\n\n")
         let nestedConstructs = try declaration.constructs.map(emitConstruct).joined(separator: "\n\n")
-        let nestedProtocols = try declaration.protocols.map(emitProtocol).joined(separator: "\n\n")
         let genericParameterNames = extensionGenericParameterNames(in: declaration)
         let initializers = try declaration.initializers.map {
             try emitInitializer(
@@ -1937,7 +1936,6 @@ struct SwiftBackendEmitter {
         }.joined(separator: "\n\n")
 
         let memberSections = [
-            nestedProtocols,
             nestedEnumerations,
             nestedConstructs,
             initializers,

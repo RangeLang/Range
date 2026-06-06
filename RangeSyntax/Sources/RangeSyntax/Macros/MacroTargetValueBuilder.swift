@@ -50,9 +50,6 @@ struct MacroTargetValueBuilder {
     func targetValue(for extensionDeclaration: ExtensionDeclaration) -> CompileTimeValue {
         let target = typeReferenceValue(extensionDeclaration.targetType)
         let declaration = value(for: extensionDeclaration)
-        let protocols = extensionDeclaration.protocols.map {
-            graphIdentity(kind: "protocol", name: $0.name)
-        }
         let initializers = extensionDeclaration.initializers.map { value(for: $0) }
         let functions = extensionDeclaration.callables.map { value(for: $0) }
         let constructs = extensionDeclaration.constructs.map {
@@ -72,7 +69,6 @@ struct MacroTargetValueBuilder {
                 "written": writtenSyntaxByID["extension:\(extensionDeclaration.targetType.displayName)"] ?? writtenSyntax(""),
                 "target": target,
                 "declaration": declaration,
-                "protocols": .array(protocols),
                 "inits": .array(initializers),
                 "functions": .array(functions),
                 "constructs": .array(constructs),
@@ -84,9 +80,6 @@ struct MacroTargetValueBuilder {
     func value(for declaration: ExtensionDeclaration) -> CompileTimeValue {
         let target = typeReferenceValue(declaration.targetType)
         let conformances = declaration.conformances.map(typeReferenceValue)
-        let protocols = declaration.protocols.map {
-            graphIdentity(kind: "protocol", name: $0.name)
-        }
         let initializers = declaration.initializers.map { value(for: $0) }
         let functions = declaration.callables.map { value(for: $0) }
         let constructs = declaration.constructs.map {
@@ -105,7 +98,6 @@ struct MacroTargetValueBuilder {
                 ),
                 "target": target,
                 "conformances": .array(conformances),
-                "protocols": .array(protocols),
                 "inits": .array(initializers),
                 "functions": .array(functions),
                 "constructs": .array(constructs),
