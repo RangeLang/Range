@@ -1831,6 +1831,52 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(compoundAssignmentName == "Math.clamp")
     }
 
+    @Test("Background macro rewrites block to thread spawn")
+    func backgroundMacroRewritesBlockToThreadSpawn() throws {
+        let projectPath = "/tmp/BackgroundMacroRewrite.range"
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: projectPath,
+                source: """
+                @main {
+                    @background {
+                        Thread.yield()
+                    }
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let expandedFile = try #require(
+            program.projectExpandedFiles.first(where: { $0.path == projectPath })
+        )
+        guard case .mainBlock(let mainBlock) = expandedFile.sourceFile else {
+            Issue.record("Expected expanded project file to contain a main block.")
+            return
+        }
+
+        guard case .expression(.call(let name, let arguments))? = mainBlock.body.first else {
+            Issue.record("Expected @background to rewrite to a Thread.spawn expression statement.")
+            return
+        }
+
+        #expect(name == "Thread.spawn")
+        guard case .block(let body)? = arguments.first?.value else {
+            Issue.record("Expected Thread.spawn to receive the background block as its closure body.")
+            return
+        }
+
+        guard case .expression(.call(let bodyCallName, _))? = body.first else {
+            Issue.record("Expected background body to be preserved inside Thread.spawn.")
+            return
+        }
+
+        #expect(bodyCallName == "Thread.yield")
+    }
+
     @Test("State getter macro rewrites reads in expressions")
     func stateGetterMacroRewritesReadsInExpressions() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "Macros/GetterState.range")

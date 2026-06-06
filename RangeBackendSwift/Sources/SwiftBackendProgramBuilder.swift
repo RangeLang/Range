@@ -347,6 +347,8 @@ struct SwiftBackendProgramBuilder {
                         && isCorePath(parsedFile.path, containing: "Macro/SyntaxEmittable.range"))
                     || isCorePath(parsedFile.path, containing: "Syntax/Program/")
                     || isCorePath(parsedFile.path, containing: "System/File/")
+                    || isCorePath(parsedFile.path, containing: "System/Memory/")
+                    || isCorePath(parsedFile.path, containing: "System/Thread/")
             else {
                 return nil
             }
@@ -459,13 +461,24 @@ struct SwiftBackendProgramBuilder {
         _ declaration: ConstructDeclaration,
         in path: String
     ) -> Bool {
-        guard isCorePath(path, containing: "System/File/") else {
-            return true
+        if isCorePath(path, containing: "System/File/") {
+            return declaration.name != "HostFileSystem"
+                && declaration.name != "FileManager"
+                && declaration.name != "UTF8"
         }
 
-        return declaration.name != "HostFileSystem"
-            && declaration.name != "FileManager"
-            && declaration.name != "UTF8"
+        if isCorePath(path, containing: "System/Memory/") {
+            return declaration.name != "POSIXMemory"
+                && declaration.name != "Memory"
+                && declaration.name != "CPU"
+        }
+
+        if isCorePath(path, containing: "System/Thread/") {
+            return declaration.name != "POSIXThread"
+                && declaration.name != "Thread"
+        }
+
+        return true
     }
 
     private func isCorePath(_ path: String, containing suffix: String) -> Bool {

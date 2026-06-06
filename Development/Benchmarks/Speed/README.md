@@ -8,9 +8,11 @@ npm run speed
 
 The task builds and runs equivalent compatible programs in C, Rust, Swift,
 Python, and Range. It currently covers integer loops, strings, collections,
-construct initialization, and generic calls. It reports median runtime for
-the executable/program only; compiler and setup time are shown separately and are
-not included in the median.
+construct initialization, and generic calls. It reports median wall-clock
+runtime, child CPU time, CPU utilization, and peak resident memory for the
+executable/program only; compiler and setup time are shown separately and are not
+included in the medians. Runtime, CPU time, and memory are also printed relative
+to C per benchmark case.
 
 JSON encoding and real `@background` concurrency are intentionally not included
 yet because those generated paths are not Embedded Swift-compatible today.

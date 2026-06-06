@@ -1,0 +1,28 @@
+@language
+enum ThreadError {
+    case invalid
+    case unavailable
+}
+
+@language
+construct ThreadHandle {
+    let raw: Int
+}
+
+construct POSIXThread {
+    function spawn(_ body: () -> Void): Result<ThreadHandle, ThreadError>
+    function join(_ handle: ThreadHandle): Result<Void, ThreadError>
+    function detach(_ handle: ThreadHandle): Result<Void, ThreadError>
+    function current(): ThreadHandle
+    function yield()
+    function sleep(milliseconds: Int)
+}
+
+construct Thread {
+    function spawn(_ body: () -> Void): Result<ThreadHandle, ThreadError>
+    function join(_ handle: ThreadHandle): Result<Void, ThreadError>
+    function detach(_ handle: ThreadHandle): Result<Void, ThreadError>
+    function current(): ThreadHandle
+    function yield()
+    function sleep(milliseconds: Int)
+}

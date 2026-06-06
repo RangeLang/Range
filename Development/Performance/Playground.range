@@ -8,7 +8,7 @@ function performanceReportGeneratedAt(): String {
 
 function styleSheet(): String {
     return "<style>\n" +
-        ":root{--bg:@fbfbfc;--ink:#15181f;--muted:#8a92a0;--line:@d7dce4;--range:#21a66f;--other:#555d6a;--missing:@b7bec8;}\n" +
+        ":root{--bg:@fbfbfc;--ink:#15181f;--muted:#8a92a0;--line:@d7dce4;--range:#21a66f;--other:#555d6a;--cpu:#3978c9;--memory:#9b6a21;--missing:@b7bec8;}\n" +
         "*{box-sizing:border-box;}\n" +
         "body{margin:0;background:var(--bg);color:var(--ink);font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}\n" +
         "main{min-height:100vh;display:grid;place-items:center;padding:30px;}\n" +
@@ -27,7 +27,20 @@ function styleSheet(): String {
         ".skip{fill:none;stroke:var(--missing);stroke-width:3.5;stroke-dasharray:6 6;}\n" +
         ".pill{stroke:@fff;stroke-width:3;rx:13;ry:13;}\n" +
         ".pill-text{fill:@fff;font-size:14px;font-weight:800;}\n" +
+        ".metric-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;}\n" +
+        ".metric-card{border:1px solid var(--line);border-radius:8px;padding:18px;background:@fff;display:grid;gap:14px;}\n" +
+        ".metric-card h2{margin:0;font-size:22px;font-weight:800;letter-spacing:0;}\n" +
+        ".metric-card p{margin:0;color:var(--muted);font-size:14px;font-weight:700;}\n" +
+        ".metric-rows{display:grid;gap:10px;}\n" +
+        ".metric-row{display:grid;grid-template-columns:70px 1fr 58px;align-items:center;gap:10px;font-size:14px;font-weight:800;}\n" +
+        ".metric-track{display:block;height:12px;border-radius:999px;background:@eef1f5;overflow:hidden;}\n" +
+        ".metric-fill{display:block;height:100%;border-radius:999px;background:var(--other);}\n" +
+        ".metric-fill.range{background:var(--range);}\n" +
+        ".metric-fill.cpu{background:var(--cpu);}\n" +
+        ".metric-fill.memory{background:var(--memory);}\n" +
+        ".metric-value{color:var(--muted);text-align:right;}\n" +
         "@media(max-width:760px){main{place-items:start;padding:20px;}h1{font-size:36px;}}\n" +
+        "@media(max-width:860px){.metric-grid{grid-template-columns:1fr;}}\n" +
         "</style>\n"
 }
 
@@ -54,6 +67,45 @@ function point(color color: String, x x: Int, y y: Int, radius radius: Int): Str
 function pill(text text: String, x x: Int, y y: Int, width width: Int, color color: String): String {
     return "<rect class='pill' x='\(x)' y='\(y)' width='\(width)' height='26' fill='\(color)'></rect>\n" +
         "<text class='pill-text' x='\(x + 13)' y='\(y + 18)'>\(text)</text>\n"
+}
+
+function metricRow(name name: String, value value: String, width width: Int, className className: String): String {
+    return "<div class='metric-row'>\n" +
+        "<span>\(name)</span>\n" +
+        "<span class='metric-track'><span class='metric-fill \(className)' style='width:\(width)%'></span></span>\n" +
+        "<span class='metric-value'>\(value)</span>\n" +
+        "</div>\n"
+}
+
+function metricCard(title title: String, subtitle subtitle: String, kind kind: String): String {
+    state output: ""
+    output += "<article class='metric-card'>\n"
+    output += "<h2>\(title)</h2>\n"
+    output += "<p>\(subtitle)</p>\n"
+    output += "<div class='metric-rows'>\n"
+
+    if kind == "cpu" {
+        output += metricRow(name: "C", value: "1.00x", width: 67, className: "cpu")
+        output += metricRow(name: "Rust", value: "1.03x", width: 69, className: "cpu")
+        output += metricRow(name: "Swift", value: "1.23x", width: 82, className: "cpu")
+        output += metricRow(name: "Range", value: "1.34x", width: 90, className: "range")
+    } else {
+        output += metricRow(name: "C", value: "1.00x", width: 67, className: "memory")
+        output += metricRow(name: "Rust", value: "1.15x", width: 77, className: "memory")
+        output += metricRow(name: "Swift", value: "1.35x", width: 90, className: "memory")
+        output += metricRow(name: "Range", value: "1.42x", width: 95, className: "range")
+    }
+
+    output += "</div>\n"
+    output += "</article>\n"
+    return output
+}
+
+function metricComparisonPanels(): String {
+    return "<section class='metric-grid' aria-label='CPU and memory usage comparison'>\n" +
+        metricCard(title: "CPU Usage", subtitle: "Median child CPU time relative to C. Lower is better.", kind: "cpu") +
+        metricCard(title: "Memory Usage", subtitle: "Median peak resident memory relative to C. Lower is better.", kind: "memory") +
+        "</section>\n"
 }
 
 function chartSvg(): String {
@@ -121,6 +173,7 @@ function renderPerformanceComparisonHTML(): String {
         "<p class='subtitle'>Range vs C, Rust and Swift</p>\n" +
         "</header>\n" +
         chartSvg() +
+        metricComparisonPanels() +
         "</section>\n" +
         "</main>\n" +
         "</body>\n" +

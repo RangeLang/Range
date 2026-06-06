@@ -397,7 +397,18 @@ extension MacroExpander {
         switch statement {
         case .expression(.call(let name, let arguments))
         where name == targetBinding && arguments.isEmpty:
+            _ = arguments
             return targetBlock
+        case .expression(let expression):
+            return [
+                .expression(
+                    substituteMacroTargetCalls(
+                        in: expression,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    )
+                )
+            ]
         case .derived(let name, let typeName, let body):
             return [
                 .derived(
@@ -515,6 +526,127 @@ extension MacroExpander {
             ]
         default:
             return [statement]
+        }
+    }
+
+    static func substituteMacroTargetCalls(
+        in expression: Expression,
+        targetBinding: String,
+        targetBlock: [Statement]
+    ) -> Expression {
+        switch expression {
+        case .call(let name, let arguments):
+            return .call(
+                name: name,
+                arguments: arguments.map { argument in
+                    CallArgument(
+                        label: argument.label,
+                        value: substituteMacroTargetCalls(
+                            in: argument.value,
+                            targetBinding: targetBinding,
+                            targetBlock: targetBlock
+                        )
+                    )
+                }
+            )
+        case .block(let body):
+            return .block(
+                substituteMacroTargetCalls(
+                    in: body,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                )
+            )
+        case .array(let elements):
+            return .array(
+                elements.map {
+                    substituteMacroTargetCalls(
+                        in: $0,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    )
+                }
+            )
+        case .dictionary(let elements):
+            return .dictionary(
+                elements.map { element in
+                    DictionaryElement(
+                        key: substituteMacroTargetCalls(
+                            in: element.key,
+                            targetBinding: targetBinding,
+                            targetBlock: targetBlock
+                        ),
+                        value: substituteMacroTargetCalls(
+                            in: element.value,
+                            targetBinding: targetBinding,
+                            targetBlock: targetBlock
+                        )
+                    )
+                }
+            )
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return .ternary(
+                condition: substituteMacroTargetCalls(
+                    in: condition,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                ),
+                trueExpression: substituteMacroTargetCalls(
+                    in: trueExpression,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                ),
+                falseExpression: substituteMacroTargetCalls(
+                    in: falseExpression,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                )
+            )
+        case .unary(let operatorSymbol, let nested):
+            return .unary(
+                operatorSymbol: operatorSymbol,
+                expression: substituteMacroTargetCalls(
+                    in: nested,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                )
+            )
+        case .binary(let lhs, let operatorSymbol, let rhs):
+            return .binary(
+                lhs: substituteMacroTargetCalls(
+                    in: lhs,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                ),
+                operatorSymbol: operatorSymbol,
+                rhs: substituteMacroTargetCalls(
+                    in: rhs,
+                    targetBinding: targetBinding,
+                    targetBlock: targetBlock
+                )
+            )
+        case .interpolatedString(let string):
+            return .interpolatedString(
+                InterpolatedString(
+                    segments: string.segments.map { segment in
+                        switch segment {
+                        case .text:
+                            return segment
+                        case .expression(let nested):
+                            return .expression(
+                                substituteMacroTargetCalls(
+                                    in: nested,
+                                    targetBinding: targetBinding,
+                                    targetBlock: targetBlock
+                                )
+                            )
+                        }
+                    }
+                )
+            )
+        case .integer, .double, .string, .boolean, .nilLiteral, .macroInvocation, .identifier,
+            .bindingReference:
+            return expression
         }
     }
 }

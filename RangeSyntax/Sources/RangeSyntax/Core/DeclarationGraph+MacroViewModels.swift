@@ -1224,7 +1224,7 @@ extension RewriteSurfaceView {
         let directPath = "\(targetBinding).replace"
         if normalizedPath == directPath {
             switch targetKind {
-            case .expression:
+            case .expression, .block:
                 return .targetDirect
             default:
                 return nil

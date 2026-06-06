@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "speed": "python3 Benchmarks/Speed/run.py"
+    "speed": "python3 Development/Benchmarks/Speed/run.py"
   }
 }

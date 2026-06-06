@@ -247,12 +247,10 @@ extension MacroExpander {
         applications: [MacroApplication],
         declarationName: String,
         macros: [String: MacroDeclaration],
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        targetValue: CompileTimeValue? = nil
     ) throws {
-        let targetValue = CompileTimeValue.object(
-            typeName: "Block",
-            fields: ["statements": .array([])]
-        )
+        let targetValue = targetValue ?? blockMacroTargetValue([])
         for application in applications {
             guard let macro = macros[application.name] else {
                 throw ParseError("Unknown attached macro @\(application.name).")
@@ -269,6 +267,18 @@ extension MacroExpander {
                 context: context
             )
         }
+    }
+
+    static func blockMacroTargetValue(_ statements: [Statement]) -> CompileTimeValue {
+        .object(
+            typeName: "Block",
+            fields: [
+                "statements": .array(statements.map { statement in
+                    _ = statement
+                    return .string("")
+                })
+            ]
+        )
     }
 
     static func expand(
@@ -1047,26 +1057,44 @@ extension MacroExpander {
             _ = body
             throw ParseError("Block macros like #\(name) { ... } are no longer supported.")
         case .background(let background):
+            let expandedBody = try expand(
+                statements: background.body,
+                expectedReturnType: nil,
+                macros: macros,
+                protocols: protocols,
+                parameterMacroSignatures: parameterMacroSignatures,
+                literalBridges: literalBridges,
+                context: context,
+                stateEffects: stateEffects
+            )
             try emitBlockMacroDiagnostics(
                 applications: background.macros,
                 declarationName: "@background",
                 macros: macros,
-                context: context
+                context: context,
+                targetValue: blockMacroTargetValue(expandedBody)
             )
-            return [
-                .background(
-                    Background(macros: background.macros, body: try expand(
-                        statements: background.body,
-                        expectedReturnType: nil,
-                        macros: macros,
-                        protocols: protocols,
-                        parameterMacroSignatures: parameterMacroSignatures,
-                        literalBridges: literalBridges,
-                        context: context,
-                        stateEffects: stateEffects
-                    ))
-                )
-            ]
+            guard let application = background.macros.first,
+                let macro = macros[application.name],
+                let bindings = macro.bindings
+            else {
+                throw ParseError("Unknown attached macro @background.")
+            }
+            let rewritten = substituteMacroTargetCalls(
+                in: try rewriteBody(for: macro, context: context),
+                targetBinding: bindings.target,
+                targetBlock: expandedBody
+            )
+            return try expand(
+                statements: rewritten,
+                expectedReturnType: nil,
+                macros: macros,
+                protocols: protocols,
+                parameterMacroSignatures: parameterMacroSignatures,
+                literalBridges: literalBridges,
+                context: context,
+                stateEffects: stateEffects
+            )
         case .deferBlock(let deferred):
             return [
                 .deferBlock(

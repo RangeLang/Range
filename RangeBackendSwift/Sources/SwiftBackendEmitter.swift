@@ -446,7 +446,7 @@ struct SwiftBackendEmitter {
 
     private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
         let support = """
-            // Backend implementation for RangeCore's Promise, Result, ChannelStorage, and Logger surface.
+            // Backend implementation for RangeCore's Promise, Result, memory, threads, ChannelStorage, and Logger surface.
             // RangeCore declares the language-visible API; Swift runtime support lives here.
             enum Range_Promise<Success, Failure> {
                 case loading
@@ -457,6 +457,233 @@ struct SwiftBackendEmitter {
             enum Range_Result<Success, Failure> {
                 case success(result: Success)
                 case failure(cause: Failure)
+            }
+
+            enum Range_POSIXMemory {
+                static func allocate(byteCount: Int, alignment: Int) -> Range_Result<Range_MemoryRegion, Range_MemoryAccessError> {
+                    guard byteCount >= 0 && alignment > 0 else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    let minimumAlignment = MemoryLayout<UnsafeRawPointer>.alignment
+                    let normalizedAlignment = max(alignment, minimumAlignment)
+                    guard normalizedAlignment > 0 && normalizedAlignment & (normalizedAlignment - 1) == 0 else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    var rawPointer: UnsafeMutableRawPointer?
+                    let status = posix_memalign(&rawPointer, normalizedAlignment, byteCount)
+                    guard status == 0, let allocated = rawPointer else {
+                        return .failure(cause: .outOfMemory)
+                    }
+
+                    return .success(
+                        result: Range_MemoryRegion(
+                            address: Range_MemoryAddress(raw: Int(bitPattern: allocated)),
+                            byteCount: byteCount,
+                            alignment: normalizedAlignment
+                        )
+                    )
+                }
+
+                static func deallocate(region: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
+                    guard region.address.raw != 0 else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    free(UnsafeMutableRawPointer(bitPattern: region.address.raw))
+                    return .success(result: Void())
+                }
+
+                static func zero(region: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
+                    return fill(region: region, byte: 0)
+                }
+
+                static func fill(region: Range_MemoryRegion, byte: UInt8) -> Range_Result<Void, Range_MemoryAccessError> {
+                    guard let pointer = UnsafeMutableRawPointer(bitPattern: region.address.raw), region.byteCount >= 0 else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    memset(pointer, Int32(byte), region.byteCount)
+                    return .success(result: Void())
+                }
+
+                static func copy(source: Range_MemoryRegion, destination: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
+                    guard let sourcePointer = UnsafeRawPointer(bitPattern: source.address.raw),
+                          let destinationPointer = UnsafeMutableRawPointer(bitPattern: destination.address.raw),
+                          source.byteCount >= 0,
+                          destination.byteCount >= source.byteCount
+                    else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    memcpy(destinationPointer, sourcePointer, source.byteCount)
+                    return .success(result: Void())
+                }
+
+                static func readByte(address: Range_MemoryAddress) -> Range_Result<UInt8, Range_MemoryAccessError> {
+                    guard let pointer = UnsafeRawPointer(bitPattern: address.raw) else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    return .success(result: pointer.load(as: UInt8.self))
+                }
+
+                static func writeByte(address: Range_MemoryAddress, byte: UInt8) -> Range_Result<Void, Range_MemoryAccessError> {
+                    guard let pointer = UnsafeMutableRawPointer(bitPattern: address.raw) else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    pointer.storeBytes(of: byte, as: UInt8.self)
+                    return .success(result: Void())
+                }
+
+                static func pageSize() -> Int {
+                    Int(sysconf(_SC_PAGESIZE))
+                }
+            }
+
+            enum Range_Memory {
+                static func allocate(byteCount: Int, alignment: Int) -> Range_Result<Range_MemoryRegion, Range_MemoryAccessError> {
+                    return Range_POSIXMemory.allocate(byteCount: byteCount, alignment: alignment)
+                }
+
+                static func deallocate(region: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
+                    return Range_POSIXMemory.deallocate(region: region)
+                }
+
+                static func zero(region: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
+                    return Range_POSIXMemory.zero(region: region)
+                }
+
+                static func fill(region: Range_MemoryRegion, byte: UInt8) -> Range_Result<Void, Range_MemoryAccessError> {
+                    return Range_POSIXMemory.fill(region: region, byte: byte)
+                }
+
+                static func copy(source: Range_MemoryRegion, destination: Range_MemoryRegion) -> Range_Result<Void, Range_MemoryAccessError> {
+                    return Range_POSIXMemory.copy(source: source, destination: destination)
+                }
+
+                static func readByte(address: Range_MemoryAddress) -> Range_Result<UInt8, Range_MemoryAccessError> {
+                    return Range_POSIXMemory.readByte(address: address)
+                }
+
+                static func writeByte(address: Range_MemoryAddress, byte: UInt8) -> Range_Result<Void, Range_MemoryAccessError> {
+                    return Range_POSIXMemory.writeByte(address: address, byte: byte)
+                }
+
+                static func pageSize() -> Int {
+                    return Range_POSIXMemory.pageSize()
+                }
+            }
+
+            enum Range_CPU {
+                static func logicalCoreCount() -> Int {
+                    Int(sysconf(_SC_NPROCESSORS_ONLN))
+                }
+
+                static func cacheLineSize() -> Int {
+                    #if os(macOS)
+                    var value = 0
+                    var size = MemoryLayout<Int>.size
+                    if sysctlbyname("hw.cachelinesize", &value, &size, nil, 0) == 0 {
+                        return value
+                    }
+                    #endif
+                    return 64
+                }
+            }
+
+            final class Range_ThreadStart {
+                let body: () -> Void
+
+                init(body: @escaping () -> Void) {
+                    self.body = body
+                }
+            }
+
+            enum Range_POSIXThread {
+                static func spawn(_ body: @escaping () -> Void) -> Range_Result<Range_ThreadHandle, Range_ThreadError> {
+                    var thread: pthread_t?
+                    let context = Unmanaged.passRetained(Range_ThreadStart(body: body)).toOpaque()
+                    let status = pthread_create(&thread, nil, { rawContext in
+                        let start = Unmanaged<Range_ThreadStart>
+                            .fromOpaque(rawContext)
+                            .takeRetainedValue()
+                        start.body()
+                        return nil
+                    }, context)
+
+                    guard status == 0, let thread else {
+                        Unmanaged<Range_ThreadStart>.fromOpaque(context).release()
+                        return .failure(cause: .unavailable)
+                    }
+
+                    return .success(result: Range_ThreadHandle(raw: Int(bitPattern: thread)))
+                }
+
+                static func join(_ handle: Range_ThreadHandle) -> Range_Result<Void, Range_ThreadError> {
+                    guard let thread = pthread_t(bitPattern: handle.raw) else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    return pthread_join(thread, nil) == 0
+                        ? .success(result: Void())
+                        : .failure(cause: .invalid)
+                }
+
+                static func detach(_ handle: Range_ThreadHandle) -> Range_Result<Void, Range_ThreadError> {
+                    guard let thread = pthread_t(bitPattern: handle.raw) else {
+                        return .failure(cause: .invalid)
+                    }
+
+                    return pthread_detach(thread) == 0
+                        ? .success(result: Void())
+                        : .failure(cause: .invalid)
+                }
+
+                static func current() -> Range_ThreadHandle {
+                    Range_ThreadHandle(raw: Int(bitPattern: pthread_self()))
+                }
+
+                static func yield() {
+                    sched_yield()
+                }
+
+                static func sleep(milliseconds: Int) {
+                    guard milliseconds > 0 else {
+                        return
+                    }
+
+                    let clamped = min(milliseconds, Int(UInt32.max / 1000))
+                    usleep(useconds_t(clamped * 1000))
+                }
+            }
+
+            enum Range_Thread {
+                static func spawn(_ body: @escaping () -> Void) -> Range_Result<Range_ThreadHandle, Range_ThreadError> {
+                    return Range_POSIXThread.spawn(body)
+                }
+
+                static func join(_ handle: Range_ThreadHandle) -> Range_Result<Void, Range_ThreadError> {
+                    return Range_POSIXThread.join(handle)
+                }
+
+                static func detach(_ handle: Range_ThreadHandle) -> Range_Result<Void, Range_ThreadError> {
+                    return Range_POSIXThread.detach(handle)
+                }
+
+                static func current() -> Range_ThreadHandle {
+                    return Range_POSIXThread.current()
+                }
+
+                static func yield() {
+                    Range_POSIXThread.yield()
+                }
+
+                static func sleep(milliseconds: Int) {
+                    Range_POSIXThread.sleep(milliseconds: milliseconds)
+                }
             }
 
             enum Range_POSIXFileSystem {
@@ -2931,7 +3158,7 @@ struct SwiftBackendEmitter {
                 scope: scope
             )
             return """
-                \(prefix)Task.detached {
+                \(prefix)_ = Range_POSIXThread.spawn {
                 \(bodyText)
                 \(prefix)}
                 """
@@ -3149,6 +3376,13 @@ struct SwiftBackendEmitter {
         case .call(let name, let arguments):
             if let closure = try emitCoreClosureCall(name: name, arguments: arguments, scope: scope) {
                 return closure
+            }
+            if let lowered = try emitKnownSystemCall(
+                name: name,
+                arguments: arguments,
+                scope: scope
+            ) {
+                return lowered
             }
             if let lowered = try emitKnownCollectionCall(
                 name: name,
@@ -3406,6 +3640,36 @@ struct SwiftBackendEmitter {
         return try arguments.map { try emitCallArgument($0, scope: scope) }.joined(separator: ", ")
     }
 
+    private func emitKnownSystemCall(
+        name: String,
+        arguments: [CallArgument],
+        scope: EmissionScope = .empty
+    ) throws -> String? {
+        let directPOSIXTargets: [String: String] = [
+            "Memory.allocate": "Range_POSIXMemory.allocate",
+            "Memory.deallocate": "Range_POSIXMemory.deallocate",
+            "Memory.zero": "Range_POSIXMemory.zero",
+            "Memory.fill": "Range_POSIXMemory.fill",
+            "Memory.copy": "Range_POSIXMemory.copy",
+            "Memory.readByte": "Range_POSIXMemory.readByte",
+            "Memory.writeByte": "Range_POSIXMemory.writeByte",
+            "Memory.pageSize": "Range_POSIXMemory.pageSize",
+            "Thread.spawn": "Range_POSIXThread.spawn",
+            "Thread.join": "Range_POSIXThread.join",
+            "Thread.detach": "Range_POSIXThread.detach",
+            "Thread.current": "Range_POSIXThread.current",
+            "Thread.yield": "Range_POSIXThread.yield",
+            "Thread.sleep": "Range_POSIXThread.sleep",
+        ]
+
+        guard let target = directPOSIXTargets[name] else {
+            return nil
+        }
+
+        let rendered = try emitCallArguments(arguments, for: name, scope: scope)
+        return "\(target)(\(rendered))"
+    }
+
     private func emitKnownCollectionCall(
         name: String,
         arguments: [CallArgument],
@@ -3600,7 +3864,7 @@ struct SwiftBackendEmitter {
                 enclosingReturnType: enclosingReturnType
             )
             return """
-                \(prefix)Task.detached {
+                \(prefix)_ = Range_POSIXThread.spawn {
                 \(bodyText)
                 \(prefix)}
                 """

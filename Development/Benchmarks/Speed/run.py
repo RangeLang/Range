@@ -7,14 +7,15 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import textwrap
 import time
 from dataclasses import dataclass
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[2]
-BENCH = ROOT / "Benchmarks" / "Speed"
+ROOT = Path(__file__).resolve().parents[3]
+BENCH = ROOT / "Development" / "Benchmarks" / "Speed"
 BUILD = BENCH / ".build"
 ITERATIONS = int(os.environ.get("N", "1000000"))
 RUNS = int(os.environ.get("RUNS", "5"))
@@ -38,6 +39,14 @@ class BenchTarget:
     command: list[str]
 
 
+@dataclass(frozen=True)
+class Measurement:
+    wall_seconds: float
+    cpu_seconds: float
+    peak_rss_kb: int
+    output: str
+
+
 def run_command(
     command: list[str],
     cwd: Path = ROOT,
@@ -55,6 +64,52 @@ def run_command(
         stderr=subprocess.PIPE,
         check=True,
     )
+
+
+def measured_command(command: list[str], cwd: Path = ROOT) -> Measurement:
+    started = time.perf_counter()
+
+    with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stdout_file:
+        with tempfile.TemporaryFile(mode="w+t", encoding="utf-8") as stderr_file:
+            process = subprocess.Popen(
+                command,
+                cwd=cwd,
+                text=True,
+                stdout=stdout_file,
+                stderr=stderr_file,
+            )
+            _, status, usage = os.wait4(process.pid, 0)
+            stdout_file.seek(0)
+            stderr_file.seek(0)
+            stdout = stdout_file.read()
+            stderr = stderr_file.read()
+
+    elapsed = time.perf_counter() - started
+    cpu_seconds = max(0.0, usage.ru_utime + usage.ru_stime)
+    returncode = os.waitstatus_to_exitcode(status)
+
+    if returncode:
+        raise subprocess.CalledProcessError(
+            returncode,
+            command,
+            output=stdout,
+            stderr=stderr,
+        )
+
+    return Measurement(
+        wall_seconds=elapsed,
+        cpu_seconds=cpu_seconds,
+        peak_rss_kb=peak_rss_kb(usage.ru_maxrss),
+        output=stdout.strip(),
+    )
+
+
+def peak_rss_kb(raw_rss: int) -> int:
+    if raw_rss <= 0:
+        return 0
+    if sys.platform == "darwin":
+        return raw_rss // 1024
+    return raw_rss
 
 
 def timed_setup(
@@ -542,22 +597,40 @@ def build_case(
     return targets
 
 
-def measure(target: BenchTarget) -> tuple[float, str]:
-    samples: list[float] = []
+def median_int(values: list[int]) -> int:
+    return int(statistics.median(values)) if values else 0
+
+
+def format_rss(kb: int) -> str:
+    if kb <= 0:
+        return "n/a"
+    return f"{kb / 1024:.1f}MB"
+
+
+def measure(target: BenchTarget) -> Measurement:
+    wall_samples: list[float] = []
+    cpu_samples: list[float] = []
+    rss_samples: list[int] = []
     output = ""
 
     for _ in range(RUNS):
-        started = time.perf_counter()
-        result = run_command(target.command)
-        samples.append(time.perf_counter() - started)
-        current_output = result.stdout.strip()
+        result = measured_command(target.command)
+        wall_samples.append(result.wall_seconds)
+        cpu_samples.append(result.cpu_seconds)
+        rss_samples.append(result.peak_rss_kb)
+        current_output = result.output
         if output and current_output != output:
             raise SystemExit(
                 f"{target.language} produced inconsistent output: {current_output} != {output}"
             )
         output = current_output
 
-    return statistics.median(samples), output
+    return Measurement(
+        wall_seconds=statistics.median(wall_samples),
+        cpu_seconds=statistics.median(cpu_samples),
+        peak_rss_kb=median_int(rss_samples),
+        output=output,
+    )
 
 
 def main() -> int:
@@ -581,23 +654,54 @@ def main() -> int:
     ):
         raise SystemExit("CLI setup failed")
 
-    results: dict[str, list[tuple[str, float, float, str]]] = {}
+    results: dict[str, list[tuple[str, Measurement, float, float, float, str]]] = {}
 
     for case in cases():
         print()
         print(f"== {case.name} (N={case.n}) ==")
         targets = build_case(case, range_cli, range_env)
-        baselines: dict[str, float] = {}
-        case_results: list[tuple[str, float, float, str]] = []
+        wall_baselines: dict[str, float] = {}
+        cpu_baselines: dict[str, float] = {}
+        rss_baselines: dict[str, int] = {}
+        case_results: list[tuple[str, Measurement, float, float, float, str]] = []
 
         for target in targets:
-            median, output = measure(target)
-            if "C" not in baselines and target.language == "C":
-                baselines["C"] = median
-            baseline = baselines.get("C", median)
-            relative = median / baseline if baseline else 1.0
-            case_results.append((target.language, median, relative, output))
-            print(f"{target.language:>6}: {median:.4f}s  {relative:>6.2f}x  output={output}")
+            measurement = measure(target)
+            if target.language == "C":
+                wall_baselines["C"] = measurement.wall_seconds
+                cpu_baselines["C"] = measurement.cpu_seconds
+                rss_baselines["C"] = measurement.peak_rss_kb
+
+            wall_baseline = wall_baselines.get("C", measurement.wall_seconds)
+            cpu_baseline = cpu_baselines.get("C", measurement.cpu_seconds)
+            rss_baseline = rss_baselines.get("C", measurement.peak_rss_kb)
+            wall_relative = measurement.wall_seconds / wall_baseline if wall_baseline else 1.0
+            cpu_relative = measurement.cpu_seconds / cpu_baseline if cpu_baseline else 1.0
+            rss_relative = measurement.peak_rss_kb / rss_baseline if rss_baseline else 1.0
+            cpu_percent = (
+                measurement.cpu_seconds / measurement.wall_seconds * 100
+                if measurement.wall_seconds
+                else 0
+            )
+
+            case_results.append(
+                (
+                    target.language,
+                    measurement,
+                    wall_relative,
+                    cpu_relative,
+                    rss_relative,
+                    measurement.output,
+                )
+            )
+            print(
+                f"{target.language:>6}: "
+                f"wall {measurement.wall_seconds:.4f}s {wall_relative:>6.2f}x  "
+                f"cpu {measurement.cpu_seconds:.4f}s {cpu_relative:>6.2f}x "
+                f"({cpu_percent:>5.1f}%)  "
+                f"mem {format_rss(measurement.peak_rss_kb):>8} {rss_relative:>6.2f}x  "
+                f"output={measurement.output}"
+            )
 
         results[case.name] = case_results
 
@@ -607,13 +711,29 @@ def main() -> int:
         range_row = next((row for row in case_results if row[0] == "Range"), None)
         rust_row = next((row for row in case_results if row[0] == "Rust"), None)
         if range_row and rust_row:
-            range_vs_rust = range_row[1] / rust_row[1] if rust_row[1] else 0
+            range_wall = range_row[1].wall_seconds
+            rust_wall = rust_row[1].wall_seconds
+            range_cpu = range_row[1].cpu_seconds
+            rust_cpu = rust_row[1].cpu_seconds
+            range_mem = range_row[1].peak_rss_kb
+            rust_mem = rust_row[1].peak_rss_kb
+            range_vs_rust = range_wall / rust_wall if rust_wall else 0
+            range_cpu_vs_rust = range_cpu / rust_cpu if rust_cpu else 0
+            range_mem_vs_rust = range_mem / rust_mem if rust_mem else 0
             print(
-                f"{case_name:>14}: Range {range_row[1]:.4f}s, "
-                f"Rust {rust_row[1]:.4f}s, Range/Rust {range_vs_rust:.2f}x"
+                f"{case_name:>14}: "
+                f"Range wall {range_wall:.4f}s, Rust wall {rust_wall:.4f}s, "
+                f"Range/Rust wall {range_vs_rust:.2f}x, "
+                f"cpu {range_cpu_vs_rust:.2f}x, "
+                f"mem {range_mem_vs_rust:.2f}x"
             )
         elif range_row:
-            print(f"{case_name:>14}: Range {range_row[1]:.4f}s")
+            print(
+                f"{case_name:>14}: "
+                f"Range wall {range_row[1].wall_seconds:.4f}s, "
+                f"cpu {range_row[1].cpu_seconds:.4f}s, "
+                f"mem {format_rss(range_row[1].peak_rss_kb)}"
+            )
         else:
             print(f"{case_name:>14}: Range skipped")
 
