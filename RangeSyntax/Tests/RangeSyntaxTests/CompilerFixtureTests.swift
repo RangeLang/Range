@@ -883,9 +883,32 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 }
 
                 macro tagProof<T>(_ key: String? = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
-                    return TagProofBehavior(key: key, exclude: exclude)
+                    return TagProofBehavior(key: key ?? self.identifier.name, exclude: self.identifier != self.identifier)
                 }
 
+                macro selfFiltered(): Construct { target, diagnostics, graph in
+                    let graphApplications: Array<Macro.Application>(
+                        graph.macros(named: self.name)
+                    )
+                    let ownApplications: Array<Macro.Application>(
+                        graphApplications.filter { application in
+                            application.identifier == self.identifier
+                        }
+                    )
+                    if ownApplications.count != 1 {
+                        diagnostics.error("Expected self-filtered macro application.")
+                    }
+
+                    target.declaration.expand {
+                        extension #(target.declaration.self) {
+                            function selfFilteredMacroCount(): Int {
+                                return #(ownApplications.count)
+                            }
+                        }
+                    }
+                }
+
+                @selfFiltered
                 construct Profile {
                     @tagProof("id")
                     let userId: Int

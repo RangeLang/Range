@@ -318,6 +318,8 @@ struct MacroTargetValueBuilder {
             targetBinding: metadataBindings?.target ?? "__metadata_target__",
             targetValue: targetValue,
             graphBinding: metadataBindings?.graph,
+            selfValue: MacroTargetValueBuilder(knownObjectTypeNames: knownObjectTypeNames)
+                .value(for: metadata),
             localBindings: initialBindings,
             knownObjectTypeNames: knownObjectTypeNames,
             context: context
@@ -421,7 +423,7 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    private func value(for declaration: MacroDeclaration) -> CompileTimeValue {
+    func value(for declaration: MacroDeclaration) -> CompileTimeValue {
         let bodyText = renderStatements(declaration.body)
         return .object(
             typeName: "Macro.Declaration",
@@ -442,6 +444,31 @@ struct MacroTargetValueBuilder {
                 ),
                 "body": .string(bodyText),
                 "syntaxBody": .string(renderEmittedCodeBlock(declaration.syntaxBody)),
+            ]
+        )
+    }
+
+    func value(for metadata: MacroMetadataDeclaration) -> CompileTimeValue {
+        let bodyText = renderStatements(metadata.body)
+        return .object(
+            typeName: "Macro.Declaration",
+            fields: [
+                "name": .string(metadata.name),
+                "identifier": identifier(metadata.name),
+                "packageVisibility": .string(packageVisibilityName(for: metadata.packageVisibility)),
+                "target": .string(metadata.target.displayName),
+                "targetSyntax": value(for: metadata.target),
+                "expansionType": typeReferenceValue(metadata.valueType),
+                "generics": .array(metadata.genericParameters.map(value(for:))),
+                "parameters": .array(metadata.parameters.map(value(for:))),
+                "writtenBody": writtenSyntax(bodyText),
+                "parsedBody": parsedValue(
+                    written: bodyText,
+                    value: blockValue(for: metadata.body),
+                    diagnostics: []
+                ),
+                "body": .string(bodyText),
+                "syntaxBody": .string(""),
             ]
         )
     }

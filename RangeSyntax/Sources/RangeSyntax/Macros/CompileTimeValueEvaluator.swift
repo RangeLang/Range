@@ -63,6 +63,7 @@ struct CompileTimeValueEvaluator {
                     macro,
                     arguments: arguments,
                     callerLocals: locals,
+                    callerSelfValue: selfValue,
                     context: context
                 )
             else {
@@ -925,6 +926,7 @@ struct CompileTimeValueEvaluator {
                         macro,
                         arguments: arguments,
                         callerLocals: nestedLocals,
+                        callerSelfValue: selfValue,
                         context: context
                     )
                 else {

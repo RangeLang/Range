@@ -2460,6 +2460,11 @@ extension MacroExpander {
         let targetSurface = MacroTargetSurface(
             targetBinding: bindings.target,
             graphBinding: bindings.graph,
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
             targetType: target.typeReference,
             targetDeclarationName: targetDeclarationName,
             localBindings: localBindings,
@@ -2497,6 +2502,11 @@ extension MacroExpander {
                         callerLocals: localBindings,
                         callerTargetBinding: bindings.target,
                         callerTargetValue: targetValue,
+                        callerSelfValue: MacroTargetValueBuilder(
+                            macroDeclarationsByName: context.macroDeclarationsByName,
+                            macroMetadataByName: context.macroMetadataByName,
+                            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+                        ).value(for: macro),
                         context: context
                     )
                 else {
@@ -2523,6 +2533,7 @@ extension MacroExpander {
             typeName: "SyntaxMacro.ArgumentTarget",
             fields: [:]
         ),
+        callerSelfValue: CompileTimeValue? = nil,
         context: MacroExpansionContext
     ) throws -> CompileTimeValue? {
         guard macro.target == nil,
@@ -2540,6 +2551,7 @@ extension MacroExpander {
                 callerLocals: callerLocals,
                 callerTargetBinding: callerTargetBinding,
                 callerTargetValue: callerTargetValue,
+                callerSelfValue: callerSelfValue,
                 context: context
             )
             bindings[name] = resolvedExpression
@@ -2562,6 +2574,7 @@ extension MacroExpander {
         )
         let rendered = try renderFreestandingSyntaxMacroBody(
             syntaxBody,
+            macro: macro,
             localBindings: bindings,
             parameterBindings: resolvedArgumentBindings,
             context: context
@@ -2577,6 +2590,11 @@ extension MacroExpander {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "__syntax_macro_target__",
             targetValue: .object(typeName: "SyntaxMacro.Target", fields: [:]),
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
             localBindings: localBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
             context: context
@@ -2615,6 +2633,11 @@ extension MacroExpander {
                         invokedMacro,
                         arguments: arguments,
                         callerLocals: locals,
+                        callerSelfValue: MacroTargetValueBuilder(
+                            macroDeclarationsByName: context.macroDeclarationsByName,
+                            macroMetadataByName: context.macroMetadataByName,
+                            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+                        ).value(for: macro),
                         context: context
                     )
                 case .return(let expression?):
@@ -2647,11 +2670,13 @@ extension MacroExpander {
         callerLocals: [String: Expression],
         callerTargetBinding: String,
         callerTargetValue: CompileTimeValue,
+        callerSelfValue: CompileTimeValue? = nil,
         context: MacroExpansionContext
     ) -> Expression {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: callerTargetBinding,
             targetValue: callerTargetValue,
+            selfValue: callerSelfValue,
             localBindings: callerLocals,
             macroDeclarationsByName: context.macroDeclarationsByName,
             context: context
@@ -2675,12 +2700,14 @@ extension MacroExpander {
             callerLocals: callerLocals,
             callerTargetBinding: callerTargetBinding,
             callerTargetValue: callerTargetValue,
+            callerSelfValue: callerSelfValue,
             context: context
         )
     }
 
     static func renderFreestandingSyntaxMacroBody(
         _ block: EmittedCodeBlock,
+        macro: MacroDeclaration,
         localBindings: [String: Expression],
         parameterBindings: [String: Expression],
         context: MacroExpansionContext
@@ -2688,6 +2715,11 @@ extension MacroExpander {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "__syntax_macro_target__",
             targetValue: .object(typeName: "SyntaxMacro.Target", fields: [:]),
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
             localBindings: localBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
             context: context
@@ -2724,12 +2756,17 @@ extension MacroExpander {
                 }
                 return renderExpressionForStringify(rendered)
             case .syntaxMacroInvocation(let name, let arguments):
-                guard let macro = context.macroDeclarationsByName[name],
-                    macro.target == nil,
+                guard let invokedMacro = context.macroDeclarationsByName[name],
+                    invokedMacro.target == nil,
                     let value = try evaluateFreestandingSyntaxMacro(
-                        macro,
+                        invokedMacro,
                         arguments: arguments,
                         callerLocals: localBindings,
+                        callerSelfValue: MacroTargetValueBuilder(
+                            macroDeclarationsByName: context.macroDeclarationsByName,
+                            macroMetadataByName: context.macroMetadataByName,
+                            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+                        ).value(for: macro),
                         context: context
                     ),
                     let rendered = renderer.renderSyntax(value)
