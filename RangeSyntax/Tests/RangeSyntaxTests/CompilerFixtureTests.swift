@@ -268,6 +268,11 @@ struct CompilerFixtureTests {
         )
         #expect(fieldTargetKinds.contains(.function))
         #expect(fieldTargetKinds.contains(.construct))
+        let propertyTargetKinds = macroTargetKinds(
+            for: .macroSurface("property"),
+            syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+        )
+        #expect(propertyTargetKinds == [.property])
         let target = MacroTargetValueBuilder().targetValue(for: construct)
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",

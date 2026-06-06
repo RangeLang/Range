@@ -1,4 +1,5 @@
 @syntax
+@property
 @field
 construct Binding<T> {
     let identity: GraphIdentity

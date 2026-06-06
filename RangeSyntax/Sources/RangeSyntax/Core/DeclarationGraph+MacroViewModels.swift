@@ -141,6 +141,9 @@ func macroTargetKinds(
         if name == "field" {
             return [.immutable, .state, .binding, .derived, .property, .function, .construct]
         }
+        if name == "property" {
+            return [.property]
+        }
         return [macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver)]
     case .anyOf(let targets), .allOf(let targets):
         return Set(targets.flatMap { macroTargetKinds(for: $0, syntaxResolver: syntaxResolver) })
@@ -164,6 +167,9 @@ func macroTargetAllows(
         }
         if name == "field" {
             return [.immutable, .state, .binding, .derived, .property, .function, .construct].contains(kind)
+        }
+        if name == "property" {
+            return kind == .property
         }
         return macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver) == kind
     case .anyOf(let targets):

@@ -1,4 +1,5 @@
 @syntax
+@property
 @field
 construct Derived<T> {
     let identity: GraphIdentity
