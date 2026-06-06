@@ -25,7 +25,6 @@ enum MacroTargetKind: Hashable {
     case function
     case construct
     case enumeration
-    case protocolDefinition
     case typeExtension
     case other(String)
 }
@@ -58,7 +57,6 @@ func macroTargetKindPriority() -> [MacroTargetKind] {
         .function,
         .construct,
         .enumeration,
-        .protocolDefinition,
         .typeExtension,
     ]
 }
@@ -118,8 +116,6 @@ func macroTargetKind(
         return .construct
     case "Enum":
         return .enumeration
-    case "Protocol":
-        return .protocolDefinition
     case "Extension":
         return .typeExtension
     default:
@@ -1344,7 +1340,7 @@ extension RewriteSurfaceView {
                 return nil
             }
         case .expression, .state, .immutable, .binding, .derived, .property, .block, .construct,
-            .enumeration, .protocolDefinition, .typeExtension, .other:
+            .enumeration, .typeExtension, .other:
             return nil
         }
     }

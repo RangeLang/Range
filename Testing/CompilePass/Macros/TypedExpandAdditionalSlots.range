@@ -3,9 +3,6 @@ protocol AdditionalTypedExpandProtocol {
 
 macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
     target.declaration.expand {
-        protocol #(Identifier(name: "GeneratedTypedExpandProtocol")): #(AdditionalTypedExpandProtocol) {
-        }
-
         enum #(Identifier(name: "GeneratedTypedExpandEnum")): #(AdditionalTypedExpandProtocol) {
             case #(Identifier(name: "payload"))(value: #(Int))
         }

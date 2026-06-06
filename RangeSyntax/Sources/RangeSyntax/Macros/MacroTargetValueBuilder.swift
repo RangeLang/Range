@@ -47,27 +47,6 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    func targetValue(for protocolDeclaration: ProtocolDeclaration) -> CompileTimeValue {
-        let id = "protocol:\(protocolDeclaration.name)"
-        return .object(
-            typeName: "Protocol",
-            fields: [
-                "identity": graphIdentity(kind: "protocol", name: protocolDeclaration.name),
-                "written": writtenSyntaxByID[id] ?? writtenSyntax(""),
-                "declaration": .object(
-                    typeName: "Protocol.Declaration",
-                    fields: [
-                        "identity": graphIdentity(kind: "protocol", name: protocolDeclaration.name),
-                        "self": nominalTypeReference(protocolDeclaration.name),
-                        "generics": .array(protocolDeclaration.genericParameters.map(value(for:))),
-                        "inits": .array(protocolDeclaration.initializers.map(value(for:))),
-                        "functions": .array(protocolDeclaration.callables.map(value(for:))),
-                    ]
-                )
-            ]
-        )
-    }
-
     func targetValue(for extensionDeclaration: ExtensionDeclaration) -> CompileTimeValue {
         let target = typeReferenceValue(extensionDeclaration.targetType)
         let declaration = value(for: extensionDeclaration)

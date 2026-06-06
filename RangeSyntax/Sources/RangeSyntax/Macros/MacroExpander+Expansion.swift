@@ -77,9 +77,6 @@ extension MacroExpander {
                 + module.enumerations.map {
                     try emittedDeclarations(from: $0, macros: macros, context: context)
                 }
-                + module.protocols.map {
-                    try emittedDeclarations(from: $0, macros: macros, context: context)
-                }
             let expandedExtensions = try module.extensions.map {
                 try expand(extensionDeclaration: $0, macros: macros, context: context)
             }
@@ -190,29 +187,8 @@ extension MacroExpander {
                     extensions: emittedBundle.extensions
                 )
             )
-        case .protocolDefinition(let declaration):
-            let emittedBundle = try emittedDeclarations(
-                from: declaration,
-                macros: macros,
-                context: context
-            )
-            guard !emittedBundle.isEmpty else {
-                return sourceFile
-            }
-            return .module(
-                ModuleFileNode(
-                    mainBlock: nil,
-                    states: emittedBundle.states,
-                    callables: emittedBundle.callables,
-                    constructs: emittedBundle.constructs,
-                    enumerations: emittedBundle.enumerations,
-                    protocols: [declaration] + emittedBundle.protocols,
-                    macros: emittedBundle.macros,
-                    precedenceGroups: [],
-                    operators: [],
-                    extensions: emittedBundle.extensions
-                )
-            )
+        case .protocolDefinition:
+            return sourceFile
         case .extensions(let declarations):
             return .extensions(
                 try declarations.map {
@@ -1900,35 +1876,6 @@ extension MacroExpander {
     }
 
     static func emittedDeclarations(
-        from protocolDeclaration: ProtocolDeclaration,
-        macros: [String: MacroDeclaration],
-        context: MacroExpansionContext
-    ) throws -> EmittedDeclarationBundle {
-        var emitted = EmittedDeclarationBundle()
-
-        for application in protocolDeclaration.macros {
-            guard
-                let macro = macros[application.name],
-                macroTargetAllows(macro.target!, kind: .protocolDefinition, syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
-            else {
-                continue
-            }
-            emitted.merge(
-                try emittedDeclarations(
-                    from: macro,
-                    targetValue: MacroTargetValueBuilder(
-                        macroMetadataByName: context.macroMetadataByName,
-                        writtenSyntaxByID: context.graphContext.writtenSyntaxByID
-                    ).targetValue(for: protocolDeclaration),
-                    context: context
-                )
-            )
-        }
-
-        return emitted
-    }
-
-    static func emittedDeclarations(
         from macro: MacroDeclaration,
         construct: ConstructDeclaration,
         context: MacroExpansionContext,
@@ -3439,8 +3386,8 @@ extension MacroExpander {
             return EmittedDeclarationBundle(constructs: [declaration])
         case .enumeration(let declaration):
             return EmittedDeclarationBundle(enumerations: [declaration])
-        case .protocolDefinition(let declaration):
-            return EmittedDeclarationBundle(protocols: [declaration])
+        case .protocolDefinition:
+            throw ParseError("Macros cannot emit protocol declarations.")
         case .extensions(let declarations):
             return EmittedDeclarationBundle(extensions: declarations)
         case .module(let module):
