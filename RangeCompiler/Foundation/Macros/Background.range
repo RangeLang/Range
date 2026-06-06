@@ -1,0 +1,5 @@
+macro background(): Block & @syntax { target, diagnostics, graph in
+    if target.statements.count == 0 {
+        diagnostics.error("@background block must not be empty.")
+    }
+}

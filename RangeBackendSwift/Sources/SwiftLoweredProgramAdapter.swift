@@ -116,7 +116,9 @@ struct SwiftLoweredProgramAdapter {
         case .expand:
             return statement
         case .background(let background):
-            return .background(Background(body: lower(statements: background.body)))
+            return .background(
+                Background(macros: background.macros, body: lower(statements: background.body))
+            )
         case .deferBlock(let deferred):
             return .deferBlock(DeferredBlock(body: lower(statements: deferred.body)))
         case .localBinding(let declaration):

@@ -63,7 +63,10 @@ extension MacroExpander {
             )
         case .background(let background):
             return .background(
-                Background(body: substituteMacroBindings(in: background.body, bindings: bindings))
+                Background(
+                    macros: background.macros,
+                    body: substituteMacroBindings(in: background.body, bindings: bindings)
+                )
             )
         case .deferBlock(let deferred):
             return .deferBlock(
@@ -410,11 +413,14 @@ extension MacroExpander {
         case .background(let background):
             return [
                 .background(
-                    Background(body: substituteMacroTargetCalls(
-                        in: background.body,
-                        targetBinding: targetBinding,
-                        targetBlock: targetBlock
-                    ))
+                    Background(
+                        macros: background.macros,
+                        body: substituteMacroTargetCalls(
+                            in: background.body,
+                            targetBinding: targetBinding,
+                            targetBlock: targetBlock
+                        )
+                    )
                 )
             ]
         case .deferBlock(let deferred):

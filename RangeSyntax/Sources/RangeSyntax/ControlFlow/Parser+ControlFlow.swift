@@ -15,16 +15,16 @@ extension Parser {
             return try parseTargetExpandStatement(targetPath: targetPath)
         }
 
-        if isMacroApplicationStart() {
-            return .expression(try parseExpression())
-        }
-
         if isLocalBackgroundCallableStart() {
             return try parseLocalBackgroundCallableDeclaration(localBindings: &localBindings)
         }
 
         if isBackgroundStatementStart() {
             return try parseBackgroundStatement(localBindings: &localBindings)
+        }
+
+        if isMacroApplicationStart() {
+            return .expression(try parseExpression())
         }
 
         if isDeferStatementStart() {
@@ -217,7 +217,12 @@ extension Parser {
         }
         advance()
         let body = try parseStatementBlock(baseLocalBindings: localBindings)
-        return .background(Background(body: body))
+        return .background(
+            Background(
+                macros: [MacroApplication(name: name, genericArguments: [], argumentClause: nil)],
+                body: body
+            )
+        )
     }
 
     mutating func parseDeferStatement(

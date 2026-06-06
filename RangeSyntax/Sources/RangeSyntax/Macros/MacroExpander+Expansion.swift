@@ -235,17 +235,31 @@ extension MacroExpander {
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
     ) throws {
+        try emitBlockMacroDiagnostics(
+            applications: mainBlock.macros,
+            declarationName: "@main",
+            macros: macros,
+            context: context
+        )
+    }
+
+    static func emitBlockMacroDiagnostics(
+        applications: [MacroApplication],
+        declarationName: String,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) throws {
         let targetValue = CompileTimeValue.object(
             typeName: "Block",
             fields: ["statements": .array([])]
         )
-        for application in mainBlock.macros {
+        for application in applications {
             guard let macro = macros[application.name] else {
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
             guard macroTargetAllows(macro.target!, kind: .block) else {
                 throw ParseError(
-                    "Macro @\(application.name) is used on @main block but targets \(macro.target!.displayName)."
+                    "Macro @\(application.name) is used on \(declarationName) block but targets \(macro.target!.displayName)."
                 )
             }
             try emitMacroDiagnostics(
@@ -1033,9 +1047,15 @@ extension MacroExpander {
             _ = body
             throw ParseError("Block macros like #\(name) { ... } are no longer supported.")
         case .background(let background):
+            try emitBlockMacroDiagnostics(
+                applications: background.macros,
+                declarationName: "@background",
+                macros: macros,
+                context: context
+            )
             return [
                 .background(
-                    Background(body: try expand(
+                    Background(macros: background.macros, body: try expand(
                         statements: background.body,
                         expectedReturnType: nil,
                         macros: macros,
