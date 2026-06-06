@@ -345,7 +345,8 @@ extension Parser {
             return .declaration
         case .keyword(RangeSyntax.Keyword.typeExtension.rawValue):
             return .nominalTypeReference
-        case .keyword(RangeSyntax.Keyword.function.rawValue):
+        case .keyword(RangeSyntax.Keyword.function.rawValue),
+            .keyword(RangeSyntax.Keyword.macro.rawValue):
             return .callableName
         case .keyword(RangeSyntax.Keyword.binding.rawValue):
             return .typeReference

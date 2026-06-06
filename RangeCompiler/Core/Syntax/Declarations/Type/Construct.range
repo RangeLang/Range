@@ -5,6 +5,7 @@ construct Construct {
 
     @graph(.declaration)
     construct Declaration<SelfType: NominalTypeReference>: SyntaxExpandable<SelfType>, SyntaxEmittable {
+        let identifier: Identifier
         let self: SelfType
         let macros: [Macro.Application]
         let generics: [Generic]

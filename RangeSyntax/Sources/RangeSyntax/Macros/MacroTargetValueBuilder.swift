@@ -151,6 +151,7 @@ struct MacroTargetValueBuilder {
             typeName: "Construct.Declaration",
             fields: [
                 "identity": graphIdentity(kind: "construct", name: qualifiedName),
+                "identifier": identifier(declaration.name),
                 "self": nominalTypeReference(qualifiedName),
                 "macros": .array(declaration.macros.map(value(for:))),
                 "generics": .array(declaration.genericParameters.map(value(for:))),

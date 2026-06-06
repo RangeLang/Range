@@ -5,6 +5,7 @@ extension MacroExpander {
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var protocols: [ProtocolDeclaration] = []
+        var macros: [MacroDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
 
         var isEmpty: Bool {
@@ -13,6 +14,7 @@ extension MacroExpander {
                 && constructs.isEmpty
                 && enumerations.isEmpty
                 && protocols.isEmpty
+                && macros.isEmpty
                 && extensions.isEmpty
         }
 
@@ -22,6 +24,7 @@ extension MacroExpander {
             constructs.append(contentsOf: other.constructs)
             enumerations.append(contentsOf: other.enumerations)
             protocols.append(contentsOf: other.protocols)
+            macros.append(contentsOf: other.macros)
             extensions.append(contentsOf: other.extensions)
         }
     }
@@ -119,7 +122,7 @@ extension MacroExpander {
                     constructs: expandedConstructs + emittedDeclarationBundles.flatMap(\.constructs),
                     enumerations: module.enumerations + emittedDeclarationBundles.flatMap(\.enumerations),
                     protocols: module.protocols + emittedDeclarationBundles.flatMap(\.protocols),
-                    macros: module.macros,
+                    macros: module.macros + emittedDeclarationBundles.flatMap(\.macros),
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
                     extensions: expandedExtensions + emittedDeclarationBundles.flatMap(\.extensions)
@@ -145,6 +148,7 @@ extension MacroExpander {
                     || !emittedBundle.constructs.isEmpty
                     || !emittedBundle.enumerations.isEmpty
                     || !emittedBundle.protocols.isEmpty
+                    || !emittedBundle.macros.isEmpty
                     || !emittedBundle.extensions.isEmpty
             else {
                 return .construct(expandedConstruct)
@@ -157,7 +161,7 @@ extension MacroExpander {
                     constructs: [expandedConstruct] + emittedBundle.constructs,
                     enumerations: emittedBundle.enumerations,
                     protocols: emittedBundle.protocols,
-                    macros: [],
+                    macros: emittedBundle.macros,
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
@@ -180,7 +184,7 @@ extension MacroExpander {
                     constructs: emittedBundle.constructs,
                     enumerations: [declaration] + emittedBundle.enumerations,
                     protocols: emittedBundle.protocols,
-                    macros: [],
+                    macros: emittedBundle.macros,
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
@@ -203,7 +207,7 @@ extension MacroExpander {
                     constructs: emittedBundle.constructs,
                     enumerations: emittedBundle.enumerations,
                     protocols: [declaration] + emittedBundle.protocols,
-                    macros: [],
+                    macros: emittedBundle.macros,
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
@@ -321,7 +325,7 @@ extension MacroExpander {
             guard let macro = macros[application.name] else {
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetAllows(macro.target!, kind: targetKind) else {
+            guard macroTargetAllows(macro.target!, kind: targetKind, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
                 throw ParseError(
                     "Macro @\(application.name) is used on \(declarationName) but targets \(macro.target!.displayName)."
                 )
@@ -791,7 +795,11 @@ extension MacroExpander {
         for application in applications {
             guard let macro = macros[application.name] else {
                 if let metadata = context.macroMetadataByName[application.name] {
-                    guard macroTargetAllowsAny(metadata.target, kinds: allowedMacroTargetKinds(for: propertyKind))
+                    guard macroTargetAllowsAny(
+                        metadata.target,
+                        kinds: allowedMacroTargetKinds(for: propertyKind),
+                        syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+                    )
                     else {
                         throw ParseError(
                             "Macro @\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(metadata.target.displayName)."
@@ -842,7 +850,11 @@ extension MacroExpander {
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetAllowsAny(macro.target!, kinds: allowedMacroTargetKinds(for: propertyKind)) else {
+            guard macroTargetAllowsAny(
+                macro.target!,
+                kinds: allowedMacroTargetKinds(for: propertyKind),
+                syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+            ) else {
                 throw ParseError(
                     "Macro @\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target!.displayName)."
                 )
@@ -1482,7 +1494,7 @@ extension MacroExpander {
             let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
                 macroApplication in
                 guard let macro = macros[macroApplication.name],
-                    macroTargetAllows(macro.target!, kind: .parameter)
+                    macroTargetAllows(macro.target!, kind: .parameter, syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
                 else {
                     return nil
                 }
@@ -1610,7 +1622,7 @@ extension MacroExpander {
         case .macroInvocation(let name, let arguments):
             guard let macro = macros[name],
                 let target = macro.target,
-                macroTargetAllows(target, kind: .expression)
+                macroTargetAllows(target, kind: .expression, syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
             else {
                 let rewrittenArguments = try arguments.map { argument in
                     CallArgument(
@@ -1817,7 +1829,7 @@ extension MacroExpander {
         var emitted = EmittedDeclarationBundle()
 
         for application in construct.macros {
-            guard let macro = macros[application.name], macroTargetAllows(macro.target!, kind: .construct) else {
+            guard let macro = macros[application.name], macroTargetAllows(macro.target!, kind: .construct, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
                 continue
             }
             let argumentBindings = try parseMacroArgumentBindings(
@@ -1869,7 +1881,7 @@ extension MacroExpander {
         var emitted = EmittedDeclarationBundle()
 
         for application in enumeration.macros {
-            guard let macro = macros[application.name], macroTargetAllows(macro.target!, kind: .enumeration) else {
+            guard let macro = macros[application.name], macroTargetAllows(macro.target!, kind: .enumeration, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
                 continue
             }
             emitted.merge(
@@ -1897,7 +1909,7 @@ extension MacroExpander {
         for application in protocolDeclaration.macros {
             guard
                 let macro = macros[application.name],
-                macroTargetAllows(macro.target!, kind: .protocolDefinition)
+                macroTargetAllows(macro.target!, kind: .protocolDefinition, syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
             else {
                 continue
             }
@@ -2436,8 +2448,13 @@ extension MacroExpander {
             localBindings: localBindings,
             context: context
         )
-        var parser = try Parser(source: rendered)
-        let sourceFile = try parser.parseSourceFile()
+        let sourceFile: SourceFileNode
+        do {
+            var parser = try Parser(source: rendered)
+            sourceFile = try parser.parseSourceFile()
+        } catch {
+            throw ParseError("Could not parse emitted declarations from @\(macro.name).\n\(rendered)")
+        }
         return try declarationBundle(from: sourceFile)
     }
 
@@ -3433,12 +3450,13 @@ extension MacroExpander {
                 constructs: module.constructs,
                 enumerations: module.enumerations,
                 protocols: module.protocols,
+                macros: module.macros,
                 extensions: module.extensions
             )
         case .mainBlock:
             throw ParseError("Macros cannot emit @main blocks.")
-        case .macro:
-            throw ParseError("Macros cannot emit macro declarations.")
+        case .macro(let declaration):
+            return EmittedDeclarationBundle(macros: [declaration])
         }
     }
 }

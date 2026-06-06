@@ -22,7 +22,10 @@ extension DeclarationGraph {
     }
 
     func macroRealizationView(macrosByName: [String: MacroDeclaration]) -> MacroRealizationView {
-        let registryView = MacroRegistryView(macrosByName: macrosByName)
+        let registryView = MacroRegistryView(
+            macrosByName: macrosByName,
+            syntaxResolver: syntaxResolver
+        )
         return MacroRealizationView(
             parameterMacroSignatures: parameterMacroSignatures(registryView: registryView),
             functionMacroSignatures: functionMacroSignatures(registryView: registryView),

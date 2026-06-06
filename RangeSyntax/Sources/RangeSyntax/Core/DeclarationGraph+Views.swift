@@ -210,15 +210,18 @@ public struct DeclarationRegistryView {
 public struct DeclarationSyntaxResolver {
     private let protocolsByName: [String: ProtocolDeclaration]
     private let constructsByName: [String: ConstructDeclaration]
+    private let macrosByName: [String: MacroDeclaration]
     private let extensionsByTargetName: [String: [ExtensionDeclaration]]
 
     public init(
         protocolsByName: [String: ProtocolDeclaration],
         constructsByName: [String: ConstructDeclaration],
+        macrosByName: [String: MacroDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
         self.protocolsByName = protocolsByName
         self.constructsByName = constructsByName
+        self.macrosByName = macrosByName
         self.extensionsByTargetName = extensionsByTargetName
     }
 
@@ -230,9 +233,35 @@ public struct DeclarationSyntaxResolver {
     }
 
     public func syntaxTypeName(forSurface surfaceName: String) -> String? {
-        constructsByName.keys.first {
+        if let macro = macrosByName[surfaceName],
+            let targetTypeName = nominalName(of: macro.target?.typeReference),
+            declarationIsSyntaxBoundary(named: targetTypeName)
+        {
+            return targetTypeName
+        }
+
+        return syntaxBoundaryTypeNames().first {
+            Self.emittedSyntaxMacroName(forTypeName: $0) == surfaceName
+        }
+    }
+
+    public var syntaxSurfaceTypeNames: [String] {
+        let emittedMacroTargets: [String] = macrosByName.values.compactMap { macro in
+            guard let targetTypeName = nominalName(of: macro.target?.typeReference),
+                declarationIsSyntaxBoundary(named: targetTypeName)
+            else {
+                return nil
+            }
+            return targetTypeName
+        }
+        let syntaxBoundaries = syntaxBoundaryTypeNames()
+        return Array(Set<String>(emittedMacroTargets + syntaxBoundaries))
+    }
+
+    private func syntaxBoundaryTypeNames() -> [String] {
+        let syntaxBoundaryNames = Array(protocolsByName.keys) + Array(constructsByName.keys)
+        return syntaxBoundaryNames.filter {
             declarationIsSyntaxBoundary(named: $0)
-                && Self.syntaxSurfaceName(forTypeName: $0) == surfaceName
         }
     }
 
@@ -320,11 +349,30 @@ public struct DeclarationSyntaxResolver {
         return false
     }
 
-    private static func syntaxSurfaceName(forTypeName typeName: String) -> String {
-        guard let first = typeName.first else {
-            return typeName
+    private static func emittedSyntaxMacroName(forTypeName typeName: String) -> String {
+        snakeCase(typeName)
+    }
+
+    private static func snakeCase(_ name: String) -> String {
+        var result = ""
+        var previousWasLowercaseOrDigit = false
+
+        for scalar in name.unicodeScalars {
+            let character = Character(scalar)
+            let string = String(character)
+            let isUppercase = string.uppercased() == string && string.lowercased() != string
+            let isLowercase = string.lowercased() == string && string.uppercased() != string
+            let isDigit = CharacterSet.decimalDigits.contains(scalar)
+
+            if isUppercase && previousWasLowercaseOrDigit && !result.isEmpty {
+                result.append("_")
+            }
+
+            result.append(string.lowercased())
+            previousWasLowercaseOrDigit = isLowercase || isDigit
         }
-        return first.lowercased() + typeName.dropFirst()
+
+        return result
     }
 
     public func nominalName(of typeReference: TypeReference?) -> String? {

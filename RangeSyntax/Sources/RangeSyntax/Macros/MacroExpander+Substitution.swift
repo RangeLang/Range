@@ -354,7 +354,10 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws -> [ResolvedRewriteCall] {
         let targetBinding = macro.bindings!.target
-        let targetKind = macroTargetKind(for: macro)
+        let targetKind = macroTargetKind(
+            for: macro,
+            syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+        )
         let operationExpressions = macroOperationExpressions(in: macro.body).filter {
             !isMacroDiagnosticsCall($0, diagnosticsBinding: macro.bindings!.diagnostics)
         }

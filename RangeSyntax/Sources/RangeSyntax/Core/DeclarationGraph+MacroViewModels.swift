@@ -30,11 +30,14 @@ enum MacroTargetKind: Hashable {
     case other(String)
 }
 
-func macroTargetKind(for macro: MacroDeclaration) -> MacroTargetKind {
+func macroTargetKind(
+    for macro: MacroDeclaration,
+    syntaxResolver: DeclarationSyntaxResolver
+) -> MacroTargetKind {
     guard let target = macro.target else {
         return .other("__freestanding")
     }
-    let kinds = macroTargetKinds(for: target)
+    let kinds = macroTargetKinds(for: target, syntaxResolver: syntaxResolver)
     for kind in macroTargetKindPriority() where kinds.contains(kind) {
         return kind
     }
@@ -60,67 +63,39 @@ func macroTargetKindPriority() -> [MacroTargetKind] {
     ]
 }
 
-func syntaxSurfaceTargetKinds() -> Set<MacroTargetKind> {
-    [
-        .expression,
-        .parameter,
-        .initializer,
-        .state,
-        .immutable,
-        .binding,
-        .derived,
-        .property,
-        .block,
-        .function,
-        .construct,
-        .enumeration,
-        .protocolDefinition,
-        .typeExtension,
-    ]
+func syntaxSurfaceTargetKinds(syntaxResolver: DeclarationSyntaxResolver) -> Set<MacroTargetKind> {
+    Set(
+        syntaxResolver.syntaxSurfaceTypeNames.map {
+            macroTargetKind(for: .named($0), syntaxResolver: syntaxResolver)
+        }
+    )
 }
 
-func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
-    let name: String
+func macroTargetKind(
+    for typeReference: TypeReference,
+    syntaxResolver: DeclarationSyntaxResolver
+) -> MacroTargetKind {
+    var name: String
     switch typeReference {
     case .named(let named):
         name = named
     case .member(_, let member):
         name = member
     case .generic(let base, _):
-        return macroTargetKind(for: base)
+        return macroTargetKind(for: base, syntaxResolver: syntaxResolver)
     case .array, .function, .optional, .variadic:
         name = typeReference.displayName
     }
 
+    if name.hasPrefix("@") {
+        let surfaceName = String(name.dropFirst())
+        guard let syntaxTypeName = syntaxResolver.syntaxTypeName(forSurface: surfaceName) else {
+            return .other(name)
+        }
+        name = syntaxTypeName
+    }
+
     switch name {
-    case "@expression":
-        return .expression
-    case "@parameter":
-        return .parameter
-    case "@init":
-        return .initializer
-    case "@state":
-        return .state
-    case "@let":
-        return .immutable
-    case "@binding":
-        return .binding
-    case "@derived":
-        return .derived
-    case "@property":
-        return .property
-    case "@block":
-        return .block
-    case "@function":
-        return .function
-    case "@construct":
-        return .construct
-    case "@enum":
-        return .enumeration
-    case "@protocol":
-        return .protocolDefinition
-    case "@extension":
-        return .typeExtension
     case "Expression":
         return .expression
     case "Parameter":
@@ -153,70 +128,48 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
 }
 
 
-func macroTargetKinds(for target: MacroTarget) -> Set<MacroTargetKind> {
+func macroTargetKinds(
+    for target: MacroTarget,
+    syntaxResolver: DeclarationSyntaxResolver
+) -> Set<MacroTargetKind> {
     switch target {
     case .syntax(let typeReference):
-        return [macroTargetKind(for: typeReference)]
+        return [macroTargetKind(for: typeReference, syntaxResolver: syntaxResolver)]
     case .macroSurface(let name):
         if name == "syntax" {
-            return syntaxSurfaceTargetKinds()
+            return syntaxSurfaceTargetKinds(syntaxResolver: syntaxResolver)
         }
-        return [macroSurfaceTargetKind(named: name)]
+        return [macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver)]
     case .anyOf(let targets), .allOf(let targets):
-        return Set(targets.flatMap { macroTargetKinds(for: $0) })
+        return Set(targets.flatMap { macroTargetKinds(for: $0, syntaxResolver: syntaxResolver) })
     }
 }
 
-func macroTargetAllows(_ target: MacroTarget, kind: MacroTargetKind) -> Bool {
+func macroTargetAllows(
+    _ target: MacroTarget,
+    kind: MacroTargetKind,
+    syntaxResolver: DeclarationSyntaxResolver
+) -> Bool {
     switch target {
     case .syntax(let typeReference):
-        return macroTargetKind(for: typeReference) == kind
+        return macroTargetKind(for: typeReference, syntaxResolver: syntaxResolver) == kind
     case .macroSurface(let name):
-        return name == "syntax" ? syntaxSurfaceTargetKinds().contains(kind) : macroSurfaceTargetKind(named: name) == kind
+        return name == "syntax"
+            ? syntaxSurfaceTargetKinds(syntaxResolver: syntaxResolver).contains(kind)
+            : macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver) == kind
     case .anyOf(let targets):
-        return targets.contains { macroTargetAllows($0, kind: kind) }
+        return targets.contains { macroTargetAllows($0, kind: kind, syntaxResolver: syntaxResolver) }
     case .allOf(let targets):
-        return targets.allSatisfy { macroTargetAllows($0, kind: kind) }
+        return targets.allSatisfy { macroTargetAllows($0, kind: kind, syntaxResolver: syntaxResolver) }
     }
 }
 
-func macroTargetAllowsAny(_ target: MacroTarget, kinds: Set<MacroTargetKind>) -> Bool {
-    kinds.contains { macroTargetAllows(target, kind: $0) }
-}
-
-func macroSurfaceTargetKind(named name: String) -> MacroTargetKind {
-    switch name {
-    case "expression":
-        return .expression
-    case "parameter":
-        return .parameter
-    case "init":
-        return .initializer
-    case "state":
-        return .state
-    case "let":
-        return .immutable
-    case "binding":
-        return .binding
-    case "derived":
-        return .derived
-    case "property":
-        return .property
-    case "block":
-        return .block
-    case "function":
-        return .function
-    case "construct":
-        return .construct
-    case "enum":
-        return .enumeration
-    case "protocol":
-        return .protocolDefinition
-    case "extension":
-        return .typeExtension
-    default:
-        return .other("@\(name)")
-    }
+func macroTargetAllowsAny(
+    _ target: MacroTarget,
+    kinds: Set<MacroTargetKind>,
+    syntaxResolver: DeclarationSyntaxResolver
+) -> Bool {
+    kinds.contains { macroTargetAllows(target, kind: $0, syntaxResolver: syntaxResolver) }
 }
 
 func indexedReference(
@@ -244,13 +197,14 @@ struct MacroRealizationView {
 
 struct MacroRegistryView {
     let macrosByName: [String: MacroDeclaration]
+    let syntaxResolver: DeclarationSyntaxResolver
 
     func firstMacro(
         in applications: [MacroApplication],
         targetKind: MacroTargetKind
     ) -> MacroDeclaration? {
         applications.lazy.compactMap { macrosByName[$0.name] }.first(where: {
-            macroTargetAllows($0.target!, kind: targetKind)
+            macroTargetAllows($0.target!, kind: targetKind, syntaxResolver: syntaxResolver)
         })
     }
 
@@ -259,7 +213,8 @@ struct MacroRegistryView {
         targetKind: MacroTargetKind
     ) -> [MacroDeclaration] {
         applications.compactMap { application in
-            guard let macro = macrosByName[application.name], macroTargetAllows(macro.target!, kind: targetKind)
+            guard let macro = macrosByName[application.name],
+                macroTargetAllows(macro.target!, kind: targetKind, syntaxResolver: syntaxResolver)
             else {
                 return nil
             }
@@ -295,7 +250,7 @@ struct RewriteSurfaceView {
         targetBinding: String,
         targetType: TypeReference
     ) -> Set<String> {
-        if macroTargetKind(for: targetType) == .initializer {
+        if macroTargetKind(for: targetType, syntaxResolver: syntaxResolver) == .initializer {
             return [
                 "\(targetBinding).application.replace",
                 "\(targetBinding).application.arguments[].expression.replace",
@@ -407,7 +362,7 @@ struct RewriteSurfaceView {
         targetBinding: String,
         targetType: TypeReference
     ) -> Bool {
-        if macroTargetKind(for: targetType) == .initializer {
+        if macroTargetKind(for: targetType, syntaxResolver: syntaxResolver) == .initializer {
             return normalizedPath == "\(targetBinding).application.replace"
                 || normalizedPath == "\(targetBinding).application.arguments[].expression.replace"
         }
@@ -1316,7 +1271,7 @@ extension RewriteSurfaceView {
         targetBinding: String,
         targetType: TypeReference
     ) -> [RewriteSiteDescriptor] {
-        let targetKind = macroTargetKind(for: targetType)
+        let targetKind = macroTargetKind(for: targetType, syntaxResolver: syntaxResolver)
         return allowedPaths(
             targetBinding: targetBinding,
             targetType: targetType

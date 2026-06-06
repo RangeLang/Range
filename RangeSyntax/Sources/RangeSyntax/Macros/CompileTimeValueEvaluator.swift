@@ -97,12 +97,6 @@ struct CompileTimeValueEvaluator {
             {
                 return value
             }
-            if arguments.isEmpty,
-                let dot = name.lastIndex(of: "."),
-                dot < name.index(before: name.endIndex)
-            {
-                return enumCaseValue(named: String(name[name.index(after: dot)...]))
-            }
             if let context,
                 let rewritten = try? MacroExpander.applyInitMacroRewritesIfNeeded(
                     callName: name,
@@ -140,6 +134,12 @@ struct CompileTimeValueEvaluator {
                 locals: locals
             ) {
                 return stringValue
+            }
+            if arguments.isEmpty,
+                let dot = name.lastIndex(of: "."),
+                dot < name.index(before: name.endIndex)
+            {
+                return enumCaseValue(named: String(name[name.index(after: dot)...]))
             }
             if let transformed = evaluateArrayTransform(
                 name: name,

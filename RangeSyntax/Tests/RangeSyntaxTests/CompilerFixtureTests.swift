@@ -1057,6 +1057,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.protocolsByName["Expression"]?.isCore == true)
         #expect(!graph.syntaxResolver.declaration(named: "Expression", conformsTo: "Syntax"))
         #expect(graph.syntaxResolver.typeConformsToSyntax(.named("Expression")))
+        #expect(graph.syntaxResolver.syntaxTypeName(forSurface: "block") == "Block")
+        #expect(graph.syntaxResolver.type(.named("Block"), matchesSyntaxSurface: "block"))
     }
 
     @Test("Token metadata reads delimiter macros")

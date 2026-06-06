@@ -1,2 +1,6 @@
-closed macro syntax(): @syntax { target, diagnostics in
+closed macro syntax(): Construct { target, diagnostics in
+    target.declaration.expand {
+        closed macro #(target.declaration.identifier)(): #(target.declaration.self) { target, diagnostics, graph in
+        }
+    }
 }

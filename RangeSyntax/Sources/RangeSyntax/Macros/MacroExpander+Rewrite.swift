@@ -50,7 +50,7 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws -> Expression? {
         guard let macro = macros[macroName],
-            macroTargetAllowsAny(macro.target!, kinds: [.initializer, .function])
+            macroTargetAllowsAny(macro.target!, kinds: [.initializer, .function], syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
         else {
             return nil
         }
@@ -101,7 +101,7 @@ extension MacroExpander {
 
         for macroApplication in target.macros {
             guard let macro = macros[macroApplication.name],
-                macroTargetAllows(macro.target!, kind: .initializer)
+                macroTargetAllows(macro.target!, kind: .initializer, syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
             else {
                 continue
             }
@@ -468,7 +468,7 @@ extension MacroExpander {
             }
             guard let macro = macros[application.name] else {
                 if let metadata = context.macroMetadataByName[application.name] {
-                    guard macroTargetAllows(metadata.target, kind: .construct) else {
+                    guard macroTargetAllows(metadata.target, kind: .construct, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
                         throw ParseError(
                             "Macro @\(application.name) is used on a construct but targets \(metadata.target.displayName)."
                         )
@@ -503,13 +503,13 @@ extension MacroExpander {
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            if macroTargetAllows(macro.target!, kind: .initializer) {
+            if macroTargetAllows(macro.target!, kind: .initializer, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) {
                 if !macroOperationExpressions(in: macro.body).isEmpty {
                     _ = try resolvedRewriteCalls(for: macro, context: context)
                 }
                 continue
             }
-            guard macroTargetAllows(macro.target!, kind: .construct) else {
+            guard macroTargetAllows(macro.target!, kind: .construct, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
                 throw ParseError(
                     "Macro @\(application.name) is used on a construct but targets \(macro.target!.displayName)."
                 )
@@ -551,7 +551,7 @@ extension MacroExpander {
         for application in applications {
             guard let macro = macros[application.name] else {
                 if let metadata = context.macroMetadataByName[application.name] {
-                    guard macroTargetAllows(metadata.target, kind: .typeExtension) else {
+                    guard macroTargetAllows(metadata.target, kind: .typeExtension, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
                         throw ParseError(
                             "Macro @\(application.name) is used on an extension but targets \(metadata.target.displayName)."
                         )
@@ -577,7 +577,7 @@ extension MacroExpander {
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetAllows(macro.target!, kind: .typeExtension) else {
+            guard macroTargetAllows(macro.target!, kind: .typeExtension, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
                 throw ParseError(
                     "Macro @\(application.name) is used on an extension but targets \(macro.target!.displayName)."
                 )

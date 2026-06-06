@@ -109,10 +109,18 @@ public struct DeclarationGraph {
         self.precedenceGroupsByName = precedenceGroups
         self.sourceTextByPath = sourceTextByPath
         self.sourceLocations = Self.collectSourceLocations(from: files)
+        let syntaxResolver = DeclarationSyntaxResolver(
+            protocolsByName: protocols,
+            constructsByName: constructs,
+            macrosByName: macros,
+            extensionsByTargetName: extensions
+        )
+
         self.realizedLiteralBridges = Self.collectRealizedLiteralBridges(from: constructs)
         self.realizedInitMacroTargets = Self.collectRealizedInitMacroTargets(
             from: constructs,
-            macrosByName: macros
+            macrosByName: macros,
+            syntaxResolver: syntaxResolver
         )
         self.programGraph = Self.collectProgramGraph(from: files)
     }
@@ -152,6 +160,7 @@ public struct DeclarationGraph {
             syntaxResolver: DeclarationSyntaxResolver(
                 protocolsByName: protocolsByName,
                 constructsByName: constructsByName,
+                macrosByName: macrosByName,
                 extensionsByTargetName: extensionsByTargetName
             )
         )
@@ -1066,7 +1075,8 @@ public struct DeclarationGraph {
 
     static func collectRealizedInitMacroTargets(
         from constructs: [String: ConstructDeclaration],
-        macrosByName: [String: MacroDeclaration]
+        macrosByName: [String: MacroDeclaration],
+        syntaxResolver: DeclarationSyntaxResolver
     ) -> [RealizedInitMacroTarget] {
         constructs.values.flatMap { construct in
             var targets = construct.initializers.compactMap { initializer -> RealizedInitMacroTarget? in
@@ -1088,7 +1098,7 @@ public struct DeclarationGraph {
                 guard let macro = macrosByName[application.name], let target = macro.target else {
                     return false
                 }
-                return macroTargetAllows(target, kind: .initializer)
+                return macroTargetAllows(target, kind: .initializer, syntaxResolver: syntaxResolver)
             }
 
             if !constructInitMacros.isEmpty {
