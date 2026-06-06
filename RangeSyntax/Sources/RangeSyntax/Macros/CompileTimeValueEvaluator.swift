@@ -7,6 +7,7 @@ struct CompileTimeValueEvaluator {
     let selfValue: CompileTimeValue?
     let localBindings: [String: Expression]
     let macroDeclarationsByName: [String: MacroDeclaration]
+    let knownObjectTypeNames: Set<String>
     let context: MacroExpansionContext?
 
     init(
@@ -16,6 +17,7 @@ struct CompileTimeValueEvaluator {
         selfValue: CompileTimeValue? = nil,
         localBindings: [String: Expression],
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
+        knownObjectTypeNames: Set<String> = [],
         context: MacroExpansionContext? = nil
     ) {
         self.targetBinding = targetBinding
@@ -24,6 +26,7 @@ struct CompileTimeValueEvaluator {
         self.selfValue = selfValue
         self.localBindings = localBindings
         self.macroDeclarationsByName = macroDeclarationsByName
+        self.knownObjectTypeNames = knownObjectTypeNames
         self.context = context
     }
 
@@ -499,16 +502,7 @@ struct CompileTimeValueEvaluator {
             }
         }
 
-        switch name {
-        case "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
-            "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
-            "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
-            "ValueGeneric", "GraphIdentity", "Macro.Application", "Macro.Declaration", "Macro.Target",
-            "CodingBehavior",
-            "Void", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
-            "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
-            "WrittenExpression",
-            "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook":
+        if isKnownObjectType(name) {
             var fields: [String: CompileTimeValue] = [:]
             for argument in arguments {
                 guard let label = argument.label,
@@ -519,10 +513,26 @@ struct CompileTimeValueEvaluator {
                 fields[label] = value
             }
             return .object(typeName: name, fields: fields)
-        default:
-            return nil
         }
+
+        return nil
     }
+
+    private func isKnownObjectType(_ name: String) -> Bool {
+        Self.builtInObjectTypeNames.contains(name)
+            || knownObjectTypeNames.contains(name)
+            || context?.graphContext.knownObjectTypeNames.contains(name) == true
+    }
+
+    private static let builtInObjectTypeNames: Set<String> = [
+        "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
+        "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
+        "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
+        "Void", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
+        "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
+        "WrittenExpression",
+        "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook",
+    ]
 
     private func evaluatePrimitiveConstruction(
         name: String,

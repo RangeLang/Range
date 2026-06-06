@@ -870,6 +870,56 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(profile.macros.first?.argumentClause == #""settings""#)
     }
 
+    @Test("Macro metadata values construct declared object tags")
+    func macroMetadataValuesConstructDeclaredObjectTags() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MacroMetadataObjectTag.range",
+                source: """
+                construct TagProofBehavior {
+                    let key: String?
+                    let exclude: Bool
+                }
+
+                macro tagProof<T>(_ key: String? = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
+                    return TagProofBehavior(key: key, exclude: exclude)
+                }
+
+                construct Profile {
+                    @tagProof("id")
+                    let userId: Int
+                }
+                """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let macrosByName = MacroExpander.collectMacroDeclarations(from: program.parsedFiles)
+        let metadataByName = MacroExpander.collectMacroMetadata(from: program.parsedFiles)
+        let context = program.declarationGraph.macroExpansionContext(
+            macrosByName: macrosByName,
+            macroMetadataDeclarationsByName: metadataByName
+        )
+        let userId = MacroTargetValueBuilder().graphIdentity(kind: "let", name: "Profile.userId")
+        let macros = try #require(context.graphContext.macros(on: userId))
+
+        guard case .array(let applications) = macros,
+            case .object("Macro.Application", let fields)? = applications.first,
+            case .object("TagProofBehavior", let valueFields)? = fields["value"]
+        else {
+            Issue.record("Expected @tagProof metadata to carry a TagProofBehavior object tag.")
+            return
+        }
+        guard case .string("id")? = valueFields["key"],
+            case .boolean(false)? = valueFields["exclude"]
+        else {
+            Issue.record("Expected TagProofBehavior fields to preserve @tagProof arguments.")
+            return
+        }
+    }
+
     @Test("Package manifests collect package metadata")
     func packageManifestsCollectPackageMetadata() throws {
         var inputs = try rangeCoreInputs()

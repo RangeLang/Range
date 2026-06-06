@@ -11,7 +11,7 @@ macro encodeBody(container: KeyedEncodingContainer, properties: [Let]) -> [Switc
     #(properties.map { property in
         let codingMacros: Array<Macro.Application>(
             property.macros.filter { application in
-            application.identifier.name == "coding"
+            application.identifier.name == "codable"
             }
         )
         let behaviors: Array<CodingBehavior>(
@@ -47,7 +47,7 @@ macro decodeBody(container: KeyedDecodingContainer, properties: [Let]) -> [Switc
     #(properties.map { property in
         let codingMacros: Array<Macro.Application>(
             property.macros.filter { application in
-            application.identifier.name == "coding"
+            application.identifier.name == "codable"
             }
         )
         let behaviors: Array<CodingBehavior>(
@@ -71,7 +71,7 @@ macro decodeBody(container: KeyedDecodingContainer, properties: [Let]) -> [Switc
     })
 }
 
-macro codable<let shape: CodingShape = .object>(): Construct { target, diagnostics in
+macro codable<let shape: CodingShape = .object>(): @construct { target, diagnostics in
     if shape != .object {
         diagnostics.error("@codable currently supports object coding only.")
     }
@@ -80,7 +80,7 @@ macro codable<let shape: CodingShape = .object>(): Construct { target, diagnosti
         target.declaration.lets.filter { property in
             let codingMacros: Array<Macro.Application>(
                 property.macros.filter { application in
-                application.identifier.name == "coding"
+                application.identifier.name == "codable"
                 }
             )
             let behaviors: Array<CodingBehavior>(

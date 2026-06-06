@@ -497,6 +497,7 @@ extension MacroExpander {
                         for: application,
                         metadata: metadata,
                         targetValue: targetValue,
+                        knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
                         context: context
                     )
                     continue
@@ -569,8 +570,10 @@ extension MacroExpander {
                         metadata: metadata,
                         targetValue: MacroTargetValueBuilder(
                             macroMetadataByName: context.macroMetadataByName,
-                            writtenSyntaxByID: context.graphContext.writtenSyntaxByID
+                            writtenSyntaxByID: context.graphContext.writtenSyntaxByID,
+                            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
                         ).targetValue(for: extensionDeclaration),
+                        knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
                         context: context
                     )
                     continue

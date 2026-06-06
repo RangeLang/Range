@@ -4,15 +4,18 @@ struct MacroTargetValueBuilder {
     let macroDeclarationsByName: [String: MacroDeclaration]
     let macroMetadataByName: [String: MacroMetadataDeclaration]
     let writtenSyntaxByID: [String: CompileTimeValue]
+    let knownObjectTypeNames: Set<String>
 
     init(
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroMetadataByName: [String: MacroMetadataDeclaration] = [:],
-        writtenSyntaxByID: [String: CompileTimeValue] = [:]
+        writtenSyntaxByID: [String: CompileTimeValue] = [:],
+        knownObjectTypeNames: Set<String> = []
     ) {
         self.macroDeclarationsByName = macroDeclarationsByName
         self.macroMetadataByName = macroMetadataByName
         self.writtenSyntaxByID = writtenSyntaxByID
+        self.knownObjectTypeNames = knownObjectTypeNames
     }
 
     func targetValue(for construct: ConstructDeclaration) -> CompileTimeValue {
@@ -287,6 +290,7 @@ struct MacroTargetValueBuilder {
         for application: MacroApplication,
         metadata: MacroMetadataDeclaration,
         targetValue: CompileTimeValue = .object(typeName: "Macro.Target", fields: [:]),
+        knownObjectTypeNames: Set<String> = [],
         context: MacroExpansionContext? = nil
     ) throws -> CompileTimeValue {
         let bindings = try MacroExpander.parseMacroMetadataArgumentBindings(
@@ -315,6 +319,7 @@ struct MacroTargetValueBuilder {
             targetValue: targetValue,
             graphBinding: metadataBindings?.graph,
             localBindings: initialBindings,
+            knownObjectTypeNames: knownObjectTypeNames,
             context: context
         )
 
@@ -401,7 +406,11 @@ struct MacroTargetValueBuilder {
                 fields["value"] = .object(typeName: "Macro.Effect", fields: [:])
             } else if metadata.valueType == .named("Void") {
                 fields["value"] = .object(typeName: "Void", fields: [:])
-            } else if let evaluatedValue = try? Self.evaluateMacroMetadataValue(for: application, metadata: metadata) {
+            } else if let evaluatedValue = try? Self.evaluateMacroMetadataValue(
+                for: application,
+                metadata: metadata,
+                knownObjectTypeNames: knownObjectTypeNames
+            ) {
                 fields["value"] = evaluatedValue
             }
         }

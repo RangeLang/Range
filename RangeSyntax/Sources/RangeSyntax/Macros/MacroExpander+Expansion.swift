@@ -765,6 +765,51 @@ extension MacroExpander {
         var setterTransforms: [Expression] = []
 
         for application in applications {
+            if let metadata = context.macroMetadataByName[application.name],
+                macroTargetAllowsAny(
+                    metadata.target,
+                    kinds: allowedMacroTargetKinds(for: propertyKind),
+                    syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+                ),
+                context.propertyMacroMetadataTargetMatches(
+                    metadata,
+                    propertyTypeName: propertyTypeName,
+                    propertyValueType: propertyValueType
+                )
+            {
+                let argumentBindings = try parseMacroMetadataArgumentBindings(
+                    for: metadata,
+                    argumentClause: application.argumentClause,
+                    rawBody: application.rawBody
+                )
+                let genericBindings = macroMetadataGenericArgumentBindings(
+                    for: metadata,
+                    application: application
+                )
+                let targetValue = macroMetadataTargetValue(
+                    kind: propertyKindDescription(propertyKind),
+                    name: name
+                )
+                try emitMacroMetadataDiagnostics(
+                    from: metadata.body,
+                    metadata: metadata,
+                    targetValue: targetValue,
+                    context: context,
+                    localBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
+                )
+                if metadata.valueType.isMacroMetadataEffect {
+                    continue
+                }
+                _ = try MacroTargetValueBuilder.evaluateMacroMetadataValue(
+                    for: application,
+                    metadata: metadata,
+                    targetValue: targetValue,
+                    knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+                    context: context
+                )
+                continue
+            }
+
             guard let macro = macros[application.name] else {
                 if let metadata = context.macroMetadataByName[application.name] {
                     guard macroTargetAllowsAny(
@@ -813,6 +858,7 @@ extension MacroExpander {
                         for: application,
                         metadata: metadata,
                         targetValue: targetValue,
+                        knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
                         context: context
                     )
                     continue

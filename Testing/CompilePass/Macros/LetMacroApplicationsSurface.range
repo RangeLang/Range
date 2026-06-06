@@ -1,4 +1,4 @@
-macro codingCases(): Construct { target, diagnostics in
+macro codableCases(): Construct { target, diagnostics in
     let generatedKeys: Array<String>(
         target.declaration.lets.flatMap { property in
             property.macros.compactMap { application in
@@ -16,9 +16,9 @@ macro codingCases(): Construct { target, diagnostics in
     }
 }
 
-@codingCases
+@codableCases
 construct LetMacroApplicationsSurfaceFixture {
-    @coding("user_id")
+    @codable("user_id")
     let id: Int
 
     let name: String

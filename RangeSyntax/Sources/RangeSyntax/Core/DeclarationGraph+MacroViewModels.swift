@@ -135,6 +135,12 @@ func macroTargetKinds(
         if name == "syntax" {
             return syntaxSurfaceTargetKinds(syntaxResolver: syntaxResolver)
         }
+        if name == "construct" {
+            return [.construct]
+        }
+        if name == "field" {
+            return [.immutable, .state, .binding, .derived, .property]
+        }
         return [macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver)]
     case .anyOf(let targets), .allOf(let targets):
         return Set(targets.flatMap { macroTargetKinds(for: $0, syntaxResolver: syntaxResolver) })
@@ -150,9 +156,16 @@ func macroTargetAllows(
     case .syntax(let typeReference):
         return macroTargetKind(for: typeReference, syntaxResolver: syntaxResolver) == kind
     case .macroSurface(let name):
-        return name == "syntax"
-            ? syntaxSurfaceTargetKinds(syntaxResolver: syntaxResolver).contains(kind)
-            : macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver) == kind
+        if name == "syntax" {
+            return syntaxSurfaceTargetKinds(syntaxResolver: syntaxResolver).contains(kind)
+        }
+        if name == "construct" {
+            return kind == .construct
+        }
+        if name == "field" {
+            return [.immutable, .state, .binding, .derived, .property].contains(kind)
+        }
+        return macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver) == kind
     case .anyOf(let targets):
         return targets.contains { macroTargetAllows($0, kind: kind, syntaxResolver: syntaxResolver) }
     case .allOf(let targets):
@@ -652,6 +665,10 @@ struct MacroExpansionContext {
         propertyTypeName: String,
         propertyValueType: TypeReference
     ) -> Bool {
+        if case .macroSurface("field")? = macro.target {
+            return true
+        }
+
         let actualTargetType = TypeReference.generic(
             base: .named(propertyTypeName),
             arguments: [propertyValueType]
@@ -673,6 +690,10 @@ struct MacroExpansionContext {
         propertyTypeName: String,
         propertyValueType: TypeReference
     ) -> Bool {
+        if case .macroSurface("field") = metadata.target {
+            return true
+        }
+
         let actualTargetType = TypeReference.generic(
             base: .named(propertyTypeName),
             arguments: [propertyValueType]
@@ -848,6 +869,7 @@ struct MacroGraphContext {
     let writtenSyntaxByID: [String: CompileTimeValue]
     let sourcePathByID: [String: String]
     let sourceDirectoryByID: [String: String]
+    let knownObjectTypeNames: Set<String>
 
     init(
         declarationGraph: DeclarationGraph,
@@ -857,10 +879,15 @@ struct MacroGraphContext {
         let writtenSyntaxByID = Self.writtenSyntaxByID(for: declarationGraph)
         let sourcePathByID = Self.sourcePathByID(for: declarationGraph)
         let sourceDirectoryByID = sourcePathByID.mapValues(Self.directoryPath(for:))
+        let knownObjectTypeNames = Self.knownObjectTypeNames(
+            declarationGraph: declarationGraph,
+            macroMetadataDeclarationsByName: macroMetadataDeclarationsByName
+        )
         let builder = MacroTargetValueBuilder(
             macroDeclarationsByName: macroDeclarationsByName,
             macroMetadataByName: macroMetadataDeclarationsByName,
-            writtenSyntaxByID: writtenSyntaxByID
+            writtenSyntaxByID: writtenSyntaxByID,
+            knownObjectTypeNames: knownObjectTypeNames
         )
         var declarationsByID: [String: CompileTimeValue] = [:]
         var membersByID: [String: [CompileTimeValue]] = [:]
@@ -964,6 +991,100 @@ struct MacroGraphContext {
         self.writtenSyntaxByID = writtenSyntaxByID
         self.sourcePathByID = sourcePathByID
         self.sourceDirectoryByID = sourceDirectoryByID
+        self.knownObjectTypeNames = Self.knownObjectTypeNames(
+            seededBy: knownObjectTypeNames,
+            declarationsByID: declarationsByID,
+            membersByID: membersByID,
+            parentByID: parentByID,
+            macrosByID: macrosByID,
+            macrosByName: macrosByName,
+            main: main,
+            writtenSyntaxByID: writtenSyntaxByID
+        )
+    }
+
+    private static func knownObjectTypeNames(
+        declarationGraph: DeclarationGraph,
+        macroMetadataDeclarationsByName: [String: MacroMetadataDeclaration]
+    ) -> Set<String> {
+        var names = Set(declarationGraph.constructsByName.keys)
+        for metadata in macroMetadataDeclarationsByName.values {
+            names.formUnion(objectTypeNames(for: metadata.valueType))
+        }
+        return names
+    }
+
+    private static func objectTypeNames(for type: TypeReference) -> Set<String> {
+        switch type {
+        case .named(let name):
+            return [name]
+        case .member(let base, let member):
+            var names = Set(objectTypeNames(for: base).map { "\($0).\(member)" })
+            names.insert(type.displayName)
+            return names
+        case .generic(let base, _):
+            return objectTypeNames(for: base)
+        case .optional(let wrapped), .variadic(let wrapped):
+            return objectTypeNames(for: wrapped)
+        case .array(let element):
+            return objectTypeNames(for: element)
+        case .function:
+            return []
+        }
+    }
+
+    private static func knownObjectTypeNames(
+        seededBy seeds: Set<String>,
+        declarationsByID: [String: CompileTimeValue],
+        membersByID: [String: [CompileTimeValue]],
+        parentByID: [String: CompileTimeValue],
+        macrosByID: [String: [CompileTimeValue]],
+        macrosByName: [String: [CompileTimeValue]],
+        main: CompileTimeValue,
+        writtenSyntaxByID: [String: CompileTimeValue]
+    ) -> Set<String> {
+        var names = seeds
+        for value in declarationsByID.values {
+            names.formUnion(objectTypeNames(in: value))
+        }
+        for values in membersByID.values {
+            for value in values {
+                names.formUnion(objectTypeNames(in: value))
+            }
+        }
+        for value in parentByID.values {
+            names.formUnion(objectTypeNames(in: value))
+        }
+        for values in macrosByID.values {
+            for value in values {
+                names.formUnion(objectTypeNames(in: value))
+            }
+        }
+        for values in macrosByName.values {
+            for value in values {
+                names.formUnion(objectTypeNames(in: value))
+            }
+        }
+        names.formUnion(objectTypeNames(in: main))
+        for value in writtenSyntaxByID.values {
+            names.formUnion(objectTypeNames(in: value))
+        }
+        return names
+    }
+
+    private static func objectTypeNames(in value: CompileTimeValue) -> Set<String> {
+        switch value {
+        case .string, .integer, .double, .boolean, .nilValue:
+            return []
+        case .array(let values):
+            return values.reduce(into: Set<String>()) { names, value in
+                names.formUnion(objectTypeNames(in: value))
+            }
+        case .object(let typeName, let fields):
+            return fields.values.reduce(into: Set([typeName])) { names, value in
+                names.formUnion(objectTypeNames(in: value))
+            }
+        }
     }
 
     func declaration(for identity: CompileTimeValue) -> CompileTimeValue? {
