@@ -2,7 +2,7 @@ macro block(statements: [@Statement]) -> [@Statement] {
     #(statements)
 }
 
-macro background(): Block & @syntax { target, diagnostics, graph in
+macro background(): @block & @syntax { target, diagnostics, graph in
     if target.declaration.statements.count == 0 {
         diagnostics.error("@background block must not be empty.")
     }

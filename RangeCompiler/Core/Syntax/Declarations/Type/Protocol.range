@@ -9,7 +9,7 @@ construct Protocol {
         let generics: [Generic]
         let functions: [Function.Declaration]
 
-        function expand(_ expansion: () -> [Syntax])
+        function expand(_ expansion: () -> [@syntax])
     }
 
     @graph(.application)

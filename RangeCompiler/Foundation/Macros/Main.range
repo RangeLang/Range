@@ -1,4 +1,4 @@
-open macro main(): Block { target, diagnostics, graph in
+open macro main(): @block { target, diagnostics, graph in
     let mainMacros: Array<Macro.Application>(graph.macros(named: self.name))
 
     if mainMacros.count > 1 {

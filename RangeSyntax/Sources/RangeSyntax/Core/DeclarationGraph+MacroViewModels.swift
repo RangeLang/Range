@@ -34,7 +34,30 @@ func macroTargetKind(for macro: MacroDeclaration) -> MacroTargetKind {
     guard let target = macro.target else {
         return .other("__freestanding")
     }
-    return macroTargetKind(for: target.typeReference)
+    let kinds = macroTargetKinds(for: target)
+    for kind in macroTargetKindPriority() where kinds.contains(kind) {
+        return kind
+    }
+    return kinds.first ?? .other("__unknown")
+}
+
+func macroTargetKindPriority() -> [MacroTargetKind] {
+    [
+        .block,
+        .expression,
+        .parameter,
+        .initializer,
+        .state,
+        .immutable,
+        .binding,
+        .derived,
+        .property,
+        .function,
+        .construct,
+        .enumeration,
+        .protocolDefinition,
+        .typeExtension,
+    ]
 }
 
 func syntaxSurfaceTargetKinds() -> Set<MacroTargetKind> {
@@ -70,6 +93,34 @@ func macroTargetKind(for typeReference: TypeReference) -> MacroTargetKind {
     }
 
     switch name {
+    case "@expression":
+        return .expression
+    case "@parameter":
+        return .parameter
+    case "@init":
+        return .initializer
+    case "@state":
+        return .state
+    case "@let":
+        return .immutable
+    case "@binding":
+        return .binding
+    case "@derived":
+        return .derived
+    case "@property":
+        return .property
+    case "@block":
+        return .block
+    case "@function":
+        return .function
+    case "@construct":
+        return .construct
+    case "@enum":
+        return .enumeration
+    case "@protocol":
+        return .protocolDefinition
+    case "@extension":
+        return .typeExtension
     case "Expression":
         return .expression
     case "Parameter":
@@ -107,7 +158,10 @@ func macroTargetKinds(for target: MacroTarget) -> Set<MacroTargetKind> {
     case .syntax(let typeReference):
         return [macroTargetKind(for: typeReference)]
     case .macroSurface(let name):
-        return name == "syntax" ? syntaxSurfaceTargetKinds() : [.other("@\(name)")]
+        if name == "syntax" {
+            return syntaxSurfaceTargetKinds()
+        }
+        return [macroSurfaceTargetKind(named: name)]
     case .anyOf(let targets), .allOf(let targets):
         return Set(targets.flatMap { macroTargetKinds(for: $0) })
     }
@@ -118,7 +172,7 @@ func macroTargetAllows(_ target: MacroTarget, kind: MacroTargetKind) -> Bool {
     case .syntax(let typeReference):
         return macroTargetKind(for: typeReference) == kind
     case .macroSurface(let name):
-        return name == "syntax" ? syntaxSurfaceTargetKinds().contains(kind) : kind == .other("@\(name)")
+        return name == "syntax" ? syntaxSurfaceTargetKinds().contains(kind) : macroSurfaceTargetKind(named: name) == kind
     case .anyOf(let targets):
         return targets.contains { macroTargetAllows($0, kind: kind) }
     case .allOf(let targets):
@@ -128,6 +182,41 @@ func macroTargetAllows(_ target: MacroTarget, kind: MacroTargetKind) -> Bool {
 
 func macroTargetAllowsAny(_ target: MacroTarget, kinds: Set<MacroTargetKind>) -> Bool {
     kinds.contains { macroTargetAllows(target, kind: $0) }
+}
+
+func macroSurfaceTargetKind(named name: String) -> MacroTargetKind {
+    switch name {
+    case "expression":
+        return .expression
+    case "parameter":
+        return .parameter
+    case "init":
+        return .initializer
+    case "state":
+        return .state
+    case "let":
+        return .immutable
+    case "binding":
+        return .binding
+    case "derived":
+        return .derived
+    case "property":
+        return .property
+    case "block":
+        return .block
+    case "function":
+        return .function
+    case "construct":
+        return .construct
+    case "enum":
+        return .enumeration
+    case "protocol":
+        return .protocolDefinition
+    case "extension":
+        return .typeExtension
+    default:
+        return .other("@\(name)")
+    }
 }
 
 func indexedReference(
@@ -213,8 +302,13 @@ struct RewriteSurfaceView {
             ]
         }
 
-        guard let targetName = syntaxResolver.nominalName(of: targetType) else {
+        guard var targetName = syntaxResolver.nominalName(of: targetType) else {
             return []
+        }
+        if targetName.hasPrefix("@"),
+            let syntaxTypeName = syntaxResolver.syntaxTypeName(forSurface: String(targetName.dropFirst()))
+        {
+            targetName = syntaxTypeName
         }
 
         var paths: Set<String> = []
@@ -249,7 +343,7 @@ struct RewriteSurfaceView {
                 return (text, isArray)
             }
 
-            if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
+            if syntaxResolver.declarationIsSyntaxBoundary(named: text)
                 || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
                 || syntaxResolver.declaration(named: text, conformsTo: "SyntaxExpandable")
                 || syntaxResolver.declaration(named: text, conformsTo: "SyntaxOmittable")
@@ -318,8 +412,13 @@ struct RewriteSurfaceView {
                 || normalizedPath == "\(targetBinding).application.arguments[].expression.replace"
         }
 
-        guard let targetName = syntaxResolver.nominalName(of: targetType) else {
+        guard var targetName = syntaxResolver.nominalName(of: targetType) else {
             return false
+        }
+        if targetName.hasPrefix("@"),
+            let syntaxTypeName = syntaxResolver.syntaxTypeName(forSurface: String(targetName.dropFirst()))
+        {
+            targetName = syntaxTypeName
         }
 
         let directPath = "\(targetBinding).replace"
@@ -414,7 +513,7 @@ struct RewriteSurfaceView {
             return (text, isArray)
         }
 
-        if syntaxResolver.declaration(named: text, conformsTo: "Syntax")
+        if syntaxResolver.declarationIsSyntaxBoundary(named: text)
             || syntaxResolver.declaration(named: text, conformsTo: "SyntaxReplaceable")
             || syntaxResolver.declaration(named: text, conformsTo: "SyntaxExpandable")
             || syntaxResolver.declaration(named: text, conformsTo: "SyntaxOmittable")
@@ -748,23 +847,33 @@ struct MacroExpansionContext {
     ) -> ResolvedRewriteCall? {
         guard
             case .call(let name, let arguments) = expression,
-            arguments.count == 1,
-            arguments[0].label == "with"
+            let payload = arguments.first(where: { $0.label == "with" })?.value
+                ?? (arguments.count == 1 ? arguments[0].value : nil)
         else {
             return nil
         }
 
         guard
-            let normalizedPath = normalizedRewritePath(name, targetBinding: targetBinding),
-            let descriptor = rewriteSurfaceView.rewriteSiteDescriptors(
-                targetBinding: targetBinding,
-                targetType: targetType
-            ).first(where: { $0.normalizedPath == normalizedPath })
+            let normalizedPath = normalizedRewritePath(name, targetBinding: targetBinding)
         else {
             return nil
         }
 
-        return ResolvedRewriteCall(site: descriptor.site, payload: arguments[0].value)
+        if normalizedPath == "\(targetBinding).replace",
+            rewriteSurfaceView.allowedPaths(targetBinding: targetBinding, targetType: targetType)
+                .contains(normalizedPath)
+        {
+            return ResolvedRewriteCall(site: .targetDirect, payload: payload)
+        }
+
+        guard let descriptor = rewriteSurfaceView.rewriteSiteDescriptors(
+            targetBinding: targetBinding,
+            targetType: targetType
+        ).first(where: { $0.normalizedPath == normalizedPath }) else {
+            return nil
+        }
+
+        return ResolvedRewriteCall(site: descriptor.site, payload: payload)
     }
 }
 
@@ -1044,6 +1153,7 @@ private struct MacroTargetTypeMatcher {
             return matches(actual: actual, expected: typeReference)
         case .macroSurface(let name):
             return name == "syntax" && syntaxResolver.typeConformsToSyntax(actual)
+                || syntaxResolver.type(actual, matchesSyntaxSurface: name)
         case .anyOf(let targets):
             return targets.contains { matches(actual: actual, expected: $0) }
         case .allOf(let targets):

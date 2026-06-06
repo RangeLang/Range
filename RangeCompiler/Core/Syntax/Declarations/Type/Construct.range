@@ -17,7 +17,7 @@ construct Construct {
         let constructs: [Construct.Declaration]
         let extensions: [Extension<SelfType>]
 
-        function expand(_ expansion: () -> [Syntax])
+        function expand(_ expansion: () -> [@syntax])
     }
 
     @graph(.application)

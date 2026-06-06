@@ -1,0 +1,5 @@
+macro validateBlockSurface(): @block { target, diagnostics in
+    if target.declaration.statements.count == 0 {
+        diagnostics.error("@validateBlockSurface block must not be empty.")
+    }
+}

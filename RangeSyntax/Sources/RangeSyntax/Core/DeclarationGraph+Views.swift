@@ -227,7 +227,23 @@ public struct DeclarationSyntaxResolver {
             return false
         }
         return declarationIsSyntaxBoundary(named: typeName)
-            || declaration(named: typeName, conformsTo: "Syntax")
+    }
+
+    public func syntaxTypeName(forSurface surfaceName: String) -> String? {
+        constructsByName.keys.first {
+            declarationIsSyntaxBoundary(named: $0)
+                && Self.syntaxSurfaceName(forTypeName: $0) == surfaceName
+        }
+    }
+
+    public func type(_ typeReference: TypeReference?, matchesSyntaxSurface surfaceName: String) -> Bool {
+        guard let typeName = nominalName(of: typeReference),
+            let surfaceTypeName = syntaxTypeName(forSurface: surfaceName)
+        else {
+            return false
+        }
+        return typeName == surfaceTypeName
+            || declaration(named: typeName, conformsTo: surfaceTypeName)
     }
 
     public func typeConforms(_ typeReference: TypeReference?, to targetProtocol: String) -> Bool {
@@ -294,7 +310,7 @@ public struct DeclarationSyntaxResolver {
         return false
     }
 
-    private func declarationIsSyntaxBoundary(named name: String) -> Bool {
+    public func declarationIsSyntaxBoundary(named name: String) -> Bool {
         if protocolsByName[name]?.macros.contains(where: { $0.name == "syntax" }) == true {
             return true
         }
@@ -302,6 +318,13 @@ public struct DeclarationSyntaxResolver {
             return true
         }
         return false
+    }
+
+    private static func syntaxSurfaceName(forTypeName typeName: String) -> String {
+        guard let first = typeName.first else {
+            return typeName
+        }
+        return first.lowercased() + typeName.dropFirst()
     }
 
     public func nominalName(of typeReference: TypeReference?) -> String? {
