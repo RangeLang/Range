@@ -36,16 +36,11 @@ extension MacroExpander {
     ) throws -> SourceFileNode {
         switch sourceFile {
         case .mainBlock(let mainBlock):
-            try emitMainBlockMacroDiagnostics(
-                mainBlock,
-                macros: macros,
-                context: context
-            )
             return .mainBlock(
                 MainBlockNode(
                     macros: mainBlock.macros,
-                    body: try expand(
-                        statements: mainBlock.body,
+                    body: try expandMainBlockBody(
+                        mainBlock,
                         expectedReturnType: nil,
                         macros: macros,
                         protocols: protocols,
@@ -88,15 +83,10 @@ extension MacroExpander {
             return .module(
                 ModuleFileNode(
                     mainBlock: try module.mainBlock.map {
-                        try emitMainBlockMacroDiagnostics(
-                            $0,
-                            macros: macros,
-                            context: context
-                        )
-                        return MainBlockNode(
+                        MainBlockNode(
                             macros: $0.macros,
-                            body: try expand(
-                                statements: $0.body,
+                            body: try expandMainBlockBody(
+                                $0,
                                 expectedReturnType: nil,
                                 macros: macros,
                                 protocols: protocols,
@@ -230,16 +220,71 @@ extension MacroExpander {
         }
     }
 
+    static func expandMainBlockBody(
+        _ mainBlock: MainBlockNode,
+        expectedReturnType: TypeReference?,
+        macros: [String: MacroDeclaration],
+        protocols: [String: ProtocolDeclaration],
+        parameterMacroSignatures: [ParameterMacroSignature],
+        literalBridges: [RealizedLiteralBridge],
+        context: MacroExpansionContext,
+        stateEffects: [String: PropertyMacroEffects] = [:]
+    ) throws -> [Statement] {
+        let expandedBody = try expand(
+            statements: mainBlock.body,
+            expectedReturnType: expectedReturnType,
+            macros: macros,
+            protocols: protocols,
+            parameterMacroSignatures: parameterMacroSignatures,
+            literalBridges: literalBridges,
+            context: context,
+            stateEffects: stateEffects
+        )
+
+        try emitMainBlockMacroDiagnostics(
+            mainBlock,
+            macros: macros,
+            context: context,
+            targetValue: blockMacroTargetValue(expandedBody)
+        )
+
+        guard let application = mainBlock.macros.first,
+            let macro = macros[application.name],
+            let bindings = macro.bindings
+        else {
+            return expandedBody
+        }
+
+        let rewritten = substituteMacroTargetCalls(
+            in: try rewriteBody(for: macro, context: context),
+            targetBinding: bindings.target,
+            targetBlock: expandedBody
+        )
+
+        return try expand(
+            statements: rewritten,
+            expectedReturnType: expectedReturnType,
+            macros: macros,
+            protocols: protocols,
+            parameterMacroSignatures: parameterMacroSignatures,
+            literalBridges: literalBridges,
+            context: context,
+            stateEffects: stateEffects
+        )
+    }
+
     static func emitMainBlockMacroDiagnostics(
         _ mainBlock: MainBlockNode,
         macros: [String: MacroDeclaration],
-        context: MacroExpansionContext
+        context: MacroExpansionContext,
+        targetValue: CompileTimeValue? = nil
     ) throws {
         try emitBlockMacroDiagnostics(
             applications: mainBlock.macros,
             declarationName: "@main",
             macros: macros,
-            context: context
+            context: context,
+            targetValue: targetValue ?? blockMacroTargetValue(mainBlock.body)
         )
     }
 
@@ -250,14 +295,31 @@ extension MacroExpander {
         context: MacroExpansionContext,
         targetValue: CompileTimeValue? = nil
     ) throws {
-        let targetValue = targetValue ?? blockMacroTargetValue([])
+        try emitTargetMacroDiagnostics(
+            applications: applications,
+            declarationName: declarationName,
+            targetKind: .block,
+            macros: macros,
+            context: context,
+            targetValue: targetValue ?? blockMacroTargetValue([])
+        )
+    }
+
+    static func emitTargetMacroDiagnostics(
+        applications: [MacroApplication],
+        declarationName: String,
+        targetKind: MacroTargetKind,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext,
+        targetValue: CompileTimeValue
+    ) throws {
         for application in applications {
             guard let macro = macros[application.name] else {
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetAllows(macro.target!, kind: .block) else {
+            guard macroTargetAllows(macro.target!, kind: targetKind) else {
                 throw ParseError(
-                    "Macro @\(application.name) is used on \(declarationName) block but targets \(macro.target!.displayName)."
+                    "Macro @\(application.name) is used on \(declarationName) but targets \(macro.target!.displayName)."
                 )
             }
             try emitMacroDiagnostics(

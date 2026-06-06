@@ -170,21 +170,14 @@ struct SwiftBackendProgramBuilder {
 
                 declarations.append(contentsOf: moduleDeclarations)
 
-                if let block = module.mainBlock {
-                    if mainBlock != nil {
-                        throw SwiftBackendError(
-                            "Found multiple @main modules while generating Swift."
-                        )
-                    }
+                if mainBlock == nil, let block = module.mainBlock {
                     mainBlock = block
                 }
 
             case .mainBlock(let block):
-                if mainBlock != nil {
-                    throw SwiftBackendError("Found multiple @main modules while generating Swift.")
+                if mainBlock == nil {
+                    mainBlock = block
                 }
-
-                mainBlock = block
                 units.append(
                     .init(
                         outputFileName: outputFileName,

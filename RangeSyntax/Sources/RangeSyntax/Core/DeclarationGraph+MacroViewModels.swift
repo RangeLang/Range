@@ -774,6 +774,7 @@ struct MacroGraphContext {
     let parentByID: [String: CompileTimeValue]
     let macrosByID: [String: [CompileTimeValue]]
     let macrosByName: [String: [CompileTimeValue]]
+    let main: CompileTimeValue
     let writtenSyntaxByID: [String: CompileTimeValue]
     let sourcePathByID: [String: String]
     let sourceDirectoryByID: [String: String]
@@ -796,6 +797,7 @@ struct MacroGraphContext {
         var parentByID: [String: CompileTimeValue] = [:]
         var macrosByID: [String: [CompileTimeValue]] = [:]
         var macrosByName: [String: [CompileTimeValue]] = [:]
+        var main: CompileTimeValue = .nilValue
 
         func recordMacros(_ macros: [CompileTimeValue], id: String) {
             macrosByID[id] = macros
@@ -876,7 +878,11 @@ struct MacroGraphContext {
         }
 
         for (index, application) in declarationGraph.mainBlockMacros.enumerated() {
-            recordMacros([builder.value(for: application)], id: "mainBlock:\(index)")
+            let applicationValue = builder.value(for: application)
+            if index == 0 {
+                main = applicationValue
+            }
+            recordMacros([applicationValue], id: "mainBlock:\(index)")
         }
 
         self.declarationsByID = declarationsByID
@@ -884,6 +890,7 @@ struct MacroGraphContext {
         self.parentByID = parentByID
         self.macrosByID = macrosByID
         self.macrosByName = macrosByName
+        self.main = main
         self.writtenSyntaxByID = writtenSyntaxByID
         self.sourcePathByID = sourcePathByID
         self.sourceDirectoryByID = sourceDirectoryByID
@@ -915,6 +922,10 @@ struct MacroGraphContext {
 
     func macros(named name: String) -> CompileTimeValue {
         .array(macrosByName[name, default: []])
+    }
+
+    func mainMacro() -> CompileTimeValue {
+        main
     }
 
     func sourcePath(of identity: CompileTimeValue) -> CompileTimeValue? {

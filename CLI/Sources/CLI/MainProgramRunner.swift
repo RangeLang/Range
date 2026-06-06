@@ -80,10 +80,6 @@ struct MainProgramRunner {
         if mainBlocks.isEmpty {
             throw ValidationError("Missing @main block in \(project.projectRoot.path)")
         }
-        if mainBlocks.count > 1 {
-            let names = mainBlocks.map(\.lastPathComponent).sorted().joined(separator: ", ")
-            throw ValidationError("Found multiple @main modules: \(names)")
-        }
         return mainBlocks[0]
     }
 

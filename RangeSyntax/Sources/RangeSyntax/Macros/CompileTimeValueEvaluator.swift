@@ -306,6 +306,7 @@ struct CompileTimeValueEvaluator {
             value = .object(
                 typeName: "GraphContext",
                 fields: [
+                    "main": context?.graphContext.mainMacro() ?? .nilValue,
                     "macros": context?.graphContext.macros() ?? .array([])
                 ]
             )

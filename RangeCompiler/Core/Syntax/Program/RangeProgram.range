@@ -10,6 +10,7 @@ construct RangeGraph {
     let lexedSources: [ProgramLexedSource]
     let artifacts: [ProgramArtifact]
     let topology: RangeGraphTopology
+    state main: Optional<@main>
     state syntax: [@syntax]
 }
 
