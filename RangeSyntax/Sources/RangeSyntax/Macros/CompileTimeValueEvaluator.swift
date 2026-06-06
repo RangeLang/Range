@@ -504,6 +504,7 @@ struct CompileTimeValueEvaluator {
             "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
             "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
             "ValueGeneric", "GraphIdentity", "Macro.Application", "Macro.Declaration", "Macro.Target",
+            "CodingBehavior",
             "Void", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
             "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
             "WrittenExpression",
@@ -889,10 +890,59 @@ struct CompileTimeValueEvaluator {
             switch statement {
             case .localBinding(let declaration):
                 nestedLocals[declaration.name] = declaration.expression
+            case .macroInvocation(let name, let argumentClause, _):
+                guard let macro = macroDeclarationsByName[name] else {
+                    return nil
+                }
+                let arguments: [CallArgument]
+                if let argumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines),
+                    !argumentClause.isEmpty
+                {
+                    var parser = try? Parser(source: "macro(\(argumentClause))")
+                    guard parser != nil else {
+                        return nil
+                    }
+                    _ = try? parser?.consumeCallableName()
+                    guard let parsedArguments = try? parser?.parseInvocationArgumentsIfPresent() else {
+                        return nil
+                    }
+                    arguments = parsedArguments
+                } else {
+                    arguments = []
+                }
+                guard let context,
+                    let value = try? MacroExpander.evaluateFreestandingSyntaxMacro(
+                        macro,
+                        arguments: arguments,
+                        callerLocals: nestedLocals,
+                        context: context
+                    )
+                else {
+                    return nil
+                }
+                return value
             case .expression(let expression):
                 return evaluate(expression, locals: nestedLocals)
             case .return(let expression?):
                 return evaluate(expression, locals: nestedLocals)
+            case .switchStatement:
+                return try? MacroExpander.statementSyntaxValue(statement)
+            case .conditional(let branches):
+                for branch in branches {
+                    if let condition = branch.condition {
+                        guard case .boolean(true) = evaluate(condition, locals: nestedLocals) else {
+                            continue
+                        }
+                    }
+                    return evaluateSingleParameterClosure(
+                        [
+                            CallArgument(label: "parameters", value: .array([.identifier(parameterName)])),
+                            CallArgument(label: "body", value: .block(branch.body)),
+                        ],
+                        element: element,
+                        locals: nestedLocals
+                    )
+                }
             default:
                 return nil
             }

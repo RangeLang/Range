@@ -11,6 +11,15 @@ construct IdentityCodableMacroFixture {
 
 @codable<.object>
 construct MacroOverrideCodableMacroFixture {
-    @codingKey("id")
+    @coding("id")
+    let userId: Int
+
+    @coding(exclude: true)
+    let transientName: String("local")
+}
+
+@codable<.object>
+construct MacroNamedCodingMacroFixture {
+    @coding(key: "id")
     let userId: Int
 }

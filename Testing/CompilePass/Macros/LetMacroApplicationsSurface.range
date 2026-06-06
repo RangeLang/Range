@@ -1,24 +1,24 @@
-macro codingKeyCases(): Construct { target, diagnostics in
-    let generatedKeys: Enum.Declaration(
-        self: NamedTypeReference(name: "GeneratedKeys"),
-        generics: [],
-        cases: target.declaration.lets.flatMap { property in
-            property.macros.map { macro in
-                Enum.Case(identifier: Identifier(name: macro.value), associatedValues: [])
+macro codingCases(): Construct { target, diagnostics in
+    let generatedKeys: Array<String>(
+        target.declaration.lets.flatMap { property in
+            property.macros.compactMap { application in
+                application.value.key
             }
         }
     )
 
     target.declaration.expand {
         extension #(target.declaration.self) {
-            #(generatedKeys)
+            function generatedCodingKeyCount(): Int {
+                return #(generatedKeys.count)
+            }
         }
     }
 }
 
-@codingKeyCases
+@codingCases
 construct LetMacroApplicationsSurfaceFixture {
-    @codingKey("user_id")
+    @coding("user_id")
     let id: Int
 
     let name: String

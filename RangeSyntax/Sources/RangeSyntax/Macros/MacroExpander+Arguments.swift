@@ -231,12 +231,45 @@ extension MacroExpander {
         }
 
         var bindings: [String: Expression] = [:]
-        for (parameter, argument) in zip(parameters, arguments) {
+        var consumedArgumentIndices = Set<Int>()
+
+        for parameter in parameters {
             let expectedLabel = macroArgumentLabel(for: parameter)
+            let argumentIndex: Int?
+
+            if let expectedLabel {
+                argumentIndex = arguments.indices.first { index in
+                    !consumedArgumentIndices.contains(index) && arguments[index].label == expectedLabel
+                } ?? arguments.indices.first { index in
+                    !consumedArgumentIndices.contains(index) && arguments[index].label == nil
+                }
+            } else {
+                argumentIndex = arguments.indices.first { index in
+                    !consumedArgumentIndices.contains(index) && arguments[index].label == parameter.localName
+                } ?? arguments.indices.first { index in
+                    !consumedArgumentIndices.contains(index) && arguments[index].label == nil
+                }
+            }
+
+            guard let argumentIndex else {
+                if let defaultValue = parameter.defaultValue {
+                    bindings[parameter.localName] = defaultValue
+                    continue
+                }
+                if parameter.typeReference?.isOptionalReference == true {
+                    bindings[parameter.localName] = .nilLiteral
+                    continue
+                }
+                throw ParseError("\(kind) #\(name) requires argument \(parameter.localName).")
+            }
+
+            let argument = arguments[argumentIndex]
             let actualLabel = argument.label
 
             if actualLabel == nil, expectedLabel == nil {
                 // Unlabeled macro and macro metadata arguments require an explicit `_` label erasure.
+            } else if expectedLabel == nil, actualLabel == parameter.localName {
+                // Allow local-name labels for metadata values that also support positional spelling.
             } else if let expectedLabel, let actualLabel, expectedLabel == actualLabel {
                 // Label matched.
             } else if let expectedLabel, actualLabel == nil {
@@ -257,18 +290,15 @@ extension MacroExpander {
                 for: parameter,
                 kind: kind
             )
+            consumedArgumentIndices.insert(argumentIndex)
         }
 
-        for parameter in parameters.dropFirst(arguments.count) {
-            if let defaultValue = parameter.defaultValue {
-                bindings[parameter.localName] = defaultValue
-                continue
+        if consumedArgumentIndices.count != arguments.count {
+            let index = arguments.indices.first { !consumedArgumentIndices.contains($0) }!
+            if let label = arguments[index].label {
+                throw ParseError("\(kind) #\(name) got unexpected argument label \(label).")
             }
-            if parameter.typeReference?.isOptionalReference == true {
-                bindings[parameter.localName] = .nilLiteral
-                continue
-            }
-            throw ParseError("\(kind) #\(name) requires argument \(parameter.localName).")
+            throw ParseError("\(kind) #\(name) got unexpected positional argument.")
         }
 
         return bindings

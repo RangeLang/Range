@@ -1,0 +1,8 @@
+construct CodingBehavior {
+    let key: String?
+    let exclude: Bool
+}
+
+macro coding<T>(_ key: String? = nil, exclude: Bool = false): Let<T> -> CodingBehavior { target, diagnostics in
+    return CodingBehavior(key: key, exclude: exclude)
+}

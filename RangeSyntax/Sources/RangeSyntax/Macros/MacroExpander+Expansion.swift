@@ -2535,20 +2535,65 @@ extension MacroExpander {
             macroDeclarationsByName: context.macroDeclarationsByName,
             context: context
         )
-        var locals = localBindings
-        for statement in macro.body {
-            switch statement {
-            case .localBinding(let declaration):
-                locals[declaration.name] = declaration.expression
-            case .return(let expression?):
-                return evaluator.evaluate(expression, with: locals)
-            case .expression(let expression):
-                return evaluator.evaluate(expression, with: locals)
-            default:
-                return nil
+
+        func evaluateStatements(
+            _ statements: [Statement],
+            locals initialLocals: [String: Expression]
+        ) -> CompileTimeValue? {
+            var locals = initialLocals
+            for statement in statements {
+                switch statement {
+                case .localBinding(let declaration):
+                    locals[declaration.name] = declaration.expression
+                case .macroInvocation(let name, let argumentClause, _):
+                    guard let invokedMacro = context.macroDeclarationsByName[name] else {
+                        return nil
+                    }
+                    let arguments: [CallArgument]
+                    if let argumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines),
+                        !argumentClause.isEmpty
+                    {
+                        var parser = try? Parser(source: "macro(\(argumentClause))")
+                        guard parser != nil else {
+                            return nil
+                        }
+                        _ = try? parser?.consumeCallableName()
+                        guard let parsedArguments = try? parser?.parseInvocationArgumentsIfPresent() else {
+                            return nil
+                        }
+                        arguments = parsedArguments
+                    } else {
+                        arguments = []
+                    }
+                    return try? evaluateFreestandingSyntaxMacro(
+                        invokedMacro,
+                        arguments: arguments,
+                        callerLocals: locals,
+                        context: context
+                    )
+                case .return(let expression?):
+                    return evaluator.evaluate(expression, with: locals)
+                case .expression(let expression):
+                    return evaluator.evaluate(expression, with: locals)
+                case .switchStatement:
+                    return try? statementSyntaxValue(statement)
+                case .conditional(let branches):
+                    for branch in branches {
+                        if let condition = branch.condition {
+                            guard case .boolean(true) = evaluator.evaluate(condition, with: locals) else {
+                                continue
+                            }
+                        }
+                        return evaluateStatements(branch.body, locals: locals)
+                    }
+                default:
+                    return nil
+                }
             }
+            return nil
         }
-        return nil
+
+        return evaluateStatements(macro.body, locals: localBindings)
     }
 
     static func resolvedSyntaxMacroArgument(
@@ -2612,7 +2657,9 @@ extension MacroExpander {
                 return try renderSyntaxMacroText(text, parameterBindings: parameterBindings)
             case .splice(let expression, let expected):
                 guard let value = evaluator.evaluate(expression) else {
-                    throw ParseError("Could not evaluate syntax macro splice.")
+                    throw ParseError(
+                        "Could not evaluate syntax macro splice: \(renderExpressionForStringify(expression))"
+                    )
                 }
                 if expected == .expressionList, let rendered = renderExpressionList(value, renderer: renderer) {
                     return rendered
