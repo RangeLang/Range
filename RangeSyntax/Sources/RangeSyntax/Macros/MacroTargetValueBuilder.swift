@@ -559,9 +559,16 @@ struct MacroTargetValueBuilder {
     }
 
     private func blockValue(for statements: [Statement]) -> CompileTimeValue {
-        .object(
+        let statementValues = statements.map(statementValue)
+        return .object(
             typeName: "Block",
-            fields: ["statements": .array(statements.map(statementValue))]
+            fields: [
+                "declaration": .object(
+                    typeName: "Block.Declaration",
+                    fields: ["statements": .array(statementValues)]
+                ),
+                "statements": .array(statementValues),
+            ]
         )
     }
 

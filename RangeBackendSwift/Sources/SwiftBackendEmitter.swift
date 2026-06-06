@@ -3158,8 +3158,13 @@ struct SwiftBackendEmitter {
                 scope: scope
             )
             return """
-                \(prefix)_ = Range_POSIXThread.spawn {
+                \(prefix)switch Range_POSIXThread.spawn({
                 \(bodyText)
+                \(prefix)}) {
+                \(prefix)case .success(let handle):
+                \(prefix)    _ = Range_POSIXThread.detach(handle)
+                \(prefix)case .failure:
+                \(prefix)    Range_Logger.error("@background failed to spawn thread.")
                 \(prefix)}
                 """
         case .deferBlock(let deferred):
@@ -3864,8 +3869,13 @@ struct SwiftBackendEmitter {
                 enclosingReturnType: enclosingReturnType
             )
             return """
-                \(prefix)_ = Range_POSIXThread.spawn {
+                \(prefix)switch Range_POSIXThread.spawn({
                 \(bodyText)
+                \(prefix)}) {
+                \(prefix)case .success(let handle):
+                \(prefix)    _ = Range_POSIXThread.detach(handle)
+                \(prefix)case .failure:
+                \(prefix)    Range_Logger.error("@background failed to spawn thread.")
                 \(prefix)}
                 """
         case .deferBlock(let deferred):

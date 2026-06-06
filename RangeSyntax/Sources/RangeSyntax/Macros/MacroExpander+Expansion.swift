@@ -270,13 +270,18 @@ extension MacroExpander {
     }
 
     static func blockMacroTargetValue(_ statements: [Statement]) -> CompileTimeValue {
-        .object(
+        let statementValues = statements.map { statement in
+            _ = statement
+            return CompileTimeValue.string("")
+        }
+        return .object(
             typeName: "Block",
             fields: [
-                "statements": .array(statements.map { statement in
-                    _ = statement
-                    return .string("")
-                })
+                "declaration": .object(
+                    typeName: "Block.Declaration",
+                    fields: ["statements": .array(statementValues)]
+                ),
+                "statements": .array(statementValues),
             ]
         )
     }

@@ -1,6 +1,11 @@
 @syntax
 construct Block: SyntaxReplaceable<Block> {
+    let declaration: Declaration
     let statements: [@Statement]
+
+    construct Declaration {
+        let statements: [@Statement]
+    }
 
     function replace(with replacement: Block): Block
 }

@@ -409,6 +409,57 @@ extension MacroExpander {
                     )
                 )
             ]
+        case .localBinding(let declaration):
+            return [
+                .localBinding(
+                    LocalBindingDeclaration(
+                        kind: declaration.kind,
+                        name: declaration.name,
+                        hasExplicitTypeAnnotation: declaration.hasExplicitTypeAnnotation,
+                        type: declaration.type,
+                        expression: substituteMacroTargetCalls(
+                            in: declaration.expression,
+                            targetBinding: targetBinding,
+                            targetBlock: targetBlock
+                        )
+                    )
+                )
+            ]
+        case .assignment(let target, let expression):
+            return [
+                .assignment(
+                    target: target,
+                    expression: substituteMacroTargetCalls(
+                        in: expression,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    )
+                )
+            ]
+        case .compoundAssignment(let target, let operatorSymbol, let expression):
+            return [
+                .compoundAssignment(
+                    target: target,
+                    operatorSymbol: operatorSymbol,
+                    expression: substituteMacroTargetCalls(
+                        in: expression,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    )
+                )
+            ]
+        case .return(let expression):
+            return [
+                .return(
+                    expression.map {
+                        substituteMacroTargetCalls(
+                            in: $0,
+                            targetBinding: targetBinding,
+                            targetBlock: targetBlock
+                        )
+                    }
+                )
+            ]
         case .derived(let name, let typeName, let body):
             return [
                 .derived(
@@ -464,10 +515,22 @@ extension MacroExpander {
                 )
             ]
         case .forEach(let name, let sequence, let body):
+            if shouldSpliceTargetBlock(
+                loopBinding: name,
+                sequence: sequence,
+                body: body,
+                targetBinding: targetBinding
+            ) {
+                return targetBlock
+            }
             return [
                 .forEach(
                     name: name,
-                    sequence: sequence,
+                    sequence: substituteMacroTargetCalls(
+                        in: sequence,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    ),
                     body: substituteMacroTargetCalls(
                         in: body,
                         targetBinding: targetBinding,
@@ -478,7 +541,11 @@ extension MacroExpander {
         case .whileLoop(let condition, let body):
             return [
                 .whileLoop(
-                    condition: condition,
+                    condition: substituteMacroTargetCalls(
+                        in: condition,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    ),
                     body: substituteMacroTargetCalls(
                         in: body,
                         targetBinding: targetBinding,
@@ -491,7 +558,13 @@ extension MacroExpander {
                 .conditional(
                     branches.map { branch in
                         StatementConditionalBranch(
-                            condition: branch.condition,
+                            condition: branch.condition.map {
+                                substituteMacroTargetCalls(
+                                    in: $0,
+                                    targetBinding: targetBinding,
+                                    targetBlock: targetBlock
+                                )
+                            },
                             body: substituteMacroTargetCalls(
                                 in: branch.body,
                                 targetBinding: targetBinding,
@@ -504,7 +577,11 @@ extension MacroExpander {
         case .switchStatement(let expression, let cases, let defaultBody):
             return [
                 .switchStatement(
-                    expression: expression,
+                    expression: substituteMacroTargetCalls(
+                        in: expression,
+                        targetBinding: targetBinding,
+                        targetBlock: targetBlock
+                    ),
                     cases: cases.map { switchCase in
                         SwitchCase(
                             pattern: switchCase.pattern,
@@ -527,6 +604,23 @@ extension MacroExpander {
         default:
             return [statement]
         }
+    }
+
+    static func shouldSpliceTargetBlock(
+        loopBinding: String,
+        sequence: Expression,
+        body: [Statement],
+        targetBinding: String
+    ) -> Bool {
+        guard case .identifier(let sequenceName) = sequence,
+            sequenceName == "\(targetBinding).declaration.statements"
+                || sequenceName == "\(targetBinding).statements",
+            body.count == 1,
+            case .expression(.identifier(loopBinding)) = body[0]
+        else {
+            return false
+        }
+        return true
     }
 
     static func substituteMacroTargetCalls(

@@ -169,7 +169,7 @@ def embedded_swift_env() -> dict[str, str] | None:
 
 
 def package_manifest(name: str) -> str:
-    return f"""#package
+    return f"""@Project
 construct Project {{
     let name: Title("{name}")
     let version: Version(0.1.0)
@@ -511,7 +511,7 @@ def cases() -> list[BenchmarkCase]:
                 print(acc)
             """,
             range_source=rf"""
-                function choose<T>(lhs lhs: T, rhs rhs: T, flag flag: Bool) -> T {{
+                function choose<T>(lhs lhs: T, rhs rhs: T, flag flag: Bool): T {{
                     if flag {{
                         return lhs
                     }}
@@ -540,6 +540,8 @@ def write_text(path: Path, value: str) -> None:
 
 def prepare_range_project(case: BenchmarkCase) -> Path:
     project = BUILD / "range-projects" / case.name
+    if project.exists():
+        shutil.rmtree(project)
     project.mkdir(parents=True, exist_ok=True)
     write_text(project / "Project.range", package_manifest("RangeSpeed" + case.name.title().replace("_", "")))
     write_text(project / "Playground.range", case.range_source)
@@ -582,17 +584,12 @@ def build_case(
     targets.append(BenchTarget("Python", ["python3", str(python_source), str(case.n)]))
 
     range_project = prepare_range_project(case)
-    range_binary = range_project / ".range" / "Build" / "swift" / ".build" / "release" / "RangeGenerated"
-    if timed_setup(f"{case.name} Range emit", [str(range_cli), "compile", str(range_project)]):
-        if timed_setup(
-            f"{case.name} Range generated Swift",
-            ["swift", "build", "-c", "release"],
-            cwd=range_project / ".range" / "Build" / "swift",
-            env=range_env,
-        ):
+    range_binary = range_project / ".range" / "Build" / "swift" / ".build" / "debug" / "RangeGenerated"
+    if timed_setup(f"{case.name} Range emit/build", [str(range_cli), "run", str(range_project)]):
+        if range_binary.is_file():
             targets.append(BenchTarget("Range", [str(range_binary)]))
         else:
-            print(f"{case.name} Range runtime: skipped because generated Swift did not build")
+            print(f"{case.name} Range runtime: skipped because generated binary was not found")
 
     return targets
 

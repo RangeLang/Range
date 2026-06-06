@@ -125,7 +125,9 @@ struct SwiftBackendEmitterLayoutTests {
             )
         )
 
-        #expect(swift.contains("_ = Range_POSIXThread.spawn {"))
+        #expect(swift.contains("switch Range_POSIXThread.spawn({"))
+        #expect(swift.contains("_ = Range_POSIXThread.detach(handle)"))
+        #expect(swift.contains("Range_Logger.error(\"@background failed to spawn thread.\")"))
         #expect(!swift.contains("_ = Range_Thread.spawn"))
         #expect(!swift.contains("Task.detached"))
     }

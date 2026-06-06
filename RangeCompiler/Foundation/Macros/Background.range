@@ -1,11 +1,18 @@
 macro background(): Block & @syntax { target, diagnostics, graph in
-    if target.statements.count == 0 {
+    if target.declaration.statements.count == 0 {
         diagnostics.error("@background block must not be empty.")
     }
 
     target.replace(with: {
-        Thread.spawn({
-            target()
-        })
+        switch Thread.spawn({
+            for statement in target.declaration.statements {
+                statement
+            }
+        }) {
+        case .success(let handle):
+            Thread.detach(handle)
+        case .failure:
+            Logger.error("@background failed to spawn thread.")
+        }
     })
 }

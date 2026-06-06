@@ -1831,8 +1831,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(compoundAssignmentName == "Math.clamp")
     }
 
-    @Test("Background macro rewrites block to thread spawn")
-    func backgroundMacroRewritesBlockToThreadSpawn() throws {
+    @Test("Background macro rewrites block to detached thread spawn")
+    func backgroundMacroRewritesBlockToDetachedThreadSpawn() throws {
         let projectPath = "/tmp/BackgroundMacroRewrite.range"
         var inputs = try rangeCoreInputs()
         inputs.append(
@@ -1858,11 +1858,15 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             return
         }
 
-        guard case .expression(.call(let name, let arguments))? = mainBlock.body.first else {
-            Issue.record("Expected @background to rewrite to a Thread.spawn expression statement.")
+        guard case .switchStatement(let spawnExpression, let cases, _)? = mainBlock.body.first else {
+            Issue.record("Expected @background to rewrite to a switch over Thread.spawn.")
             return
         }
 
+        guard case .call(let name, let arguments) = spawnExpression else {
+            Issue.record("Expected @background switch subject to call Thread.spawn.")
+            return
+        }
         #expect(name == "Thread.spawn")
         guard case .block(let body)? = arguments.first?.value else {
             Issue.record("Expected Thread.spawn to receive the background block as its closure body.")
@@ -1875,6 +1879,24 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         }
 
         #expect(bodyCallName == "Thread.yield")
+
+        let successCase = try #require(cases.first)
+        guard case .enumCase(".success", let binding?) = successCase.pattern else {
+            Issue.record("Expected @background success case to bind the thread handle.")
+            return
+        }
+
+        #expect(binding.name == "handle")
+        guard case .expression(.call(let detachName, let detachArguments))? = successCase.body.first else {
+            Issue.record("Expected @background success case to detach the spawned thread.")
+            return
+        }
+
+        #expect(detachName == "Thread.detach")
+        guard case .identifier("handle")? = detachArguments.first?.value else {
+            Issue.record("Expected Thread.detach to receive the spawned thread handle.")
+            return
+        }
     }
 
     @Test("State getter macro rewrites reads in expressions")
