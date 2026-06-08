@@ -13,7 +13,7 @@ Compiler-owned syntax surfaces now live in `RangeCompiler/Core/Syntax`:
 - `Types`
 - `Declarations`
 
-`RangeSyntax/Sources/RangeSyntax/Macros/Macros.Context.md` documents the current
+[Context](Context.md) documents the current
 target-surface model, including declaration-side and application-side macro
 access where needed.
 

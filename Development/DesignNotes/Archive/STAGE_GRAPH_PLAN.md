@@ -54,8 +54,8 @@ Macro graph view files:
 
 Supporting docs:
 
-- [Macros.Context.md](/Users/george/Documents/Range/RangeSyntax/Sources/RangeSyntax/Macros/Macros.Context.md)
-- [DeclarationGraph.md](/Users/george/Documents/Range/RangeSyntax/Sources/RangeSyntax/GraphBindings/MemoryGraph/DeclarationGraph.md)
+- [Macros Context](../Language/Macros/Context.md)
+- [Declaration Graph](../Compiler/Graphs/DeclarationGraph.md)
 
 ### Current Roles
 
