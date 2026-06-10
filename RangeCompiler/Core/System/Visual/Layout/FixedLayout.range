@@ -1,0 +1,15 @@
+@language
+construct FixedLayout: Layout {
+    let size: Size
+
+    function measure(_ proposal: SizeProposal): Size {
+        return Size(
+            width: Math.min(lhs: self.size.width, rhs: proposal.width),
+            height: Math.min(lhs: self.size.height, rhs: proposal.height)
+        )
+    }
+
+    function place(in bounds: Rect): LayoutPlacement {
+        return LayoutPlacement(bounds: bounds, children: [])
+    }
+}

@@ -1,0 +1,5 @@
+@language
+construct LayoutPlacement {
+    let bounds: Rect
+    let children: [LayoutPlacement]
+}

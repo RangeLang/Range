@@ -1,0 +1,9 @@
+@language
+construct Size {
+    let width: Float
+    let height: Float
+
+    derived isEmpty: Bool {
+        return self.width <= 0.0 || self.height <= 0.0
+    }
+}

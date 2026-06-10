@@ -1,0 +1,5 @@
+@language
+protocol Layout {
+    function measure(_ proposal: SizeProposal): Size
+    function place(in bounds: Rect): LayoutPlacement
+}

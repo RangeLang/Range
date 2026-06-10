@@ -1,0 +1,5 @@
+@language
+construct Point {
+    let x: Float
+    let y: Float
+}
