@@ -3,6 +3,6 @@ construct CodingBehavior {
     let exclude: Bool
 }
 
-macro codable<T>(_ key: String? = nil, exclude: Bool = false): @field -> CodingBehavior { target, diagnostics in
+macro codable<T>(_ key: String? = nil, exclude: Bool = false): @property -> CodingBehavior { target, diagnostics in
     return CodingBehavior(key: key, exclude: exclude)
 }

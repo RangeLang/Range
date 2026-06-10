@@ -138,9 +138,6 @@ func macroTargetKinds(
         if name == "construct" {
             return [.construct]
         }
-        if name == "field" {
-            return [.immutable, .state, .binding, .derived, .property, .function, .construct]
-        }
         if name == "property" {
             return [.property]
         }
@@ -164,9 +161,6 @@ func macroTargetAllows(
         }
         if name == "construct" {
             return kind == .construct
-        }
-        if name == "field" {
-            return [.immutable, .state, .binding, .derived, .property, .function, .construct].contains(kind)
         }
         if name == "property" {
             return kind == .property
@@ -671,7 +665,7 @@ struct MacroExpansionContext {
         propertyTypeName: String,
         propertyValueType: TypeReference
     ) -> Bool {
-        if case .macroSurface("field")? = macro.target {
+        if case .macroSurface("property")? = macro.target {
             return true
         }
 
@@ -696,7 +690,7 @@ struct MacroExpansionContext {
         propertyTypeName: String,
         propertyValueType: TypeReference
     ) -> Bool {
-        if case .macroSurface("field") = metadata.target {
+        if case .macroSurface("property") = metadata.target {
             return true
         }
 

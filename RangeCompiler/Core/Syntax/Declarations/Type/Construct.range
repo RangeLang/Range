@@ -4,7 +4,6 @@ construct Construct {
     let application: Application
 
     @graph(.declaration)
-    @field
     construct Declaration {
         let identifier: Identifier
         let self: NominalTypeReference
@@ -15,7 +14,7 @@ construct Construct {
         let states: [State]
         let bindings: [Binding]
         let deriveds: [Derived]
-        let fields: [GraphIdentity]
+        let members: [GraphIdentity]
         let functions: [Function.Declaration]
         let constructs: [Construct.Declaration]
         let extensions: [Extension]

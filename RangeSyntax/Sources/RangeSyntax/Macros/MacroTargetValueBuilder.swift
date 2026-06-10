@@ -45,7 +45,7 @@ struct MacroTargetValueBuilder {
                         "generics": .array(enumeration.genericParameters.map(value(for:))),
                         "cases": .array(enumeration.cases.map(value(for:))),
                     ]
-                )
+                ),
             ]
         )
     }
@@ -69,7 +69,9 @@ struct MacroTargetValueBuilder {
                     kind: "extension",
                     name: extensionDeclaration.targetType.displayName
                 ),
-                "written": writtenSyntaxByID["extension:\(extensionDeclaration.targetType.displayName)"] ?? writtenSyntax(""),
+                "written": writtenSyntaxByID[
+                    "extension:\(extensionDeclaration.targetType.displayName)"]
+                    ?? writtenSyntax(""),
                 "target": target,
                 "declaration": declaration,
                 "inits": .array(initializers),
@@ -120,20 +122,30 @@ struct MacroTargetValueBuilder {
         return name
     }
 
-    func declarationValue(for declaration: ConstructDeclaration, qualifiedName: String) -> CompileTimeValue {
-        let fieldIdentities = declaration.values.map {
-            graphIdentity(kind: "let", name: "\(qualifiedName).\($0.name)")
-        } + declaration.states.map {
-            graphIdentity(kind: "state", name: "\(qualifiedName).\($0.name)")
-        } + declaration.bindings.map {
-            graphIdentity(kind: "binding", name: "\(qualifiedName).\($0.name)")
-        } + declaration.deriveds.map {
-            graphIdentity(kind: "derived", name: "\(qualifiedName).\($0.name)")
-        } + declaration.callables.map {
-            graphIdentity(kind: "function", name: "\(qualifiedName).\($0.name)")
-        } + declaration.constructs.map {
-            graphIdentity(kind: "construct", name: qualifiedNestedName(owner: qualifiedName, member: $0.name))
-        }
+    func declarationValue(for declaration: ConstructDeclaration, qualifiedName: String)
+        -> CompileTimeValue
+    {
+        let memberIdentities =
+            declaration.values.map {
+                graphIdentity(kind: "let", name: "\(qualifiedName).\($0.name)")
+            }
+            + declaration.states.map {
+                graphIdentity(kind: "state", name: "\(qualifiedName).\($0.name)")
+            }
+            + declaration.bindings.map {
+                graphIdentity(kind: "binding", name: "\(qualifiedName).\($0.name)")
+            }
+            + declaration.deriveds.map {
+                graphIdentity(kind: "derived", name: "\(qualifiedName).\($0.name)")
+            }
+            + declaration.callables.map {
+                graphIdentity(kind: "function", name: "\(qualifiedName).\($0.name)")
+            }
+            + declaration.constructs.map {
+                graphIdentity(
+                    kind: "construct",
+                    name: qualifiedNestedName(owner: qualifiedName, member: $0.name))
+            }
 
         return .object(
             typeName: "Construct.Declaration",
@@ -145,27 +157,33 @@ struct MacroTargetValueBuilder {
                 "generics": .array(declaration.genericParameters.map(value(for:))),
                 "conformances": .array(declaration.conformances.map(typeReferenceValue)),
                 "inits": .array(declaration.initializers.map(value(for:))),
-                "lets": .array(declaration.values.map {
-                    value(for: $0, ownerConstructName: qualifiedName)
-                }),
-                "states": .array(declaration.states.map {
-                    value(for: $0, ownerConstructName: qualifiedName)
-                }),
-                "bindings": .array(declaration.bindings.map {
-                    value(for: $0, ownerConstructName: qualifiedName)
-                }),
-                "deriveds": .array(declaration.deriveds.map {
-                    value(for: $0, ownerConstructName: qualifiedName)
-                }),
-                "fields": .array(fieldIdentities),
-                "functions": .array(declaration.callables.map {
-                    value(for: $0, ownerConstructName: qualifiedName)
-                }),
+                "lets": .array(
+                    declaration.values.map {
+                        value(for: $0, ownerConstructName: qualifiedName)
+                    }),
+                "states": .array(
+                    declaration.states.map {
+                        value(for: $0, ownerConstructName: qualifiedName)
+                    }),
+                "bindings": .array(
+                    declaration.bindings.map {
+                        value(for: $0, ownerConstructName: qualifiedName)
+                    }),
+                "deriveds": .array(
+                    declaration.deriveds.map {
+                        value(for: $0, ownerConstructName: qualifiedName)
+                    }),
+                "members": .array(memberIdentities),
+                "functions": .array(
+                    declaration.callables.map {
+                        value(for: $0, ownerConstructName: qualifiedName)
+                    }),
                 "constructs": .array(
                     declaration.constructs.map {
                         declarationValue(
                             for: $0,
-                            qualifiedName: qualifiedNestedName(owner: qualifiedName, member: $0.name)
+                            qualifiedName: qualifiedNestedName(
+                                owner: qualifiedName, member: $0.name)
                         )
                     }
                 ),
@@ -384,7 +402,9 @@ struct MacroTargetValueBuilder {
         return value
     }
 
-    private static func macroMetadataValue(_ value: CompileTimeValue, matches type: TypeReference) -> Bool {
+    private static func macroMetadataValue(_ value: CompileTimeValue, matches type: TypeReference)
+        -> Bool
+    {
         switch (value, type) {
         case (.string, .named("String")):
             return true
@@ -426,7 +446,8 @@ struct MacroTargetValueBuilder {
             fields["declaration"] = value(for: declaration)
         }
         if let metadata = macroMetadataByName[application.name] {
-            fields["packageVisibility"] = .string(packageVisibilityName(for: metadata.packageVisibility))
+            fields["packageVisibility"] = .string(
+                packageVisibilityName(for: metadata.packageVisibility))
             fields["valueType"] = typeReferenceValue(metadata.valueType)
             fields["valueTypeName"] = .string(metadata.valueType.displayName)
             if metadata.valueType.isMacroMetadataEffect {
@@ -455,7 +476,8 @@ struct MacroTargetValueBuilder {
             fields: [
                 "name": .string(declaration.name),
                 "identifier": identifier(declaration.name),
-                "packageVisibility": .string(packageVisibilityName(for: declaration.packageVisibility)),
+                "packageVisibility": .string(
+                    packageVisibilityName(for: declaration.packageVisibility)),
                 "target": .string(declaration.target?.displayName ?? ""),
                 "targetSyntax": declaration.target.map(value(for:)) ?? .string(""),
                 "expansionType": declaration.expansionType.map(typeReferenceValue) ?? .string(""),
@@ -480,7 +502,8 @@ struct MacroTargetValueBuilder {
             fields: [
                 "name": .string(metadata.name),
                 "identifier": identifier(metadata.name),
-                "packageVisibility": .string(packageVisibilityName(for: metadata.packageVisibility)),
+                "packageVisibility": .string(
+                    packageVisibilityName(for: metadata.packageVisibility)),
                 "target": .string(metadata.target.displayName),
                 "targetSyntax": value(for: metadata.target),
                 "expansionType": typeReferenceValue(metadata.valueType),
@@ -614,25 +637,30 @@ struct MacroTargetValueBuilder {
                     "mutable": .boolean(declaration.kind == .mutable),
                     "identifier": identifier(declaration.name),
                     "type": typeReferenceValue(declaration.type),
-                    "expression": writtenSyntax(MacroExpander.renderExpressionForStringify(declaration.expression)),
+                    "expression": writtenSyntax(
+                        MacroExpander.renderExpressionForStringify(declaration.expression)),
                 ]
             )
         case .return(let expression):
             return .object(
                 typeName: "Return",
                 fields: [
-                    "expression": expression.map { writtenSyntax(MacroExpander.renderExpressionForStringify($0)) } ?? writtenSyntax("")
+                    "expression": expression.map {
+                        writtenSyntax(MacroExpander.renderExpressionForStringify($0))
+                    } ?? writtenSyntax("")
                 ]
             )
         case .expression(let expression):
             return .object(
                 typeName: "ExpressionStatement",
                 fields: [
-                    "expression": writtenSyntax(MacroExpander.renderExpressionForStringify(expression))
+                    "expression": writtenSyntax(
+                        MacroExpander.renderExpressionForStringify(expression))
                 ]
             )
         case .background(let background):
-            return .object(typeName: "Background", fields: ["body": blockValue(for: background.body)])
+            return .object(
+                typeName: "Background", fields: ["body": blockValue(for: background.body)])
         case .deferBlock(let deferred):
             return .object(typeName: "Defer", fields: ["body": blockValue(for: deferred.body)])
         case .break:
@@ -678,7 +706,8 @@ struct MacroTargetValueBuilder {
             case .text(let text):
                 return text
             case .splice(let expression, let expected):
-                return "#(\(MacroExpander.renderExpressionForStringify(expression)): \(expected.rawValue))"
+                return
+                    "#(\(MacroExpander.renderExpressionForStringify(expression)): \(expected.rawValue))"
             case .syntaxMacroInvocation(let name, let arguments):
                 let renderedArguments = arguments.map { argument in
                     let value = MacroExpander.renderExpressionForStringify(argument.value)
@@ -690,9 +719,11 @@ struct MacroTargetValueBuilder {
     }
 
     private func argumentValues(for application: MacroApplication) -> [CompileTimeValue] {
-        guard let argumentClause = application.argumentClause?.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        ), !argumentClause.isEmpty else {
+        guard
+            let argumentClause = application.argumentClause?.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ), !argumentClause.isEmpty
+        else {
             return []
         }
 
@@ -740,7 +771,8 @@ struct MacroTargetValueBuilder {
             "returnType": declaration.returnType.map(typeReferenceValue) ?? .string("Void"),
         ]
         if let ownerConstructName {
-            fields["identity"] = graphIdentity(kind: "function", name: "\(ownerConstructName).\(declaration.name)")
+            fields["identity"] = graphIdentity(
+                kind: "function", name: "\(ownerConstructName).\(declaration.name)")
             fields["parent"] = graphIdentity(kind: "construct", name: ownerConstructName)
         }
         return .object(
@@ -776,10 +808,12 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Parameter.Declaration",
             fields: [
-                "externalName": declaration.externalLabel.map(CompileTimeValue.string) ?? .string(""),
+                "externalName": declaration.externalLabel.map(CompileTimeValue.string)
+                    ?? .string(""),
                 "localName": .string(declaration.localName),
                 "type": declaration.typeReference.map(typeReferenceValue) ?? .string("Void"),
-                "captureMetadataType": declaration.captureMetadataType.map(typeReferenceValue) ?? .string(""),
+                "captureMetadataType": declaration.captureMetadataType.map(typeReferenceValue)
+                    ?? .string(""),
                 "defaultValue": declaration.defaultValue.flatMap(value(for:)) ?? .string(""),
             ]
         )
@@ -795,7 +829,8 @@ struct MacroTargetValueBuilder {
                         .object(
                             typeName: "Enum.AssociatedValue",
                             fields: [
-                                "name": associatedValue.label.map(CompileTimeValue.string) ?? .string(""),
+                                "name": associatedValue.label.map(CompileTimeValue.string)
+                                    ?? .string(""),
                                 "type": typeReferenceValue(associatedValue.typeReference),
                             ]
                         )

@@ -1,0 +1,2 @@
+open macro member(): Construct -> Void { target, diagnostics in
+}

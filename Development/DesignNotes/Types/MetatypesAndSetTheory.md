@@ -178,8 +178,9 @@ In this framing:
 - `@syntax` is the broad syntax meta-value universe.
 - `@property` is a semantic category for transform-capable property declarations.
 
-`@field` may still be useful as a domain word for construct member fields, but it
-should only remain if it adds a real semantic distinction beyond "member syntax."
+There is no separate `@field` surface for now. Broad member lists should use
+graph or syntax collections plus narrowing. `@property` remains the semantic
+category for transform-capable property declarations.
 
 ## Property Surfaces
 
@@ -232,8 +233,8 @@ That can be modeled directly with types and surfaces as sets.
   strict contexts?
 - Should there be a spelling for set difference, such as `reject(@property)` or
   `filter(!@property)`?
-- Should `@field` remain as a named surface, or should broad member lists simply
-  use `[@syntax]` plus filtering?
+- Should broad member lists use `[@syntax]` plus filtering, or should the graph
+  expose a dedicated member relationship view?
 - Should type expressions support explicit difference, for example
   `@syntax - @property`?
 - How should graph identities participate in narrowing: as direct values, lazy

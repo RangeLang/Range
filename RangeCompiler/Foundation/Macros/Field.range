@@ -1,2 +1,0 @@
-open macro field(): Construct -> Void { target, diagnostics in
-}

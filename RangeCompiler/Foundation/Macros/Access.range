@@ -1,4 +1,4 @@
-macro access(_ accessTarget: AccessTarget): Construct { target, diagnostics in
+macro access(_ accessTarget: AccessTarget): @syntax { target, diagnostics in
     let accessibleFields: Enum.Declaration(
         self: NamedTypeReference(name: "AccessibleFields"),
         generics: [],

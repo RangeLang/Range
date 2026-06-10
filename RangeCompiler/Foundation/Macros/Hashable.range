@@ -8,6 +8,19 @@ macro hashableBody(hasher: Hasher, properties: [Let]) -> [@Statement] {
     })
 }
 
+macro hash(): Construct { target, diagnostics, graph in
+    target.declaration.expand {
+        extension #(target.declaration.self) {
+            function hash(into hasher: Hasher) {
+                @hashableBody(
+                    hasher: hasher,
+                    properties: target.declaration.lets
+                )
+            }
+        }
+    }
+}
+
 macro hashable(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {

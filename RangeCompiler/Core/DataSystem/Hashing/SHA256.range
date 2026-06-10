@@ -1,0 +1,6 @@
+@language
+construct SHA256 {
+    function digest(data: Data): Data
+
+    function digest(string: String): Data
+}

@@ -1,0 +1,5 @@
+construct PropertyMacroSurfaceFixture {
+    let id: Int
+
+    state count: Int(0)
+}

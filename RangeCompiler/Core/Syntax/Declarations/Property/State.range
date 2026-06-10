@@ -1,6 +1,7 @@
 @syntax
 @property
-@field
+@member
+@graph
 construct State<T> {
     let identity: GraphIdentity
     let parent: GraphIdentity?

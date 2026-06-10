@@ -1,6 +1,7 @@
 @syntax
 @property
-@field
+@member
+@graph
 construct Binding<T> {
     let identity: GraphIdentity
     let parent: GraphIdentity?

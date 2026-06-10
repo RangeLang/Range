@@ -1,6 +1,7 @@
 construct Identity {
+    let uuid: UUID
 }
 
-macro identity(): Construct -> String { target, diagnostics in
-    return "identity"
+macro identity(): Construct -> Identity { target, diagnostics in
+    return Identity(uuid: UUID(storage: UUIDStorage()))
 }

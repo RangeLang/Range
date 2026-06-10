@@ -1,6 +1,7 @@
 import Foundation
-@testable import RangeSyntax
 import Testing
+
+@testable import RangeSyntax
 
 @Suite("Compiler fixtures")
 struct CompilerFixtureTests {
@@ -55,7 +56,8 @@ struct CompilerFixtureTests {
 
     @Test("Open enum extension cases validate")
     func openEnumExtensionCasesValidate() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "System/OpenEnumExtensionCases.range")
+        let fixture = try fixtureFile(
+            in: "CompilePass", path: "System/OpenEnumExtensionCases.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
 
         let cases = program.declarationGraph.enumCases(onEnum: "EncodingFormat").map(\.name)
@@ -66,7 +68,10 @@ struct CompilerFixtureTests {
     func closedEnumExtensionCasesFail() throws {
         let fixtures = [
             ("System/ClosedEnumExtensionCases.range", "Closed enum ClosedEncodingFormat"),
-            ("System/ExplicitClosedEnumExtensionCases.range", "Closed enum ExplicitClosedEncodingFormat"),
+            (
+                "System/ExplicitClosedEnumExtensionCases.range",
+                "Closed enum ExplicitClosedEncodingFormat"
+            ),
         ]
 
         for (path, expectedMessage) in fixtures {
@@ -93,29 +98,29 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/DuplicateProjects.range",
                 source: """
-                open macro Project(): Construct -> Void { target, diagnostics, graph in
-                    let projectMacros: Array<Macro.Application>(
-                        graph.macros.where { entry in
-                            entry.identifier.name == "Project"
+                    open macro Project(): Construct -> Void { target, diagnostics, graph in
+                        let projectMacros: Array<Macro.Application>(
+                            graph.macros.where { entry in
+                                entry.identifier.name == "Project"
+                            }
+                        )
+                        if projectMacros.count > 1 {
+                            diagnostics.error("A second @Project conflicts with the project already declared in this Range project.")
                         }
-                    )
-                    if projectMacros.count > 1 {
-                        diagnostics.error("A second @Project conflicts with the project already declared in this Range project.")
                     }
-                }
 
-                construct Identifier {
-                    let name: String
-                }
+                    construct Identifier {
+                        let name: String
+                    }
 
-                @Project
-                construct FirstProject {
-                }
+                    @Project
+                    construct FirstProject {
+                    }
 
-                @Project
-                construct SecondProject {
-                }
-                """,
+                    @Project
+                    construct SecondProject {
+                    }
+                    """,
                 role: .project
             )
         ]
@@ -137,15 +142,15 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: projectPath,
                 source: """
-                macro reportBody(): Construct { target, diagnostics in
-                    diagnostics.warning(target.body.text)
-                }
+                    macro reportBody(): Construct { target, diagnostics in
+                        diagnostics.warning(target.body.text)
+                    }
 
-                @reportBody
-                construct SourceReadable {
-                    let value: Int
-                }
-                """,
+                    @reportBody
+                    construct SourceReadable {
+                        let value: Int
+                    }
+                    """,
                 role: .project
             )
         )
@@ -220,21 +225,21 @@ struct CompilerFixtureTests {
     @Test("Macro metadata queries graph through identities")
     func macroMetadataQueriesGraphThroughIdentities() throws {
         let source = """
-        @tracked("root")
-        construct User {
-            @tracked("name")
-            let name: String
-            let age: Int
+            @tracked("root")
+            construct User {
+                @tracked("name")
+                let name: String
+                let age: Int
 
-            function displayName(): String {
-                return name
-            }
+                function displayName(): String {
+                    return name
+                }
 
-            construct Nested {
-                let value: Int
+                construct Nested {
+                    let value: Int
+                }
             }
-        }
-        """
+            """
         var parser = try Parser(source: source)
         let sourceFile = try parser.parseSourceFile()
         guard case .construct(let construct) = sourceFile else {
@@ -262,12 +267,6 @@ struct CompilerFixtureTests {
             syntaxBody: nil
         )
         let context = graph.macroExpansionContext(macrosByName: ["tracked": trackedMacro])
-        let fieldTargetKinds = macroTargetKinds(
-            for: .macroSurface("field"),
-            syntaxResolver: context.rewriteSurfaceView.syntaxResolver
-        )
-        #expect(fieldTargetKinds.contains(.function))
-        #expect(fieldTargetKinds.contains(.construct))
         let propertyTargetKinds = macroTargetKinds(
             for: .macroSurface("property"),
             syntaxResolver: context.rewriteSurfaceView.syntaxResolver
@@ -282,9 +281,11 @@ struct CompilerFixtureTests {
             context: context
         )
 
-        guard case .string("User")? = evaluator.evaluate(
-            Expression.identifier("target.identity.name")
-        ) else {
+        guard
+            case .string("User")? = evaluator.evaluate(
+                Expression.identifier("target.identity.name")
+            )
+        else {
             Issue.record("Expected target.identity.name to resolve.")
             return
         }
@@ -356,14 +357,17 @@ struct CompilerFixtureTests {
             Issue.record("Expected attached macro declaration target text to be readable.")
             return
         }
-        guard case .object("Macro.Target", let targetFields)? = macroDeclaration.field("targetSyntax"),
+        guard
+            case .object("Macro.Target", let targetFields)? = macroDeclaration.field("targetSyntax"),
             case .string("macroSurface")? = targetFields["kind"],
             case .string("syntax")? = targetFields["name"]
         else {
             Issue.record("Expected attached macro declaration target to be a metaobject.")
             return
         }
-        guard case .object("WrittenSyntax", let writtenFields)? = macroDeclaration.field("writtenBody"),
+        guard
+            case .object("WrittenSyntax", let writtenFields)? = macroDeclaration.field(
+                "writtenBody"),
             case .string("return \"macro body\"")? = writtenFields["text"]
         else {
             Issue.record("Expected attached macro written body to carry authored text.")
@@ -379,12 +383,12 @@ struct CompilerFixtureTests {
         #expect(statements.count == 1)
 
         let targetDeclaration = try #require(target.field("declaration"))
-        guard case .array(let fieldIdentities)? = targetDeclaration.field("fields") else {
-            Issue.record("Expected construct declaration to expose unified fields.")
+        guard case .array(let memberIdentities)? = targetDeclaration.field("members") else {
+            Issue.record("Expected construct declaration to expose unified members.")
             return
         }
-        #expect(fieldIdentities.count == 4)
-        let fieldIDs: [String] = fieldIdentities.compactMap {
+        #expect(memberIdentities.count == 4)
+        let memberIDs: [String] = memberIdentities.compactMap {
             guard case .object("GraphIdentity", let fields) = $0,
                 case .string(let id)? = fields["id"]
             else {
@@ -392,18 +396,19 @@ struct CompilerFixtureTests {
             }
             return id
         }
-        #expect(fieldIDs == [
-            "let:User.name",
-            "let:User.age",
-            "function:User.displayName",
-            "construct:User.Nested",
-        ])
+        #expect(
+            memberIDs == [
+                "let:User.name",
+                "let:User.age",
+                "function:User.displayName",
+                "construct:User.Nested",
+            ])
 
         let functionDeclaration = try #require(
             evaluator.evaluate(
                 Expression.call(
                     name: "graph.declaration",
-                    arguments: [CallArgument(label: nil, value: fieldIdentities[2].expression!)]
+                    arguments: [CallArgument(label: nil, value: memberIdentities[2].expression!)]
                 )
             )
         )
@@ -414,14 +419,14 @@ struct CompilerFixtureTests {
             evaluator.evaluate(
                 Expression.call(
                     name: "graph.parent",
-                    arguments: [CallArgument(label: "of", value: fieldIdentities[3].expression!)]
+                    arguments: [CallArgument(label: "of", value: memberIdentities[3].expression!)]
                 )
             )
         )
         guard case .object("GraphIdentity", let nestedParentFields) = nestedParent,
             case .string("construct:User")? = nestedParentFields["id"]
         else {
-            Issue.record("Expected graph.parent(of:) to resolve nested construct fields.")
+            Issue.record("Expected graph.parent(of:) to resolve nested construct members.")
             return
         }
 
@@ -457,22 +462,22 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/MacroGraphExpansion.range",
                 source: """
-                macro graphNamed(): Construct { target, diagnostics, graph in
-                    let declaration: Construct.Declaration(graph.declaration(target.identity))
-                    target.declaration.expand {
-                        extension #(declaration.self) {
-                            function graphName(): String {
-                                return "User"
+                    macro graphNamed(): Construct { target, diagnostics, graph in
+                        let declaration: Construct.Declaration(graph.declaration(target.identity))
+                        target.declaration.expand {
+                            extension #(declaration.self) {
+                                function graphName(): String {
+                                    return "User"
+                                }
                             }
                         }
                     }
-                }
 
-                @graphNamed
-                construct User {
-                    let name: String
-                }
-                """,
+                    @graphNamed
+                    construct User {
+                        let name: String
+                    }
+                    """,
                 role: .project
             )
         )
@@ -492,14 +497,14 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/WrittenSyntaxMacro.range",
                 source: """
-                @WrittenSyntax {
-                function this is not parsed -> nope
-                @@@ raw ascii stays isolated
-                }
-                construct User {
-                    let name: String
-                }
-                """,
+                    @WrittenSyntax {
+                    function this is not parsed -> nope
+                    @@@ raw ascii stays isolated
+                    }
+                    construct User {
+                        let name: String
+                    }
+                    """,
                 role: .project
             )
         )
@@ -516,16 +521,16 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/MacroGraphIdentity.range",
                 source: """
-                macro graphName(): Construct -> String { target, diagnostics, graph in
-                    let declaration: Construct.Declaration(graph.declaration(target.identity))
-                    return declaration.self.name
-                }
+                    macro graphName(): Construct -> String { target, diagnostics, graph in
+                        let declaration: Construct.Declaration(graph.declaration(target.identity))
+                        return declaration.self.name
+                    }
 
-                @graphName
-                construct User {
-                    let name: String
-                }
-                """,
+                    @graphName
+                    construct User {
+                        let name: String
+                    }
+                    """,
                 role: .project
             )
         )
@@ -540,21 +545,21 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ExtensionMacro.range",
                 source: """
-                macro extensionTargetName(): Extension -> String { target, diagnostics in
-                    return target.target.name
-                }
-
-                construct User {
-                    let name: String
-                }
-
-                @extensionTargetName
-                extension User {
-                    function displayName(): String {
-                        return name
+                    macro extensionTargetName(): Extension -> String { target, diagnostics in
+                        return target.target.name
                     }
-                }
-                """,
+
+                    construct User {
+                        let name: String
+                    }
+
+                    @extensionTargetName
+                    extension User {
+                        function displayName(): String {
+                            return name
+                        }
+                    }
+                    """,
                 role: .project
             )
         )
@@ -573,21 +578,21 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/InvalidExtensionMacro.range",
                 source: """
-                macro constructOnly(): Construct -> String { target, diagnostics in
-                    return target.declaration.self.name
-                }
-
-                construct User {
-                    let name: String
-                }
-
-                @constructOnly
-                extension User {
-                    function displayName(): String {
-                        return name
+                    macro constructOnly(): Construct -> String { target, diagnostics in
+                        return target.declaration.self.name
                     }
-                }
-                """,
+
+                    construct User {
+                        let name: String
+                    }
+
+                    @constructOnly
+                    extension User {
+                        function displayName(): String {
+                            return name
+                        }
+                    }
+                    """,
                 role: .project
             )
         )
@@ -596,7 +601,8 @@ struct CompilerFixtureTests {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
             Issue.record("Expected construct macro on extension to fail validation.")
         } catch {
-            #expect(String(describing: error).contains("used on an extension but targets Construct"))
+            #expect(
+                String(describing: error).contains("used on an extension but targets Construct"))
         }
     }
 
@@ -608,10 +614,10 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: projectPath,
                 source: """
-                macro bad(): Parameter { target, diagnostics in
-                    parameters: #[]
-                }
-                """,
+                    macro bad(): Parameter { target, diagnostics in
+                        parameters: #[]
+                    }
+                    """,
                 role: .project
             )
         )
@@ -631,34 +637,34 @@ struct CompilerFixtureTests {
         #expect(diagnostic.range?.end.character == 16)
     }
 
-@Test("Function declarations reject arrow return syntax")
-func functionDeclarationsRejectArrowReturnSyntax() throws {
-    let projectPath = "/tmp/FunctionArrowReturn.range"
-    var inputs = try rangeCoreInputs()
-    inputs.append(
-        SourceInput(
-            path: projectPath,
-            source: """
-            function passthrough(value: Int) -> Int {
-                return value
-            }
-            """,
-            role: .project
+    @Test("Function declarations reject arrow return syntax")
+    func functionDeclarationsRejectArrowReturnSyntax() throws {
+        let projectPath = "/tmp/FunctionArrowReturn.range"
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: projectPath,
+                source: """
+                    function passthrough(value: Int) -> Int {
+                        return value
+                    }
+                    """,
+                role: .project
+            )
         )
-    )
 
-    let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
-    let diagnostic = try #require(
-        diagnostics.first {
-            $0.message == "Function return type clause must be ': ReturnType'."
-                && $0.source == "range-parser"
-                && $0.path == projectPath
-        }
-    )
+        let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
+        let diagnostic = try #require(
+            diagnostics.first {
+                $0.message == "Function return type clause must be ': ReturnType'."
+                    && $0.source == "range-parser"
+                    && $0.path == projectPath
+            }
+        )
 
-    #expect(diagnostic.range?.start.line == 0)
-    #expect(diagnostic.range?.start.character == 33)
-}
+        #expect(diagnostic.range?.start.line == 0)
+        #expect(diagnostic.range?.start.character == 33)
+    }
 
     @Test("Project source cannot declare initializers")
     func projectSourceCannotDeclareInitializers() throws {
@@ -668,14 +674,14 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: projectPath,
                 source: """
-                construct Version {
-                    let value: String
+                    construct Version {
+                        let value: String
 
-                    init(value: String) {
-                        self.value = value
+                        init(value: String) {
+                            self.value = value
+                        }
                     }
-                }
-                """,
+                    """,
                 role: .project
             )
         )
@@ -697,15 +703,15 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/DirectConstructApplication.range",
                 source: """
-                construct User {
-                    let id: Int
-                    let name: String
-                }
+                    construct User {
+                        let id: Int
+                        let name: String
+                    }
 
-                @main {
-                    let user: User(id: 1, name: "George")
-                }
-                """,
+                    @main {
+                        let user: User(id: 1, name: "George")
+                    }
+                    """,
                 role: .project
             )
         )
@@ -716,20 +722,20 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     @Test("Typed construction annotations can be optional")
     func typedConstructionAnnotationsCanBeOptional() throws {
         let source = """
-        construct WidgetCount {
-            let value: Double
-        }
+            construct WidgetCount {
+                let value: Double
+            }
 
-        construct Counter {
-            let count: Optional<Int>(5)
-            let widgetCount: Optional<WidgetCount>(value: 0.1)
-            state current: Optional<Int>(5)
-        }
+            construct Counter {
+                let count: Optional<Int>(5)
+                let widgetCount: Optional<WidgetCount>(value: 0.1)
+                state current: Optional<Int>(5)
+            }
 
-        @main {
-            let local: Optional<Int>(5)
-        }
-        """
+            @main {
+                let local: Optional<Int>(5)
+            }
+            """
 
         var parser = try Parser(source: source)
         let file = try parser.parseSourceFile()
@@ -789,10 +795,10 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     @Test("Local typed declarations replace assignment-shaped type construction")
     func localTypedDeclarationsReplaceAssignmentShapedTypeConstruction() throws {
         let validSource = """
-        @main {
-            let input: Channel<Int>
-        }
-        """
+            @main {
+                let input: Channel<Int>
+            }
+            """
 
         var validInputs = try rangeCoreInputs()
         validInputs.append(
@@ -810,10 +816,10 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: invalidPath,
                 source: """
-                @main {
-                    let input = Channel<Int>
-                }
-                """,
+                    @main {
+                        let input = Channel<Int>
+                    }
+                    """,
                 role: .project
             )
         )
@@ -835,10 +841,10 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: projectPath,
                 source: """
-                @main {
-                    state cursor   LexerCursor(source: "", foreignBodies: [], rules: [])
-                }
-                """,
+                    @main {
+                        state cursor   LexerCursor(source: "", foreignBodies: [], rules: [])
+                    }
+                    """,
                 role: .project
             )
         )
@@ -860,15 +866,15 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: projectPath,
                 source: """
-                construct User {
-                    let id: Int
-                    let name: String
-                }
+                    construct User {
+                        let id: Int
+                        let name: String
+                    }
 
-                @main {
-                    let user: User(identifier: 1, name: "George")
-                }
-                """,
+                    @main {
+                        let user: User(identifier: 1, name: "George")
+                    }
+                    """,
                 role: .project
             )
         )
@@ -889,14 +895,14 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MetadataSlot.range",
                 source: """
-                macro styling(): Construct -> Void { target, diagnostics in
-                }
+                    macro styling(): Construct -> Void { target, diagnostics in
+                    }
 
-                @styling
-                construct Panel {
-                    let title: String
-                }
-                """,
+                    @styling
+                    construct Panel {
+                        let title: String
+                    }
+                    """,
                 role: .project
             )
         )
@@ -914,14 +920,14 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MetadataSlotTarget.range",
                 source: """
-                macro persisted(_ prefix: String): Construct -> Void { target, diagnostics in
-                }
+                    macro persisted(_ prefix: String): Construct -> Void { target, diagnostics in
+                    }
 
-                @persisted("settings")
-                construct Profile {
-                    let displayName: String
-                }
-                """,
+                    @persisted("settings")
+                    construct Profile {
+                        let displayName: String
+                    }
+                    """,
                 role: .project
             )
         )
@@ -939,48 +945,48 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MacroMetadataObjectTag.range",
                 source: """
-                construct TagProofBehavior {
-                    let key: String?
-                    let exclude: Bool
-                }
-
-                macro tagProof<T>(_ key: String? = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
-                    return TagProofBehavior(key: key ?? self.identifier.name, exclude: self.identifier != self.identifier)
-                }
-
-                macro selfFiltered(): Construct { target, diagnostics, graph in
-                    let graphApplications: Array<Macro.Application>(
-                        graph.macros(named: self.name)
-                    )
-                    let namedApplications: Array<Macro.Application>(
-                        graphApplications.filter { application in
-                            application.name == self.name
-                        }
-                    )
-                    let ownApplications: Array<Macro.Application>(
-                        namedApplications.filter { application in
-                            application.identifier == self.identifier
-                        }
-                    )
-                    if ownApplications.count != 1 {
-                        diagnostics.error("Expected self-filtered macro application.")
+                    construct TagProofBehavior {
+                        let key: String?
+                        let exclude: Bool
                     }
 
-                    target.declaration.expand {
-                        extension #(target.declaration.self) {
-                            function selfFilteredMacroCount(): Int {
-                                return #(ownApplications.count)
+                    macro tagProof<T>(_ key: String? = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
+                        return TagProofBehavior(key: key ?? self.identifier.name, exclude: self.identifier != self.identifier)
+                    }
+
+                    macro selfFiltered(): Construct { target, diagnostics, graph in
+                        let graphApplications: Array<Macro.Application>(
+                            graph.macros(named: self.name)
+                        )
+                        let namedApplications: Array<Macro.Application>(
+                            graphApplications.filter { application in
+                                application.name == self.name
+                            }
+                        )
+                        let ownApplications: Array<Macro.Application>(
+                            namedApplications.filter { application in
+                                application.identifier == self.identifier
+                            }
+                        )
+                        if ownApplications.count != 1 {
+                            diagnostics.error("Expected self-filtered macro application.")
+                        }
+
+                        target.declaration.expand {
+                            extension #(target.declaration.self) {
+                                function selfFilteredMacroCount(): Int {
+                                    return #(ownApplications.count)
+                                }
                             }
                         }
                     }
-                }
 
-                @selfFiltered
-                construct Profile {
-                    @tagProof("id")
-                    let userId: Int
-                }
-                """,
+                    @selfFiltered
+                    construct Profile {
+                        @tagProof("id")
+                        let userId: Int
+                    }
+                    """,
                 role: .project
             )
         )
@@ -1017,14 +1023,14 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/PackageManifest.range",
                 source: """
-                @package
-                construct Project {
-                    let name: Title("Example")
-                    let version: Version(0.1.0)
-                    let author: "George"
-                    let modules: ["acme/logger"]
-                }
-                """,
+                    @package
+                    construct Project {
+                        let name: Title("Example")
+                        let version: Version(0.1.0)
+                        let author: "George"
+                        let modules: ["acme/logger"]
+                    }
+                    """,
                 role: .project
             )
         )
@@ -1042,11 +1048,11 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/UnknownAttribute.range",
                 source: """
-                @Missing
-                construct Panel {
-                    let title: String
-                }
-                """,
+                    @Missing
+                    construct Panel {
+                        let title: String
+                    }
+                    """,
                 role: .project
             )
         )
@@ -1066,10 +1072,10 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/ProjectMacros.range",
                 source: """
-                macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
-                    target.replace(with: "captured: \\(value)")
-                }
-                """,
+                    macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
+                        target.replace(with: "captured: \\(value)")
+                    }
+                    """,
                 role: .project
             )
         )
@@ -1077,10 +1083,10 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/ProjectMain.range",
                 source: """
-                @main {
-                    let text: @captureText(1 + 2)
-                }
-                """,
+                    @main {
+                        let text: @captureText(1 + 2)
+                    }
+                    """,
                 role: .project
             )
         )
@@ -1095,19 +1101,19 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/ForwardDeclarations.range",
                 source: """
-                @main {
-                    let messageText: message()
-                    let captured: @captureText(1 + 2)
-                }
+                    @main {
+                        let messageText: message()
+                        let captured: @captureText(1 + 2)
+                    }
 
-                function message(): String {
-                    return "Hello"
-                }
+                    function message(): String {
+                        return "Hello"
+                    }
 
-                macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
-                    target.replace(with: "captured: \\(value)")
-                }
-                """,
+                    macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
+                        target.replace(with: "captured: \\(value)")
+                    }
+                    """,
                 role: .project
             )
         )
@@ -1164,17 +1170,40 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
         #expect(graph.constructsByName["Construct"] != nil)
         #expect(graph.constructsByName["Construct.Application"] != nil)
-        #expect(graph.syntaxResolver.declaration(named: "Construct.Application", conformsTo: "SyntaxReplaceable"))
-        #expect(graph.constructsByName["Construct"]?.macros.contains { $0.name == "syntax" } == true)
-        #expect(graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "graph" && $0.argumentClause == ". declaration" } == true)
-        #expect(graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "graph" && $0.argumentClause == ". application" } == true)
+        #expect(
+            graph.syntaxResolver.declaration(
+                named: "Construct.Application", conformsTo: "SyntaxReplaceable"))
+        #expect(
+            graph.constructsByName["Construct"]?.macros.contains { $0.name == "syntax" } == true)
+        #expect(
+            graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "syntax" }
+                == false)
+        #expect(
+            graph.constructsByName["Construct.Declaration"]?.macros.contains {
+                $0.name == "graph" && $0.argumentClause == ". declaration"
+            } == true)
+        #expect(
+            graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "syntax" }
+                == false)
+        #expect(
+            graph.constructsByName["Construct.Application"]?.macros.contains {
+                $0.name == "graph" && $0.argumentClause == ". application"
+            } == true)
         #expect(graph.constructsByName["Macro"]?.macros.contains { $0.name == "syntax" } == true)
-        #expect(graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "graph" && $0.argumentClause == ". declaration" } == true)
-        #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "syntax" } == false)
-        #expect(graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "graph" && $0.argumentClause == ". application" } == true)
+        #expect(
+            graph.constructsByName["Macro.Declaration"]?.macros.contains { $0.name == "syntax" }
+                == false)
+        #expect(
+            graph.constructsByName["Macro.Declaration"]?.macros.contains {
+                $0.name == "graph" && $0.argumentClause == ". declaration"
+            } == true)
+        #expect(
+            graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "syntax" }
+                == false)
+        #expect(
+            graph.constructsByName["Macro.Application"]?.macros.contains {
+                $0.name == "graph" && $0.argumentClause == ". application"
+            } == true)
     }
 
     @Test("@syntax graph projection contains declaration and application surfaces")
@@ -1377,7 +1406,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
                 )
             )
         )
-        for comparisonToken in ["BangEqual", "EqualEqual", "Less", "LessEqual", "Greater", "GreaterEqual"] {
+        for comparisonToken in [
+            "BangEqual", "EqualEqual", "Less", "LessEqual", "Greater", "GreaterEqual",
+        ] {
             #expect(
                 operators.contains(
                     TokenOperatorConcept(
@@ -1481,20 +1512,20 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     @Test("Declaration graph carries source locations")
     func declarationGraphCarriesSourceLocations() throws {
         let source = """
-        macro codable(): Construct { target, diagnostics in
-        }
+            macro codable(): Construct { target, diagnostics in
+            }
 
-        macro codingKey<T>(_ value: String): Let<T> -> String { target, diagnostics in
-            return value
-        }
+            macro codingKey<T>(_ value: String): Let<T> -> String { target, diagnostics in
+                return value
+            }
 
-        construct User {
-        }
+            construct User {
+            }
 
-        function makeUser(): User {
-            return User()
-        }
-        """
+            function makeUser(): User {
+                return User()
+            }
+            """
         let program = try CompilerPipeline().build(inputs: [
             SourceInput(path: "/tmp/GraphLocations.range", source: source, role: .project)
         ])
@@ -1520,82 +1551,82 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/DeclarationGraphRegistrySnapshot.range",
                 source: """
-                @package
-                construct Project {
-                    let packageName: String("Registry Snapshot")
-                    let modules: ["acme/registry-snapshot"]
-                }
+                    @package
+                    construct Project {
+                        let packageName: String("Registry Snapshot")
+                        let modules: ["acme/registry-snapshot"]
+                    }
 
-                macro styling(): Construct -> Void { target, diagnostics in
-                }
+                    macro styling(): Construct -> Void { target, diagnostics in
+                    }
 
-                macro hostSpace(): Construct -> Void { target, diagnostics in
-                }
+                    macro hostSpace(): Construct -> Void { target, diagnostics in
+                    }
 
-                macro decorate(): Construct { target, diagnostics in
-                }
+                    macro decorate(): Construct { target, diagnostics in
+                    }
 
-                protocol Renderable {
-                    function render(title: String): String
-                }
+                    protocol Renderable {
+                        function render(title: String): String
+                    }
 
-                enum DisplayMode {
-                    case compact
-                    case expanded
-                }
+                    enum DisplayMode {
+                        case compact
+                        case expanded
+                    }
 
-                state globalCount: Int(0)
+                    state globalCount: Int(0)
 
-                construct Address {
-                    let street: String
-                }
+                    construct Address {
+                        let street: String
+                    }
 
-                @styling
-                construct Panel: Renderable {
-                    state count: Int(0)
-                    binding selected: Bool {
-                        get {
-                            return true
+                    @styling
+                    construct Panel: Renderable {
+                        state count: Int(0)
+                        binding selected: Bool {
+                            get {
+                                return true
+                            }
+
+                            set {
+                            }
+                        }
+                        derived label: String {
+                            return title
+                        }
+                        let title: String
+                        let address: Address
+
+                        function render(title: String): String {
+                            return title
                         }
 
-                        set {
+                        function configure(_ value: Int, label name: String): String {
+                            return name
+                        }
+
+                        construct Nested {
+                            let value: Int
                         }
                     }
-                    derived label: String {
-                        return title
-                    }
-                    let title: String
-                    let address: Address
 
-                    function render(title: String): String {
-                        return title
-                    }
+                    extension Panel {
+                        function reset() {
+                        }
 
-                    function configure(_ value: Int, label name: String): String {
-                        return name
+                        enum ExtensionMode {
+                            case reset
+                        }
                     }
 
-                    construct Nested {
-                        let value: Int
+                    @hostSpace
+                    construct Routes {
+                        function home(): String {
+                            return "home"
+                        }
                     }
-                }
-
-                extension Panel {
-                    function reset() {
-                    }
-
-                    enum ExtensionMode {
-                        case reset
-                    }
-                }
-
-                @hostSpace
-                construct Routes {
-                    function home(): String {
-                        return "home"
-                    }
-                }
-                """,
+                    """,
                 role: .project
             )
         )
@@ -1613,38 +1644,42 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(graph.macroMetadataByName["hostSpace"]?.hasMetadataSlotEffect == true)
         #expect(registry.hasExtensions(targeting: "Panel"))
         #expect(graph.packageValues(named: "packageName").count == 1)
-        #expect(graph.topLevelStates(inFilePath: "/tmp/DeclarationGraphRegistrySnapshot.range")
-            .map(\.name) == ["globalCount"])
+        #expect(
+            graph.topLevelStates(inFilePath: "/tmp/DeclarationGraphRegistrySnapshot.range")
+                .map(\.name) == ["globalCount"])
 
         #expect(registry.states(onConstruct: "Panel").map(\.name) == ["count"])
         #expect(registry.bindings(onConstruct: "Panel").map(\.name) == ["selected"])
         #expect(registry.deriveds(onConstruct: "Panel").map(\.name) == ["label"])
         #expect(registry.values(onConstruct: "Panel").map(\.name) == ["title", "address"])
-        #expect(graph.callables(onConstruct: "Panel").map(\.name).sorted() == [
-            "configure",
-            "render",
-            "reset",
-        ])
+        #expect(
+            graph.callables(onConstruct: "Panel").map(\.name).sorted() == [
+                "configure",
+                "render",
+                "reset",
+            ])
 
         let configure = try #require(graph.callable(named: "configure", onConstruct: "Panel"))
         let configureParameters = registry.parameters(ofCallable: configure, ownerName: "Panel")
         #expect(configureParameters.map(\.localName) == ["value", "name"])
         #expect(configureParameters.map(\.externalLabel) == [nil, "label"])
 
-        #expect(graph.declaredMemberSurfaces(forConstruct: "Panel").map(\.name).sorted() == [
-            "address",
-            "count",
-            "label",
-            "selected",
-            "title",
-        ])
+        #expect(
+            graph.declaredMemberSurfaces(forConstruct: "Panel").map(\.name).sorted() == [
+                "address",
+                "count",
+                "label",
+                "selected",
+                "title",
+            ])
         #expect(graph.declaresMemberPath("Panel.address.street", onConstruct: "Panel"))
-        #expect(graph.initializerSurfaces(onConstruct: "Panel").first?.labels == [
-            "title",
-            "address",
-            "count",
-            "selected",
-        ])
+        #expect(
+            graph.initializerSurfaces(onConstruct: "Panel").first?.labels == [
+                "title",
+                "address",
+                "count",
+                "selected",
+            ])
 
         #expect(graph.constructsByName["Panel"]?.macros.map(\.name).contains("styling") == true)
         #expect(graph.constructsByName["Routes"]?.callables.map(\.name) == ["home"])
@@ -1708,25 +1743,28 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/NestedConstructs.range",
                 source: """
-                construct System {
-                    construct Math {
-                        function zero(): Int {
-                            return 0
-                        }
+                    construct System {
+                        construct Math {
+                            function zero(): Int {
+                                return 0
+                            }
 
-                        construct Box {
-                            let number: Int
+                            construct Box {
+                                let number: Int
+                            }
                         }
                     }
-                }
-                """,
+                    """,
                 role: .project
             )
         )
 
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
 
-        #expect(program.declarationGraph.constructsByName["System.Math"]?.callables.map(\.name) == ["zero"])
+        #expect(
+            program.declarationGraph.constructsByName["System.Math"]?.callables.map(\.name) == [
+                "zero"
+            ])
         #expect(program.declarationGraph.constructsByName["System.Math.Box"] != nil)
     }
 
@@ -1737,23 +1775,23 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/MetadataSlotConstruct.range",
                 source: """
-                macro semantic(): Construct -> Void { target, diagnostics in
-                }
-
-                @semantic
-                construct Language {
-                    let defaultLocale: String("en")
-
-                    function identifier(): String {
-                        return defaultLocale
+                    macro semantic(): Construct -> Void { target, diagnostics in
                     }
 
-                    construct Token {
-                        let raw: String
-                    }
-                }
+                    @semantic
+                    construct Language {
+                        let defaultLocale: String("en")
 
-                """,
+                        function identifier(): String {
+                            return defaultLocale
+                        }
+
+                        construct Token {
+                            let raw: String
+                        }
+                    }
+
+                    """,
                 role: .project
             )
         )
@@ -1783,16 +1821,16 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/RegisteredConstructMacro.range",
                 source: """
-                macro hostSpace(): Construct -> Void { target, diagnostics in
-                }
-
-                @hostSpace
-                construct Client {
-                    function route(): String {
-                        return "home"
+                    macro hostSpace(): Construct -> Void { target, diagnostics in
                     }
-                }
-                """,
+
+                    @hostSpace
+                    construct Client {
+                        function route(): String {
+                            return "home"
+                        }
+                    }
+                    """,
                 role: .project
             )
         )
@@ -1822,11 +1860,11 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/TupleShape.range",
                 source: """
-                @tuple
-                construct Point {
-                    binding x: String
-                }
-                """,
+                    @tuple
+                    construct Point {
+                        binding x: String
+                    }
+                    """,
                 role: .project
             )
         )
@@ -1835,7 +1873,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
             Issue.record("Expected @tuple with one binding field to fail validation.")
         } catch {
-            #expect(String(describing: error).contains("@tuple expects exactly two binding fields."))
+            #expect(
+                String(describing: error).contains("@tuple expects exactly two binding fields."))
         }
     }
 
@@ -1843,13 +1882,14 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     func coreMathConstructIsAvailable() throws {
         let program = try CompilerPipeline().buildValidated(inputs: rangeCoreInputs())
 
-        #expect(program.declarationGraph.constructsByName["Math"]?.callables.map(\.name) == [
-            "abs",
-            "abs",
-            "min",
-            "max",
-            "clamp",
-        ])
+        #expect(
+            program.declarationGraph.constructsByName["Math"]?.callables.map(\.name) == [
+                "abs",
+                "abs",
+                "min",
+                "max",
+                "clamp",
+            ])
     }
 
     @Test("Construct extensions reopen static member surface")
@@ -1859,16 +1899,16 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/tmp/ConstructExtension.range",
                 source: """
-                extension Math {
-                    function twice(value: Int): Int {
-                        return value + value
-                    }
+                    extension Math {
+                        function twice(value: Int): Int {
+                            return value + value
+                        }
 
-                    construct Box {
-                        let number: Int
+                        construct Box {
+                            let number: Int
+                        }
                     }
-                }
-                """,
+                    """,
                 role: .project
             )
         )
@@ -1881,8 +1921,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     @Test("Construct conformances require nominal type references")
     func constructConformancesRequireNominalTypeReferences() throws {
         let source = """
-        construct Box: [Int] { }
-        """
+            construct Box: [Int] { }
+            """
 
         do {
             var parser = try Parser(source: source)
@@ -1897,8 +1937,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     @Test("Extension targets require nominal type references")
     func extensionTargetsRequireNominalTypeReferences() throws {
         let source = """
-        extension [Int] { }
-        """
+            extension [Int] { }
+            """
 
         do {
             var parser = try Parser(source: source)
@@ -2131,7 +2171,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
     @Test("Construct macro expand emits extension declarations")
     func constructMacroExpandEmitsExtensionDeclarations() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ConstructAddExtensionSurface.range")
+        let fixture = try fixtureFile(
+            in: "CompilePass", path: "Macros/ConstructAddExtensionSurface.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -2177,7 +2218,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         #expect(module.enumerations.contains(where: { $0.name == "CodingKeys" }) == false)
         #expect(
             module.extensions.allSatisfy { extensionDeclaration in
-                extensionDeclaration.enumerations.contains(where: { $0.name == "CodingKeys" }) == false
+                extensionDeclaration.enumerations.contains(where: { $0.name == "CodingKeys" })
+                    == false
             }
         )
 
@@ -2203,7 +2245,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
     @Test("Equatable macro synthesizes field comparisons")
     func equatableMacroSynthesizesFieldComparisons() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/EquatableMacroSynthesis.range")
+        let fixture = try fixtureFile(
+            in: "CompilePass", path: "Macros/EquatableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -2234,7 +2277,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
     @Test("Hashable macro synthesizes field combines")
     func hashableMacroSynthesizesFieldCombines() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/HashableMacroSynthesis.range")
+        let fixture = try fixtureFile(
+            in: "CompilePass", path: "Macros/HashableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -2263,7 +2307,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
     @Test("Comparable macro synthesizes lexicographic ordering")
     func comparableMacroSynthesizesLexicographicOrdering() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/ComparableMacroSynthesis.range")
+        let fixture = try fixtureFile(
+            in: "CompilePass", path: "Macros/ComparableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -2283,14 +2328,15 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         )
         #expect(fixtureExtension.conformances.map(\.displayName) == ["Comparable"])
         #expect(equalityComparisons(in: fixtureExtension) == ["major", "minor", "patch"])
-        #expect(comparisonChecks(in: fixtureExtension) == [
-            ComparisonCheck(property: "major", returns: true),
-            ComparisonCheck(property: "major", returns: false),
-            ComparisonCheck(property: "minor", returns: true),
-            ComparisonCheck(property: "minor", returns: false),
-            ComparisonCheck(property: "patch", returns: true),
-            ComparisonCheck(property: "patch", returns: false),
-        ])
+        #expect(
+            comparisonChecks(in: fixtureExtension) == [
+                ComparisonCheck(property: "major", returns: true),
+                ComparisonCheck(property: "major", returns: false),
+                ComparisonCheck(property: "minor", returns: true),
+                ComparisonCheck(property: "minor", returns: false),
+                ComparisonCheck(property: "patch", returns: true),
+                ComparisonCheck(property: "patch", returns: false),
+            ])
         #expect(comparisonReturnsFalse(in: fixtureExtension))
 
         let emptyExtension = try #require(
@@ -2302,7 +2348,8 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
 
     @Test("CaseIterable macro synthesizes allCases function")
     func caseIterableMacroSynthesizesAllCasesFunction() throws {
-        let fixture = try fixtureFile(in: "CompilePass", path: "Macros/CaseIterableMacroSynthesis.range")
+        let fixture = try fixtureFile(
+            in: "CompilePass", path: "Macros/CaseIterableMacroSynthesis.range")
         let program = try compile(fixture: fixture, expectedRole: .pass)
         let expandedFile = try #require(
             program.projectExpandedFiles.first(where: { $0.path == fixture.path })
@@ -2366,24 +2413,24 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
     @Test("Generic parameter clauses are shared across declarations")
     func genericParameterClausesAreSharedAcrossDeclarations() throws {
         let source = """
-        construct Box<T: Comparable, let count: Int = 3> { }
+            construct Box<T: Comparable, let count: Int = 3> { }
 
-        enum Maybe<T: Comparable, let count: Int = 3> {
-            case value(T)
-        }
+            enum Maybe<T: Comparable, let count: Int = 3> {
+                case value(T)
+            }
 
-        protocol Cache<T: Comparable, let capacity: Int = 1> {
-            function get(value: T): T
-        }
+            protocol Cache<T: Comparable, let capacity: Int = 1> {
+                function get(value: T): T
+            }
 
-        function identity<T: Comparable, let count: Int = 3>(value: T): T {
-            return value
-        }
+            function identity<T: Comparable, let count: Int = 3>(value: T): T {
+                return value
+            }
 
-        macro clamped<T: Comparable, let count: Int = 3>(_ value: T): State<T> { target, diagnostics in
-            target.replace(with: value)
-        }
-        """
+            macro clamped<T: Comparable, let count: Int = 3>(_ value: T): State<T> { target, diagnostics in
+                target.replace(with: value)
+            }
+            """
 
         var parser = try Parser(source: source)
         let file = try parser.parseSourceFile()
@@ -2406,8 +2453,6 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
         expectSharedGenericShape(module.macros[0].genericParameters)
     }
 
-
-
     @Test("Closed macros cannot be used outside declaring package")
     func closedMacrosCannotBeUsedOutsideDeclaringPackage() throws {
         var inputs = try rangeCoreInputs()
@@ -2415,11 +2460,11 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/test/ClosedMacro.range",
                 source: """
-                closed macro coreOnly(): Construct { target, diagnostics in
-                    target.declaration.expand {
+                    closed macro coreOnly(): Construct { target, diagnostics in
+                        target.declaration.expand {
+                        }
                     }
-                }
-                """,
+                    """,
                 role: .core
             )
         )
@@ -2427,10 +2472,10 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             SourceInput(
                 path: "/test/UseClosedMacro.range",
                 source: """
-                @coreOnly
-                construct UseClosedMacro {
-                }
-                """,
+                    @coreOnly
+                    construct UseClosedMacro {
+                    }
+                    """,
                 role: .project
             )
         )
@@ -2439,7 +2484,9 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             _ = try CompilerPipeline().buildValidated(inputs: inputs)
             Issue.record("Expected closed macro use outside its package to fail.")
         } catch {
-            #expect(String(describing: error).contains("Closed macro @coreOnly can only be used inside its declaring package"))
+            #expect(
+                String(describing: error).contains(
+                    "Closed macro @coreOnly can only be used inside its declaring package"))
         }
     }
 
@@ -2477,14 +2524,15 @@ func functionDeclarationsRejectArrowReturnSyntax() throws {
             runtimeHooks: [hook]
         )
 
-        #expect(hook.stages == [
-            .coreDeclarationsDiscovered,
-            .coreParsed,
-            .projectDeclarationsDiscovered,
-            .projectParsed,
-            .macrosExpanded,
-            .declarationGraphBuilt,
-        ])
+        #expect(
+            hook.stages == [
+                .coreDeclarationsDiscovered,
+                .coreParsed,
+                .projectDeclarationsDiscovered,
+                .projectParsed,
+                .macrosExpanded,
+                .declarationGraphBuilt,
+            ])
         #expect(program.runtimeHookResults.count == 6)
         #expect(program.runtimeHookResults.last?.artifacts["constructs"] != nil)
         #expect(
@@ -2558,7 +2606,6 @@ private func expectSharedGenericShape(_ parameters: [GenericParameter]) {
 
     #expect(value == 3 || value == 1)
 }
-
 
 private func encodeKeys(in extensionDeclaration: ExtensionDeclaration) -> [String: String] {
     guard let encode = extensionDeclaration.callables.first(where: { $0.name == "encode" }),
@@ -2769,16 +2816,19 @@ private func fixtureFile(in suite: String, path: String) throws -> URL {
 
 private func rangeCoreInputs() throws -> [SourceInput] {
     let root = try repositoryRoot().appendingPathComponent("RangeCompiler", isDirectory: true)
-    let files = try rangeFiles(
-        in: root.appendingPathComponent("Core", isDirectory: true),
-        excludingExploration: true
-    ) + rangeFiles(
-        in: root.appendingPathComponent("Foundation/Macros", isDirectory: true),
-        excludingExploration: true
-    ) + rangeFiles(
-        in: root.appendingPathComponent("Lexer", isDirectory: true),
-        excludingExploration: true
-    )
+    let files =
+        try rangeFiles(
+            in: root.appendingPathComponent("Core", isDirectory: true),
+            excludingExploration: true
+        )
+        + rangeFiles(
+            in: root.appendingPathComponent("Foundation/Macros", isDirectory: true),
+            excludingExploration: true
+        )
+        + rangeFiles(
+            in: root.appendingPathComponent("Lexer", isDirectory: true),
+            excludingExploration: true
+        )
 
     return try files.map { file in
         SourceInput(
@@ -2825,13 +2875,15 @@ private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL
 private func repositoryRoot() throws -> URL {
     var current = URL(fileURLWithPath: #filePath)
     while current.path != "/" {
-        let candidateCore = current
+        let candidateCore =
+            current
             .appendingPathComponent("RangeCompiler", isDirectory: true)
             .appendingPathComponent("Core", isDirectory: true)
         let candidateFixtures = current.appendingPathComponent("Testing", isDirectory: true)
         var isCoreDirectory: ObjCBool = false
         var isFixturesDirectory: ObjCBool = false
-        if FileManager.default.fileExists(atPath: candidateCore.path, isDirectory: &isCoreDirectory),
+        if FileManager.default.fileExists(
+            atPath: candidateCore.path, isDirectory: &isCoreDirectory),
             isCoreDirectory.boolValue,
             FileManager.default.fileExists(
                 atPath: candidateFixtures.path,
