@@ -9,10 +9,8 @@ to a final implementation.
 
 - [Concurrency](Concurrency.md)
 - [Control Flow](ControlFlow.md)
-- [Layout](Layout.md)
 - [Operators](Operators.md)
 - [Syntax](Syntax.md)
-- [View System Handoff](ViewHandoff.md)
 
 ## Graph Bindings
 

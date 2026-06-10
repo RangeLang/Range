@@ -1,1 +1,0 @@
-macro view(): Function { target, diagnostics in }

@@ -1,9 +1,0 @@
-@language
-construct LayoutMetrics {
-    function outset(size: Size, by insets: EdgeInsets): Size {
-        return Size(
-            width: size.width + insets.horizontal,
-            height: size.height + insets.vertical
-        )
-    }
-}
