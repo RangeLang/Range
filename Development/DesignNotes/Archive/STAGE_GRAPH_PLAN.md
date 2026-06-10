@@ -54,7 +54,7 @@ Macro graph view files:
 
 Supporting docs:
 
-- [Macros Context](../Language/Macros/Context.md)
+- [Macros Context](../Macros/Context.md)
 - [Declaration Graph](../Compiler/Graphs/DeclarationGraph.md)
 
 ### Current Roles

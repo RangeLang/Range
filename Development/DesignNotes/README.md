@@ -5,43 +5,40 @@ still being shaped. These notes are intentionally exploratory: they should
 capture the model, vocabulary, and pressure points before the compiler commits
 to a final implementation.
 
-## Type Theory
+## High Level
 
-- [Generics](TypeTheory/Generics.md)
-- [Metatypes And Set Theory](TypeTheory/MetatypesAndSetTheory.md)
-
-## Language
-
-- [Concurrency](Language/Concurrency.md)
-- [Control Flow](Language/ControlFlow.md)
-- [Operators](Language/Operators.md)
-- [Syntax](Language/Syntax.md)
+- [Concurrency](HighLevel/Concurrency.md)
+- [Control Flow](HighLevel/ControlFlow.md)
+- [Operators](HighLevel/Operators.md)
+- [Syntax](HighLevel/Syntax.md)
 
 ## Graph Bindings
 
-- [Binding](Language/GraphBindings/Binding.md)
-- [Derived](Language/GraphBindings/Derived.md)
-- [State](Language/GraphBindings/State.md)
-- [Value](Language/GraphBindings/Value.md)
+- [Binding](GraphBindings/Binding.md)
+- [Derived](GraphBindings/Derived.md)
+- [State](GraphBindings/State.md)
+- [Value](GraphBindings/Value.md)
 
 ## Macros
 
-- [Macros](Language/Macros/Macros.md)
-- [Core Macro Surface](Language/Macros/CoreMacroSurface.md)
-- [Context](Language/Macros/Context.md)
-- [Expression Block](Language/Macros/ExpressionBlock.md)
-- [Mapping](Language/Macros/Mapping.md)
-- [Phase](Language/Macros/Phase.md)
+- [Macros](Macros/Macros.md)
+- [Core Macro Surface](Macros/CoreMacroSurface.md)
+- [Context](Macros/Context.md)
+- [Expression Block](Macros/ExpressionBlock.md)
+- [Mapping](Macros/Mapping.md)
+- [Phase](Macros/Phase.md)
 
 ## Types
 
-- [Construct](Language/Types/Construct/Construct.md)
-- [Construct Identity](Language/Types/Construct/Identity.md)
-- [Construct Initialization](Language/Types/Construct/Initialization.md)
-- [Enum](Language/Types/Enum.md)
-- [Extension](Language/Types/Extension.md)
-- [Function](Language/Types/Function.md)
-- [Protocol](Language/Types/Protocol.md)
+- [Generics](Types/Generics.md)
+- [Metatypes And Set Theory](Types/MetatypesAndSetTheory.md)
+- [Construct](Types/Construct/Construct.md)
+- [Construct Identity](Types/Construct/Identity.md)
+- [Construct Initialization](Types/Construct/Initialization.md)
+- [Enum](Types/Enum.md)
+- [Extension](Types/Extension.md)
+- [Function](Types/Function.md)
+- [Protocol](Types/Protocol.md)
 
 ## Compiler
 
