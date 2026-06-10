@@ -5,12 +5,12 @@ still being shaped. These notes are intentionally exploratory: they should
 capture the model, vocabulary, and pressure points before the compiler commits
 to a final implementation.
 
-## High Level
+## Core
 
-- [Concurrency](HighLevel/Concurrency.md)
-- [Control Flow](HighLevel/ControlFlow.md)
-- [Operators](HighLevel/Operators.md)
-- [Syntax](HighLevel/Syntax.md)
+- [Concurrency](Concurrency.md)
+- [Control Flow](ControlFlow.md)
+- [Operators](Operators.md)
+- [Syntax](Syntax.md)
 
 ## Graph Bindings
 
