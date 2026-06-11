@@ -765,7 +765,7 @@ extension Parser {
     }
 
     func parameterSignatureKey(_ parameter: RangeFunctionParameter) -> String {
-        let label = parameter.externalLabel ?? "_"
+        let label = parameter.externalLabel ?? parameter.localName
         let typeName =
             parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
             ?? "_"
@@ -782,7 +782,7 @@ extension Parser {
             }
             return "\(externalLabel) \(parameter.localName): \(typeName)"
         }
-        return "_ \(parameter.localName): \(typeName)"
+        return "\(parameter.localName): \(typeName)"
     }
 
     func signatureParameterVariants(_ parameters: [RangeFunctionParameter])

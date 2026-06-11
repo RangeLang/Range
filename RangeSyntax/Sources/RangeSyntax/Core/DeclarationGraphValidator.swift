@@ -527,7 +527,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     }
 
     private func renderParameterRequirement(_ parameter: RangeFunctionParameter) -> String {
-        let label = parameter.externalLabel ?? "_"
+        let label = parameter.externalLabel ?? parameter.localName
         let typeName = parameter.typeReference?.displayName ?? "_"
         return "\(label): \(typeName)"
     }

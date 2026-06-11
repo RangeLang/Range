@@ -1271,7 +1271,7 @@ public struct DeclarationGraph {
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
                 ?? "_"
-            let label = parameter.externalLabel ?? "_"
+            let label = parameter.externalLabel ?? parameter.localName
             return "\(label):\(typeName)"
         }.joined(separator: ",")
     }
@@ -1620,7 +1620,7 @@ private struct SyntaxProjectionAccumulator {
     }
 
     private mutating func addParameter(_ parameter: RangeFunctionParameter, parentID: String) {
-        let label = parameter.externalLabel ?? "_"
+        let label = parameter.externalLabel ?? parameter.localName
         let parameterID = "\(parentID)/parameter:\(label):\(parameter.localName)"
         addEntity(id: parameterID, kind: .parameter, label: parameter.localName)
         addRelation(from: parentID, to: parameterID, kind: .contains)
@@ -1749,7 +1749,7 @@ private struct SyntaxProjectionAccumulator {
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
                 ?? "_"
-            let label = parameter.externalLabel ?? "_"
+            let label = parameter.externalLabel ?? parameter.localName
             return "\(label):\(typeName)"
         }.joined(separator: ",")
     }

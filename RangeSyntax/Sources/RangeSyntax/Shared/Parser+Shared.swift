@@ -74,13 +74,13 @@ extension Parser {
             guard secondName != "_" else {
                 throw ParseError("\(kind.capitalized) internal name cannot be '_'.")
             }
-            return (secondName, firstName == "_" ? nil : firstName)
+            return (secondName, firstName)
         case .keyword(let secondName) where peek(offset: 1) == .colon:
             advance()
             guard secondName != "_" else {
                 throw ParseError("\(kind.capitalized) internal name cannot be '_'.")
             }
-            return (secondName, firstName == "_" ? nil : firstName)
+            return (secondName, firstName)
         default:
             break
         }
