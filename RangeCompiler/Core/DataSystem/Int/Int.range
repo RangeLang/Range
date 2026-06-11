@@ -1,18 +1,62 @@
 @language
 construct Int<let bits: IntLiteral, let signedness: Signedness = .signed> {
-    let storage: IntStorage
+    let storage: Memory<self.identifier>
 
     function literal(literal: IntLiteral): Self {
-        return Self(storage: literal.storage())
+        return Self(memory: literal.storage())
     }
 }
 
 extension Int {
+    @assembly(.arm64, {
+        cmp #lhs.storage #rhs.storage
+        cset #result eq
+    })
     function ==(lhs: Self, rhs: Self): Bool
 }
 
 extension Int {
+    @assembly(.arm64, {
+        cmp #lhs.storage #rhs.storage
+        cset #result lt
+    })
     function <(lhs: Self, rhs: Self): Bool
+}
+
+extension Int {
+    @assembly(.arm64, {
+        add #result.storage #lhs.storage #rhs.storage
+    })
+    function +(lhs: Self, rhs: Self): Self
+}
+
+extension Int {
+    @assembly(.arm64, {
+        sub #result.storage #lhs.storage #rhs.storage
+    })
+    function -(lhs: Self, rhs: Self): Self
+}
+
+extension Int {
+    @assembly(.arm64, {
+        mul #result.storage #lhs.storage #rhs.storage
+    })
+    function *(lhs: Self, rhs: Self): Self
+}
+
+extension Int {
+    @assembly(.arm64, {
+        sdiv #result.storage #lhs.storage #rhs.storage
+    })
+    function /(lhs: Self, rhs: Self): Self
+}
+
+extension Int {
+    @assembly(.arm64, {
+        sdiv #quotient.storage #lhs.storage #rhs.storage
+        msub #result.storage #quotient.storage #rhs.storage #lhs.storage
+    })
+    function %(lhs: Self, rhs: Self): Self
 }
 
 extension Int {

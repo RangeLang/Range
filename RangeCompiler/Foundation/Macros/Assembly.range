@@ -1,0 +1,64 @@
+macro assemblyOperand(@spliced(delimiter: " ") syntax: @syntax): AssemblyOperand { target, diagnostics, graph in
+    return AssemblyOperand(
+        syntax: syntax,
+        representation: syntax.description
+    )
+}
+
+macro assemblyInstruction(
+    @spliced(delimiter: " ") parts: [@syntax]
+): AssemblyInstruction { target, diagnostics, graph in
+    let operands: [AssemblyOperand](
+        parts.map { part in
+            @assemblyOperand(syntax: part)
+        }
+    )
+    let mnemonic: AssemblyOperand(
+        operands.first(
+            default: AssemblyOperand(
+                syntax: target.application.syntax,
+                representation: ""
+            )
+        )
+    )
+
+    return AssemblyInstruction(
+        syntax: target.application.syntax,
+        mnemonic: mnemonic,
+        operands: operands,
+        representation: target.application.syntax.description
+    )
+}
+
+macro assemblySurface(
+    @spliced(delimiter: "\n") lines: [@syntax]
+): AssemblySurface { target, diagnostics, graph in
+    let instructions: [AssemblyInstruction](
+        lines.map { line in
+            @assemblyInstruction(parts: line)
+        }
+    )
+
+    return AssemblySurface(
+        syntax: target.application.syntax,
+        instructions: instructions,
+        representation: target.application.syntax.description
+    )
+}
+
+macro assembly(
+    _ assemblyTarget: AssemblyTarget,
+    @closure representation: @syntax
+): Function -> AssemblyLowering { target, diagnostics, graph in
+    let surface: AssemblySurface(
+        @assemblySurface(lines: representation)
+    )
+
+    return AssemblyLowering(
+        identifier: target.declaration.identifier,
+        parameters: target.declaration.parameters,
+        returnType: target.declaration.returnType,
+        target: assemblyTarget,
+        surface: surface
+    )
+}

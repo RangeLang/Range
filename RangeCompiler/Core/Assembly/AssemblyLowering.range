@@ -1,0 +1,30 @@
+enum AssemblyTarget {
+    case arm64
+}
+
+construct AssemblyOperand {
+    let syntax: @syntax
+    let representation: String
+}
+
+construct AssemblyInstruction {
+    let syntax: @syntax
+    let mnemonic: AssemblyOperand
+    let operands: [AssemblyOperand]
+    let representation: String
+}
+
+construct AssemblySurface {
+    let syntax: @syntax
+    let instructions: [AssemblyInstruction]
+    let representation: String
+}
+
+@graph(.application)
+construct AssemblyLowering {
+    let identifier: Identifier
+    let parameters: [Parameter.Declaration]
+    let returnType: TypeReference?
+    let target: AssemblyTarget
+    let surface: AssemblySurface
+}
