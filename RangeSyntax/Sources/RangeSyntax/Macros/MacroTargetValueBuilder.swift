@@ -806,9 +806,8 @@ struct MacroTargetValueBuilder {
         .object(
             typeName: "Parameter.Declaration",
             fields: [
-                "externalName": declaration.externalLabel.map(CompileTimeValue.string)
-                    ?? .string(""),
-                "localName": .string(declaration.localName),
+                "name": .string(declaration.name),
+                "identifier": identifier(declaration.name),
                 "type": declaration.typeReference.map(typeReferenceValue) ?? .string("Void"),
                 "macros": .array(declaration.macros.map(value(for:))),
                 "capturesSyntax": .boolean(declaration.capturesSyntax),

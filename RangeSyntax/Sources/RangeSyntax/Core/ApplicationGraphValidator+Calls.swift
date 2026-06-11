@@ -587,11 +587,9 @@ extension ApplicationGraphValidator {
 
         for (argument, parameter) in zip(arguments, parameterSequence) {
             if let actualLabel = argument.label {
-                guard actualLabel == parameter.externalLabel else {
+                guard actualLabel == parameter.name else {
                     return false
                 }
-            } else if parameter.externalLabel != nil {
-                return false
             }
         }
 
@@ -609,7 +607,7 @@ extension ApplicationGraphValidator {
             var didMatch = false
             while parameterIndex < parameters.count {
                 let candidate = parameters[parameterIndex]
-                if argument.label == candidate.externalLabel {
+                if argument.label == nil || argument.label == candidate.name {
                     matched.append(candidate)
                     parameterIndex += 1
                     didMatch = true
@@ -649,10 +647,7 @@ extension ApplicationGraphValidator {
         candidates
             .map { callable in
                 let labels = callable.parameters.map { parameter in
-                    if let label = parameter.externalLabel {
-                        return "\(label): ..."
-                    }
-                    return "..."
+                    "\(parameter.name): ..."
                 }.joined(separator: ", ")
                 return "\(callable.name)(\(labels))"
             }

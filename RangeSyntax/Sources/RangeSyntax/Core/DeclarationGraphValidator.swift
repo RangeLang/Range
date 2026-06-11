@@ -478,7 +478,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     ) -> Bool {
         candidate.parameters.count == requirement.parameters.count
             && zip(candidate.parameters, requirement.parameters).allSatisfy { candidate, requirement in
-                labelsMatch(candidate.externalLabel, requirement.externalLabel)
+                candidate.name == requirement.name
                     && candidate.typeReference?.displayName == requirement.typeReference?.displayName
             }
             && candidate.returnType?.displayName == requirement.returnType?.displayName
@@ -492,22 +492,9 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             && candidate.parameters.count == requirement.parameters.count
             && candidate.returnType?.displayName == requirement.returnType?.displayName
             && zip(candidate.parameters, requirement.parameters).allSatisfy { candidate, requirement in
-                labelsMatch(candidate.externalLabel, requirement.externalLabel)
+                candidate.name == requirement.name
                     && candidate.typeReference?.displayName == requirement.typeReference?.displayName
             }
-    }
-
-    private func labelsMatch(_ lhs: String?, _ rhs: String?) -> Bool {
-        normalizeLabel(lhs) == normalizeLabel(rhs)
-    }
-
-    private func normalizeLabel(_ label: String?) -> String? {
-        switch label {
-        case nil, "_":
-            return nil
-        case .some(let value):
-            return value
-        }
     }
 
     private func renderInitializerSignature(_ declaration: InitializerDeclaration) -> String {
@@ -527,7 +514,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
     }
 
     private func renderParameterRequirement(_ parameter: RangeFunctionParameter) -> String {
-        let label = parameter.externalLabel ?? parameter.localName
+        let label = parameter.name
         let typeName = parameter.typeReference?.displayName ?? "_"
         return "\(label): \(typeName)"
     }
@@ -1080,8 +1067,7 @@ private extension RangeFunctionParameter {
     func substituted(using bindings: [String: TypeReference]) -> RangeFunctionParameter {
         RangeFunctionParameter(
             macros: macros,
-            localName: localName,
-            externalLabel: externalLabel,
+            name: localName,
             typeReference: typeReference.map { substitute($0, using: bindings) },
             defaultValue: defaultValue,
             slotName: slotName,

@@ -1598,7 +1598,7 @@ struct CompilerFixtureTests {
                             return title
                         }
 
-                        function configure(_ value: Int, label name: String): String {
+                        function configure(value: Int, name: String): String {
                             return name
                         }
 
@@ -1658,7 +1658,6 @@ struct CompilerFixtureTests {
         let configure = try #require(graph.callable(named: "configure", onConstruct: "Panel"))
         let configureParameters = registry.parameters(ofCallable: configure, ownerName: "Panel")
         #expect(configureParameters.map(\.localName) == ["value", "name"])
-        #expect(configureParameters.map(\.externalLabel) == [nil, "label"])
 
         #expect(
             graph.declaredMemberSurfaces(forConstruct: "Panel").map(\.name).sorted() == [
@@ -2423,7 +2422,7 @@ struct CompilerFixtureTests {
                 return value
             }
 
-            macro clamped<T: Comparable, let count: Int = 3>(_ value: T): State<T> { target, diagnostics in
+            macro clamped<T: Comparable, let count: Int = 3>(value: T): State<T> { target, diagnostics in
                 target.replace(with: value)
             }
             """

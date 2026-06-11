@@ -127,7 +127,7 @@ struct GraphCollector {
             let initializerID = "\(constructID)/init:\(renderParameterList(initializer.parameters))"
             var initializerScope = scope
             for parameter in initializer.parameters {
-                let label = parameter.externalLabel ?? parameter.localName
+                let label = parameter.name
                 let parameterID = "\(initializerID)/parameter:\(label):\(parameter.localName)"
                 initializerScope.symbols[parameter.name] = parameterID
                 if let typeReference = parameter.typeReference,
@@ -174,7 +174,7 @@ struct GraphCollector {
             flowState.inferredConstructTypeByNodeID[selfID] = receiverType.displayName
         }
         for parameter in declaration.parameters {
-            let label = parameter.externalLabel ?? parameter.localName
+            let label = parameter.name
             let parameterID = "\(callableID)/parameter:\(label):\(parameter.localName)"
             callableScope.symbols[parameter.name] = parameterID
             if let typeReference = parameter.typeReference,
@@ -865,7 +865,7 @@ struct GraphCollector {
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
                 ?? "_"
-            let label = parameter.externalLabel ?? parameter.localName
+            let label = parameter.name
             return "\(label):\(typeName)"
         }.joined(separator: ",")
     }

@@ -4,8 +4,8 @@ construct Parameter {
     @description {
         ## The parameter's name and hashed identity.
     }
-    @hidden
-    let identity: Identifier
+    let name: String
+    let identifier: Identifier
     let macros: [@macro]
     let syntax: @syntax
 }
@@ -16,8 +16,8 @@ construct Parameter {
     @description {
         ## The parameter's name and hashed identity.
     }
-    @hidden
-    let identity: Identifier
+    let name: String
+    let identifier: Identifier
     let type: @type
     let syntax: @syntax
 }

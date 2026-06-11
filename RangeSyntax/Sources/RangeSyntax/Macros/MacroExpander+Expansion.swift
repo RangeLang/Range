@@ -1561,8 +1561,7 @@ extension MacroExpander {
 
             return RangeFunctionParameter(
                 macros: parameter.macros,
-                localName: parameter.localName,
-                externalLabel: parameter.externalLabel,
+                name: parameter.localName,
                 typeReference: rewrittenType,
                 defaultValue: parameter.defaultValue,
                 slotName: parameter.slotName,

@@ -14,8 +14,7 @@ public struct DeclarationMacroExpansionResolver: Sendable {
     public static let empty = DeclarationMacroExpansionResolver(macrosByName: [:])
 
     private struct MacroExpansionParameter: Sendable {
-        var localName: String
-        var externalLabel: String?
+        var name: String
         var typeReference: TypeReference?
         var isBinding: Bool
         var capturesSyntax: Bool
@@ -39,8 +38,7 @@ public struct DeclarationMacroExpansionResolver: Sendable {
                     genericParameterNames: Set(macro.genericParameters.map(Self.genericParameterName)),
                     parameters: macro.parameters.map {
                         MacroExpansionParameter(
-                            localName: $0.localName,
-                            externalLabel: $0.externalLabel,
+                            name: $0.name,
                             typeReference: $0.typeReference,
                             isBinding: $0.isBinding,
                             capturesSyntax: $0.capturesSyntax
@@ -108,7 +106,7 @@ public struct DeclarationMacroExpansionResolver: Sendable {
         guard let actualLabel else {
             return true
         }
-        let expectedLabel = parameter.externalLabel ?? parameter.localName
+        let expectedLabel = parameter.name
         return actualLabel == expectedLabel
     }
 
@@ -902,8 +900,7 @@ public struct DeclarationMemberResolver: Sendable {
     }
 
     private struct MemberCallableParameter: Sendable {
-        var localName: String
-        var externalLabel: String?
+        var name: String
         var typeReference: TypeReference?
         var hasDefaultValue: Bool
     }
@@ -969,8 +966,7 @@ public struct DeclarationMemberResolver: Sendable {
                     enumType: enumType,
                     parameters: enumCase.associatedValues.map { associatedValue in
                         MemberCallableParameter(
-                            localName: associatedValue.label ?? "_",
-                            externalLabel: associatedValue.label,
+                            name: associatedValue.label ?? "_",
                             typeReference: associatedValue.typeReference,
                             hasDefaultValue: false
                         )
@@ -1143,8 +1139,7 @@ public struct DeclarationMemberResolver: Sendable {
     ) -> [MemberCallableParameter] {
         parameters.map { parameter in
             MemberCallableParameter(
-                localName: parameter.localName,
-                externalLabel: parameter.externalLabel,
+                name: parameter.name,
                 typeReference: parameter.typeReference.map {
                     qualifyNestedLocalTypes($0, using: nestedTypeMap)
                 },
@@ -1441,7 +1436,7 @@ public struct DeclarationMemberResolver: Sendable {
         guard let actualLabel else {
             return true
         }
-        let expectedLabel = parameter.externalLabel ?? parameter.localName
+        let expectedLabel = parameter.name
         return actualLabel == expectedLabel
     }
 

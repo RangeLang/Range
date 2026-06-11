@@ -582,12 +582,6 @@ extension ApplicationGraphValidator {
         let typeName =
             parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
             ?? "_"
-        if let externalLabel = parameter.externalLabel {
-            if externalLabel == parameter.localName {
-                return "\(parameter.localName): \(typeName)"
-            }
-            return "\(externalLabel) \(parameter.localName): \(typeName)"
-        }
-        return "\(parameter.localName): \(typeName)"
+        return "\(parameter.name): \(typeName)"
     }
 }

@@ -436,7 +436,7 @@ extension MacroExpander {
     }
 
     static func macroArgumentLabel(for parameter: RangeFunctionParameter) -> String? {
-        parameter.externalLabel
+        parameter.name
     }
 }
 

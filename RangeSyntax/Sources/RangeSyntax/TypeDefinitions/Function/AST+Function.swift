@@ -2,8 +2,7 @@ import Foundation
 
 public struct RangeFunctionParameter {
     public let macros: [MacroApplication]
-    public let localName: String
-    public let externalLabel: String?
+    public let name: String
     public let typeReference: TypeReference?
     public let defaultValue: Expression?
     public let slotName: String?
@@ -13,8 +12,7 @@ public struct RangeFunctionParameter {
 
     public init(
         macros: [MacroApplication],
-        localName: String,
-        externalLabel: String?,
+        name: String,
         typeReference: TypeReference?,
         defaultValue: Expression? = nil,
         slotName: String?,
@@ -23,8 +21,7 @@ public struct RangeFunctionParameter {
         captureMetadataType: TypeReference? = nil
     ) {
         self.macros = macros
-        self.localName = localName
-        self.externalLabel = externalLabel
+        self.name = name
         self.typeReference = typeReference
         self.defaultValue = defaultValue
         self.slotName = slotName
@@ -33,8 +30,8 @@ public struct RangeFunctionParameter {
         self.captureMetadataType = captureMetadataType
     }
 
-    public var name: String {
-        localName
+    public var localName: String {
+        name
     }
 
     public var isOptional: Bool {

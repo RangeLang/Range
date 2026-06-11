@@ -393,7 +393,7 @@ public struct DeclarationGraph {
             DeclaredCallableSurface(
                 ownerConstructName: named,
                 name: callable.name,
-                labels: callable.parameters.map(\.externalLabel),
+                labels: callable.parameters.map { Optional($0.name) },
                 parameterTypeNames: callable.parameters.map {
                     $0.typeReference?.displayName ?? $0.slotName
                 },
@@ -418,7 +418,7 @@ public struct DeclarationGraph {
                 DeclaredCallableSurface(
                     ownerConstructName: nil,
                     name: callable.name,
-                    labels: callable.parameters.map(\.externalLabel),
+                    labels: callable.parameters.map { Optional($0.name) },
                     parameterTypeNames: callable.parameters.map {
                         $0.typeReference?.displayName ?? $0.slotName
                     },
@@ -450,7 +450,7 @@ public struct DeclarationGraph {
                 surfaces.append(
                     DeclaredInitializerSurface(
                         ownerConstructName: named,
-                        labels: parameters.map(\.externalLabel),
+                        labels: parameters.map { Optional($0.name) },
                         parameterTypeNames: parameters.map {
                             $0.typeReference?.displayName ?? $0.slotName
                         },
@@ -463,7 +463,7 @@ public struct DeclarationGraph {
         surfaces.append(contentsOf: initializers(onConstruct: named).map { initializer in
             DeclaredInitializerSurface(
                 ownerConstructName: named,
-                labels: initializer.parameters.map(\.externalLabel),
+                labels: initializer.parameters.map { Optional($0.name) },
                 parameterTypeNames: initializer.parameters.map {
                     $0.typeReference?.displayName ?? $0.slotName
                 },
@@ -550,8 +550,7 @@ public struct DeclarationGraph {
             let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
             return RangeFunctionParameter(
                 macros: [],
-                localName: value.localName,
-                externalLabel: value.externalLabel ?? value.localName,
+                name: value.localName,
                 typeReference: .named(value.typeName),
                 defaultValue: defaultValue,
                 slotName: nil,
@@ -572,8 +571,7 @@ public struct DeclarationGraph {
             }
             return RangeFunctionParameter(
                 macros: [],
-                localName: state.name,
-                externalLabel: state.name,
+                name: state.name,
                 typeReference: state.type,
                 defaultValue: defaultValue,
                 slotName: nil,
@@ -587,8 +585,7 @@ public struct DeclarationGraph {
             }
             return RangeFunctionParameter(
                 macros: [],
-                localName: binding.name,
-                externalLabel: binding.externalLabel ?? binding.name,
+                name: binding.name,
                 typeReference: .named(binding.typeName),
                 slotName: nil,
                 isBinding: true,
@@ -1064,7 +1061,7 @@ public struct DeclarationGraph {
                 return RealizedLiteralBridge(
                     initTarget: RealizedInitTarget(
                         constructName: construct.name,
-                        parameterLabels: callable.parameters.map(\.externalLabel),
+                        parameterLabels: callable.parameters.map { Optional($0.name) },
                         isCore: construct.isCore
                     ),
                     carrierTypeName: carrierType.displayName
@@ -1087,7 +1084,7 @@ public struct DeclarationGraph {
                 return RealizedInitMacroTarget(
                     initTarget: RealizedInitTarget(
                         constructName: construct.name,
-                        parameterLabels: initializer.parameters.map(\.externalLabel),
+                        parameterLabels: initializer.parameters.map { Optional($0.name) },
                         isCore: construct.isCore
                     ),
                     macros: initializer.macros
@@ -1108,7 +1105,7 @@ public struct DeclarationGraph {
                     macrosByName: macrosByName,
                     activeConstructs: []
                 )
-                let rewriteLabels = parameters.map(\.externalLabel)
+                let rewriteLabels = parameters.map { Optional($0.name) }
                 let applicationLabels: [String?] = parameters.count == 1 ? [nil] : rewriteLabels
                 targets.append(
                     RealizedInitMacroTarget(
@@ -1271,7 +1268,7 @@ public struct DeclarationGraph {
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
                 ?? "_"
-            let label = parameter.externalLabel ?? parameter.localName
+            let label = parameter.name
             return "\(label):\(typeName)"
         }.joined(separator: ",")
     }
@@ -1329,7 +1326,6 @@ public struct DeclarationGraph {
             rhs.parameters,
             by: {
                 $0.localName == $1.localName
-                    && $0.externalLabel == $1.externalLabel
                     && $0.typeReference == $1.typeReference
                     && $0.slotName == $1.slotName
                     && $0.isBinding == $1.isBinding
@@ -1620,7 +1616,7 @@ private struct SyntaxProjectionAccumulator {
     }
 
     private mutating func addParameter(_ parameter: RangeFunctionParameter, parentID: String) {
-        let label = parameter.externalLabel ?? parameter.localName
+        let label = parameter.name
         let parameterID = "\(parentID)/parameter:\(label):\(parameter.localName)"
         addEntity(id: parameterID, kind: .parameter, label: parameter.localName)
         addRelation(from: parentID, to: parameterID, kind: .contains)
@@ -1749,7 +1745,7 @@ private struct SyntaxProjectionAccumulator {
             let typeName =
                 parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
                 ?? "_"
-            let label = parameter.externalLabel ?? parameter.localName
+            let label = parameter.name
             return "\(label):\(typeName)"
         }.joined(separator: ",")
     }

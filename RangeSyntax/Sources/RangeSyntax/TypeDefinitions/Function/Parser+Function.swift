@@ -232,8 +232,7 @@ extension Parser {
                         parameters.append(
                             RangeFunctionParameter(
                                 macros: macros,
-                                localName: "__anonymous\(parameters.count)",
-                                externalLabel: nil,
+                                name: "__anonymous\(parameters.count)",
                                 typeReference: typeReference,
                                 slotName: nil
                             )
@@ -244,10 +243,7 @@ extension Parser {
                     }
                     index = anonymousParameterStart
                 }
-                let (localName, externalLabel) = try parseLabeledDeclarationName(
-                    expecting: "parameter",
-                    allowOmittedLocalName: allowOmittedLocalName
-                )
+                let localName = try parseParameterName()
 
                 var typeReference: TypeReference?
                 var slotName: String?
@@ -308,8 +304,7 @@ extension Parser {
                 parameters.append(
                     RangeFunctionParameter(
                         macros: macros,
-                        localName: localName,
-                        externalLabel: externalLabel,
+                        name: localName,
                         typeReference: typeReference,
                         defaultValue: defaultValue,
                         slotName: slotName,
@@ -326,6 +321,37 @@ extension Parser {
 
         try consume(.rightParen)
         return parameters
+    }
+
+    private mutating func parseParameterName() throws -> String {
+        let name: String
+        switch peek() {
+        case .identifier(let value):
+            name = value
+            advance()
+        case .keyword(let value):
+            name = value
+            advance()
+        default:
+            throw ParseError("Expected parameter name.")
+        }
+
+        guard name != "_" else {
+            throw ParseError("Parameter name cannot be '_'. Use a macro for hidden parameter behavior.")
+        }
+
+        switch peek() {
+        case .identifier, .keyword:
+            if peek(offset: 1) == .colon {
+                throw ParseError(
+                    "Parameter declarations use a single name; external labels are not supported."
+                )
+            }
+        default:
+            break
+        }
+
+        return name
     }
 
     mutating func parseInitializerDeclaration(signatureOnly: Bool = false) throws -> InitializerDeclaration {
@@ -721,7 +747,7 @@ extension Parser {
             return false
         }
         return zip(lhs, rhs).allSatisfy {
-            $0.externalLabel == $1.externalLabel
+            $0.name == $1.name
                 && $0.typeReference == $1.typeReference
                 && $0.slotName == $1.slotName
                 && $0.isBinding == $1.isBinding
@@ -765,7 +791,7 @@ extension Parser {
     }
 
     func parameterSignatureKey(_ parameter: RangeFunctionParameter) -> String {
-        let label = parameter.externalLabel ?? parameter.localName
+        let label = parameter.name
         let typeName =
             parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
             ?? "_"
@@ -776,13 +802,7 @@ extension Parser {
         let typeName =
             parameter.slotName.map { "@\($0)" } ?? parameter.renderedTypeName
             ?? "_"
-        if let externalLabel = parameter.externalLabel {
-            if externalLabel == parameter.localName {
-                return "\(parameter.localName): \(typeName)"
-            }
-            return "\(externalLabel) \(parameter.localName): \(typeName)"
-        }
-        return "\(parameter.localName): \(typeName)"
+        return "\(parameter.name): \(typeName)"
     }
 
     func signatureParameterVariants(_ parameters: [RangeFunctionParameter])

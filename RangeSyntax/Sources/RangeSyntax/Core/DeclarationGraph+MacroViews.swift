@@ -97,7 +97,7 @@ extension DeclarationGraph {
 
         return ParameterMacroSignature(
             name: callable.name,
-            labels: callable.parameters.map(\.externalLabel),
+            labels: callable.parameters.map { Optional($0.name) },
             parameterMacrosByIndex: parameterMacrosByIndex
         )
     }
@@ -121,7 +121,7 @@ extension DeclarationGraph {
 
         return FunctionMacroSignature(
             name: callable.name,
-            labels: callable.parameters.map(\.externalLabel),
+            labels: callable.parameters.map { Optional($0.name) },
             functionMacros: functionMacros
         )
     }
