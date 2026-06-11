@@ -1,0 +1,8 @@
+open macro expand(
+    _ expansionTarget: @syntax,
+    @closure expansion: @syntax
+): @syntax -> Void { target, diagnostics, graph in
+    expansionTarget.expand {
+        expansion
+    }
+}

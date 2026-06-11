@@ -1,5 +1,13 @@
-open macro closure(): @property -> Void { target, diagnostics in
-    target.syntax.replace(with: {
-        target.syntax
-    })
+construct ClosureSyntax: @syntax {
+    let syntax: @syntax
+    let description: String
+    let delimiter: String
+}
+
+open macro closure(_ delimiter: String = "\n"): @parameter -> @syntax { target, diagnostics in
+    return ClosureSyntax(
+        syntax: target.application.syntax,
+        description: target.application.syntax.description,
+        delimiter: delimiter
+    )
 }
