@@ -64,6 +64,49 @@ struct CompilerFixtureTests {
         #expect(cases == ["json", "binary", "urlForm"])
     }
 
+    @Test("Int addition carries arm64 assembly lowering")
+    func intAdditionCarriesArm64AssemblyLowering() throws {
+        let source = """
+            construct Int {
+            }
+
+            extension Int {
+                @assembly(.arm64, {
+                    add #result #lhs #rhs
+                })
+                function +(lhs: Self, rhs: Self): Self
+            }
+
+            function makeValue(): Int {
+                return 5 + 10
+            }
+            """
+        let program = try CompilerPipeline().build(inputs: [
+            SourceInput(path: "/tmp/IntAdditionAssembly.range", source: source, role: .project)
+        ])
+
+        let addition = try #require(
+            program.declarationGraph.callables(onConstruct: "Int").first { $0.name == "+" }
+        )
+        let assembly = try #require(addition.macros.first { $0.name == "assembly" })
+
+        #expect(assembly.argumentClause?.contains(". arm64") == true)
+        #expect(assembly.argumentClause?.contains("add # result # lhs # rhs") == true)
+
+        let makeValue = try #require(program.declarationGraph.callablesByName["makeValue"]?.first)
+        #expect(makeValue.body?.contains(where: { statement in
+            guard case .return(let expression?) = statement else {
+                return false
+            }
+            guard case .binary(let lhs, let operation, let rhs) = expression else {
+                return false
+            }
+            return operation == .addition
+                && MacroExpander.renderExpressionForStringify(lhs) == "5"
+                && MacroExpander.renderExpressionForStringify(rhs) == "10"
+        }) == true)
+    }
+
     @Test("Closed enum extension cases fail")
     func closedEnumExtensionCasesFail() throws {
         let fixtures = [

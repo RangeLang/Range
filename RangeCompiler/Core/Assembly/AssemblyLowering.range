@@ -5,6 +5,7 @@ enum AssemblyTarget {
 construct AssemblyOperand {
     let syntax: @syntax
     let representation: String
+    let symbol: Identifier?
 }
 
 construct AssemblyInstruction {
@@ -18,6 +19,12 @@ construct AssemblySurface {
     let syntax: @syntax
     let instructions: [AssemblyInstruction]
     let representation: String
+}
+
+construct AssemblyInstructionShape {
+    let mnemonic: String
+    let operandCount: Int
+    let resultOperandIndex: Int?
 }
 
 @graph(.application)

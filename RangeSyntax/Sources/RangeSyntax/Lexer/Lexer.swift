@@ -129,7 +129,8 @@ struct RangeAuthoredLexerCursor {
                         return .failure(error)
                     }
                 } else {
-                    return failure(message: "Expected '(' after #.", start: start)
+                    _ = advance()
+                    emit(kind: .hash, start: start)
                 }
             } else if character == "@" {
                 switch readSigilIdentifier(start: start) {
