@@ -1,0 +1,5 @@
+open macro closure(): @property -> Void { target, diagnostics in
+    target.syntax.replace(with: {
+        target.syntax
+    })
+}

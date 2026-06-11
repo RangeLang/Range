@@ -66,6 +66,8 @@ public struct CompilationArtifactsEmitter {
             return "foreignBody(\(language), \(text.debugDescription))"
         case .stringLiteral(let value):
             return "stringLiteral(\(value.debugDescription))"
+        case .colorLiteral(let value):
+            return "colorLiteral(#\(value))"
         case .integer(let value):
             return "integer(\(value))"
         case .double(let value):

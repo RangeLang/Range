@@ -68,9 +68,10 @@ extension MacroExpander {
                     context: context
                 )
             }
-            let emittedDeclarationBundles = try module.constructs.map {
-                try emittedDeclarations(from: $0, macros: macros, context: context)
-            }
+            let emittedDeclarationBundles =
+                try module.constructs.map {
+                    try emittedDeclarations(from: $0, macros: macros, context: context)
+                }
                 + module.enumerations.map {
                     try emittedDeclarations(from: $0, macros: macros, context: context)
                 }
@@ -113,8 +114,10 @@ extension MacroExpander {
                             stateEffects: moduleStateEffects
                         )
                     } + emittedDeclarationBundles.flatMap(\.callables),
-                    constructs: expandedConstructs + emittedDeclarationBundles.flatMap(\.constructs),
-                    enumerations: module.enumerations + emittedDeclarationBundles.flatMap(\.enumerations),
+                    constructs: expandedConstructs
+                        + emittedDeclarationBundles.flatMap(\.constructs),
+                    enumerations: module.enumerations
+                        + emittedDeclarationBundles.flatMap(\.enumerations),
                     protocols: module.protocols,
                     macros: module.macros + emittedDeclarationBundles.flatMap(\.macros),
                     precedenceGroups: module.precedenceGroups,
@@ -297,7 +300,11 @@ extension MacroExpander {
             guard let macro = macros[application.name] else {
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetAllows(macro.target!, kind: targetKind, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
+            guard
+                macroTargetAllows(
+                    macro.target!, kind: targetKind,
+                    syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
+            else {
                 throw ParseError(
                     "Macro @\(application.name) is used on \(declarationName) but targets \(macro.target!.displayName)."
                 )
@@ -474,7 +481,8 @@ extension MacroExpander {
             name: callable.name,
             genericParameters: callable.genericParameters,
             hasExplicitParameterClause: callable.hasExplicitParameterClause,
-            parameters: try expand(parameters: callable.parameters, macros: macros, context: context),
+            parameters: try expand(
+                parameters: callable.parameters, macros: macros, context: context),
             returnType: callable.returnType,
             body: try callable.body.map {
                 try expand(
@@ -502,7 +510,8 @@ extension MacroExpander {
     ) throws -> InitializerDeclaration {
         InitializerDeclaration(
             macros: initializer.macros,
-            parameters: try expand(parameters: initializer.parameters, macros: macros, context: context),
+            parameters: try expand(
+                parameters: initializer.parameters, macros: macros, context: context),
             returnType: initializer.returnType,
             body: try initializer.body.map {
                 try expand(
@@ -795,7 +804,8 @@ extension MacroExpander {
                     metadata: metadata,
                     targetValue: targetValue,
                     context: context,
-                    localBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
+                    localBindings: argumentBindings.merging(genericBindings) { _, generic in generic
+                    }
                 )
                 if metadata.valueType.isMacroMetadataEffect {
                     continue
@@ -812,21 +822,24 @@ extension MacroExpander {
 
             guard let macro = macros[application.name] else {
                 if let metadata = context.macroMetadataByName[application.name] {
-                    guard macroTargetAllowsAny(
-                        metadata.target,
-                        kinds: allowedMacroTargetKinds(for: propertyKind),
-                        syntaxResolver: context.rewriteSurfaceView.syntaxResolver
-                    )
+                    guard
+                        macroTargetAllowsAny(
+                            metadata.target,
+                            kinds: allowedMacroTargetKinds(for: propertyKind),
+                            syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+                        )
                     else {
                         throw ParseError(
                             "Macro @\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(metadata.target.displayName)."
                         )
                     }
-                    guard context.propertyMacroMetadataTargetMatches(
-                        metadata,
-                        propertyTypeName: propertyTypeName,
-                        propertyValueType: propertyValueType
-                    ) else {
+                    guard
+                        context.propertyMacroMetadataTargetMatches(
+                            metadata,
+                            propertyTypeName: propertyTypeName,
+                            propertyValueType: propertyValueType
+                        )
+                    else {
                         throw ParseError(
                             "Macro @\(application.name) targeting \(metadata.target.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                         )
@@ -849,7 +862,9 @@ extension MacroExpander {
                         metadata: metadata,
                         targetValue: targetValue,
                         context: context,
-                        localBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
+                        localBindings: argumentBindings.merging(genericBindings) { _, generic in
+                            generic
+                        }
                     )
                     if metadata.valueType.isMacroMetadataEffect {
                         continue
@@ -868,20 +883,24 @@ extension MacroExpander {
                 }
                 throw ParseError("Unknown attached macro @\(application.name).")
             }
-            guard macroTargetAllowsAny(
-                macro.target!,
-                kinds: allowedMacroTargetKinds(for: propertyKind),
-                syntaxResolver: context.rewriteSurfaceView.syntaxResolver
-            ) else {
+            guard
+                macroTargetAllowsAny(
+                    macro.target!,
+                    kinds: allowedMacroTargetKinds(for: propertyKind),
+                    syntaxResolver: context.rewriteSurfaceView.syntaxResolver
+                )
+            else {
                 throw ParseError(
                     "Macro @\(application.name) is used on \(propertyKindDescription(propertyKind)) \(name) but targets \(macro.target!.displayName)."
                 )
             }
-            guard context.propertyMacroTargetMatches(
-                macro,
-                propertyTypeName: propertyTypeName,
-                propertyValueType: propertyValueType
-            ) else {
+            guard
+                context.propertyMacroTargetMatches(
+                    macro,
+                    propertyTypeName: propertyTypeName,
+                    propertyValueType: propertyValueType
+                )
+            else {
                 throw ParseError(
                     "Macro @\(application.name) targeting \(macro.target!.displayName) does not match \(propertyKindDescription(propertyKind)) \(name): \(propertyValueType.displayName)."
                 )
@@ -920,21 +939,27 @@ extension MacroExpander {
                     initializerTransforms.append(
                         substituteMacroBindings(
                             in: substituted,
-                            bindings: [registration.parameterName: .identifier("__property_input__")]
+                            bindings: [
+                                registration.parameterName: .identifier("__property_input__")
+                            ]
                         )
                     )
                 case .getter:
                     getterTransforms.append(
                         substituteMacroBindings(
                             in: substituted,
-                            bindings: [registration.parameterName: .identifier("__property_input__")]
+                            bindings: [
+                                registration.parameterName: .identifier("__property_input__")
+                            ]
                         )
                     )
                 case .setter:
                     setterTransforms.append(
                         substituteMacroBindings(
                             in: substituted,
-                            bindings: [registration.parameterName: .identifier("__property_input__")]
+                            bindings: [
+                                registration.parameterName: .identifier("__property_input__")
+                            ]
                         )
                     )
                 }
@@ -1199,16 +1224,17 @@ extension MacroExpander {
         case .deferBlock(let deferred):
             return [
                 .deferBlock(
-                    DeferredBlock(body: try expand(
-                        statements: deferred.body,
-                        expectedReturnType: expectedReturnType,
-                        macros: macros,
-                        protocols: protocols,
-                        parameterMacroSignatures: parameterMacroSignatures,
-                        literalBridges: literalBridges,
-                        context: context,
-                        stateEffects: stateEffects
-                    ))
+                    DeferredBlock(
+                        body: try expand(
+                            statements: deferred.body,
+                            expectedReturnType: expectedReturnType,
+                            macros: macros,
+                            protocols: protocols,
+                            parameterMacroSignatures: parameterMacroSignatures,
+                            literalBridges: literalBridges,
+                            context: context,
+                            stateEffects: stateEffects
+                        ))
                 )
             ]
         case .localCallable(let declaration):
@@ -1512,7 +1538,9 @@ extension MacroExpander {
             let attachedParameterMacros: [MacroDeclaration] = parameter.macros.compactMap {
                 macroApplication in
                 guard let macro = macros[macroApplication.name],
-                    macroTargetAllows(macro.target!, kind: .parameter, syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
+                    macroTargetAllows(
+                        macro.target!, kind: .parameter,
+                        syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
                 else {
                     return nil
                 }
@@ -1527,7 +1555,8 @@ extension MacroExpander {
 
             let rewrittenType = try attachedParameterMacros.reduce(typeReference) {
                 currentType, macro in
-                try applyAttachedParameterTypeRewrite(macro: macro, to: currentType, context: context)
+                try applyAttachedParameterTypeRewrite(
+                    macro: macro, to: currentType, context: context)
             }
 
             return RangeFunctionParameter(
@@ -1582,7 +1611,8 @@ extension MacroExpander {
 
                 for parameterIndex in signature.labels.indices {
                     if let macro = signature.parameterMacrosByIndex[parameterIndex],
-                        try parameterApplicationRewritePlan(for: macro, context: context)?.isVariadic == true
+                        try parameterApplicationRewritePlan(for: macro, context: context)?
+                            .isVariadic == true
                     {
                         let consumedArguments = Array(rewrittenArguments.dropFirst(argumentIndex))
                         wrappedArguments.append(
@@ -1640,7 +1670,9 @@ extension MacroExpander {
         case .macroInvocation(let name, let arguments):
             guard let macro = macros[name],
                 let target = macro.target,
-                macroTargetAllows(target, kind: .expression, syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
+                macroTargetAllows(
+                    target, kind: .expression,
+                    syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
             else {
                 let rewrittenArguments = try arguments.map { argument in
                     CallArgument(
@@ -1847,7 +1879,11 @@ extension MacroExpander {
         var emitted = EmittedDeclarationBundle()
 
         for application in construct.macros {
-            guard let macro = macros[application.name], macroTargetAllows(macro.target!, kind: .construct, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
+            guard let macro = macros[application.name],
+                macroTargetAllows(
+                    macro.target!, kind: .construct,
+                    syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
+            else {
                 continue
             }
             let argumentBindings = try parseMacroArgumentBindings(
@@ -1863,7 +1899,9 @@ extension MacroExpander {
                     from: macro,
                     construct: construct,
                     context: context,
-                    argumentBindings: argumentBindings.merging(genericBindings) { _, generic in generic }
+                    argumentBindings: argumentBindings.merging(genericBindings) { _, generic in
+                        generic
+                    }
                 )
             )
         }
@@ -1898,7 +1936,11 @@ extension MacroExpander {
         var emitted = EmittedDeclarationBundle()
 
         for application in enumeration.macros {
-            guard let macro = macros[application.name], macroTargetAllows(macro.target!, kind: .enumeration, syntaxResolver: context.rewriteSurfaceView.syntaxResolver) else {
+            guard let macro = macros[application.name],
+                macroTargetAllows(
+                    macro.target!, kind: .enumeration,
+                    syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
+            else {
                 continue
             }
             emitted.merge(
@@ -1967,8 +2009,12 @@ extension MacroExpander {
         return emitted
     }
 
-    static func emittedCodeBlocks(in statements: [Statement]) -> [(targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression])] {
-        var blocks: [(targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression])] = []
+    static func emittedCodeBlocks(in statements: [Statement]) -> [(
+        targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression]
+    )] {
+        var blocks:
+            [(targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression])] =
+                []
         var localBindings: [String: Expression] = [:]
 
         for statement in statements {
@@ -2141,7 +2187,8 @@ extension MacroExpander {
                 )
                 for branch in branches {
                     if let condition = branch.condition {
-                        guard case .boolean(true) = evaluator.evaluate(condition, with: locals) else {
+                        guard case .boolean(true) = evaluator.evaluate(condition, with: locals)
+                        else {
                             continue
                         }
                     }
@@ -2164,7 +2211,8 @@ extension MacroExpander {
                 while true {
                     let evaluator = CompileTimeValueEvaluator(
                         targetBinding: targetBinding,
-                        targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
+                        targetValue: targetValue
+                            ?? .object(typeName: "MacroDiagnostics", fields: [:]),
                         graphBinding: graphBinding,
                         selfValue: macroSelfValue(named: diagnosticOwnerName),
                         localBindings: locals,
@@ -2175,7 +2223,9 @@ extension MacroExpander {
                         break
                     }
                     guard iterationCount < 10_000 else {
-                        throw ParseError("Macro @\(diagnosticOwnerName) diagnostic loop exceeded 10000 iterations.")
+                        throw ParseError(
+                            "Macro @\(diagnosticOwnerName) diagnostic loop exceeded 10000 iterations."
+                        )
                     }
                     let bodyResult = try macroDiagnosticsAndLocals(
                         in: body,
@@ -2285,7 +2335,8 @@ extension MacroExpander {
                     macroDeclarationsByName: context.macroDeclarationsByName,
                     context: context
                 )
-                locals[name] = evaluator.evaluate(expression, with: locals)?.expression ?? expression
+                locals[name] =
+                    evaluator.evaluate(expression, with: locals)?.expression ?? expression
             case .compoundAssignment(let target, .plusEquals, let expression):
                 guard let name = diagnosticMutableBindingName(target),
                     let currentExpression = locals[name]
@@ -2371,7 +2422,8 @@ extension MacroExpander {
             context: context
         )
         guard case .string(let message) = evaluator.evaluate(firstArgument) else {
-            throw ParseError("Macro @\(diagnosticOwnerName) \(name)(...) message must evaluate to String.")
+            throw ParseError(
+                "Macro @\(diagnosticOwnerName) \(name)(...) message must evaluate to String.")
         }
 
         switch name {
@@ -2441,7 +2493,8 @@ extension MacroExpander {
             var parser = try Parser(source: rendered)
             sourceFile = try parser.parseSourceFile()
         } catch {
-            throw ParseError("Could not parse emitted declarations from @\(macro.name).\n\(rendered)")
+            throw ParseError(
+                "Could not parse emitted declarations from @\(macro.name).\n\(rendered)")
         }
         return try declarationBundle(from: sourceFile)
     }
@@ -2454,7 +2507,8 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws -> String {
         guard let bindings = macro.bindings, let target = macro.target else {
-            throw ParseError("Macro @\(macro.name) cannot render an attached expansion block without a target.")
+            throw ParseError(
+                "Macro @\(macro.name) cannot render an attached expansion block without a target.")
         }
         let targetDeclarationName = MacroTargetValueBuilder().declarationName(for: targetValue)
         let targetSurface = MacroTargetSurface(
@@ -2614,7 +2668,8 @@ extension MacroExpander {
                         return nil
                     }
                     let arguments: [CallArgument]
-                    if let argumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines),
+                    if let argumentClause = argumentClause?.trimmingCharacters(
+                        in: .whitespacesAndNewlines),
                         !argumentClause.isEmpty
                     {
                         var parser = try? Parser(source: "macro(\(argumentClause))")
@@ -2622,7 +2677,8 @@ extension MacroExpander {
                             return nil
                         }
                         _ = try? parser?.consumeCallableName()
-                        guard let parsedArguments = try? parser?.parseInvocationArgumentsIfPresent() else {
+                        guard let parsedArguments = try? parser?.parseInvocationArgumentsIfPresent()
+                        else {
                             return nil
                         }
                         arguments = parsedArguments
@@ -2649,7 +2705,8 @@ extension MacroExpander {
                 case .conditional(let branches):
                     for branch in branches {
                         if let condition = branch.condition {
-                            guard case .boolean(true) = evaluator.evaluate(condition, with: locals) else {
+                            guard case .boolean(true) = evaluator.evaluate(condition, with: locals)
+                            else {
                                 continue
                             }
                         }
@@ -2739,7 +2796,9 @@ extension MacroExpander {
                         "Could not evaluate syntax macro splice: \(renderExpressionForStringify(expression))"
                     )
                 }
-                if expected == .expressionList, let rendered = renderExpressionList(value, renderer: renderer) {
+                if expected == .expressionList,
+                    let rendered = renderExpressionList(value, renderer: renderer)
+                {
                     return rendered
                 }
                 if expected == .expression, case .string = value {
@@ -2853,6 +2912,8 @@ extension MacroExpander {
             return value
         case .stringLiteral(let value):
             return "\"\(value)\""
+        case .colorLiteral(let value):
+            return "#\(value)"
         case .integer(let value):
             return String(value)
         case .double(let value):
@@ -3264,7 +3325,8 @@ extension MacroExpander {
         }
     }
 
-    static func syntaxValue(from source: String, as type: TypeReference) throws -> CompileTimeValue {
+    static func syntaxValue(from source: String, as type: TypeReference) throws -> CompileTimeValue
+    {
         if case .array(let elementType) = type {
             var parser = try Parser(source: source)
             parser.currentSelfAvailable = true
@@ -3283,7 +3345,8 @@ extension MacroExpander {
                     } else if elementName == "Statement" {
                         values.append(try statementSyntaxValue(statement))
                     } else {
-                        throw ParseError("Unsupported syntax macro return type \(type.displayName).")
+                        throw ParseError(
+                            "Unsupported syntax macro return type \(type.displayName).")
                     }
                 }
             }
@@ -3505,7 +3568,9 @@ extension MacroExpander {
         return rendered.joined(separator: ", ")
     }
 
-    static func declarationBundle(from sourceFile: SourceFileNode) throws -> EmittedDeclarationBundle {
+    static func declarationBundle(from sourceFile: SourceFileNode) throws
+        -> EmittedDeclarationBundle
+    {
         switch sourceFile {
         case .construct(let declaration):
             return EmittedDeclarationBundle(constructs: [declaration])

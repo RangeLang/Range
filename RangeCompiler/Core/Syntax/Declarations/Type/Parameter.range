@@ -1,22 +1,23 @@
-@syntax
+@syntax(.chained, { #name: #type }, separator: ", ")
+@graph(.declaration)
 construct Parameter {
-    let declaration: Declaration
-    let application: Application
-
-    @graph(.declaration)
-    construct Declaration {
-        let externalName: String?
-        let localName: String
-        let type: TypeReference
-        let captureMetadataType: TypeReference?
-        let defaultValue: Expression?
+    @description {
+        ## The parameter's name and hashed identity.
     }
+    @hidden
+    let identity: Identifier
+    let macros: [@macro]
+    let syntax: @syntax
+}
 
-    @graph(.application)
-    construct Application {
-        let label: String?
-        let type: TypeReference
-        let expression: Expression
-        let syntax: WrittenSyntax
+@syntax(.chained, { #name: #type }, separator: ", ")
+@graph(.application)
+construct Parameter {
+    @description {
+        ## The parameter's name and hashed identity.
     }
+    @hidden
+    let identity: Identifier
+    let type: @type
+    let syntax: @syntax
 }

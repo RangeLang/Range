@@ -5,6 +5,7 @@ enum Token: Equatable {
     case identifier(String)
     case foreignBody(language: String, text: String)
     case stringLiteral(String)
+    case colorLiteral(String)
     case integer(Int)
     case double(Double)
     case keyword(String)

@@ -170,7 +170,10 @@ extension Parser {
 
         var localBindings: [String: LocalBindingSymbol] = [
             "self": .init(kind: .constant, type: .named("Macro.Declaration")),
-            bindings.target: .init(kind: .constant, type: .named("MacroTarget")),
+            bindings.target: .init(
+                kind: .constant,
+                type: .member(base: .named("Macro"), name: "Target")
+            ),
             bindings.diagnostics: .init(kind: .constant, type: .named("MacroDiagnostics")),
         ]
         if let graph = bindings.graph {

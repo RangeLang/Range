@@ -1,6 +1,38 @@
-closed macro syntax(): Construct { target, diagnostics in
+construct SplicedSyntax: @syntax {
+    let delimiter: String
+    let syntax: @syntax
+    let description: String
+}
+
+macro syntax(@literal @spliced(delimiter: "") syntax: @syntax): Construct { target, diagnostics, graph in
+    let splicedParameters: [Parameter.Declaration](
+        target.declaration.parameters.filter { parameter in
+            let splicedMacros: [Macro.Application](
+                parameter.macros.filter { application in
+                    application.identifier.name == "spliced"
+                }
+            )
+
+            return splicedMacros.count > 0
+        }
+    )
+
     target.declaration.expand {
-        closed macro #(target.declaration.identifier)(): #(target.declaration.self) { target, diagnostics, graph in
+        closed macro #(target.declaration.identifier)(
+            #(splicedParameters)
+        ): #(target.declaration.self) { target, diagnostics, graph in
+        }
+
+        extension #(target.declaration.self) {
+            let description: String
         }
     }
+}
+
+open macro spliced(_ delimiter: String = ""): @parameter -> @syntax { target, diagnostics in
+    return SplicedSyntax(
+        delimiter: delimiter,
+        syntax: target.application.syntax,
+        description: target.application.syntax.description
+    )
 }

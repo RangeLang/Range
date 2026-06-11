@@ -99,7 +99,8 @@ extension Parser {
                 expression: try parseExpression()
             )
         default:
-            throw ParseError("Expected assignment operator (`+=`) or `set` statement in action block.")
+            throw ParseError(
+                "Expected assignment operator (`+=`) or `set` statement in action block.")
         }
     }
 
@@ -264,7 +265,7 @@ extension Parser {
 
     func isExpressionStatementStart() -> Bool {
         switch peek() {
-        case .identifier, .integer, .double, .stringLiteral, .leftBracket,
+        case .identifier, .integer, .double, .stringLiteral, .colorLiteral, .leftBracket,
             .leftParen, .dollar, .dot, .bang:
             return true
         case .hash where peek(offset: 1) == .leftParen:
@@ -347,7 +348,7 @@ extension Parser {
 
     func canStartExpression(_ token: Token) -> Bool {
         switch token {
-        case .identifier, .integer, .double, .stringLiteral, .macroAttribute,
+        case .identifier, .integer, .double, .stringLiteral, .colorLiteral, .macroAttribute,
             .leftBracket, .leftParen, .leftBrace, .dollar, .dot, .bang:
             return true
         case .keyword(let value):

@@ -1,0 +1,3 @@
+macro type(_ role: TypeRole): Construct -> Identity { target, diagnostics in
+    return Identity(uuid: UUID(storage: UUIDStorage()))
+}

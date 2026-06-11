@@ -478,8 +478,7 @@ struct MacroTargetValueBuilder {
                 "identifier": identifier(declaration.name),
                 "packageVisibility": .string(
                     packageVisibilityName(for: declaration.packageVisibility)),
-                "target": .string(declaration.target?.displayName ?? ""),
-                "targetSyntax": declaration.target.map(value(for:)) ?? .string(""),
+                "target": declaration.target.map(value(for:)) ?? .nilValue,
                 "expansionType": declaration.expansionType.map(typeReferenceValue) ?? .string(""),
                 "generics": .array(declaration.genericParameters.map(value(for:))),
                 "parameters": .array(declaration.parameters.map(value(for:))),
@@ -504,8 +503,7 @@ struct MacroTargetValueBuilder {
                 "identifier": identifier(metadata.name),
                 "packageVisibility": .string(
                     packageVisibilityName(for: metadata.packageVisibility)),
-                "target": .string(metadata.target.displayName),
-                "targetSyntax": value(for: metadata.target),
+                "target": value(for: metadata.target),
                 "expansionType": typeReferenceValue(metadata.valueType),
                 "generics": .array(metadata.genericParameters.map(value(for:))),
                 "parameters": .array(metadata.parameters.map(value(for:))),
@@ -812,6 +810,8 @@ struct MacroTargetValueBuilder {
                     ?? .string(""),
                 "localName": .string(declaration.localName),
                 "type": declaration.typeReference.map(typeReferenceValue) ?? .string("Void"),
+                "macros": .array(declaration.macros.map(value(for:))),
+                "capturesSyntax": .boolean(declaration.capturesSyntax),
                 "captureMetadataType": declaration.captureMetadataType.map(typeReferenceValue)
                     ?? .string(""),
                 "defaultValue": declaration.defaultValue.flatMap(value(for:)) ?? .string(""),

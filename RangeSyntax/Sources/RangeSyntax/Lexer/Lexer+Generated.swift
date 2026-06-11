@@ -9,6 +9,7 @@ enum RangeAuthoredTokenKind {
     case identifier(value: String)
     case foreignBody(language: String, text: String)
     case stringLiteral(value: String)
+    case colorLiteral(value: String)
     case integer(value: String)
     case double(value: String)
     case keyword(value: String)
@@ -60,6 +61,8 @@ extension Lexer {
             parserToken = .foreignBody(language: language, text: text)
         case .stringLiteral(let value):
             parserToken = .stringLiteral(value)
+        case .colorLiteral(let value):
+            parserToken = .colorLiteral(value)
         case .integer(let value):
             guard let integer = Int(value) else {
                 throw ParseError("Invalid integer literal \(value).", range: token.range)
@@ -147,28 +150,34 @@ extension Lexer {
 
 extension RangeAuthoredLexer {
     static let generatedRules: [RangeAuthoredLexerRule] = [
-        RangeAuthoredLexerRule(name: "whitespace", pattern: "whitespace+", token: "skip", priority: 0),
+        RangeAuthoredLexerRule(
+            name: "whitespace", pattern: "whitespace+", token: "skip", priority: 0),
         RangeAuthoredLexerRule(name: "leftBrace", pattern: "{", token: "leftBrace", priority: 20),
         RangeAuthoredLexerRule(name: "rightBrace", pattern: "}", token: "rightBrace", priority: 20),
         RangeAuthoredLexerRule(name: "leftParen", pattern: "(", token: "leftParen", priority: 20),
         RangeAuthoredLexerRule(name: "rightParen", pattern: ")", token: "rightParen", priority: 20),
-        RangeAuthoredLexerRule(name: "leftBracket", pattern: "[", token: "leftBracket", priority: 20),
-        RangeAuthoredLexerRule(name: "rightBracket", pattern: "]", token: "rightBracket", priority: 20),
+        RangeAuthoredLexerRule(
+            name: "leftBracket", pattern: "[", token: "leftBracket", priority: 20),
+        RangeAuthoredLexerRule(
+            name: "rightBracket", pattern: "]", token: "rightBracket", priority: 20),
         RangeAuthoredLexerRule(name: "ellipsis", pattern: "...", token: "ellipsis", priority: 30),
         RangeAuthoredLexerRule(name: "dot", pattern: ".", token: "dot", priority: 20),
         RangeAuthoredLexerRule(name: "arrow", pattern: "->", token: "arrow", priority: 30),
         RangeAuthoredLexerRule(name: "minus", pattern: "-", token: "minus", priority: 20),
         RangeAuthoredLexerRule(name: "bangEqual", pattern: "!=", token: "bangEqual", priority: 30),
         RangeAuthoredLexerRule(name: "bang", pattern: "!", token: "bang", priority: 20),
-        RangeAuthoredLexerRule(name: "equalEqual", pattern: "==", token: "equalEqual", priority: 30),
+        RangeAuthoredLexerRule(
+            name: "equalEqual", pattern: "==", token: "equalEqual", priority: 30),
         RangeAuthoredLexerRule(name: "equal", pattern: "=", token: "equal", priority: 20),
         RangeAuthoredLexerRule(name: "lessEqual", pattern: "<=", token: "lessEqual", priority: 30),
         RangeAuthoredLexerRule(name: "less", pattern: "<", token: "less", priority: 20),
-        RangeAuthoredLexerRule(name: "greaterEqual", pattern: ">=", token: "greaterEqual", priority: 30),
+        RangeAuthoredLexerRule(
+            name: "greaterEqual", pattern: ">=", token: "greaterEqual", priority: 30),
         RangeAuthoredLexerRule(name: "greater", pattern: ">", token: "greater", priority: 20),
         RangeAuthoredLexerRule(name: "plusEqual", pattern: "+=", token: "plusEqual", priority: 30),
         RangeAuthoredLexerRule(name: "plus", pattern: "+", token: "plus", priority: 20),
-        RangeAuthoredLexerRule(name: "questionQuestion", pattern: "??", token: "questionQuestion", priority: 30),
+        RangeAuthoredLexerRule(
+            name: "questionQuestion", pattern: "??", token: "questionQuestion", priority: 30),
         RangeAuthoredLexerRule(name: "question", pattern: "?", token: "question", priority: 20),
         RangeAuthoredLexerRule(name: "andAnd", pattern: "&&", token: "andAnd", priority: 30),
         RangeAuthoredLexerRule(name: "orOr", pattern: "||", token: "orOr", priority: 30),
@@ -180,14 +189,20 @@ extension RangeAuthoredLexer {
         RangeAuthoredLexerRule(name: "dollar", pattern: "$", token: "dollar", priority: 20),
         RangeAuthoredLexerRule(name: "percent", pattern: "%", token: "percent", priority: 20),
         RangeAuthoredLexerRule(name: "pipe", pattern: "|", token: "pipe", priority: 20),
-        RangeAuthoredLexerRule(name: "stringLiteral", pattern: "quotedString", token: "stringLiteral", priority: 40),
+        RangeAuthoredLexerRule(
+            name: "stringLiteral", pattern: "quotedString", token: "stringLiteral", priority: 40),
         RangeAuthoredLexerRule(name: "hash", pattern: "#(", token: "hash", priority: 50),
-        RangeAuthoredLexerRule(name: "macroAttribute", pattern: "@identifier", token: "macroAttribute", priority: 40),
-        RangeAuthoredLexerRule(name: "escapedIdentifier", pattern: "`identifier`", token: "identifier", priority: 40),
-        RangeAuthoredLexerRule(name: "double", pattern: "digits.digits", token: "double", priority: 40),
+        RangeAuthoredLexerRule(
+            name: "macroAttribute", pattern: "@identifier", token: "macroAttribute", priority: 40),
+        RangeAuthoredLexerRule(
+            name: "escapedIdentifier", pattern: "`identifier`", token: "identifier", priority: 40),
+        RangeAuthoredLexerRule(
+            name: "double", pattern: "digits.digits", token: "double", priority: 40),
         RangeAuthoredLexerRule(name: "integer", pattern: "digits", token: "integer", priority: 30),
-        RangeAuthoredLexerRule(name: "keyword", pattern: "keywordIdentifier", token: "keyword", priority: 40),
-        RangeAuthoredLexerRule(name: "identifier", pattern: "identifier", token: "identifier", priority: 30),
-        RangeAuthoredLexerRule(name: "eof", pattern: "end", token: "eof", priority: 0)
+        RangeAuthoredLexerRule(
+            name: "keyword", pattern: "keywordIdentifier", token: "keyword", priority: 40),
+        RangeAuthoredLexerRule(
+            name: "identifier", pattern: "identifier", token: "identifier", priority: 30),
+        RangeAuthoredLexerRule(name: "eof", pattern: "end", token: "eof", priority: 0),
     ]
 }

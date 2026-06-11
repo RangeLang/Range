@@ -195,6 +195,8 @@ extension Parser {
             return value
         case .stringLiteral(let value):
             return "\"\(value)\""
+        case .colorLiteral(let value):
+            return "#\(value)"
         case .integer(let value):
             return String(value)
         case .double(let value):

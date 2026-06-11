@@ -139,6 +139,12 @@ extension Parser {
                 name: "__syntaxSplice",
                 arguments: [CallArgument(label: nil, value: expression)]
             )
+        case .colorLiteral(let value):
+            advance()
+            return .call(
+                name: "Color",
+                arguments: [CallArgument(label: "hex", value: .string("#\(value)"))]
+            )
         case .identifier(let name), .keyword(let name):
             advance()
             if name == "true" {
@@ -230,7 +236,8 @@ extension Parser {
             }
         }
 
-        let rawArgument = parts.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        let rawArgument = parts.joined(separator: " ").trimmingCharacters(
+            in: .whitespacesAndNewlines)
         guard !rawArgument.isEmpty else {
             throw ParseError("Captured macro argument cannot be empty.")
         }
@@ -486,13 +493,14 @@ extension Parser {
                     return true
                 }
             case .eof, .leftBrace, .rightBrace, .rightParen, .rightBracket, .equal, .equalEqual,
-                .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash, .ampersand, .andAnd, .pipe, .orOr,
+                .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash,
+                .ampersand, .andAnd, .pipe, .orOr,
                 .questionQuestion, .colon, .arrow:
                 return false
             case .hash, .foreignBody, .macroAttribute, .dollar, .percent, .bang:
                 return false
-            case .identifier, .keyword, .stringLiteral, .integer, .double, .leftBracket,
-                .leftParen, .asterisk, .dot, .ellipsis, .question, .comma:
+            case .identifier, .keyword, .stringLiteral, .colorLiteral, .integer, .double,
+                .leftBracket, .leftParen, .asterisk, .dot, .ellipsis, .question, .comma:
                 break
             }
             offset += 1

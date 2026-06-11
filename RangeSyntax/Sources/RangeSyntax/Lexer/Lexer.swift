@@ -121,6 +121,13 @@ struct RangeAuthoredLexerCursor {
                 if hasCharacter(offset: 1, value: "(") {
                     _ = advance()
                     emit(kind: .hash, start: start)
+                } else if isHexDigitAt(offset: 1) {
+                    switch readHexColorLiteral(start: start) {
+                    case .success(let value):
+                        emit(kind: .colorLiteral(value: value), start: start)
+                    case .failure(let error):
+                        return .failure(error)
+                    }
                 } else {
                     return failure(message: "Expected '(' after #.", start: start)
                 }
@@ -400,7 +407,8 @@ struct RangeAuthoredLexerCursor {
         let identifier = readIdentifier()
 
         if !match("`") {
-            return .failure(lexicalFailure(message: "Unterminated escaped identifier.", start: start))
+            return .failure(
+                lexicalFailure(message: "Unterminated escaped identifier.", start: start))
         }
 
         return .success(identifier)
@@ -423,6 +431,28 @@ struct RangeAuthoredLexerCursor {
         }
 
         return .success(readIdentifier())
+    }
+
+    mutating func readHexColorLiteral(
+        start: RangeAuthoredLexerPosition
+    ) -> Result<String, RangeAuthoredLexingError> {
+        _ = advance()
+        var digits = ""
+        while !isAtEnd() && isIdentifierPart(currentCharacter()) {
+            digits += advance()
+        }
+
+        guard digits.count == 6, digits.allSatisfy({ isHexDigit(String($0)) }) else {
+            return .failure(
+                lexicalFailure(
+                    message:
+                        "Invalid hex color literal '#\(digits)'. Expected 6 hexadecimal digits.",
+                    start: start
+                )
+            )
+        }
+
+        return .success(digits)
     }
 
     mutating func readNumberLiteral(start: RangeAuthoredLexerPosition) -> RangeAuthoredTokenKind {
@@ -543,7 +573,8 @@ struct RangeAuthoredLexerCursor {
         }
 
         return .failure(
-            lexicalFailure(message: "Unterminated string literal inside interpolation.", start: start)
+            lexicalFailure(
+                message: "Unterminated string literal inside interpolation.", start: start)
         )
     }
 
@@ -613,6 +644,23 @@ struct RangeAuthoredLexerCursor {
             return false
         }
         return isDigit(characters[position])
+    }
+
+    func isHexDigitAt(offset: Int) -> Bool {
+        let position = index + offset
+        if position >= characters.count {
+            return false
+        }
+        return isHexDigit(characters[position])
+    }
+
+    func isHexDigit(_ value: String) -> Bool {
+        guard let byte = singleASCIIByte(value) else {
+            return false
+        }
+        return (byte >= CharacterBytes.zero && byte <= CharacterBytes.nine)
+            || (byte >= CharacterBytes.lowerA && byte <= CharacterBytes.lowerF)
+            || (byte >= CharacterBytes.upperA && byte <= CharacterBytes.upperF)
     }
 
     func isWhitespace(_ value: String) -> Bool {
@@ -695,18 +743,20 @@ private enum CharacterBytes {
     static let zero = UInt8(ascii: "0")
     static let nine = UInt8(ascii: "9")
     static let lowerA = UInt8(ascii: "a")
+    static let lowerF = UInt8(ascii: "f")
     static let lowerZ = UInt8(ascii: "z")
     static let upperA = UInt8(ascii: "A")
+    static let upperF = UInt8(ascii: "F")
     static let upperZ = UInt8(ascii: "Z")
 }
 
-private extension String {
-    func __rangeCharacter(index: Int) -> String {
+extension String {
+    fileprivate func __rangeCharacter(index: Int) -> String {
         let position = self.index(startIndex, offsetBy: index)
         return String(self[position])
     }
 
-    func __rangeSubstring(start: Int, end: Int) -> String {
+    fileprivate func __rangeSubstring(start: Int, end: Int) -> String {
         let lowerBound = self.index(startIndex, offsetBy: start)
         let upperBound = self.index(startIndex, offsetBy: end)
         return String(self[lowerBound..<upperBound])

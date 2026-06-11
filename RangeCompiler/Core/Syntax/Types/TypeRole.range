@@ -1,0 +1,11 @@
+enum TypeRole {
+    case nominal
+    case structural
+    case generic
+    case member
+    case function
+    case optional
+    case array
+    case variadic
+    case application
+}

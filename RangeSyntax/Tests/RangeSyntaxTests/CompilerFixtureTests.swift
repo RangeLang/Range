@@ -353,12 +353,8 @@ struct CompilerFixtureTests {
             Issue.record("Expected attached macro declaration body to be readable.")
             return
         }
-        guard case .string("@syntax")? = macroDeclaration.field("target") else {
-            Issue.record("Expected attached macro declaration target text to be readable.")
-            return
-        }
         guard
-            case .object("Macro.Target", let targetFields)? = macroDeclaration.field("targetSyntax"),
+            case .object("Macro.Target", let targetFields)? = macroDeclaration.field("target"),
             case .string("macroSurface")? = targetFields["kind"],
             case .string("syntax")? = targetFields["name"]
         else {
