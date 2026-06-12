@@ -1,10 +1,14 @@
-construct SplicedSyntax: @syntax {
+@syntax
+construct SplicedSyntax {
     let delimiter: String
-    let syntax: @syntax
+    let syntax: WrittenSyntax
     let description: String
 }
 
-macro syntax(@literal @spliced(delimiter: "") syntax: @syntax): Construct { target, diagnostics, graph in
+macro syntax(): Construct { target, diagnostics, graph in
+}
+
+macro syntaxCapture(@literal @spliced(delimiter: "") syntax: @syntax): Construct { target, diagnostics, graph in
     let splicedParameters: [Parameter.Declaration](
         target.declaration.parameters.filter { parameter in
             let splicedMacros: [Macro.Application](

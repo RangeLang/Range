@@ -3,7 +3,7 @@ construct Construct {
     let declaration: Declaration
     let application: Application
 
-    @graph(.declaration)
+    @graph(role: .declaration)
     construct Declaration {
         let identifier: Identifier
         let self: NominalTypeReference
@@ -22,7 +22,7 @@ construct Construct {
         function expand(expansion: () -> [@syntax])
     }
 
-    @graph(.application)
+    @graph(role: .application)
     construct Application {
         let type: TypeReference
         let arguments: [Parameter.Application]

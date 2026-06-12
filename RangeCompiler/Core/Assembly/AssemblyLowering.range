@@ -24,7 +24,7 @@ construct AssemblyInstructionShape {
     let resultOperandIndex: Int?
 }
 
-@graph(.application)
+@graph(role: .application)
 construct AssemblyLowering {
     let identifier: Identifier
     let parameters: [Parameter.Declaration]

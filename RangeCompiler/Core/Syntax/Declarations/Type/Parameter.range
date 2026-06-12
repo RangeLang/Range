@@ -1,21 +1,17 @@
-@syntax(.chained, { #identifier.name: #type }, separator: ", ")
-@graph(.declaration)
+@syntax
 construct Parameter {
-    @description {
-        ## The parameter name and hashed identity.
-    }
-    let identifier: Identifier
-    let macros: [@macro]
-    let syntax: @syntax
-}
 
-@syntax(.chained, { #identifier.name: #type }, separator: ", ")
-@graph(.application)
-construct Parameter {
-    @description {
-        ## The parameter name and hashed identity.
+    @graph(role: .declaration)
+    construct Declaration {
+        let identifier: Identifier
+        let macros: [@macro]
+        let syntax: WrittenSyntax
     }
-    let identifier: Identifier
-    let type: @type
-    let syntax: @syntax
+
+    @graph(role: .application)
+    construct Application {
+        let identifier: Identifier
+        let type: TypeReference
+        let syntax: WrittenSyntax
+    }
 }

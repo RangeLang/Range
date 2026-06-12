@@ -2,7 +2,7 @@
 construct Enum {
     let declaration: Declaration
 
-    @graph(.declaration)
+    @graph(role: .declaration)
     construct Declaration {
         let self: NominalTypeReference
         let generics: [Generic]
@@ -11,7 +11,7 @@ construct Enum {
         function expand(expansion: () -> [@syntax])
     }
 
-    @graph(.declaration)
+    @graph(role: .declaration)
     construct Case {
         let identifier: Identifier
         let associatedValues: [AssociatedValue]

@@ -1,4 +1,4 @@
-@graph(.declaration)
+@graph(role: .declaration)
 construct ProgramFileGraphNode { }
 
 function renderProgram(program: RangeProgram): String {

@@ -22,7 +22,7 @@ macro hash(algorithm: HashAlgorithm): Construct { target, diagnostics, graph in
 
 macro hashable(): Construct { target, diagnostics in
     target.declaration.expand {
-        extension #(target.declaration.self) {
+        extension #(target.declaration.self): Hashable {
             function hash(hasher: Hasher) {
                 @hashableBody(
                     hasher: hasher,

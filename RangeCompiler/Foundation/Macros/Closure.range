@@ -1,5 +1,6 @@
-construct ClosureSyntax: @syntax {
-    let syntax: @syntax
+@syntax
+construct ClosureSyntax {
+    let syntax: WrittenSyntax
     let description: String
     let delimiter: String
 }

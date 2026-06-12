@@ -3,7 +3,7 @@ construct Function {
     let declaration: Declaration
     let call: Call
 
-    @graph(.declaration)
+    @graph(role: .declaration)
     construct Declaration {
         let identity: GraphIdentity
         let parent: GraphIdentity?
@@ -14,7 +14,7 @@ construct Function {
         let body: Block
     }
 
-    @graph(.application)
+    @graph(role: .application)
     construct Call {
         let identifier: Identifier
         let arguments: [Parameter.Application]

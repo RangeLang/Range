@@ -1,5 +1,5 @@
-@Token("a")
-@Token("b")
+@Token(pattern: "a")
+@Token(pattern: "b")
 @lexer<.emit>
 construct DuplicateLexerToken {
 }
