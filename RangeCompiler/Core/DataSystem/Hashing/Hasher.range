@@ -2,39 +2,39 @@
 construct Hasher {
     state storage: HasherStorage()
 
-    function combine<T>(_ value: T) {
-        value.hash(into: self)
+    function combine<T>(value: T) {
+        value.hash(hasher: self)
     }
 
-    function combineStorage(_ value: IntStorage) {
+    function combineStorage(value: IntStorage) {
         storage.combine(value)
     }
 
-    function combineStorage(_ value: StringStorage) {
+    function combineStorage(value: StringStorage) {
         storage.combine(value)
     }
 
-    function combineStorage(_ value: BoolStorage) {
+    function combineStorage(value: BoolStorage) {
         storage.combine(value)
     }
 
-    function combineStorage(_ value: DateStorage) {
+    function combineStorage(value: DateStorage) {
         storage.combine(value)
     }
 
-    function combineStorage(_ value: DateTimeStorage) {
+    function combineStorage(value: DateTimeStorage) {
         storage.combine(value)
     }
 
-    function combineStorage(_ value: FloatStorage) {
+    function combineStorage(value: FloatStorage) {
         storage.combine(value)
     }
 
-    function combineStorage(_ value: DataStorage) {
+    function combineStorage(value: DataStorage) {
         storage.combine(value)
     }
 
-    function combineStorage(_ value: UUIDStorage) {
+    function combineStorage(value: UUIDStorage) {
         storage.combine(value)
     }
 

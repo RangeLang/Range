@@ -1,13 +1,13 @@
 macro forwardFirstArgument(): Function { target, diagnostics in
     if !target.call.arguments.isEmpty {
-        target.call.arguments[0].expression.replace(with:
+        target.call.arguments[0].expression.replace(replacement:
             target.call.arguments[0].expression
         )
     }
 }
 
 @forwardFirstArgument
-function passthrough(value value: Int): Int {
+function passthrough(value: Int): Int {
     return value
 }
 

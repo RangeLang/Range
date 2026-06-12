@@ -150,11 +150,11 @@ construct LexerCursor {
         return false
     }
 
-    function isLiteralLexerRule(_ rule: LexerRule): Bool {
+    function isLiteralLexerRule(rule: LexerRule): Bool {
         return isLiteralLexerToken(rule.token)
     }
 
-    function isLiteralLexerToken(_ token: String): Bool {
+    function isLiteralLexerToken(token: String): Bool {
         return token == "leftBrace"
             || token == "rightBrace"
             || token == "leftParen"
@@ -260,7 +260,7 @@ construct LexerCursor {
         return true
     }
 
-    function hasPrefix(_ pattern: String): Bool {
+    function hasPrefix(pattern: String): Bool {
         if index + pattern.count > source.count {
             return false
         }
@@ -268,7 +268,7 @@ construct LexerCursor {
         return value == pattern
     }
 
-    function advancePattern(_ pattern: String) {
+    function advancePattern(pattern: String) {
         state remaining: pattern.count
         while remaining > 0 {
             advance()
@@ -314,11 +314,11 @@ construct LexerCursor {
         return LexerPosition(index: index, location: currentLocation())
     }
 
-    function range(from start: LexerPosition): SourceRange {
+    function range(start: LexerPosition): SourceRange {
         return SourceRange(start: start.location, end: currentLocation())
     }
 
-    function sourceSlice(from start: LexerPosition): String {
+    function sourceSlice(start: LexerPosition): String {
         let value: String(source.substring(start: start.index, end: index))
         return value
     }
@@ -327,21 +327,21 @@ construct LexerCursor {
         tokens.append(
             element: LexicalToken(
                 kind: kind,
-                range: range(from: start),
-                source: sourceSlice(from: start)
+                range: range(start: start),
+                source: sourceSlice(start: start)
             )
         )
     }
 
     function failure(message: String, start: LexerPosition): Result<[LexicalToken], LexingError> {
-        return .failure(cause: LexingError(message: message, range: range(from: start)))
+        return .failure(cause: LexingError(message: message, range: range(start: start)))
     }
 
     function lexicalFailure(message: String, start: LexerPosition): LexingError {
-        return LexingError(message: message, range: range(from: start))
+        return LexingError(message: message, range: range(start: start))
     }
 
-    function match(_ expected: String): Bool {
+    function match(expected: String): Bool {
         if isAtEnd() || currentCharacter() != expected {
             return false
         }
@@ -406,7 +406,7 @@ construct LexerCursor {
         if digits.count != 6 || !isHexDigits(digits) {
             return .failure(
                 cause: lexicalFailure(
-                    message: "Invalid hex color literal '#\(digits)'. Expected 6 hexadecimal digits.",
+                    message: "Invalid hex color literal #\(digits). Expected 6 hexadecimal digits.",
                     start: start
                 )
             )
@@ -570,7 +570,7 @@ construct LexerCursor {
         return true
     }
 
-    function trimNewlines(_ text: String): String {
+    function trimNewlines(text: String): String {
         state start: 0
         state end: text.count
 
@@ -615,11 +615,11 @@ construct LexerCursor {
         return isHexDigit(value)
     }
 
-    function isWhitespace(_ value: String): Bool {
+    function isWhitespace(value: String): Bool {
         return value == " " || value == "\n" || value == "\r" || value == "\t"
     }
 
-    function isNewline(_ value: String): Bool {
+    function isNewline(value: String): Bool {
         return value == "\n" || value == "\r"
     }
 
@@ -628,15 +628,15 @@ construct LexerCursor {
         return isNewline(value)
     }
 
-    function isDigit(_ value: String): Bool {
+    function isDigit(value: String): Bool {
         return value >= "0" && value <= "9"
     }
 
-    function isHexDigit(_ value: String): Bool {
+    function isHexDigit(value: String): Bool {
         return isDigit(value) || value >= "a" && value <= "f" || value >= "A" && value <= "F"
     }
 
-    function isHexDigits(_ value: String): Bool {
+    function isHexDigits(value: String): Bool {
         state position: 0
         while position < value.count {
             let character: String(value.character(index: position))
@@ -648,19 +648,19 @@ construct LexerCursor {
         return true
     }
 
-    function isASCIILetter(_ value: String): Bool {
+    function isASCIILetter(value: String): Bool {
         return value >= "a" && value <= "z" || value >= "A" && value <= "Z"
     }
 
-    function isIdentifierStart(_ value: String): Bool {
+    function isIdentifierStart(value: String): Bool {
         return isASCIILetter(value) || value == "_"
     }
 
-    function isIdentifierPart(_ value: String): Bool {
+    function isIdentifierPart(value: String): Bool {
         return isIdentifierStart(value) || isDigit(value)
     }
 
-    function isKeyword(_ value: String): Bool {
+    function isKeyword(value: String): Bool {
         return value == "let"
             || value == "state"
             || value == "binding"

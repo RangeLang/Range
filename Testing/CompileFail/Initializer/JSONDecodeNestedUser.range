@@ -3,10 +3,10 @@ construct NestedAddress {
 }
 
 extension NestedAddress {
-    init(from decoder: Decoder) -> Result<Self, DecodingError> {
+    init(decoder: Decoder) -> Result<Self, DecodingError> {
         let container: decoder.keyedContainer()
 
-        switch container.decode(String.self, forKey: "city") {
+        switch container.decode(String.self, key: "city") {
         case .success(let city):
             set self.city   city
         case .failure(let error):
@@ -23,17 +23,17 @@ construct NestedDecodedUser {
 }
 
 extension NestedDecodedUser {
-    init(from decoder: Decoder) -> Result<Self, DecodingError> {
+    init(decoder: Decoder) -> Result<Self, DecodingError> {
         let container: decoder.keyedContainer()
 
-        switch container.decode(Int.self, forKey: "id") {
+        switch container.decode(Int.self, key: "id") {
         case .success(let id):
             set self.id   id
         case .failure(let error):
             return .failure(cause: error)
         }
 
-        switch container.decode(NestedAddress.self, forKey: "address") {
+        switch container.decode(NestedAddress.self, key: "address") {
         case .success(let address):
             set self.address   address
         case .failure(let error):
@@ -53,7 +53,7 @@ function decodeNestedUser(): Result<NestedDecodedUser, DecodingError> {
         JSONField(key: "address", value: .object(fields: addressFields)),
     ]
     let decoder: JSONDecoder(value: .object(fields: fields))
-    return NestedDecodedUser.decode(from: decoder)
+    return NestedDecodedUser.decode(value: decoder)
 }
 
 @main {

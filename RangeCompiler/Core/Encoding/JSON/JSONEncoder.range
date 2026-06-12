@@ -3,7 +3,7 @@ construct JSONEncoder {
     state isObject: Bool(false)
     state isArray: Bool(false)
 
-    function encode<T>(_ value: T): Result<String, EncodingError> {
+    function encode<T>(value: T): Result<String, EncodingError> {
         return .failure(cause: .failed)
     }
 

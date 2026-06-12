@@ -1,4 +1,4 @@
-macro incremented(by amount: Int): Derived<Int> { target, diagnostics in
+macro incremented(amount: Int): Derived<Int> { target, diagnostics in
     target.getter { value in
         value + amount
     }
@@ -7,7 +7,7 @@ macro incremented(by amount: Int): Derived<Int> { target, diagnostics in
 construct Reader {
     state age: Int(10)
 
-    @incremented(by: 1)
+    @incremented(amount: 1)
     derived next: Int {
         age
     }

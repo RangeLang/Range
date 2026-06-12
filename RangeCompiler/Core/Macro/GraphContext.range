@@ -1,11 +1,11 @@
 construct GraphContext {
     let macros: [Macro.Application<Void>]
 
-    function declaration(_ identity: GraphIdentity): GraphEntry
-    function parent(of identity: GraphIdentity): GraphIdentity?
-    function members(of identity: GraphIdentity): [GraphIdentity]
-    function sourcePath(of identity: GraphIdentity): String
-    function sourceDirectory(of identity: GraphIdentity): String
-    function macros(on identity: GraphIdentity): [Macro.Application<Void>]
-    function macros(named name: String): [Macro.Application<Void>]
+    function declaration(identity: GraphIdentity): GraphEntry
+    function parent(identity: GraphIdentity): GraphIdentity?
+    function members(identity: GraphIdentity): [GraphIdentity]
+    function sourcePath(identity: GraphIdentity): String
+    function sourceDirectory(identity: GraphIdentity): String
+    function macros(identity: GraphIdentity): [Macro.Application<Void>]
+    function macros(named: String): [Macro.Application<Void>]
 }

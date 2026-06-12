@@ -4,12 +4,12 @@ construct Address {
 }
 
 extension Address {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.keyedContainer()
 
-        switch container.encode(city, forKey: "city") {
+        switch container.encode(city, key: "city") {
         case .success:
-            return container.encode(zip, forKey: "zip")
+            return container.encode(zip, key: "zip")
         case .failure(let error):
             return .failure(cause: error)
         }
@@ -25,14 +25,14 @@ construct User {
 }
 
 extension User {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.keyedContainer()
 
-        switch container.encode(name, forKey: "name") {
+        switch container.encode(name, key: "name") {
         case .success:
-            switch container.encode(address, forKey: "address") {
+            switch container.encode(address, key: "address") {
             case .success:
-                return container.encode(scores, forKey: "scores")
+                return container.encode(scores, key: "scores")
             case .failure(let error):
                 return .failure(cause: error)
             }

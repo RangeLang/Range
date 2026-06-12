@@ -1,8 +1,8 @@
 construct JSONKeyedDecodingContainer {
     let fields: [JSONField]
 
-    function decode(_ type: Bool.Type, forKey key: String): Result<Bool, DecodingError> {
-        switch value(forKey: key) {
+    function decode(type: Bool.Type, key: String): Result<Bool, DecodingError> {
+        switch value(key: key) {
         case .success(let value):
             let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(Bool.self)
@@ -11,8 +11,8 @@ construct JSONKeyedDecodingContainer {
         }
     }
 
-    function decode(_ type: Date.Type, forKey key: String): Result<Date, DecodingError> {
-        switch value(forKey: key) {
+    function decode(type: Date.Type, key: String): Result<Date, DecodingError> {
+        switch value(key: key) {
         case .success(let value):
             let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(Date.self)
@@ -21,8 +21,8 @@ construct JSONKeyedDecodingContainer {
         }
     }
 
-    function decode(_ type: DateTime.Type, forKey key: String): Result<DateTime, DecodingError> {
-        switch value(forKey: key) {
+    function decode(type: DateTime.Type, key: String): Result<DateTime, DecodingError> {
+        switch value(key: key) {
         case .success(let value):
             let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(DateTime.self)
@@ -31,8 +31,8 @@ construct JSONKeyedDecodingContainer {
         }
     }
 
-    function decode(_ type: Float.Type, forKey key: String): Result<Float, DecodingError> {
-        switch value(forKey: key) {
+    function decode(type: Float.Type, key: String): Result<Float, DecodingError> {
+        switch value(key: key) {
         case .success(let value):
             let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(Float.self)
@@ -41,8 +41,8 @@ construct JSONKeyedDecodingContainer {
         }
     }
 
-    function decode(_ type: Int.Type, forKey key: String): Result<Int, DecodingError> {
-        switch value(forKey: key) {
+    function decode(type: Int.Type, key: String): Result<Int, DecodingError> {
+        switch value(key: key) {
         case .success(let value):
             let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(Int.self)
@@ -51,8 +51,8 @@ construct JSONKeyedDecodingContainer {
         }
     }
 
-    function decode(_ type: String.Type, forKey key: String): Result<String, DecodingError> {
-        switch value(forKey: key) {
+    function decode(type: String.Type, key: String): Result<String, DecodingError> {
+        switch value(key: key) {
         case .success(let value):
             let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(String.self)
@@ -61,8 +61,8 @@ construct JSONKeyedDecodingContainer {
         }
     }
 
-    function decode(_ type: UUID.Type, forKey key: String): Result<UUID, DecodingError> {
-        switch value(forKey: key) {
+    function decode(type: UUID.Type, key: String): Result<UUID, DecodingError> {
+        switch value(key: key) {
         case .success(let value):
             let container: JSONSingleValueDecodingContainer(value: value)
             return container.decode(UUID.self)
@@ -71,11 +71,11 @@ construct JSONKeyedDecodingContainer {
         }
     }
 
-    function decode<T>(_ type: T.Type, forKey key: String): Result<T, DecodingError> {
+    function decode<T>(type: T.Type, key: String): Result<T, DecodingError> {
         return .failure(cause: .failed)
     }
 
-    function value(forKey key: String): Result<JSONValue, DecodingError> {
+    function value(key: String): Result<JSONValue, DecodingError> {
         for field in fields {
             if field.key == key {
                 return .success(result: field.value)

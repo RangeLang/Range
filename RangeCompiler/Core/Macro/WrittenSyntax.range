@@ -1,4 +1,4 @@
-macro WrittenSyntax(_ text: Foreign<ASCII>): @syntax -> WrittenSyntax { target, diagnostics in
+macro WrittenSyntax(text: Foreign<ASCII>): @syntax -> WrittenSyntax { target, diagnostics in
     return WrittenSyntax(
         text: text,
         range: SourceRange(

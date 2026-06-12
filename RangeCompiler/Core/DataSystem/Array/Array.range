@@ -24,8 +24,8 @@ construct Array<Element> {
         return storage.first()
     }
 
-    function first(where include: (Element) -> Bool): Element? {
-        return storage.first(where: include)
+    function first(include: (Element) -> Bool): Element? {
+        return storage.first(include: include)
     }
 
     function last(): Element? {
@@ -56,25 +56,25 @@ construct Array<Element> {
         return Array(storage: storage.filter(include: include))
     }
 
-    function map<Output>(_ transform: (Element) -> Output): Array<Output> {
+    function map<Output>(transform: (Element) -> Output): Array<Output> {
         return Array<Output>(storage: storage.map(transform))
     }
 
-    function compactMap<Output>(_ transform: (Element) -> Output?): Array<Output> {
+    function compactMap<Output>(transform: (Element) -> Output?): Array<Output> {
         return Array<Output>(storage: storage.compactMap(transform))
     }
 
-    function flatMap<Output>(_ transform: (Element) -> Array<Output>): Array<Output> {
+    function flatMap<Output>(transform: (Element) -> Array<Output>): Array<Output> {
         return Array<Output>(storage: storage.flatMap(transform))
     }
 
-    function forEach(_ body: (Element) -> Void) {
+    function forEach(body: (Element) -> Void) {
         storage.forEach(body)
     }
 }
 
 extension Array {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.unkeyedContainer()
         state index: 0
 

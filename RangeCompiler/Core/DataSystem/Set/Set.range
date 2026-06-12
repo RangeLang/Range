@@ -31,8 +31,8 @@ construct Set<Element> {
         return storage.filter(include: include)
     }
 
-    function first(where include: (Element) -> Bool): Element? {
-        return storage.first(where: include)
+    function first(include: (Element) -> Bool): Element? {
+        return storage.first(include: include)
     }
 
     function clear() {
@@ -41,7 +41,7 @@ construct Set<Element> {
 }
 
 extension Set<Element> {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.unkeyedContainer()
         let values: Array<Element>(elements())
         state index: 0

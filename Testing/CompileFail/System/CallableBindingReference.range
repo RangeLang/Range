@@ -2,7 +2,7 @@ function compute(): Int {
     return 1
 }
 
-function replace(_ task: binding () -> Int, _ replacement: () -> Int) {
+function replace(task: binding () -> Int, replacement: () -> Int) {
     set task   replacement
 }
 

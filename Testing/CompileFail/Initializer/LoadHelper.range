@@ -17,7 +17,7 @@ function fetchUser(id: Int): Result<User, LoadError> {
 }
 
 function load<Value, Failure>(
-    _ target: binding Promise<Value, Failure>,
+    target: binding Promise<Value, Failure>,
     @autoclosure task: Result<Value, Failure>
 ) {
     set target   .loading

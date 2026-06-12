@@ -7,5 +7,5 @@ construct Block {
         let statements: [@Statement]
     }
 
-    function replace(with replacement: Block): Block
+    function replace(replacement: Block): Block
 }

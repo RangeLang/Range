@@ -1,13 +1,13 @@
 macro firstArgument(): Function { target, diagnostics in
     if !target.call.arguments.isEmpty {
-        target.call.replace(with:
+        target.call.replace(replacement:
             target.call.arguments[0].expression
         )
     }
 }
 
 @firstArgument
-function select(text text: String, number number: Int): String {
+function select(text: String, number: Int): String {
     return text
 }
 

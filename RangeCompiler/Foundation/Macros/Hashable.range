@@ -8,10 +8,7 @@ macro hashableBody(hasher: Hasher, properties: [Let]) -> [@Statement] {
     })
 }
 
-@description {
-    # hash(_:) macro derives a graph-backed hash member for a construct.
-}
-macro hash(_ algorithm: HashAlgorithm): Construct { target, diagnostics, graph in
+macro hash(algorithm: HashAlgorithm): Construct { target, diagnostics, graph in
     switch algorithm {
     case .sha256:
         target.declaration.expand {
@@ -23,13 +20,10 @@ macro hash(_ algorithm: HashAlgorithm): Construct { target, diagnostics, graph i
     }
 }
 
-@description {
-    # hashable() macro provides a default hash(into:) function for Hashable types.
-}
 macro hashable(): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
-            function hash(into hasher: Hasher) {
+            function hash(hasher: Hasher) {
                 @hashableBody(
                     hasher: hasher,
                     properties: target.declaration.lets

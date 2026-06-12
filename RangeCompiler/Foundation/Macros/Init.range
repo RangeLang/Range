@@ -4,7 +4,7 @@ macro init<
     let wrapper: String? = nil,
     let length: Int? = nil
 >(
-    @capture _ pattern: Expression
+    @capture pattern: Expression
 ): Construct & @syntax { target, diagnostics in
     let source: String(pattern.written.text)
     state delimiterCount: Int(0)

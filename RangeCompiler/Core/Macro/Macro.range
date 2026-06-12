@@ -17,13 +17,13 @@ construct Macro {
 }
 
 @syntax(.plural) {
-    #(@prefix(@))?
+    #(@prefix("@"))?
     #target
 }
 @graph(.declaration)
 construct Macro {
 
-    let identifier: Identifier(prefix: @)
+    let identifier: Identifier(prefix: "@")
     let genericArguments: [TypeReference]
     let argumentClause: String
     let arguments: [Expression]

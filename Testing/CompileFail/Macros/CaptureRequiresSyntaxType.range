@@ -1,5 +1,5 @@
-macro badCapture(@capture<String> _ value: String): Expression { target, diagnostics in
-    target.replace(with: value)
+macro badCapture(@capture<String> value: String): Expression { target, diagnostics in
+    target.replace(replacement: value)
 }
 
 @main {

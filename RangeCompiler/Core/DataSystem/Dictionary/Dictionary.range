@@ -35,8 +35,8 @@ construct Dictionary<Key, Value> {
         return storage.filter(include: include)
     }
 
-    function first(where include: (DictionaryEntry<Key, Value>) -> Bool): DictionaryEntry<Key, Value>? {
-        return storage.first(where: include)
+    function first(include: (DictionaryEntry<Key, Value>) -> Bool): DictionaryEntry<Key, Value>? {
+        return storage.first(include: include)
     }
 
     function clear() {
@@ -45,7 +45,7 @@ construct Dictionary<Key, Value> {
 }
 
 extension Dictionary<String, Value> {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.keyedContainer()
         let values: Array<DictionaryEntry<String, Value>>(entries())
         state index: 0
@@ -53,7 +53,7 @@ extension Dictionary<String, Value> {
         while index < values.count {
             let entry: DictionaryEntry<String, Value>(values.element(index: index))
 
-            switch container.encode(entry.value, forKey: entry.key) {
+            switch container.encode(entry.value, key: entry.key) {
             case .success:
                 index += 1
             case .failure(let error):

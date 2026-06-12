@@ -12,7 +12,7 @@ extension Bool {
 }
 
 extension Bool {
-    function decode(from decoder: Decoder): Result<Self, DecodingError> {
+    function decode(decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(Bool.self) {
         case .success(let value):
@@ -24,14 +24,14 @@ extension Bool {
 }
 
 extension Bool {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
 extension Bool {
-    function hash(into hasher: Hasher) {
+    function hash(hasher: Hasher) {
         hasher.combineStorage(storage)
     }
 }

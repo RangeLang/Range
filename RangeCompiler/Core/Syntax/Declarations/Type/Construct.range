@@ -19,7 +19,7 @@ construct Construct {
         let constructs: [Construct.Declaration]
         let extensions: [Extension]
 
-        function expand(_ expansion: () -> [@syntax])
+        function expand(expansion: () -> [@syntax])
     }
 
     @graph(.application)
@@ -27,6 +27,6 @@ construct Construct {
         let type: TypeReference
         let arguments: [Parameter.Application]
 
-        function replace(with replacement: Expression): Expression
+        function replace(replacement: Expression): Expression
     }
 }

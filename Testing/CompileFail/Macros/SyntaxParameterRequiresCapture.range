@@ -1,5 +1,5 @@
-macro badStringify(_ value: Expression): Expression { target, diagnostics in
-    target.replace(with: "\(value)")
+macro badStringify(value: Expression): Expression { target, diagnostics in
+    target.replace(replacement: "\(value)")
 }
 
 @main {

@@ -2,7 +2,7 @@
 @graph(.declaration)
 construct Parameter {
     @description {
-        ## The parameter's name and hashed identity.
+        ## The parameter name and hashed identity.
     }
     let identifier: Identifier
     let macros: [@macro]
@@ -13,7 +13,7 @@ construct Parameter {
 @graph(.application)
 construct Parameter {
     @description {
-        ## The parameter's name and hashed identity.
+        ## The parameter name and hashed identity.
     }
     let identifier: Identifier
     let type: @type

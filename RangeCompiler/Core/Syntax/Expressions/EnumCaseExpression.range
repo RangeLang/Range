@@ -3,5 +3,5 @@ construct EnumCaseExpression {
     let type: TypeReference?
     let identifier: Identifier
 
-    function replace(with replacement: Expression): Expression
+    function replace(replacement: Expression): Expression
 }

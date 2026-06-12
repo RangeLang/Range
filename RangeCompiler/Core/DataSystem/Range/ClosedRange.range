@@ -5,11 +5,11 @@ construct ClosedRange<Bound> {
     let lowerBound: Bound
     let upperBound: Bound
 
-    function contains(_ value: Bound): Bool {
+    function contains(value: Bound): Bool {
         return !(value < lowerBound) && !(upperBound < value)
     }
 
-    function overlaps(_ other: ClosedRange<Bound>): Bool {
+    function overlaps(other: ClosedRange<Bound>): Bool {
         return contains(other.lowerBound) || other.contains(lowerBound)
     }
 

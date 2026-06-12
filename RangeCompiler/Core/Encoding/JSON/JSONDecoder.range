@@ -1,22 +1,22 @@
 construct JSONDecoder {
     let value: JSONValue
 
-    function decode(_ type: Bool.Type, from value: JSONValue): Result<Bool, DecodingError> {
+    function decode(type: Bool.Type, value: JSONValue): Result<Bool, DecodingError> {
         let container: JSONSingleValueDecodingContainer(value: value)
         return container.decode(Bool.self)
     }
 
-    function decode(_ type: Float.Type, from value: JSONValue): Result<Float, DecodingError> {
+    function decode(type: Float.Type, value: JSONValue): Result<Float, DecodingError> {
         let container: JSONSingleValueDecodingContainer(value: value)
         return container.decode(Float.self)
     }
 
-    function decode(_ type: Int.Type, from value: JSONValue): Result<Int, DecodingError> {
+    function decode(type: Int.Type, value: JSONValue): Result<Int, DecodingError> {
         let container: JSONSingleValueDecodingContainer(value: value)
         return container.decode(Int.self)
     }
 
-    function decode(_ type: String.Type, from value: JSONValue): Result<String, DecodingError> {
+    function decode(type: String.Type, value: JSONValue): Result<String, DecodingError> {
         let container: JSONSingleValueDecodingContainer(value: value)
         return container.decode(String.self)
     }

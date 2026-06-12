@@ -1,5 +1,5 @@
-macro fallbackOne(_ value: Int?): Expression { target, diagnostics in
-    target.replace(with: value ?? 1)
+macro fallbackOne(value: Int?): Expression { target, diagnostics in
+    target.replace(replacement: value ?? 1)
 }
 
 @main {

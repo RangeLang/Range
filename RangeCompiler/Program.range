@@ -1,5 +1,5 @@
 construct RangeCompilerProgram {
-    function fileTree(path path: String): Result<FileTreeNode, FileReadError> {
+    function fileTree(path: String): Result<FileTreeNode, FileReadError> {
         return FileTree.read(path: path)
     }
 

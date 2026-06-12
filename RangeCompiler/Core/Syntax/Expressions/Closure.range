@@ -4,5 +4,5 @@ construct Closure {
     let parameters: Array<Parameter.Declaration>()
     let body: Block
 
-    function replace(with replacement: Expression): Expression
+    function replace(replacement: Expression): Expression
 }

@@ -1,5 +1,5 @@
 macro arrayifyParameter(): Parameter { target, diagnostics in
-    target.declaration.type.replace(with:
+    target.declaration.type.replace(replacement:
         ArrayTypeReference(
             element: target.declaration.type
         )

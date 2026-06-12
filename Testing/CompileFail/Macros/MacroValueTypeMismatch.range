@@ -1,4 +1,4 @@
-macro badKey<T>(_ value: Int): Let<T> -> String {
+macro badKey<T>(value: Int): Let<T> -> String {
     return value
 }
 

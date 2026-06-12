@@ -1,10 +1,10 @@
-macro incremented(by amount: Int): State<Int> { target, diagnostics in
+macro incremented(amount: Int): State<Int> { target, diagnostics in
     target.getter { value in
         value + amount
     }
 }
 
 construct Reader {
-    @incremented(by: 1)
+    @incremented(amount: 1)
     state name: String("George")
 }

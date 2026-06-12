@@ -1,0 +1,118 @@
+construct AssemblyArtifact {
+    let path: String
+    let contents: String
+}
+
+function assemblyFilePath(outputDirectory: String, symbol: String): String {
+    return "\(outputDirectory)/\(symbol).s"
+}
+
+function assemblySymbol(identifier: Identifier): String {
+    return "_\(identifier.name)"
+}
+
+function arm64ArgumentRegister(index: Int): String {
+    if index == 0 {
+        return "x0"
+    }
+
+    if index == 1 {
+        return "x1"
+    }
+
+    if index == 2 {
+        return "x2"
+    }
+
+    if index == 3 {
+        return "x3"
+    }
+
+    if index == 4 {
+        return "x4"
+    }
+
+    if index == 5 {
+        return "x5"
+    }
+
+    if index == 6 {
+        return "x6"
+    }
+
+    if index == 7 {
+        return "x7"
+    }
+
+    return "x\(index)"
+}
+
+function renderAssemblyOperand(operand: AssemblyOperand, lowering: AssemblyLowering): String {
+    switch lowering.target {
+    case .arm64:
+        if operand.representation == "#result" || operand.representation == "#result.storage" {
+            return "x0"
+        }
+
+        state index: Int(0)
+        while index < lowering.parameters.count {
+            let parameter: Parameter.Declaration(lowering.parameters.element(index: index))
+            if operand.representation == "#\(parameter.identifier.name)"
+                || operand.representation == "#\(parameter.identifier.name).storage" {
+                return arm64ArgumentRegister(index: index)
+            }
+
+            index += 1
+        }
+    }
+
+    return operand.representation
+}
+
+function renderAssemblyInstruction(instruction: AssemblyInstruction, lowering: AssemblyLowering): String {
+    state output: String("    \(instruction.mnemonic.representation)")
+    state index: Int(0)
+
+    while index < instruction.operands.count {
+        let operand: AssemblyOperand(instruction.operands.element(index: index))
+        set output   "\(output) \(renderAssemblyOperand(operand: operand, lowering: lowering))"
+        index += 1
+    }
+
+    return output
+}
+
+function renderAssemblySurface(lowering: AssemblyLowering): String {
+    state output: String("")
+    state index: Int(0)
+
+    while index < lowering.surface.instructions.count {
+        let instruction: AssemblyInstruction(lowering.surface.instructions.element(index: index))
+        set output   "\(output)\(renderAssemblyInstruction(instruction: instruction, lowering: lowering))\n"
+        index += 1
+    }
+
+    return output
+}
+
+function renderAssemblyFunction(lowering: AssemblyLowering): String {
+    let symbol: String(assemblySymbol(identifier: lowering.identifier))
+
+    switch lowering.target {
+    case .arm64:
+        return ".text\n.globl \(symbol)\n\(symbol):\n\(renderAssemblySurface(lowering: lowering))    ret\n"
+    }
+}
+
+function assemblyArtifact(lowering: AssemblyLowering, outputDirectory: String): AssemblyArtifact {
+    let symbol: String(assemblySymbol(identifier: lowering.identifier))
+
+    return AssemblyArtifact(
+        path: assemblyFilePath(outputDirectory: outputDirectory, symbol: symbol),
+        contents: renderAssemblyFunction(lowering: lowering)
+    )
+}
+
+function emitAssemblyArtifact(artifact: AssemblyArtifact): Result<Void, FileWriteError> {
+    return FileManager.createFile(path: artifact.path, text: artifact.contents)
+}

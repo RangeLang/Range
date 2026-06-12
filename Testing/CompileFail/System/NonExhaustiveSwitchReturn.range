@@ -3,7 +3,7 @@ enum MissingSwitchReturnValue {
     case second
 }
 
-function describe(_ value: MissingSwitchReturnValue): String {
+function describe(value: MissingSwitchReturnValue): String {
     switch value {
     case .first:
         return "first"

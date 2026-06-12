@@ -3,20 +3,17 @@ enum AssemblyTarget {
 }
 
 construct AssemblyOperand {
-    let syntax: @syntax
     let representation: String
     let symbol: Identifier?
 }
 
 construct AssemblyInstruction {
-    let syntax: @syntax
     let mnemonic: AssemblyOperand
     let operands: [AssemblyOperand]
     let representation: String
 }
 
 construct AssemblySurface {
-    let syntax: @syntax
     let instructions: [AssemblyInstruction]
     let representation: String
 }

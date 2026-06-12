@@ -1,3 +1,3 @@
-macro graph(_ role: GraphRole?): Construct -> Identity { target, diagnostics in
+macro graph(role: GraphRole?): Construct -> Identity { target, diagnostics in
     return Identity(uuid: UUID(storage: UUIDStorage()))
 }

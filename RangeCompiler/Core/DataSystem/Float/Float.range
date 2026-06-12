@@ -16,7 +16,7 @@ extension Float {
 }
 
 extension Float {
-    function decode(from decoder: Decoder): Result<Self, DecodingError> {
+    function decode(decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(Float.self) {
         case .success(let value):
@@ -28,14 +28,14 @@ extension Float {
 }
 
 extension Float {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
 extension Float {
-    function hash(into hasher: Hasher) {
+    function hash(hasher: Hasher) {
         hasher.combineStorage(storage)
     }
 }

@@ -1,20 +1,20 @@
 @language
 construct HasherStorage {
-    function combine(_ value: IntStorage)
+    function combine(value: IntStorage)
 
-    function combine(_ value: StringStorage)
+    function combine(value: StringStorage)
 
-    function combine(_ value: BoolStorage)
+    function combine(value: BoolStorage)
 
-    function combine(_ value: DateStorage)
+    function combine(value: DateStorage)
 
-    function combine(_ value: DateTimeStorage)
+    function combine(value: DateTimeStorage)
 
-    function combine(_ value: FloatStorage)
+    function combine(value: FloatStorage)
 
-    function combine(_ value: DataStorage)
+    function combine(value: DataStorage)
 
-    function combine(_ value: UUIDStorage)
+    function combine(value: UUIDStorage)
 
     function finalize(): Int
 }

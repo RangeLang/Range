@@ -10,18 +10,18 @@ construct ThreadHandle {
 }
 
 construct POSIXThread {
-    function spawn(_ body: () -> Void): Result<ThreadHandle, ThreadError>
-    function join(_ handle: ThreadHandle): Result<Void, ThreadError>
-    function detach(_ handle: ThreadHandle): Result<Void, ThreadError>
+    function spawn(body: () -> Void): Result<ThreadHandle, ThreadError>
+    function join(handle: ThreadHandle): Result<Void, ThreadError>
+    function detach(handle: ThreadHandle): Result<Void, ThreadError>
     function current(): ThreadHandle
     function yield()
     function sleep(milliseconds: Int)
 }
 
 construct Thread {
-    function spawn(_ body: () -> Void): Result<ThreadHandle, ThreadError>
-    function join(_ handle: ThreadHandle): Result<Void, ThreadError>
-    function detach(_ handle: ThreadHandle): Result<Void, ThreadError>
+    function spawn(body: () -> Void): Result<ThreadHandle, ThreadError>
+    function join(handle: ThreadHandle): Result<Void, ThreadError>
+    function detach(handle: ThreadHandle): Result<Void, ThreadError>
     function current(): ThreadHandle
     function yield()
     function sleep(milliseconds: Int)

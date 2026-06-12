@@ -29,7 +29,7 @@ macro syntax(@literal @spliced(delimiter: "") syntax: @syntax): Construct { targ
     }
 }
 
-open macro spliced(_ delimiter: String = ""): @parameter -> @syntax { target, diagnostics in
+open macro spliced(delimiter: String = ""): @parameter -> @syntax { target, diagnostics in
     return SplicedSyntax(
         delimiter: delimiter,
         syntax: target.application.syntax,

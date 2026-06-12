@@ -8,6 +8,6 @@ construct DictionaryStorage<Key, Value> {
     function contains(key: Key): Bool
     function entries(): [DictionaryEntry<Key, Value>]
     function filter(include: (DictionaryEntry<Key, Value>) -> Bool): [DictionaryEntry<Key, Value>]
-    function first(where include: (DictionaryEntry<Key, Value>) -> Bool): DictionaryEntry<Key, Value>?
+    function first(include: (DictionaryEntry<Key, Value>) -> Bool): DictionaryEntry<Key, Value>?
     function clear()
 }

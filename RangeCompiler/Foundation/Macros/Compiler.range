@@ -5,7 +5,7 @@ macro compiler(): Construct & @syntax { target, diagnostics, graph in
         diagnostics.error("A second @compiler conflicts with the compiler already declared in this Range project.")
     }
 
-    let sourceDirectory: String(graph.sourceDirectory(of: target.identity))
+    let sourceDirectory: String(graph.sourceDirectory(identity: target.identity))
     let rangeFiles: Array<String>(FileTree.rangeFiles(path: sourceDirectory))
 
     if rangeFiles.count == 0 {

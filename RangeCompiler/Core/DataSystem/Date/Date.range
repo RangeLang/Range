@@ -23,7 +23,7 @@ extension Date {
 }
 
 extension Date {
-    function decode(from decoder: Decoder): Result<Self, DecodingError> {
+    function decode(decoder: Decoder): Result<Self, DecodingError> {
         let container: decoder.singleValueContainer()
         switch container.decode(Date.self) {
         case .success(let value):
@@ -35,14 +35,14 @@ extension Date {
 }
 
 extension Date {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
 extension Date {
-    function hash(into hasher: Hasher) {
+    function hash(hasher: Hasher) {
         hasher.combineStorage(storage)
     }
 }

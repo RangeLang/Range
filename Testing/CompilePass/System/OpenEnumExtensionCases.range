@@ -11,7 +11,7 @@ function defaultEncodingFormat(): EncodingFormat {
     return .binary
 }
 
-function describeEncodingFormat(_ format: EncodingFormat): String {
+function describeEncodingFormat(format: EncodingFormat): String {
     switch format {
     case .json:
         return "json"

@@ -8,7 +8,7 @@ construct Enum {
         let generics: [Generic]
         let cases: [Case]
 
-        function expand(_ expansion: () -> [@syntax])
+        function expand(expansion: () -> [@syntax])
     }
 
     @graph(.declaration)

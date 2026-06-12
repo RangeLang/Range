@@ -1,5 +1,5 @@
 macro badCapture(@capture _ value): Expression { target, diagnostics in
-    target.replace(with: value)
+    target.replace(replacement: value)
 }
 
 @main {

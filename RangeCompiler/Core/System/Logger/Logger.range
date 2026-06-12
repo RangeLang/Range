@@ -1,9 +1,9 @@
 @language
 construct Logger {
-    function log(_ message: String)
-    function debug(_ message: String)
-    function info(_ message: String)
-    function success(_ message: String)
-    function warning(_ message: String)
-    function error(_ message: String)
+    function log(message: String)
+    function debug(message: String)
+    function info(message: String)
+    function success(message: String)
+    function warning(message: String)
+    function error(message: String)
 }

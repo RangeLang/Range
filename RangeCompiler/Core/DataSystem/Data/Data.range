@@ -8,14 +8,14 @@ extension Data {
 }
 
 extension Data {
-    function encode(to encoder: Encoder): Result<Void, EncodingError> {
+    function encode(encoder: Encoder): Result<Void, EncodingError> {
         let container: encoder.singleValueContainer()
         return container.encode(self)
     }
 }
 
 extension Data {
-    function hash(into hasher: Hasher) {
+    function hash(hasher: Hasher) {
         hasher.combineStorage(storage)
     }
 }

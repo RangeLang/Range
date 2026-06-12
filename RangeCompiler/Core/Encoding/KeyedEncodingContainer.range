@@ -1,11 +1,11 @@
 construct KeyedEncodingContainer {
-    function encode(_ value: Bool, forKey key: String): Result<Void, EncodingError>
-    function encode(_ value: Data, forKey key: String): Result<Void, EncodingError>
-    function encode(_ value: Date, forKey key: String): Result<Void, EncodingError>
-    function encode(_ value: DateTime, forKey key: String): Result<Void, EncodingError>
-    function encode(_ value: Float, forKey key: String): Result<Void, EncodingError>
-    function encode(_ value: Int, forKey key: String): Result<Void, EncodingError>
-    function encode(_ value: String, forKey key: String): Result<Void, EncodingError>
-    function encode(_ value: UUID, forKey key: String): Result<Void, EncodingError>
-    function encode<T>(_ value: T, forKey key: String): Result<Void, EncodingError>
+    function encode(value: Bool, key: String): Result<Void, EncodingError>
+    function encode(value: Data, key: String): Result<Void, EncodingError>
+    function encode(value: Date, key: String): Result<Void, EncodingError>
+    function encode(value: DateTime, key: String): Result<Void, EncodingError>
+    function encode(value: Float, key: String): Result<Void, EncodingError>
+    function encode(value: Int, key: String): Result<Void, EncodingError>
+    function encode(value: String, key: String): Result<Void, EncodingError>
+    function encode(value: UUID, key: String): Result<Void, EncodingError>
+    function encode<T>(value: T, key: String): Result<Void, EncodingError>
 }

@@ -1,4 +1,4 @@
-macro shifted(by amount: Int): Let<Int> { target, diagnostics in
+macro shifted(amount: Int): Let<Int> { target, diagnostics in
     target.initializer { value in
         value + amount
     }
@@ -9,7 +9,7 @@ macro shifted(by amount: Int): Let<Int> { target, diagnostics in
 }
 
 construct Holder {
-    @shifted(by: 2)
+    @shifted(amount: 2)
     let count: Int(10)
 
     function current(): Int {

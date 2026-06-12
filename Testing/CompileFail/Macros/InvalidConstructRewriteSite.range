@@ -1,5 +1,5 @@
 macro badConstructRewrite(): Construct { target, diagnostics in
-    target.replace(with: target)
+    target.replace(replacement: target)
 }
 
 @badConstructRewrite

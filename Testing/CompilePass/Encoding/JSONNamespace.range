@@ -3,7 +3,7 @@ function encodeJSONValue(): Result<String, EncodingError> {
 }
 
 function decodeJSONString(): Result<String, DecodingError> {
-    return JSON.decode(String.self, from: .string(value: "George"))
+    return JSON.decode(String.self, value: .string(value: "George"))
 }
 
 @main {

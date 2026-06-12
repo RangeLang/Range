@@ -7,7 +7,7 @@ macro background(): @block & @syntax { target, diagnostics, graph in
         diagnostics.error("@background block must not be empty.")
     }
 
-    target.replace(with: {
+    target.replace(replacement: {
         switch Thread.spawn({
             @block(statements: target.declaration.statements)
             Thread.yield()

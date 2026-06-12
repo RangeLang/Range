@@ -1,6 +1,5 @@
 macro assemblyOperand(@spliced(delimiter: " ") syntax: @syntax): AssemblyOperand { target, diagnostics, graph in
     return AssemblyOperand(
-        syntax: syntax,
         representation: syntax.description,
         symbol: nil
     )
@@ -17,14 +16,12 @@ macro assemblyInstruction(
     let mnemonic: AssemblyOperand(
         operands.first(
             default: AssemblyOperand(
-                syntax: target.application.syntax,
                 representation: ""
             )
         )
     )
 
     return AssemblyInstruction(
-        syntax: target.application.syntax,
         mnemonic: mnemonic,
         operands: operands,
         representation: target.application.syntax.description
@@ -41,13 +38,12 @@ macro assemblySurface(
     )
 
     return AssemblySurface(
-        syntax: target.application.syntax,
         instructions: instructions,
         representation: target.application.syntax.description
     )
 }
 
-macro arm64InstructionShapes(): [AssemblyInstructionShape] {
+function arm64InstructionShapes(): [AssemblyInstructionShape] {
     return [
         AssemblyInstructionShape(mnemonic: "add", operandCount: 3, resultOperandIndex: 0),
         AssemblyInstructionShape(mnemonic: "sub", operandCount: 3, resultOperandIndex: 0),
@@ -66,7 +62,7 @@ macro validateAssemblySurface(
 ): Void { target, diagnostics, graph in
     switch assemblyTarget {
     case .arm64:
-        let shapes: [AssemblyInstructionShape](@arm64InstructionShapes())
+        let shapes: [AssemblyInstructionShape](arm64InstructionShapes())
 
         surface.instructions.forEach { instruction in
             let matchingShapes: [AssemblyInstructionShape](
@@ -77,7 +73,7 @@ macro validateAssemblySurface(
 
             if matchingShapes.count == 0 {
                 diagnostics.error(
-                    "@assembly uses unknown arm64 instruction '\(instruction.mnemonic.representation)'."
+                    "@assembly uses unknown arm64 instruction \(instruction.mnemonic.representation)."
                 )
             }
 
@@ -93,14 +89,14 @@ macro validateAssemblySurface(
 
             if instruction.operands.count != shape.operandCount {
                 diagnostics.error(
-                    "@assembly instruction '\(shape.mnemonic)' expects \(shape.operandCount) operands."
+                    "@assembly instruction \(shape.mnemonic) expects \(shape.operandCount) operands."
                 )
             }
 
             instruction.operands.forEach { operand in
                 if operand.representation == "#result" && targetDeclaration.returnType == nil {
                     diagnostics.error(
-                        "@assembly references #result, but '\(targetDeclaration.identifier.name)' has no return type."
+                        "@assembly references #result, but \(targetDeclaration.identifier.name) has no return type."
                     )
                 }
 
@@ -116,7 +112,7 @@ macro validateAssemblySurface(
                     && operand.representation != "#result.storage"
                     && matchingParameters.count == 0 {
                     diagnostics.error(
-                        "@assembly references unknown operand '\(operand.representation)' on '\(targetDeclaration.identifier.name)'."
+                        "@assembly references unknown operand \(operand.representation) on \(targetDeclaration.identifier.name)."
                     )
                 }
             }
@@ -125,7 +121,7 @@ macro validateAssemblySurface(
 }
 
 macro assembly(
-    _ assemblyTarget: AssemblyTarget,
+    assemblyTarget: AssemblyTarget,
     @closure representation: @syntax
 ): Function -> AssemblyLowering { target, diagnostics, graph in
     let surface: AssemblySurface(
