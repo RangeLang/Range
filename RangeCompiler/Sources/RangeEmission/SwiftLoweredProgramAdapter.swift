@@ -1,9 +1,9 @@
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct SwiftLoweredProgramAdapter {
-    private typealias RangeExpression = RangeSyntax.Expression
-    private typealias RangeStatement = RangeSyntax.Statement
+    private typealias RangeExpression = RangeCompiler.Expression
+    private typealias RangeStatement = RangeCompiler.Statement
 
     func adapt(program: LoweredProgram) -> LoweredProgram {
         .init(

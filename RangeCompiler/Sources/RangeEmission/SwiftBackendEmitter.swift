@@ -1,5 +1,5 @@
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct SwiftBackendEmitter {
     private struct LLVMCallableBridge {
@@ -283,8 +283,8 @@ struct SwiftBackendEmitter {
         "UUIDStorage": "UUID",
     ]
 
-    private typealias RangeExpression = RangeSyntax.Expression
-    private typealias RangeStatement = RangeSyntax.Statement
+    private typealias RangeExpression = RangeCompiler.Expression
+    private typealias RangeStatement = RangeCompiler.Statement
     private let context: SwiftEmissionContext
 
     init() {
@@ -1732,7 +1732,7 @@ struct SwiftBackendEmitter {
     }
 
     private func propertyForwardsInitializer(macros applications: [MacroApplication]) -> Bool {
-        applications.contains { application in
+        applications.contains(where: { application in
             guard let macro = context.macrosByName[application.name],
                 let targetBinding = macro.bindings?.target
             else {
@@ -1744,7 +1744,7 @@ struct SwiftBackendEmitter {
                 }
                 return name == "\(targetBinding).initializer.forward" && arguments.isEmpty
             }
-        }
+        })
     }
 
     private func macroOperationExpressions(in statements: [RangeStatement]) -> [RangeExpression] {
@@ -2419,10 +2419,13 @@ struct SwiftBackendEmitter {
         case .expression(let expression):
             return expressionReferencesInstanceSelf(expression)
         case .return(let expression):
-            return expression.map(expressionReferencesInstanceSelf) ?? false
+            guard let expression else {
+                return false
+            }
+            return expressionReferencesInstanceSelf(expression)
         case .conditional(let branches):
             return branches.contains { branch in
-                (branch.condition.map(expressionReferencesInstanceSelf) ?? false)
+                (branch.condition.map { expressionReferencesInstanceSelf($0) } ?? false)
                     || statementsReferenceInstanceSelf(branch.body)
             }
         case .forEach(_, let sequence, let body):
@@ -3492,11 +3495,11 @@ struct SwiftBackendEmitter {
         let base = String(name[..<dot])
         let member = String(name[name.index(after: dot)...])
 
-        func argument(_ label: String) -> RangeSyntax.Expression? {
+        func argument(_ label: String) -> RangeCompiler.Expression? {
             arguments.first(where: { $0.label == label })?.value
         }
 
-        func unlabeledArgument() -> RangeSyntax.Expression? {
+        func unlabeledArgument() -> RangeCompiler.Expression? {
             guard arguments.count == 1, arguments[0].label == nil else {
                 return nil
             }
@@ -3938,7 +3941,7 @@ struct SwiftBackendEmitter {
     ) throws -> String? {
         let baseName = name.split(separator: "<", maxSplits: 1).first.map(String.init) ?? name
 
-        func singleArgument(label: String?) -> RangeSyntax.Expression? {
+        func singleArgument(label: String?) -> RangeCompiler.Expression? {
             guard arguments.count == 1, arguments[0].label == label else {
                 return nil
             }

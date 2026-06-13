@@ -1,4 +1,4 @@
-import RangeSyntax
+import RangeCompiler
 
 enum LLVMLowerability {
     static func canLower(_ callable: CallableDeclaration) -> Bool {

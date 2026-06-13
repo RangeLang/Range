@@ -1,8 +1,8 @@
 import Foundation
 
-// Bootstrap lexer generated from RangeCompiler/Lexer/*.range.
+// Bootstrap lexer generated from RangeCompiler/Range/Lexer/*.range.
 // Range lexer source fingerprint: 3041c414bc62e2b2
-// Source of truth: RangeCompiler/Lexer/*.range.
+// Source of truth: RangeCompiler/Range/Lexer/*.range.
 
 enum RangeAuthoredTokenKind {
     case hash

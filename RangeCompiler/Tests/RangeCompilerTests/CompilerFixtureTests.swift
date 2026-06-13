@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import RangeSyntax
+@testable import RangeCompiler
 
 @Suite("Compiler fixtures")
 struct CompilerFixtureTests {
@@ -2871,7 +2871,9 @@ private func fixtureFile(in suite: String, path: String) throws -> URL {
 }
 
 private func rangeCoreInputs() throws -> [SourceInput] {
-    let root = try repositoryRoot().appendingPathComponent("RangeCompiler", isDirectory: true)
+    let root = try repositoryRoot()
+        .appendingPathComponent("RangeCompiler", isDirectory: true)
+        .appendingPathComponent("Range", isDirectory: true)
     let files =
         try rangeFiles(
             in: root.appendingPathComponent("Core", isDirectory: true),
@@ -2913,7 +2915,7 @@ private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL
         if excludingExploration,
             isDirectory,
             url.lastPathComponent == "Exploration",
-            url.path.contains("/RangeCompiler/Core/")
+            url.path.contains("/RangeCompiler/Range/Core/")
         {
             enumerator.skipDescendants()
             continue
@@ -2934,6 +2936,7 @@ private func repositoryRoot() throws -> URL {
         let candidateCore =
             current
             .appendingPathComponent("RangeCompiler", isDirectory: true)
+            .appendingPathComponent("Range", isDirectory: true)
             .appendingPathComponent("Core", isDirectory: true)
         let candidateFixtures = current.appendingPathComponent("Tests", isDirectory: true)
         var isCoreDirectory: ObjCBool = false

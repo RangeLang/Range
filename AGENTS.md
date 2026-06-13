@@ -31,6 +31,20 @@ when multiple implementation languages are involved.
 
 ## Current Backend Reality
 
+The active package layout is:
+
+```text
+RangeCompiler/
+  Sources/RangeCompiler/  Swift compiler pipeline
+  Sources/RangeEmission/  Swift-hosted emission and LLVM lowering
+  Range/Core/             Range-authored core declarations
+  Range/Foundation/       Range-authored bundled macros/features
+  Range/Lexer/            Range-authored lexer declarations
+
+CLI/
+  Sources/                command-line shell
+```
+
 Normal Range program execution currently uses the Range Swift-hosted emission
 pipeline (Swift):
 

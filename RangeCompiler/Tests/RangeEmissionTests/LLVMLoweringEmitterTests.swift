@@ -1,7 +1,7 @@
 import Foundation
-import RangeSyntax
+import RangeCompiler
 import Testing
-@testable import RangeBackendSwift
+@testable import RangeEmission
 
 @Suite("LLVM lowering emission")
 struct LLVMLoweringEmitterTests {

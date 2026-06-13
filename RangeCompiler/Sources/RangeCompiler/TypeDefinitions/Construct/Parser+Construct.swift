@@ -91,7 +91,7 @@ extension Parser {
 
             if peek() != .rightBrace {
                 throw ParseError(
-                    "Construct render bodies are no longer supported in RangeSyntax. Use declarations only."
+                    "Construct render bodies are no longer supported in RangeCompiler. Use declarations only."
                 )
             }
 

@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
-import RangeBackendSwift
-import RangeSyntax
+import RangeEmission
+import RangeCompiler
 
 extension CLI {
     struct Compile: ParsableCommand {

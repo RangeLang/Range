@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct ProjectUpdater {
     private static let releaseRepository = "georgetchelidze/Range"

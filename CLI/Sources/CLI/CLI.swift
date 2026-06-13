@@ -1,5 +1,5 @@
 import ArgumentParser
-import RangeSyntax
+import RangeCompiler
 
 @main
 struct CLI: ParsableCommand {

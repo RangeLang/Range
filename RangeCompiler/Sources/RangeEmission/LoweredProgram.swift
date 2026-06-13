@@ -1,5 +1,5 @@
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct LoweredSourceUnit {
     let outputFileName: String

@@ -1,6 +1,6 @@
-import RangeSyntax
+import RangeCompiler
 import Testing
-@testable import RangeBackendSwift
+@testable import RangeEmission
 
 @Suite("Swift backend layout emission")
 struct SwiftBackendEmitterLayoutTests {

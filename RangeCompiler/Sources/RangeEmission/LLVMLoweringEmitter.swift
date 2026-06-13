@@ -1,5 +1,5 @@
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct LLVMModuleEmission: Equatable {
     let moduleName: String
@@ -171,7 +171,7 @@ private struct LLVMFunctionEmitter {
 
     private mutating func emitAssignment(
         target: AssignmentTarget,
-        expression: RangeSyntax.Expression
+        expression: RangeCompiler.Expression
     ) throws {
         guard case .local(let name) = target else {
             throw LLVMLoweringError("LLVM assignment currently supports local state only.")
@@ -188,7 +188,7 @@ private struct LLVMFunctionEmitter {
     }
 
     private mutating func emitWhileLoop(
-        condition: RangeSyntax.Expression,
+        condition: RangeCompiler.Expression,
         body: [Statement]
     ) throws {
         let labelID = freshLabelID()
@@ -220,7 +220,7 @@ private struct LLVMFunctionEmitter {
         emitLabel(endLabel)
     }
 
-    private mutating func emitExpression(_ expression: RangeSyntax.Expression) throws -> Value {
+    private mutating func emitExpression(_ expression: RangeCompiler.Expression) throws -> Value {
         switch expression {
         case .integer(let value):
             return Value(type: "i64", representation: String(value))

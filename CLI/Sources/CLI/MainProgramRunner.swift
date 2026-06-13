@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct MainProgramRunner {
     private let project: LoadedProject
@@ -398,7 +398,7 @@ private struct MainProgramInterpreter {
         }
     }
 
-    private mutating func executeExpressionStatement(_ expression: RangeSyntax.Expression) throws {
+    private mutating func executeExpressionStatement(_ expression: RangeCompiler.Expression) throws {
         guard case .call(let name, let arguments) = expression else {
             throw ValidationError("Standalone expression statements must be callable.")
         }
@@ -440,7 +440,7 @@ private struct MainProgramInterpreter {
         }
     }
 
-    private mutating func evaluate(_ expression: RangeSyntax.Expression) throws -> RuntimeValue {
+    private mutating func evaluate(_ expression: RangeCompiler.Expression) throws -> RuntimeValue {
         switch expression {
         case .integer(let value):
             return .int(value)
@@ -585,7 +585,7 @@ private struct MainProgramInterpreter {
         }.joined()
     }
 
-    private func evaluateForInterpolation(_ expression: RangeSyntax.Expression) throws
+    private func evaluateForInterpolation(_ expression: RangeCompiler.Expression) throws
         -> RuntimeValue
     {
         var copy = self

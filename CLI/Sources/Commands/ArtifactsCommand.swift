@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 extension CLI {
     struct Artifacts: ParsableCommand {

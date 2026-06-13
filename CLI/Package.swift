@@ -9,16 +9,15 @@ let package = Package(
         .macOS(.v13)
     ],
     dependencies: [
-        .package(path: "../RangeSyntax"),
-        .package(path: "../RangeBackendSwift"),
+        .package(path: "../RangeCompiler"),
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
     ],
     targets: [
         .executableTarget(
             name: "CLI",
             dependencies: [
-                .product(name: "RangeSyntax", package: "RangeSyntax"),
-                .product(name: "RangeBackendSwift", package: "RangeBackendSwift"),
+                .product(name: "RangeCompiler", package: "RangeCompiler"),
+                .product(name: "RangeEmission", package: "RangeCompiler"),
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ],
             path: "Sources",

@@ -1,5 +1,5 @@
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct RangeLanguageServer {
     private var documents: [String: DocumentState] = [:]

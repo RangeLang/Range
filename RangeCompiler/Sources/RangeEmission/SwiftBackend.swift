@@ -1,5 +1,5 @@
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 public struct SwiftBackendError: LocalizedError {
     public let message: String

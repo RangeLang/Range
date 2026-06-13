@@ -1,5 +1,5 @@
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct SwiftBackendProgramBuilder {
     func build(
@@ -305,7 +305,7 @@ struct SwiftBackendProgramBuilder {
                     || (includeSyntaxLexingSupport
                         && isCorePath(parsedFile.path, containing: "Syntax/Lexing/"))
                     || (includeSyntaxLexingSupport
-                        && parsedFile.path.contains("/RangeCompiler/Lexer/"))
+                        && parsedFile.path.contains("/RangeCompiler/Range/Lexer/"))
                     || (includeSyntaxLexingSupport
                         && isCorePath(parsedFile.path, containing: "Syntax/Identifier.range"))
                     || (includeSyntaxLexingSupport
@@ -432,6 +432,6 @@ struct SwiftBackendProgramBuilder {
     }
 
     private func isCorePath(_ path: String, containing suffix: String) -> Bool {
-        path.contains("/RangeCore/\(suffix)") || path.contains("/RangeCompiler/Core/\(suffix)")
+        path.contains("/RangeCore/\(suffix)") || path.contains("/RangeCompiler/Range/Core/\(suffix)")
     }
 }

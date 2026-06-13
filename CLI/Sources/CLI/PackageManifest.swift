@@ -1,6 +1,6 @@
 import ArgumentParser
 import Foundation
-import RangeSyntax
+import RangeCompiler
 
 struct PackageManifest {
     let name: String
@@ -185,7 +185,7 @@ enum PackageManifestLoader {
         }
     }
 
-    private static func remoteURL(from expression: RangeSyntax.Expression) -> String? {
+    private static func remoteURL(from expression: RangeCompiler.Expression) -> String? {
         switch expression {
         case .string(let string):
             return string

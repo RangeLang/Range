@@ -1,5 +1,5 @@
 import ArgumentParser
-import RangeSyntax
+import RangeCompiler
 
 extension CLI {
     struct LSP: ParsableCommand {
