@@ -1607,10 +1607,6 @@ struct CompilerFixtureTests {
                     macro decorate(): Construct { target, diagnostics in
                     }
 
-                    protocol Renderable {
-                        function render(title: String): String
-                    }
-
                     enum DisplayMode {
                         case compact
                         case expanded
@@ -1623,7 +1619,8 @@ struct CompilerFixtureTests {
                     }
 
                     @styling
-                    construct Panel: Renderable {
+                    @graph
+                    construct Panel {
                         state count: Int(0)
                         binding selected: Bool {
                             get {
@@ -1679,9 +1676,9 @@ struct CompilerFixtureTests {
         #expect(registry.construct(named: "Panel") != nil)
         #expect(registry.construct(named: "Panel.Nested") != nil)
         #expect(registry.construct(named: "Routes") != nil)
-        #expect(registry.hasProtocol(named: "Renderable"))
         #expect(registry.hasEnumeration(named: "DisplayMode"))
         #expect(registry.hasMacro(named: "decorate"))
+        #expect(graph.constructsByName["Panel"]?.macros.contains { $0.name == "graph" } == true)
         #expect(graph.macroMetadataByName["hostSpace"]?.hasMetadataSlotEffect == true)
         #expect(registry.hasExtensions(targeting: "Panel"))
         #expect(graph.packageValues(named: "packageName").count == 1)
@@ -1958,19 +1955,37 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.registryView.hasExtensions(targeting: "Math"))
     }
 
-    @Test("Construct conformances require nominal type references")
-    func constructConformancesRequireNominalTypeReferences() throws {
+    @Test("Construct conformance clauses are unsupported")
+    func constructConformanceClausesAreUnsupported() throws {
         let source = """
-            construct Box: [Int] { }
+            construct Box: Codable { }
             """
 
         do {
             var parser = try Parser(source: source)
             _ = try parser.parseSourceFile()
-            Issue.record("Expected non-nominal construct conformance to fail parsing.")
+            Issue.record("Expected construct conformance clause to fail parsing.")
         } catch {
             let description = String(describing: error)
-            #expect(description.contains("Conformance must be a nominal type reference"))
+            #expect(description.contains("Conformance clauses are no longer supported"))
+        }
+    }
+
+    @Test("Protocol declarations are unsupported")
+    func protocolDeclarationsAreUnsupported() throws {
+        let source = """
+            protocol Renderable {
+                function render(): String
+            }
+            """
+
+        do {
+            var parser = try Parser(source: source)
+            _ = try parser.parseSourceFile()
+            Issue.record("Expected protocol declaration to fail parsing.")
+        } catch {
+            let description = String(describing: error)
+            #expect(description.contains("Protocol declarations are no longer supported"))
         }
     }
 
@@ -2453,10 +2468,6 @@ struct CompilerFixtureTests {
                 case value(T)
             }
 
-            protocol Cache<T: Comparable, let capacity: Int = 1> {
-                function get(value: T): T
-            }
-
             function identity<T: Comparable, let count: Int = 3>(value: T): T {
                 return value
             }
@@ -2476,13 +2487,11 @@ struct CompilerFixtureTests {
 
         #expect(module.constructs.count == 1)
         #expect(module.enumerations.count == 1)
-        #expect(module.protocols.count == 1)
         #expect(module.callables.count == 1)
         #expect(module.macros.count == 1)
 
         expectSharedGenericShape(module.constructs[0].genericParameters)
         expectSharedGenericShape(module.enumerations[0].genericParameters)
-        expectSharedGenericShape(module.protocols[0].genericParameters)
         expectSharedGenericShape(module.callables[0].genericParameters)
         expectSharedGenericShape(module.macros[0].genericParameters)
     }

@@ -80,7 +80,7 @@ struct SwiftBackendProgramBuilder {
             return .init(
                 macrosByName: compiledProgram.declarationGraph.macrosByName,
                 callables: module.callables,
-                protocols: supportUnits.flatMap(\.protocols) + module.protocols,
+                protocols: [],
                 enumerations: moduleEnumerations,
                 declarations: supportUnits.flatMap(\.declarations) + moduleDeclarations,
                 extensions: supportUnits.flatMap(\.extensions) + module.extensions,
@@ -88,7 +88,7 @@ struct SwiftBackendProgramBuilder {
                 units: [
                     .init(
                         outputFileName: fileURL.deletingPathExtension().lastPathComponent + ".swift",
-                        protocols: module.protocols,
+                        protocols: [],
                         enumerations: moduleEnumerations,
                         declarations: moduleDeclarations,
                         extensions: module.extensions,
@@ -110,14 +110,12 @@ struct SwiftBackendProgramBuilder {
 
     private func build(compiledProgram: CompiledProgram) throws -> LoweredProgram {
         var callables: [CallableDeclaration] = []
-        var protocols: [ProtocolDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var declarations: [ConstructDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
         var mainBlock: MainBlockNode?
         var units: [LoweredSourceUnit] = coreSupportUnits(in: compiledProgram)
 
-        protocols.append(contentsOf: units.flatMap(\.protocols))
         enumerations.append(contentsOf: units.flatMap(\.enumerations))
         declarations.append(contentsOf: units.flatMap(\.declarations))
         extensions.append(contentsOf: units.flatMap(\.extensions))
@@ -148,7 +146,6 @@ struct SwiftBackendProgramBuilder {
 
             case .module(let module):
                 callables.append(contentsOf: module.callables)
-                protocols.append(contentsOf: module.protocols)
                 enumerations.append(contentsOf: module.enumerations)
                 extensions.append(contentsOf: module.extensions)
 
@@ -159,7 +156,7 @@ struct SwiftBackendProgramBuilder {
                 units.append(
                     .init(
                         outputFileName: outputFileName,
-                        protocols: module.protocols,
+                        protocols: [],
                         enumerations: module.enumerations,
                         declarations: moduleDeclarations,
                         extensions: module.extensions,
@@ -204,12 +201,11 @@ struct SwiftBackendProgramBuilder {
                     )
                 )
 
-            case .protocolDefinition(let declaration):
-                protocols.append(declaration)
+            case .protocolDefinition:
                 units.append(
                     .init(
                         outputFileName: outputFileName,
-                        protocols: [declaration],
+                        protocols: [],
                         enumerations: [],
                         declarations: [],
                         extensions: [],
@@ -256,7 +252,7 @@ struct SwiftBackendProgramBuilder {
         let loweredUnits = units.map { unit in
             LoweredSourceUnit(
                 outputFileName: unit.outputFileName,
-                protocols: unit.protocols,
+                protocols: [],
                 enumerations: mergeExtendedEnumCases(
                     into: unit.enumerations,
                     extendedCasesByEnumName: extendedCasesByEnumName
@@ -271,7 +267,7 @@ struct SwiftBackendProgramBuilder {
         return .init(
             macrosByName: compiledProgram.declarationGraph.macrosByName,
             callables: callables,
-            protocols: protocols,
+            protocols: [],
             enumerations: loweredEnumerations,
             declarations: declarations,
             extensions: extensions,
@@ -296,7 +292,7 @@ struct SwiftBackendProgramBuilder {
                 attribute: declaration.attribute,
                 name: declaration.name,
                 genericParameters: declaration.genericParameters,
-                conformances: declaration.conformances,
+                conformances: [],
                 cases: declaration.cases + extensionCases
             )
         }
@@ -374,10 +370,10 @@ struct SwiftBackendProgramBuilder {
                     callables: [],
                     mainBlock: nil
                 )
-            case .protocolDefinition(let declaration):
+            case .protocolDefinition:
                 return .init(
                     outputFileName: outputFileName,
-                    protocols: [declaration],
+                    protocols: [],
                     enumerations: [],
                     declarations: [],
                     extensions: [],
@@ -402,7 +398,7 @@ struct SwiftBackendProgramBuilder {
 
                 return .init(
                     outputFileName: outputFileName,
-                    protocols: module.protocols,
+                    protocols: [],
                     enumerations: module.enumerations,
                     declarations: declarations,
                     extensions: module.extensions,

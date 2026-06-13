@@ -118,20 +118,9 @@ extension Parser {
             return []
         }
 
-        try consume(.colon)
-        var conformances: [TypeReference] = []
-
-        while true {
-            conformances.append(
-                try parseNominalTypeReferenceNode(
-                    expectedDescription: "Conformance"
-                )
-            )
-            guard peek() == .comma else { break }
-            advance()
-        }
-
-        return conformances
+        throw ParseError(
+            "Conformance clauses are no longer supported. Use macro graph metadata instead."
+        )
     }
 
     mutating func skipUnknownBlockBody() throws {
