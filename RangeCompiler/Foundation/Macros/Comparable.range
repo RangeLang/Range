@@ -18,7 +18,7 @@ macro comparableBody<T>(lhs: T, rhs: T, properties: [Let]) -> [@Statement] {
 
 macro comparable(): Construct { target, diagnostics in
     target.declaration.expand {
-        extension #(target.declaration.self): Comparable {
+        extension #(target.declaration.self) {
             function ==(lhs: Self, rhs: Self): Bool {
                 @equatableBody(
                     lhs: lhs,

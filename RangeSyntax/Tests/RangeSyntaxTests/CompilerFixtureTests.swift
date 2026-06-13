@@ -1216,9 +1216,6 @@ struct CompilerFixtureTests {
         #expect(graph.constructsByName["Construct"] != nil)
         #expect(graph.constructsByName["Construct.Application"] != nil)
         #expect(
-            graph.syntaxResolver.declaration(
-                named: "Construct.Application", conformsTo: "SyntaxReplaceable"))
-        #expect(
             graph.constructsByName["Construct"]?.macros.contains { $0.name == "syntax" } == true)
         #expect(
             graph.constructsByName["Construct.Declaration"]?.macros.contains { $0.name == "syntax" }
@@ -1263,13 +1260,12 @@ struct CompilerFixtureTests {
         #expect(constructSyntax.applications.map(\.label) == ["Application"])
     }
 
-    @Test("@syntax declarations are syntax-facing without Syntax conformance")
-    func syntaxDeclarationsAreSyntaxFacingWithoutSyntaxConformance() throws {
+    @Test("@syntax declarations are syntax-facing through metadata")
+    func syntaxDeclarationsAreSyntaxFacingThroughMetadata() throws {
         let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
         let graph = program.declarationGraph
 
         #expect(graph.constructsByName["Expression"]?.isCore == true)
-        #expect(!graph.syntaxResolver.declaration(named: "Expression", conformsTo: "Syntax"))
         #expect(graph.syntaxResolver.typeConformsToSyntax(.named("Expression")))
         #expect(graph.syntaxResolver.syntaxTypeName(forSurface: "block") == "Block")
         #expect(graph.syntaxResolver.type(.named("Block"), matchesSyntaxSurface: "block"))
@@ -2233,7 +2229,6 @@ struct CompilerFixtureTests {
 
         let extensionDeclaration = try #require(module.extensions.first)
         #expect(extensionDeclaration.targetType.displayName == "ExtendableFixture")
-        #expect(extensionDeclaration.conformances.map(\.displayName) == ["Greetable"])
         #expect(extensionDeclaration.callables.contains(where: { $0.name == "greet" }))
         #expect(
             extensionDeclaration.callables.first(where: { $0.name == "clone" })?.returnType?
@@ -2270,7 +2265,6 @@ struct CompilerFixtureTests {
         let object = try #require(
             module.extensions.first(where: { $0.targetName == "ObjectCodableMacroFixture" })
         )
-        #expect(object.conformances.map(\.displayName) == ["Codable"])
         #expect(encodeKeys(in: object) == ["userId": "userId", "displayName": "displayName"])
         #expect(decodeKeys(in: object) == ["userId": "userId", "displayName": "displayName"])
 
@@ -2308,7 +2302,6 @@ struct CompilerFixtureTests {
         let fixtureExtension = try #require(
             module.extensions.first(where: { $0.targetName == "EquatableMacroFixture" })
         )
-        #expect(fixtureExtension.conformances.map(\.displayName) == ["Equatable"])
         #expect(equalityComparisons(in: fixtureExtension) == ["id", "name", "active"])
         #expect(equalityReturnsTrue(in: fixtureExtension))
 
@@ -2340,7 +2333,6 @@ struct CompilerFixtureTests {
         let fixtureExtension = try #require(
             module.extensions.first(where: { $0.targetName == "HashableMacroFixture" })
         )
-        #expect(fixtureExtension.conformances.map(\.displayName) == ["Hashable"])
         #expect(hashCombines(in: fixtureExtension) == ["id", "name", "active"])
 
         let emptyExtension = try #require(
@@ -2370,7 +2362,6 @@ struct CompilerFixtureTests {
         let fixtureExtension = try #require(
             module.extensions.first(where: { $0.targetName == "ComparableMacroFixture" })
         )
-        #expect(fixtureExtension.conformances.map(\.displayName) == ["Comparable"])
         #expect(equalityComparisons(in: fixtureExtension) == ["major", "minor", "patch"])
         #expect(
             comparisonChecks(in: fixtureExtension) == [
@@ -2411,7 +2402,6 @@ struct CompilerFixtureTests {
         let fixtureExtension = try #require(
             module.extensions.first(where: { $0.targetName == "CaseIterableMacroFixture" })
         )
-        #expect(fixtureExtension.conformances.map(\.displayName) == ["CaseIterable"])
         #expect(allCasesReturnValues(in: fixtureExtension) == [".loading", ".ready", ".failed"])
 
         let emptyExtension = try #require(
