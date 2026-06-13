@@ -54,7 +54,7 @@ struct GraphCollector {
         switch parsedFile.sourceFile {
         case .construct(let declaration):
             analyzeConstructDeclaration(declaration, parentID: fileID)
-        case .enumeration, .protocolDefinition, .macro:
+        case .enumeration, .macro:
             return
         case .extensions:
             return
@@ -325,7 +325,7 @@ struct GraphCollector {
         label: String
     ) {
         switch kind {
-        case .construct, .enumeration, .protocolDefinition, .macro:
+        case .construct, .enumeration, .macro:
             let name = declarationName(for: entityID, fallbackLabel: label)
             resolutionIndex.declarationProjectionNodeIDsByName[name, default: []].insert(entityID)
         case .function:

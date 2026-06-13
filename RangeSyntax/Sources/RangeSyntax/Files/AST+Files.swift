@@ -3,7 +3,6 @@ import Foundation
 public enum SourceFileNode {
     case construct(ConstructDeclaration)
     case enumeration(EnumDeclaration)
-    case protocolDefinition(ProtocolDeclaration)
     case macro(MacroDeclaration)
     case mainBlock(MainBlockNode)
     case extensions([ExtensionDeclaration])
@@ -26,7 +25,6 @@ public struct ModuleFileNode {
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]
     public let enumerations: [EnumDeclaration]
-    public let protocols: [ProtocolDeclaration]
     public let macros: [MacroDeclaration]
     public let precedenceGroups: [PrecedenceGroupDeclaration]
     public let operators: [OperatorDeclaration]
@@ -38,7 +36,6 @@ public struct ModuleFileNode {
         callables: [CallableDeclaration],
         constructs: [ConstructDeclaration],
         enumerations: [EnumDeclaration],
-        protocols: [ProtocolDeclaration],
         macros: [MacroDeclaration],
         precedenceGroups: [PrecedenceGroupDeclaration],
         operators: [OperatorDeclaration],
@@ -49,7 +46,6 @@ public struct ModuleFileNode {
         self.callables = callables
         self.constructs = constructs
         self.enumerations = enumerations
-        self.protocols = protocols
         self.macros = macros
         self.precedenceGroups = precedenceGroups
         self.operators = operators

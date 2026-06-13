@@ -94,7 +94,7 @@ struct SwiftBackendProgramBuilder {
                 ] + supportUnits
             )
 
-        case .construct, .enumeration, .protocolDefinition, .macro:
+        case .construct, .enumeration, .macro:
             throw SwiftBackendError(
                 "Swift backend requires a file with @main { ... } when compiling a single file."
             )
@@ -186,18 +186,6 @@ struct SwiftBackendProgramBuilder {
                     .init(
                         outputFileName: outputFileName,
                         enumerations: [declaration],
-                        declarations: [],
-                        extensions: [],
-                        callables: [],
-                        mainBlock: nil
-                    )
-                )
-
-            case .protocolDefinition:
-                units.append(
-                    .init(
-                        outputFileName: outputFileName,
-                        enumerations: [],
                         declarations: [],
                         extensions: [],
                         callables: [],
@@ -351,15 +339,6 @@ struct SwiftBackendProgramBuilder {
                 return .init(
                     outputFileName: outputFileName,
                     enumerations: [declaration],
-                    declarations: [],
-                    extensions: [],
-                    callables: [],
-                    mainBlock: nil
-                )
-            case .protocolDefinition:
-                return .init(
-                    outputFileName: outputFileName,
-                    enumerations: [],
                     declarations: [],
                     extensions: [],
                     callables: [],

@@ -78,7 +78,7 @@ extension ApplicationGraphValidator {
             return [declaration]
         case .module(let module):
             return module.constructs
-        case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
+        case .mainBlock, .extensions, .enumeration, .macro:
             return []
         }
     }

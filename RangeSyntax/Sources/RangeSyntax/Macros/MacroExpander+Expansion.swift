@@ -29,7 +29,6 @@ extension MacroExpander {
     static func expand(
         sourceFile: SourceFileNode,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext
@@ -43,7 +42,6 @@ extension MacroExpander {
                         mainBlock,
                         expectedReturnType: nil,
                         macros: macros,
-                        protocols: protocols,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
                         context: context
@@ -62,7 +60,6 @@ extension MacroExpander {
                 try expand(
                     construct: $0,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context
@@ -87,7 +84,6 @@ extension MacroExpander {
                                 $0,
                                 expectedReturnType: nil,
                                 macros: macros,
-                                protocols: protocols,
                                 parameterMacroSignatures: parameterMacroSignatures,
                                 literalBridges: literalBridges,
                                 context: context,
@@ -107,7 +103,6 @@ extension MacroExpander {
                         try expand(
                             callable: $0,
                             macros: macros,
-                            protocols: protocols,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
                             context: context,
@@ -118,7 +113,6 @@ extension MacroExpander {
                         + emittedDeclarationBundles.flatMap(\.constructs),
                     enumerations: module.enumerations
                         + emittedDeclarationBundles.flatMap(\.enumerations),
-                    protocols: module.protocols,
                     macros: module.macros + emittedDeclarationBundles.flatMap(\.macros),
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
@@ -129,7 +123,6 @@ extension MacroExpander {
             let expandedConstruct = try expand(
                 construct: declaration,
                 macros: macros,
-                protocols: protocols,
                 parameterMacroSignatures: parameterMacroSignatures,
                 literalBridges: literalBridges,
                 context: context
@@ -156,7 +149,6 @@ extension MacroExpander {
                     callables: emittedBundle.callables,
                     constructs: [expandedConstruct] + emittedBundle.constructs,
                     enumerations: emittedBundle.enumerations,
-                    protocols: [],
                     macros: emittedBundle.macros,
                     precedenceGroups: [],
                     operators: [],
@@ -179,15 +171,12 @@ extension MacroExpander {
                     callables: emittedBundle.callables,
                     constructs: emittedBundle.constructs,
                     enumerations: [declaration] + emittedBundle.enumerations,
-                    protocols: [],
                     macros: emittedBundle.macros,
                     precedenceGroups: [],
                     operators: [],
                     extensions: emittedBundle.extensions
                 )
             )
-        case .protocolDefinition:
-            return sourceFile
         case .extensions(let declarations):
             return .extensions(
                 try declarations.map {
@@ -203,7 +192,6 @@ extension MacroExpander {
         _ mainBlock: MainBlockNode,
         expectedReturnType: TypeReference?,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
@@ -213,7 +201,6 @@ extension MacroExpander {
             statements: mainBlock.body,
             expectedReturnType: expectedReturnType,
             macros: macros,
-            protocols: protocols,
             parameterMacroSignatures: parameterMacroSignatures,
             literalBridges: literalBridges,
             context: context,
@@ -248,7 +235,6 @@ extension MacroExpander {
             statements: rewritten,
             expectedReturnType: expectedReturnType,
             macros: macros,
-            protocols: protocols,
             parameterMacroSignatures: parameterMacroSignatures,
             literalBridges: literalBridges,
             context: context,
@@ -353,7 +339,6 @@ extension MacroExpander {
     static func expand(
         construct: ConstructDeclaration,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext
@@ -372,12 +357,6 @@ extension MacroExpander {
             deriveds: construct.deriveds,
             macros: macros,
             context: context
-        )
-
-        let carriedInitializers = DeclarationGraph.carriedProtocolInitializerMacros(
-            for: construct.initializers,
-            conformances: construct.conformances,
-            protocols: protocols
         )
 
         return ConstructDeclaration(
@@ -401,7 +380,6 @@ extension MacroExpander {
                 try expand(
                     binding: $0,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -412,7 +390,6 @@ extension MacroExpander {
                 try expand(
                     derived: $0,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -429,11 +406,10 @@ extension MacroExpander {
                     stateEffects: constructStateEffects
                 )
             },
-            initializers: try carriedInitializers.map {
+            initializers: try construct.initializers.map {
                 try expand(
                     initializer: $0,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -444,7 +420,6 @@ extension MacroExpander {
                 try expand(
                     callable: $0,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -455,7 +430,6 @@ extension MacroExpander {
                 try expand(
                     construct: $0,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context
@@ -467,7 +441,6 @@ extension MacroExpander {
     static func expand(
         callable: CallableDeclaration,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
@@ -489,7 +462,6 @@ extension MacroExpander {
                     statements: $0,
                     expectedReturnType: callable.returnType,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -502,7 +474,6 @@ extension MacroExpander {
     static func expand(
         initializer: InitializerDeclaration,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
@@ -518,7 +489,6 @@ extension MacroExpander {
                     statements: $0,
                     expectedReturnType: nil,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -531,7 +501,6 @@ extension MacroExpander {
     static func expand(
         derived: DerivedDeclaration,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
@@ -547,7 +516,6 @@ extension MacroExpander {
                     statements: $0,
                     expectedReturnType: nil,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -647,7 +615,6 @@ extension MacroExpander {
     static func expand(
         binding declaration: BindingDeclaration,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
@@ -663,7 +630,6 @@ extension MacroExpander {
                     statements: getterBody,
                     expectedReturnType: nil,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -673,7 +639,6 @@ extension MacroExpander {
                     statements: setterBody,
                     expectedReturnType: nil,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -1142,7 +1107,6 @@ extension MacroExpander {
         statements: [Statement],
         expectedReturnType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
@@ -1155,7 +1119,6 @@ extension MacroExpander {
                     statement: statement,
                     expectedReturnType: expectedReturnType,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -1169,7 +1132,6 @@ extension MacroExpander {
         statement: Statement,
         expectedReturnType: TypeReference? = nil,
         macros: [String: MacroDeclaration],
-        protocols: [String: ProtocolDeclaration],
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
@@ -1187,7 +1149,6 @@ extension MacroExpander {
                 statements: background.body,
                 expectedReturnType: nil,
                 macros: macros,
-                protocols: protocols,
                 parameterMacroSignatures: parameterMacroSignatures,
                 literalBridges: literalBridges,
                 context: context,
@@ -1215,7 +1176,6 @@ extension MacroExpander {
                 statements: rewritten,
                 expectedReturnType: nil,
                 macros: macros,
-                protocols: protocols,
                 parameterMacroSignatures: parameterMacroSignatures,
                 literalBridges: literalBridges,
                 context: context,
@@ -1229,7 +1189,6 @@ extension MacroExpander {
                             statements: deferred.body,
                             expectedReturnType: expectedReturnType,
                             macros: macros,
-                            protocols: protocols,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
                             context: context,
@@ -1252,7 +1211,6 @@ extension MacroExpander {
                             statements: declaration.body,
                             expectedReturnType: declaration.returnType,
                             macros: macros,
-                            protocols: protocols,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
                             context: context,
@@ -1268,7 +1226,6 @@ extension MacroExpander {
                     body: try expand(
                         statements: body,
                         macros: macros,
-                        protocols: protocols,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
                         context: context,
@@ -1292,7 +1249,6 @@ extension MacroExpander {
                         statements: body,
                         expectedReturnType: expectedReturnType,
                         macros: macros,
-                        protocols: protocols,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
                         context: context,
@@ -1315,7 +1271,6 @@ extension MacroExpander {
                         statements: body,
                         expectedReturnType: expectedReturnType,
                         macros: macros,
-                        protocols: protocols,
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
                         context: context
@@ -1340,7 +1295,6 @@ extension MacroExpander {
                                 statements: branch.body,
                                 expectedReturnType: expectedReturnType,
                                 macros: macros,
-                                protocols: protocols,
                                 parameterMacroSignatures: parameterMacroSignatures,
                                 literalBridges: literalBridges,
                                 context: context,
@@ -1402,7 +1356,6 @@ extension MacroExpander {
                     statement: rewrittenAssignment,
                     expectedReturnType: expectedReturnType,
                     macros: macros,
-                    protocols: protocols,
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
@@ -1476,7 +1429,6 @@ extension MacroExpander {
                                 statements: switchCase.body,
                                 expectedReturnType: expectedReturnType,
                                 macros: macros,
-                                protocols: protocols,
                                 parameterMacroSignatures: parameterMacroSignatures,
                                 literalBridges: literalBridges,
                                 context: context,
@@ -1489,7 +1441,6 @@ extension MacroExpander {
                             statements: $0,
                             expectedReturnType: expectedReturnType,
                             macros: macros,
-                            protocols: protocols,
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
                             context: context,
@@ -1847,7 +1798,6 @@ extension MacroExpander {
                         statement: $0,
                         expectedReturnType: nil,
                         macros: macros,
-                        protocols: [:],
                         parameterMacroSignatures: parameterMacroSignatures,
                         literalBridges: literalBridges,
                         context: context,
@@ -3575,14 +3525,9 @@ extension MacroExpander {
             return EmittedDeclarationBundle(constructs: [declaration])
         case .enumeration(let declaration):
             return EmittedDeclarationBundle(enumerations: [declaration])
-        case .protocolDefinition:
-            throw ParseError("Macros cannot emit protocol declarations.")
         case .extensions(let declarations):
             return EmittedDeclarationBundle(extensions: declarations)
         case .module(let module):
-            guard module.protocols.isEmpty else {
-                throw ParseError("Macros cannot emit protocol declarations.")
-            }
             return EmittedDeclarationBundle(
                 states: module.states,
                 callables: module.callables,

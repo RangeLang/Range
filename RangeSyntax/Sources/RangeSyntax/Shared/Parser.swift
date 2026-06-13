@@ -252,7 +252,6 @@ public struct Parser {
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
-        var protocols: [ProtocolDeclaration] = []
         var macros: [MacroDeclaration] = []
         var precedenceGroups: [PrecedenceGroupDeclaration] = []
         var operators: [OperatorDeclaration] = []
@@ -290,8 +289,7 @@ public struct Parser {
             }
 
             if isProtocolDeclarationStart() {
-                protocols.append(try parseProtocolDeclaration(requiresEOF: false))
-                continue
+                _ = try parseProtocolDeclaration(requiresEOF: false)
             }
 
             if isMacroDeclarationStart() {
@@ -331,7 +329,6 @@ public struct Parser {
 
         if let mainBlock,
             topLevelStates.isEmpty, topLevelCallables.isEmpty, enumerations.isEmpty,
-            protocols.isEmpty,
             constructs.isEmpty,
             macros.isEmpty,
             precedenceGroups.isEmpty,
@@ -343,7 +340,6 @@ public struct Parser {
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty,
             enumerations.isEmpty,
-            protocols.isEmpty,
             constructs.count == 1,
             macros.isEmpty,
             precedenceGroups.isEmpty,
@@ -354,7 +350,6 @@ public struct Parser {
         }
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            protocols.isEmpty,
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
@@ -365,18 +360,6 @@ public struct Parser {
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
-            protocols.count == 1,
-            macros.isEmpty,
-            precedenceGroups.isEmpty,
-            operators.isEmpty,
-            extensions.isEmpty
-        {
-            return .protocolDefinition(protocols[0])
-        }
-
-        if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
-            enumerations.isEmpty,
-            protocols.isEmpty,
             macros.count == 1,
             precedenceGroups.isEmpty,
             operators.isEmpty,
@@ -387,7 +370,6 @@ public struct Parser {
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
-            protocols.isEmpty,
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
@@ -398,7 +380,6 @@ public struct Parser {
 
         if mainBlock == nil, topLevelStates.isEmpty, topLevelCallables.isEmpty, constructs.isEmpty,
             enumerations.isEmpty,
-            protocols.isEmpty,
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
@@ -413,7 +394,6 @@ public struct Parser {
                 callables: topLevelCallables,
                 constructs: constructs,
                 enumerations: enumerations,
-                protocols: protocols,
                 macros: macros,
                 precedenceGroups: precedenceGroups,
                 operators: operators,
@@ -428,7 +408,6 @@ public struct Parser {
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
         var enumerations: [EnumDeclaration] = []
-        var protocols: [ProtocolDeclaration] = []
         var extensions: [ExtensionDeclaration] = []
         var macros: [MacroDeclaration] = []
         var precedenceGroups: [PrecedenceGroupDeclaration] = []
@@ -482,8 +461,7 @@ public struct Parser {
             }
 
             if isProtocolDeclarationStart() {
-                protocols.append(try parseProtocolDeclaration(requiresEOF: false))
-                continue
+                _ = try parseProtocolDeclaration(requiresEOF: false)
             }
 
             if isEnumDeclarationStart() {
@@ -503,7 +481,6 @@ public struct Parser {
                 callables: topLevelCallables,
                 constructs: constructs,
                 enumerations: enumerations,
-                protocols: protocols,
                 macros: macros,
                 precedenceGroups: precedenceGroups,
                 operators: operators,

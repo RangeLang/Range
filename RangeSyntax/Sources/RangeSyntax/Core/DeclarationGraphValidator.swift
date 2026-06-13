@@ -190,19 +190,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     filePath: parsedFile.path
                 )
             }
-            for declaration in protocols(in: parsedFile.sourceFile) {
-                try validateAttribute(
-                    declaration.attribute,
-                    declarationName: declaration.name,
-                    filePath: parsedFile.path,
-                    declarationGraph: declarationGraph
-                )
-                try validateBuiltinAttachedMacroUsage(
-                    declaration.macros,
-                    declarationName: declaration.name,
-                    filePath: parsedFile.path
-                )
-            }
             for declaration in enumerations(in: parsedFile.sourceFile) {
                 try validateAttribute(
                     declaration.attribute,
@@ -300,8 +287,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return attachedMacroUsages(in: declaration)
         case .enumeration(let declaration):
             return [AttachedMacroUsage(macros: declaration.macros, declarationName: declaration.name)]
-        case .protocolDefinition(let declaration):
-            return attachedMacroUsages(in: declaration)
         case .extensions(let declarations):
             return declarations.flatMap(attachedMacroUsages(in:))
         case .module(let module):
@@ -313,7 +298,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 + module.callables.flatMap(attachedMacroUsages(in:))
                 + module.constructs.flatMap(attachedMacroUsages(in:))
                 + module.enumerations.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-                + module.protocols.flatMap(attachedMacroUsages(in:))
                 + module.extensions.flatMap(attachedMacroUsages(in:))
         case .mainBlock(let mainBlock):
             return [AttachedMacroUsage(macros: mainBlock.macros, declarationName: "@main")]
@@ -332,16 +316,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         usages += declaration.callables.flatMap(attachedMacroUsages(in:))
         usages += declaration.constructs.flatMap(attachedMacroUsages(in:))
         return usages
-    }
-
-    private func attachedMacroUsages(in declaration: ProtocolDeclaration) -> [AttachedMacroUsage] {
-        [AttachedMacroUsage(macros: declaration.macros, declarationName: declaration.name)]
-            + declaration.values.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.states.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.bindings.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.deriveds.map { AttachedMacroUsage(macros: $0.macros, declarationName: $0.name) }
-            + declaration.initializers.flatMap(attachedMacroUsages(in:))
-            + declaration.callables.flatMap(attachedMacroUsages(in:))
     }
 
     private func attachedMacroUsages(in declaration: ExtensionDeclaration) -> [AttachedMacroUsage] {
@@ -452,7 +426,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .enumeration, .protocolDefinition, .mainBlock, .extensions:
+        case .construct, .enumeration, .mainBlock, .extensions:
             return []
         }
     }
@@ -468,7 +442,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 + module.extensions.flatMap { attributedConstructs(in: $0) }
         case .extensions(let declarations):
             return declarations.flatMap { attributedConstructs(in: $0) }
-        case .mainBlock, .enumeration, .protocolDefinition, .macro:
+        case .mainBlock, .enumeration, .macro:
             return []
         }
     }
@@ -496,7 +470,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return [declaration]
         case .module(let module):
             return module.constructs
-        case .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
+        case .mainBlock, .extensions, .enumeration, .macro:
             return []
         }
     }
@@ -505,7 +479,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .mainBlock, .extensions, .enumeration, .protocolDefinition, .macro:
+        case .construct, .mainBlock, .extensions, .enumeration, .macro:
             return []
         }
     }
@@ -520,18 +494,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return declaration.callables + declaration.constructs.flatMap { callables(in: .construct($0)) }
         case .extensions(let declarations):
             return declarations.flatMap { callables(in: $0) }
-        case .mainBlock, .enumeration, .protocolDefinition, .macro:
-            return []
-        }
-    }
-
-    private func protocols(in sourceFile: SourceFileNode) -> [ProtocolDeclaration] {
-        switch sourceFile {
-        case .protocolDefinition(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.protocols
-        case .construct, .mainBlock, .enumeration, .macro, .extensions:
+        case .mainBlock, .enumeration, .macro:
             return []
         }
     }
@@ -544,7 +507,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return module.enumerations + module.extensions.flatMap { enumerations(in: $0) }
         case .extensions(let declarations):
             return declarations.flatMap { enumerations(in: $0) }
-        case .construct, .mainBlock, .protocolDefinition, .macro:
+        case .construct, .mainBlock, .macro:
             return []
         }
     }

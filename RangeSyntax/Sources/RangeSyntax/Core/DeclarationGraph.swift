@@ -58,14 +58,12 @@ public struct DeclarationGraph {
             }
         )
         let packageValues = Self.collectPackageManifestValues(from: files)
-        let protocols = Self.collectProtocols(from: files)
         let macroMetadata = Self.collectMacroMetadata(from: files)
         let metadataSlotMacros = Self.metadataSlotMacroNames(in: macroMetadata)
         let extensions = Self.collectExtensions(from: files)
         let mainBlockMacros = Self.collectMainBlockMacros(from: files)
         let constructs = Self.collectConstructs(
             from: files,
-            protocols: protocols,
             metadataSlotMacros: metadataSlotMacros
         )
         let enumerations = Self.collectEnums(from: files)
@@ -88,7 +86,7 @@ public struct DeclarationGraph {
             extensions: extensions
         )
 
-        self.protocolsByName = protocols
+        self.protocolsByName = [:]
         self.packageValues = packageValues
         self.constructsByName = constructs
         self.enumsByName = enumerations
@@ -110,7 +108,7 @@ public struct DeclarationGraph {
         self.sourceTextByPath = sourceTextByPath
         self.sourceLocations = Self.collectSourceLocations(from: files)
         let syntaxResolver = DeclarationSyntaxResolver(
-            protocolsByName: protocols,
+            protocolsByName: [:],
             constructsByName: constructs,
             macrosByName: macros,
             extensionsByTargetName: extensions
@@ -627,16 +625,6 @@ public struct DeclarationGraph {
         return constructsByName[name]
     }
 
-    static func collectProtocols(from files: [ParsedSourceFile]) -> [String: ProtocolDeclaration] {
-        var registry: [String: ProtocolDeclaration] = [:]
-        for parsedFile in files {
-            for declaration in protocols(in: parsedFile.sourceFile) {
-                registry[declaration.name] = declaration
-            }
-        }
-        return registry
-    }
-
     static func collectPackageManifestValues(from files: [ParsedSourceFile]) -> [ValueDeclaration] {
         files.flatMap { parsedFile in
             constructs(in: parsedFile.sourceFile, metadataSlotMacros: [])
@@ -647,7 +635,6 @@ public struct DeclarationGraph {
 
     static func collectConstructs(
         from files: [ParsedSourceFile],
-        protocols: [String: ProtocolDeclaration],
         metadataSlotMacros: Set<String>
     ) -> [String: ConstructDeclaration] {
         var registry: [String: ConstructDeclaration] = [:]
@@ -659,8 +646,7 @@ public struct DeclarationGraph {
                 collectConstruct(
                     declaration,
                     qualifiedName: declaration.name,
-                    into: &registry,
-                    protocols: protocols
+                    into: &registry
                 )
             }
         }
@@ -906,7 +892,7 @@ public struct DeclarationGraph {
                     registry: &registry,
                     ownerName: construct.name
                 )
-            case .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+            case .enumeration, .macro, .mainBlock, .extensions:
                 continue
             }
         }
@@ -941,15 +927,8 @@ public struct DeclarationGraph {
     private static func collectConstruct(
         _ declaration: ConstructDeclaration,
         qualifiedName: String,
-        into registry: inout [String: ConstructDeclaration],
-        protocols: [String: ProtocolDeclaration]
+        into registry: inout [String: ConstructDeclaration]
     ) {
-        let realizedInitializers = carriedProtocolInitializerMacros(
-            for: declaration.initializers,
-            conformances: declaration.conformances,
-            protocols: protocols
-        )
-
         let qualifiedChildren = declaration.constructs.map { child in
             qualifiedConstruct(child, qualifiedName: "\(qualifiedName).\(child.name)")
         }
@@ -965,7 +944,7 @@ public struct DeclarationGraph {
             bindings: declaration.bindings,
             deriveds: declaration.deriveds,
             values: declaration.values,
-            initializers: realizedInitializers,
+            initializers: declaration.initializers,
             callables: declaration.callables,
             constructs: qualifiedChildren
         )
@@ -974,8 +953,7 @@ public struct DeclarationGraph {
             collectConstruct(
                 child,
                 qualifiedName: "\(qualifiedName).\(child.name)",
-                into: &registry,
-                protocols: protocols
+                into: &registry
             )
         }
     }
@@ -1128,17 +1106,6 @@ public struct DeclarationGraph {
         }
     }
 
-    static func protocols(in sourceFile: SourceFileNode) -> [ProtocolDeclaration] {
-        switch sourceFile {
-        case .protocolDefinition(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.protocols
-        case .construct, .enumeration, .mainBlock, .macro, .extensions:
-            return []
-        }
-    }
-
     static func constructs(
         in sourceFile: SourceFileNode,
         metadataSlotMacros: Set<String>
@@ -1148,7 +1115,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.constructs
-        case .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .enumeration, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -1163,7 +1130,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.states
-        case .construct, .enumeration, .protocolDefinition, .macro, .mainBlock, .extensions:
+        case .construct, .enumeration, .macro, .mainBlock, .extensions:
             return []
         }
     }
@@ -1174,7 +1141,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.enumerations
-        case .construct, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -1185,7 +1152,7 @@ public struct DeclarationGraph {
             return [declaration]
         case .module(let module):
             return module.macros
-        case .construct, .enumeration, .mainBlock, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .extensions:
             return []
         }
     }
@@ -1196,7 +1163,7 @@ public struct DeclarationGraph {
             return declarations
         case .module(let module):
             return module.extensions
-        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition:
+        case .construct, .enumeration, .mainBlock, .macro:
             return []
         }
     }
@@ -1205,7 +1172,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.operators
-        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -1214,7 +1181,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.precedenceGroups
-        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -1223,7 +1190,7 @@ public struct DeclarationGraph {
         switch sourceFile {
         case .module(let module):
             return module.callables
-        case .construct, .enumeration, .mainBlock, .macro, .protocolDefinition, .extensions:
+        case .construct, .enumeration, .mainBlock, .macro, .extensions:
             return []
         }
     }
@@ -1273,65 +1240,6 @@ public struct DeclarationGraph {
         }.joined(separator: ",")
     }
 
-    static func carriedProtocolInitializerMacros(
-        for initializers: [InitializerDeclaration],
-        conformances: [TypeReference],
-        protocols: [String: ProtocolDeclaration]
-    ) -> [InitializerDeclaration] {
-        let requirementInitializers = conformances.compactMap { protocols[$0.displayName] }
-            .flatMap(\.initializers)
-
-        guard !requirementInitializers.isEmpty else {
-            return initializers
-        }
-
-        return initializers.map { initializer in
-            let carried =
-                requirementInitializers
-                .filter { requirement in
-                    carriedInitializerSignatureMatches(lhs: requirement, rhs: initializer)
-                }
-                .flatMap(\.macros)
-
-            guard !carried.isEmpty else {
-                return initializer
-            }
-
-            let mergedMacros =
-                initializer.macros
-                + carried.filter { carriedMacro in
-                    !initializer.macros.contains {
-                        $0.name == carriedMacro.name
-                            && $0.genericArguments == carriedMacro.genericArguments
-                            && $0.argumentClause == carriedMacro.argumentClause
-                            && $0.rawBodyLanguage == carriedMacro.rawBodyLanguage
-                            && $0.rawBody == carriedMacro.rawBody
-                    }
-                }
-
-            return InitializerDeclaration(
-                macros: mergedMacros,
-                parameters: initializer.parameters,
-                returnType: initializer.returnType,
-                body: initializer.body
-            )
-        }
-    }
-
-    static func carriedInitializerSignatureMatches(
-        lhs: InitializerDeclaration,
-        rhs: InitializerDeclaration
-    ) -> Bool {
-        lhs.parameters.elementsEqual(
-            rhs.parameters,
-            by: {
-                $0.localName == $1.localName
-                    && $0.typeReference == $1.typeReference
-                    && $0.slotName == $1.slotName
-                    && $0.isBinding == $1.isBinding
-            })
-    }
-
     static func collectProgramGraph(from files: [ParsedSourceFile]) -> ProgramGraph {
         var collector = SemanticGraphCollector()
         for parsedFile in files.sorted(by: { $0.path < $1.path }) {
@@ -1364,8 +1272,6 @@ private struct SemanticGraphCollector {
             addConstruct(declaration, parentID: fileID)
         case .enumeration(let declaration):
             addEnumeration(declaration, parentID: fileID)
-        case .protocolDefinition(let declaration):
-            addProtocol(declaration, parentID: fileID)
         case .macro(let declaration):
             addMacroDeclaration(declaration, parentID: fileID)
         case .extensions(let declarations):
@@ -1390,9 +1296,6 @@ private struct SemanticGraphCollector {
             }
             for declaration in module.enumerations {
                 addEnumeration(declaration, parentID: fileID)
-            }
-            for declaration in module.protocols {
-                addProtocol(declaration, parentID: fileID)
             }
             for declaration in module.macros {
                 addMacroDeclaration(declaration, parentID: fileID)
@@ -1468,22 +1371,6 @@ private struct SyntaxProjectionAccumulator {
         addRelation(from: parentID, to: enumID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: enumID)
         addTypeReferences(declaration.conformances, from: enumID, kind: .conformsTo)
-    }
-
-    private mutating func addProtocol(_ declaration: ProtocolDeclaration, parentID: String) {
-        let protocolID = "\(parentID)/protocol:\(declaration.name)"
-        let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
-        let entity = SemanticGraphEntity(id: protocolID, kind: .protocolDefinition, label: label)
-        addEntity(entity)
-        addRelation(from: parentID, to: protocolID, kind: .contains)
-        addMacroApplications(declaration.macros, parentID: protocolID)
-        addTypeReferences(declaration.conformances, from: protocolID, kind: .conformsTo)
-        collectSyntaxProjection(
-            identity: entity,
-            macros: declaration.macros,
-            nestedConstructs: [],
-            ownerID: protocolID
-        )
     }
 
     private mutating func addMacroDeclaration(_ declaration: MacroDeclaration, parentID: String) {

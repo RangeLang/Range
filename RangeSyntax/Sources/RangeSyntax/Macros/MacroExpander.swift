@@ -13,7 +13,6 @@ public enum MacroExpander {
         let registry = collectMacros(from: files)
         let macroMetadataRegistry = collectMacroMetadata(from: files)
         let declarationGraph = DeclarationGraph(files: files)
-        let protocols = declarationGraph.protocolsByName
         let graphViews = declarationGraph.views
         try validateMacroSyntaxCaptures(
             macros: Array(registry.values),
@@ -31,7 +30,6 @@ public enum MacroExpander {
                 sourceFile: try expand(
                     sourceFile: parsedFile.sourceFile,
                     macros: registry,
-                    protocols: protocols,
                     parameterMacroSignatures: context.macroRealizationView.parameterMacroSignatures,
                     literalBridges: context.macroRealizationView.realizedLiteralBridges,
                     context: context.withCurrentPath(parsedFile.path)

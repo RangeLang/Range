@@ -38,7 +38,7 @@ extension ApplicationGraphValidator {
                     context: .root,
                     fileName: fileName
                 )
-            case .enumeration, .protocolDefinition, .macro, .extensions:
+            case .enumeration, .macro, .extensions:
                 break
             }
         }

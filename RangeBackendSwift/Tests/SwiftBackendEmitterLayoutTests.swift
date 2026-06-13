@@ -4,6 +4,28 @@ import Testing
 
 @Suite("Swift backend layout emission")
 struct SwiftBackendEmitterLayoutTests {
+    private func mainBlock(from sourceFile: SourceFileNode) -> MainBlockNode? {
+        switch sourceFile {
+        case .mainBlock(let mainBlock):
+            return mainBlock
+        case .module(let module):
+            return module.mainBlock
+        case .construct, .enumeration, .macro, .extensions:
+            return nil
+        }
+    }
+
+    private func macro(named name: String, in sourceFile: SourceFileNode) -> MacroDeclaration? {
+        switch sourceFile {
+        case .macro(let declaration):
+            return declaration.name == name ? declaration : nil
+        case .module(let module):
+            return module.macros.first { $0.name == name }
+        case .construct, .enumeration, .mainBlock, .extensions:
+            return nil
+        }
+    }
+
     @Test("Runtime file system support lowers through POSIX descriptors")
     func runtimeFileSystemSupportLowersThroughPOSIXDescriptors() throws {
         let swift = try SwiftBackendEmitter().emit(
@@ -104,7 +126,7 @@ struct SwiftBackendEmitterLayoutTests {
         }
         """)
         let sourceFile = try parser.parseSourceFile()
-        guard case .mainBlock(let mainBlock) = sourceFile else {
+        guard let mainBlock = mainBlock(from: sourceFile) else {
             Issue.record("Expected main block.")
             return
         }
@@ -137,7 +159,7 @@ struct SwiftBackendEmitterLayoutTests {
         }
         """)
         let sourceFile = try parser.parseSourceFile()
-        guard case .mainBlock(let mainBlock) = sourceFile else {
+        guard let mainBlock = mainBlock(from: sourceFile) else {
             Issue.record("Expected main block.")
             return
         }
@@ -226,7 +248,7 @@ struct SwiftBackendEmitterLayoutTests {
         }
         """)
         let sourceFile = try macroParser.parseSourceFile()
-        guard case .macro(let initForwarded) = sourceFile else {
+        guard let initForwarded = macro(named: "initForwarded", in: sourceFile) else {
             Issue.record("Expected initForwarded macro.")
             return
         }

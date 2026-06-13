@@ -55,7 +55,7 @@ extension ApplicationGraphValidator {
                         fileName: fileName
                     )
                 }
-            case .mainBlock, .enumeration, .protocolDefinition, .macro, .extensions:
+            case .mainBlock, .enumeration, .macro, .extensions:
                 break
             }
         }
