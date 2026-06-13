@@ -26,7 +26,6 @@ public struct DeclarationSourceLocation {
 }
 
 public struct DeclarationGraph {
-    public let protocolsByName: [String: ProtocolDeclaration]
     public let packageValues: [ValueDeclaration]
     public let constructsByName: [String: ConstructDeclaration]
     public let enumsByName: [String: EnumDeclaration]
@@ -86,7 +85,6 @@ public struct DeclarationGraph {
             extensions: extensions
         )
 
-        self.protocolsByName = [:]
         self.packageValues = packageValues
         self.constructsByName = constructs
         self.enumsByName = enumerations
@@ -108,7 +106,6 @@ public struct DeclarationGraph {
         self.sourceTextByPath = sourceTextByPath
         self.sourceLocations = Self.collectSourceLocations(from: files)
         let syntaxResolver = DeclarationSyntaxResolver(
-            protocolsByName: [:],
             constructsByName: constructs,
             macrosByName: macros,
             extensionsByTargetName: extensions
@@ -129,18 +126,15 @@ public struct DeclarationGraph {
             memberResolver: DeclarationMemberResolver(
                 constructsByName: constructsByName,
                 enumsByName: enumsByName,
-                protocolsByName: protocolsByName,
                 extensionsByTargetName: extensionsByTargetName
             ),
             operatorResolver: DeclarationOperatorResolver(callablesByName: operatorCallablesByName),
             typeCompatibilityResolver: DeclarationTypeCompatibilityResolver(
-                protocolsByName: protocolsByName,
                 constructsByName: constructsByName,
                 enumsByName: enumsByName,
                 extensionsByTargetName: extensionsByTargetName
             ),
             registryView: DeclarationRegistryView(
-                protocolsByName: protocolsByName,
                 constructsByName: constructsByName,
                 enumsByName: enumsByName,
                 macrosByName: macrosByName,
@@ -156,7 +150,6 @@ public struct DeclarationGraph {
                 callablesByName: callablesByName
             ),
             syntaxResolver: DeclarationSyntaxResolver(
-                protocolsByName: protocolsByName,
                 constructsByName: constructsByName,
                 macrosByName: macrosByName,
                 extensionsByTargetName: extensionsByTargetName
@@ -1334,7 +1327,6 @@ private struct SyntaxProjectionAccumulator {
         addEntity(entity)
         addRelation(from: parentID, to: constructID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: constructID)
-        addTypeReferences(declaration.conformances, from: constructID, kind: .conformsTo)
         collectSyntaxProjection(
             identity: entity,
             macros: declaration.macros,
@@ -1370,7 +1362,6 @@ private struct SyntaxProjectionAccumulator {
         addEntity(id: enumID, kind: .enumeration, label: declaration.name)
         addRelation(from: parentID, to: enumID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: enumID)
-        addTypeReferences(declaration.conformances, from: enumID, kind: .conformsTo)
     }
 
     private mutating func addMacroDeclaration(_ declaration: MacroDeclaration, parentID: String) {
@@ -1391,7 +1382,6 @@ private struct SyntaxProjectionAccumulator {
         addRelation(from: parentID, to: extensionID, kind: .contains)
         addMacroApplications(declaration.macros, parentID: extensionID)
         addTypeReference(declaration.targetType, from: extensionID, kind: .extends)
-        addTypeReferences(declaration.conformances, from: extensionID, kind: .conformsTo)
     }
 
     private mutating func addState(_ declaration: StateDeclaration, parentID: String) {

@@ -1146,7 +1146,6 @@ struct MacroGraphContext {
             case .type:
                 if graph.constructsByName[location.name] != nil { values["construct:\(location.name)"] = written }
                 if graph.enumsByName[location.name] != nil { values["enum:\(location.name)"] = written }
-                if graph.protocolsByName[location.name] != nil { values["protocol:\(location.name)"] = written }
             case .function:
                 values["function:\(location.name)"] = written
             case .macro:
@@ -1165,7 +1164,6 @@ struct MacroGraphContext {
             case .type:
                 if graph.constructsByName[location.name] != nil { values["construct:\(location.name)"] = location.path }
                 if graph.enumsByName[location.name] != nil { values["enum:\(location.name)"] = location.path }
-                if graph.protocolsByName[location.name] != nil { values["protocol:\(location.name)"] = location.path }
             case .function:
                 values["function:\(location.name)"] = location.path
             case .macro:
@@ -1264,11 +1262,7 @@ private struct MacroTargetTypeMatcher {
                 continue
             }
 
-            guard let constraintName = syntaxResolver.nominalName(of: constraint) else {
-                return false
-            }
-
-            guard syntaxResolver.typeConforms(binding, to: constraintName) else {
+            guard typeMatches(actual: binding, expected: constraint, bindings: &bindings) else {
                 return false
             }
         }
@@ -1317,7 +1311,6 @@ private struct MacroTargetTypeMatcher {
         switch (actual, expected) {
         case (.named(let actualName), .named(let expectedName)):
             return actualName == expectedName
-                || syntaxResolver.declaration(named: actualName, conformsTo: expectedName)
         case (.generic(let actualBase, _), .named):
             return typeMatches(
                 actual: actualBase,

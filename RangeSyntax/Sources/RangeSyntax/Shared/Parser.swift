@@ -288,10 +288,6 @@ public struct Parser {
                 continue
             }
 
-            if isProtocolDeclarationStart() {
-                _ = try parseProtocolDeclaration(requiresEOF: false)
-            }
-
             if isMacroDeclarationStart() {
                 let declaration = try parseMacroDeclaration()
                 macros.append(declaration)
@@ -458,10 +454,6 @@ public struct Parser {
             if isConstructDeclarationStart() || isBuilderDeclarationStart() {
                 constructs.append(try parseConstructDeclarationForDeclarationDiscovery())
                 continue
-            }
-
-            if isProtocolDeclarationStart() {
-                _ = try parseProtocolDeclaration(requiresEOF: false)
             }
 
             if isEnumDeclarationStart() {

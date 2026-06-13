@@ -16,7 +16,6 @@ public enum ApplicationGraphNodeKind: String, Sendable {
     case file
     case construct
     case enumeration
-    case protocolDefinition
     case macro
     case typeExtension
     case mainBlock
@@ -37,7 +36,6 @@ public enum ApplicationGraphNodeKind: String, Sendable {
         case .file: return .file
         case .construct: return .construct
         case .enumeration: return .enumeration
-        case .protocolDefinition: return .protocolDefinition
         case .macro: return .macro
         case .typeExtension: return .typeExtension
         case .mainBlock: return .mainBlock
@@ -68,7 +66,6 @@ public struct ApplicationGraphNode: Hashable {
 
 public enum ApplicationGraphEdgeKind: String {
     case contains
-    case conformsTo
     case extends
     case referencesType
     case referencesIdentity
@@ -83,7 +80,6 @@ public enum ApplicationGraphEdgeKind: String {
     public var semanticKind: SemanticGraphRelationKind {
         switch self {
         case .contains: return .contains
-        case .conformsTo: return .conformsTo
         case .extends: return .extends
         case .referencesType: return .referencesType
         case .referencesIdentity: return .referencesIdentity

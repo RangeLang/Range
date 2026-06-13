@@ -205,7 +205,6 @@ extension ApplicationGraph {
                   file: "#577590",
                   construct: "#c8553d",
                   enumeration: "#9c6644",
-                  protocolDefinition: "#6d597a",
                   macro: "#355070",
                   typeExtension: "#4d908e",
                   mainBlock: "#e9c46a",
@@ -239,7 +238,7 @@ extension ApplicationGraph {
 
                 const attachedTypeOwnerIDsByTypeID = new Map();
                 for (const edge of rawEdges) {
-                  const isAttachedTypeEdge = (edge.kind === "referencesType" || edge.kind === "referencesIdentity" || edge.kind === "conformsTo")
+                  const isAttachedTypeEdge = (edge.kind === "referencesType" || edge.kind === "referencesIdentity")
                     && edge.target.kind === "typeReference";
                   if (!isAttachedTypeEdge) continue;
                   edge.source.attachedTypes.push(edge.target.label);
@@ -346,7 +345,6 @@ extension ApplicationGraph {
                   ["mainBlock", 1],
                   ["construct", 2],
                   ["enumeration", 3],
-                  ["protocolDefinition", 4],
                   ["macro", 5],
                   ["typeExtension", 6],
                   ["state", 7],
@@ -635,7 +633,6 @@ extension ApplicationGraph {
 
                 const declarationEdgeKinds = new Set([
                   "contains",
-                  "conformsTo",
                   "extends",
                   "referencesType",
                   "referencesIdentity",

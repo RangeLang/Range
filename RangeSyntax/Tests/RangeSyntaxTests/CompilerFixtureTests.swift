@@ -1971,8 +1971,8 @@ struct CompilerFixtureTests {
         }
     }
 
-    @Test("Protocol declarations are unsupported")
-    func protocolDeclarationsAreUnsupported() throws {
+    @Test("Protocol declarations are not language surface")
+    func protocolDeclarationsAreNotLanguageSurface() throws {
         let source = """
             protocol Renderable {
                 function render(): String
@@ -1985,7 +1985,7 @@ struct CompilerFixtureTests {
             Issue.record("Expected protocol declaration to fail parsing.")
         } catch {
             let description = String(describing: error)
-            #expect(description.contains("Protocol declarations are no longer supported"))
+            #expect(description.contains("Expected top-level"))
         }
     }
 

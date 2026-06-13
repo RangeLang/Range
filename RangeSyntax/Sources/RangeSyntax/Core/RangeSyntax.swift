@@ -27,7 +27,6 @@ enum RangeSyntax {
         case switchStatement = "switch"
         case defaultBranch = "default"
         case enumeration = "enum"
-        case protocolDefinition = "protocol"
         case construct = "construct"
         case macro = "macro"
         case open = "open"

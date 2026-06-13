@@ -4,7 +4,6 @@ public enum SemanticGraphEntityKind: String, Sendable {
     case file
     case construct
     case enumeration
-    case protocolDefinition
     case macro
     case typeExtension
     case mainBlock
@@ -25,7 +24,6 @@ public enum SemanticGraphEntityKind: String, Sendable {
 
 public enum SemanticGraphRelationKind: String, Sendable {
     case contains
-    case conformsTo
     case extends
     case referencesType
     case referencesIdentity

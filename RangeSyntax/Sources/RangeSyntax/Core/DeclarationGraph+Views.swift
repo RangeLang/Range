@@ -26,7 +26,6 @@ public struct DeclarationGraphViews {
 }
 
 public struct DeclarationRegistryView {
-    private let protocolsByName: [String: ProtocolDeclaration]
     private let constructsByName: [String: ConstructDeclaration]
     private let enumsByName: [String: EnumDeclaration]
     private let macrosByName: [String: MacroDeclaration]
@@ -42,7 +41,6 @@ public struct DeclarationRegistryView {
     private let callablesByName: [String: [CallableDeclaration]]
 
     public init(
-        protocolsByName: [String: ProtocolDeclaration],
         constructsByName: [String: ConstructDeclaration],
         enumsByName: [String: EnumDeclaration],
         macrosByName: [String: MacroDeclaration],
@@ -57,7 +55,6 @@ public struct DeclarationRegistryView {
         parametersByInitializerIdentity: [String: [RangeFunctionParameter]],
         callablesByName: [String: [CallableDeclaration]]
     ) {
-        self.protocolsByName = protocolsByName
         self.constructsByName = constructsByName
         self.enumsByName = enumsByName
         self.macrosByName = macrosByName
@@ -75,10 +72,6 @@ public struct DeclarationRegistryView {
 
     public var allConstructsByName: [String: ConstructDeclaration] {
         constructsByName
-    }
-
-    public func `protocol`(named name: String) -> ProtocolDeclaration? {
-        protocolsByName[name]
     }
 
     public func construct(named name: String) -> ConstructDeclaration? {
@@ -162,10 +155,6 @@ public struct DeclarationRegistryView {
         ]
     }
 
-    public func hasProtocol(named name: String) -> Bool {
-        protocolsByName[name] != nil
-    }
-
     public func hasConstruct(named name: String) -> Bool {
         constructsByName[name] != nil
     }
@@ -208,21 +197,17 @@ public struct DeclarationRegistryView {
 }
 
 public struct DeclarationSyntaxResolver {
-    private let protocolsByName: [String: ProtocolDeclaration]
     private let constructsByName: [String: ConstructDeclaration]
     private let macrosByName: [String: MacroDeclaration]
-    private let extensionsByTargetName: [String: [ExtensionDeclaration]]
 
     public init(
-        protocolsByName: [String: ProtocolDeclaration],
         constructsByName: [String: ConstructDeclaration],
         macrosByName: [String: MacroDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
-        self.protocolsByName = protocolsByName
         self.constructsByName = constructsByName
         self.macrosByName = macrosByName
-        self.extensionsByTargetName = extensionsByTargetName
+        _ = extensionsByTargetName
     }
 
     public func typeConformsToSyntax(_ typeReference: TypeReference?) -> Bool {
@@ -259,8 +244,7 @@ public struct DeclarationSyntaxResolver {
     }
 
     private func syntaxBoundaryTypeNames() -> [String] {
-        let syntaxBoundaryNames = Array(protocolsByName.keys) + Array(constructsByName.keys)
-        return syntaxBoundaryNames.filter {
+        constructsByName.keys.filter {
             declarationIsSyntaxBoundary(named: $0)
         }
     }
@@ -272,77 +256,9 @@ public struct DeclarationSyntaxResolver {
             return false
         }
         return typeName == surfaceTypeName
-            || declaration(named: typeName, conformsTo: surfaceTypeName)
-    }
-
-    public func typeConforms(_ typeReference: TypeReference?, to targetProtocol: String) -> Bool {
-        guard let typeName = nominalName(of: typeReference) else {
-            return false
-        }
-        return declaration(named: typeName, conformsTo: targetProtocol)
-    }
-
-    public func declaration(
-        named name: String,
-        conformsTo targetProtocol: String
-    ) -> Bool {
-        declaration(
-            named: name,
-            conformsTo: targetProtocol,
-            visited: []
-        )
-    }
-
-    private func declaration(
-        named name: String,
-        conformsTo targetProtocol: String,
-        visited: Set<String>
-    ) -> Bool {
-        if name == targetProtocol {
-            return true
-        }
-        if visited.contains(name) {
-            return false
-        }
-        var nextVisited = visited
-        nextVisited.insert(name)
-
-        if let protocolDeclaration = protocolsByName[name] {
-            return protocolDeclaration.conformances.contains {
-                conformance in
-                guard let conformanceName = nominalName(of: conformance) else {
-                    return false
-                }
-                return declaration(
-                    named: conformanceName,
-                    conformsTo: targetProtocol,
-                    visited: nextVisited
-                )
-            }
-        }
-
-        if let constructDeclaration = constructsByName[name] {
-            let extensionConformances = extensionsByTargetName[name, default: []].flatMap(\.conformances)
-            return (constructDeclaration.conformances + extensionConformances).contains {
-                conformance in
-                guard let conformanceName = nominalName(of: conformance) else {
-                    return false
-                }
-                return declaration(
-                    named: conformanceName,
-                    conformsTo: targetProtocol,
-                    visited: nextVisited
-                )
-            }
-        }
-
-        return false
     }
 
     public func declarationIsSyntaxBoundary(named name: String) -> Bool {
-        if protocolsByName[name]?.macros.contains(where: { $0.name == "syntax" }) == true {
-            return true
-        }
         if constructsByName[name]?.macros.contains(where: { $0.name == "syntax" }) == true {
             return true
         }

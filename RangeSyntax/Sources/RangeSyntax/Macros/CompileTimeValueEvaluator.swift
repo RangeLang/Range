@@ -498,7 +498,7 @@ struct CompileTimeValueEvaluator {
             let value = evaluate(arguments[0].value, locals: locals),
             case .object(let typeName, _) = value
         {
-            if typeName == name || objectType(typeName, conformsTo: name) {
+            if typeName == name {
                 return value
             }
         }
@@ -552,13 +552,6 @@ struct CompileTimeValueEvaluator {
             return value
         default:
             return nil
-        }
-    }
-
-    private func objectType(_ typeName: String, conformsTo protocolName: String) -> Bool {
-        switch protocolName {
-        default:
-            return false
         }
     }
 

@@ -502,7 +502,6 @@ public struct DeclarationOperatorResolver: Sendable {
 
 public struct DeclarationTypeCompatibilityResolver: Sendable {
     public static let empty = DeclarationTypeCompatibilityResolver(
-        protocolsByName: [:],
         constructsByName: [:],
         enumsByName: [:],
         extensionsByTargetName: [:]
@@ -513,97 +512,17 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
         var arguments: [TypeReference]
     }
 
-    private struct NominalConformance: Sendable {
-        var declarationGenericParameterNames: [String]
-        var extensionTargetType: TypeReference?
-        var genericArgumentConstraints: [ExtensionGenericArgumentConstraint]
-        var conformance: TypeReference
-    }
-
-    private let protocolNames: Set<String>
     private let constructMemberNamesByName: [String: Set<String>]
-    private let conformancesByNominalName: [String: [NominalConformance]]
 
     public init(
-        protocolsByName: [String: ProtocolDeclaration],
         constructsByName: [String: ConstructDeclaration],
         enumsByName: [String: EnumDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
-        self.protocolNames = Set(protocolsByName.keys)
+        _ = enumsByName
+        _ = extensionsByTargetName
         self.constructMemberNamesByName = constructsByName.mapValues {
             Set($0.values.map(\.name)).union($0.callables.map(\.name))
-        }
-
-        var conformances: [String: [NominalConformance]] = [:]
-        for construct in constructsByName.values {
-            let genericParameterNames = construct.genericParameters.map(Self.genericParameterName)
-            conformances[construct.name, default: []].append(
-                contentsOf: construct.conformances.map {
-                    NominalConformance(
-                        declarationGenericParameterNames: genericParameterNames,
-                        extensionTargetType: nil,
-                        genericArgumentConstraints: [],
-                        conformance: $0
-                    )
-                }
-            )
-        }
-        for enumeration in enumsByName.values {
-            conformances[enumeration.name, default: []].append(
-                contentsOf: enumeration.conformances.map {
-                    NominalConformance(
-                        declarationGenericParameterNames: [],
-                        extensionTargetType: nil,
-                        genericArgumentConstraints: [],
-                        conformance: $0
-                    )
-                }
-            )
-        }
-        for protocolDeclaration in protocolsByName.values {
-            let genericParameterNames = protocolDeclaration.genericParameters.map(
-                Self.genericParameterName
-            )
-            conformances[protocolDeclaration.name, default: []].append(
-                contentsOf: protocolDeclaration.conformances.map {
-                    NominalConformance(
-                        declarationGenericParameterNames: genericParameterNames,
-                        extensionTargetType: nil,
-                        genericArgumentConstraints: [],
-                        conformance: $0
-                    )
-                }
-            )
-        }
-        for (targetName, extensions) in extensionsByTargetName {
-            for extensionDeclaration in extensions {
-                let genericParameterNames = genericParameterNames(for: targetName)
-                conformances[targetName, default: []].append(
-                    contentsOf: extensionDeclaration.conformances.map {
-                        NominalConformance(
-                            declarationGenericParameterNames: genericParameterNames,
-                            extensionTargetType: extensionDeclaration.usesSpecializedTarget
-                                ? extensionDeclaration.targetType : nil,
-                            genericArgumentConstraints: extensionDeclaration
-                                .genericArgumentConstraints,
-                            conformance: $0
-                        )
-                    }
-                )
-            }
-        }
-
-        self.conformancesByNominalName = conformances
-
-        func genericParameterNames(for targetName: String) -> [String] {
-            if let construct = constructsByName[targetName] {
-                return construct.genericParameters.map(Self.genericParameterName)
-            }
-            if let protocolDeclaration = protocolsByName[targetName] {
-                return protocolDeclaration.genericParameters.map(Self.genericParameterName)
-            }
-            return []
         }
     }
 
@@ -616,11 +535,7 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
             return true
         }
 
-        guard isKnownProtocol(expected) else {
-            return false
-        }
-
-        return conforms(actual: actual, expectedProtocol: expected, visited: [])
+        return false
     }
 
     private func structurallyAssignable(actual: TypeReference, expected: TypeReference) -> Bool {
@@ -660,123 +575,6 @@ public struct DeclarationTypeCompatibilityResolver: Sendable {
         }
 
         return expectedMemberNames.isSubset(of: actualMemberNames)
-    }
-
-    private func conforms(
-        actual: TypeReference,
-        expectedProtocol: TypeReference,
-        visited: Set<String>
-    ) -> Bool {
-        guard let actualContext = typeContext(for: actual) else {
-            return false
-        }
-        let visitKey = "\(actual.displayName)->\(expectedProtocol.displayName)"
-        guard !visited.contains(visitKey) else {
-            return false
-        }
-        let nextVisited = visited.union([visitKey])
-
-        for conformance in conformancesByNominalName[actualContext.name, default: []] {
-            guard
-                let substitution = conformanceSubstitution(
-                    conformance,
-                    actualContext: actualContext,
-                    visited: nextVisited
-                )
-            else {
-                continue
-            }
-            let resolvedConformance = Self.substitute(conformance.conformance, using: substitution)
-            if Self.typesMatch(actual: resolvedConformance, expected: expectedProtocol) {
-                return true
-            }
-            if conforms(
-                actual: resolvedConformance,
-                expectedProtocol: expectedProtocol,
-                visited: nextVisited
-            ) {
-                return true
-            }
-        }
-
-        return false
-    }
-
-    private func conformanceSubstitution(
-        _ conformance: NominalConformance,
-        actualContext: TypeContext,
-        visited: Set<String>
-    ) -> [String: TypeReference]? {
-        if let extensionTargetType = conformance.extensionTargetType {
-            return extensionSubstitution(
-                targetType: extensionTargetType,
-                genericArgumentConstraints: conformance.genericArgumentConstraints,
-                actualContext: actualContext,
-                visited: visited
-            )
-        }
-
-        return Dictionary(
-            uniqueKeysWithValues: zip(
-                conformance.declarationGenericParameterNames,
-                actualContext.arguments
-            )
-        )
-    }
-
-    private func extensionSubstitution(
-        targetType: TypeReference,
-        genericArgumentConstraints: [ExtensionGenericArgumentConstraint],
-        actualContext: TypeContext,
-        visited: Set<String>
-    ) -> [String: TypeReference]? {
-        guard let targetContext = typeContext(for: targetType),
-            targetContext.name == actualContext.name,
-            targetContext.arguments.count == actualContext.arguments.count
-        else {
-            return nil
-        }
-
-        var bindings: [String: TypeReference] = [:]
-        let constraintNames = Set(genericArgumentConstraints.map(\.parameterName))
-
-        for (pattern, actual) in zip(targetContext.arguments, actualContext.arguments) {
-            if case .named(let name) = pattern,
-                constraintNames.contains(name)
-                    || !Self.typesMatch(actual: pattern, expected: actual)
-            {
-                if let existing = bindings[name],
-                    !Self.typesMatch(actual: existing, expected: actual)
-                {
-                    return nil
-                }
-                bindings[name] = actual
-                continue
-            }
-
-            guard Self.typesMatch(actual: actual, expected: pattern) else {
-                return nil
-            }
-        }
-
-        for genericConstraint in genericArgumentConstraints {
-            guard let actual = bindings[genericConstraint.parameterName] else {
-                return nil
-            }
-            let expected = Self.substitute(genericConstraint.constraint, using: bindings)
-            guard isAssignable(actual: actual, expected: expected) else {
-                return nil
-            }
-        }
-
-        return bindings
-    }
-
-    private func isKnownProtocol(_ type: TypeReference) -> Bool {
-        guard let context = typeContext(for: type) else {
-            return false
-        }
-        return protocolNames.contains(context.name)
     }
 
     private func typeContext(for type: TypeReference) -> TypeContext? {
@@ -876,7 +674,6 @@ public struct DeclarationMemberResolver: Sendable {
     public static let empty = DeclarationMemberResolver(
         constructsByName: [:],
         enumsByName: [:],
-        protocolsByName: [:],
         extensionsByTargetName: [:]
     )
 
@@ -923,27 +720,17 @@ public struct DeclarationMemberResolver: Sendable {
     private let membersByConstructName: [String: ConstructMembers]
     private let enumCaseSignaturesByQualifiedName: [String: EnumCaseSignature]
     private let enumCaseSignaturesByEnumName: [String: [String: EnumCaseSignature]]
-    private let propertyTypesByProtocolName: [String: [String: TypeReference]]
-    private let callableSignaturesByProtocolName: [String: [String: [MemberCallableSignature]]]
     private let genericParameterConstraintsByName: [String: TypeReference]
 
     public init(
         constructsByName: [String: ConstructDeclaration],
         enumsByName: [String: EnumDeclaration],
-        protocolsByName: [String: ProtocolDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) {
         self.genericParameterConstraintsByName = Self.genericParameterConstraints(
             constructsByName: constructsByName,
-            protocolsByName: protocolsByName,
             extensionsByTargetName: extensionsByTargetName
         )
-        self.propertyTypesByProtocolName = protocolsByName.mapValues { declaration in
-            Self.protocolPropertyTypes(for: declaration)
-        }
-        self.callableSignaturesByProtocolName = protocolsByName.mapValues { declaration in
-            Self.protocolCallableSignatures(for: declaration)
-        }
         var enumCaseSignaturesByQualifiedName: [String: EnumCaseSignature] = [:]
         var enumCaseSignaturesByEnumName: [String: [String: EnumCaseSignature]] = [:]
         for (enumName, declaration) in enumsByName {
@@ -1100,39 +887,6 @@ public struct DeclarationMemberResolver: Sendable {
         )
     }
 
-    private static func protocolCallableSignatures(
-        for declaration: ProtocolDeclaration
-    ) -> [String: [MemberCallableSignature]] {
-        var signatures: [String: [MemberCallableSignature]] = [:]
-        for callable in declaration.callables {
-            signatures[callable.name, default: []].append(MemberCallableSignature(
-                genericParameterNames: callable.genericParameters.map(Self.genericParameterName),
-                parameters: Self.memberCallableParameters(callable.parameters, using: [:]),
-                returnType: callable.returnType ?? .named("Void")
-            ))
-        }
-        return signatures
-    }
-
-    private static func protocolPropertyTypes(
-        for declaration: ProtocolDeclaration
-    ) -> [String: TypeReference] {
-        var propertyTypes: [String: TypeReference] = [:]
-        for state in declaration.states {
-            propertyTypes[state.name] = state.type
-        }
-        for binding in declaration.bindings {
-            propertyTypes[binding.name] = simpleTypeReference(named: binding.typeName)
-        }
-        for derived in declaration.deriveds {
-            propertyTypes[derived.name] = simpleTypeReference(named: derived.typeName)
-        }
-        for value in declaration.values {
-            propertyTypes[value.name] = simpleTypeReference(named: value.typeName)
-        }
-        return propertyTypes
-    }
-
     private static func memberCallableParameters(
         _ parameters: [RangeFunctionParameter],
         using nestedTypeMap: [String: TypeReference]
@@ -1150,7 +904,6 @@ public struct DeclarationMemberResolver: Sendable {
 
     private static func genericParameterConstraints(
         constructsByName: [String: ConstructDeclaration],
-        protocolsByName: [String: ProtocolDeclaration],
         extensionsByTargetName: [String: [ExtensionDeclaration]]
     ) -> [String: TypeReference] {
         var candidates: [String: [TypeReference]] = [:]
@@ -1170,12 +923,6 @@ public struct DeclarationMemberResolver: Sendable {
         for construct in constructsByName.values {
             record(construct.genericParameters)
             for callable in construct.callables {
-                record(callable.genericParameters)
-            }
-        }
-        for declaration in protocolsByName.values {
-            record(declaration.genericParameters)
-            for callable in declaration.callables {
                 record(callable.genericParameters)
             }
         }
@@ -1244,18 +991,9 @@ public struct DeclarationMemberResolver: Sendable {
         baseType: TypeReference,
         memberName: String
     ) -> TypeReference? {
-        if case .named(let name) = baseType,
-            let constrainedType = genericParameterConstraintsByName[name]
-        {
-            return protocolPropertyType(baseType: constrainedType, memberName: memberName)
-        }
-
-        guard let context = constructContext(for: baseType),
-            let type = propertyTypesByProtocolName[context.name]?[memberName]
-        else {
-            return nil
-        }
-        return type
+        _ = baseType
+        _ = memberName
+        return nil
     }
 
     public func memberCallableReturnType(
@@ -1264,15 +1002,6 @@ public struct DeclarationMemberResolver: Sendable {
         genericArguments: [TypeReference] = [],
         arguments: [MemberCallArgument] = []
     ) -> TypeReference? {
-        if let protocolType = protocolCallableReturnType(
-            baseType: baseType,
-            memberName: memberName,
-            genericArguments: genericArguments,
-            arguments: arguments
-        ) {
-            return protocolType
-        }
-
         guard let context = constructContext(for: baseType),
             let members = membersByConstructName[context.name],
             let signature = selectCallableSignature(
@@ -1297,42 +1026,6 @@ public struct DeclarationMemberResolver: Sendable {
             )
         ) { _, callable in callable }
         return Self.substitute(signature.returnType, using: substitution)
-    }
-
-    private func protocolCallableReturnType(
-        baseType: TypeReference,
-        memberName: String,
-        genericArguments: [TypeReference],
-        arguments: [MemberCallArgument]
-    ) -> TypeReference? {
-        if case .named(let name) = baseType,
-            let constrainedType = genericParameterConstraintsByName[name]
-        {
-            return protocolCallableReturnType(
-                baseType: constrainedType,
-                memberName: memberName,
-                genericArguments: genericArguments,
-                arguments: arguments
-            )
-        }
-
-        guard let context = constructContext(for: baseType),
-            let signature = selectCallableSignature(
-                callableSignaturesByProtocolName[context.name]?[memberName] ?? [],
-                genericArguments: genericArguments,
-                arguments: arguments
-            )
-        else {
-            return nil
-        }
-        return Self.substitute(
-            signature.returnType,
-            using: callableGenericSubstitution(
-                for: signature,
-                genericArguments: genericArguments,
-                callArguments: arguments
-            )
-        )
     }
 
     private func callableGenericSubstitution(

@@ -283,7 +283,6 @@ struct GraphCollector {
         case .file: return .file
         case .construct: return .construct
         case .enumeration: return .enumeration
-        case .protocolDefinition: return .protocolDefinition
         case .macro: return .macro
         case .typeExtension: return .typeExtension
         case .mainBlock: return .mainBlock
@@ -305,7 +304,6 @@ struct GraphCollector {
     private static func applicationEdgeKind(for kind: SemanticGraphRelationKind) -> ApplicationGraphEdgeKind? {
         switch kind {
         case .contains: return .contains
-        case .conformsTo: return .conformsTo
         case .extends: return .extends
         case .referencesType: return .referencesType
         case .referencesIdentity: return .referencesIdentity
