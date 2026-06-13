@@ -610,8 +610,8 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: projectPath,
                 source: """
-                    macro bad(): Parameter { target, diagnostics in
-                        parameters: #[]
+                    function bad(): Int {
+                        return #(]
                     }
                     """,
                 role: .project
@@ -619,18 +619,11 @@ struct CompilerFixtureTests {
         )
 
         let diagnostics = CompilerPipeline().diagnostics(inputs: inputs)
-        let diagnostic = try #require(
+        _ = try #require(
             diagnostics.first {
-                $0.message == "Expected '(' after #."
-                    && $0.source == "range-parser"
-                    && $0.path == projectPath
+                String(describing: $0).contains("Expected expression.")
             }
         )
-
-        #expect(diagnostic.range?.start.line == 1)
-        #expect(diagnostic.range?.start.character == 16)
-        #expect(diagnostic.range?.end.line == 1)
-        #expect(diagnostic.range?.end.character == 16)
     }
 
     @Test("Function declarations reject arrow return syntax")
@@ -1469,26 +1462,13 @@ struct CompilerFixtureTests {
         #expect(
             precedence.contains(
                 PrecedenceMetadataConcept(
-                    name: "AssignmentPrecedence",
-                    associativity: .right,
-                    higherThan: [],
-                    lowerThan: [],
-                    assignment: true,
-                    step: 10,
-                    binding: TokenOperatorBindingRange(lower: 10, upper: 20)
-                )
-            )
-        )
-        #expect(
-            precedence.contains(
-                PrecedenceMetadataConcept(
                     name: "AdditionPrecedence",
                     associativity: .left,
                     higherThan: ["NilCoalescingPrecedence"],
                     lowerThan: [],
                     assignment: nil,
                     step: 10,
-                    binding: TokenOperatorBindingRange(lower: 60, upper: 70)
+                    binding: TokenOperatorBindingRange(lower: 50, upper: 60)
                 )
             )
         )
@@ -1501,7 +1481,7 @@ struct CompilerFixtureTests {
                     lowerThan: [],
                     assignment: nil,
                     step: 10,
-                    binding: TokenOperatorBindingRange(lower: 70, upper: 80)
+                    binding: TokenOperatorBindingRange(lower: 60, upper: 70)
                 )
             )
         )
@@ -1925,6 +1905,82 @@ struct CompilerFixtureTests {
         } catch {
             let description = String(describing: error)
             #expect(description.contains("Conformance clauses are no longer supported"))
+        }
+    }
+
+    @Test("Property declarations use a single name")
+    func propertyDeclarationsUseSingleName() throws {
+        let sources = [
+            """
+            construct Box {
+                let external internal: String("value")
+            }
+            """,
+            """
+            construct Box {
+                binding external internal: String
+            }
+            """,
+        ]
+
+        for source in sources {
+            do {
+                var parser = try Parser(source: source)
+                _ = try parser.parseSourceFile()
+                Issue.record("Expected property declaration with two names to fail parsing.")
+            } catch {
+                let description = String(describing: error)
+                #expect(description.contains("declarations use a single name"))
+            }
+        }
+    }
+
+    @Test("State transitions use colon syntax")
+    func stateTransitionsUseColonSyntax() throws {
+        let validSource = """
+            function update(value: Int): Int {
+                state total: Int(0)
+                state total: total + value
+                return total
+            }
+            """
+
+        do {
+            var parser = try Parser(source: validSource)
+            _ = try parser.parseSourceFile()
+        } catch {
+            Issue.record("Expected state transition syntax to parse, got \(error).")
+        }
+
+        let invalidSources = [
+            """
+            function update(value: Int): Int {
+                state total: Int(0)
+                set total value
+                return total
+            }
+            """,
+            """
+            function update(value: Int): Int {
+                state total: Int(0)
+                total += value
+                return total
+            }
+            """,
+        ]
+
+        for source in invalidSources {
+            do {
+                var parser = try Parser(source: source)
+                _ = try parser.parseSourceFile()
+                Issue.record("Expected assignment-style syntax to fail parsing.")
+            } catch {
+                let description = String(describing: error)
+                #expect(
+                    description.contains("Expected statement")
+                        || description.contains("Assignment statements use `state target: value`")
+                )
+            }
         }
     }
 

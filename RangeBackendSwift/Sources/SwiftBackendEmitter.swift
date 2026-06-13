@@ -1614,7 +1614,7 @@ struct SwiftBackendEmitter {
             let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
             return RangeFunctionParameter(
                 macros: [],
-                name: value.localName,
+                name: value.name,
                 typeReference: .named(value.typeName),
                 defaultValue: defaultValue,
                 slotName: nil

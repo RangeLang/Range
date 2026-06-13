@@ -1,5 +1,5 @@
 function write(target: binding Int, let: Int) {
-    set target   value
+    state target: value
 }
 
 construct Counter {

@@ -3,7 +3,7 @@
         state counter: 0
 
         while counter < 3 {
-            counter += 1
+            state counter: counter + 1
 
             if counter == 1 {
                 continue

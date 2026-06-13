@@ -53,7 +53,7 @@ extension Parser {
         }
         if case .keyword(RangeSyntax.Keyword.state.rawValue) = peek() {
             advance()
-            return try parseLocalDeclaration(kind: .mutable, localBindings: &localBindings)
+            return try parseLocalStateStatement(localBindings: &localBindings)
         }
         if case .keyword(RangeSyntax.Keyword.derived.rawValue) = peek() {
             advance()
@@ -78,30 +78,15 @@ extension Parser {
             return .continue
         }
 
-        if case .keyword("set") = peek() {
-            advance()
-            let target = try parseAssignmentTarget(localBindings: localBindings)
-            return .assignment(target: target, expression: try parseExpression())
-        }
-
         if isExpressionStatementStart() && !isAssignmentStatementStart() {
             return .expression(try parseExpression())
         }
 
-        let target = try parseAssignmentTarget(localBindings: localBindings)
-
-        switch peek() {
-        case .plusEqual:
-            advance()
-            return .compoundAssignment(
-                target: target,
-                operatorSymbol: .plusEquals,
-                expression: try parseExpression()
-            )
-        default:
-            throw ParseError(
-                "Expected assignment operator (`+=`) or `set` statement in action block.")
+        if isAssignmentStatementStart() {
+            throw ParseError("Assignment statements use `state target: value`.")
         }
+
+        throw ParseError("Expected statement.")
     }
 
     func targetExpandStatementPath() -> String? {
@@ -344,6 +329,37 @@ extension Parser {
         )
         localBindings[name] = LocalBindingSymbol(kind: kind, type: declaration.type)
         return .localBinding(declaration)
+    }
+
+    mutating func parseLocalStateStatement(
+        localBindings: inout [String: LocalBindingSymbol]
+    ) throws -> Statement {
+        guard case .identifier(let name) = peek() else {
+            throw ParseError("Expected state name.")
+        }
+
+        if isExistingMutableTargetStart(name: name, localBindings: localBindings) {
+            let target = try parseAssignmentTarget(localBindings: localBindings)
+            try consume(.colon)
+            return .assignment(target: target, expression: try parseExpression())
+        }
+
+        return try parseLocalDeclaration(kind: .mutable, localBindings: &localBindings)
+    }
+
+    func isExistingMutableTargetStart(
+        name: String,
+        localBindings: [String: LocalBindingSymbol]
+    ) -> Bool {
+        if currentSelfAvailable, name == "self" {
+            return true
+        }
+        if localBindings[name] != nil {
+            return true
+        }
+        return currentMutableStateNames.contains(name)
+            || currentBindingNames.contains(name)
+            || currentStateNames.contains(name)
     }
 
     func canStartExpression(_ token: Token) -> Bool {

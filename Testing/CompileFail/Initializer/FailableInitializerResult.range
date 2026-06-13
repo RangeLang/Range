@@ -10,7 +10,7 @@ construct User {
     let name: String
 
     init(value: String) -> Result<Self, ParseError> {
-        set self.name   value
+        state self.name: value
     }
 }
 

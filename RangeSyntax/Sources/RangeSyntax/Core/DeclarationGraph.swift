@@ -541,7 +541,7 @@ public struct DeclarationGraph {
             let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
             return RangeFunctionParameter(
                 macros: [],
-                name: value.localName,
+                name: value.name,
                 typeReference: .named(value.typeName),
                 defaultValue: defaultValue,
                 slotName: nil,
@@ -1605,7 +1605,7 @@ private struct SyntaxProjectionAccumulator {
         return macros.contains { macro in
             guard macro.name == "graph" else { return false }
             let clause = macro.argumentClause?.replacingOccurrences(of: " ", with: "")
-            return clause == expected
+            return clause == expected || clause == "role:\(expected)"
         }
     }
 

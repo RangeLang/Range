@@ -48,11 +48,11 @@ construct JSONKeyedEncodingContainer {
 
     function appendField(key: String, value: String) {
         if wroteField {
-            set output   output + ","
+            state output: output + ","
         } else {
-            set wroteField   true
+            state wroteField: true
         }
 
-        set output   output + "\"" + key + "\":" + value
+        state output: output + "\"" + key + "\":" + value
     }
 }

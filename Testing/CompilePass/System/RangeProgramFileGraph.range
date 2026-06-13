@@ -15,8 +15,8 @@ function renderFiles(files: [FileTreeNode]): String {
 
     while index < files.count {
         let file: FileTreeNode(files.element(index: index))
-        output += "- \(file.path) children: \(file.children.count)\n"
-        index += 1
+        state output: output + "- \(file.path) children: \(file.children.count)\n"
+        state index: index + 1
     }
 
     return output
@@ -32,8 +32,8 @@ function renderRangeGraphNodes(nodes: [RangeGraphNode]): String {
 
     while index < nodes.count {
         let node: RangeGraphNode(nodes.element(index: index))
-        output += "- node \(renderIdentity(identity: node.identity)) source: \(node.sourcePath) labels: \(node.labels.count)\n"
-        index += 1
+        state output: output + "- node \(renderIdentity(identity: node.identity)) source: \(node.sourcePath) labels: \(node.labels.count)\n"
+        state index: index + 1
     }
 
     return output
@@ -45,8 +45,8 @@ function renderRangeGraphRelationships(relationships: [RangeGraphRelationship]):
 
     while index < relationships.count {
         let relationship: RangeGraphRelationship(relationships.element(index: index))
-        output += "- relationship \(relationship.kind) \(relationship.origin.id) -> \(relationship.destination.id)\n"
-        index += 1
+        state output: output + "- relationship \(relationship.kind) \(relationship.origin.id) -> \(relationship.destination.id)\n"
+        state index: index + 1
     }
 
     return output
@@ -58,10 +58,10 @@ function renderSyntaxItems(items: [GraphSyntax]): String {
 
     while index < items.count {
         let item: GraphSyntax(items.element(index: index))
-        output += "- syntax \(renderIdentity(identity: item.identity))\n"
-        output += "  declarations: \(item.declarations.count)\n"
-        output += "  applications: \(item.applications.count)\n"
-        index += 1
+        state output: output + "- syntax \(renderIdentity(identity: item.identity))\n"
+        state output: output + "  declarations: \(item.declarations.count)\n"
+        state output: output + "  applications: \(item.applications.count)\n"
+        state index: index + 1
     }
 
     return output
@@ -73,8 +73,8 @@ function countDeclarations(graph: RangeGraph): Int {
 
     while index < graph.syntax.count {
         let syntax: GraphSyntax(graph.syntax.element(index: index))
-        count += syntax.declarations.count
-        index += 1
+        state count: count + syntax.declarations.count
+        state index: index + 1
     }
 
     return count
@@ -86,8 +86,8 @@ function countApplications(graph: RangeGraph): Int {
 
     while index < graph.syntax.count {
         let syntax: GraphSyntax(graph.syntax.element(index: index))
-        count += syntax.applications.count
-        index += 1
+        state count: count + syntax.applications.count
+        state index: index + 1
     }
 
     return count

@@ -48,11 +48,11 @@ construct JSONUnkeyedEncodingContainer {
 
     function appendValue(value: String) {
         if wroteValue {
-            set output   output + ","
+            state output: output + ","
         } else {
-            set wroteValue   true
+            state wroteValue: true
         }
 
-        set output   output + value
+        state output: output + value
     }
 }

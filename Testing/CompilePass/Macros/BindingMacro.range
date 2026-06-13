@@ -18,7 +18,7 @@ construct Box {
         }
 
         set {
-            set age   newValue
+            state age: newValue
         }
     }
 
@@ -27,7 +27,7 @@ construct Box {
     }
 
     function update(value: Int) {
-        set score   value
-        score += value
+        state score: value
+        state score: score + value
     }
 }

@@ -52,35 +52,28 @@ extension Parser {
         return .type(name: name, constraint: constraint, defaultArgument: defaultArgument)
     }
 
-    mutating func parseLabeledDeclarationName(
-        expecting kind: String,
-        allowOmittedLocalName: Bool = true
-    ) throws -> (localName: String, externalLabel: String?) {
-        let firstName: String
+    mutating func parseDeclarationName(expecting kind: String) throws -> String {
+        let name: String
         switch peek() {
         case .identifier(let value):
-            firstName = value
+            name = value
             advance()
         case .keyword(let value):
-            firstName = value
+            name = value
             advance()
         default:
             throw ParseError("Expected \(kind) name.")
         }
 
         switch peek() {
-        case .identifier(let secondName) where peek(offset: 1) == .colon:
-            advance()
-            guard secondName != "_" else {
-                throw ParseError("\(kind.capitalized) internal name cannot be '_'.")
-            }
-            return (secondName, firstName)
-        case .keyword(let secondName) where peek(offset: 1) == .colon:
-            advance()
-            guard secondName != "_" else {
-                throw ParseError("\(kind.capitalized) internal name cannot be '_'.")
-            }
-            return (secondName, firstName)
+        case .identifier where peek(offset: 1) == .colon:
+            throw ParseError(
+                "\(kind.capitalized) declarations use a single name; external labels are not supported."
+            )
+        case .keyword where peek(offset: 1) == .colon:
+            throw ParseError(
+                "\(kind.capitalized) declarations use a single name; external labels are not supported."
+            )
         default:
             break
         }
@@ -89,12 +82,11 @@ extension Parser {
             throw ParseError("Expected ':' after \(kind) name.")
         }
 
-        if firstName == "_" {
-            throw ParseError("\(kind.capitalized) internal name cannot be '_'.")
+        if name == "_" {
+            throw ParseError("\(kind.capitalized) name cannot be '_'. Use a macro for hidden behavior.")
         }
 
-        _ = allowOmittedLocalName
-        return (firstName, firstName)
+        return name
     }
 
     mutating func parseAttributeIfPresent(before keyword: RangeSyntax.Keyword)

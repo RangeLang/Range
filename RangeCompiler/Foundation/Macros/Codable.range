@@ -37,7 +37,7 @@ macro encodeBody(container: KeyedEncodingContainer, properties: [Let]) -> [Switc
 macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, value: Identifier, key: String) -> Switch {
     switch container.decode(#(type).self, key: key) {
     case .success(let #(value)):
-        set self.#(value)   #(value)
+        state self.#(value): #(value)
     case .failure(let error):
         return .failure(cause: error)
     }

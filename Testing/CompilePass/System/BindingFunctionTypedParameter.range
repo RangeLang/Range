@@ -1,5 +1,5 @@
 function replace(task: binding () -> Int, replacement: () -> Int) {
-    set task   replacement
+    state task: replacement
 }
 
 @main {

@@ -8,12 +8,12 @@ construct JSONEncoder {
     }
 
     function keyedContainer(): JSONKeyedEncodingContainer {
-        set isObject   true
+        state isObject: true
         return JSONKeyedEncodingContainer(output: $self.output, isObject: $self.isObject)
     }
 
     function unkeyedContainer(): JSONUnkeyedEncodingContainer {
-        set isArray   true
+        state isArray: true
         return JSONUnkeyedEncodingContainer(output: $self.output, isArray: $self.isArray)
     }
 

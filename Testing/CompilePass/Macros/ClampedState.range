@@ -3,7 +3,7 @@ construct Person {
     state age: Int(150)
 
     function update(value: Int) {
-        set age   value
-        age += value
+        state age: value
+        state age: age + value
     }
 }

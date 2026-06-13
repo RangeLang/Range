@@ -4,7 +4,7 @@ extension Parser {
     mutating func parseValueDeclaration() throws -> ValueDeclaration {
         let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.let)
-        let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "let")
+        let name = try parseDeclarationName(expecting: "let")
         try consume(.colon)
         let annotation: (type: TypeReference, initializer: Expression?)?
         let value: Expression?
@@ -15,14 +15,14 @@ extension Parser {
             value = annotation!.initializer
             if canStartInlineExpression() {
                 throw ParseError(
-                    "let '\(localName)' expects one initializer after ':'. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
+                    "let '\(name)' expects one initializer after ':'. Use typed construction, for example `let \(name): \(type.displayName)(value)`."
                 )
             }
         } else {
             annotation = nil
             value = try parseExpression()
             type = try inferInitializedBindingType(
-                name: localName,
+                name: name,
                 explicitType: nil,
                 expression: value!,
                 accessibleTypes: accessibleContextTypes(),
@@ -31,7 +31,7 @@ extension Parser {
         }
         if peek() == .equal {
             throw ParseError(
-                "let '\(localName)' expects declaration initialization after ':'. Use typed construction, for example `let \(localName): \(type.displayName)(value)`."
+                "let '\(name)' expects declaration initialization after ':'. Use typed construction, for example `let \(name): \(type.displayName)(value)`."
             )
         }
         if peek() == .leftBrace {
@@ -41,8 +41,7 @@ extension Parser {
         }
         return ValueDeclaration(
             macros: macros,
-            localName: localName,
-            externalLabel: externalLabel,
+            name: name,
             typeName: type.displayName,
             value: value
         )

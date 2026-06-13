@@ -8,7 +8,7 @@ extension NestedAddress {
 
         switch container.decode(String.self, key: "city") {
         case .success(let city):
-            set self.city   city
+            state self.city: city
         case .failure(let error):
             return .failure(cause: error)
         }
@@ -28,14 +28,14 @@ extension NestedDecodedUser {
 
         switch container.decode(Int.self, key: "id") {
         case .success(let id):
-            set self.id   id
+            state self.id: id
         case .failure(let error):
             return .failure(cause: error)
         }
 
         switch container.decode(NestedAddress.self, key: "address") {
         case .success(let address):
-            set self.address   address
+            state self.address: address
         case .failure(let error):
             return .failure(cause: error)
         }

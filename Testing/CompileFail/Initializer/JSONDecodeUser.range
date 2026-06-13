@@ -9,14 +9,14 @@ extension DecodedUser {
 
         switch container.decode(Int.self, key: "id") {
         case .success(let id):
-            set self.id   id
+            state self.id: id
         case .failure(let error):
             return .failure(cause: error)
         }
 
         switch container.decode(String.self, key: "name") {
         case .success(let name):
-            set self.name   name
+            state self.name: name
         case .failure(let error):
             return .failure(cause: error)
         }

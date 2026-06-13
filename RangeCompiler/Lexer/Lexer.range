@@ -145,7 +145,7 @@ construct LexerCursor {
                 advancePattern(rule.pattern)
                 return emitRuleToken(token: rule.token, start: start)
             }
-            ruleIndex += 1
+            state ruleIndex: ruleIndex + 1
         }
         return false
     }
@@ -272,7 +272,7 @@ construct LexerCursor {
         state remaining: pattern.count
         while remaining > 0 {
             advance()
-            set remaining   remaining - 1
+            state remaining: remaining - 1
         }
     }
 
@@ -296,12 +296,12 @@ construct LexerCursor {
 
     function advance(): String {
         let value: currentCharacter()
-        index += 1
+        state index: index + 1
         if value == "\n" {
-            line += 1
-            set column   0
+            state line: line + 1
+            state column: 0
         } else {
-            column += 1
+            state column: column + 1
         }
         return value
     }
@@ -400,7 +400,7 @@ construct LexerCursor {
         advance()
         state digits: ""
         while !isAtEnd() && isIdentifierPart(currentCharacter()) {
-            digits += advance()
+            state digits: digits + advance()
         }
 
         if digits.count != 6 || !isHexDigits(digits) {
@@ -468,9 +468,9 @@ construct LexerCursor {
                     )
                 }
                 let escaped: advance()
-                set result   result + "\\" + escaped
+                state result: result + "\\" + escaped
                 if escaped == "(" {
-                    interpolationDepth += 1
+                    state interpolationDepth: interpolationDepth + 1
                 }
                 continue
             }
@@ -479,7 +479,7 @@ construct LexerCursor {
                 if character == "\"" {
                     switch readInterpolatedStringLiteral(start: start) {
                     case .success(let value):
-                        set result   result + value
+                        state result: result + value
                     case .failure(let error):
                         return .failure(cause: error)
                     }
@@ -487,13 +487,13 @@ construct LexerCursor {
                 }
 
                 if character == "(" {
-                    interpolationDepth += 1
+                    state interpolationDepth: interpolationDepth + 1
                 } else if character == ")" {
-                    set interpolationDepth   interpolationDepth - 1
+                    state interpolationDepth: interpolationDepth - 1
                 }
             }
 
-            set result   result + character
+            state result: result + character
             advance()
         }
 
@@ -506,7 +506,7 @@ construct LexerCursor {
 
         while !isAtEnd() {
             let character: currentCharacter()
-            set result   result + character
+            state result: result + character
             advance()
 
             if character == "\\" {
@@ -519,7 +519,7 @@ construct LexerCursor {
                     )
                 }
                 let escaped: advance()
-                set result   result + escaped
+                state result: result + escaped
                 continue
             }
 
@@ -548,7 +548,7 @@ construct LexerCursor {
                 return .success(result: trimNewlines(result))
             }
 
-            set result   result + currentCharacter()
+            state result: result + currentCharacter()
             advance()
         }
 
@@ -565,7 +565,7 @@ construct LexerCursor {
             if !isWhitespace(character) {
                 return false
             }
-            set position   position - 1
+            state position: position - 1
         }
         return true
     }
@@ -575,11 +575,11 @@ construct LexerCursor {
         state end: text.count
 
         while start < end && isNewlineAt(text: text, index: start) {
-            start += 1
+            state start: start + 1
         }
 
         while end > start && isNewlineAt(text: text, index: end - 1) {
-            set end   end - 1
+            state end: end - 1
         }
 
         return text.substring(start: start, end: end)
@@ -592,7 +592,7 @@ construct LexerCursor {
             if body.directive == directive {
                 return body.language
             }
-            bodyIndex += 1
+            state bodyIndex: bodyIndex + 1
         }
         return ""
     }
@@ -643,7 +643,7 @@ construct LexerCursor {
             if !isHexDigit(character) {
                 return false
             }
-            position += 1
+            state position: position + 1
         }
         return true
     }

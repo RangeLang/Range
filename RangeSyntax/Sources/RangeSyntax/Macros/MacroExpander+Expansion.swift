@@ -595,8 +595,7 @@ extension MacroExpander {
 
         return ValueDeclaration(
             macros: declaration.macros,
-            localName: declaration.localName,
-            externalLabel: declaration.externalLabel,
+            name: declaration.name,
             typeName: declaration.typeName,
             value: try declaration.value.map {
                 try expand(
@@ -649,8 +648,7 @@ extension MacroExpander {
 
         return BindingDeclaration(
             macros: declaration.macros,
-            localName: declaration.localName,
-            externalLabel: declaration.externalLabel,
+            name: declaration.name,
             typeName: declaration.typeName,
             storage: storage
         )
@@ -2110,7 +2108,18 @@ extension MacroExpander {
         for statement in statements {
             switch statement {
             case .localBinding(let declaration):
-                locals[declaration.name] = declaration.expression
+                let evaluator = CompileTimeValueEvaluator(
+                    targetBinding: targetBinding,
+                    targetValue: targetValue ?? .object(typeName: "MacroDiagnostics", fields: [:]),
+                    graphBinding: graphBinding,
+                    selfValue: macroSelfValue(named: diagnosticOwnerName),
+                    localBindings: locals,
+                    macroDeclarationsByName: context.macroDeclarationsByName,
+                    context: context
+                )
+                locals[declaration.name] =
+                    evaluator.evaluate(declaration.expression, with: locals)?.expression
+                    ?? declaration.expression
             case .expression(let expression):
                 if let diagnostic = try macroDiagnostic(
                     from: expression,
@@ -2611,7 +2620,9 @@ extension MacroExpander {
             for statement in statements {
                 switch statement {
                 case .localBinding(let declaration):
-                    locals[declaration.name] = declaration.expression
+                    locals[declaration.name] =
+                        evaluator.evaluate(declaration.expression, with: locals)?.expression
+                        ?? declaration.expression
                 case .macroInvocation(let name, let argumentClause, _):
                     guard let invokedMacro = context.macroDeclarationsByName[name] else {
                         return nil

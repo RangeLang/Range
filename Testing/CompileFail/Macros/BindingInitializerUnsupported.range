@@ -14,7 +14,7 @@ construct Holder {
         }
 
         set {
-            set age   newValue
+            state age: newValue
         }
     }
 }

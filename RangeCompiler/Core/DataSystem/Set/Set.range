@@ -49,7 +49,7 @@ extension Set<Element> {
         while index < values.count {
             switch container.encode(values.element(index: index)) {
             case .success:
-                index += 1
+                state index: index + 1
             case .failure(let error):
                 return .failure(cause: error)
             }

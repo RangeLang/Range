@@ -10,16 +10,9 @@ public struct Parser {
         static func bootstrap() -> OperatorEnvironment {
             let groups = [
                 PrecedenceGroupDeclaration(
-                    name: "AssignmentPrecedence",
-                    associativity: .right,
-                    higherThan: [],
-                    lowerThan: [],
-                    assignment: true
-                ),
-                PrecedenceGroupDeclaration(
                     name: "LogicalDisjunctionPrecedence",
                     associativity: .left,
-                    higherThan: ["AssignmentPrecedence"],
+                    higherThan: [],
                     lowerThan: [],
                     assignment: nil
                 ),

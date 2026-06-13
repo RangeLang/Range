@@ -4,22 +4,21 @@ extension Parser {
     mutating func parseBindingDeclaration() throws -> BindingDeclaration {
         let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.binding)
-        let (localName, externalLabel) = try parseLabeledDeclarationName(expecting: "binding")
+        let name = try parseDeclarationName(expecting: "binding")
         try consume(.colon)
         let typeName = try consumeTypeReference()
         let storage: BindingStorage
         if peek() == .leftBrace {
             let previousBindingNames = currentBindingNames
-            currentBindingNames = previousBindingNames.union([localName])
-            storage = try parseDerivedBindingStorage(name: localName, typeName: typeName)
-            currentBindingNames = previousBindingNames.union([localName])
+            currentBindingNames = previousBindingNames.union([name])
+            storage = try parseDerivedBindingStorage(name: name, typeName: typeName)
+            currentBindingNames = previousBindingNames.union([name])
         } else {
             storage = .plain
         }
         return BindingDeclaration(
             macros: macros,
-            localName: localName,
-            externalLabel: externalLabel,
+            name: name,
             typeName: typeName,
             storage: storage
         )

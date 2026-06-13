@@ -2,12 +2,12 @@ construct JSONSingleValueEncodingContainer {
     binding output: String
 
     function encodeNil(): Result<Void, EncodingError> {
-        set output   "null"
+        state output: "null"
         return .success(result: Void())
     }
 
     function encode(value: Bool): Result<Void, EncodingError> {
-        set output   "\(value)"
+        state output: "\(value)"
         return .success(result: Void())
     }
 
@@ -16,32 +16,32 @@ construct JSONSingleValueEncodingContainer {
     }
 
     function encode(value: Date): Result<Void, EncodingError> {
-        set output   "\"\(value)\""
+        state output: "\"\(value)\""
         return .success(result: Void())
     }
 
     function encode(value: DateTime): Result<Void, EncodingError> {
-        set output   "\"\(value)\""
+        state output: "\"\(value)\""
         return .success(result: Void())
     }
 
     function encode(value: Float): Result<Void, EncodingError> {
-        set output   "\(value)"
+        state output: "\(value)"
         return .success(result: Void())
     }
 
     function encode(value: Int): Result<Void, EncodingError> {
-        set output   "\(value)"
+        state output: "\(value)"
         return .success(result: Void())
     }
 
     function encode(value: String): Result<Void, EncodingError> {
-        set output   "\"\(value)\""
+        state output: "\"\(value)\""
         return .success(result: Void())
     }
 
     function encode(value: UUID): Result<Void, EncodingError> {
-        set output   "\"\(value)\""
+        state output: "\"\(value)\""
         return .success(result: Void())
     }
 

@@ -47,7 +47,7 @@ macro init<
         }
 
         if source.count > 0 {
-            set delimiterCount   source.count(of: actualDelimiter)
+            state delimiterCount: source.count(of: actualDelimiter)
 
             if delimiterCount == 0 {
                 diagnostics.error("@init pattern must contain at least one delimiter.")
@@ -88,7 +88,7 @@ macro init<
                 diagnostics.error("@init field type must match the literal value type.")
             }
 
-            letIndex += 1
+            state letIndex: letIndex + 1
         }
 
         state stateIndex: Int(0)
@@ -109,7 +109,7 @@ macro init<
                 diagnostics.error("@init field type must match the literal value type.")
             }
 
-            stateIndex += 1
+            state stateIndex: stateIndex + 1
         }
     }
 }

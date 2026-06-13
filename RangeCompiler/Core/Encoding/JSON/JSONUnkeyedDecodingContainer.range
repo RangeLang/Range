@@ -85,7 +85,7 @@ construct JSONUnkeyedDecodingContainer {
             return .failure(cause: .failed)
         }
 
-        index += 1
+        state index: index + 1
         return .success(result: self.values.element(index: index - 1))
     }
 }
