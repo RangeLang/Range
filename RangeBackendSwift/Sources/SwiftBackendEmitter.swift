@@ -20,12 +20,6 @@ struct SwiftBackendEmitter {
                 Self.collectFailableInitializers(from: Self.allExtensions(in: program)),
                 uniquingKeysWith: { lhs, rhs in lhs + rhs }
             )
-            if Self.programIncludesProtocol(named: "Decodable", in: program) {
-                self.failableInitializersByConstructName.merge(
-                    Self.nativeScalarDecodableInitializers(),
-                    uniquingKeysWith: { lhs, rhs in lhs + rhs }
-                )
-            }
             self.failableInitializersByProtocolName = Self.collectFailableInitializers(
                 fromProtocols: protocols
             )
@@ -101,78 +95,6 @@ struct SwiftBackendEmitter {
                 declarations.append(contentsOf: unit.extensions)
             }
             return declarations
-        }
-
-        private static func programIncludesProtocol(
-            named name: String,
-            in program: LoweredProgram
-        ) -> Bool {
-            allProtocols(in: program).contains { $0.name == name }
-        }
-
-        private static func nativeScalarDecodableInitializers()
-            -> [String: [FailableInitializerSignature]]
-        {
-            let failureType = TypeReference.named("DecodingError")
-            let signature = { (constructName: String) in
-                FailableInitializerSignature(
-                    constructName: constructName,
-                    labels: ["from"],
-                    failureType: failureType
-                )
-            }
-
-            return [
-                "Bool": [signature("Bool")],
-                "Date": [
-                    signature("Date"),
-                    FailableInitializerSignature(
-                        constructName: "Date",
-                        labels: ["iso8601String"],
-                        failureType: failureType
-                    ),
-                ],
-                "DateStorage": [
-                    FailableInitializerSignature(
-                        constructName: "DateStorage",
-                        labels: ["iso8601String"],
-                        failureType: failureType
-                    )
-                ],
-                "DateTime": [
-                    signature("DateTime"),
-                    FailableInitializerSignature(
-                        constructName: "DateTime",
-                        labels: ["iso8601String"],
-                        failureType: failureType
-                    ),
-                ],
-                "DateTimeStorage": [
-                    FailableInitializerSignature(
-                        constructName: "DateTimeStorage",
-                        labels: ["iso8601String"],
-                        failureType: failureType
-                    )
-                ],
-                "Float": [signature("Float")],
-                "Int": [signature("Int")],
-                "String": [signature("String")],
-                "UUID": [
-                    signature("UUID"),
-                    FailableInitializerSignature(
-                        constructName: "UUID",
-                        labels: ["uuidString"],
-                        failureType: failureType
-                    ),
-                ],
-                "UUIDStorage": [
-                    FailableInitializerSignature(
-                        constructName: "UUIDStorage",
-                        labels: ["uuidString"],
-                        failureType: failureType
-                    )
-                ],
-            ]
         }
 
         private static func collectFailableInitializers(
@@ -387,10 +309,6 @@ struct SwiftBackendEmitter {
         let sections = [
             emitRuntimeSupport(includeFoundationImport: false),
             protocols,
-            program.protocols.contains(where: { $0.name == "Encodable" })
-                ? emitNativeEncodingConformances() : "",
-            program.protocols.contains(where: { $0.name == "Decodable" })
-                ? emitNativeDecodingConformances() : "",
             enumerations,
             declarations,
             extensions,
@@ -1384,14 +1302,6 @@ struct SwiftBackendEmitter {
             sections.append(protocols)
         }
 
-        if unit.protocols.contains(where: { $0.name == "Encodable" }) {
-            sections.append(emitNativeEncodingConformances())
-        }
-
-        if unit.protocols.contains(where: { $0.name == "Decodable" }) {
-            sections.append(emitNativeDecodingConformances())
-        }
-
         let enumerations = try unit.enumerations.map(emitEnum).joined(separator: "\n\n")
         if !enumerations.isEmpty {
             sections.append(enumerations)
@@ -1421,186 +1331,6 @@ struct SwiftBackendEmitter {
         }
 
         return sections.joined(separator: "\n\n") + "\n"
-    }
-
-    private func emitNativeEncodingConformances() -> String {
-        """
-        extension Bool: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.singleValueContainer()
-                return container.encode(self)
-            }
-        }
-
-        extension Data: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.singleValueContainer()
-                return container.encode(self)
-            }
-        }
-
-        extension __RangeDateOnly: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.singleValueContainer()
-                return container.encode(self)
-            }
-        }
-
-        extension __RangeDateTime: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.singleValueContainer()
-                return container.encode(self)
-            }
-        }
-
-        extension Float: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.singleValueContainer()
-                return container.encode(self)
-            }
-        }
-
-        extension Int: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.singleValueContainer()
-                return container.encode(self)
-            }
-        }
-
-        extension String: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.singleValueContainer()
-                return container.encode(self)
-            }
-        }
-
-        extension UUID: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.singleValueContainer()
-                return container.encode(self)
-            }
-        }
-
-        extension Array: Range_Encodable where Element: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.unkeyedContainer()
-
-                for element in self {
-                    switch container.encode(element) {
-                    case .success:
-                        continue
-                    case .failure(let error):
-                        return .failure(cause: error)
-                    }
-                }
-
-                return .success(result: Void())
-            }
-        }
-
-        extension Optional: Range_Encodable where Wrapped: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                switch self {
-                case .some(let value):
-                    return value.encode(to: encoder)
-                case .none:
-                    var container = encoder.singleValueContainer()
-                    return container.encodeNil()
-                }
-            }
-        }
-
-        extension Dictionary: Range_Encodable where Key == String, Value: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.keyedContainer()
-
-                for key in keys.sorted() {
-                    guard let value = self[key] else {
-                        continue
-                    }
-
-                    switch container.encode(value, forKey: key) {
-                    case .success:
-                        continue
-                    case .failure(let error):
-                        return .failure(cause: error)
-                    }
-                }
-
-                return .success(result: Void())
-            }
-        }
-
-        extension Set: Range_Encodable where Element: Range_Encodable {
-            func encode(to encoder: Range_Encoder) -> Range_Result<Void, Range_EncodingError> {
-                var container = encoder.unkeyedContainer()
-
-                for element in self {
-                    switch container.encode(element) {
-                    case .success:
-                        continue
-                    case .failure(let error):
-                        return .failure(cause: error)
-                    }
-                }
-
-                return .success(result: Void())
-            }
-        }
-        """
-    }
-
-    private func emitNativeDecodingConformances() -> String {
-        """
-        extension Bool: Range_Decodable {
-            static func decode(from decoder: Range_Decoder) -> Range_Result<Bool, Range_DecodingError> {
-                let container = decoder.singleValueContainer()
-                return container.decode(Bool.self)
-            }
-        }
-
-        extension __RangeDateOnly: Range_Decodable {
-            static func decode(from decoder: Range_Decoder) -> Range_Result<__RangeDateOnly, Range_DecodingError> {
-                let container = decoder.singleValueContainer()
-                return container.decode(__RangeDateOnly.self)
-            }
-        }
-
-        extension __RangeDateTime: Range_Decodable {
-            static func decode(from decoder: Range_Decoder) -> Range_Result<__RangeDateTime, Range_DecodingError> {
-                let container = decoder.singleValueContainer()
-                return container.decode(__RangeDateTime.self)
-            }
-        }
-
-        extension Float: Range_Decodable {
-            static func decode(from decoder: Range_Decoder) -> Range_Result<Float, Range_DecodingError> {
-                let container = decoder.singleValueContainer()
-                return container.decode(Float.self)
-            }
-        }
-
-        extension Int: Range_Decodable {
-            static func decode(from decoder: Range_Decoder) -> Range_Result<Int, Range_DecodingError> {
-                let container = decoder.singleValueContainer()
-                return container.decode(Int.self)
-            }
-        }
-
-        extension String: Range_Decodable {
-            static func decode(from decoder: Range_Decoder) -> Range_Result<String, Range_DecodingError> {
-                let container = decoder.singleValueContainer()
-                return container.decode(String.self)
-            }
-        }
-
-        extension UUID: Range_Decodable {
-            static func decode(from decoder: Range_Decoder) -> Range_Result<UUID, Range_DecodingError> {
-                let container = decoder.singleValueContainer()
-                return container.decode(UUID.self)
-            }
-        }
-        """
     }
 
     private func emitMain(_ mainBlock: MainBlockNode) throws -> String {
