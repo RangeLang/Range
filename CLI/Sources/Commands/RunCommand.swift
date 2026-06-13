@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import RangeBackendSwift
 import RangeSyntax
 
 extension CLI {
@@ -20,12 +21,16 @@ extension CLI {
                 let compiledProgram = try ProjectSourceValidator.validatedCompiledProgram(
                     for: project
                 )
-                let backend = BackendRegistry.default()
-                let workspace = try backend.emitWorkspace(
-                    project: project,
+                let backend = SwiftBackend()
+                let workspaceRoot = try backend.emitWorkspace(
+                    project: SwiftBackendProject(
+                        projectFiles: project.projectFiles,
+                        isSingleFile: project.isSingleFile,
+                        buildRoot: project.defaultBuildRoot
+                    ),
                     compiledProgram: compiledProgram
                 )
-                try backend.run(workspace: workspace)
+                try backend.run(workspaceRoot: workspaceRoot)
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure

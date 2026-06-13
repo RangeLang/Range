@@ -10,7 +10,7 @@ Examples:
 - Range compiler pipeline (Swift)
 - Range parser/type checker/macro expander (Swift)
 - Range lexer declarations (Range)
-- Range backend Swift (Swift)
+- Range Swift-hosted emission pipeline (Swift)
 - Range LLVM emitter (Swift)
 - Range runtime support (Swift)
 - RangeCore syntax declarations (Range)
@@ -31,23 +31,28 @@ when multiple implementation languages are involved.
 
 ## Current Backend Reality
 
-Normal Range program execution currently uses Range backend Swift (Swift):
+Normal Range program execution currently uses the Range Swift-hosted emission
+pipeline (Swift):
 
 ```text
 Range source
 -> Range compiler pipeline (Swift)
 -> generated Swift workspace
+-> optional LLVM IR/object for supported scalar functions
 -> Swift compiler
 -> executable
 ```
 
-Range LLVM emitter (Swift) is experimental and currently emits LLVM IR artifacts
-for lowerable scalar `Int` functions. It supports simple integer arithmetic,
-local `state`, `while` loops, and nested `while` loops.
+Range LLVM emitter (Swift) is an internal lowering path of the Swift-hosted
+emission pipeline, not a separate peer backend. It currently emits LLVM IR and a
+linked object file for lowerable scalar `Int` functions. It supports simple
+integer arithmetic, local `state`, `while` loops, and nested `while` loops.
 
 Range LLVM emitter (Swift) is verified by tests that compile emitted LLVM IR with
-Apple `clang` and run a small C harness. It is not yet wired into normal
-`range run` execution.
+Apple `clang` and run a small C harness. It is also wired into normal `range run`
+workspace emission for lowerable scalar functions.
 
 When explaining hybrid execution, say explicitly that Swift remains the current
-program driver and LLVM is currently a side path for scalar compute artifacts.
+program driver and LLVM is the native lowering path for supported scalar compute
+inside that generated Swift workspace. Do not describe C, Rust, or other
+imaginary backends as active targets.

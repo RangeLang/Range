@@ -12,7 +12,7 @@ struct LLVMLoweredSymbol: Equatable {
     let llvmName: String
 }
 
-struct LLVMBackendEmitter {
+struct LLVMLoweringEmitter {
     func emitModule(program: LoweredProgram, moduleName: String = "RangeScalar") throws
         -> LLVMModuleEmission?
     {
@@ -41,7 +41,7 @@ struct LLVMBackendEmitter {
 
     private func emitFunction(_ callable: CallableDeclaration) throws -> String {
         guard let body = callable.body else {
-            throw LLVMBackendError("LLVM lowering requires function \(callable.name) to have a body.")
+            throw LLVMLoweringError("LLVM lowering requires function \(callable.name) to have a body.")
         }
 
         var function = LLVMFunctionEmitter(parameters: callable.parameters)
@@ -120,7 +120,7 @@ private struct LLVMFunctionEmitter {
             }
         }
 
-        throw LLVMBackendError("LLVM lowering requires an explicit return statement.")
+        throw LLVMLoweringError("LLVM lowering requires an explicit return statement.")
     }
 
     private mutating func emitStatement(_ statement: Statement) throws -> String? {
@@ -137,30 +137,30 @@ private struct LLVMFunctionEmitter {
         case .return(let expression?):
             let value = try emitExpression(expression)
             guard value.type == "i64" else {
-                throw LLVMBackendError("LLVM return value must be i64.")
+                throw LLVMLoweringError("LLVM return value must be i64.")
             }
             blockTerminated = true
             return value.representation
         case .return(nil):
-            throw LLVMBackendError("LLVM lowering does not support bare return.")
+            throw LLVMLoweringError("LLVM lowering does not support bare return.")
         case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
             .compoundAssignment, .expression, .forEach, .conditional, .break, .continue,
             .switchStatement:
-            throw LLVMBackendError("LLVM lowering does not support statement \(statement).")
+            throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
         }
     }
 
     private mutating func emitLocalBinding(_ declaration: LocalBindingDeclaration) throws {
         guard declaration.type.displayName == "Int" else {
-            throw LLVMBackendError("LLVM local binding '\(declaration.name)' must be Int.")
+            throw LLVMLoweringError("LLVM local binding '\(declaration.name)' must be Int.")
         }
         guard symbols[declaration.name] == nil else {
-            throw LLVMBackendError("LLVM local binding '\(declaration.name)' is already declared.")
+            throw LLVMLoweringError("LLVM local binding '\(declaration.name)' is already declared.")
         }
 
         let value = try emitExpression(declaration.expression)
         guard value.type == "i64" else {
-            throw LLVMBackendError("LLVM local binding initializer must be i64.")
+            throw LLVMLoweringError("LLVM local binding initializer must be i64.")
         }
 
         let pointer = "%\(declaration.name).addr"
@@ -174,15 +174,15 @@ private struct LLVMFunctionEmitter {
         expression: RangeSyntax.Expression
     ) throws {
         guard case .local(let name) = target else {
-            throw LLVMBackendError("LLVM assignment currently supports local state only.")
+            throw LLVMLoweringError("LLVM assignment currently supports local state only.")
         }
         guard case .stackSlot(let pointer) = symbols[name] else {
-            throw LLVMBackendError("LLVM assignment target '\(name)' is not a local state slot.")
+            throw LLVMLoweringError("LLVM assignment target '\(name)' is not a local state slot.")
         }
 
         let value = try emitExpression(expression)
         guard value.type == "i64" else {
-            throw LLVMBackendError("LLVM assignment value must be i64.")
+            throw LLVMLoweringError("LLVM assignment value must be i64.")
         }
         emit("store i64 \(value.representation), ptr \(pointer)")
     }
@@ -200,7 +200,7 @@ private struct LLVMFunctionEmitter {
         emitLabel(conditionLabel)
         let conditionValue = try emitExpression(condition)
         guard conditionValue.type == "i1" else {
-            throw LLVMBackendError("LLVM while condition must be i1.")
+            throw LLVMLoweringError("LLVM while condition must be i1.")
         }
         emit("br i1 \(conditionValue.representation), label %\(bodyLabel), label %\(endLabel)")
         blockTerminated = true
@@ -226,7 +226,7 @@ private struct LLVMFunctionEmitter {
             return Value(type: "i64", representation: String(value))
         case .identifier(let name):
             guard let symbol = symbols[name] else {
-                throw LLVMBackendError("LLVM lowering cannot resolve identifier '\(name)'.")
+                throw LLVMLoweringError("LLVM lowering cannot resolve identifier '\(name)'.")
             }
             switch symbol {
             case .parameter:
@@ -240,7 +240,7 @@ private struct LLVMFunctionEmitter {
             let lhsValue = try emitExpression(lhs)
             let rhsValue = try emitExpression(rhs)
             guard lhsValue.type == "i64", rhsValue.type == "i64" else {
-                throw LLVMBackendError("LLVM binary operands must be i64.")
+                throw LLVMLoweringError("LLVM binary operands must be i64.")
             }
             let instruction = try llvmInstruction(for: operatorSymbol)
             let register = freshRegister()
@@ -249,7 +249,7 @@ private struct LLVMFunctionEmitter {
             )
             return Value(type: instruction.resultType, representation: register)
         default:
-            throw LLVMBackendError("LLVM lowering does not support expression \(expression).")
+            throw LLVMLoweringError("LLVM lowering does not support expression \(expression).")
         }
     }
 
@@ -305,13 +305,13 @@ private struct LLVMFunctionEmitter {
         case .greaterEqual:
             return ("icmp sge", "i1")
         case .and, .or, .nilCoalescing:
-            throw LLVMBackendError(
+            throw LLVMLoweringError(
                 "LLVM lowering does not support operator '\(operatorSymbol.rawValue)' yet.")
         }
     }
 }
 
-enum LLVMBackendError: Error, CustomStringConvertible {
+enum LLVMLoweringError: Error, CustomStringConvertible {
     case message(String)
 
     init(_ message: String) {

@@ -3,8 +3,8 @@ import RangeSyntax
 import Testing
 @testable import RangeBackendSwift
 
-@Suite("LLVM backend emission")
-struct LLVMBackendEmitterTests {
+@Suite("LLVM lowering emission")
+struct LLVMLoweringEmitterTests {
     @Test("Scalar Int function lowers to textual LLVM IR")
     func scalarIntFunctionLowersToTextualLLVMIR() throws {
         let callable = try parseCallable(
@@ -16,7 +16,7 @@ struct LLVMBackendEmitterTests {
         )
 
         let module = try #require(
-            try LLVMBackendEmitter().emitModule(
+            try LLVMLoweringEmitter().emitModule(
                 program: LoweredProgram(
                     macrosByName: [:],
                     callables: [callable],
@@ -57,7 +57,7 @@ struct LLVMBackendEmitterTests {
         )
 
         #expect(LLVMLowerability.canLower(callable) == false)
-        let module = try LLVMBackendEmitter().emitModule(
+        let module = try LLVMLoweringEmitter().emitModule(
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [callable],
@@ -97,7 +97,7 @@ struct LLVMBackendEmitterTests {
 
         #expect(LLVMLowerability.canLower(callable))
         let module = try #require(
-            try LLVMBackendEmitter().emitModule(
+            try LLVMLoweringEmitter().emitModule(
                 program: LoweredProgram(
                     macrosByName: [:],
                     callables: [callable],
@@ -149,7 +149,7 @@ struct LLVMBackendEmitterTests {
             """
         )
         let module = try #require(
-            try LLVMBackendEmitter().emitModule(
+            try LLVMLoweringEmitter().emitModule(
                 program: LoweredProgram(
                     macrosByName: [:],
                     callables: [callable],
@@ -216,7 +216,7 @@ struct LLVMBackendEmitterTests {
         )
 
         let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("RangeLLVMBackendEmitterTests-\(UUID().uuidString)")
+            .appendingPathComponent("RangeLLVMLoweringEmitterTests-\(UUID().uuidString)")
         defer {
             try? FileManager.default.removeItem(at: root)
         }
@@ -321,7 +321,7 @@ struct LLVMBackendEmitterTests {
             return try #require(module.callables.first)
         case .construct, .enumeration, .macro, .extensions, .mainBlock:
             Issue.record("Expected module source file with a callable.")
-            throw LLVMBackendEmitterTestError.expectedCallable
+            throw LLVMLoweringEmitterTestError.expectedCallable
         }
     }
 
@@ -334,7 +334,7 @@ struct LLVMBackendEmitterTests {
             return module
         case .construct, .enumeration, .macro, .extensions, .mainBlock:
             Issue.record("Expected module source file.")
-            throw LLVMBackendEmitterTestError.expectedCallable
+            throw LLVMLoweringEmitterTestError.expectedCallable
         }
     }
 
@@ -361,6 +361,6 @@ struct LLVMBackendEmitterTests {
     }
 }
 
-private enum LLVMBackendEmitterTestError: Error {
+private enum LLVMLoweringEmitterTestError: Error {
     case expectedCallable
 }

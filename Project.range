@@ -2,5 +2,5 @@
 construct Project {
     let name: Title("Range")
     let version: Version(0.1.28)
-    let author: "George"
+    let author: String("George")
 }

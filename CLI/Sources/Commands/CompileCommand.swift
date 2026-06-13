@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import RangeBackendSwift
 import RangeSyntax
 
 extension CLI {
@@ -24,10 +25,14 @@ extension CLI {
                     for: project
                 )
                 if let output {
-                    let backend = BackendRegistry.default()
+                    let backend = SwiftBackend()
                     let outputURL = URL(fileURLWithPath: output).standardizedFileURL
                     _ = try backend.emitSourceFile(
-                        project: project,
+                        project: SwiftBackendProject(
+                            projectFiles: project.projectFiles,
+                            isSingleFile: project.isSingleFile,
+                            buildRoot: project.defaultBuildRoot
+                        ),
                         compiledProgram: compiledProgram,
                         outputURL: outputURL
                     )

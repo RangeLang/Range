@@ -117,7 +117,7 @@ struct SwiftBackendEmitter {
                     return
                 }
                 result[callable.name] = LLVMCallableBridge(
-                    symbolName: LLVMBackendEmitter.symbolName(for: callable),
+                    symbolName: LLVMLoweringEmitter.symbolName(for: callable),
                     parameterCount: callable.parameters.count
                 )
             }
@@ -336,7 +336,7 @@ struct SwiftBackendEmitter {
         try FileManager.default.createDirectory(
             at: sourcesDirectory, withIntermediateDirectories: true)
 
-        let llvmModule = try LLVMBackendEmitter().emitModule(program: program)
+        let llvmModule = try LLVMLoweringEmitter().emitModule(program: program)
         let llvmObjectPath = llvmModule.map { "LLVM/\($0.moduleName).o" }
         let linkerSettings = llvmObjectPath.map {
             """
