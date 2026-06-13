@@ -1,5 +1,0 @@
-extension Person {
-    function displayName(): String {
-        "\(name) (\(age))"
-    }
-}

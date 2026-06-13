@@ -1,26 +1,32 @@
+function sum3(x: Int, y: Int, z: Int): Int {
+    return x + y + z
+}
+
+function nestedSum(limit: Int): Int {
+    state outer: Int(0)
+    state total: Int(0)
+
+    while outer < limit {
+        state inner: Int(0)
+
+        while inner < limit {
+            state total: total + outer + inner
+            state inner: inner + 1
+        }
+
+        state outer: outer + 1
+    }
+
+    return total
+}
+
+function describe(value: Int): String {
+    return "Range playground result: \(value)"
+}
+
 @main {
-  state person: Person(name: "George", age: 26)
+    let scalar: Int(sum3(x: 1, y: 2, z: 3))
+    let loop: Int(nestedSum(limit: 10))
 
-  person.age += 1
-
-  derived personString: String {
-    "Person: \(person.name), Age: \(person.age)"
-  }
-
-  state user: User(person: $person)
-  user.incrementAge()
-
-}
-
-construct Person {
-    let name: String
-    state age: Int
-}
-
-construct User {
-  binding person: Person
-
-  function incrementAge() {
-    person.age += 1
-  }
+    Logger.info(describe(value: scalar + loop))
 }

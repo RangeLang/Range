@@ -2858,14 +2858,14 @@ private func compile(fixture: URL, expectedRole: FixtureRole) throws -> Compiled
 
 private func fixtureFiles(in suite: String) throws -> [URL] {
     let root = try repositoryRoot()
-        .appendingPathComponent("Testing", isDirectory: true)
+        .appendingPathComponent("Tests", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
     return try rangeFiles(in: root, excludingExploration: false)
 }
 
 private func fixtureFile(in suite: String, path: String) throws -> URL {
     try repositoryRoot()
-        .appendingPathComponent("Testing", isDirectory: true)
+        .appendingPathComponent("Tests", isDirectory: true)
         .appendingPathComponent(suite, isDirectory: true)
         .appendingPathComponent(path)
 }
@@ -2935,7 +2935,7 @@ private func repositoryRoot() throws -> URL {
             current
             .appendingPathComponent("RangeCompiler", isDirectory: true)
             .appendingPathComponent("Core", isDirectory: true)
-        let candidateFixtures = current.appendingPathComponent("Testing", isDirectory: true)
+        let candidateFixtures = current.appendingPathComponent("Tests", isDirectory: true)
         var isCoreDirectory: ObjCBool = false
         var isFixturesDirectory: ObjCBool = false
         if FileManager.default.fileExists(

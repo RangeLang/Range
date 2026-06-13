@@ -1,8 +1,0 @@
-Tokens:
-  keyword(construct)
-  identifier(RangePlayground)
-  colon
-  identifier(Package)
-  leftBrace
-  rightBrace
-  eof

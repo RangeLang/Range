@@ -2,12 +2,18 @@ import Foundation
 import RangeSyntax
 
 struct SwiftBackendEmitter {
+    private struct LLVMCallableBridge {
+        let symbolName: String
+        let parameterCount: Int
+    }
+
     private struct SwiftEmissionContext {
         var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
         var genericParameterNames: Set<String> = []
         var constructsByName: [String: ConstructDeclaration] = [:]
         var macrosByName: [String: MacroDeclaration] = [:]
         var callableParameterLabelsByName: [String: [[String]]] = [:]
+        var llvmBridgesByCallableName: [String: LLVMCallableBridge] = [:]
 
         init() {}
 
@@ -26,6 +32,7 @@ struct SwiftBackendEmitter {
             }
             self.macrosByName = program.macrosByName
             self.callableParameterLabelsByName = Self.collectCallableParameterLabels(from: program)
+            self.llvmBridgesByCallableName = Self.collectLLVMBridges(from: program)
         }
 
         private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<
@@ -99,6 +106,21 @@ struct SwiftBackendEmitter {
             allExtensions(in: program).flatMap(\.callables).forEach(record)
 
             return labelsByName
+        }
+
+        private static func collectLLVMBridges(from program: LoweredProgram) -> [String: LLVMCallableBridge] {
+            let callables = program.callables + program.units.flatMap(\.callables)
+            return callables.reduce(into: [:]) { result, callable in
+                guard callable.targetType == nil,
+                    LLVMLowerability.canLower(callable)
+                else {
+                    return
+                }
+                result[callable.name] = LLVMCallableBridge(
+                    symbolName: LLVMBackendEmitter.symbolName(for: callable),
+                    parameterCount: callable.parameters.count
+                )
+            }
         }
 
         private static func allExtensions(in program: LoweredProgram) -> [ExtensionDeclaration] {
@@ -282,7 +304,7 @@ struct SwiftBackendEmitter {
         let allCallables = program.callables + program.declarations.flatMap(\.callables)
         let functions =
             try allCallables
-            .filter { $0.targetType == nil }
+            .filter { $0.targetType == nil && context.llvmBridgesByCallableName[$0.name] == nil }
             .map(emitFunction)
             .joined(separator: "\n\n")
         let enumerations = try program.enumerations.map(emitEnum).joined(separator: "\n\n")
@@ -293,6 +315,7 @@ struct SwiftBackendEmitter {
 
         let sections = [
             emitRuntimeSupport(includeFoundationImport: false),
+            emitLLVMBridgeDeclarations(),
             enumerations,
             declarations,
             extensions,
@@ -313,6 +336,16 @@ struct SwiftBackendEmitter {
         try FileManager.default.createDirectory(
             at: sourcesDirectory, withIntermediateDirectories: true)
 
+        let llvmModule = try LLVMBackendEmitter().emitModule(program: program)
+        let llvmObjectPath = llvmModule.map { "LLVM/\($0.moduleName).o" }
+        let linkerSettings = llvmObjectPath.map {
+            """
+                                linkerSettings: [
+                                    .unsafeFlags(["\($0)"])
+                                ]
+            """
+        } ?? ""
+        let targetArgumentSuffix = linkerSettings.isEmpty ? "" : ","
         let packageSwift = """
             // swift-tools-version: 6.2
             import PackageDescription
@@ -324,7 +357,8 @@ struct SwiftBackendEmitter {
                 ],
                 targets: [
                     .executableTarget(
-                        name: "RangeGenerated"
+                        name: "RangeGenerated"\(targetArgumentSuffix)
+            \(linkerSettings)
                     )
                 ]
             )
@@ -336,7 +370,10 @@ struct SwiftBackendEmitter {
             encoding: .utf8
         )
 
-        let runtimeSwift = emitRuntimeSupport(includeFoundationImport: false)
+        let runtimeSwift = [
+            emitRuntimeSupport(includeFoundationImport: false),
+            emitLLVMBridgeDeclarations(),
+        ].filter { !$0.isEmpty }.joined(separator: "\n\n")
 
         try runtimeSwift.write(
             to: sourcesDirectory.appendingPathComponent("Runtime.swift"),
@@ -351,6 +388,20 @@ struct SwiftBackendEmitter {
                 atomically: true,
                 encoding: .utf8
             )
+        }
+
+        if let llvmModule {
+            let llvmDirectory = root.appendingPathComponent("LLVM", isDirectory: true)
+            try FileManager.default.createDirectory(
+                at: llvmDirectory, withIntermediateDirectories: true)
+            let irURL = llvmDirectory.appendingPathComponent("\(llvmModule.moduleName).ll")
+            let objectURL = llvmDirectory.appendingPathComponent("\(llvmModule.moduleName).o")
+            try llvmModule.ir.write(
+                to: irURL,
+                atomically: true,
+                encoding: .utf8
+            )
+            try compileLLVMIR(irURL: irURL, objectURL: objectURL)
         }
     }
 
@@ -1278,6 +1329,46 @@ struct SwiftBackendEmitter {
         return "\(imports)\n\n\(support)"
     }
 
+    private func emitLLVMBridgeDeclarations() -> String {
+        let bridges = context.llvmBridgesByCallableName.sorted { $0.key < $1.key }.map {
+            _, bridge in
+            let parameters = (0..<bridge.parameterCount)
+                .map { "_ argument\($0): Int64" }
+                .joined(separator: ", ")
+            return """
+            @_silgen_name("\(bridge.symbolName)")
+            func \(bridge.symbolName)(\(parameters)) -> Int64
+            """
+        }
+
+        return bridges.joined(separator: "\n\n")
+    }
+
+    private func compileLLVMIR(irURL: URL, objectURL: URL) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/clang")
+        process.arguments = [
+            "-O3",
+            "-c",
+            irURL.path,
+            "-o",
+            objectURL.path,
+        ]
+
+        let stderr = Pipe()
+        process.standardError = stderr
+
+        try process.run()
+        process.waitUntilExit()
+
+        guard process.terminationStatus == 0 else {
+            let errorText =
+                String(data: stderr.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
+                ?? ""
+            throw SwiftBackendError("LLVM object emission failed: \(errorText)")
+        }
+    }
+
     private func emitSourceUnit(_ unit: LoweredSourceUnit) throws -> String {
         var sections: [String] = []
 
@@ -1297,7 +1388,7 @@ struct SwiftBackendEmitter {
         }
 
         let functions = try unit.callables
-            .filter { $0.targetType == nil }
+            .filter { $0.targetType == nil && context.llvmBridgesByCallableName[$0.name] == nil }
             .map(emitFunction)
             .joined(separator: "\n\n")
 
@@ -3804,6 +3895,10 @@ struct SwiftBackendEmitter {
         arguments: [CallArgument],
         scope: EmissionScope = .empty
     ) throws -> String {
+        if let llvmCall = try emitLLVMBridgeCall(name: name, arguments: arguments, scope: scope) {
+            return llvmCall
+        }
+
         if let knownInitializer = try emitKnownCoreStorageInitializer(
             name: name,
             arguments: arguments,
@@ -3814,6 +3909,26 @@ struct SwiftBackendEmitter {
 
         let rendered = try emitCallArguments(arguments, for: name, scope: scope)
         return "\(emitSwiftReferenceName(name, scope: scope))(\(rendered))"
+    }
+
+    private func emitLLVMBridgeCall(
+        name: String,
+        arguments: [CallArgument],
+        scope: EmissionScope
+    ) throws -> String? {
+        guard let bridge = context.llvmBridgesByCallableName[name] else {
+            return nil
+        }
+        guard arguments.count == bridge.parameterCount else {
+            throw SwiftBackendError(
+                "LLVM bridge call \(name) expects \(bridge.parameterCount) arguments, got \(arguments.count)."
+            )
+        }
+
+        let renderedArguments = try arguments.map {
+            "Int64(\(try emitExpression($0.value, scope: scope)))"
+        }.joined(separator: ", ")
+        return "Int(\(bridge.symbolName)(\(renderedArguments)))"
     }
 
     private func emitKnownCoreStorageInitializer(
