@@ -7,6 +7,7 @@ struct SwiftBackendEmitter {
         var genericParameterNames: Set<String> = []
         var constructsByName: [String: ConstructDeclaration] = [:]
         var macrosByName: [String: MacroDeclaration] = [:]
+        var callableParameterLabelsByName: [String: [[String]]] = [:]
 
         init() {}
 
@@ -24,6 +25,7 @@ struct SwiftBackendEmitter {
                 result[declaration.name] = declaration
             }
             self.macrosByName = program.macrosByName
+            self.callableParameterLabelsByName = Self.collectCallableParameterLabels(from: program)
         }
 
         private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<
@@ -68,6 +70,35 @@ struct SwiftBackendEmitter {
                 declarations.append(contentsOf: unit.declarations)
             }
             return declarations
+        }
+
+        private static func collectCallableParameterLabels(
+            from program: LoweredProgram
+        ) -> [String: [[String]]] {
+            var labelsByName: [String: [[String]]] = [:]
+
+            func record(_ callable: CallableDeclaration) {
+                let labels = callable.parameters.map(\.name)
+                labelsByName[callable.name, default: []].append(labels)
+
+                if let lastComponent = callable.name.split(separator: ".").last.map(String.init),
+                    lastComponent != callable.name
+                {
+                    labelsByName[lastComponent, default: []].append(labels)
+                }
+            }
+
+            func record(_ declaration: ConstructDeclaration) {
+                declaration.callables.forEach(record)
+                declaration.constructs.forEach(record)
+            }
+
+            program.callables.forEach(record)
+            program.units.flatMap(\.callables).forEach(record)
+            allDeclarations(in: program).forEach(record)
+            allExtensions(in: program).flatMap(\.callables).forEach(record)
+
+            return labelsByName
         }
 
         private static func allExtensions(in program: LoweredProgram) -> [ExtensionDeclaration] {
@@ -3273,10 +3304,14 @@ struct SwiftBackendEmitter {
 
     private func emitCallArgument(
         _ argument: CallArgument,
+        inferredLabel: String? = nil,
         scope: EmissionScope = .empty
     ) throws -> String {
         if let label = argument.label {
             return "\(label): \(try emitExpression(argument.value, scope: scope))"
+        }
+        if let inferredLabel {
+            return "\(inferredLabel): \(try emitExpression(argument.value, scope: scope))"
         }
         return try emitExpression(argument.value, scope: scope)
     }
@@ -3286,8 +3321,41 @@ struct SwiftBackendEmitter {
         for callee: String,
         scope: EmissionScope = .empty
     ) throws -> String {
-        _ = callee
-        return try arguments.map { try emitCallArgument($0, scope: scope) }.joined(separator: ", ")
+        let inferredLabels = inferredCallLabels(for: callee, arguments: arguments)
+        return try arguments.enumerated().map { index, argument in
+            try emitCallArgument(
+                argument,
+                inferredLabel: inferredLabels?[index],
+                scope: scope
+            )
+        }.joined(separator: ", ")
+    }
+
+    private func inferredCallLabels(
+        for callee: String,
+        arguments: [CallArgument]
+    ) -> [String]? {
+        guard !arguments.isEmpty,
+            arguments.allSatisfy({ $0.label == nil }),
+            !callableNameIsOperator(callee)
+        else {
+            return nil
+        }
+
+        let lookupName = callee.split(separator: ".").last.map(String.init) ?? callee
+        let candidates = context.callableParameterLabelsByName[callee, default: []]
+            + context.callableParameterLabelsByName[lookupName, default: []]
+        let matching = candidates.filter { $0.count == arguments.count }
+        let unique = Set(matching)
+
+        guard unique.count == 1,
+            let labels = unique.first,
+            labels.count == arguments.count
+        else {
+            return nil
+        }
+
+        return labels
     }
 
     private func emitKnownSystemCall(

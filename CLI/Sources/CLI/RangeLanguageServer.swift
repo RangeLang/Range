@@ -2405,7 +2405,6 @@ private struct ProjectNavigationIndex {
     func definition(named word: String, occurrence: SemanticTokenOccurrence?) -> DefinitionLocation? {
         if word.first?.isUppercase == true || occurrence?.type == .type {
             if declarationGraph.registryView.hasConstruct(named: word)
-                || declarationGraph.registryView.hasProtocol(named: word)
                 || declarationGraph.registryView.hasEnumeration(named: word)
             {
                 return definitionLocation(named: word, kinds: [.type])

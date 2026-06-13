@@ -60,8 +60,6 @@ enum PackageManifestLoader {
             )
         case .enumeration:
             throw ValidationError("Project.range must declare @Project construct Name { ... }.")
-        case .protocolDefinition:
-            throw ValidationError("Project.range must declare @Project construct Name { ... }.")
         case .macro:
             throw ValidationError("Project.range must declare @Project construct Name { ... }.")
         }
