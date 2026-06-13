@@ -11,7 +11,7 @@ construct IdentityCodableMacroFixture {
 
 @codable<.object>
 construct MacroOverrideCodableMacroFixture {
-    @codable("id")
+    @codable(key: "id")
     let userId: Int
 
     @codable(exclude: true)

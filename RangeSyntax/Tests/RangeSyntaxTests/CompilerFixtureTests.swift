@@ -959,10 +959,10 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/MetadataSlotTarget.range",
                 source: """
-                    macro persisted(_ prefix: String): Construct -> Void { target, diagnostics in
+                    macro persisted(prefix: String): Construct -> Void { target, diagnostics in
                     }
 
-                    @persisted("settings")
+                    @persisted(prefix: "settings")
                     construct Profile {
                         let displayName: String
                     }
@@ -974,7 +974,7 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let profile = try #require(program.declarationGraph.constructsByName["Profile"])
         #expect(profile.macros.map(\.name) == ["persisted"])
-        #expect(profile.macros.first?.argumentClause == #""settings""#)
+        #expect(profile.macros.first?.argumentClause == #"prefix : "settings""#)
     }
 
     @Test("Macro metadata values construct declared object tags")
@@ -989,7 +989,7 @@ struct CompilerFixtureTests {
                         let exclude: Bool
                     }
 
-                    macro tagProof<T>(_ key: String? = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
+                    macro tagProof<T>(key: String? = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
                         return TagProofBehavior(key: key ?? self.identifier.name, exclude: self.identifier != self.identifier)
                     }
 
@@ -1022,7 +1022,7 @@ struct CompilerFixtureTests {
 
                     @selfFiltered
                     construct Profile {
-                        @tagProof("id")
+                        @tagProof(key: "id")
                         let userId: Int
                     }
                     """,
@@ -1111,8 +1111,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/ProjectMacros.range",
                 source: """
-                    macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
-                        target.replace(with: "captured: \\(value)")
+                    macro styling(): Construct -> Void { target, diagnostics in
                     }
                     """,
                 role: .project
@@ -1123,7 +1122,11 @@ struct CompilerFixtureTests {
                 path: "/tmp/ProjectMain.range",
                 source: """
                     @main {
-                        let text: @captureText(1 + 2)
+                        let panel: Panel()
+                    }
+
+                    @styling
+                    construct Panel {
                     }
                     """,
                 role: .project
@@ -1142,15 +1145,18 @@ struct CompilerFixtureTests {
                 source: """
                     @main {
                         let messageText: message()
-                        let captured: @captureText(1 + 2)
+                        let panel: Panel()
                     }
 
                     function message(): String {
                         return "Hello"
                     }
 
-                    macro captureText(@capture<Expression> _ value: Expression): Expression -> String { target, diagnostics in
-                        target.replace(with: "captured: \\(value)")
+                    @styling
+                    construct Panel {
+                    }
+
+                    macro styling(): Construct -> Void { target, diagnostics in
                     }
                     """,
                 role: .project
@@ -1219,14 +1225,14 @@ struct CompilerFixtureTests {
                 == false)
         #expect(
             graph.constructsByName["Construct.Declaration"]?.macros.contains {
-                $0.name == "graph" && $0.argumentClause == ". declaration"
+                $0.name == "graph" && $0.argumentClause == "role : . declaration"
             } == true)
         #expect(
             graph.constructsByName["Construct.Application"]?.macros.contains { $0.name == "syntax" }
                 == false)
         #expect(
             graph.constructsByName["Construct.Application"]?.macros.contains {
-                $0.name == "graph" && $0.argumentClause == ". application"
+                $0.name == "graph" && $0.argumentClause == "role : . application"
             } == true)
         #expect(graph.constructsByName["Macro"]?.macros.contains { $0.name == "syntax" } == true)
         #expect(
@@ -1234,14 +1240,14 @@ struct CompilerFixtureTests {
                 == false)
         #expect(
             graph.constructsByName["Macro.Declaration"]?.macros.contains {
-                $0.name == "graph" && $0.argumentClause == ". declaration"
+                $0.name == "graph" && $0.argumentClause == "role : . declaration"
             } == true)
         #expect(
             graph.constructsByName["Macro.Application"]?.macros.contains { $0.name == "syntax" }
                 == false)
         #expect(
             graph.constructsByName["Macro.Application"]?.macros.contains {
-                $0.name == "graph" && $0.argumentClause == ". application"
+                $0.name == "graph" && $0.argumentClause == "role : . application"
             } == true)
     }
 
@@ -1554,7 +1560,7 @@ struct CompilerFixtureTests {
             macro codable(): Construct { target, diagnostics in
             }
 
-            macro codingKey<T>(_ value: String): Let<T> -> String { target, diagnostics in
+            macro codingKey<T>(value: String): Let<T> -> String { target, diagnostics in
                 return value
             }
 

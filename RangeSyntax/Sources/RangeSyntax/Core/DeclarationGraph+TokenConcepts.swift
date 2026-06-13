@@ -243,7 +243,7 @@ extension DeclarationGraph {
             try parser.consume(.eof)
 
             guard arguments.count == 1,
-                arguments[0].label == nil,
+                (arguments[0].label == nil || arguments[0].label == "pattern"),
                 case .string(let pattern) = arguments[0].value
             else {
                 return nil
@@ -279,7 +279,7 @@ extension DeclarationGraph {
             try parser.consume(.eof)
 
             guard arguments.count == 1,
-                arguments[0].label == nil,
+                (arguments[0].label == nil || arguments[0].label == "pairedToken"),
                 case .identifier(let name) = arguments[0].value
             else {
                 return nil
