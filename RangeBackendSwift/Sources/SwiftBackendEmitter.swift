@@ -191,7 +191,7 @@ struct SwiftBackendEmitter {
                     signatures[declaration.name, default: []].append(
                         FailableInitializerSignature(
                             constructName: declaration.name,
-                            labels: initializer.parameters.map(\.externalLabel),
+                            labels: initializer.parameters.map(\.name),
                             failureType: failureType
                         )
                     )
@@ -217,7 +217,7 @@ struct SwiftBackendEmitter {
                     signatures[declaration.targetName, default: []].append(
                         FailableInitializerSignature(
                             constructName: declaration.targetName,
-                            labels: initializer.parameters.map(\.externalLabel),
+                            labels: initializer.parameters.map(\.name),
                             failureType: failureType
                         )
                     )
@@ -243,7 +243,7 @@ struct SwiftBackendEmitter {
                     signatures[declaration.name, default: []].append(
                         FailableInitializerSignature(
                             constructName: declaration.name,
-                            labels: initializer.parameters.map(\.externalLabel),
+                            labels: initializer.parameters.map(\.name),
                             failureType: failureType
                         )
                     )
@@ -1847,8 +1847,8 @@ struct SwiftBackendEmitter {
                 })
             let arguments = forwardedParameters.map { parameter in
                 CallArgument(
-                    label: parameter.externalLabel,
-                    value: .identifier(parameter.localName)
+                    label: parameter.name,
+                    value: .identifier(parameter.name)
                 )
             }
             assignments.append(
@@ -1867,8 +1867,8 @@ struct SwiftBackendEmitter {
                 })
             let arguments = forwardedParameters.map { parameter in
                 CallArgument(
-                    label: parameter.externalLabel,
-                    value: .identifier(parameter.localName)
+                    label: parameter.name,
+                    value: .identifier(parameter.name)
                 )
             }
             assignments.append(
@@ -1967,8 +1967,7 @@ struct SwiftBackendEmitter {
             let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
             return RangeFunctionParameter(
                 macros: [],
-                localName: value.localName,
-                externalLabel: value.externalLabel ?? value.localName,
+                name: value.localName,
                 typeReference: .named(value.typeName),
                 defaultValue: defaultValue,
                 slotName: nil
@@ -1985,8 +1984,7 @@ struct SwiftBackendEmitter {
             }
             return RangeFunctionParameter(
                 macros: [],
-                localName: state.name,
-                externalLabel: state.name,
+                name: state.name,
                 typeReference: state.type,
                 defaultValue: defaultValue,
                 slotName: nil
@@ -2162,27 +2160,13 @@ struct SwiftBackendEmitter {
             throw SwiftBackendError("Swift backend requires explicit parameter types.")
         }
 
-        let local = parameter.localName
+        let local = parameter.name
         let renderedType = emitTypeName(typeReference, genericParameterNames: genericParameterNames)
         if parameter.isBinding {
-            switch parameter.externalLabel {
-            case .none:
-                return "_ \(local): __RangeBinding<\(renderedType)>"
-            case .some(let external) where external == local:
-                return "\(local): __RangeBinding<\(renderedType)>"
-            case .some(let external):
-                return "\(external) \(local): __RangeBinding<\(renderedType)>"
-            }
+            return "\(local): __RangeBinding<\(renderedType)>"
         }
 
-        switch parameter.externalLabel {
-        case .none:
-            return "_ \(local): \(renderedType)"
-        case .some(let external) where external == local:
-            return "\(local): \(renderedType)"
-        case .some(let external):
-            return "\(external) \(local): \(renderedType)"
-        }
+        return "\(local): \(renderedType)"
     }
 
     private func emitReturnClause(

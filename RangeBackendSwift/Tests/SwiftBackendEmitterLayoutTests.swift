@@ -209,12 +209,16 @@ struct SwiftBackendEmitterLayoutTests {
         """)
         let point = try pointParser.parseConstructDeclaration()
 
-        var metadataParser = try Parser(source: "construct Metadata { let title: String }")
+        var metadataParser = try Parser(source: """
+        construct Metadata {
+            let title: String
+        }
+        """)
         let metadata = try metadataParser.parseConstructDeclaration()
 
         var wrappedParser = try Parser(source: """
         construct PointWithMetadata {
-            #initForwarded
+            @initForwarded
             state point: Point
 
             let somethingElse: Metadata
