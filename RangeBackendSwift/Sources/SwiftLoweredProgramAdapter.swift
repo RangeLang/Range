@@ -9,7 +9,6 @@ struct SwiftLoweredProgramAdapter {
         .init(
             macrosByName: program.macrosByName,
             callables: program.callables.map(lower(callable:)),
-            protocols: [],
             enumerations: program.enumerations,
             declarations: program.declarations.map(lower(construct:)),
             extensions: program.extensions.map(lower(extension:)),
@@ -21,7 +20,6 @@ struct SwiftLoweredProgramAdapter {
     private func lower(sourceUnit: LoweredSourceUnit) -> LoweredSourceUnit {
         .init(
             outputFileName: sourceUnit.outputFileName,
-            protocols: [],
             enumerations: sourceUnit.enumerations,
             declarations: sourceUnit.declarations.map(lower(construct:)),
             extensions: sourceUnit.extensions.map(lower(extension:)),

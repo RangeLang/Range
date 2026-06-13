@@ -3,7 +3,6 @@ import RangeSyntax
 
 struct LoweredSourceUnit {
     let outputFileName: String
-    let protocols: [ProtocolDeclaration]
     let enumerations: [EnumDeclaration]
     let declarations: [ConstructDeclaration]
     let extensions: [ExtensionDeclaration]
@@ -14,7 +13,6 @@ struct LoweredSourceUnit {
 struct LoweredProgram {
     let macrosByName: [String: MacroDeclaration]
     let callables: [CallableDeclaration]
-    let protocols: [ProtocolDeclaration]
     let enumerations: [EnumDeclaration]
     let declarations: [ConstructDeclaration]
     let extensions: [ExtensionDeclaration]

@@ -10,7 +10,6 @@ struct SwiftBackendEmitterLayoutTests {
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [],
-                protocols: [],
                 enumerations: [],
                 declarations: [],
                 extensions: [],
@@ -49,7 +48,6 @@ struct SwiftBackendEmitterLayoutTests {
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [],
-                protocols: [],
                 enumerations: [],
                 declarations: [],
                 extensions: [],
@@ -77,7 +75,6 @@ struct SwiftBackendEmitterLayoutTests {
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [],
-                protocols: [],
                 enumerations: [],
                 declarations: [],
                 extensions: [],
@@ -116,7 +113,6 @@ struct SwiftBackendEmitterLayoutTests {
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [],
-                protocols: [],
                 enumerations: [],
                 declarations: [],
                 extensions: [],
@@ -150,7 +146,6 @@ struct SwiftBackendEmitterLayoutTests {
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [],
-                protocols: [],
                 enumerations: [],
                 declarations: [],
                 extensions: [],
@@ -181,7 +176,6 @@ struct SwiftBackendEmitterLayoutTests {
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [],
-                protocols: [],
                 enumerations: [],
                 declarations: [declaration],
                 extensions: [],
@@ -241,7 +235,6 @@ struct SwiftBackendEmitterLayoutTests {
             program: LoweredProgram(
                 macrosByName: ["initForwarded": initForwarded],
                 callables: [],
-                protocols: [],
                 enumerations: [],
                 declarations: [point, metadata, wrapped],
                 extensions: [],

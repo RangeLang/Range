@@ -4,7 +4,6 @@ import RangeSyntax
 struct SwiftBackendEmitter {
     private struct SwiftEmissionContext {
         var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
-        var failableInitializersByProtocolName: [String: [FailableInitializerSignature]] = [:]
         var genericParameterNames: Set<String> = []
         var constructsByName: [String: ConstructDeclaration] = [:]
         var macrosByName: [String: MacroDeclaration] = [:]
@@ -12,16 +11,12 @@ struct SwiftBackendEmitter {
         init() {}
 
         init(program: LoweredProgram) {
-            let protocols = Self.allProtocols(in: program)
             self.failableInitializersByConstructName = Self.collectFailableInitializers(
                 from: Self.allDeclarations(in: program)
             )
             self.failableInitializersByConstructName.merge(
                 Self.collectFailableInitializers(from: Self.allExtensions(in: program)),
                 uniquingKeysWith: { lhs, rhs in lhs + rhs }
-            )
-            self.failableInitializersByProtocolName = Self.collectFailableInitializers(
-                fromProtocols: protocols
             )
             self.genericParameterNames = Self.collectGenericParameterNames(from: program)
             self.constructsByName = Self.allDeclarations(in: program).reduce(into: [:]) {
@@ -58,12 +53,6 @@ struct SwiftBackendEmitter {
             for declaration in allDeclarations(in: program) {
                 record(declaration)
             }
-            for protocolDeclaration in program.protocols + program.units.flatMap(\.protocols) {
-                record(protocolDeclaration.genericParameters)
-                for callable in protocolDeclaration.callables {
-                    record(callable.genericParameters)
-                }
-            }
             for extensionDeclaration in allExtensions(in: program) {
                 for callable in extensionDeclaration.callables {
                     record(callable.genericParameters)
@@ -77,14 +66,6 @@ struct SwiftBackendEmitter {
             var declarations = program.declarations
             for unit in program.units {
                 declarations.append(contentsOf: unit.declarations)
-            }
-            return declarations
-        }
-
-        private static func allProtocols(in program: LoweredProgram) -> [ProtocolDeclaration] {
-            var declarations = program.protocols
-            for unit in program.units {
-                declarations.append(contentsOf: unit.protocols)
             }
             return declarations
         }
@@ -139,32 +120,6 @@ struct SwiftBackendEmitter {
                     signatures[declaration.targetName, default: []].append(
                         FailableInitializerSignature(
                             constructName: declaration.targetName,
-                            labels: initializer.parameters.map(\.name),
-                            failureType: failureType
-                        )
-                    )
-                }
-            }
-
-            return signatures
-        }
-
-        private static func collectFailableInitializers(
-            fromProtocols protocols: [ProtocolDeclaration]
-        ) -> [String: [FailableInitializerSignature]] {
-            var signatures: [String: [FailableInitializerSignature]] = [:]
-
-            for declaration in protocols {
-                for initializer in declaration.initializers {
-                    guard let returnType = initializer.returnType,
-                        let failureType = resultSelfFailureType(returnType)
-                    else {
-                        continue
-                    }
-
-                    signatures[declaration.name, default: []].append(
-                        FailableInitializerSignature(
-                            constructName: declaration.name,
                             labels: initializer.parameters.map(\.name),
                             failureType: failureType
                         )
@@ -299,7 +254,6 @@ struct SwiftBackendEmitter {
             .filter { $0.targetType == nil }
             .map(emitFunction)
             .joined(separator: "\n\n")
-        let protocols = try program.protocols.map(emitProtocol).joined(separator: "\n\n")
         let enumerations = try program.enumerations.map(emitEnum).joined(separator: "\n\n")
         let declarations = try program.declarations.map(emitConstruct).joined(separator: "\n\n")
         let extensions = try program.extensions.map(emitExtension).joined(separator: "\n\n")
@@ -308,7 +262,6 @@ struct SwiftBackendEmitter {
 
         let sections = [
             emitRuntimeSupport(includeFoundationImport: false),
-            protocols,
             enumerations,
             declarations,
             extensions,
@@ -1297,11 +1250,6 @@ struct SwiftBackendEmitter {
     private func emitSourceUnit(_ unit: LoweredSourceUnit) throws -> String {
         var sections: [String] = []
 
-        let protocols = try unit.protocols.map(emitProtocol).joined(separator: "\n\n")
-        if !protocols.isEmpty {
-            sections.append(protocols)
-        }
-
         let enumerations = try unit.enumerations.map(emitEnum).joined(separator: "\n\n")
         if !enumerations.isEmpty {
             sections.append(enumerations)
@@ -1394,53 +1342,6 @@ struct SwiftBackendEmitter {
         )
 
         return indentBlock(try emitFunction(callable), level: indent)
-    }
-
-    private func emitProtocol(_ declaration: ProtocolDeclaration) throws -> String {
-        let genericClause = emitProtocolPrimaryAssociatedTypeClause(declaration.genericParameters)
-        let genericParameterNames = genericParameterNames(declaration.genericParameters)
-        let associatedTypeRequirements = declaration.genericParameters.compactMap {
-            emitAssociatedTypeRequirement($0, genericParameterNames: genericParameterNames)
-        }.joined(separator: "\n")
-        let valueRequirements = declaration.values.map {
-            "var \($0.name): \(emitDeclaredTypeName($0.typeName, genericParameterNames: genericParameterNames)) { get }"
-        }.joined(separator: "\n")
-        let stateRequirements = declaration.states.map {
-            "var \($0.name): \(emitTypeName($0.type, genericParameterNames: genericParameterNames)) { get set }"
-        }.joined(separator: "\n")
-        let bindingRequirements = declaration.bindings.map {
-            "var \($0.name): \(emitDeclaredTypeName($0.typeName, genericParameterNames: genericParameterNames)) { get set }"
-        }.joined(separator: "\n")
-        let initializerRequirements = try declaration.initializers.map {
-            try emitInitializerRequirement($0, genericParameterNames: genericParameterNames)
-        }.joined(separator: "\n")
-        let callableRequirements = try declaration.callables.map {
-            try emitCallableRequirement(
-                $0,
-                enclosingProtocolName: declaration.name,
-                enclosingGenericParameterNames: genericParameterNames
-            )
-        }.joined(separator: "\n")
-
-        let memberSections = [
-            associatedTypeRequirements,
-            valueRequirements,
-            stateRequirements,
-            bindingRequirements,
-            initializerRequirements,
-            callableRequirements,
-        ].filter { !$0.isEmpty }
-
-        if memberSections.isEmpty {
-            return
-                "protocol \(emitSwiftSymbolName(declaration.name))\(genericClause) {}"
-        }
-
-        return """
-            protocol \(emitSwiftSymbolName(declaration.name))\(genericClause) {
-            \(indentBlock(memberSections.joined(separator: "\n"), level: 1))
-            }
-            """
     }
 
     private func emitEnum(_ declaration: EnumDeclaration) throws -> String {
@@ -2105,85 +2006,6 @@ struct SwiftBackendEmitter {
 
         guard !rendered.isEmpty else { return "" }
         return "<\(rendered.joined(separator: ", "))>"
-    }
-
-    private func emitProtocolPrimaryAssociatedTypeClause(_ parameters: [GenericParameter]) -> String
-    {
-        let names = parameters.compactMap { parameter -> String? in
-            guard case .type(let name, _, _) = parameter else {
-                return nil
-            }
-            return name
-        }
-
-        guard !names.isEmpty else { return "" }
-        return "<\(names.joined(separator: ", "))>"
-    }
-
-    private func emitAssociatedTypeRequirement(
-        _ parameter: GenericParameter,
-        genericParameterNames: Set<String>
-    ) -> String? {
-        guard case .type(let name, let constraint, _) = parameter else {
-            return nil
-        }
-
-        if let constraint {
-            return
-                "associatedtype \(name): \(emitTypeName(constraint, genericParameterNames: genericParameterNames))"
-        }
-
-        return "associatedtype \(name)"
-    }
-
-    private func emitInitializerRequirement(
-        _ initializer: InitializerDeclaration,
-        genericParameterNames: Set<String> = []
-    ) throws -> String {
-        let parameters = try initializer.parameters.map {
-            try emitParameter($0, genericParameterNames: genericParameterNames)
-        }.joined(separator: ", ")
-        let throwsClause = isFailableInitializerReturnType(initializer.returnType) ? " throws" : ""
-        return "init(\(parameters))\(throwsClause)"
-    }
-
-    private func emitCallableRequirement(
-        _ callable: CallableDeclaration,
-        enclosingProtocolName: String,
-        enclosingGenericParameterNames: Set<String> = []
-    ) throws -> String {
-        let genericClause = emitGenericClause(
-            callable.genericParameters,
-            inheritedGenericParameterNames: enclosingGenericParameterNames
-        )
-        let genericParameterNames = enclosingGenericParameterNames.union(
-            genericParameterNames(callable.genericParameters)
-        )
-        let parameters = try callable.parameters.map {
-            try emitParameter($0, genericParameterNames: genericParameterNames)
-        }.joined(separator: ", ")
-        let returnClause = try emitReturnClause(
-            callable.returnType,
-            genericParameterNames: genericParameterNames
-        )
-        let isStatic = callableShouldEmitStatic(callable)
-        let mutatingPrefix =
-            !isStatic
-                && protocolRequirementNeedsMutation(
-                    callable,
-                    enclosingProtocolName: enclosingProtocolName
-                ) ? "mutating " : ""
-        let staticPrefix = isStatic ? "static " : ""
-        return
-            "\(staticPrefix)\(mutatingPrefix)func \(callable.name)\(genericClause)(\(parameters))\(returnClause)"
-    }
-
-    private func protocolRequirementNeedsMutation(
-        _ callable: CallableDeclaration,
-        enclosingProtocolName: String
-    ) -> Bool {
-        _ = callable
-        return enclosingProtocolName.contains("EncodingContainer")
     }
 
     private func genericParameterNames(_ parameters: [GenericParameter]) -> Set<String> {
@@ -4037,45 +3859,12 @@ struct SwiftBackendEmitter {
         scope: EmissionScope = .empty
     ) -> FailableInitializerSignature? {
         let constructName = constructorConstructName(from: name)
-        if context.genericParameterNames.contains(constructName),
-            let signature = genericFailableInitializerSignature(
-                forGenericParameter: constructName,
-                arguments: arguments,
-                scope: scope
-            )
-        {
-            return FailableInitializerSignature(
-                constructName: constructName,
-                labels: signature.labels,
-                failureType: signature.failureType
-            )
-        }
+        _ = scope
         guard let signatures = context.failableInitializersByConstructName[constructName] else {
             return nil
         }
 
         return matchingFailableInitializer(in: signatures, arguments: arguments)
-    }
-
-    private func genericFailableInitializerSignature(
-        forGenericParameter name: String,
-        arguments: [CallArgument],
-        scope: EmissionScope = .empty
-    ) -> FailableInitializerSignature? {
-        let matches = scope.genericParameterConstraintsByName[name, default: []].compactMap {
-            constraint -> FailableInitializerSignature? in
-            guard let constraintName = nominalTypeName(constraint),
-                let signatures = context.failableInitializersByProtocolName[constraintName]
-            else {
-                return nil
-            }
-            return matchingFailableInitializer(in: signatures, arguments: arguments)
-        }
-
-        guard matches.count == 1 else {
-            return nil
-        }
-        return matches[0]
     }
 
     private func matchingFailableInitializer(
