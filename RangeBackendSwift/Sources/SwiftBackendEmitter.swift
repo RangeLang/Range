@@ -1669,10 +1669,6 @@ struct SwiftBackendEmitter {
     private func emitProtocol(_ declaration: ProtocolDeclaration) throws -> String {
         let genericClause = emitProtocolPrimaryAssociatedTypeClause(declaration.genericParameters)
         let genericParameterNames = genericParameterNames(declaration.genericParameters)
-        let conformanceClause = emitConformanceClause(
-            declaration.conformances,
-            genericParameterNames: genericParameterNames
-        )
         let associatedTypeRequirements = declaration.genericParameters.compactMap {
             emitAssociatedTypeRequirement($0, genericParameterNames: genericParameterNames)
         }.joined(separator: "\n")
@@ -1707,11 +1703,11 @@ struct SwiftBackendEmitter {
 
         if memberSections.isEmpty {
             return
-                "protocol \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {}"
+                "protocol \(emitSwiftSymbolName(declaration.name))\(genericClause) {}"
         }
 
         return """
-            protocol \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {
+            protocol \(emitSwiftSymbolName(declaration.name))\(genericClause) {
             \(indentBlock(memberSections.joined(separator: "\n"), level: 1))
             }
             """
@@ -1753,16 +1749,6 @@ struct SwiftBackendEmitter {
         let bindingNames = Set(declaration.bindings.map(\.name))
         let isReferenceType = !declaration.states.isEmpty || !declaration.bindings.isEmpty
         let typeKeyword = isReferenceType ? "final class" : "struct"
-        let conformanceClause = emitConformanceClause(
-            declaration.conformances,
-            genericParameterNames: genericParameterNames
-        )
-        let conformanceAssociatedTypeAliases = declaration.conformances.compactMap {
-            emitConformanceAssociatedTypeAlias(
-                $0,
-                genericParameterNames: genericParameterNames
-            )
-        }.joined(separator: "\n")
         let storedValues = try storedValueEmissionOrder(for: declaration).map {
             try emitStoredValue($0, genericParameterNames: genericParameterNames)
         }.joined(separator: "\n")
@@ -1803,7 +1789,6 @@ struct SwiftBackendEmitter {
             .joined(separator: "\n\n")
 
         let memberSections = [
-            conformanceAssociatedTypeAliases,
             storedValues,
             storedStates,
             storedBindings,
@@ -1815,12 +1800,12 @@ struct SwiftBackendEmitter {
 
         if memberSections.isEmpty {
             return
-                "\(typeKeyword) \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {\n}"
+                "\(typeKeyword) \(emitSwiftSymbolName(declaration.name))\(genericClause) {\n}"
         }
 
         let body = memberSections.joined(separator: "\n\n")
         return """
-            \(typeKeyword) \(emitSwiftSymbolName(declaration.name))\(genericClause)\(conformanceClause) {
+            \(typeKeyword) \(emitSwiftSymbolName(declaration.name))\(genericClause) {
             \(indentBlock(body, level: 1))
             }
             """
@@ -2090,12 +2075,10 @@ struct SwiftBackendEmitter {
         guard declaration.usesSpecializedTarget,
             case .generic(let base, let arguments) = declaration.targetType
         else {
-            return
-                "extension \(emitTypeName(declaration.targetType))\(emitConformanceClause(declaration.conformances))"
+            return "extension \(emitTypeName(declaration.targetType))"
         }
 
         let target = emitTypeName(base)
-        let conformanceClause = emitConformanceClause(declaration.conformances)
         let genericParameterNames = extensionGenericParameterNames(in: declaration)
         var constraints: [String] = []
         let baseGenericNames = extensionBaseGenericNames(for: base, argumentCount: arguments.count)
@@ -2123,7 +2106,7 @@ struct SwiftBackendEmitter {
         }
 
         let whereClause = constraints.isEmpty ? "" : " where \(constraints.joined(separator: ", "))"
-        return "extension \(target)\(conformanceClause)\(whereClause)"
+        return "extension \(target)\(whereClause)"
     }
 
     private func extensionGenericParameterNames(in declaration: ExtensionDeclaration) -> Set<String>
@@ -2392,45 +2375,6 @@ struct SwiftBackendEmitter {
 
         guard !rendered.isEmpty else { return "" }
         return "<\(rendered.joined(separator: ", "))>"
-    }
-
-    private func emitConformanceClause(
-        _ conformances: [TypeReference],
-        genericParameterNames: Set<String> = []
-    ) -> String {
-        guard !conformances.isEmpty else { return "" }
-        let rendered = conformances.map {
-            emitConformanceTypeName($0, genericParameterNames: genericParameterNames)
-        }.joined(separator: ", ")
-        return ": \(rendered)"
-    }
-
-    private func emitConformanceTypeName(
-        _ typeReference: TypeReference,
-        genericParameterNames: Set<String> = []
-    ) -> String {
-        switch typeReference {
-        case .generic(let base, _):
-            return emitTypeName(base, genericParameterNames: genericParameterNames)
-        default:
-            return emitTypeName(typeReference, genericParameterNames: genericParameterNames)
-        }
-    }
-
-    private func emitConformanceAssociatedTypeAlias(
-        _ typeReference: TypeReference,
-        genericParameterNames: Set<String>
-    ) -> String? {
-        switch typeReference {
-        case .generic(.named("Encoder"), let arguments) where arguments.count == 1:
-            return
-                "typealias Output = \(emitTypeName(arguments[0], genericParameterNames: genericParameterNames))"
-        case .generic(.named("Decoder"), let arguments) where arguments.count == 1:
-            return
-                "typealias Input = \(emitTypeName(arguments[0], genericParameterNames: genericParameterNames))"
-        default:
-            return nil
-        }
     }
 
     private func emitProtocolPrimaryAssociatedTypeClause(_ parameters: [GenericParameter]) -> String
