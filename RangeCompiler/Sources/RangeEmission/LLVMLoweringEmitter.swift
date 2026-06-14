@@ -107,6 +107,8 @@ private extension LLVMLowerability.ScalarType {
             return "i64"
         case .bool:
             return "i1"
+        case .float:
+            return "double"
         }
     }
 }
@@ -178,10 +180,11 @@ private struct LLVMFunctionEmitter {
             try emitConditional(branches)
         case .return(let expression?):
             let value = try emitExpression(expression)
-            guard value.type == returnType.llvmType else {
+            let converted = try convert(value, to: returnType)
+            guard converted.type == returnType.llvmType else {
                 throw LLVMLoweringError("LLVM return value must be \(returnType.llvmType).")
             }
-            emit("ret \(returnType.llvmType) \(value.representation)")
+            emit("ret \(returnType.llvmType) \(converted.representation)")
             blockTerminated = true
         case .return(nil):
             throw LLVMLoweringError("LLVM lowering does not support bare return.")
@@ -203,14 +206,15 @@ private struct LLVMFunctionEmitter {
 
     private mutating func emitLocalBinding(_ declaration: LocalBindingDeclaration) throws {
         guard let scalarType = ScalarType(typeReference: declaration.type) else {
-            throw LLVMLoweringError("LLVM local binding '\(declaration.name)' must be Int or Bool.")
+            throw LLVMLoweringError("LLVM local binding '\(declaration.name)' must be Int, Bool, or Float.")
         }
         guard symbols[declaration.name] == nil else {
             throw LLVMLoweringError("LLVM local binding '\(declaration.name)' is already declared.")
         }
 
         let value = try emitExpression(declaration.expression)
-        guard value.type == scalarType.llvmType else {
+        let converted = try convert(value, to: scalarType)
+        guard converted.type == scalarType.llvmType else {
             throw LLVMLoweringError(
                 "LLVM local binding initializer must be \(scalarType.llvmType)."
             )
@@ -218,7 +222,7 @@ private struct LLVMFunctionEmitter {
 
         let pointer = "%\(declaration.name).addr"
         emit("\(pointer) = alloca \(scalarType.llvmType)")
-        emit("store \(scalarType.llvmType) \(value.representation), ptr \(pointer)")
+        emit("store \(scalarType.llvmType) \(converted.representation), ptr \(pointer)")
         symbols[declaration.name] = .stackSlot(
             pointer: pointer,
             type: scalarType,
@@ -240,10 +244,11 @@ private struct LLVMFunctionEmitter {
         }
 
         let value = try emitExpression(expression)
-        guard value.type == type.llvmType else {
+        let converted = try convert(value, to: type)
+        guard converted.type == type.llvmType else {
             throw LLVMLoweringError("LLVM assignment value must be \(type.llvmType).")
         }
-        emit("store \(type.llvmType) \(value.representation), ptr \(pointer)")
+        emit("store \(type.llvmType) \(converted.representation), ptr \(pointer)")
     }
 
     private mutating func emitWhileLoop(
@@ -343,6 +348,8 @@ private struct LLVMFunctionEmitter {
         switch expression {
         case .integer(let value):
             return Value(type: "i64", representation: String(value))
+        case .double(let value):
+            return Value(type: "double", representation: String(value))
         case .boolean(let value):
             return Value(type: "i1", representation: value ? "1" : "0")
         case .identifier(let name):
@@ -368,17 +375,16 @@ private struct LLVMFunctionEmitter {
         case .binary(let lhs, let operatorSymbol, let rhs):
             let lhsValue = try emitExpression(lhs)
             let rhsValue = try emitExpression(rhs)
-            let instruction = try llvmInstruction(for: operatorSymbol)
-            guard lhsValue.type == instruction.operandType,
-                rhsValue.type == instruction.operandType
-            else {
-                throw LLVMLoweringError(
-                    "LLVM \(operatorSymbol.rawValue) operands must be \(instruction.operandType)."
-                )
-            }
+            let instruction = try llvmInstruction(
+                for: operatorSymbol,
+                lhsType: lhsValue.type,
+                rhsType: rhsValue.type
+            )
+            let convertedLHS = try convert(value: lhsValue, toLLVMType: instruction.operandType)
+            let convertedRHS = try convert(value: rhsValue, toLLVMType: instruction.operandType)
             let register = freshRegister()
             emit(
-                "\(register) = \(instruction.mnemonic) \(instruction.operandType) \(lhsValue.representation), \(rhsValue.representation)"
+                "\(register) = \(instruction.mnemonic) \(instruction.operandType) \(convertedLHS.representation), \(convertedRHS.representation)"
             )
             return Value(type: instruction.resultType, representation: register)
         case .call(let name, let arguments):
@@ -389,15 +395,18 @@ private struct LLVMFunctionEmitter {
             guard argumentValues.count == callable.signature.parameters.count else {
                 throw LLVMLoweringError("LLVM lowered call '\(name)' has wrong argument count.")
             }
-            for (argumentValue, parameterType) in zip(argumentValues, callable.signature.parameters) {
-                guard argumentValue.type == parameterType.llvmType else {
+            let convertedArguments = try zip(argumentValues, callable.signature.parameters).map {
+                argumentValue, parameterType in
+                let converted = try convert(argumentValue, to: parameterType)
+                guard converted.type == parameterType.llvmType else {
                     throw LLVMLoweringError(
                         "LLVM lowered call '\(name)' argument must be \(parameterType.llvmType)."
                     )
                 }
+                return converted
             }
             let register = freshRegister()
-            let argumentsText = zip(argumentValues, callable.signature.parameters)
+            let argumentsText = zip(convertedArguments, callable.signature.parameters)
                 .map { argumentValue, parameterType in
                     "\(parameterType.llvmType) \(argumentValue.representation)"
                 }
@@ -436,39 +445,145 @@ private struct LLVMFunctionEmitter {
         return nextLabel
     }
 
-    private func llvmInstruction(for operatorSymbol: BinaryOperator) throws -> (
+    private mutating func convert(_ value: Value, to scalarType: ScalarType) throws -> Value {
+        try convert(value: value, toLLVMType: scalarType.llvmType)
+    }
+
+    private mutating func convert(value: Value, toLLVMType llvmType: String) throws -> Value {
+        if value.type == llvmType {
+            return value
+        }
+        if value.type == "i64", llvmType == "double" {
+            let register = freshRegister()
+            emit("\(register) = sitofp i64 \(value.representation) to double")
+            return Value(type: "double", representation: register)
+        }
+        return value
+    }
+
+    private func llvmInstruction(
+        for operatorSymbol: BinaryOperator,
+        lhsType: String,
+        rhsType: String
+    ) throws -> (
         mnemonic: String, operandType: String, resultType: String
     ) {
         switch operatorSymbol {
-        case .addition:
-            return ("add", "i64", "i64")
-        case .subtraction:
-            return ("sub", "i64", "i64")
-        case .multiplication:
-            return ("mul", "i64", "i64")
-        case .division:
-            return ("sdiv", "i64", "i64")
+        case .addition, .subtraction, .multiplication, .division:
+            if lhsType == "double" || rhsType == "double" {
+                return (floatArithmeticMnemonic(for: operatorSymbol), "double", "double")
+            }
+            guard lhsType == "i64", rhsType == "i64" else {
+                throw LLVMLoweringError(
+                    "LLVM \(operatorSymbol.rawValue) operands must be numeric.")
+            }
+            return (intArithmeticMnemonic(for: operatorSymbol), "i64", "i64")
         case .remainder:
+            guard lhsType == "i64", rhsType == "i64" else {
+                throw LLVMLoweringError("LLVM % operands must be i64.")
+            }
             return ("srem", "i64", "i64")
-        case .equal:
-            return ("icmp eq", "i64", "i1")
-        case .notEqual:
-            return ("icmp ne", "i64", "i1")
-        case .less:
-            return ("icmp slt", "i64", "i1")
-        case .lessEqual:
-            return ("icmp sle", "i64", "i1")
-        case .greater:
-            return ("icmp sgt", "i64", "i1")
-        case .greaterEqual:
-            return ("icmp sge", "i64", "i1")
+        case .equal, .notEqual:
+            if lhsType == "double" || rhsType == "double" {
+                return (floatComparisonMnemonic(for: operatorSymbol), "double", "i1")
+            }
+            if lhsType == "i64", rhsType == "i64" {
+                return (intComparisonMnemonic(for: operatorSymbol), "i64", "i1")
+            }
+            if lhsType == "i1", rhsType == "i1" {
+                return (intComparisonMnemonic(for: operatorSymbol), "i1", "i1")
+            }
+            throw LLVMLoweringError("LLVM \(operatorSymbol.rawValue) operands must match.")
+        case .less, .lessEqual, .greater, .greaterEqual:
+            if lhsType == "double" || rhsType == "double" {
+                return (floatComparisonMnemonic(for: operatorSymbol), "double", "i1")
+            }
+            guard lhsType == "i64", rhsType == "i64" else {
+                throw LLVMLoweringError(
+                    "LLVM \(operatorSymbol.rawValue) operands must be numeric.")
+            }
+            return (intComparisonMnemonic(for: operatorSymbol), "i64", "i1")
         case .and:
+            guard lhsType == "i1", rhsType == "i1" else {
+                throw LLVMLoweringError("LLVM && operands must be i1.")
+            }
             return ("and", "i1", "i1")
         case .or:
+            guard lhsType == "i1", rhsType == "i1" else {
+                throw LLVMLoweringError("LLVM || operands must be i1.")
+            }
             return ("or", "i1", "i1")
         case .nilCoalescing:
             throw LLVMLoweringError(
                 "LLVM lowering does not support operator '\(operatorSymbol.rawValue)' yet.")
+        }
+    }
+
+    private func intArithmeticMnemonic(for operatorSymbol: BinaryOperator) -> String {
+        switch operatorSymbol {
+        case .addition:
+            return "add"
+        case .subtraction:
+            return "sub"
+        case .multiplication:
+            return "mul"
+        case .division:
+            return "sdiv"
+        default:
+            return ""
+        }
+    }
+
+    private func floatArithmeticMnemonic(for operatorSymbol: BinaryOperator) -> String {
+        switch operatorSymbol {
+        case .addition:
+            return "fadd"
+        case .subtraction:
+            return "fsub"
+        case .multiplication:
+            return "fmul"
+        case .division:
+            return "fdiv"
+        default:
+            return ""
+        }
+    }
+
+    private func intComparisonMnemonic(for operatorSymbol: BinaryOperator) -> String {
+        switch operatorSymbol {
+        case .equal:
+            return "icmp eq"
+        case .notEqual:
+            return "icmp ne"
+        case .less:
+            return "icmp slt"
+        case .lessEqual:
+            return "icmp sle"
+        case .greater:
+            return "icmp sgt"
+        case .greaterEqual:
+            return "icmp sge"
+        default:
+            return ""
+        }
+    }
+
+    private func floatComparisonMnemonic(for operatorSymbol: BinaryOperator) -> String {
+        switch operatorSymbol {
+        case .equal:
+            return "fcmp oeq"
+        case .notEqual:
+            return "fcmp one"
+        case .less:
+            return "fcmp olt"
+        case .lessEqual:
+            return "fcmp ole"
+        case .greater:
+            return "fcmp ogt"
+        case .greaterEqual:
+            return "fcmp oge"
+        default:
+            return ""
         }
     }
 

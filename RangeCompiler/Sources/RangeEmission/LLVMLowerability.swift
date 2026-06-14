@@ -9,6 +9,7 @@ enum LLVMLowerability {
     enum ScalarType {
         case int
         case bool
+        case float
 
         init?(typeReference: TypeReference) {
             switch typeReference.displayName {
@@ -16,6 +17,8 @@ enum LLVMLowerability {
                 self = .int
             case "Bool":
                 self = .bool
+            case "Float":
+                self = .float
             default:
                 return nil
             }
@@ -90,26 +93,20 @@ enum LLVMLowerability {
 
             switch statement {
             case .localBinding(let declaration):
-                guard let type = ScalarType(typeReference: declaration.type),
-                    canLower(
-                        declaration.expression,
-                        locals: locals,
-                        lowerableFunctionSignatures: lowerableFunctionSignatures
-                    ) == type
-                else {
+                guard canLowerLocalBinding(
+                    declaration,
+                    locals: &locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
                     return false
                 }
-                locals[declaration.name] = type
             case .assignment(let target, let expression):
-                guard case .local(let name) = target,
-                    let type = locals[name],
-                    canLower(
-                        expression,
-                        locals: locals,
-                        lowerableFunctionSignatures: lowerableFunctionSignatures
-                    )
-                        == type
-                else {
+                guard canLowerAssignment(
+                    target: target,
+                    expression: expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
                     return false
                 }
             case .whileLoop(let condition, let body):
@@ -117,9 +114,7 @@ enum LLVMLowerability {
                     condition,
                     locals: locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures
-                )
-                    == .bool
-                else {
+                ) == .bool else {
                     return false
                 }
                 var bodyLocals = locals
@@ -148,13 +143,14 @@ enum LLVMLowerability {
                     sawReturn = true
                 }
             case .return(let expression?):
-                guard canLower(
-                    expression,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
-                )
-                    == returnType
-                else {
+                guard canConvert(
+                    canLower(
+                        expression,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures
+                    ),
+                    to: returnType
+                ) else {
                     return false
                 }
                 sawReturn = true
@@ -176,26 +172,20 @@ enum LLVMLowerability {
         for statement in statements {
             switch statement {
             case .localBinding(let declaration):
-                guard let type = ScalarType(typeReference: declaration.type),
-                    canLower(
-                        declaration.expression,
-                        locals: locals,
-                        lowerableFunctionSignatures: lowerableFunctionSignatures
-                    ) == type
-                else {
+                guard canLowerLocalBinding(
+                    declaration,
+                    locals: &locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
                     return false
                 }
-                locals[declaration.name] = type
             case .assignment(let target, let expression):
-                guard case .local(let name) = target,
-                    let type = locals[name],
-                    canLower(
-                        expression,
-                        locals: locals,
-                        lowerableFunctionSignatures: lowerableFunctionSignatures
-                    )
-                        == type
-                else {
+                guard canLowerAssignment(
+                    target: target,
+                    expression: expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
                     return false
                 }
             case .whileLoop(let condition, let body):
@@ -203,9 +193,7 @@ enum LLVMLowerability {
                     condition,
                     locals: locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures
-                )
-                    == .bool
-                else {
+                ) == .bool else {
                     return false
                 }
                 var nestedLocals = locals
@@ -236,6 +224,49 @@ enum LLVMLowerability {
         return true
     }
 
+    private static func canLowerLocalBinding(
+        _ declaration: LocalBindingDeclaration,
+        locals: inout [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> Bool {
+        guard let type = ScalarType(typeReference: declaration.type),
+            canConvert(
+                canLower(
+                    declaration.expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ),
+                to: type
+            )
+        else {
+            return false
+        }
+        locals[declaration.name] = type
+        return true
+    }
+
+    private static func canLowerAssignment(
+        target: AssignmentTarget,
+        expression: Expression,
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> Bool {
+        guard case .local(let name) = target,
+            let type = locals[name],
+            canConvert(
+                canLower(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ),
+                to: type
+            )
+        else {
+            return false
+        }
+        return true
+    }
+
     private static func canLowerConditional(
         _ branches: [StatementConditionalBranch],
         returnType: ScalarType,
@@ -252,8 +283,7 @@ enum LLVMLowerability {
                     condition,
                     locals: locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures
-                )
-                    != .bool
+                ) != .bool
             {
                 return false
             }
@@ -307,6 +337,8 @@ enum LLVMLowerability {
         switch expression {
         case .integer:
             return .int
+        case .double:
+            return .float
         case .boolean:
             return .bool
         case .identifier(let name):
@@ -316,11 +348,14 @@ enum LLVMLowerability {
                 arguments.count == signature.parameters.count,
                 zip(arguments, signature.parameters).allSatisfy({
                     argument, parameterType in
-                    canLower(
-                        argument.value,
-                        locals: locals,
-                        lowerableFunctionSignatures: lowerableFunctionSignatures
-                    ) == parameterType
+                    canConvert(
+                        canLower(
+                            argument.value,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures
+                        ),
+                        to: parameterType
+                    )
                 })
             else {
                 return nil
@@ -336,52 +371,68 @@ enum LLVMLowerability {
             }
             return .bool
         case .binary(let lhs, let operatorSymbol, let rhs):
-            guard let operandType = operandType(for: operatorSymbol),
-                canLower(
-                    lhs,
-                    locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
-                )
-                    == operandType,
-                canLower(
+            guard let lhsType = canLower(
+                lhs,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ),
+                let rhsType = canLower(
                     rhs,
                     locals: locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures
                 )
-                    == operandType
             else {
                 return nil
             }
-            return resultType(for: operatorSymbol)
-        case .double, .string, .interpolatedString, .nilLiteral, .macroInvocation, .block,
+            return resultType(for: operatorSymbol, lhs: lhsType, rhs: rhsType)
+        case .string, .interpolatedString, .nilLiteral, .macroInvocation, .block,
             .bindingReference, .array, .dictionary, .ternary:
             return nil
         }
     }
 
-    private static func operandType(for operatorSymbol: BinaryOperator) -> ScalarType? {
+    private static func canConvert(_ actual: ScalarType?, to expected: ScalarType) -> Bool {
+        guard let actual else {
+            return false
+        }
+        return actual == expected || (actual == .int && expected == .float)
+    }
+
+    private static func resultType(
+        for operatorSymbol: BinaryOperator,
+        lhs: ScalarType,
+        rhs: ScalarType
+    ) -> ScalarType? {
         switch operatorSymbol {
-        case .addition, .subtraction, .multiplication, .division, .remainder:
-            return .int
-        case .equal, .notEqual, .less, .lessEqual, .greater, .greaterEqual:
-            return .int
+        case .addition, .subtraction, .multiplication, .division:
+            guard lhs.isNumeric, rhs.isNumeric else {
+                return nil
+            }
+            return lhs == .float || rhs == .float ? .float : .int
+        case .remainder:
+            return lhs == .int && rhs == .int ? .int : nil
+        case .equal, .notEqual:
+            if lhs == rhs {
+                return .bool
+            }
+            return lhs.isNumeric && rhs.isNumeric ? .bool : nil
+        case .less, .lessEqual, .greater, .greaterEqual:
+            return lhs.isNumeric && rhs.isNumeric ? .bool : nil
         case .and, .or:
-            return .bool
+            return lhs == .bool && rhs == .bool ? .bool : nil
         case .nilCoalescing:
             return nil
         }
     }
+}
 
-    private static func resultType(for operatorSymbol: BinaryOperator) -> ScalarType? {
-        switch operatorSymbol {
-        case .addition, .subtraction, .multiplication, .division, .remainder:
-            return .int
-        case .equal, .notEqual, .less, .lessEqual, .greater, .greaterEqual:
-            return .bool
-        case .and, .or:
-            return .bool
-        case .nilCoalescing:
-            return nil
+private extension LLVMLowerability.ScalarType {
+    var isNumeric: Bool {
+        switch self {
+        case .int, .float:
+            return true
+        case .bool:
+            return false
         }
     }
 }

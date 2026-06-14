@@ -152,6 +152,72 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("sub i64 10, %value"))
     }
 
+    @Test("Float arithmetic lowers to LLVM double operations")
+    func floatArithmeticLowersToLLVMDoubleOperations() throws {
+        let callable = try parseCallable(
+            """
+            function blend(lhs: Float, rhs: Float): Float {
+                let adjusted: Float(lhs + rhs * 2.0)
+                return adjusted / 3.0
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define double @RangeLLVM_blend(double %lhs, double %rhs)"))
+        #expect(module.ir.contains("fmul double %rhs, 2.0"))
+        #expect(module.ir.contains("fadd double %lhs"))
+        #expect(module.ir.contains("%adjusted.addr = alloca double"))
+        #expect(module.ir.contains("fdiv double"))
+        #expect(module.ir.contains("ret double"))
+    }
+
+    @Test("Mixed Int and Float operands lower through LLVM promotion")
+    func mixedIntAndFloatOperandsLowerThroughLLVMPromotion() throws {
+        let callable = try parseCallable(
+            """
+            function mixed(lhs: Float, rhs: Int): Float {
+                return lhs + rhs
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define double @RangeLLVM_mixed(double %lhs, i64 %rhs)"))
+        #expect(module.ir.contains("sitofp i64 %rhs to double"))
+        #expect(module.ir.contains("fadd double %lhs"))
+        #expect(module.ir.contains("ret double"))
+    }
+
+    @Test("Float comparison lowers to LLVM ordered comparison")
+    func floatComparisonLowersToLLVMOrderedComparison() throws {
+        let callable = try parseCallable(
+            """
+            function floatLess(lhs: Float, rhs: Int): Bool {
+                return lhs < rhs
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i1 @RangeLLVM_floatLess(double %lhs, i64 %rhs)"))
+        #expect(module.ir.contains("sitofp i64 %rhs to double"))
+        #expect(module.ir.contains("fcmp olt double %lhs"))
+        #expect(module.ir.contains("ret i1"))
+    }
+
     @Test("Int comparison can return Bool through LLVM")
     func intComparisonCanReturnBoolThroughLLVM() throws {
         let callable = try parseCallable(
@@ -642,6 +708,67 @@ struct LLVMLoweringEmitterTests {
         #expect(ir.contains("define i64 @RangeLLVM_choose(i1 %flag, i64 %value)"))
     }
 
+    @Test("Swift workspace emission bridges Float LLVM calls")
+    func swiftWorkspaceEmissionBridgesFloatLLVMCalls() throws {
+        let source = try parseModule(
+            """
+            function mixed(lhs: Float, rhs: Int): Float {
+                return lhs + rhs
+            }
+
+            @main {
+                mixed(lhs: 1.5, rhs: 2)
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMFloatBridgeTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Main.swift",
+                        enumerations: source.enumerations,
+                        declarations: source.constructs,
+                        extensions: source.extensions,
+                        callables: source.callables,
+                        mainBlock: source.mainBlock
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let runtime = try String(
+            contentsOf: root.appendingPathComponent("Sources/Runtime.swift"),
+            encoding: .utf8
+        )
+        let main = try String(
+            contentsOf: root.appendingPathComponent("Sources/Main.swift"),
+            encoding: .utf8
+        )
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+
+        #expect(runtime.contains("func RangeLLVM_mixed(_ argument0: Double, _ argument1: Int64) -> Double"))
+        #expect(main.contains("RangeLLVM_mixed(Double(1.5), Int64(2))"))
+        #expect(ir.contains("define double @RangeLLVM_mixed(double %lhs, i64 %rhs)"))
+        #expect(ir.contains("sitofp i64 %rhs to double"))
+        #expect(!main.contains("func mixed"))
+    }
+
     @Test("Mixed scalar calls between LLVM functions stay in LLVM")
     func mixedScalarCallsBetweenLLVMFunctionsStayInLLVM() throws {
         let module = try parseModule(
@@ -785,6 +912,9 @@ struct LLVMLoweringEmitterTests {
         let expectedDefinitions = [
             "define i64 @RangeLLVM_llvmAdd(i64 %lhs, i64 %rhs)",
             "define i64 @RangeLLVM_llvmArithmetic(i64 %value)",
+            "define double @RangeLLVM_llvmFloatBlend(double %lhs, double %rhs)",
+            "define double @RangeLLVM_llvmMixedFloat(double %lhs, i64 %rhs)",
+            "define i1 @RangeLLVM_llvmFloatLess(double %lhs, i64 %rhs)",
             "define i1 @RangeLLVM_llvmIsLess(i64 %lhs, i64 %rhs)",
             "define i1 @RangeLLVM_llvmBoth(i1 %lhs, i1 %rhs)",
             "define i64 @RangeLLVM_llvmChoose(i1 %flag, i64 %value)",
@@ -803,10 +933,16 @@ struct LLVMLoweringEmitterTests {
         #expect(ir.contains("br label %while.cond"))
         #expect(ir.contains("call i1 @RangeLLVM_llvmIsLess(i64 %lhs, i64 %rhs)"))
         #expect(ir.contains("call i64 @RangeLLVM_llvmChoose(i1"))
+        #expect(ir.contains("fadd double"))
+        #expect(ir.contains("sitofp i64 %rhs to double"))
+        #expect(ir.contains("fcmp olt double"))
 
         let expectedFunctionNames = [
             "llvmAdd",
             "llvmArithmetic",
+            "llvmFloatBlend",
+            "llvmMixedFloat",
+            "llvmFloatLess",
             "llvmIsLess",
             "llvmBoth",
             "llvmChoose",

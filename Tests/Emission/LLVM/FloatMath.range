@@ -1,0 +1,12 @@
+function llvmFloatBlend(lhs: Float, rhs: Float): Float {
+    let adjusted: Float(lhs + rhs * 2.0)
+    return adjusted / 3.0
+}
+
+function llvmMixedFloat(lhs: Float, rhs: Int): Float {
+    return lhs + rhs
+}
+
+function llvmFloatLess(lhs: Float, rhs: Int): Bool {
+    return lhs < rhs
+}

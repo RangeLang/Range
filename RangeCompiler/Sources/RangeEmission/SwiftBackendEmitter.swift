@@ -1383,6 +1383,8 @@ struct SwiftBackendEmitter {
             return "Int64"
         case .bool:
             return "Bool"
+        case .float:
+            return "Double"
         }
     }
 
@@ -3989,6 +3991,8 @@ struct SwiftBackendEmitter {
             return "Int64(\(rendered))"
         case .bool:
             return rendered
+        case .float:
+            return "Double(\(rendered))"
         }
     }
 
@@ -4000,6 +4004,8 @@ struct SwiftBackendEmitter {
         case .int:
             return "Int(\(call))"
         case .bool:
+            return call
+        case .float:
             return call
         }
     }
