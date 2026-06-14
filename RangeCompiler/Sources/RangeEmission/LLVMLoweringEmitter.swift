@@ -13,11 +13,9 @@ struct LLVMLoweredSymbol: Equatable {
 }
 
 struct LLVMLoweringEmitter {
-    func emitModule(program: LoweredProgram, moduleName: String = "RangeScalar") throws
+    func emitModule(callables lowerableFunctions: [CallableDeclaration], moduleName: String = "RangeScalar") throws
         -> LLVMModuleEmission?
     {
-        let callables = program.callables + program.units.flatMap(\.callables)
-        let lowerableFunctions = uniqueLowerableFunctions(from: callables)
         guard !lowerableFunctions.isEmpty else {
             return nil
         }
@@ -60,23 +58,6 @@ struct LLVMLoweringEmitter {
 
     static func symbolName(for callable: CallableDeclaration) -> String {
         "RangeLLVM_" + sanitizeSymbol(callable.name)
-    }
-
-    private func uniqueLowerableFunctions(from callables: [CallableDeclaration])
-        -> [CallableDeclaration]
-    {
-        var seenSymbols: Set<String> = []
-        var functions: [CallableDeclaration] = []
-
-        for callable in callables where LLVMLowerability.canLower(callable) {
-            let symbol = Self.symbolName(for: callable)
-            guard seenSymbols.insert(symbol).inserted else {
-                continue
-            }
-            functions.append(callable)
-        }
-
-        return functions
     }
 
     private static func sanitizeSymbol(_ value: String) -> String {

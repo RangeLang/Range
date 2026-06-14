@@ -14,6 +14,7 @@ struct SwiftBackendEmitter {
         var macrosByName: [String: MacroDeclaration] = [:]
         var callableParameterLabelsByName: [String: [[String]]] = [:]
         var llvmBridgesByCallableName: [String: LLVMCallableBridge] = [:]
+        var llvmLoweredCallables: [CallableDeclaration] = []
 
         init() {}
 
@@ -32,7 +33,8 @@ struct SwiftBackendEmitter {
             }
             self.macrosByName = program.macrosByName
             self.callableParameterLabelsByName = Self.collectCallableParameterLabels(from: program)
-            self.llvmBridgesByCallableName = Self.collectLLVMBridges(from: program)
+            self.llvmLoweredCallables = Self.collectLLVMLoweredCallables(from: program)
+            self.llvmBridgesByCallableName = Self.collectLLVMBridges(from: llvmLoweredCallables)
         }
 
         private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<
@@ -108,14 +110,28 @@ struct SwiftBackendEmitter {
             return labelsByName
         }
 
-        private static func collectLLVMBridges(from program: LoweredProgram) -> [String: LLVMCallableBridge] {
+        private static func collectLLVMLoweredCallables(from program: LoweredProgram)
+            -> [CallableDeclaration]
+        {
             let callables = program.callables + program.units.flatMap(\.callables)
-            return callables.reduce(into: [:]) { result, callable in
-                guard callable.targetType == nil,
-                    LLVMLowerability.canLower(callable)
-                else {
-                    return
+            var seenSymbols: Set<String> = []
+            var loweredCallables: [CallableDeclaration] = []
+
+            for callable in callables where LLVMLowerability.canLower(callable) {
+                let symbol = LLVMLoweringEmitter.symbolName(for: callable)
+                guard seenSymbols.insert(symbol).inserted else {
+                    continue
                 }
+                loweredCallables.append(callable)
+            }
+
+            return loweredCallables
+        }
+
+        private static func collectLLVMBridges(
+            from callables: [CallableDeclaration]
+        ) -> [String: LLVMCallableBridge] {
+            callables.reduce(into: [:]) { result, callable in
                 result[callable.name] = LLVMCallableBridge(
                     symbolName: LLVMLoweringEmitter.symbolName(for: callable),
                     parameterCount: callable.parameters.count
@@ -336,7 +352,9 @@ struct SwiftBackendEmitter {
         try FileManager.default.createDirectory(
             at: sourcesDirectory, withIntermediateDirectories: true)
 
-        let llvmModule = try LLVMLoweringEmitter().emitModule(program: program)
+        let llvmModule = try LLVMLoweringEmitter().emitModule(
+            callables: context.llvmLoweredCallables
+        )
         let llvmObjectPath = llvmModule.map { "LLVM/\($0.moduleName).o" }
         let linkerSettings = llvmObjectPath.map {
             """

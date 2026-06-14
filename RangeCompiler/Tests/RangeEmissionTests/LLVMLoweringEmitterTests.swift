@@ -16,17 +16,7 @@ struct LLVMLoweringEmitterTests {
         )
 
         let module = try #require(
-            try LLVMLoweringEmitter().emitModule(
-                program: LoweredProgram(
-                    macrosByName: [:],
-                    callables: [callable],
-                    enumerations: [],
-                    declarations: [],
-                    extensions: [],
-                    mainBlock: MainBlockNode(macros: [], body: []),
-                    units: []
-                )
-            )
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
         )
 
         #expect(module.moduleName == "RangeScalar")
@@ -57,17 +47,7 @@ struct LLVMLoweringEmitterTests {
         )
 
         #expect(LLVMLowerability.canLower(callable) == false)
-        let module = try LLVMLoweringEmitter().emitModule(
-            program: LoweredProgram(
-                macrosByName: [:],
-                callables: [callable],
-                enumerations: [],
-                declarations: [],
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: []
-            )
-        )
+        let module = try LLVMLoweringEmitter().emitModule(callables: [])
         #expect(module == nil)
     }
 
@@ -97,17 +77,7 @@ struct LLVMLoweringEmitterTests {
 
         #expect(LLVMLowerability.canLower(callable))
         let module = try #require(
-            try LLVMLoweringEmitter().emitModule(
-                program: LoweredProgram(
-                    macrosByName: [:],
-                    callables: [callable],
-                    enumerations: [],
-                    declarations: [],
-                    extensions: [],
-                    mainBlock: MainBlockNode(macros: [], body: []),
-                    units: []
-                )
-            )
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
         )
 
         #expect(module.ir.contains("define i64 @RangeLLVM_nestedSum(i64 %limit)"))
@@ -149,17 +119,7 @@ struct LLVMLoweringEmitterTests {
             """
         )
         let module = try #require(
-            try LLVMLoweringEmitter().emitModule(
-                program: LoweredProgram(
-                    macrosByName: [:],
-                    callables: [callable],
-                    enumerations: [],
-                    declarations: [],
-                    extensions: [],
-                    mainBlock: MainBlockNode(macros: [], body: []),
-                    units: []
-                )
-            )
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
         )
 
         let clang = URL(fileURLWithPath: "/usr/bin/clang")
