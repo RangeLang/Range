@@ -143,6 +143,10 @@ struct SwiftBackendEmitter {
                     else {
                         continue
                     }
+                    guard llvmSignatureIsSwiftBridgeable(signature) else {
+                        seenSymbols.remove(symbol)
+                        continue
+                    }
                     loweredCallables.append(callable)
                     loweredSignatures[callable.name] = signature
                     changed = true
@@ -170,6 +174,18 @@ struct SwiftBackendEmitter {
             return llvmCandidateCallables(from: program)
                 .filter { !loweredNames.contains($0.name) }
                 .map { callable in
+                    if let signature = LLVMLowerability.scalarSignature(for: callable),
+                        LLVMLowerability.canLower(
+                            callable,
+                            lowerableFunctionSignatures: loweredSignatures
+                        ),
+                        !llvmSignatureIsSwiftBridgeable(signature)
+                    {
+                        return LLVMRejectedCallable(
+                            name: callable.name,
+                            reason: "returns [Int], which is not Swift-LLVM bridgeable yet"
+                        )
+                    }
                     return LLVMRejectedCallable(
                         name: callable.name,
                         reason: LLVMLowerability.rejectionReason(
@@ -185,6 +201,12 @@ struct SwiftBackendEmitter {
             -> [CallableDeclaration]
         {
             program.callables + program.units.flatMap(\.callables)
+        }
+
+        private static func llvmSignatureIsSwiftBridgeable(
+            _ signature: LLVMLowerability.ScalarSignature
+        ) -> Bool {
+            signature.returnType != .intArray
         }
 
         private static func collectLLVMBridges(
@@ -1455,6 +1477,29 @@ struct SwiftBackendEmitter {
                     }
                 }
             }
+
+            struct __RangeLLVMIntArray {
+                let pointer: UnsafePointer<Int64>
+                let count: Int64
+                let capacity: Int64
+
+                static func withIntArray<Result>(
+                    _ value: [Int],
+                    _ body: (__RangeLLVMIntArray) throws -> Result
+                ) rethrows -> Result {
+                    let logicalCount = value.count
+                    let values = value.isEmpty ? [Int64(0)] : value.map(Int64.init)
+                    return try values.withUnsafeBufferPointer { buffer in
+                        try body(
+                            __RangeLLVMIntArray(
+                                pointer: buffer.baseAddress!,
+                                count: Int64(logicalCount),
+                                capacity: Int64(logicalCount)
+                            )
+                        )
+                    }
+                }
+            }
             """
 
         let hostIOImport = """
@@ -1494,6 +1539,8 @@ struct SwiftBackendEmitter {
             return "Double"
         case .string:
             return "__RangeLLVMString"
+        case .intArray:
+            return "__RangeLLVMIntArray"
         }
     }
 
@@ -4126,6 +4173,15 @@ struct SwiftBackendEmitter {
                 )
                 return "__RangeLLVMString.withString(\(rendered)) { \(name) in \(nested) }"
             }
+            if type == .intArray {
+                let rendered = try emitExpression(argument.value, scope: scope)
+                let name = "__rangeLLVMIntArrayArgument\(index)"
+                let nested = try build(
+                    index: index + 1,
+                    renderedArguments: renderedArguments + [name]
+                )
+                return "__RangeLLVMIntArray.withIntArray(\(rendered)) { \(name) in \(nested) }"
+            }
 
             let rendered = try emitLLVMBridgeArgument(argument.value, type: type, scope: scope)
             return try build(index: index + 1, renderedArguments: renderedArguments + [rendered])
@@ -4149,6 +4205,8 @@ struct SwiftBackendEmitter {
             return "Double(\(rendered))"
         case .string:
             return rendered
+        case .intArray:
+            return rendered
         }
     }
 
@@ -4165,6 +4223,8 @@ struct SwiftBackendEmitter {
             return "Float(\(call))"
         case .string:
             return "__RangeLLVMString.decode(\(call))"
+        case .intArray:
+            return call
         }
     }
 

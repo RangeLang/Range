@@ -220,6 +220,64 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i64"))
     }
 
+    @Test("Int array count and isEmpty lower through LLVM")
+    func intArrayCountAndIsEmptyLowerThroughLLVM() throws {
+        let module = try parseModule(
+            """
+            function size(values: [Int]): Int {
+                return values.count
+            }
+
+            function empty(values: [Int]): Bool {
+                return values.isEmpty
+            }
+            """
+        )
+        let signatures = Dictionary(
+            uniqueKeysWithValues: module.callables.compactMap { callable in
+                LLVMLowerability.scalarSignature(for: callable).map { (callable.name, $0) }
+            }
+        )
+
+        #expect(
+            module.callables.allSatisfy {
+                LLVMLowerability.canLower($0, lowerableFunctionSignatures: signatures)
+            }
+        )
+        let emission = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: module.callables)
+        )
+
+        #expect(emission.ir.contains("%Range.IntArray = type { ptr, i64, i64 }"))
+        #expect(emission.ir.contains("define i64 @RangeLLVM_size(%Range.IntArray %values)"))
+        #expect(emission.ir.contains("define i1 @RangeLLVM_empty(%Range.IntArray %values)"))
+        #expect(emission.ir.contains("extractvalue %Range.IntArray %values, 1"))
+        #expect(emission.ir.contains("icmp eq i64"))
+    }
+
+    @Test("Int array element lowers through LLVM pointer load")
+    func intArrayElementLowersThroughLLVMPointerLoad() throws {
+        let callable = try parseCallable(
+            """
+            function first(values: [Int]): Int {
+                return values.element(index: 0)
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("%Range.IntArray = type { ptr, i64, i64 }"))
+        #expect(module.ir.contains("define i64 @RangeLLVM_first(%Range.IntArray %values)"))
+        #expect(module.ir.contains("extractvalue %Range.IntArray %values, 0"))
+        #expect(module.ir.contains("getelementptr inbounds i64, ptr"))
+        #expect(module.ir.contains("load i64, ptr"))
+        #expect(module.ir.contains("ret i64"))
+    }
+
     @Test("Nested Int while loops lower to LLVM basic blocks")
     func nestedIntWhileLoopsLowerToLLVMBasicBlocks() throws {
         let callable = try parseCallable(
@@ -1473,6 +1531,68 @@ struct LLVMLoweringEmitterTests {
         #expect(ir.contains("define i64 @RangeLLVM_size(%Range.String %value)"))
         #expect(ir.contains("extractvalue %Range.String %value, 1"))
         #expect(!main.contains("func size"))
+    }
+
+    @Test("Swift workspace emission bridges LLVM Int array arguments")
+    func swiftWorkspaceEmissionBridgesLLVMIntArrayArguments() throws {
+        let source = try parseModule(
+            """
+            function first(values: [Int]): Int {
+                return values.element(index: 0)
+            }
+
+            @main {
+                first(values: [1, 2, 3])
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMIntArrayBridgeTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Main.swift",
+                        enumerations: source.enumerations,
+                        declarations: source.constructs,
+                        extensions: source.extensions,
+                        callables: source.callables,
+                        mainBlock: source.mainBlock
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let runtime = try String(
+            contentsOf: root.appendingPathComponent("Sources/Runtime.swift"),
+            encoding: .utf8
+        )
+        let main = try String(
+            contentsOf: root.appendingPathComponent("Sources/Main.swift"),
+            encoding: .utf8
+        )
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+
+        #expect(runtime.contains("struct __RangeLLVMIntArray"))
+        #expect(runtime.contains("func RangeLLVM_first(_ argument0: __RangeLLVMIntArray) -> Int64"))
+        #expect(main.contains("Int(__RangeLLVMIntArray.withIntArray([1, 2, 3]) { __rangeLLVMIntArrayArgument0 in RangeLLVM_first(__rangeLLVMIntArrayArgument0) })"))
+        #expect(ir.contains("define i64 @RangeLLVM_first(%Range.IntArray %values)"))
+        #expect(ir.contains("load i64, ptr"))
+        #expect(!main.contains("func first"))
     }
 
     @Test("Swift workspace emission converts LLVM Float return for Swift wrappers")

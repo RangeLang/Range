@@ -39,6 +39,9 @@ struct LLVMLoweringEmitter {
         for symbol in symbolsByName.values where symbol.signature.usesString {
             stringTable.requireStringType()
         }
+        for symbol in symbolsByName.values where symbol.signature.usesIntArray {
+            stringTable.requireIntArrayType()
+        }
         let functions = try lowerableFunctions.map {
             try emitFunction($0, symbolsByName: symbolsByName, stringTable: stringTable)
         }
@@ -119,6 +122,8 @@ private extension LLVMLowerability.ScalarType {
             return "double"
         case .string:
             return "%Range.String"
+        case .intArray:
+            return "%Range.IntArray"
         }
     }
 }
@@ -127,14 +132,23 @@ private extension LLVMLowerability.ScalarSignature {
     var usesString: Bool {
         returnType == .string || parameters.contains(.string)
     }
+
+    var usesIntArray: Bool {
+        returnType == .intArray || parameters.contains(.intArray)
+    }
 }
 
 private final class LLVMStringTable {
     private var namesByValue: [String: String] = [:]
     private var requiresType = false
+    private var requiresIntArrayType = false
 
     func requireStringType() {
         requiresType = true
+    }
+
+    func requireIntArrayType() {
+        requiresIntArrayType = true
     }
 
     func constantName(for value: String) -> String {
@@ -148,14 +162,21 @@ private final class LLVMStringTable {
     }
 
     func supportDefinitions() -> String {
-        guard requiresType else {
+        guard requiresType || requiresIntArrayType else {
             return ""
+        }
+        var definitions: [String] = []
+        if requiresType {
+            definitions.append("%Range.String = type { ptr, i64 }")
+        }
+        if requiresIntArrayType {
+            definitions.append("%Range.IntArray = type { ptr, i64, i64 }")
         }
         let globals = namesByValue.sorted { $0.value < $1.value }.map { value, name in
             let bytes = Array(value.utf8)
             return "\(name) = private unnamed_addr constant [\(bytes.count + 1) x i8] c\"\(llvmEscapedCString(bytes))\\00\", align 1"
         }
-        return (["%Range.String = type { ptr, i64 }"] + globals).joined(separator: "\n")
+        return (definitions + globals).joined(separator: "\n")
     }
 
     private func llvmEscapedCString(_ bytes: [UInt8]) -> String {
@@ -174,7 +195,9 @@ private struct LLVMFunctionEmitter {
     private typealias ScalarType = LLVMLowerability.ScalarType
 
     private enum LowerableMember {
+        case count
         case byteCount
+        case element
         case isEmpty
     }
 
@@ -580,6 +603,9 @@ private struct LLVMFunctionEmitter {
             )
             return Value(type: resultType, representation: register)
         case .call(let name, let arguments):
+            if let memberCall = try emitLowerableMemberCall(name: name, arguments: arguments) {
+                return memberCall
+            }
             guard let callable = callableSymbolsByName[name] else {
                 throw LLVMLoweringError("LLVM lowering cannot resolve callable '\(name)'.")
             }
@@ -618,20 +644,24 @@ private struct LLVMFunctionEmitter {
         }
         let baseName = String(name[..<dotIndex])
         let memberName = String(name[name.index(after: dotIndex)...])
-        guard let member = lowerableMember(name: memberName) else {
+        guard let member = lowerableMemberAccess(name: memberName) else {
             return nil
         }
 
         let base = try emitIdentifier(named: baseName)
-        guard base.type == "%Range.String" else {
+        guard base.type == "%Range.String" || base.type == "%Range.IntArray" else {
             return nil
         }
 
         let countRegister = freshRegister()
-        emit("\(countRegister) = extractvalue %Range.String \(base.representation), 1")
+        emit("\(countRegister) = extractvalue \(base.type) \(base.representation), 1")
         switch member {
+        case .count:
+            return Value(type: "i64", representation: countRegister)
         case .byteCount:
             return Value(type: "i64", representation: countRegister)
+        case .element:
+            return nil
         case .isEmpty:
             let resultRegister = freshRegister()
             emit("\(resultRegister) = icmp eq i64 \(countRegister), 0")
@@ -639,12 +669,60 @@ private struct LLVMFunctionEmitter {
         }
     }
 
-    private func lowerableMember(name: String) -> LowerableMember? {
+    private mutating func emitLowerableMemberCall(
+        name: String,
+        arguments: [CallArgument]
+    ) throws -> Value? {
+        guard let dotIndex = name.lastIndex(of: ".") else {
+            return nil
+        }
+        let baseName = String(name[..<dotIndex])
+        let memberName = String(name[name.index(after: dotIndex)...])
+        guard lowerableMemberCall(name: memberName) == .element else {
+            return nil
+        }
+        guard arguments.count == 1 else {
+            throw LLVMLoweringError("LLVM Array<Int>.element expects one index argument.")
+        }
+
+        let base = try emitIdentifier(named: baseName)
+        guard base.type == "%Range.IntArray" else {
+            return nil
+        }
+        let rawIndex = try emitExpression(arguments[0].value)
+        let index = try convert(value: rawIndex, toLLVMType: "i64")
+        guard index.type == "i64" else {
+            throw LLVMLoweringError("LLVM Array<Int>.element index must be i64.")
+        }
+
+        let pointerRegister = freshRegister()
+        emit("\(pointerRegister) = extractvalue %Range.IntArray \(base.representation), 0")
+        let elementPointerRegister = freshRegister()
+        emit(
+            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(index.representation)"
+        )
+        let valueRegister = freshRegister()
+        emit("\(valueRegister) = load i64, ptr \(elementPointerRegister)")
+        return Value(type: "i64", representation: valueRegister)
+    }
+
+    private func lowerableMemberAccess(name: String) -> LowerableMember? {
         switch name {
+        case "count":
+            return .count
         case "byteCount":
             return .byteCount
         case "isEmpty":
             return .isEmpty
+        default:
+            return nil
+        }
+    }
+
+    private func lowerableMemberCall(name: String) -> LowerableMember? {
+        switch name {
+        case "element":
+            return .element
         default:
             return nil
         }

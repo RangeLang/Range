@@ -11,6 +11,7 @@ enum LLVMLowerability {
         case bool
         case float
         case string
+        case intArray
 
         init?(typeReference: TypeReference) {
             switch typeReference.displayName {
@@ -22,6 +23,8 @@ enum LLVMLowerability {
                 self = .float
             case "String":
                 self = .string
+            case "[Int]":
+                self = .intArray
             default:
                 return nil
             }
@@ -908,6 +911,14 @@ enum LLVMLowerability {
             }
             return locals[name]
         case .call(let name, let arguments):
+            if let memberCall = lowerableMemberCall(
+                name: name,
+                arguments: arguments,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) {
+                return memberCall.result
+            }
             guard let signature = lowerableFunctionSignatures[name],
                 arguments.count == signature.parameters.count,
                 zip(arguments, signature.parameters).allSatisfy({
@@ -992,7 +1003,9 @@ enum LLVMLowerability {
     }
 
     private enum LowerableMember {
+        case count
         case byteCount
+        case element
         case isEmpty
     }
 
@@ -1030,6 +1043,10 @@ enum LLVMLowerability {
             return .byteCount
         case (.string, "isEmpty"):
             return .isEmpty
+        case (.intArray, "count"):
+            return .count
+        case (.intArray, "isEmpty"):
+            return .isEmpty
         default:
             return nil
         }
@@ -1037,10 +1054,76 @@ enum LLVMLowerability {
 
     private static func resultType(for member: LowerableMember) -> ScalarType {
         switch member {
+        case .count:
+            return .int
         case .byteCount:
+            return .int
+        case .element:
             return .int
         case .isEmpty:
             return .bool
+        }
+    }
+
+    private struct LowerableMemberCall {
+        let baseName: String
+        let baseType: ScalarType
+        let member: LowerableMember
+        let result: ScalarType
+    }
+
+    private static func lowerableMemberCall(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> LowerableMemberCall? {
+        guard let dotIndex = name.lastIndex(of: ".") else {
+            return nil
+        }
+        let baseName = String(name[..<dotIndex])
+        let memberName = String(name[name.index(after: dotIndex)...])
+        guard let baseType = locals[baseName],
+            let member = lowerableMemberCall(baseType: baseType, name: memberName)
+        else {
+            return nil
+        }
+
+        switch member {
+        case .element:
+            guard arguments.count == 1,
+                canConvert(
+                    canLower(
+                        arguments[0].value,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures
+                    ),
+                    to: .int
+                )
+            else {
+                return nil
+            }
+        default:
+            return nil
+        }
+
+        return LowerableMemberCall(
+            baseName: baseName,
+            baseType: baseType,
+            member: member,
+            result: resultType(for: member)
+        )
+    }
+
+    private static func lowerableMemberCall(
+        baseType: ScalarType,
+        name: String
+    ) -> LowerableMember? {
+        switch (baseType, name) {
+        case (.intArray, "element"):
+            return .element
+        default:
+            return nil
         }
     }
 
@@ -1089,7 +1172,7 @@ private extension LLVMLowerability.ScalarType {
         switch self {
         case .int, .float:
             return true
-        case .bool, .string:
+        case .bool, .string, .intArray:
             return false
         }
     }
