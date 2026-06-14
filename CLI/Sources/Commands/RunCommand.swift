@@ -12,6 +12,9 @@ extension CLI {
         @Argument(help: "Project directory or source .range file to run.")
         var input: String?
 
+        @Flag(help: "Build and run the generated Swift workspace in release mode.")
+        var release = false
+
         mutating func run() throws {
             do {
                 let project = try ProjectLoader.load(
@@ -30,7 +33,10 @@ extension CLI {
                     ),
                     compiledProgram: compiledProgram
                 )
-                try backend.run(workspaceRoot: workspaceRoot)
+                try backend.run(
+                    workspaceRoot: workspaceRoot,
+                    configuration: release ? .release : .debug
+                )
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure

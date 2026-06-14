@@ -218,6 +218,119 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i1"))
     }
 
+    @Test("Scalar ternary lowers to LLVM select")
+    func scalarTernaryLowersToLLVMSelect() throws {
+        let callable = try parseCallable(
+            """
+            function choose(flag: Bool, lhs: Int, rhs: Int): Int {
+                return flag ? lhs : rhs
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_choose(i1 %flag, i64 %lhs, i64 %rhs)"))
+        #expect(module.ir.contains("select i1 %flag, i64 %lhs, i64 %rhs"))
+        #expect(module.ir.contains("ret i64"))
+    }
+
+    @Test("Mixed scalar ternary promotes Int branch to Float")
+    func mixedScalarTernaryPromotesIntBranchToFloat() throws {
+        let callable = try parseCallable(
+            """
+            function chooseFloat(flag: Bool, lhs: Float, rhs: Int): Float {
+                return flag ? lhs : rhs
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define double @RangeLLVM_chooseFloat(i1 %flag, double %lhs, i64 %rhs)"))
+        #expect(module.ir.contains("sitofp i64 %rhs to double"))
+        #expect(module.ir.contains("select i1 %flag, double %lhs, double"))
+        #expect(module.ir.contains("ret double"))
+    }
+
+    @Test("Local scalar plus-equals lowers to LLVM load add store")
+    func localScalarPlusEqualsLowersToLLVMLoadAddStore() throws {
+        let callable = CallableDeclaration(
+            macros: [],
+            attribute: nil,
+            targetType: nil,
+            name: "addLoop",
+            genericParameters: [],
+            hasExplicitParameterClause: true,
+            parameters: [
+                RangeFunctionParameter(
+                    macros: [],
+                    name: "limit",
+                    typeReference: .named("Int"),
+                    slotName: nil
+                )
+            ],
+            returnType: .named("Int"),
+            body: [
+                .localBinding(
+                    LocalBindingDeclaration(
+                        kind: .mutable,
+                        name: "index",
+                        hasExplicitTypeAnnotation: true,
+                        type: .named("Int"),
+                        expression: .integer(0)
+                    )
+                ),
+                .localBinding(
+                    LocalBindingDeclaration(
+                        kind: .mutable,
+                        name: "total",
+                        hasExplicitTypeAnnotation: true,
+                        type: .named("Int"),
+                        expression: .integer(0)
+                    )
+                ),
+                .whileLoop(
+                    condition: .binary(
+                        lhs: .identifier("index"),
+                        operatorSymbol: .less,
+                        rhs: .identifier("limit")
+                    ),
+                    body: [
+                        .compoundAssignment(
+                            target: .local("total"),
+                            operatorSymbol: .plusEquals,
+                            expression: .identifier("index")
+                        ),
+                        .compoundAssignment(
+                            target: .local("index"),
+                            operatorSymbol: .plusEquals,
+                            expression: .integer(1)
+                        ),
+                    ]
+                ),
+                .return(.identifier("total")),
+            ]
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_addLoop(i64 %limit)"))
+        #expect(module.ir.contains("load i64, ptr %total.addr"))
+        #expect(module.ir.contains("add i64"))
+        #expect(module.ir.contains("store i64"))
+        #expect(module.ir.contains("ret i64"))
+    }
+
     @Test("Int comparison can return Bool through LLVM")
     func intComparisonCanReturnBoolThroughLLVM() throws {
         let callable = try parseCallable(

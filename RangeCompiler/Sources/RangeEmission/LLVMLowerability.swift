@@ -109,6 +109,16 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
+            case .compoundAssignment(let target, let operatorSymbol, let expression):
+                guard canLowerCompoundAssignment(
+                    target: target,
+                    operatorSymbol: operatorSymbol,
+                    expression: expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return false
+                }
             case .whileLoop(let condition, let body):
                 guard canLower(
                     condition,
@@ -155,8 +165,7 @@ enum LLVMLowerability {
                 }
                 sawReturn = true
             case .return(nil), .macroInvocation, .expand, .background, .deferBlock, .localCallable,
-                .derived, .compoundAssignment, .expression, .forEach, .break, .continue,
-                .switchStatement:
+                .derived, .expression, .forEach, .break, .continue, .switchStatement:
                 return false
             }
         }
@@ -182,6 +191,16 @@ enum LLVMLowerability {
             case .assignment(let target, let expression):
                 guard canLowerAssignment(
                     target: target,
+                    expression: expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return false
+                }
+            case .compoundAssignment(let target, let operatorSymbol, let expression):
+                guard canLowerCompoundAssignment(
+                    target: target,
+                    operatorSymbol: operatorSymbol,
                     expression: expression,
                     locals: locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures
@@ -214,7 +233,7 @@ enum LLVMLowerability {
                     return false
                 }
             case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-                .compoundAssignment, .expression, .forEach, .return, .switchStatement:
+                .expression, .forEach, .return, .switchStatement:
                 return false
             case .break, .continue:
                 continue
@@ -261,6 +280,28 @@ enum LLVMLowerability {
                 ),
                 to: type
             )
+        else {
+            return false
+        }
+        return true
+    }
+
+    private static func canLowerCompoundAssignment(
+        target: AssignmentTarget,
+        operatorSymbol: CompoundOperator,
+        expression: Expression,
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> Bool {
+        guard case .plusEquals = operatorSymbol,
+            case .local(let name) = target,
+            let type = locals[name],
+            let rhsType = canLower(
+                expression,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ),
+            resultType(for: .addition, lhs: type, rhs: rhsType) == type
         else {
             return false
         }
@@ -385,8 +426,28 @@ enum LLVMLowerability {
                 return nil
             }
             return resultType(for: operatorSymbol, lhs: lhsType, rhs: rhsType)
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            guard canLower(
+                condition,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) == .bool,
+                let trueType = canLower(
+                    trueExpression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ),
+                let falseType = canLower(
+                    falseExpression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                )
+            else {
+                return nil
+            }
+            return ternaryResultType(trueType, falseType)
         case .string, .interpolatedString, .nilLiteral, .macroInvocation, .block,
-            .bindingReference, .array, .dictionary, .ternary:
+            .bindingReference, .array, .dictionary:
             return nil
         }
     }
@@ -396,6 +457,16 @@ enum LLVMLowerability {
             return false
         }
         return actual == expected || (actual == .int && expected == .float)
+    }
+
+    private static func ternaryResultType(_ lhs: ScalarType, _ rhs: ScalarType) -> ScalarType? {
+        if lhs == rhs {
+            return lhs
+        }
+        if lhs.isNumeric, rhs.isNumeric {
+            return lhs == .float || rhs == .float ? .float : .int
+        }
+        return nil
     }
 
     private static func resultType(

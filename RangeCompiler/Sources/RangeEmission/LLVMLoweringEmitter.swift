@@ -174,6 +174,12 @@ private struct LLVMFunctionEmitter {
             try emitLocalBinding(declaration)
         case .assignment(let target, let expression):
             try emitAssignment(target: target, expression: expression)
+        case .compoundAssignment(let target, let operatorSymbol, let expression):
+            try emitCompoundAssignment(
+                target: target,
+                operatorSymbol: operatorSymbol,
+                expression: expression
+            )
         case .whileLoop(let condition, let body):
             try emitWhileLoop(condition: condition, body: body)
         case .conditional(let branches):
@@ -199,7 +205,7 @@ private struct LLVMFunctionEmitter {
             }
             emitBranch(to: target.conditionLabel)
         case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-            .compoundAssignment, .expression, .forEach, .switchStatement:
+            .expression, .forEach, .switchStatement:
             throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
         }
     }
@@ -247,6 +253,39 @@ private struct LLVMFunctionEmitter {
         let converted = try convert(value, to: type)
         guard converted.type == type.llvmType else {
             throw LLVMLoweringError("LLVM assignment value must be \(type.llvmType).")
+        }
+        emit("store \(type.llvmType) \(converted.representation), ptr \(pointer)")
+    }
+
+    private mutating func emitCompoundAssignment(
+        target: AssignmentTarget,
+        operatorSymbol: CompoundOperator,
+        expression: RangeCompiler.Expression
+    ) throws {
+        guard case .plusEquals = operatorSymbol else {
+            throw LLVMLoweringError("LLVM compound assignment currently supports += only.")
+        }
+        guard case .local(let name) = target else {
+            throw LLVMLoweringError("LLVM compound assignment currently supports local state only.")
+        }
+        guard case .stackSlot(let pointer, let type, let mutable) = symbols[name],
+            mutable
+        else {
+            throw LLVMLoweringError("LLVM compound assignment target '\(name)' is not mutable local state.")
+        }
+
+        let currentRegister = freshRegister()
+        emit("\(currentRegister) = load \(type.llvmType), ptr \(pointer)")
+        let currentValue = Value(type: type.llvmType, representation: currentRegister)
+        let rhsValue = try emitExpression(expression)
+        let sum = try emitBinaryExpression(
+            lhsValue: currentValue,
+            operatorSymbol: .addition,
+            rhsValue: rhsValue
+        )
+        let converted = try convert(sum, to: type)
+        guard converted.type == type.llvmType else {
+            throw LLVMLoweringError("LLVM compound assignment value must be \(type.llvmType).")
         }
         emit("store \(type.llvmType) \(converted.representation), ptr \(pointer)")
     }
@@ -375,18 +414,26 @@ private struct LLVMFunctionEmitter {
         case .binary(let lhs, let operatorSymbol, let rhs):
             let lhsValue = try emitExpression(lhs)
             let rhsValue = try emitExpression(rhs)
-            let instruction = try llvmInstruction(
-                for: operatorSymbol,
-                lhsType: lhsValue.type,
-                rhsType: rhsValue.type
+            return try emitBinaryExpression(
+                lhsValue: lhsValue,
+                operatorSymbol: operatorSymbol,
+                rhsValue: rhsValue
             )
-            let convertedLHS = try convert(value: lhsValue, toLLVMType: instruction.operandType)
-            let convertedRHS = try convert(value: rhsValue, toLLVMType: instruction.operandType)
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            let conditionValue = try emitExpression(condition)
+            guard conditionValue.type == "i1" else {
+                throw LLVMLoweringError("LLVM ternary condition must be i1.")
+            }
+            let trueValue = try emitExpression(trueExpression)
+            let falseValue = try emitExpression(falseExpression)
+            let resultType = try ternaryLLVMType(trueValue.type, falseValue.type)
+            let convertedTrue = try convert(value: trueValue, toLLVMType: resultType)
+            let convertedFalse = try convert(value: falseValue, toLLVMType: resultType)
             let register = freshRegister()
             emit(
-                "\(register) = \(instruction.mnemonic) \(instruction.operandType) \(convertedLHS.representation), \(convertedRHS.representation)"
+                "\(register) = select i1 \(conditionValue.representation), \(resultType) \(convertedTrue.representation), \(resultType) \(convertedFalse.representation)"
             )
-            return Value(type: instruction.resultType, representation: register)
+            return Value(type: resultType, representation: register)
         case .call(let name, let arguments):
             guard let callable = callableSymbolsByName[name] else {
                 throw LLVMLoweringError("LLVM lowering cannot resolve callable '\(name)'.")
@@ -455,6 +502,37 @@ private struct LLVMFunctionEmitter {
             return raw
         }
         return "\(mantissa).0\(raw[exponentIndex...])"
+    }
+
+    private mutating func emitBinaryExpression(
+        lhsValue: Value,
+        operatorSymbol: BinaryOperator,
+        rhsValue: Value
+    ) throws -> Value {
+        let instruction = try llvmInstruction(
+            for: operatorSymbol,
+            lhsType: lhsValue.type,
+            rhsType: rhsValue.type
+        )
+        let convertedLHS = try convert(value: lhsValue, toLLVMType: instruction.operandType)
+        let convertedRHS = try convert(value: rhsValue, toLLVMType: instruction.operandType)
+        let register = freshRegister()
+        emit(
+            "\(register) = \(instruction.mnemonic) \(instruction.operandType) \(convertedLHS.representation), \(convertedRHS.representation)"
+        )
+        return Value(type: instruction.resultType, representation: register)
+    }
+
+    private func ternaryLLVMType(_ lhsType: String, _ rhsType: String) throws -> String {
+        if lhsType == rhsType {
+            return lhsType
+        }
+        if (lhsType == "i64" && rhsType == "double")
+            || (lhsType == "double" && rhsType == "i64")
+        {
+            return "double"
+        }
+        throw LLVMLoweringError("LLVM ternary branches must have compatible scalar types.")
     }
 
     private mutating func convert(_ value: Value, to scalarType: ScalarType) throws -> Value {
