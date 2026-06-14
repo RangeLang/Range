@@ -339,12 +339,12 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("define i64 @RangeLLVM_sumAllocated(i64 %limit)"))
     }
 
-    @Test("Int array append grows from zero capacity")
-    func intArrayAppendGrowsFromZeroCapacity() throws {
+    @Test("Default Int array append grows from empty storage")
+    func defaultIntArrayAppendGrowsFromEmptyStorage() throws {
         let callable = try parseCallable(
             """
             function grown(): Int {
-                state values: [Int](capacity: 0)
+                state values: [Int]
                 values.append(element: 4)
                 values.append(element: 8)
                 return values.element(index: 1)
@@ -358,7 +358,12 @@ struct LLVMLoweringEmitterTests {
         )
 
         #expect(module.ir.contains("array.grow."))
+        #expect(module.ir.contains("ptr null, 0"))
+        #expect(module.ir.contains("i64 0, 2"))
         #expect(module.ir.contains("icmp eq i64"))
+        #expect(module.ir.contains("icmp ne i64"))
+        #expect(module.ir.contains("array.grow.copy."))
+        #expect(module.ir.contains("array.grow.finish."))
         #expect(module.ir.contains("select i1"))
         #expect(module.ir.contains("i64 1"))
         #expect(module.ir.contains("call void @llvm.memcpy.p0.p0.i64"))

@@ -1034,7 +1034,13 @@ enum LLVMLowerability {
         locals: [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature]
     ) -> Bool {
-        guard name == "[Int]", arguments.count == 1 else {
+        guard name == "[Int]" else {
+            return false
+        }
+        if arguments.isEmpty {
+            return true
+        }
+        guard arguments.count == 1 else {
             return false
         }
         guard arguments[0].label == "capacity" || arguments[0].label == nil else {

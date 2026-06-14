@@ -768,6 +768,22 @@ private struct LLVMFunctionEmitter {
         guard name == "[Int]" else {
             return nil
         }
+        if arguments.isEmpty {
+            stringTable.requireIntArrayType()
+            let pointerValueRegister = freshRegister()
+            emit(
+                "\(pointerValueRegister) = insertvalue %Range.IntArray undef, ptr null, 0"
+            )
+            let countValueRegister = freshRegister()
+            emit(
+                "\(countValueRegister) = insertvalue %Range.IntArray \(pointerValueRegister), i64 0, 1"
+            )
+            let capacityValueRegister = freshRegister()
+            emit(
+                "\(capacityValueRegister) = insertvalue %Range.IntArray \(countValueRegister), i64 0, 2"
+            )
+            return Value(type: "%Range.IntArray", representation: capacityValueRegister)
+        }
         guard arguments.count == 1 else {
             throw LLVMLoweringError("LLVM intArray allocation expects one capacity argument.")
         }
@@ -918,12 +934,24 @@ private struct LLVMFunctionEmitter {
         emit("\(newPointerRegister) = call ptr @malloc(i64 \(byteCountRegister))")
         let oldPointerRegister = freshRegister()
         emit("\(oldPointerRegister) = extractvalue %Range.IntArray \(array.representation), 0")
+        let hasElementsRegister = freshRegister()
+        emit("\(hasElementsRegister) = icmp ne i64 \(count), 0")
+        let labelID = freshLabelID()
+        let copyLabel = "array.grow.copy.\(labelID)"
+        let finishLabel = "array.grow.finish.\(labelID)"
+        emit("br i1 \(hasElementsRegister), label %\(copyLabel), label %\(finishLabel)")
+        blockTerminated = true
+
+        emitLabel(copyLabel)
         let copiedByteCountRegister = freshRegister()
         emit("\(copiedByteCountRegister) = mul i64 \(count), 8")
         emit(
             "call void @llvm.memcpy.p0.p0.i64(ptr \(newPointerRegister), ptr \(oldPointerRegister), i64 \(copiedByteCountRegister), i1 false)"
         )
         emit("call void @free(ptr \(oldPointerRegister))")
+        emitBranch(to: finishLabel)
+
+        emitLabel(finishLabel)
         let pointerArrayRegister = freshRegister()
         emit(
             "\(pointerArrayRegister) = insertvalue %Range.IntArray \(array.representation), ptr \(newPointerRegister), 0"
