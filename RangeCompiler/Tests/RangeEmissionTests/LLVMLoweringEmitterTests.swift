@@ -537,6 +537,86 @@ struct LLVMLoweringEmitterTests {
         #expect(ir.contains("define i64 @RangeLLVM_choose(i1 %flag, i64 %value)"))
     }
 
+    @Test("Mixed scalar calls between LLVM functions stay in LLVM")
+    func mixedScalarCallsBetweenLLVMFunctionsStayInLLVM() throws {
+        let module = try parseModule(
+            """
+            function isLess(lhs: Int, rhs: Int): Bool {
+                return lhs < rhs
+            }
+
+            function invert(value: Bool): Bool {
+                return !value
+            }
+
+            function choose(flag: Bool, value: Int): Int {
+                if flag {
+                    return value
+                } else {
+                    return 0
+                }
+            }
+
+            function chooseLower(lhs: Int, rhs: Int): Int {
+                if isLess(lhs: lhs, rhs: rhs) {
+                    return choose(flag: invert(value: false), value: lhs)
+                } else {
+                    return choose(flag: false, value: rhs)
+                }
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMMixedCallChainTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Math.swift",
+                        enumerations: [],
+                        declarations: [],
+                        extensions: [],
+                        callables: module.callables,
+                        mainBlock: nil
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+        let swift = try String(
+            contentsOf: root.appendingPathComponent("Sources/Math.swift"),
+            encoding: .utf8
+        )
+
+        #expect(ir.contains("define i1 @RangeLLVM_isLess(i64 %lhs, i64 %rhs)"))
+        #expect(ir.contains("define i1 @RangeLLVM_invert(i1 %value)"))
+        #expect(ir.contains("define i64 @RangeLLVM_choose(i1 %flag, i64 %value)"))
+        #expect(ir.contains("define i64 @RangeLLVM_chooseLower(i64 %lhs, i64 %rhs)"))
+        #expect(ir.contains("call i1 @RangeLLVM_isLess(i64 %lhs, i64 %rhs)"))
+        #expect(ir.contains("br i1 %"))
+        #expect(ir.contains("call i1 @RangeLLVM_invert(i1 0)"))
+        #expect(ir.contains("call i64 @RangeLLVM_choose(i1"))
+        #expect(!swift.contains("func isLess"))
+        #expect(!swift.contains("func invert"))
+        #expect(!swift.contains("func choose("))
+        #expect(!swift.contains("func chooseLower"))
+    }
+
     private func parseCallable(_ source: String) throws -> CallableDeclaration {
         var parser = try Parser(source: source)
         let sourceFile = try parser.parseSourceFile()
