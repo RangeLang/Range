@@ -255,6 +255,76 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i1"))
     }
 
+    @Test("Break in loop branches to LLVM loop end")
+    func breakInLoopBranchesToLLVMLoopEnd() throws {
+        let callable = try parseCallable(
+            """
+            function firstOverTen(limit: Int): Bool {
+                state index: Int(0)
+                state found: Bool(false)
+
+                while index < limit {
+                    if index > 10 {
+                        state found: true
+                        break
+                    }
+
+                    state index: index + 1
+                }
+
+                return found
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i1 @RangeLLVM_firstOverTen(i64 %limit)"))
+        #expect(module.ir.contains("while.cond.1:"))
+        #expect(module.ir.contains("while.end.1:"))
+        #expect(module.ir.contains("store i1 1, ptr %found.addr"))
+        #expect(module.ir.contains("br label %while.end.1"))
+    }
+
+    @Test("Continue in loop branches to LLVM loop condition")
+    func continueInLoopBranchesToLLVMLoopCondition() throws {
+        let callable = try parseCallable(
+            """
+            function sumOdd(limit: Int): Int {
+                state index: Int(0)
+                state total: Int(0)
+
+                while index < limit {
+                    state index: index + 1
+
+                    if index % 2 == 0 {
+                        continue
+                    }
+
+                    state total: total + index
+                }
+
+                return total
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_sumOdd(i64 %limit)"))
+        #expect(module.ir.contains("while.cond.1:"))
+        #expect(module.ir.contains("while.end.1:"))
+        #expect(module.ir.contains("srem i64"))
+        #expect(module.ir.contains("icmp eq i64"))
+        #expect(module.ir.contains("br label %while.cond.1"))
+    }
+
     @Test("Calls between lowerable Int functions stay in LLVM")
     func callsBetweenLowerableIntFunctionsStayInLLVM() throws {
         let module = try parseModule(

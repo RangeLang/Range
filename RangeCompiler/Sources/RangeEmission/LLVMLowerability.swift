@@ -226,9 +226,10 @@ enum LLVMLowerability {
                     return false
                 }
             case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-                .compoundAssignment, .expression, .forEach, .return, .break, .continue,
-                .switchStatement:
+                .compoundAssignment, .expression, .forEach, .return, .switchStatement:
                 return false
+            case .break, .continue:
+                continue
             }
         }
 

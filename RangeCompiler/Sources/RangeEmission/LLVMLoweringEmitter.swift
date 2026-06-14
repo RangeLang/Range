@@ -136,6 +136,7 @@ private struct LLVMFunctionEmitter {
     private var nextRegister = 0
     private var nextLabel = 0
     private var blockTerminated = false
+    private var loopTargets: [(conditionLabel: String, endLabel: String)] = []
 
     init(
         signature: LLVMLowerability.ScalarSignature,
@@ -184,9 +185,18 @@ private struct LLVMFunctionEmitter {
             blockTerminated = true
         case .return(nil):
             throw LLVMLoweringError("LLVM lowering does not support bare return.")
+        case .break:
+            guard let target = loopTargets.last else {
+                throw LLVMLoweringError("LLVM break requires an enclosing loop.")
+            }
+            emitBranch(to: target.endLabel)
+        case .continue:
+            guard let target = loopTargets.last else {
+                throw LLVMLoweringError("LLVM continue requires an enclosing loop.")
+            }
+            emitBranch(to: target.conditionLabel)
         case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-            .compoundAssignment, .expression, .forEach, .break, .continue,
-            .switchStatement:
+            .compoundAssignment, .expression, .forEach, .switchStatement:
             throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
         }
     }
@@ -255,6 +265,10 @@ private struct LLVMFunctionEmitter {
         blockTerminated = true
 
         emitLabel(bodyLabel)
+        loopTargets.append((conditionLabel: conditionLabel, endLabel: endLabel))
+        defer {
+            _ = loopTargets.popLast()
+        }
         for statement in body {
             try emitStatement(statement)
             if blockTerminated {
