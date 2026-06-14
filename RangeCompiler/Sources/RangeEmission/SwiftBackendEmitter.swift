@@ -139,8 +139,7 @@ struct SwiftBackendEmitter {
                 {
                     let symbol = LLVMLoweringEmitter.symbolName(for: callable)
                     guard seenSymbols.insert(symbol).inserted,
-                        let signature = LLVMLowerability.scalarSignature(for: callable),
-                        llvmSignatureIsSwiftBridgeable(signature)
+                        let signature = LLVMLowerability.scalarSignature(for: callable)
                     else {
                         continue
                     }
@@ -171,18 +170,6 @@ struct SwiftBackendEmitter {
             return llvmCandidateCallables(from: program)
                 .filter { !loweredNames.contains($0.name) }
                 .map { callable in
-                    if let signature = LLVMLowerability.scalarSignature(for: callable),
-                        LLVMLowerability.canLower(
-                            callable,
-                            lowerableFunctionSignatures: loweredSignatures
-                        ),
-                        !llvmSignatureIsSwiftBridgeable(signature)
-                    {
-                        return LLVMRejectedCallable(
-                            name: callable.name,
-                            reason: "has String parameters that are not Swift-LLVM bridgeable yet"
-                        )
-                    }
                     return LLVMRejectedCallable(
                         name: callable.name,
                         reason: LLVMLowerability.rejectionReason(
@@ -198,12 +185,6 @@ struct SwiftBackendEmitter {
             -> [CallableDeclaration]
         {
             program.callables + program.units.flatMap(\.callables)
-        }
-
-        private static func llvmSignatureIsSwiftBridgeable(
-            _ signature: LLVMLowerability.ScalarSignature
-        ) -> Bool {
-            !signature.parameters.contains(.string)
         }
 
         private static func collectLLVMBridges(
@@ -1456,6 +1437,22 @@ struct SwiftBackendEmitter {
                         ),
                         as: UTF8.self
                     )
+                }
+
+                static func withString<Result>(
+                    _ value: String,
+                    _ body: (__RangeLLVMString) throws -> Result
+                ) rethrows -> Result {
+                    var bytes = Array(value.utf8)
+                    bytes.append(0)
+                    return try bytes.withUnsafeBufferPointer { buffer in
+                        try body(
+                            __RangeLLVMString(
+                                pointer: buffer.baseAddress!,
+                                count: Int64(bytes.count - 1)
+                            )
+                        )
+                    }
                 }
             }
             """
@@ -4088,12 +4085,43 @@ struct SwiftBackendEmitter {
             )
         }
 
-        let renderedArguments = try zip(arguments, bridge.signature.parameters).map {
-            argument, type in
-            try emitLLVMBridgeArgument(argument.value, type: type, scope: scope)
-        }.joined(separator: ", ")
-        let call = "\(bridge.symbolName)(\(renderedArguments))"
+        let call = try emitLLVMBridgeCallExpression(
+            symbolName: bridge.symbolName,
+            arguments: arguments,
+            parameterTypes: bridge.signature.parameters,
+            scope: scope
+        )
         return emitLLVMBridgeReturn(call, type: bridge.signature.returnType)
+    }
+
+    private func emitLLVMBridgeCallExpression(
+        symbolName: String,
+        arguments: [CallArgument],
+        parameterTypes: [LLVMLowerability.ScalarType],
+        scope: EmissionScope
+    ) throws -> String {
+        func build(index: Int, renderedArguments: [String]) throws -> String {
+            guard index < arguments.count else {
+                return "\(symbolName)(\(renderedArguments.joined(separator: ", ")))"
+            }
+
+            let argument = arguments[index]
+            let type = parameterTypes[index]
+            if type == .string {
+                let rendered = try emitExpression(argument.value, scope: scope)
+                let name = "__rangeLLVMStringArgument\(index)"
+                let nested = try build(
+                    index: index + 1,
+                    renderedArguments: renderedArguments + [name]
+                )
+                return "__RangeLLVMString.withString(\(rendered)) { \(name) in \(nested) }"
+            }
+
+            let rendered = try emitLLVMBridgeArgument(argument.value, type: type, scope: scope)
+            return try build(index: index + 1, renderedArguments: renderedArguments + [rendered])
+        }
+
+        return try build(index: 0, renderedArguments: [])
     }
 
     private func emitLLVMBridgeArgument(
@@ -4110,7 +4138,7 @@ struct SwiftBackendEmitter {
         case .float:
             return "Double(\(rendered))"
         case .string:
-            throw SwiftBackendError("Swift to LLVM String argument bridges are not supported yet.")
+            return rendered
         }
     }
 

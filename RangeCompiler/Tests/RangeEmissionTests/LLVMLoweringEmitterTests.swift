@@ -81,6 +81,59 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret %Range.String %name"))
     }
 
+    @Test("String literals use UTF8 byte counts")
+    func stringLiteralsUseUTF8ByteCounts() throws {
+        let callable = try parseCallable(
+            """
+            function greeting(): String {
+                return "hé"
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("@.range.string.0 = private unnamed_addr constant [4 x i8] c\"h\\C3\\A9\\00\", align 1"))
+        #expect(module.ir.contains("i64 3, 1"))
+    }
+
+    @Test("Calls between LLVM String functions stay in LLVM")
+    func callsBetweenLLVMStringFunctionsStayInLLVM() throws {
+        let module = try parseModule(
+            """
+            function echo(value: String): String {
+                return value
+            }
+
+            function greeting(): String {
+                return echo(value: "hello")
+            }
+            """
+        )
+
+        let signatures = Dictionary(
+            uniqueKeysWithValues: module.callables.compactMap { callable in
+                LLVMLowerability.scalarSignature(for: callable).map { (callable.name, $0) }
+            }
+        )
+
+        #expect(
+            module.callables.allSatisfy {
+                LLVMLowerability.canLower($0, lowerableFunctionSignatures: signatures)
+            }
+        )
+        let emission = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: module.callables)
+        )
+
+        #expect(emission.ir.contains("define %Range.String @RangeLLVM_echo(%Range.String %value)"))
+        #expect(emission.ir.contains("define %Range.String @RangeLLVM_greeting()"))
+        #expect(emission.ir.contains("call %Range.String @RangeLLVM_echo(%Range.String"))
+    }
+
     @Test("Nested Int while loops lower to LLVM basic blocks")
     func nestedIntWhileLoopsLowerToLLVMBasicBlocks() throws {
         let callable = try parseCallable(
@@ -876,10 +929,11 @@ struct LLVMLoweringEmitterTests {
             encoding: .utf8
         )
 
-        #expect(report.contains("LLVM lowered (1):"))
+        #expect(report.contains("LLVM lowered (2):"))
         #expect(report.contains("- add"))
-        #expect(report.contains("Swift emitted (1):"))
-        #expect(report.contains("- greet: has String parameters that are not Swift-LLVM bridgeable yet"))
+        #expect(report.contains("- greet"))
+        #expect(report.contains("Swift emitted (0):"))
+        #expect(report.contains("- none"))
     }
 
     @Test("Swift workspace emission bridges calls to LLVM object")
@@ -1146,6 +1200,71 @@ struct LLVMLoweringEmitterTests {
         #expect(main.contains("__RangeLLVMString.decode(RangeLLVM_greeting())"))
         #expect(ir.contains("define %Range.String @RangeLLVM_greeting()"))
         #expect(!main.contains("func greeting"))
+    }
+
+    @Test("Swift workspace emission bridges LLVM String arguments")
+    func swiftWorkspaceEmissionBridgesLLVMStringArguments() throws {
+        let source = try parseModule(
+            """
+            function echo(value: String): String {
+                return value
+            }
+
+            @main {
+                echo(value: "hello")
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMStringArgumentBridgeTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Main.swift",
+                        enumerations: source.enumerations,
+                        declarations: source.constructs,
+                        extensions: source.extensions,
+                        callables: source.callables,
+                        mainBlock: source.mainBlock
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let runtime = try String(
+            contentsOf: root.appendingPathComponent("Sources/Runtime.swift"),
+            encoding: .utf8
+        )
+        let main = try String(
+            contentsOf: root.appendingPathComponent("Sources/Main.swift"),
+            encoding: .utf8
+        )
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+
+        #expect(runtime.contains("static func withString<Result>"))
+        #expect(runtime.contains("func RangeLLVM_echo(_ argument0: __RangeLLVMString) -> __RangeLLVMString"))
+        #expect(
+            main.contains(
+                "__RangeLLVMString.decode(__RangeLLVMString.withString(\"hello\") { __rangeLLVMStringArgument0 in RangeLLVM_echo(__rangeLLVMStringArgument0) })"
+            )
+        )
+        #expect(ir.contains("define %Range.String @RangeLLVM_echo(%Range.String %value)"))
+        #expect(!main.contains("func echo"))
     }
 
     @Test("Swift workspace emission converts LLVM Float return for Swift wrappers")
