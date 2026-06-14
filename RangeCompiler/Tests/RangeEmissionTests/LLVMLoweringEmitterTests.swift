@@ -220,6 +220,41 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i64 0"))
     }
 
+    @Test("Bool state mutation in loop lowers to LLVM")
+    func boolStateMutationInLoopLowersToLLVM() throws {
+        let callable = try parseCallable(
+            """
+            function reachesThreshold(limit: Int): Bool {
+                state index: Int(0)
+                state found: Bool(false)
+
+                while index < limit {
+                    if index > 10 {
+                        state found: true
+                    }
+
+                    state index: index + 1
+                }
+
+                return found
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i1 @RangeLLVM_reachesThreshold(i64 %limit)"))
+        #expect(module.ir.contains("%found.addr = alloca i1"))
+        #expect(module.ir.contains("store i1 0, ptr %found.addr"))
+        #expect(module.ir.contains("icmp sgt i64"))
+        #expect(module.ir.contains("store i1 1, ptr %found.addr"))
+        #expect(module.ir.contains("load i1, ptr %found.addr"))
+        #expect(module.ir.contains("ret i1"))
+    }
+
     @Test("Calls between lowerable Int functions stay in LLVM")
     func callsBetweenLowerableIntFunctionsStayInLLVM() throws {
         let module = try parseModule(
