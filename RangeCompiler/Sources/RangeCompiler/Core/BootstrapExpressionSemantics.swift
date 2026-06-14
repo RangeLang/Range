@@ -236,8 +236,15 @@ public enum ExpressionTypeSemantics {
                     operatorResolver: operatorResolver
                 )
             case .and, .or:
-                throw ParseError(
-                    "Binary operator typing is not supported by bootstrap inference yet.")
+                return try inferLogicalType(
+                    expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                )
             }
         }
     }
@@ -1513,6 +1520,51 @@ public enum ExpressionTypeSemantics {
 
         throw ParseError(
             "Operator '\(operatorSymbol.rawValue)' has no matching core signature for \(lhsType.displayName) and \(rhsType.displayName)."
+        )
+    }
+
+    private static func inferLogicalType(
+        _ expression: Expression,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) throws -> BootstrapLiteralType {
+        guard case .binary(let lhs, let operatorSymbol, let rhs) = expression,
+            operatorSymbol == .and || operatorSymbol == .or
+        else {
+            throw ParseError("Expected logical expression.")
+        }
+
+        let lhsType = try inferType(
+            of: lhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver
+        )
+        let rhsType = try inferType(
+            of: rhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver
+        )
+
+        if isCompatible(actual: lhsType, expected: .named("Bool"), resolver: resolver),
+            isCompatible(actual: rhsType, expected: .named("Bool"), resolver: resolver)
+        {
+            return .typed(.named("Bool"))
+        }
+
+        throw ParseError(
+            "Operator '\(operatorSymbol.rawValue)' requires Bool operands, got \(lhsType.displayName) and \(rhsType.displayName)."
         )
     }
 

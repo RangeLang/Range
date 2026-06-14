@@ -152,6 +152,74 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("sub i64 10, %value"))
     }
 
+    @Test("Int comparison can return Bool through LLVM")
+    func intComparisonCanReturnBoolThroughLLVM() throws {
+        let callable = try parseCallable(
+            """
+            function isLess(lhs: Int, rhs: Int): Bool {
+                return lhs < rhs
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i1 @RangeLLVM_isLess(i64 %lhs, i64 %rhs)"))
+        #expect(module.ir.contains("%1 = icmp slt i64 %lhs, %rhs"))
+        #expect(module.ir.contains("ret i1 %1"))
+    }
+
+    @Test("Bool operators can return Bool through LLVM")
+    func boolOperatorsCanReturnBoolThroughLLVM() throws {
+        let callable = try parseCallable(
+            """
+            function both(lhs: Bool, rhs: Bool): Bool {
+                let combined: Bool(lhs && rhs)
+                return !combined
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i1 @RangeLLVM_both(i1 %lhs, i1 %rhs)"))
+        #expect(module.ir.contains("%1 = and i1 %lhs, %rhs"))
+        #expect(module.ir.contains("%2 = load i1, ptr %combined.addr"))
+        #expect(module.ir.contains("xor i1 %2, true"))
+        #expect(module.ir.contains("ret i1"))
+    }
+
+    @Test("Bool parameter can control Int return through LLVM")
+    func boolParameterCanControlIntReturnThroughLLVM() throws {
+        let callable = try parseCallable(
+            """
+            function choose(flag: Bool, value: Int): Int {
+                if flag {
+                    return value
+                } else {
+                    return 0
+                }
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_choose(i1 %flag, i64 %value)"))
+        #expect(module.ir.contains("br i1 %flag"))
+        #expect(module.ir.contains("ret i64 %value"))
+        #expect(module.ir.contains("ret i64 0"))
+    }
+
     @Test("Calls between lowerable Int functions stay in LLVM")
     func callsBetweenLowerableIntFunctionsStayInLLVM() throws {
         let module = try parseModule(
@@ -386,6 +454,87 @@ struct LLVMLoweringEmitterTests {
         #expect(!main.contains("func sum3"))
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("LLVM/RangeScalar.ll").path))
         #expect(FileManager.default.fileExists(atPath: root.appendingPathComponent("LLVM/RangeScalar.o").path))
+    }
+
+    @Test("Swift workspace emission bridges mixed Bool and Int LLVM calls")
+    func swiftWorkspaceEmissionBridgesMixedBoolAndIntLLVMCalls() throws {
+        let source = try parseModule(
+            """
+            function isLess(lhs: Int, rhs: Int): Bool {
+                return lhs < rhs
+            }
+
+            function choose(flag: Bool, value: Int): Int {
+                if flag {
+                    return value
+                } else {
+                    return 0
+                }
+            }
+
+            @main {
+                choose(flag: isLess(lhs: 1, rhs: 2), value: 42)
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMMixedBridgeTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Main.swift",
+                        enumerations: source.enumerations,
+                        declarations: source.constructs,
+                        extensions: source.extensions,
+                        callables: source.callables,
+                        mainBlock: source.mainBlock
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let runtime = try String(
+            contentsOf: root.appendingPathComponent("Sources/Runtime.swift"),
+            encoding: .utf8
+        )
+        let main = try String(
+            contentsOf: root.appendingPathComponent("Sources/Main.swift"),
+            encoding: .utf8
+        )
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+
+        #expect(
+            runtime.contains(
+                "func RangeLLVM_isLess(_ argument0: Int64, _ argument1: Int64) -> Bool"
+            )
+        )
+        #expect(
+            runtime.contains(
+                "func RangeLLVM_choose(_ argument0: Bool, _ argument1: Int64) -> Int64"
+            )
+        )
+        #expect(
+            main.contains(
+                "Int(RangeLLVM_choose(RangeLLVM_isLess(Int64(1), Int64(2)), Int64(42)))"
+            )
+        )
+        #expect(ir.contains("define i1 @RangeLLVM_isLess(i64 %lhs, i64 %rhs)"))
+        #expect(ir.contains("define i64 @RangeLLVM_choose(i1 %flag, i64 %value)"))
     }
 
     private func parseCallable(_ source: String) throws -> CallableDeclaration {

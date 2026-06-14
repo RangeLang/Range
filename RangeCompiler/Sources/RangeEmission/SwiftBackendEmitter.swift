@@ -4,7 +4,7 @@ import RangeCompiler
 struct SwiftBackendEmitter {
     private struct LLVMCallableBridge {
         let symbolName: String
-        let parameterCount: Int
+        let signature: LLVMLowerability.ScalarSignature
     }
 
     private struct SwiftEmissionContext {
@@ -116,7 +116,7 @@ struct SwiftBackendEmitter {
             let callables = program.callables + program.units.flatMap(\.callables)
             var seenSymbols: Set<String> = []
             var loweredCallables: [CallableDeclaration] = []
-            var loweredNames: Set<String> = []
+            var loweredSignatures: [String: LLVMLowerability.ScalarSignature] = [:]
 
             var changed = true
             while changed {
@@ -124,15 +124,17 @@ struct SwiftBackendEmitter {
                 for callable in callables
                     where LLVMLowerability.canLower(
                         callable,
-                        lowerableFunctionNames: loweredNames
+                        lowerableFunctionSignatures: loweredSignatures
                     )
                 {
                     let symbol = LLVMLoweringEmitter.symbolName(for: callable)
-                    guard seenSymbols.insert(symbol).inserted else {
+                    guard seenSymbols.insert(symbol).inserted,
+                        let signature = LLVMLowerability.scalarSignature(for: callable)
+                    else {
                         continue
                     }
                     loweredCallables.append(callable)
-                    loweredNames.insert(callable.name)
+                    loweredSignatures[callable.name] = signature
                     changed = true
                 }
             }
@@ -146,7 +148,8 @@ struct SwiftBackendEmitter {
             callables.reduce(into: [:]) { result, callable in
                 result[callable.name] = LLVMCallableBridge(
                     symbolName: LLVMLoweringEmitter.symbolName(for: callable),
-                    parameterCount: callable.parameters.count
+                    signature: LLVMLowerability.scalarSignature(for: callable)
+                        ?? LLVMLowerability.ScalarSignature(parameters: [], returnType: .int)
                 )
             }
         }
@@ -1362,16 +1365,25 @@ struct SwiftBackendEmitter {
     private func emitLLVMBridgeDeclarations() -> String {
         let bridges = context.llvmBridgesByCallableName.sorted { $0.key < $1.key }.map {
             _, bridge in
-            let parameters = (0..<bridge.parameterCount)
-                .map { "_ argument\($0): Int64" }
+            let parameters = bridge.signature.parameters.enumerated()
+                .map { index, type in "_ argument\(index): \(swiftLLVMBridgeType(for: type))" }
                 .joined(separator: ", ")
             return """
             @_silgen_name("\(bridge.symbolName)")
-            func \(bridge.symbolName)(\(parameters)) -> Int64
+            func \(bridge.symbolName)(\(parameters)) -> \(swiftLLVMBridgeType(for: bridge.signature.returnType))
             """
         }
 
         return bridges.joined(separator: "\n\n")
+    }
+
+    private func swiftLLVMBridgeType(for type: LLVMLowerability.ScalarType) -> String {
+        switch type {
+        case .int:
+            return "Int64"
+        case .bool:
+            return "Bool"
+        }
     }
 
     private func compileLLVMIR(irURL: URL, objectURL: URL) throws {
@@ -3952,16 +3964,44 @@ struct SwiftBackendEmitter {
         guard let bridge = context.llvmBridgesByCallableName[name] else {
             return nil
         }
-        guard arguments.count == bridge.parameterCount else {
+        guard arguments.count == bridge.signature.parameters.count else {
             throw SwiftBackendError(
-                "LLVM bridge call \(name) expects \(bridge.parameterCount) arguments, got \(arguments.count)."
+                "LLVM bridge call \(name) expects \(bridge.signature.parameters.count) arguments, got \(arguments.count)."
             )
         }
 
-        let renderedArguments = try arguments.map {
-            "Int64(\(try emitExpression($0.value, scope: scope)))"
+        let renderedArguments = try zip(arguments, bridge.signature.parameters).map {
+            argument, type in
+            try emitLLVMBridgeArgument(argument.value, type: type, scope: scope)
         }.joined(separator: ", ")
-        return "Int(\(bridge.symbolName)(\(renderedArguments)))"
+        let call = "\(bridge.symbolName)(\(renderedArguments))"
+        return emitLLVMBridgeReturn(call, type: bridge.signature.returnType)
+    }
+
+    private func emitLLVMBridgeArgument(
+        _ expression: RangeExpression,
+        type: LLVMLowerability.ScalarType,
+        scope: EmissionScope
+    ) throws -> String {
+        let rendered = try emitExpression(expression, scope: scope)
+        switch type {
+        case .int:
+            return "Int64(\(rendered))"
+        case .bool:
+            return rendered
+        }
+    }
+
+    private func emitLLVMBridgeReturn(
+        _ call: String,
+        type: LLVMLowerability.ScalarType
+    ) -> String {
+        switch type {
+        case .int:
+            return "Int(\(call))"
+        case .bool:
+            return call
+        }
     }
 
     private func emitKnownCoreStorageInitializer(

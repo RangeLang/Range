@@ -21,8 +21,18 @@ struct LLVMLoweringEmitter {
         }
 
         let symbolsByName = Dictionary(
-            uniqueKeysWithValues: lowerableFunctions.map {
-                ($0.name, Self.symbolName(for: $0))
+            uniqueKeysWithValues: lowerableFunctions.compactMap {
+                callable -> (String, LLVMFunctionEmitter.CallableSymbol)? in
+                guard let signature = LLVMLowerability.scalarSignature(for: callable) else {
+                    return nil
+                }
+                return (
+                    callable.name,
+                    LLVMFunctionEmitter.CallableSymbol(
+                        symbolName: Self.symbolName(for: callable),
+                        signature: signature
+                    )
+                )
             }
         )
         let functions = try lowerableFunctions.map {
@@ -47,23 +57,29 @@ struct LLVMLoweringEmitter {
 
     private func emitFunction(
         _ callable: CallableDeclaration,
-        symbolsByName: [String: String]
+        symbolsByName: [String: LLVMFunctionEmitter.CallableSymbol]
     ) throws -> String {
         guard let body = callable.body else {
             throw LLVMLoweringError("LLVM lowering requires function \(callable.name) to have a body.")
         }
+        guard let signature = LLVMLowerability.scalarSignature(for: callable) else {
+            throw LLVMLoweringError("LLVM lowering requires scalar function \(callable.name).")
+        }
 
         var function = LLVMFunctionEmitter(
+            signature: signature,
             parameters: callable.parameters,
             callableSymbolsByName: symbolsByName
         )
         try function.emitBody(body)
-        let parameterList = callable.parameters.map { "i64 %\($0.name)" }.joined(separator: ", ")
+        let parameterList = zip(callable.parameters, signature.parameters)
+            .map { parameter, type in "\(type.llvmType) %\(parameter.name)" }
+            .joined(separator: ", ")
         let instructions = function.lines.joined(separator: "\n")
 
         let instructionBlock = instructions.isEmpty ? "" : "\(instructions)\n"
         return """
-            define i64 @\(Self.symbolName(for: callable))(\(parameterList)) {
+            define \(signature.returnType.llvmType) @\(Self.symbolName(for: callable))(\(parameterList)) {
             entry:
             \(instructionBlock)}
             """
@@ -84,30 +100,23 @@ struct LLVMLoweringEmitter {
     }
 }
 
+private extension LLVMLowerability.ScalarType {
+    var llvmType: String {
+        switch self {
+        case .int:
+            return "i64"
+        case .bool:
+            return "i1"
+        }
+    }
+}
+
 private struct LLVMFunctionEmitter {
-    private enum ScalarType {
-        case int
-        case bool
+    private typealias ScalarType = LLVMLowerability.ScalarType
 
-        var llvmType: String {
-            switch self {
-            case .int:
-                return "i64"
-            case .bool:
-                return "i1"
-            }
-        }
-
-        init?(typeReference: TypeReference) {
-            switch typeReference.displayName {
-            case "Int":
-                self = .int
-            case "Bool":
-                self = .bool
-            default:
-                return nil
-            }
-        }
+    struct CallableSymbol {
+        let symbolName: String
+        let signature: LLVMLowerability.ScalarSignature
     }
 
     private enum Symbol {
@@ -121,15 +130,24 @@ private struct LLVMFunctionEmitter {
     }
 
     private var symbols: [String: Symbol]
-    private let callableSymbolsByName: [String: String]
+    private let returnType: ScalarType
+    private let callableSymbolsByName: [String: CallableSymbol]
     private(set) var lines: [String] = []
     private var nextRegister = 0
     private var nextLabel = 0
     private var blockTerminated = false
 
-    init(parameters: [RangeFunctionParameter], callableSymbolsByName: [String: String]) {
+    init(
+        signature: LLVMLowerability.ScalarSignature,
+        parameters: [RangeFunctionParameter],
+        callableSymbolsByName: [String: CallableSymbol]
+    ) {
+        self.returnType = signature.returnType
         self.symbols = Dictionary(
-            uniqueKeysWithValues: parameters.map { ($0.name, Symbol.parameter(.int)) }
+            uniqueKeysWithValues: zip(parameters, signature.parameters).map {
+                parameter, type in
+                (parameter.name, Symbol.parameter(type))
+            }
         )
         self.callableSymbolsByName = callableSymbolsByName
     }
@@ -159,10 +177,10 @@ private struct LLVMFunctionEmitter {
             try emitConditional(branches)
         case .return(let expression?):
             let value = try emitExpression(expression)
-            guard value.type == "i64" else {
-                throw LLVMLoweringError("LLVM return value must be i64.")
+            guard value.type == returnType.llvmType else {
+                throw LLVMLoweringError("LLVM return value must be \(returnType.llvmType).")
             }
-            emit("ret i64 \(value.representation)")
+            emit("ret \(returnType.llvmType) \(value.representation)")
             blockTerminated = true
         case .return(nil):
             throw LLVMLoweringError("LLVM lowering does not support bare return.")
@@ -350,19 +368,30 @@ private struct LLVMFunctionEmitter {
             )
             return Value(type: instruction.resultType, representation: register)
         case .call(let name, let arguments):
-            guard let symbol = callableSymbolsByName[name] else {
+            guard let callable = callableSymbolsByName[name] else {
                 throw LLVMLoweringError("LLVM lowering cannot resolve callable '\(name)'.")
             }
             let argumentValues = try arguments.map { try emitExpression($0.value) }
-            guard argumentValues.allSatisfy({ $0.type == "i64" }) else {
-                throw LLVMLoweringError("LLVM lowered calls currently require i64 arguments.")
+            guard argumentValues.count == callable.signature.parameters.count else {
+                throw LLVMLoweringError("LLVM lowered call '\(name)' has wrong argument count.")
+            }
+            for (argumentValue, parameterType) in zip(argumentValues, callable.signature.parameters) {
+                guard argumentValue.type == parameterType.llvmType else {
+                    throw LLVMLoweringError(
+                        "LLVM lowered call '\(name)' argument must be \(parameterType.llvmType)."
+                    )
+                }
             }
             let register = freshRegister()
-            let argumentsText = argumentValues
-                .map { "i64 \($0.representation)" }
+            let argumentsText = zip(argumentValues, callable.signature.parameters)
+                .map { argumentValue, parameterType in
+                    "\(parameterType.llvmType) \(argumentValue.representation)"
+                }
                 .joined(separator: ", ")
-            emit("\(register) = call i64 @\(symbol)(\(argumentsText))")
-            return Value(type: "i64", representation: register)
+            emit(
+                "\(register) = call \(callable.signature.returnType.llvmType) @\(callable.symbolName)(\(argumentsText))"
+            )
+            return Value(type: callable.signature.returnType.llvmType, representation: register)
         default:
             throw LLVMLoweringError("LLVM lowering does not support expression \(expression).")
         }
