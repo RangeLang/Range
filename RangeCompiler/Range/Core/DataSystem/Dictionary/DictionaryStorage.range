@@ -1,4 +1,3 @@
-@language
 construct DictionaryStorage<Key, Value> {
     derived count: Int
     derived isEmpty: Bool

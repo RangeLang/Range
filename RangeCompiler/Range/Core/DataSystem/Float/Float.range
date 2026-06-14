@@ -1,4 +1,3 @@
-@language
 construct Float<let width: IntLiteral> {
     let storage: FloatStorage
 

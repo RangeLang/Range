@@ -1204,7 +1204,7 @@ struct CompilerFixtureTests {
         let syntax = program.programGraph.syntax
 
         let constructSyntax = try #require(
-            syntax.first { $0.identity.label == "@language Construct" }
+            syntax.first { $0.identity.label == "Construct" }
         )
         #expect(constructSyntax.declarations.map(\.label) == ["Declaration"])
         #expect(constructSyntax.applications.map(\.label) == ["Application"])

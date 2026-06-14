@@ -1,4 +1,3 @@
-@language
 construct Bool {
     let storage: BoolStorage
 

@@ -1,4 +1,3 @@
-@language
 construct Channel<Element> {
     let storage: ChannelStorage<Element>(capacity: 0)
 

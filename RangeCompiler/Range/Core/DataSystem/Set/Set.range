@@ -1,4 +1,3 @@
-@language
 @literal
 construct Set<Element> {
     state storage: SetStorage<Element>()

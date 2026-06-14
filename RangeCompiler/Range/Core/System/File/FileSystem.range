@@ -1,28 +1,23 @@
-@language
 enum FileReadError {
     case missing
     case unreadable
 }
 
-@language
 enum FileWriteError {
     case unwritable
 }
 
-@language
 enum FileSystemEntryKind {
     case file
     case directory
 }
 
-@language
 construct FileSystemEntry {
     let path: String
     let name: String
     let kind: FileSystemEntryKind
 }
 
-@language
 construct FileTreeNode {
     let path: String
     let name: String
@@ -39,7 +34,6 @@ construct FileManager {
     function listEntries(path: String): Result<[FileSystemEntry], FileReadError>
 }
 
-@language
 construct FileTree {
     function rangeFiles(path: String): [String] {
         switch read(path: path) {

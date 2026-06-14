@@ -1,15 +1,12 @@
-@language
 enum MemoryAccessError {
     case invalid
     case outOfMemory
 }
 
-@language
 construct MemoryAddress {
     let raw: Int
 }
 
-@language
 construct MemoryRegion {
     let address: MemoryAddress
     let byteCount: Int

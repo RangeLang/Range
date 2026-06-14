@@ -1,4 +1,3 @@
-@language
 @literal
 @syntax
 construct Array<Element> {

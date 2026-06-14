@@ -1,4 +1,3 @@
-@language
 @literal
 construct Dictionary<Key, Value> {
     state storage: DictionaryStorage<Key, Value>()

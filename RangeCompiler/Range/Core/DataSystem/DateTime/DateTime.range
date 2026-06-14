@@ -1,4 +1,3 @@
-@language
 construct DateTime {
     let storage: DateTimeStorage
 

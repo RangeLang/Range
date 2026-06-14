@@ -1,4 +1,3 @@
-@language
 construct Optional<Wrapped> {
     function literal(literal: NilLiteral): Self
 }

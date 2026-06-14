@@ -1,4 +1,3 @@
-@language
 construct ArrayStorage<Element> {
     derived count: Int
     derived isEmpty: Bool

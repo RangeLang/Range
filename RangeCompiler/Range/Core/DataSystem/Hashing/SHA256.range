@@ -1,4 +1,3 @@
-@language
 construct SHA256 {
     function digest(data: Data): Data
 

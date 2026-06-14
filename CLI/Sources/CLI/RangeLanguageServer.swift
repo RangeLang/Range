@@ -619,7 +619,7 @@ struct RangeLanguageServer {
 
     private func attributeCompletions() -> [[String: Any]] {
         let builtinAttributes = [
-            "@main", "@Project", "@package", "@syntax", "@background", "@language",
+            "@main", "@Project", "@package", "@syntax", "@background",
         ].map { completionItem(label: $0, kind: 14, detail: "attribute") }
 
         return uniqueCompletionItems(builtinAttributes)

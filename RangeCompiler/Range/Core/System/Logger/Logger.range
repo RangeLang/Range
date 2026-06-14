@@ -1,4 +1,3 @@
-@language
 construct Logger {
     function log(message: String)
     function debug(message: String)

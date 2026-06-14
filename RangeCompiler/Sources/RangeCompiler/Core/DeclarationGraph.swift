@@ -1322,7 +1322,7 @@ private struct SyntaxProjectionAccumulator {
 
     private mutating func addConstruct(_ declaration: ConstructDeclaration, parentID: String) {
         let constructID = "\(parentID)/construct:\(declaration.name)"
-        let label = declaration.isCore ? "@language \(declaration.name)" : declaration.name
+        let label = declaration.name
         let entity = SemanticGraphEntity(id: constructID, kind: .construct, label: label)
         addEntity(entity)
         addRelation(from: parentID, to: constructID, kind: .contains)
@@ -1567,7 +1567,7 @@ private struct SyntaxProjectionAccumulator {
 
         for nested in nestedConstructs {
             let nestedID = "\(ownerID)/construct:\(nested.name)"
-            let nestedLabel = nested.isCore ? "@language \(nested.name)" : nested.name
+            let nestedLabel = nested.name
             let nestedEntity = SemanticGraphEntity(
                 id: nestedID,
                 kind: .construct,
