@@ -318,6 +318,7 @@ struct LLVMLoweringEmitterTests {
 
         #expect(module.ir.contains("declare ptr @malloc(i64)"))
         #expect(module.ir.contains("declare void @free(ptr)"))
+        #expect(module.ir.contains("declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)"))
         #expect(module.ir.contains("declare void @llvm.trap() noreturn nounwind"))
         #expect(module.ir.contains("%Range.IntArray = type { ptr, i64, i64 }"))
         #expect(module.ir.contains("mul i64 %limit, 8"))
@@ -326,6 +327,9 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("insertvalue %Range.IntArray"))
         #expect(module.ir.contains("i64 0, 1"))
         #expect(module.ir.contains("icmp slt i64"))
+        #expect(module.ir.contains("array.grow."))
+        #expect(module.ir.contains("select i1"))
+        #expect(module.ir.contains("call void @llvm.memcpy.p0.p0.i64"))
         #expect(module.ir.contains("array.element.bounds.ok."))
         #expect(module.ir.contains("array.element.bounds.trap."))
         #expect(module.ir.contains("call void @llvm.trap()"))
@@ -333,6 +337,33 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("store i64"))
         #expect(module.ir.contains("load i64, ptr"))
         #expect(module.ir.contains("define i64 @RangeLLVM_sumAllocated(i64 %limit)"))
+    }
+
+    @Test("Int array append grows from zero capacity")
+    func intArrayAppendGrowsFromZeroCapacity() throws {
+        let callable = try parseCallable(
+            """
+            function grown(): Int {
+                state values: [Int](capacity: 0)
+                values.append(element: 4)
+                values.append(element: 8)
+                return values.element(index: 1)
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("array.grow."))
+        #expect(module.ir.contains("icmp eq i64"))
+        #expect(module.ir.contains("select i1"))
+        #expect(module.ir.contains("i64 1"))
+        #expect(module.ir.contains("call void @llvm.memcpy.p0.p0.i64"))
+        #expect(module.ir.contains("call void @free(ptr"))
+        #expect(module.ir.contains("ret i64"))
     }
 
     @Test("Int array update lowers with LLVM bounds check")

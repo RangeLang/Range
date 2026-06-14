@@ -144,6 +144,7 @@ private final class LLVMStringTable {
     private var requiresIntArrayType = false
     private var requiresMalloc = false
     private var requiresFree = false
+    private var requiresMemcpy = false
     private var requiresTrap = false
 
     func requireStringType() {
@@ -162,6 +163,10 @@ private final class LLVMStringTable {
         requiresFree = true
     }
 
+    func requireMemcpy() {
+        requiresMemcpy = true
+    }
+
     func requireTrap() {
         requiresTrap = true
     }
@@ -177,7 +182,7 @@ private final class LLVMStringTable {
     }
 
     func supportDefinitions() -> String {
-        guard requiresType || requiresIntArrayType || requiresMalloc || requiresFree || requiresTrap else {
+        guard requiresType || requiresIntArrayType || requiresMalloc || requiresFree || requiresMemcpy || requiresTrap else {
             return ""
         }
         var definitions: [String] = []
@@ -192,6 +197,9 @@ private final class LLVMStringTable {
         }
         if requiresFree {
             definitions.append("declare void @free(ptr)")
+        }
+        if requiresMemcpy {
+            definitions.append("declare void @llvm.memcpy.p0.p0.i64(ptr, ptr, i64, i1)")
         }
         if requiresTrap {
             definitions.append("declare void @llvm.trap() noreturn nounwind")
@@ -844,35 +852,87 @@ private struct LLVMFunctionEmitter {
 
         let labelID = freshLabelID()
         let appendLabel = "array.append.\(labelID)"
-        let trapLabel = "array.trap.\(labelID)"
+        let growLabel = "array.grow.\(labelID)"
         let endLabel = "array.end.\(labelID)"
-        emit("br i1 \(canAppendRegister), label %\(appendLabel), label %\(trapLabel)")
+        emit("br i1 \(canAppendRegister), label %\(appendLabel), label %\(growLabel)")
         blockTerminated = true
 
-        stringTable.requireTrap()
-        emitLabel(trapLabel)
-        emit("call void @llvm.trap()")
-        emit("unreachable")
-        blockTerminated = true
+        emitLabel(growLabel)
+        let grownArray = try emitIntArrayGrowth(
+            array: base.value,
+            count: countRegister,
+            capacity: capacityRegister
+        )
+        emit("store %Range.IntArray \(grownArray.representation), ptr \(base.pointer)")
+        emitBranch(to: appendLabel)
 
         emitLabel(appendLabel)
+        let currentArrayRegister = freshRegister()
+        emit("\(currentArrayRegister) = load %Range.IntArray, ptr \(base.pointer)")
+        let currentArray = Value(type: "%Range.IntArray", representation: currentArrayRegister)
+        let currentCountRegister = freshRegister()
+        emit("\(currentCountRegister) = extractvalue %Range.IntArray \(currentArray.representation), 1")
         let pointerRegister = freshRegister()
-        emit("\(pointerRegister) = extractvalue %Range.IntArray \(base.value.representation), 0")
+        emit("\(pointerRegister) = extractvalue %Range.IntArray \(currentArray.representation), 0")
         let elementPointerRegister = freshRegister()
         emit(
-            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(countRegister)"
+            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(currentCountRegister)"
         )
         emit("store i64 \(element.representation), ptr \(elementPointerRegister)")
         let nextCountRegister = freshRegister()
-        emit("\(nextCountRegister) = add i64 \(countRegister), 1")
+        emit("\(nextCountRegister) = add i64 \(currentCountRegister), 1")
         let updatedArrayRegister = freshRegister()
         emit(
-            "\(updatedArrayRegister) = insertvalue %Range.IntArray \(base.value.representation), i64 \(nextCountRegister), 1"
+            "\(updatedArrayRegister) = insertvalue %Range.IntArray \(currentArray.representation), i64 \(nextCountRegister), 1"
         )
         emit("store %Range.IntArray \(updatedArrayRegister), ptr \(base.pointer)")
         emitBranch(to: endLabel)
 
         emitLabel(endLabel)
+    }
+
+    private mutating func emitIntArrayGrowth(
+        array: Value,
+        count: String,
+        capacity: String
+    ) throws -> Value {
+        guard array.type == "%Range.IntArray" else {
+            throw LLVMLoweringError("LLVM Array<Int> growth requires Array<Int>.")
+        }
+
+        stringTable.requireMalloc()
+        stringTable.requireFree()
+        stringTable.requireMemcpy()
+
+        let doubledCapacityRegister = freshRegister()
+        emit("\(doubledCapacityRegister) = mul i64 \(capacity), 2")
+        let capacityIsZeroRegister = freshRegister()
+        emit("\(capacityIsZeroRegister) = icmp eq i64 \(capacity), 0")
+        let newCapacityRegister = freshRegister()
+        emit(
+            "\(newCapacityRegister) = select i1 \(capacityIsZeroRegister), i64 1, i64 \(doubledCapacityRegister)"
+        )
+        let byteCountRegister = freshRegister()
+        emit("\(byteCountRegister) = mul i64 \(newCapacityRegister), 8")
+        let newPointerRegister = freshRegister()
+        emit("\(newPointerRegister) = call ptr @malloc(i64 \(byteCountRegister))")
+        let oldPointerRegister = freshRegister()
+        emit("\(oldPointerRegister) = extractvalue %Range.IntArray \(array.representation), 0")
+        let copiedByteCountRegister = freshRegister()
+        emit("\(copiedByteCountRegister) = mul i64 \(count), 8")
+        emit(
+            "call void @llvm.memcpy.p0.p0.i64(ptr \(newPointerRegister), ptr \(oldPointerRegister), i64 \(copiedByteCountRegister), i1 false)"
+        )
+        emit("call void @free(ptr \(oldPointerRegister))")
+        let pointerArrayRegister = freshRegister()
+        emit(
+            "\(pointerArrayRegister) = insertvalue %Range.IntArray \(array.representation), ptr \(newPointerRegister), 0"
+        )
+        let capacityArrayRegister = freshRegister()
+        emit(
+            "\(capacityArrayRegister) = insertvalue %Range.IntArray \(pointerArrayRegister), i64 \(newCapacityRegister), 2"
+        )
+        return Value(type: "%Range.IntArray", representation: capacityArrayRegister)
     }
 
     private mutating func emitLowerableIntArrayUpdate(
