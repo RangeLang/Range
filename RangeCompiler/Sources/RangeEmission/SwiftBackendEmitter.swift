@@ -3431,6 +3431,9 @@ struct SwiftBackendEmitter {
 
         let base = String(name[..<dotIndex])
         let suffix = String(name[dotIndex...])
+        if suffix == ".byteCount", base.first?.isUppercase != true {
+            return "\(base).utf8.count"
+        }
         guard base.first?.isUppercase == true else {
             return name
         }

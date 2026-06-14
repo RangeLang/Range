@@ -987,8 +987,13 @@ enum LLVMLowerability {
     private struct LowerableMemberAccess {
         let baseName: String
         let baseType: ScalarType
-        let member: String
+        let member: LowerableMember
         let result: ScalarType
+    }
+
+    private enum LowerableMember {
+        case byteCount
+        case isEmpty
     }
 
     private static func lowerableMemberAccess(
@@ -999,21 +1004,43 @@ enum LLVMLowerability {
             return nil
         }
         let baseName = String(name[..<dotIndex])
-        let member = String(name[name.index(after: dotIndex)...])
+        let memberName = String(name[name.index(after: dotIndex)...])
         guard let baseType = locals[baseName] else {
             return nil
         }
 
-        switch (baseType, member) {
+        guard let member = lowerableMember(baseType: baseType, name: memberName) else {
+            return nil
+        }
+
+        return LowerableMemberAccess(
+            baseName: baseName,
+            baseType: baseType,
+            member: member,
+            result: resultType(for: member)
+        )
+    }
+
+    private static func lowerableMember(
+        baseType: ScalarType,
+        name: String
+    ) -> LowerableMember? {
+        switch (baseType, name) {
+        case (.string, "byteCount"):
+            return .byteCount
         case (.string, "isEmpty"):
-            return LowerableMemberAccess(
-                baseName: baseName,
-                baseType: baseType,
-                member: member,
-                result: .bool
-            )
+            return .isEmpty
         default:
             return nil
+        }
+    }
+
+    private static func resultType(for member: LowerableMember) -> ScalarType {
+        switch member {
+        case .byteCount:
+            return .int
+        case .isEmpty:
+            return .bool
         }
     }
 

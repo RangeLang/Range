@@ -1,5 +1,6 @@
 construct StringStorage {
     derived count: Int
+    derived byteCount: Int
     derived isEmpty: Bool
     function character(index: Int): String
     function substring(start: Int, end: Int): String

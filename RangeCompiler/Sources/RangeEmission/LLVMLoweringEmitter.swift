@@ -173,6 +173,11 @@ private final class LLVMStringTable {
 private struct LLVMFunctionEmitter {
     private typealias ScalarType = LLVMLowerability.ScalarType
 
+    private enum LowerableMember {
+        case byteCount
+        case isEmpty
+    }
+
     struct CallableSymbol {
         let symbolName: String
         let signature: LLVMLowerability.ScalarSignature
@@ -612,8 +617,8 @@ private struct LLVMFunctionEmitter {
             return nil
         }
         let baseName = String(name[..<dotIndex])
-        let member = String(name[name.index(after: dotIndex)...])
-        guard member == "isEmpty" else {
+        let memberName = String(name[name.index(after: dotIndex)...])
+        guard let member = lowerableMember(name: memberName) else {
             return nil
         }
 
@@ -624,9 +629,25 @@ private struct LLVMFunctionEmitter {
 
         let countRegister = freshRegister()
         emit("\(countRegister) = extractvalue %Range.String \(base.representation), 1")
-        let resultRegister = freshRegister()
-        emit("\(resultRegister) = icmp eq i64 \(countRegister), 0")
-        return Value(type: "i1", representation: resultRegister)
+        switch member {
+        case .byteCount:
+            return Value(type: "i64", representation: countRegister)
+        case .isEmpty:
+            let resultRegister = freshRegister()
+            emit("\(resultRegister) = icmp eq i64 \(countRegister), 0")
+            return Value(type: "i1", representation: resultRegister)
+        }
+    }
+
+    private func lowerableMember(name: String) -> LowerableMember? {
+        switch name {
+        case "byteCount":
+            return .byteCount
+        case "isEmpty":
+            return .isEmpty
+        default:
+            return nil
+        }
     }
 
     private mutating func emitIdentifier(named name: String) throws -> Value {
