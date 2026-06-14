@@ -7,6 +7,11 @@ struct SwiftBackendEmitter {
         let signature: LLVMLowerability.ScalarSignature
     }
 
+    fileprivate struct LLVMRejectedCallable {
+        let name: String
+        let reason: String
+    }
+
     private struct SwiftEmissionContext {
         var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
         var genericParameterNames: Set<String> = []
@@ -15,6 +20,7 @@ struct SwiftBackendEmitter {
         var callableParameterLabelsByName: [String: [[String]]] = [:]
         var llvmBridgesByCallableName: [String: LLVMCallableBridge] = [:]
         var llvmLoweredCallables: [CallableDeclaration] = []
+        var llvmRejectedCallables: [LLVMRejectedCallable] = []
 
         init() {}
 
@@ -35,6 +41,10 @@ struct SwiftBackendEmitter {
             self.callableParameterLabelsByName = Self.collectCallableParameterLabels(from: program)
             self.llvmLoweredCallables = Self.collectLLVMLoweredCallables(from: program)
             self.llvmBridgesByCallableName = Self.collectLLVMBridges(from: llvmLoweredCallables)
+            self.llvmRejectedCallables = Self.collectLLVMRejectedCallables(
+                from: program,
+                loweredCallables: llvmLoweredCallables
+            )
         }
 
         private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<
@@ -113,7 +123,7 @@ struct SwiftBackendEmitter {
         private static func collectLLVMLoweredCallables(from program: LoweredProgram)
             -> [CallableDeclaration]
         {
-            let callables = program.callables + program.units.flatMap(\.callables)
+            let callables = llvmCandidateCallables(from: program)
             var seenSymbols: Set<String> = []
             var loweredCallables: [CallableDeclaration] = []
             var loweredSignatures: [String: LLVMLowerability.ScalarSignature] = [:]
@@ -140,6 +150,41 @@ struct SwiftBackendEmitter {
             }
 
             return loweredCallables
+        }
+
+        private static func collectLLVMRejectedCallables(
+            from program: LoweredProgram,
+            loweredCallables: [CallableDeclaration]
+        ) -> [LLVMRejectedCallable] {
+            let loweredNames = Set(loweredCallables.map(\.name))
+            let loweredSignatures = Dictionary(
+                uniqueKeysWithValues: loweredCallables.compactMap {
+                    callable -> (String, LLVMLowerability.ScalarSignature)? in
+                    guard let signature = LLVMLowerability.scalarSignature(for: callable) else {
+                        return nil
+                    }
+                    return (callable.name, signature)
+                }
+            )
+
+            return llvmCandidateCallables(from: program)
+                .filter { !loweredNames.contains($0.name) }
+                .map { callable in
+                    LLVMRejectedCallable(
+                        name: callable.name,
+                        reason: LLVMLowerability.rejectionReason(
+                            for: callable,
+                            lowerableFunctionSignatures: loweredSignatures
+                        ) ?? "uses unsupported LLVM shape"
+                    )
+                }
+                .uniquedByNameAndReason()
+        }
+
+        private static func llvmCandidateCallables(from program: LoweredProgram)
+            -> [CallableDeclaration]
+        {
+            program.callables + program.units.flatMap(\.callables)
         }
 
         private static func collectLLVMBridges(
@@ -414,6 +459,12 @@ struct SwiftBackendEmitter {
             encoding: .utf8
         )
 
+        try emitEmissionReport().write(
+            to: root.appendingPathComponent("EmissionReport.txt"),
+            atomically: true,
+            encoding: .utf8
+        )
+
         for unit in program.units {
             let content = try emitSourceUnit(unit)
             try content.write(
@@ -436,6 +487,31 @@ struct SwiftBackendEmitter {
             )
             try compileLLVMIR(irURL: irURL, objectURL: objectURL)
         }
+    }
+
+    private func emitEmissionReport() -> String {
+        var lines: [String] = ["Range Emission Report", ""]
+
+        lines.append("LLVM lowered (\(context.llvmLoweredCallables.count)):")
+        if context.llvmLoweredCallables.isEmpty {
+            lines.append("- none")
+        } else {
+            for callable in context.llvmLoweredCallables.sorted(by: { $0.name < $1.name }) {
+                lines.append("- \(callable.name)")
+            }
+        }
+
+        lines.append("")
+        lines.append("Swift emitted (\(context.llvmRejectedCallables.count)):")
+        if context.llvmRejectedCallables.isEmpty {
+            lines.append("- none")
+        } else {
+            for rejected in context.llvmRejectedCallables.sorted(by: { $0.name < $1.name }) {
+                lines.append("- \(rejected.name): \(rejected.reason)")
+            }
+        }
+
+        return lines.joined(separator: "\n") + "\n"
     }
 
     private func emitRuntimeSupport(includeFoundationImport: Bool) -> String {
@@ -4218,5 +4294,20 @@ struct SwiftBackendEmitter {
         }
 
         return String(normalized[normalized.index(after: dot)...])
+    }
+}
+
+private extension Array where Element == SwiftBackendEmitter.LLVMRejectedCallable {
+    func uniquedByNameAndReason() -> [Element] {
+        var seen: Set<String> = []
+        var result: [Element] = []
+        for element in self {
+            let key = "\(element.name)\u{0}\(element.reason)"
+            guard seen.insert(key).inserted else {
+                continue
+            }
+            result.append(element)
+        }
+        return result
     }
 }

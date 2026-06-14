@@ -62,6 +62,55 @@ enum LLVMLowerability {
         )
     }
 
+    static func rejectionReason(
+        for callable: CallableDeclaration,
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> String? {
+        if canLower(callable, lowerableFunctionSignatures: lowerableFunctionSignatures) {
+            return nil
+        }
+        if callable.targetType != nil {
+            return "has a target type"
+        }
+        if callable.receiverType != nil {
+            return "has a receiver type"
+        }
+        if !callable.genericParameters.isEmpty {
+            return "has generic parameters"
+        }
+        guard let returnType = callable.returnType else {
+            return "has no explicit return type"
+        }
+        guard let scalarReturnType = ScalarType(typeReference: returnType) else {
+            return "return type \(returnType.displayName) is not an LLVM scalar"
+        }
+        for parameter in callable.parameters {
+            guard let typeReference = parameter.typeReference else {
+                return "parameter \(parameter.name) has no explicit type"
+            }
+            guard ScalarType(typeReference: typeReference) != nil else {
+                return "parameter \(parameter.name) type \(typeReference.displayName) is not an LLVM scalar"
+            }
+        }
+        guard let body = callable.body else {
+            return "has no body"
+        }
+        guard !body.isEmpty else {
+            return "has an empty body"
+        }
+
+        var locals: [String: ScalarType] = [:]
+        for (parameter, type) in zip(callable.parameters, scalarSignature(for: callable)?.parameters ?? []) {
+            locals[parameter.name] = type
+        }
+        return statementRejectionReason(
+            body,
+            returnType: scalarReturnType,
+            locals: &locals,
+            lowerableFunctionSignatures: lowerableFunctionSignatures
+        ) ?? "uses unsupported LLVM shape"
+    }
+
     static func scalarSignature(for callable: CallableDeclaration) -> ScalarSignature? {
         guard let returnType = callable.returnType.flatMap(ScalarType.init(typeReference:)) else {
             return nil
@@ -171,6 +220,288 @@ enum LLVMLowerability {
         }
 
         return sawReturn
+    }
+
+    private static func statementRejectionReason(
+        _ statements: [Statement],
+        returnType: ScalarType,
+        locals: inout [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> String? {
+        var sawReturn = false
+        for statement in statements {
+            if sawReturn {
+                return "has statements after return"
+            }
+            switch statement {
+            case .localBinding(let declaration):
+                guard let type = ScalarType(typeReference: declaration.type) else {
+                    return "local \(declaration.name) type \(declaration.type.displayName) is not an LLVM scalar"
+                }
+                guard let expressionType = canLower(
+                    declaration.expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return expressionRejectionReason(
+                        declaration.expression,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures
+                    )
+                }
+                guard canConvert(expressionType, to: type) else {
+                    return "local \(declaration.name) initializer is \(expressionType), expected \(type)"
+                }
+                locals[declaration.name] = type
+            case .assignment(let target, let expression):
+                guard case .local(let name) = target else {
+                    return "assignment target is not local state"
+                }
+                guard let type = locals[name] else {
+                    return "assignment target \(name) is unknown"
+                }
+                guard let expressionType = canLower(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return expressionRejectionReason(
+                        expression,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures
+                    )
+                }
+                guard canConvert(expressionType, to: type) else {
+                    return "assignment to \(name) is \(expressionType), expected \(type)"
+                }
+            case .compoundAssignment(let target, let operatorSymbol, let expression):
+                guard case .plusEquals = operatorSymbol else {
+                    return "compound assignment \(operatorSymbol.rawValue) is unsupported"
+                }
+                guard case .local(let name) = target else {
+                    return "compound assignment target is not local state"
+                }
+                guard let type = locals[name] else {
+                    return "compound assignment target \(name) is unknown"
+                }
+                guard let rhsType = canLower(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return expressionRejectionReason(
+                        expression,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures
+                    )
+                }
+                guard resultType(for: .addition, lhs: type, rhs: rhsType) == type else {
+                    return "compound assignment \(name) += value cannot preserve \(type)"
+                }
+            case .whileLoop(let condition, let body):
+                guard canLower(
+                    condition,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) == .bool else {
+                    return "while condition is not Bool"
+                }
+                var bodyLocals = locals
+                if let reason = loopBodyRejectionReason(
+                    body,
+                    locals: &bodyLocals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) {
+                    return reason
+                }
+            case .conditional(let branches):
+                if !canLowerConditional(
+                    branches,
+                    returnType: returnType,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) {
+                    return "conditional contains unsupported LLVM statements"
+                }
+            case .return(let expression?):
+                guard let expressionType = canLower(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return expressionRejectionReason(
+                        expression,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures
+                    )
+                }
+                guard canConvert(expressionType, to: returnType) else {
+                    return "return expression is \(expressionType), expected \(returnType)"
+                }
+                sawReturn = true
+            case .return(nil):
+                return "uses bare return"
+            case .macroInvocation:
+                return "uses a statement macro invocation"
+            case .expand:
+                return "uses expand"
+            case .background:
+                return "uses background"
+            case .deferBlock:
+                return "uses defer"
+            case .localCallable:
+                return "uses a local function"
+            case .derived:
+                return "uses derived"
+            case .expression:
+                return "uses an expression statement"
+            case .forEach:
+                return "uses forEach"
+            case .break:
+                return "uses break outside a lowerable loop body"
+            case .continue:
+                return "uses continue outside a lowerable loop body"
+            case .switchStatement:
+                return "uses switch"
+            }
+        }
+        return sawReturn ? nil : "does not end with an explicit return"
+    }
+
+    private static func loopBodyRejectionReason(
+        _ statements: [Statement],
+        locals: inout [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> String? {
+        if canLowerLoopBody(
+            statements,
+            locals: &locals,
+            lowerableFunctionSignatures: lowerableFunctionSignatures
+        ) {
+            return nil
+        }
+        return "loop body contains unsupported LLVM statements"
+    }
+
+    private static func expressionRejectionReason(
+        _ expression: Expression,
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> String {
+        switch expression {
+        case .integer, .double, .boolean:
+            return "literal expression should be lowerable"
+        case .identifier(let name):
+            return "identifier \(name) is not an LLVM scalar local"
+        case .call(let name, let arguments):
+            guard let signature = lowerableFunctionSignatures[name] else {
+                return "call \(name) is not LLVM-lowered"
+            }
+            guard arguments.count == signature.parameters.count else {
+                return "call \(name) has wrong argument count"
+            }
+            for (argument, parameterType) in zip(arguments, signature.parameters) {
+                guard let argumentType = canLower(
+                    argument.value,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return expressionRejectionReason(
+                        argument.value,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures
+                    )
+                }
+                guard canConvert(argumentType, to: parameterType) else {
+                    return "call \(name) argument is \(argumentType), expected \(parameterType)"
+                }
+            }
+            return "call \(name) should be lowerable"
+        case .unary(.not, let nested):
+            guard canLower(
+                nested,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) == .bool else {
+                return "! operand is not Bool"
+            }
+            return "! expression should be lowerable"
+        case .binary(let lhs, let operatorSymbol, let rhs):
+            guard let lhsType = canLower(
+                lhs,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) else {
+                return expressionRejectionReason(
+                    lhs,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                )
+            }
+            guard let rhsType = canLower(
+                rhs,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) else {
+                return expressionRejectionReason(
+                    rhs,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                )
+            }
+            guard resultType(for: operatorSymbol, lhs: lhsType, rhs: rhsType) != nil else {
+                return "operator \(operatorSymbol.rawValue) is unsupported for \(lhsType) and \(rhsType)"
+            }
+            return "binary expression should be lowerable"
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            guard canLower(
+                condition,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) == .bool else {
+                return "ternary condition is not Bool"
+            }
+            guard let trueType = canLower(
+                trueExpression,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) else {
+                return expressionRejectionReason(
+                    trueExpression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                )
+            }
+            guard let falseType = canLower(
+                falseExpression,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) else {
+                return expressionRejectionReason(
+                    falseExpression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                )
+            }
+            guard ternaryResultType(trueType, falseType) != nil else {
+                return "ternary branches \(trueType) and \(falseType) are incompatible"
+            }
+            return "ternary expression should be lowerable"
+        case .string, .interpolatedString:
+            return "uses String"
+        case .nilLiteral:
+            return "uses nil"
+        case .macroInvocation:
+            return "uses expression macro invocation"
+        case .block:
+            return "uses block expression"
+        case .bindingReference:
+            return "uses binding reference"
+        case .array:
+            return "uses Array"
+        case .dictionary:
+            return "uses Dictionary"
+        }
     }
 
     private static func canLowerLoopBody(

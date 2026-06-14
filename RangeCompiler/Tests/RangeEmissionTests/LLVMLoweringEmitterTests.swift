@@ -677,6 +677,59 @@ struct LLVMLoweringEmitterTests {
         #expect(ir.contains("%1 = mul i64 %lhs, %rhs"))
     }
 
+    @Test("Swift workspace emission writes hybrid emission report")
+    func swiftWorkspaceEmissionWritesHybridEmissionReport() throws {
+        let source = try parseModule(
+            """
+            function add(lhs: Int, rhs: Int): Int {
+                return lhs + rhs
+            }
+
+            function greet(name: String): String {
+                return name
+            }
+            """
+        )
+
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMEmissionReportTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: source.enumerations,
+                declarations: source.constructs,
+                extensions: source.extensions,
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Main.swift",
+                        enumerations: [],
+                        declarations: [],
+                        extensions: [],
+                        callables: source.callables,
+                        mainBlock: source.mainBlock
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let report = try String(
+            contentsOf: root.appendingPathComponent("EmissionReport.txt"),
+            encoding: .utf8
+        )
+
+        #expect(report.contains("LLVM lowered (1):"))
+        #expect(report.contains("- add"))
+        #expect(report.contains("Swift emitted (1):"))
+        #expect(report.contains("- greet: return type String is not an LLVM scalar"))
+    }
+
     @Test("Swift workspace emission bridges calls to LLVM object")
     func swiftWorkspaceEmissionBridgesCallsToLLVMObject() throws {
         let source = try parseModule(
