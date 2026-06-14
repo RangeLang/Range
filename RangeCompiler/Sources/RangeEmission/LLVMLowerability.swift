@@ -903,6 +903,9 @@ enum LLVMLowerability {
         case .boolean:
             return .bool
         case .identifier(let name):
+            if let member = lowerableMemberAccess(name: name, locals: locals) {
+                return member.result
+            }
             return locals[name]
         case .call(let name, let arguments):
             guard let signature = lowerableFunctionSignatures[name],
@@ -979,6 +982,39 @@ enum LLVMLowerability {
             return false
         }
         return actual == expected || (actual == .int && expected == .float)
+    }
+
+    private struct LowerableMemberAccess {
+        let baseName: String
+        let baseType: ScalarType
+        let member: String
+        let result: ScalarType
+    }
+
+    private static func lowerableMemberAccess(
+        name: String,
+        locals: [String: ScalarType]
+    ) -> LowerableMemberAccess? {
+        guard let dotIndex = name.lastIndex(of: ".") else {
+            return nil
+        }
+        let baseName = String(name[..<dotIndex])
+        let member = String(name[name.index(after: dotIndex)...])
+        guard let baseType = locals[baseName] else {
+            return nil
+        }
+
+        switch (baseType, member) {
+        case (.string, "isEmpty"):
+            return LowerableMemberAccess(
+                baseName: baseName,
+                baseType: baseType,
+                member: member,
+                result: .bool
+            )
+        default:
+            return nil
+        }
     }
 
     private static func ternaryResultType(_ lhs: ScalarType, _ rhs: ScalarType) -> ScalarType? {

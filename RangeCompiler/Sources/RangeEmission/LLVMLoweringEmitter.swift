@@ -529,6 +529,9 @@ private struct LLVMFunctionEmitter {
             emit("\(countRegister) = insertvalue %Range.String \(storageRegister), i64 \(byteCount), 1")
             return Value(type: "%Range.String", representation: countRegister)
         case .identifier(let name):
+            if let member = try emitLowerableMemberAccess(name: name) {
+                return member
+            }
             guard let symbol = symbols[name] else {
                 throw LLVMLoweringError("LLVM lowering cannot resolve identifier '\(name)'.")
             }
@@ -601,6 +604,42 @@ private struct LLVMFunctionEmitter {
             return Value(type: callable.signature.returnType.llvmType, representation: register)
         default:
             throw LLVMLoweringError("LLVM lowering does not support expression \(expression).")
+        }
+    }
+
+    private mutating func emitLowerableMemberAccess(name: String) throws -> Value? {
+        guard let dotIndex = name.lastIndex(of: ".") else {
+            return nil
+        }
+        let baseName = String(name[..<dotIndex])
+        let member = String(name[name.index(after: dotIndex)...])
+        guard member == "isEmpty" else {
+            return nil
+        }
+
+        let base = try emitIdentifier(named: baseName)
+        guard base.type == "%Range.String" else {
+            return nil
+        }
+
+        let countRegister = freshRegister()
+        emit("\(countRegister) = extractvalue %Range.String \(base.representation), 1")
+        let resultRegister = freshRegister()
+        emit("\(resultRegister) = icmp eq i64 \(countRegister), 0")
+        return Value(type: "i1", representation: resultRegister)
+    }
+
+    private mutating func emitIdentifier(named name: String) throws -> Value {
+        guard let symbol = symbols[name] else {
+            throw LLVMLoweringError("LLVM lowering cannot resolve identifier '\(name)'.")
+        }
+        switch symbol {
+        case .parameter(let type):
+            return Value(type: type.llvmType, representation: "%\(name)")
+        case .stackSlot(let pointer, let type, _):
+            let register = freshRegister()
+            emit("\(register) = load \(type.llvmType), ptr \(pointer)")
+            return Value(type: type.llvmType, representation: register)
         }
     }
 

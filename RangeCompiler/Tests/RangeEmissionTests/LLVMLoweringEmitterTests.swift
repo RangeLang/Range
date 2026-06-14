@@ -134,6 +134,50 @@ struct LLVMLoweringEmitterTests {
         #expect(emission.ir.contains("call %Range.String @RangeLLVM_echo(%Range.String"))
     }
 
+    @Test("String isEmpty member lowers through LLVM count projection")
+    func stringIsEmptyMemberLowersThroughLLVMCountProjection() throws {
+        let callable = try parseCallable(
+            """
+            function empty(value: String): Bool {
+                return value.isEmpty
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i1 @RangeLLVM_empty(%Range.String %value)"))
+        #expect(module.ir.contains("extractvalue %Range.String %value, 1"))
+        #expect(module.ir.contains("icmp eq i64"))
+        #expect(module.ir.contains("ret i1"))
+    }
+
+    @Test("String literal local isEmpty lowers through LLVM")
+    func stringLiteralLocalIsEmptyLowersThroughLLVM() throws {
+        let callable = try parseCallable(
+            """
+            function literalEmpty(): Bool {
+                let value: String("")
+                return value.isEmpty
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("@.range.string.0 = private unnamed_addr constant [1 x i8] c\"\\00\", align 1"))
+        #expect(module.ir.contains("insertvalue %Range.String"))
+        #expect(module.ir.contains("store %Range.String"))
+        #expect(module.ir.contains("extractvalue %Range.String"))
+        #expect(module.ir.contains("icmp eq i64"))
+    }
+
     @Test("Nested Int while loops lower to LLVM basic blocks")
     func nestedIntWhileLoopsLowerToLLVMBasicBlocks() throws {
         let callable = try parseCallable(
@@ -1265,6 +1309,67 @@ struct LLVMLoweringEmitterTests {
         )
         #expect(ir.contains("define %Range.String @RangeLLVM_echo(%Range.String %value)"))
         #expect(!main.contains("func echo"))
+    }
+
+    @Test("Swift workspace emission bridges LLVM String isEmpty Bool returns")
+    func swiftWorkspaceEmissionBridgesLLVMStringIsEmptyBoolReturns() throws {
+        let source = try parseModule(
+            """
+            function empty(value: String): Bool {
+                return value.isEmpty
+            }
+
+            @main {
+                empty(value: "")
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMStringIsEmptyBridgeTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Main.swift",
+                        enumerations: source.enumerations,
+                        declarations: source.constructs,
+                        extensions: source.extensions,
+                        callables: source.callables,
+                        mainBlock: source.mainBlock
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let runtime = try String(
+            contentsOf: root.appendingPathComponent("Sources/Runtime.swift"),
+            encoding: .utf8
+        )
+        let main = try String(
+            contentsOf: root.appendingPathComponent("Sources/Main.swift"),
+            encoding: .utf8
+        )
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+
+        #expect(runtime.contains("func RangeLLVM_empty(_ argument0: __RangeLLVMString) -> Bool"))
+        #expect(main.contains("__RangeLLVMString.withString(\"\") { __rangeLLVMStringArgument0 in RangeLLVM_empty(__rangeLLVMStringArgument0) }"))
+        #expect(ir.contains("define i1 @RangeLLVM_empty(%Range.String %value)"))
+        #expect(ir.contains("extractvalue %Range.String %value, 1"))
+        #expect(!main.contains("func empty"))
     }
 
     @Test("Swift workspace emission converts LLVM Float return for Swift wrappers")
