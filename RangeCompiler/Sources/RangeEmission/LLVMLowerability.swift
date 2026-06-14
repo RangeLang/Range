@@ -6,10 +6,11 @@ enum LLVMLowerability {
         var returnType: ScalarType
     }
 
-    enum ScalarType {
+    enum ScalarType: Equatable {
         case int
         case bool
         case float
+        case string
 
         init?(typeReference: TypeReference) {
             switch typeReference.displayName {
@@ -19,6 +20,8 @@ enum LLVMLowerability {
                 self = .bool
             case "Float":
                 self = .float
+            case "String":
+                self = .string
             default:
                 return nil
             }
@@ -516,8 +519,10 @@ enum LLVMLowerability {
                 return "ternary branches \(trueType) and \(falseType) are incompatible"
             }
             return "ternary expression should be lowerable"
-        case .string, .interpolatedString:
-            return "uses String"
+        case .string:
+            return "literal expression should be lowerable"
+        case .interpolatedString:
+            return "uses interpolated String"
         case .nilLiteral:
             return "uses nil"
         case .macroInvocation:
@@ -961,7 +966,9 @@ enum LLVMLowerability {
                 return nil
             }
             return ternaryResultType(trueType, falseType)
-        case .string, .interpolatedString, .nilLiteral, .macroInvocation, .block,
+        case .string:
+            return .string
+        case .interpolatedString, .nilLiteral, .macroInvocation, .block,
             .bindingReference, .array, .dictionary:
             return nil
         }
@@ -975,7 +982,7 @@ enum LLVMLowerability {
     }
 
     private static func ternaryResultType(_ lhs: ScalarType, _ rhs: ScalarType) -> ScalarType? {
-        if lhs == rhs {
+        if lhs == rhs, lhs != .string {
             return lhs
         }
         if lhs.isNumeric, rhs.isNumeric {
@@ -998,7 +1005,7 @@ enum LLVMLowerability {
         case .remainder:
             return lhs == .int && rhs == .int ? .int : nil
         case .equal, .notEqual:
-            if lhs == rhs {
+            if lhs == rhs, lhs != .string {
                 return .bool
             }
             return lhs.isNumeric && rhs.isNumeric ? .bool : nil
@@ -1019,7 +1026,7 @@ private extension LLVMLowerability.ScalarType {
         switch self {
         case .int, .float:
             return true
-        case .bool:
+        case .bool, .string:
             return false
         }
     }

@@ -139,7 +139,8 @@ struct SwiftBackendEmitter {
                 {
                     let symbol = LLVMLoweringEmitter.symbolName(for: callable)
                     guard seenSymbols.insert(symbol).inserted,
-                        let signature = LLVMLowerability.scalarSignature(for: callable)
+                        let signature = LLVMLowerability.scalarSignature(for: callable),
+                        llvmSignatureIsSwiftBridgeable(signature)
                     else {
                         continue
                     }
@@ -170,7 +171,19 @@ struct SwiftBackendEmitter {
             return llvmCandidateCallables(from: program)
                 .filter { !loweredNames.contains($0.name) }
                 .map { callable in
-                    LLVMRejectedCallable(
+                    if let signature = LLVMLowerability.scalarSignature(for: callable),
+                        LLVMLowerability.canLower(
+                            callable,
+                            lowerableFunctionSignatures: loweredSignatures
+                        ),
+                        !llvmSignatureIsSwiftBridgeable(signature)
+                    {
+                        return LLVMRejectedCallable(
+                            name: callable.name,
+                            reason: "has String parameters that are not Swift-LLVM bridgeable yet"
+                        )
+                    }
+                    return LLVMRejectedCallable(
                         name: callable.name,
                         reason: LLVMLowerability.rejectionReason(
                             for: callable,
@@ -185,6 +198,12 @@ struct SwiftBackendEmitter {
             -> [CallableDeclaration]
         {
             program.callables + program.units.flatMap(\.callables)
+        }
+
+        private static func llvmSignatureIsSwiftBridgeable(
+            _ signature: LLVMLowerability.ScalarSignature
+        ) -> Bool {
+            !signature.parameters.contains(.string)
         }
 
         private static func collectLLVMBridges(
@@ -1424,6 +1443,21 @@ struct SwiftBackendEmitter {
                 case breakLoop
                 case continueLoop
             }
+
+            struct __RangeLLVMString {
+                let pointer: UnsafePointer<UInt8>
+                let count: Int64
+
+                static func decode(_ value: __RangeLLVMString) -> String {
+                    String(
+                        decoding: UnsafeBufferPointer(
+                            start: value.pointer,
+                            count: Int(value.count)
+                        ),
+                        as: UTF8.self
+                    )
+                }
+            }
             """
 
         let hostIOImport = """
@@ -1461,6 +1495,8 @@ struct SwiftBackendEmitter {
             return "Bool"
         case .float:
             return "Double"
+        case .string:
+            return "__RangeLLVMString"
         }
     }
 
@@ -4073,6 +4109,8 @@ struct SwiftBackendEmitter {
             return rendered
         case .float:
             return "Double(\(rendered))"
+        case .string:
+            throw SwiftBackendError("Swift to LLVM String argument bridges are not supported yet.")
         }
     }
 
@@ -4087,6 +4125,8 @@ struct SwiftBackendEmitter {
             return call
         case .float:
             return "Float(\(call))"
+        case .string:
+            return "__RangeLLVMString.decode(\(call))"
         }
     }
 

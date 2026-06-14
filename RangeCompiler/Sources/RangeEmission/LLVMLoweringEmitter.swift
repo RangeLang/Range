@@ -35,14 +35,20 @@ struct LLVMLoweringEmitter {
                 )
             }
         )
+        let stringTable = LLVMStringTable()
+        for symbol in symbolsByName.values where symbol.signature.usesString {
+            stringTable.requireStringType()
+        }
         let functions = try lowerableFunctions.map {
-            try emitFunction($0, symbolsByName: symbolsByName)
+            try emitFunction($0, symbolsByName: symbolsByName, stringTable: stringTable)
         }
         .joined(separator: "\n\n")
+        let support = stringTable.supportDefinitions()
+        let supportBlock = support.isEmpty ? "" : "\n\(support)\n"
         let ir = """
             ; ModuleID = '\(moduleName)'
             source_filename = "\(moduleName).ll"
-
+            \(supportBlock)
             \(functions)
             """
 
@@ -57,7 +63,8 @@ struct LLVMLoweringEmitter {
 
     private func emitFunction(
         _ callable: CallableDeclaration,
-        symbolsByName: [String: LLVMFunctionEmitter.CallableSymbol]
+        symbolsByName: [String: LLVMFunctionEmitter.CallableSymbol],
+        stringTable: LLVMStringTable
     ) throws -> String {
         guard let body = callable.body else {
             throw LLVMLoweringError("LLVM lowering requires function \(callable.name) to have a body.")
@@ -69,7 +76,8 @@ struct LLVMLoweringEmitter {
         var function = LLVMFunctionEmitter(
             signature: signature,
             parameters: callable.parameters,
-            callableSymbolsByName: symbolsByName
+            callableSymbolsByName: symbolsByName,
+            stringTable: stringTable
         )
         try function.emitBody(body)
         let parameterList = zip(callable.parameters, signature.parameters)
@@ -109,7 +117,56 @@ private extension LLVMLowerability.ScalarType {
             return "i1"
         case .float:
             return "double"
+        case .string:
+            return "%Range.String"
         }
+    }
+}
+
+private extension LLVMLowerability.ScalarSignature {
+    var usesString: Bool {
+        returnType == .string || parameters.contains(.string)
+    }
+}
+
+private final class LLVMStringTable {
+    private var namesByValue: [String: String] = [:]
+    private var requiresType = false
+
+    func requireStringType() {
+        requiresType = true
+    }
+
+    func constantName(for value: String) -> String {
+        requireStringType()
+        if let name = namesByValue[value] {
+            return name
+        }
+        let name = "@.range.string.\(namesByValue.count)"
+        namesByValue[value] = name
+        return name
+    }
+
+    func supportDefinitions() -> String {
+        guard requiresType else {
+            return ""
+        }
+        let globals = namesByValue.sorted { $0.value < $1.value }.map { value, name in
+            let bytes = Array(value.utf8)
+            return "\(name) = private unnamed_addr constant [\(bytes.count + 1) x i8] c\"\(llvmEscapedCString(bytes))\\00\", align 1"
+        }
+        return (["%Range.String = type { ptr, i64 }"] + globals).joined(separator: "\n")
+    }
+
+    private func llvmEscapedCString(_ bytes: [UInt8]) -> String {
+        bytes.map { byte in
+            switch byte {
+            case 0x20...0x21, 0x23...0x5B, 0x5D...0x7E:
+                return String(UnicodeScalar(byte))
+            default:
+                return String(format: "\\%02X", byte)
+            }
+        }.joined()
     }
 }
 
@@ -134,6 +191,7 @@ private struct LLVMFunctionEmitter {
     private var symbols: [String: Symbol]
     private let returnType: ScalarType
     private let callableSymbolsByName: [String: CallableSymbol]
+    private let stringTable: LLVMStringTable
     private(set) var lines: [String] = []
     private var nextRegister = 0
     private var nextLabel = 0
@@ -143,7 +201,8 @@ private struct LLVMFunctionEmitter {
     init(
         signature: LLVMLowerability.ScalarSignature,
         parameters: [RangeFunctionParameter],
-        callableSymbolsByName: [String: CallableSymbol]
+        callableSymbolsByName: [String: CallableSymbol],
+        stringTable: LLVMStringTable
     ) {
         self.returnType = signature.returnType
         self.symbols = Dictionary(
@@ -153,6 +212,7 @@ private struct LLVMFunctionEmitter {
             }
         )
         self.callableSymbolsByName = callableSymbolsByName
+        self.stringTable = stringTable
     }
 
     mutating func emitBody(_ body: [Statement]) throws {
@@ -456,6 +516,18 @@ private struct LLVMFunctionEmitter {
             return Value(type: "double", representation: llvmDoubleLiteral(value))
         case .boolean(let value):
             return Value(type: "i1", representation: value ? "1" : "0")
+        case .string(let value):
+            let name = stringTable.constantName(for: value)
+            let byteCount = value.utf8.count
+            let pointerRegister = freshRegister()
+            emit(
+                "\(pointerRegister) = getelementptr inbounds [\(byteCount + 1) x i8], ptr \(name), i64 0, i64 0"
+            )
+            let storageRegister = freshRegister()
+            emit("\(storageRegister) = insertvalue %Range.String undef, ptr \(pointerRegister), 0")
+            let countRegister = freshRegister()
+            emit("\(countRegister) = insertvalue %Range.String \(storageRegister), i64 \(byteCount), 1")
+            return Value(type: "%Range.String", representation: countRegister)
         case .identifier(let name):
             guard let symbol = symbols[name] else {
                 throw LLVMLoweringError("LLVM lowering cannot resolve identifier '\(name)'.")
