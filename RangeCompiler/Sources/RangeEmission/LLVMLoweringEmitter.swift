@@ -184,6 +184,8 @@ private struct LLVMFunctionEmitter {
             try emitWhileLoop(condition: condition, body: body)
         case .conditional(let branches):
             try emitConditional(branches)
+        case .switchStatement(let expression, let cases, let defaultBody):
+            try emitSwitch(expression: expression, cases: cases, defaultBody: defaultBody)
         case .return(let expression?):
             let value = try emitExpression(expression)
             let converted = try convert(value, to: returnType)
@@ -205,7 +207,7 @@ private struct LLVMFunctionEmitter {
             }
             emitBranch(to: target.conditionLabel)
         case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-            .expression, .forEach, .switchStatement:
+            .expression, .forEach:
             throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
         }
     }
@@ -383,6 +385,69 @@ private struct LLVMFunctionEmitter {
         }
     }
 
+    private mutating func emitSwitch(
+        expression: RangeCompiler.Expression,
+        cases: [SwitchCase],
+        defaultBody: [Statement]?
+    ) throws {
+        guard !cases.isEmpty else {
+            throw LLVMLoweringError("LLVM switch requires at least one case.")
+        }
+        guard let defaultBody else {
+            throw LLVMLoweringError("LLVM switch requires a default branch.")
+        }
+
+        let subject = try emitExpression(expression)
+        guard subject.type == "i64" || subject.type == "i1" else {
+            throw LLVMLoweringError("LLVM switch subject must be i64 or i1.")
+        }
+
+        let labelID = freshLabelID()
+        let defaultLabel = "switch.default.\(labelID)"
+        let endLabel = "switch.end.\(labelID)"
+        let caseLabels = cases.indices.map { "switch.case.\(labelID).\($0)" }
+        let caseLiterals = try cases.map { try switchCaseLiteral($0.pattern, subjectType: subject.type) }
+
+        emit("switch \(subject.type) \(subject.representation), label %\(defaultLabel) [")
+        for (literal, label) in zip(caseLiterals, caseLabels) {
+            lines.append("    \(subject.type) \(literal), label %\(label)")
+        }
+        lines.append("  ]")
+        blockTerminated = true
+
+        var allBranchesTerminate = true
+        for (switchCase, label) in zip(cases, caseLabels) {
+            emitLabel(label)
+            try emitStatements(switchCase.body)
+            if !blockTerminated {
+                allBranchesTerminate = false
+                emitBranch(to: endLabel)
+            }
+        }
+
+        emitLabel(defaultLabel)
+        try emitStatements(defaultBody)
+        if !blockTerminated {
+            allBranchesTerminate = false
+            emitBranch(to: endLabel)
+        }
+
+        if allBranchesTerminate {
+            blockTerminated = true
+        } else {
+            emitLabel(endLabel)
+        }
+    }
+
+    private mutating func emitStatements(_ statements: [Statement]) throws {
+        for statement in statements {
+            try emitStatement(statement)
+            if blockTerminated {
+                break
+            }
+        }
+    }
+
     private mutating func emitExpression(_ expression: RangeCompiler.Expression) throws -> Value {
         switch expression {
         case .integer(let value):
@@ -549,6 +614,21 @@ private struct LLVMFunctionEmitter {
             return Value(type: "double", representation: register)
         }
         return value
+    }
+
+    private func switchCaseLiteral(_ pattern: SwitchCasePattern, subjectType: String) throws -> String {
+        guard case .expression(let expression) = pattern else {
+            throw LLVMLoweringError("LLVM switch only supports literal expression cases.")
+        }
+
+        switch (subjectType, expression) {
+        case ("i64", .integer(let value)):
+            return String(value)
+        case ("i1", .boolean(let value)):
+            return value ? "1" : "0"
+        default:
+            throw LLVMLoweringError("LLVM switch case literal must match the switch subject.")
+        }
     }
 
     private func llvmInstruction(

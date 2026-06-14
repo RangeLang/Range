@@ -399,6 +399,120 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i64 0"))
     }
 
+    @Test("Int switch lowers to LLVM switch")
+    func intSwitchLowersToLLVMSwitch() throws {
+        let callable = try parseCallable(
+            """
+            function classify(value: Int): Int {
+                switch value {
+                case 0:
+                    return 10
+                case 1:
+                    return 20
+                default:
+                    return 30
+                }
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_classify(i64 %value)"))
+        #expect(module.ir.contains("switch i64 %value, label %switch.default."))
+        #expect(module.ir.contains("i64 0, label %switch.case."))
+        #expect(module.ir.contains("i64 1, label %switch.case."))
+        #expect(module.ir.contains("ret i64 10"))
+        #expect(module.ir.contains("ret i64 20"))
+        #expect(module.ir.contains("ret i64 30"))
+    }
+
+    @Test("Bool switch lowers to LLVM switch")
+    func boolSwitchLowersToLLVMSwitch() throws {
+        let callable = try parseCallable(
+            """
+            function boolScore(flag: Bool): Int {
+                switch flag {
+                case true:
+                    return 1
+                default:
+                    return 0
+                }
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_boolScore(i1 %flag)"))
+        #expect(module.ir.contains("switch i1 %flag, label %switch.default."))
+        #expect(module.ir.contains("i1 1, label %switch.case."))
+        #expect(module.ir.contains("ret i64 1"))
+        #expect(module.ir.contains("ret i64 0"))
+    }
+
+    @Test("Non returning scalar switch branches join after LLVM switch")
+    func nonReturningScalarSwitchBranchesJoinAfterLLVMSwitch() throws {
+        let callable = try parseCallable(
+            """
+            function mapped(value: Int): Int {
+                state result: Int(0)
+
+                switch value {
+                case 0:
+                    state result: 10
+                case 1:
+                    state result: 20
+                default:
+                    state result: 30
+                }
+
+                return result
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_mapped(i64 %value)"))
+        #expect(module.ir.contains("switch i64 %value, label %switch.default."))
+        #expect(module.ir.contains("br label %switch.end."))
+        #expect(module.ir.contains("switch.end."))
+        #expect(module.ir.contains("load i64, ptr %result.addr"))
+        #expect(module.ir.contains("ret i64"))
+    }
+
+    @Test("Scalar switch without default is not lowerable")
+    func scalarSwitchWithoutDefaultIsNotLowerable() throws {
+        let callable = try parseCallable(
+            """
+            function classify(value: Int): Int {
+                switch value {
+                case 0:
+                    return 10
+                }
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable) == false)
+        #expect(
+            LLVMLowerability.rejectionReason(
+                for: callable,
+                lowerableFunctionSignatures: [:]
+            ) == "switch has no default"
+        )
+    }
+
     @Test("Bool state mutation in loop lowers to LLVM")
     func boolStateMutationInLoopLowersToLLVM() throws {
         let callable = try parseCallable(
@@ -1142,6 +1256,8 @@ struct LLVMLoweringEmitterTests {
             "define i1 @RangeLLVM_llvmIsLess(i64 %lhs, i64 %rhs)",
             "define i1 @RangeLLVM_llvmBoth(i1 %lhs, i1 %rhs)",
             "define i64 @RangeLLVM_llvmChoose(i1 %flag, i64 %value)",
+            "define i64 @RangeLLVM_llvmClassify(i64 %value)",
+            "define i64 @RangeLLVM_llvmBoolScore(i1 %flag)",
             "define i64 @RangeLLVM_llvmNestedSum(i64 %limit)",
             "define i1 @RangeLLVM_llvmReachesThreshold(i64 %limit)",
             "define i1 @RangeLLVM_llvmFirstOverTen(i64 %limit)",
@@ -1162,6 +1278,8 @@ struct LLVMLoweringEmitterTests {
         #expect(ir.contains("fcmp olt double"))
         #expect(ir.contains("select i1 %flag, i64 %lhs, i64 %rhs"))
         #expect(ir.contains("select i1 %flag, double %lhs"))
+        #expect(ir.contains("switch i64 %value, label %switch.default."))
+        #expect(ir.contains("switch i1 %flag, label %switch.default."))
         #expect(ir.contains("define double @RangeLLVM_llvmNestedFloatLoop"))
         #expect(ir.contains("sitofp i64"))
 
@@ -1177,6 +1295,8 @@ struct LLVMLoweringEmitterTests {
             "llvmIsLess",
             "llvmBoth",
             "llvmChoose",
+            "llvmClassify",
+            "llvmBoolScore",
             "llvmNestedSum",
             "llvmReachesThreshold",
             "llvmFirstOverTen",

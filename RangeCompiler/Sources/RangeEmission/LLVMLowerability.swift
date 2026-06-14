@@ -201,6 +201,26 @@ enum LLVMLowerability {
                 ) {
                     sawReturn = true
                 }
+            case .switchStatement(let expression, let cases, let defaultBody):
+                guard canLowerSwitch(
+                    expression: expression,
+                    cases: cases,
+                    defaultBody: defaultBody,
+                    returnType: returnType,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return false
+                }
+                if switchAlwaysReturns(
+                    cases: cases,
+                    defaultBody: defaultBody,
+                    returnType: returnType,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) {
+                    sawReturn = true
+                }
             case .return(let expression?):
                 guard canConvert(
                     canLower(
@@ -214,7 +234,7 @@ enum LLVMLowerability {
                 }
                 sawReturn = true
             case .return(nil), .macroInvocation, .expand, .background, .deferBlock, .localCallable,
-                .derived, .expression, .forEach, .break, .continue, .switchStatement:
+                .derived, .expression, .forEach, .break, .continue:
                 return false
             }
         }
@@ -323,6 +343,17 @@ enum LLVMLowerability {
                 ) {
                     return "conditional contains unsupported LLVM statements"
                 }
+            case .switchStatement(let expression, let cases, let defaultBody):
+                if let reason = switchRejectionReason(
+                    expression: expression,
+                    cases: cases,
+                    defaultBody: defaultBody,
+                    returnType: returnType,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) {
+                    return reason
+                }
             case .return(let expression?):
                 guard let expressionType = canLower(
                     expression,
@@ -361,8 +392,6 @@ enum LLVMLowerability {
                 return "uses break outside a lowerable loop body"
             case .continue:
                 return "uses continue outside a lowerable loop body"
-            case .switchStatement:
-                return "uses switch"
             }
         }
         return sawReturn ? nil : "does not end with an explicit return"
@@ -563,8 +592,19 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
+            case .switchStatement(let expression, let cases, let defaultBody):
+                guard canLowerSwitch(
+                    expression: expression,
+                    cases: cases,
+                    defaultBody: defaultBody,
+                    returnType: .int,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return false
+                }
             case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-                .expression, .forEach, .return, .switchStatement:
+                .expression, .forEach, .return:
                 return false
             case .break, .continue:
                 continue
@@ -572,6 +612,150 @@ enum LLVMLowerability {
         }
 
         return true
+    }
+
+    private static func canLowerSwitch(
+        expression: Expression,
+        cases: [SwitchCase],
+        defaultBody: [Statement]?,
+        returnType: ScalarType,
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> Bool {
+        switchRejectionReason(
+            expression: expression,
+            cases: cases,
+            defaultBody: defaultBody,
+            returnType: returnType,
+            locals: locals,
+            lowerableFunctionSignatures: lowerableFunctionSignatures
+        ) == nil
+    }
+
+    private static func switchRejectionReason(
+        expression: Expression,
+        cases: [SwitchCase],
+        defaultBody: [Statement]?,
+        returnType: ScalarType,
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> String? {
+        guard let subjectType = canLower(
+            expression,
+            locals: locals,
+            lowerableFunctionSignatures: lowerableFunctionSignatures
+        ) else {
+            return expressionRejectionReason(
+                expression,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            )
+        }
+        guard subjectType == .int || subjectType == .bool else {
+            return "switch subject \(subjectType) is not Int or Bool"
+        }
+        guard !cases.isEmpty else {
+            return "switch has no cases"
+        }
+        guard let defaultBody else {
+            return "switch has no default"
+        }
+
+        var literals = Set<String>()
+        for switchCase in cases {
+            guard let literal = switchCaseLiteral(switchCase.pattern, subjectType: subjectType) else {
+                return "switch case pattern is not a \(subjectType) literal"
+            }
+            guard literals.insert(literal).inserted else {
+                return "switch has duplicate case \(literal)"
+            }
+
+            var returningBranchLocals = locals
+            var nonReturningBranchLocals = locals
+            guard canLower(
+                switchCase.body,
+                returnType: returnType,
+                locals: &returningBranchLocals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            )
+                || canLowerLoopBody(
+                    switchCase.body,
+                    locals: &nonReturningBranchLocals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                )
+            else {
+                return "switch case contains unsupported LLVM statements"
+            }
+        }
+
+        var returningDefaultLocals = locals
+        var nonReturningDefaultLocals = locals
+        guard canLower(
+            defaultBody,
+            returnType: returnType,
+            locals: &returningDefaultLocals,
+            lowerableFunctionSignatures: lowerableFunctionSignatures
+        )
+            || canLowerLoopBody(
+                defaultBody,
+                locals: &nonReturningDefaultLocals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            )
+        else {
+            return "switch default contains unsupported LLVM statements"
+        }
+
+        return nil
+    }
+
+    private static func switchAlwaysReturns(
+        cases: [SwitchCase],
+        defaultBody: [Statement]?,
+        returnType: ScalarType,
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> Bool {
+        guard let defaultBody else {
+            return false
+        }
+
+        var defaultLocals = locals
+        guard canLower(
+            defaultBody,
+            returnType: returnType,
+            locals: &defaultLocals,
+            lowerableFunctionSignatures: lowerableFunctionSignatures
+        ) else {
+            return false
+        }
+
+        return cases.allSatisfy { switchCase in
+            var branchLocals = locals
+            return canLower(
+                switchCase.body,
+                returnType: returnType,
+                locals: &branchLocals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            )
+        }
+    }
+
+    private static func switchCaseLiteral(
+        _ pattern: SwitchCasePattern,
+        subjectType: ScalarType
+    ) -> String? {
+        guard case .expression(let expression) = pattern else {
+            return nil
+        }
+
+        switch (subjectType, expression) {
+        case (.int, .integer(let value)):
+            return String(value)
+        case (.bool, .boolean(let value)):
+            return value ? "1" : "0"
+        default:
+            return nil
+        }
     }
 
     private static func canLowerLocalBinding(
