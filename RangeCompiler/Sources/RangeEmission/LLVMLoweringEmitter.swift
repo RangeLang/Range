@@ -349,7 +349,7 @@ private struct LLVMFunctionEmitter {
         case .integer(let value):
             return Value(type: "i64", representation: String(value))
         case .double(let value):
-            return Value(type: "double", representation: String(value))
+            return Value(type: "double", representation: llvmDoubleLiteral(value))
         case .boolean(let value):
             return Value(type: "i1", representation: value ? "1" : "0")
         case .identifier(let name):
@@ -443,6 +443,18 @@ private struct LLVMFunctionEmitter {
     private mutating func freshLabelID() -> Int {
         nextLabel += 1
         return nextLabel
+    }
+
+    private func llvmDoubleLiteral(_ value: Double) -> String {
+        let raw = String(value)
+        guard let exponentIndex = raw.firstIndex(where: { $0 == "e" || $0 == "E" }) else {
+            return raw
+        }
+        let mantissa = raw[..<exponentIndex]
+        guard !mantissa.contains(".") else {
+            return raw
+        }
+        return "\(mantissa).0\(raw[exponentIndex...])"
     }
 
     private mutating func convert(_ value: Value, to scalarType: ScalarType) throws -> Value {
