@@ -1,5 +1,20 @@
+function add(lhs: Int, rhs: Int): Int {
+    return lhs + rhs
+}
+
 function sum3(x: Int, y: Int, z: Int): Int {
-    return x + y + z
+    let partial: Int(add(lhs: x, rhs: y))
+    return add(lhs: partial, rhs: z)
+}
+
+function chooseLower(lhs: Int, rhs: Int): Int {
+    let fallback: Int(lhs)
+
+    if lhs < rhs {
+        return lhs
+    } else {
+        return fallback
+    }
 }
 
 function nestedSum(limit: Int): Int {
@@ -27,6 +42,7 @@ function describe(value: Int): String {
 @main {
     let scalar: Int(sum3(x: 1, y: 2, z: 3))
     let loop: Int(nestedSum(limit: 10))
+    let chosen: Int(chooseLower(lhs: scalar, rhs: loop))
 
-    Logger.info(describe(value: scalar + loop))
+    Logger.info(describe(value: scalar + chosen + loop))
 }

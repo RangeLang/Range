@@ -1,7 +1,10 @@
 import RangeCompiler
 
 enum LLVMLowerability {
-    static func canLower(_ callable: CallableDeclaration) -> Bool {
+    static func canLower(
+        _ callable: CallableDeclaration,
+        lowerableFunctionNames: Set<String> = []
+    ) -> Bool {
         guard callable.targetType == nil,
             callable.receiverType == nil,
             callable.genericParameters.isEmpty,
@@ -12,11 +15,33 @@ enum LLVMLowerability {
             return false
         }
 
-        var localNames = Set(callable.parameters.map(\.name))
-        return canLower(body, localNames: &localNames)
+        var locals = Dictionary(
+            uniqueKeysWithValues: callable.parameters.map { ($0.name, ScalarType.int) }
+        )
+        return canLower(body, locals: &locals, lowerableFunctionNames: lowerableFunctionNames)
     }
 
-    private static func canLower(_ statements: [Statement], localNames: inout Set<String>) -> Bool {
+    private enum ScalarType {
+        case int
+        case bool
+
+        init?(typeReference: TypeReference) {
+            switch typeReference.displayName {
+            case "Int":
+                self = .int
+            case "Bool":
+                self = .bool
+            default:
+                return nil
+            }
+        }
+    }
+
+    private static func canLower(
+        _ statements: [Statement],
+        locals: inout [String: ScalarType],
+        lowerableFunctionNames: Set<String>
+    ) -> Bool {
         guard !statements.isEmpty else {
             return false
         }
@@ -29,36 +54,63 @@ enum LLVMLowerability {
 
             switch statement {
             case .localBinding(let declaration):
-                guard isMutable(declaration.kind),
-                    declaration.type.displayName == "Int",
-                    canLower(declaration.expression, localNames: localNames)
+                guard let type = ScalarType(typeReference: declaration.type),
+                    canLower(
+                        declaration.expression,
+                        locals: locals,
+                        lowerableFunctionNames: lowerableFunctionNames
+                    ) == type
                 else {
                     return false
                 }
-                localNames.insert(declaration.name)
+                locals[declaration.name] = type
             case .assignment(let target, let expression):
                 guard case .local(let name) = target,
-                    localNames.contains(name),
-                    canLower(expression, localNames: localNames)
+                    let type = locals[name],
+                    canLower(expression, locals: locals, lowerableFunctionNames: lowerableFunctionNames)
+                        == type
                 else {
                     return false
                 }
             case .whileLoop(let condition, let body):
-                guard canLowerCondition(condition, localNames: localNames) else {
+                guard canLower(condition, locals: locals, lowerableFunctionNames: lowerableFunctionNames)
+                    == .bool
+                else {
                     return false
                 }
-                var bodyLocalNames = localNames
-                guard canLowerLoopBody(body, localNames: &bodyLocalNames) else {
+                var bodyLocals = locals
+                guard canLowerLoopBody(
+                    body,
+                    locals: &bodyLocals,
+                    lowerableFunctionNames: lowerableFunctionNames
+                ) else {
                     return false
+                }
+            case .conditional(let branches):
+                guard canLowerConditional(
+                    branches,
+                    locals: locals,
+                    lowerableFunctionNames: lowerableFunctionNames
+                ) else {
+                    return false
+                }
+                if conditionalAlwaysReturns(
+                    branches,
+                    locals: locals,
+                    lowerableFunctionNames: lowerableFunctionNames
+                ) {
+                    sawReturn = true
                 }
             case .return(let expression?):
-                guard canLower(expression, localNames: localNames) else {
+                guard canLower(expression, locals: locals, lowerableFunctionNames: lowerableFunctionNames)
+                    == .int
+                else {
                     return false
                 }
                 sawReturn = true
             case .return(nil), .macroInvocation, .expand, .background, .deferBlock, .localCallable,
-                .derived, .compoundAssignment, .expression, .forEach, .conditional, .break,
-                .continue, .switchStatement:
+                .derived, .compoundAssignment, .expression, .forEach, .break, .continue,
+                .switchStatement:
                 return false
             }
         }
@@ -68,36 +120,55 @@ enum LLVMLowerability {
 
     private static func canLowerLoopBody(
         _ statements: [Statement],
-        localNames: inout Set<String>
+        locals: inout [String: ScalarType],
+        lowerableFunctionNames: Set<String>
     ) -> Bool {
         for statement in statements {
             switch statement {
             case .localBinding(let declaration):
-                guard isMutable(declaration.kind),
-                    declaration.type.displayName == "Int",
-                    canLower(declaration.expression, localNames: localNames)
+                guard let type = ScalarType(typeReference: declaration.type),
+                    canLower(
+                        declaration.expression,
+                        locals: locals,
+                        lowerableFunctionNames: lowerableFunctionNames
+                    ) == type
                 else {
                     return false
                 }
-                localNames.insert(declaration.name)
+                locals[declaration.name] = type
             case .assignment(let target, let expression):
                 guard case .local(let name) = target,
-                    localNames.contains(name),
-                    canLower(expression, localNames: localNames)
+                    let type = locals[name],
+                    canLower(expression, locals: locals, lowerableFunctionNames: lowerableFunctionNames)
+                        == type
                 else {
                     return false
                 }
             case .whileLoop(let condition, let body):
-                guard canLowerCondition(condition, localNames: localNames) else {
+                guard canLower(condition, locals: locals, lowerableFunctionNames: lowerableFunctionNames)
+                    == .bool
+                else {
                     return false
                 }
-                var nestedLocalNames = localNames
-                guard canLowerLoopBody(body, localNames: &nestedLocalNames) else {
+                var nestedLocals = locals
+                guard canLowerLoopBody(
+                    body,
+                    locals: &nestedLocals,
+                    lowerableFunctionNames: lowerableFunctionNames
+                ) else {
+                    return false
+                }
+            case .conditional(let branches):
+                guard canLowerConditional(
+                    branches,
+                    locals: locals,
+                    lowerableFunctionNames: lowerableFunctionNames
+                ) else {
                     return false
                 }
             case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-                .compoundAssignment, .expression, .forEach, .conditional, .return, .break,
-                .continue, .switchStatement:
+                .compoundAssignment, .expression, .forEach, .return, .break, .continue,
+                .switchStatement:
                 return false
             }
         }
@@ -105,55 +176,134 @@ enum LLVMLowerability {
         return true
     }
 
-    private static func canLower(_ expression: Expression, localNames: Set<String>) -> Bool {
+    private static func canLowerConditional(
+        _ branches: [StatementConditionalBranch],
+        locals: [String: ScalarType],
+        lowerableFunctionNames: Set<String>
+    ) -> Bool {
+        guard !branches.isEmpty else {
+            return false
+        }
+
+        for branch in branches {
+            if let condition = branch.condition,
+                canLower(condition, locals: locals, lowerableFunctionNames: lowerableFunctionNames)
+                    != .bool
+            {
+                return false
+            }
+
+            var branchLocals = locals
+            guard canLower(
+                branch.body,
+                locals: &branchLocals,
+                lowerableFunctionNames: lowerableFunctionNames
+            )
+                || canLowerLoopBody(
+                    branch.body,
+                    locals: &branchLocals,
+                    lowerableFunctionNames: lowerableFunctionNames
+                )
+            else {
+                return false
+            }
+        }
+
+        return true
+    }
+
+    private static func conditionalAlwaysReturns(
+        _ branches: [StatementConditionalBranch],
+        locals: [String: ScalarType],
+        lowerableFunctionNames: Set<String>
+    ) -> Bool {
+        guard branches.contains(where: { $0.condition == nil }) else {
+            return false
+        }
+
+        return branches.allSatisfy { branch in
+            var branchLocals = locals
+            return canLower(
+                branch.body,
+                locals: &branchLocals,
+                lowerableFunctionNames: lowerableFunctionNames
+            )
+        }
+    }
+
+    private static func canLower(
+        _ expression: Expression,
+        locals: [String: ScalarType],
+        lowerableFunctionNames: Set<String>
+    ) -> ScalarType? {
         switch expression {
         case .integer:
-            return true
+            return .int
+        case .boolean:
+            return .bool
         case .identifier(let name):
-            return localNames.contains(name)
+            return locals[name]
+        case .call(let name, let arguments):
+            guard lowerableFunctionNames.contains(name),
+                arguments.allSatisfy({
+                    canLower(
+                        $0.value,
+                        locals: locals,
+                        lowerableFunctionNames: lowerableFunctionNames
+                    ) == .int
+                })
+            else {
+                return nil
+            }
+            return .int
+        case .unary(.not, let expression):
+            guard canLower(
+                expression,
+                locals: locals,
+                lowerableFunctionNames: lowerableFunctionNames
+            ) == .bool else {
+                return nil
+            }
+            return .bool
         case .binary(let lhs, let operatorSymbol, let rhs):
-            return canLower(operatorSymbol)
-                && canLower(lhs, localNames: localNames)
-                && canLower(rhs, localNames: localNames)
-        case .double, .string, .interpolatedString, .boolean, .nilLiteral, .macroInvocation,
-            .block, .call, .bindingReference, .array, .dictionary, .ternary, .unary:
-            return false
+            guard let operandType = operandType(for: operatorSymbol),
+                canLower(lhs, locals: locals, lowerableFunctionNames: lowerableFunctionNames)
+                    == operandType,
+                canLower(rhs, locals: locals, lowerableFunctionNames: lowerableFunctionNames)
+                    == operandType
+            else {
+                return nil
+            }
+            return resultType(for: operatorSymbol)
+        case .double, .string, .interpolatedString, .nilLiteral, .macroInvocation, .block,
+            .bindingReference, .array, .dictionary, .ternary:
+            return nil
         }
     }
 
-    private static func canLowerCondition(_ expression: Expression, localNames: Set<String>) -> Bool {
-        guard case .binary(let lhs, let operatorSymbol, let rhs) = expression else {
-            return false
-        }
-        return canLowerComparison(operatorSymbol)
-            && canLower(lhs, localNames: localNames)
-            && canLower(rhs, localNames: localNames)
-    }
-
-    private static func canLower(_ operatorSymbol: BinaryOperator) -> Bool {
+    private static func operandType(for operatorSymbol: BinaryOperator) -> ScalarType? {
         switch operatorSymbol {
         case .addition, .subtraction, .multiplication, .division, .remainder:
-            return true
-        case .equal, .notEqual, .less, .lessEqual, .greater, .greaterEqual,
-            .and, .or, .nilCoalescing:
-            return false
-        }
-    }
-
-    private static func canLowerComparison(_ operatorSymbol: BinaryOperator) -> Bool {
-        switch operatorSymbol {
+            return .int
         case .equal, .notEqual, .less, .lessEqual, .greater, .greaterEqual:
-            return true
-        case .addition, .subtraction, .multiplication, .division, .remainder,
-            .and, .or, .nilCoalescing:
-            return false
+            return .int
+        case .and, .or:
+            return .bool
+        case .nilCoalescing:
+            return nil
         }
     }
 
-    private static func isMutable(_ kind: LocalBindingKind) -> Bool {
-        guard case .mutable = kind else {
-            return false
+    private static func resultType(for operatorSymbol: BinaryOperator) -> ScalarType? {
+        switch operatorSymbol {
+        case .addition, .subtraction, .multiplication, .division, .remainder:
+            return .int
+        case .equal, .notEqual, .less, .lessEqual, .greater, .greaterEqual:
+            return .bool
+        case .and, .or:
+            return .bool
+        case .nilCoalescing:
+            return nil
         }
-        return true
     }
 }

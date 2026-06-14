@@ -116,13 +116,25 @@ struct SwiftBackendEmitter {
             let callables = program.callables + program.units.flatMap(\.callables)
             var seenSymbols: Set<String> = []
             var loweredCallables: [CallableDeclaration] = []
+            var loweredNames: Set<String> = []
 
-            for callable in callables where LLVMLowerability.canLower(callable) {
-                let symbol = LLVMLoweringEmitter.symbolName(for: callable)
-                guard seenSymbols.insert(symbol).inserted else {
-                    continue
+            var changed = true
+            while changed {
+                changed = false
+                for callable in callables
+                    where LLVMLowerability.canLower(
+                        callable,
+                        lowerableFunctionNames: loweredNames
+                    )
+                {
+                    let symbol = LLVMLoweringEmitter.symbolName(for: callable)
+                    guard seenSymbols.insert(symbol).inserted else {
+                        continue
+                    }
+                    loweredCallables.append(callable)
+                    loweredNames.insert(callable.name)
+                    changed = true
                 }
-                loweredCallables.append(callable)
             }
 
             return loweredCallables

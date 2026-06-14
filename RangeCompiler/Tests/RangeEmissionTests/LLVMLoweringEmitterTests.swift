@@ -95,6 +95,94 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i64"))
     }
 
+    @Test("Let comparison and if lower to LLVM control flow")
+    func letComparisonAndIfLowerToLLVMControlFlow() throws {
+        let callable = try parseCallable(
+            """
+            function choose(lhs: Int, rhs: Int): Int {
+                let adjusted: Int(lhs)
+
+                if lhs < rhs {
+                    return rhs
+                } else {
+                    return adjusted
+                }
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_choose(i64 %lhs, i64 %rhs)"))
+        #expect(module.ir.contains("%adjusted.addr = alloca i64"))
+        #expect(module.ir.contains("icmp slt i64 %lhs, %rhs"))
+        #expect(module.ir.contains("br i1"))
+        #expect(module.ir.contains("if.body."))
+        #expect(module.ir.contains("ret i64 %rhs"))
+    }
+
+    @Test("Calls between lowerable Int functions stay in LLVM")
+    func callsBetweenLowerableIntFunctionsStayInLLVM() throws {
+        let module = try parseModule(
+            """
+            function add(lhs: Int, rhs: Int): Int {
+                return lhs + rhs
+            }
+
+            function sum3(x: Int, y: Int, z: Int): Int {
+                let partial: Int(add(lhs: x, rhs: y))
+                return add(lhs: partial, rhs: z)
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMCallPlanTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Math.swift",
+                        enumerations: [],
+                        declarations: [],
+                        extensions: [],
+                        callables: module.callables,
+                        mainBlock: nil
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+        let swift = try String(
+            contentsOf: root.appendingPathComponent("Sources/Math.swift"),
+            encoding: .utf8
+        )
+
+        #expect(ir.contains("define i64 @RangeLLVM_add(i64 %lhs, i64 %rhs)"))
+        #expect(ir.contains("define i64 @RangeLLVM_sum3(i64 %x, i64 %y, i64 %z)"))
+        #expect(ir.contains("call i64 @RangeLLVM_add(i64 %x, i64 %y)"))
+        #expect(ir.contains("call i64 @RangeLLVM_add"))
+        #expect(!swift.contains("func add"))
+        #expect(!swift.contains("func sum3"))
+    }
+
     @Test("LLVM IR links and runs through clang harness")
     func llvmIRLinksAndRunsThroughClangHarness() throws {
         let callable = try parseCallable(
