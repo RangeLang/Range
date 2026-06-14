@@ -1,4 +1,3 @@
-@language
 @equatable
 @hashable
 construct ClosedRange<Bound> {

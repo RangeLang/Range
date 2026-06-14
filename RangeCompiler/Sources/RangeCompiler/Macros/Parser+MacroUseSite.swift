@@ -224,6 +224,8 @@ extension Parser {
             return "*"
         case .dot:
             return "."
+        case .dotDotLess:
+            return "..<"
         case .ellipsis:
             return "..."
         case .colon:

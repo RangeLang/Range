@@ -9,6 +9,7 @@ function rangeLexer(): Lexer {
             LexerRule(name: "rightParen", pattern: ")", token: "rightParen", priority: 20),
             LexerRule(name: "leftBracket", pattern: "[", token: "leftBracket", priority: 20),
             LexerRule(name: "rightBracket", pattern: "]", token: "rightBracket", priority: 20),
+            LexerRule(name: "dotDotLess", pattern: "..<", token: "dotDotLess", priority: 30),
             LexerRule(name: "ellipsis", pattern: "...", token: "ellipsis", priority: 30),
             LexerRule(name: "dot", pattern: ".", token: "dot", priority: 20),
             LexerRule(name: "arrow", pattern: "->", token: "arrow", priority: 30),

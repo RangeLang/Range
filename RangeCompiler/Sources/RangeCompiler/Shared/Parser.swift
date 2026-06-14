@@ -33,6 +33,13 @@ public struct Parser {
                 PrecedenceGroupDeclaration(
                     name: "NilCoalescingPrecedence",
                     associativity: .right,
+                    higherThan: ["RangeFormationPrecedence"],
+                    lowerThan: [],
+                    assignment: nil
+                ),
+                PrecedenceGroupDeclaration(
+                    name: "RangeFormationPrecedence",
+                    associativity: OperatorAssociativity.none,
                     higherThan: ["ComparisonPrecedence"],
                     lowerThan: [],
                     assignment: nil
@@ -123,6 +130,16 @@ public struct Parser {
                     fixity: .infix,
                     symbol: "||",
                     precedenceGroup: "LogicalDisjunctionPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "..<",
+                    precedenceGroup: "RangeFormationPrecedence"
+                ),
+                OperatorDeclaration(
+                    fixity: .infix,
+                    symbol: "...",
+                    precedenceGroup: "RangeFormationPrecedence"
                 ),
             ]
 

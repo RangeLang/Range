@@ -113,6 +113,12 @@ extension Parser {
         case .questionQuestion:
             advance()
             return "??"
+        case .dotDotLess:
+            advance()
+            return "..<"
+        case .ellipsis:
+            advance()
+            return "..."
         default:
             throw ParseError("Expected callable name.", range: currentRange())
         }

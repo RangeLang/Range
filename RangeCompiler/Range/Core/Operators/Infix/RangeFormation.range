@@ -1,0 +1,10 @@
+infix operator ..<: RangeFormationPrecedence
+infix operator ...: RangeFormationPrecedence
+
+function ..<<Bound>(lhs: Bound, rhs: Bound): Range<Bound> {
+    return Range(lowerBound: lhs, upperBound: rhs)
+}
+
+function ...<Bound>(lhs: Bound, rhs: Bound): ClosedRange<Bound> {
+    return ClosedRange(lowerBound: lhs, upperBound: rhs)
+}

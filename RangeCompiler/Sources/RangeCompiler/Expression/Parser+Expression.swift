@@ -494,7 +494,7 @@ extension Parser {
                 }
             case .eof, .leftBrace, .rightBrace, .rightParen, .rightBracket, .equal, .equalEqual,
                 .bangEqual, .minus, .lessEqual, .greaterEqual, .plus, .plusEqual, .slash,
-                .ampersand, .andAnd, .pipe, .orOr,
+                .ampersand, .andAnd, .pipe, .orOr, .dotDotLess,
                 .questionQuestion, .colon, .arrow:
                 return false
             case .hash, .foreignBody, .macroAttribute, .dollar, .percent, .bang:
@@ -635,6 +635,8 @@ extension Parser {
             return "!"
         case .ellipsis:
             return "..."
+        case .dotDotLess:
+            return "..<"
         default:
             return nil
         }
@@ -670,6 +672,10 @@ extension Parser {
             return .and
         case "||":
             return .or
+        case "..<":
+            return .rangeUntil
+        case "...":
+            return .closedRange
         default:
             return nil
         }

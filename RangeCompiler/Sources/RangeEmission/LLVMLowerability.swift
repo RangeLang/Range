@@ -1008,6 +1008,8 @@ enum LLVMLowerability {
             return lhs == .bool && rhs == .bool ? .bool : nil
         case .nilCoalescing:
             return nil
+        case .rangeUntil, .closedRange:
+            return nil
         }
     }
 }

@@ -686,6 +686,9 @@ private struct LLVMFunctionEmitter {
         case .nilCoalescing:
             throw LLVMLoweringError(
                 "LLVM lowering does not support operator '\(operatorSymbol.rawValue)' yet.")
+        case .rangeUntil, .closedRange:
+            throw LLVMLoweringError(
+                "LLVM lowering does not support operator '\(operatorSymbol.rawValue)' yet.")
         }
     }
 

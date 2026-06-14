@@ -58,6 +58,8 @@ public enum BinaryOperator: String {
     case greaterEqual = ">="
     case and = "&&"
     case or = "||"
+    case rangeUntil = "..<"
+    case closedRange = "..."
 }
 
 public struct InterpolatedString {

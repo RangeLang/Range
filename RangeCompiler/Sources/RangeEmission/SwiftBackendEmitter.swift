@@ -3310,6 +3310,10 @@ struct SwiftBackendEmitter {
         case .unary(let operatorSymbol, let nested):
             return "\(operatorSymbol.rawValue)\(try emitExpression(nested, scope: scope))"
         case .binary(let lhs, let operatorSymbol, let rhs):
+            if operatorSymbol == .rangeUntil || operatorSymbol == .closedRange {
+                return
+                    "(\(try emitExpression(lhs, scope: scope))\(operatorSymbol.rawValue)\(try emitExpression(rhs, scope: scope)))"
+            }
             return
                 "(\(try emitExpression(lhs, scope: scope)) \(operatorSymbol.rawValue) \(try emitExpression(rhs, scope: scope)))"
         }

@@ -210,10 +210,10 @@ struct RangeAuthoredLexerCursor {
     func isLiteralLexerToken(_ token: String) -> Bool {
         switch token {
         case "leftBrace", "rightBrace", "leftParen", "rightParen", "leftBracket", "rightBracket",
-            "asterisk", "dot", "ellipsis", "colon", "arrow", "bang", "equal", "equalEqual",
-            "bangEqual", "minus", "less", "lessEqual", "greater", "greaterEqual", "plus",
-            "plusEqual", "slash", "ampersand", "andAnd", "pipe", "orOr", "question",
-            "questionQuestion", "dollar", "percent", "comma":
+            "asterisk", "dot", "dotDotLess", "ellipsis", "colon", "arrow", "bang", "equal",
+            "equalEqual", "bangEqual", "minus", "less", "lessEqual", "greater",
+            "greaterEqual", "plus", "plusEqual", "slash", "ampersand", "andAnd", "pipe",
+            "orOr", "question", "questionQuestion", "dollar", "percent", "comma":
             return true
         default:
             return false
@@ -238,6 +238,8 @@ struct RangeAuthoredLexerCursor {
             emit(kind: .asterisk, start: start)
         case "dot":
             emit(kind: .dot, start: start)
+        case "dotDotLess":
+            emit(kind: .dotDotLess, start: start)
         case "ellipsis":
             emit(kind: .ellipsis, start: start)
         case "colon":

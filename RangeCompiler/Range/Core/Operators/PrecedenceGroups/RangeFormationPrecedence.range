@@ -1,0 +1,4 @@
+precedencegroup RangeFormationPrecedence {
+    associativity: none
+    higherThan: ComparisonPrecedence
+}

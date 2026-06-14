@@ -22,6 +22,13 @@ construct Comma {
 construct Dot {
 }
 
+@Token(pattern: "..<")
+@lexer<.emit>
+@Operator<.infix>(binding: OperatorBindingRange(lower: 35, upper: 45))
+@syntax
+construct DotDotLess {
+}
+
 @Token(pattern: "{")
 @lexer<.emit>
 @Delimiter<.prefix>(pairedToken: RightBrace)

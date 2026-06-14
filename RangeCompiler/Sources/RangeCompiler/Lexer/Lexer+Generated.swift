@@ -22,6 +22,7 @@ enum RangeAuthoredTokenKind {
     case rightBracket
     case asterisk
     case dot
+    case dotDotLess
     case ellipsis
     case colon
     case arrow
@@ -93,6 +94,8 @@ extension Lexer {
             parserToken = .asterisk
         case .dot:
             parserToken = .dot
+        case .dotDotLess:
+            parserToken = .dotDotLess
         case .ellipsis:
             parserToken = .ellipsis
         case .colon:
@@ -160,6 +163,8 @@ extension RangeAuthoredLexer {
             name: "leftBracket", pattern: "[", token: "leftBracket", priority: 20),
         RangeAuthoredLexerRule(
             name: "rightBracket", pattern: "]", token: "rightBracket", priority: 20),
+        RangeAuthoredLexerRule(
+            name: "dotDotLess", pattern: "..<", token: "dotDotLess", priority: 30),
         RangeAuthoredLexerRule(name: "ellipsis", pattern: "...", token: "ellipsis", priority: 30),
         RangeAuthoredLexerRule(name: "dot", pattern: ".", token: "dot", priority: 20),
         RangeAuthoredLexerRule(name: "arrow", pattern: "->", token: "arrow", priority: 30),

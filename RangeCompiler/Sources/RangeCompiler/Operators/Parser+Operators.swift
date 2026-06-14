@@ -197,6 +197,9 @@ extension Parser {
         case .ellipsis:
             advance()
             return "..."
+        case .dotDotLess:
+            advance()
+            return "..<"
         default:
             throw ParseError("Expected operator symbol.")
         }

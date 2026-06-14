@@ -570,6 +570,11 @@ private struct MainProgramInterpreter {
                     return .bool(true)
                 }
                 return .bool(try expectBool(evaluate(rhs), context: "Logical || right operand"))
+
+            case .rangeUntil, .closedRange:
+                throw ValidationError(
+                    "Range formation operator '\(operatorSymbol.rawValue)' is not supported by the interpreted runner yet."
+                )
             }
         }
     }

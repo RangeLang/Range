@@ -95,6 +95,8 @@ public struct CompilationArtifactsEmitter {
             return "asterisk"
         case .dot:
             return "dot"
+        case .dotDotLess:
+            return "dotDotLess"
         case .ellipsis:
             return "ellipsis"
         case .colon:

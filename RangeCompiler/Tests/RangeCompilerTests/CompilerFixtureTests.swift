@@ -1454,6 +1454,45 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Range formation operators parse as binary expressions")
+    func rangeFormationOperatorsParseAsBinaryExpressions() throws {
+        var halfOpenParser = try Parser(source: "0..<limit")
+        let halfOpen = try halfOpenParser.parseExpression()
+        guard case .binary(.integer(0), .rangeUntil, .identifier("limit")) = halfOpen else {
+            Issue.record("Expected half-open range formation to parse as a binary expression.")
+            return
+        }
+
+        var closedParser = try Parser(source: "0...limit")
+        let closed = try closedParser.parseExpression()
+        guard case .binary(.integer(0), .closedRange, .identifier("limit")) = closed else {
+            Issue.record("Expected closed range formation to parse as a binary expression.")
+            return
+        }
+    }
+
+    @Test("Range formation operators validate through RangeCore")
+    func rangeFormationOperatorsValidateThroughRangeCore() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/RangeFormationOperators.range",
+                source: """
+                    function halfOpen(limit: Int): Range<Int> {
+                        return 0..<limit
+                    }
+
+                    function closed(limit: Int): ClosedRange<Int> {
+                        return 0...limit
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
     @Test("Precedence metadata records binding ranges")
     func precedenceMetadataRecordsBindingRanges() throws {
         let program = try CompilerPipeline().build(inputs: rangeCoreInputs())

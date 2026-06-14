@@ -245,6 +245,16 @@ public enum ExpressionTypeSemantics {
                     memberResolver: memberResolver,
                     operatorResolver: operatorResolver
                 )
+            case .rangeUntil, .closedRange:
+                return try inferResolvedBinaryOperatorType(
+                    expression,
+                    accessibleTypes: accessibleTypes,
+                    callableReturnTypes: callableReturnTypes,
+                    macroExpansionTypes: macroExpansionTypes,
+                    resolver: resolver,
+                    memberResolver: memberResolver,
+                    operatorResolver: operatorResolver
+                )
             }
         }
     }
@@ -1565,6 +1575,52 @@ public enum ExpressionTypeSemantics {
 
         throw ParseError(
             "Operator '\(operatorSymbol.rawValue)' requires Bool operands, got \(lhsType.displayName) and \(rhsType.displayName)."
+        )
+    }
+
+    private static func inferResolvedBinaryOperatorType(
+        _ expression: Expression,
+        accessibleTypes: [String: BootstrapLiteralType],
+        callableReturnTypes: [String: TypeReference],
+        macroExpansionTypes: [String: TypeReference],
+        resolver: LiteralBridgeResolver,
+        memberResolver: DeclarationMemberResolver,
+        operatorResolver: DeclarationOperatorResolver
+    ) throws -> BootstrapLiteralType {
+        guard case .binary(let lhs, let operatorSymbol, let rhs) = expression else {
+            throw ParseError("Expected binary expression.")
+        }
+
+        let lhsType = try inferType(
+            of: lhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver
+        )
+        let rhsType = try inferType(
+            of: rhs,
+            accessibleTypes: accessibleTypes,
+            callableReturnTypes: callableReturnTypes,
+            macroExpansionTypes: macroExpansionTypes,
+            resolver: resolver,
+            memberResolver: memberResolver,
+            operatorResolver: operatorResolver
+        )
+
+        if let returnType = operatorResolver.binaryOperatorReturnType(
+            symbol: operatorSymbol.rawValue,
+            lhs: lhsType,
+            rhs: rhsType,
+            literalBridgeResolver: resolver
+        ) {
+            return .typed(returnType)
+        }
+
+        throw ParseError(
+            "Operator '\(operatorSymbol.rawValue)' has no matching core signature for \(lhsType.displayName) and \(rhsType.displayName)."
         )
     }
 
