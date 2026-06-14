@@ -876,9 +876,64 @@ struct LLVMLoweringEmitterTests {
         )
 
         #expect(runtime.contains("func RangeLLVM_mixed(_ argument0: Double, _ argument1: Int64) -> Double"))
-        #expect(main.contains("RangeLLVM_mixed(Double(1.5), Int64(2))"))
+        #expect(main.contains("Float(RangeLLVM_mixed(Double(1.5), Int64(2)))"))
         #expect(ir.contains("define double @RangeLLVM_mixed(double %lhs, i64 %rhs)"))
         #expect(ir.contains("sitofp i64 %rhs to double"))
+        #expect(!main.contains("func mixed"))
+    }
+
+    @Test("Swift workspace emission converts LLVM Float return for Swift wrappers")
+    func swiftWorkspaceEmissionConvertsLLVMFloatReturnForSwiftWrappers() throws {
+        let source = try parseModule(
+            """
+            function mixed(lhs: Float, rhs: Int): Float {
+                return lhs + rhs
+            }
+
+            function describe(value: Float): String {
+                return "\\(value)"
+            }
+
+            @main {
+                describe(value: mixed(lhs: 1.5, rhs: 2))
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMFloatWrapperBridgeTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Main.swift",
+                        enumerations: source.enumerations,
+                        declarations: source.constructs,
+                        extensions: source.extensions,
+                        callables: source.callables,
+                        mainBlock: source.mainBlock
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let main = try String(
+            contentsOf: root.appendingPathComponent("Sources/Main.swift"),
+            encoding: .utf8
+        )
+
+        #expect(main.contains("func describe(value: Float) -> String"))
+        #expect(main.contains("describe(value: Float(RangeLLVM_mixed(Double(1.5), Int64(2))))"))
         #expect(!main.contains("func mixed"))
     }
 
@@ -1028,6 +1083,9 @@ struct LLVMLoweringEmitterTests {
             "define double @RangeLLVM_llvmFloatBlend(double %lhs, double %rhs)",
             "define double @RangeLLVM_llvmMixedFloat(double %lhs, i64 %rhs)",
             "define i1 @RangeLLVM_llvmFloatLess(double %lhs, i64 %rhs)",
+            "define double @RangeLLVM_llvmNestedFloatLoop(i64 %limit)",
+            "define i64 @RangeLLVM_llvmChooseInt(i1 %flag, i64 %lhs, i64 %rhs)",
+            "define double @RangeLLVM_llvmChooseFloat(i1 %flag, double %lhs, i64 %rhs)",
             "define i1 @RangeLLVM_llvmIsLess(i64 %lhs, i64 %rhs)",
             "define i1 @RangeLLVM_llvmBoth(i1 %lhs, i1 %rhs)",
             "define i64 @RangeLLVM_llvmChoose(i1 %flag, i64 %value)",
@@ -1049,6 +1107,10 @@ struct LLVMLoweringEmitterTests {
         #expect(ir.contains("fadd double"))
         #expect(ir.contains("sitofp i64 %rhs to double"))
         #expect(ir.contains("fcmp olt double"))
+        #expect(ir.contains("select i1 %flag, i64 %lhs, i64 %rhs"))
+        #expect(ir.contains("select i1 %flag, double %lhs"))
+        #expect(ir.contains("define double @RangeLLVM_llvmNestedFloatLoop"))
+        #expect(ir.contains("sitofp i64"))
 
         let expectedFunctionNames = [
             "llvmAdd",
@@ -1056,6 +1118,9 @@ struct LLVMLoweringEmitterTests {
             "llvmFloatBlend",
             "llvmMixedFloat",
             "llvmFloatLess",
+            "llvmNestedFloatLoop",
+            "llvmChooseInt",
+            "llvmChooseFloat",
             "llvmIsLess",
             "llvmBoth",
             "llvmChoose",

@@ -4006,7 +4006,7 @@ struct SwiftBackendEmitter {
         case .bool:
             return call
         case .float:
-            return call
+            return "Float(\(call))"
         }
     }
 

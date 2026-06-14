@@ -1,0 +1,7 @@
+function llvmChooseInt(flag: Bool, lhs: Int, rhs: Int): Int {
+    return flag ? lhs : rhs
+}
+
+function llvmChooseFloat(flag: Bool, lhs: Float, rhs: Int): Float {
+    return flag ? lhs : rhs
+}

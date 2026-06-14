@@ -1,0 +1,17 @@
+function llvmNestedFloatLoop(limit: Int): Float {
+    state outer: Int(0)
+    state total: Float(0.0)
+
+    while outer < limit {
+        state inner: Int(0)
+
+        while inner < limit {
+            state total: total + outer * 0.5 + inner * 0.25
+            state inner: inner + 1
+        }
+
+        state outer: outer + 1
+    }
+
+    return total
+}
