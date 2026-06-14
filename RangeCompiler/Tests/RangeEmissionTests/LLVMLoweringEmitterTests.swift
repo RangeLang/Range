@@ -124,6 +124,34 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i64 %rhs"))
     }
 
+    @Test("Scalar literal operands lower through LLVM")
+    func scalarLiteralOperandsLowerThroughLLVM() throws {
+        let callable = try compileCallable(
+            """
+            function adjust(value: Int): Int {
+                let incremented: Int(value + 1)
+
+                if incremented < 10 {
+                    return incremented * 2
+                } else {
+                    return 10 - value
+                }
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i64 @RangeLLVM_adjust(i64 %value)"))
+        #expect(module.ir.contains("add i64 %value, 1"))
+        #expect(module.ir.contains("icmp slt i64"))
+        #expect(module.ir.contains("mul i64"))
+        #expect(module.ir.contains("sub i64 10, %value"))
+    }
+
     @Test("Calls between lowerable Int functions stay in LLVM")
     func callsBetweenLowerableIntFunctionsStayInLLVM() throws {
         let module = try parseModule(
@@ -386,6 +414,111 @@ struct LLVMLoweringEmitterTests {
         }
     }
 
+    private func compileCallable(_ source: String) throws -> CallableDeclaration {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/RangeEmissionTests/LLVMFixture.range",
+                source: source,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        for parsedFile in program.projectExpandedFiles {
+            if case .module(let module) = parsedFile.sourceFile,
+                let callable = module.callables.first
+            {
+                return callable
+            }
+        }
+
+        Issue.record("Expected compiled project module with a callable.")
+        throw LLVMLoweringEmitterTestError.expectedCallable
+    }
+
+    private func rangeCoreInputs() throws -> [SourceInput] {
+        let root = try repositoryRoot()
+            .appendingPathComponent("RangeCompiler", isDirectory: true)
+            .appendingPathComponent("Range", isDirectory: true)
+        let files =
+            try rangeFiles(
+                in: root.appendingPathComponent("Core", isDirectory: true),
+                excludingExploration: true
+            )
+            + rangeFiles(
+                in: root.appendingPathComponent("Foundation/Macros", isDirectory: true),
+                excludingExploration: true
+            )
+            + rangeFiles(
+                in: root.appendingPathComponent("Lexer", isDirectory: true),
+                excludingExploration: true
+            )
+
+        return try files.map { file in
+            SourceInput(
+                path: file.path,
+                source: try String(contentsOf: file, encoding: .utf8),
+                role: .core
+            )
+        }
+    }
+
+    private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL] {
+        guard
+            let enumerator = FileManager.default.enumerator(
+                at: root,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
+            throw LLVMLoweringEmitterTestError.missingDirectory(root.path)
+        }
+
+        var files: [URL] = []
+        while let url = enumerator.nextObject() as? URL {
+            let isDirectory =
+                (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            if excludingExploration,
+                isDirectory,
+                url.lastPathComponent == "Exploration",
+                url.path.contains("/RangeCompiler/Range/Core/")
+            {
+                enumerator.skipDescendants()
+                continue
+            }
+
+            guard !isDirectory, url.pathExtension.lowercased() == "range" else {
+                continue
+            }
+            files.append(url)
+        }
+
+        return files.sorted { $0.path < $1.path }
+    }
+
+    private func repositoryRoot() throws -> URL {
+        var current = URL(fileURLWithPath: #filePath)
+        while current.path != "/" {
+            let candidateCore =
+                current
+                .appendingPathComponent("RangeCompiler", isDirectory: true)
+                .appendingPathComponent("Range", isDirectory: true)
+                .appendingPathComponent("Core", isDirectory: true)
+            var isCoreDirectory: ObjCBool = false
+            if FileManager.default.fileExists(
+                atPath: candidateCore.path,
+                isDirectory: &isCoreDirectory
+            ),
+                isCoreDirectory.boolValue
+            {
+                return current
+            }
+            current.deleteLastPathComponent()
+        }
+        throw LLVMLoweringEmitterTestError.missingDirectory("repository root")
+    }
+
     private func run(_ executableURL: URL, arguments: [String]) throws -> (
         status: Int32, stdout: String, stderr: String
     ) {
@@ -411,4 +544,5 @@ struct LLVMLoweringEmitterTests {
 
 private enum LLVMLoweringEmitterTestError: Error {
     case expectedCallable
+    case missingDirectory(String)
 }

@@ -293,7 +293,8 @@ public struct DeclarationOperatorResolver: Sendable {
 
                 return OperatorSignature(
                     genericParameterNames: Set(
-                        callable.genericParameters.map(Self.genericParameterName)),
+                        callable.genericParameters.map(Self.genericParameterName)
+                    ),
                     lhsType: Self.substitute(lhsParameter, using: substitutions),
                     rhsType: Self.substitute(rhsParameter, using: substitutions),
                     returnType: Self.substitute(callable.returnType ?? .named("Void"), using: substitutions)
@@ -308,25 +309,21 @@ public struct DeclarationOperatorResolver: Sendable {
         rhs: BootstrapLiteralType,
         literalBridgeResolver: LiteralBridgeResolver
     ) -> TypeReference? {
-        guard let lhsType = materializedTypeReference(for: lhs, resolver: literalBridgeResolver),
-            let rhsType = materializedTypeReference(for: rhs, resolver: literalBridgeResolver)
-        else {
-            return nil
-        }
-
         let matches: [TypeReference] = signaturesByName[symbol, default: []].compactMap {
             signature in
             var bindings: [String: TypeReference] = [:]
             guard
                 typeMatches(
-                    actual: lhsType,
+                    actual: lhs,
                     expected: signature.lhsType,
+                    resolver: literalBridgeResolver,
                     genericParameterNames: signature.genericParameterNames,
                     bindings: &bindings
                 ),
                 typeMatches(
-                    actual: rhsType,
+                    actual: rhs,
                     expected: signature.rhsType,
+                    resolver: literalBridgeResolver,
                     genericParameterNames: signature.genericParameterNames,
                     bindings: &bindings
                 )
@@ -340,6 +337,78 @@ public struct DeclarationOperatorResolver: Sendable {
             return nil
         }
         return matches[0]
+    }
+
+    private func typeMatches(
+        actual: BootstrapLiteralType,
+        expected: TypeReference,
+        resolver: LiteralBridgeResolver,
+        genericParameterNames: Set<String>,
+        bindings: inout [String: TypeReference]
+    ) -> Bool {
+        switch actual {
+        case .typed(let actualType):
+            return typeMatches(
+                actual: actualType,
+                expected: expected,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case .nilLiteral:
+            return typeMatches(
+                actual: .named("NilLiteral"),
+                expected: expected,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        case .intLiteral, .floatLiteral, .stringLiteral, .boolLiteral:
+            if case .named(let expectedName) = expected,
+                genericParameterNames.contains(expectedName)
+            {
+                if let existing = bindings[expectedName] {
+                    return resolver.isCompatible(
+                        expected: existing,
+                        carrierTypeName: actual.displayName
+                    ) || scalarLiteralCarrier(actual, matches: existing)
+                }
+                guard let actualType = materializedTypeReference(for: actual, resolver: resolver)
+                else {
+                    return false
+                }
+                bindings[expectedName] = actualType
+                return true
+            }
+            if resolver.isCompatible(expected: expected, carrierTypeName: actual.displayName) {
+                return true
+            }
+            if scalarLiteralCarrier(actual, matches: expected) {
+                return true
+            }
+            guard let actualType = materializedTypeReference(for: actual, resolver: resolver) else {
+                return false
+            }
+            return typeMatches(
+                actual: actualType,
+                expected: expected,
+                genericParameterNames: genericParameterNames,
+                bindings: &bindings
+            )
+        }
+    }
+
+    private func scalarLiteralCarrier(
+        _ actual: BootstrapLiteralType,
+        matches expected: TypeReference
+    ) -> Bool {
+        switch (actual, expected.displayName) {
+        case (.intLiteral, "Int"),
+            (.floatLiteral, "Float"),
+            (.stringLiteral, "String"),
+            (.boolLiteral, "Bool"):
+            return true
+        default:
+            return false
+        }
     }
 
     private func materializedTypeReference(

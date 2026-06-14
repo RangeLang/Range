@@ -1397,6 +1397,9 @@ public enum ExpressionTypeSemantics {
         ) {
             return .typed(returnType)
         }
+        if let returnType = scalarEqualityReturnType(lhsType, rhsType, resolver: resolver) {
+            return .typed(returnType)
+        }
 
         throw ParseError(
             "Operator '\(operatorSymbol.rawValue)' has no matching core signature for \(lhsType.displayName) and \(rhsType.displayName)."
@@ -1444,6 +1447,14 @@ public enum ExpressionTypeSemantics {
             lhs: lhsType,
             rhs: rhsType,
             literalBridgeResolver: resolver
+        ) {
+            return .typed(returnType)
+        }
+        if let returnType = scalarArithmeticReturnType(
+            lhsType,
+            rhsType,
+            operatorSymbol: operatorSymbol,
+            resolver: resolver
         ) {
             return .typed(returnType)
         }
@@ -1496,10 +1507,114 @@ public enum ExpressionTypeSemantics {
         ) {
             return .typed(returnType)
         }
+        if let returnType = scalarComparisonReturnType(lhsType, rhsType, resolver: resolver) {
+            return .typed(returnType)
+        }
 
         throw ParseError(
             "Operator '\(operatorSymbol.rawValue)' has no matching core signature for \(lhsType.displayName) and \(rhsType.displayName)."
         )
+    }
+
+    private static func scalarEqualityReturnType(
+        _ lhs: BootstrapLiteralType,
+        _ rhs: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        guard let lhsType = scalarMaterializedTypeReference(for: lhs, resolver: resolver),
+            let rhsType = scalarMaterializedTypeReference(for: rhs, resolver: resolver)
+        else {
+            return nil
+        }
+
+        if scalarComparableTypesMatch(lhsType, rhsType) {
+            return .named("Bool")
+        }
+        return nil
+    }
+
+    private static func scalarArithmeticReturnType(
+        _ lhs: BootstrapLiteralType,
+        _ rhs: BootstrapLiteralType,
+        operatorSymbol: BinaryOperator,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        guard let lhsType = scalarMaterializedTypeReference(for: lhs, resolver: resolver),
+            let rhsType = scalarMaterializedTypeReference(for: rhs, resolver: resolver)
+        else {
+            return nil
+        }
+
+        if lhsType.displayName == "Int", rhsType.displayName == "Int" {
+            return .named("Int")
+        }
+        if scalarNumericTypesMatch(lhsType, rhsType) {
+            return .named("Float")
+        }
+        if operatorSymbol == .addition,
+            lhsType.displayName == "String",
+            rhsType.displayName == "String"
+        {
+            return .named("String")
+        }
+        return nil
+    }
+
+    private static func scalarComparisonReturnType(
+        _ lhs: BootstrapLiteralType,
+        _ rhs: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        guard let lhsType = scalarMaterializedTypeReference(for: lhs, resolver: resolver),
+            let rhsType = scalarMaterializedTypeReference(for: rhs, resolver: resolver)
+        else {
+            return nil
+        }
+
+        if lhsType.displayName == rhsType.displayName || scalarNumericTypesMatch(lhsType, rhsType) {
+            return .named("Bool")
+        }
+        return nil
+    }
+
+    private static func scalarNumericTypesMatch(
+        _ lhs: TypeReference,
+        _ rhs: TypeReference
+    ) -> Bool {
+        let names = Set([lhs.displayName, rhs.displayName])
+        return names.isSubset(of: ["Int", "Float"])
+    }
+
+    private static func scalarComparableTypesMatch(
+        _ lhs: TypeReference,
+        _ rhs: TypeReference
+    ) -> Bool {
+        if scalarNumericTypesMatch(lhs, rhs) {
+            return true
+        }
+        return lhs.displayName == "String" && rhs.displayName == "String"
+    }
+
+    private static func scalarMaterializedTypeReference(
+        for type: BootstrapLiteralType,
+        resolver: LiteralBridgeResolver
+    ) -> TypeReference? {
+        if let materialized = materializedTypeReference(for: type, resolver: resolver) {
+            return materialized
+        }
+
+        switch type {
+        case .intLiteral:
+            return .named("Int")
+        case .floatLiteral:
+            return .named("Float")
+        case .stringLiteral:
+            return .named("String")
+        case .boolLiteral:
+            return .named("Bool")
+        case .nilLiteral, .typed:
+            return nil
+        }
     }
 
     private static func isStringCompatible(
