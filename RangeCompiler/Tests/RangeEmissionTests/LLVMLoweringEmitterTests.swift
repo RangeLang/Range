@@ -638,7 +638,7 @@ struct LLVMLoweringEmitterTests {
             try? FileManager.default.removeItem(at: root)
         }
 
-        try SwiftBackendEmitter().emitWorkspace(
+        let program = SwiftLoweredProgramAdapter().adapt(
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [],
@@ -656,7 +656,11 @@ struct LLVMLoweringEmitterTests {
                         mainBlock: nil
                     )
                 ]
-            ),
+            )
+        )
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: program,
             at: root
         )
 
@@ -763,7 +767,7 @@ struct LLVMLoweringEmitterTests {
             try? FileManager.default.removeItem(at: root)
         }
 
-        try SwiftBackendEmitter().emitWorkspace(
+        let program = SwiftLoweredProgramAdapter().adapt(
             program: LoweredProgram(
                 macrosByName: [:],
                 callables: [],
@@ -781,7 +785,11 @@ struct LLVMLoweringEmitterTests {
                         mainBlock: nil
                     )
                 ]
-            ),
+            )
+        )
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: program,
             at: root
         )
 
@@ -1182,6 +1190,71 @@ struct LLVMLoweringEmitterTests {
         #expect(!swift.contains("func invert"))
         #expect(!swift.contains("func choose("))
         #expect(!swift.contains("func chooseLower"))
+    }
+
+    @Test("Range for loop lowers through adapter into LLVM while")
+    func rangeForLoopLowersThroughAdapterIntoLLVMWhile() throws {
+        let source = try parseModule(
+            """
+            function rangeSum(limit: Int): Int {
+                state total: Int(0)
+
+                for index in 0..<limit {
+                    state total: total + index
+                }
+
+                return total
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMRangeForTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        let program = SwiftLoweredProgramAdapter().adapt(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Loops.swift",
+                        enumerations: source.enumerations,
+                        declarations: source.constructs,
+                        extensions: source.extensions,
+                        callables: source.callables,
+                        mainBlock: nil
+                    )
+                ]
+            )
+        )
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: program,
+            at: root
+        )
+
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+        let swift = try String(
+            contentsOf: root.appendingPathComponent("Sources/Loops.swift"),
+            encoding: .utf8
+        )
+
+        #expect(ir.contains("define i64 @RangeLLVM_rangeSum(i64 %limit)"))
+        #expect(ir.contains("%__range_index_index.addr = alloca i64"))
+        #expect(ir.contains("while.cond."))
+        #expect(ir.contains("icmp slt i64"))
+        #expect(ir.contains("add i64"))
+        #expect(ir.contains("ret i64"))
+        #expect(!swift.contains("func rangeSum"))
     }
 
     @Test("LLVM fixture folder emits documented scalar support")

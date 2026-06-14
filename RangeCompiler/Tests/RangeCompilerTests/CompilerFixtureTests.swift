@@ -1493,6 +1493,30 @@ struct CompilerFixtureTests {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
+    @Test("Range for loop validates with Int loop binding")
+    func rangeForLoopValidatesWithIntLoopBinding() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/RangeForLoop.range",
+                source: """
+                    function sum(limit: Int): Int {
+                        state total: Int(0)
+
+                        for index in 0..<limit {
+                            state total: total + index
+                        }
+
+                        return total
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+    }
+
     @Test("Precedence metadata records binding ranges")
     func precedenceMetadataRecordsBindingRanges() throws {
         let program = try CompilerPipeline().build(inputs: rangeCoreInputs())

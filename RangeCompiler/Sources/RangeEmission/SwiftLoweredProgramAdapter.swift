@@ -99,7 +99,20 @@ struct SwiftLoweredProgramAdapter {
     }
 
     private func lower(statements: [RangeStatement]) -> [RangeStatement] {
-        statements.map(lower(statement:))
+        statements.flatMap(lower(statementsFor:))
+    }
+
+    private func lower(statementsFor statement: RangeStatement) -> [RangeStatement] {
+        if case .forEach(let name, let sequence, let body) = statement,
+            let loweredRangeLoop = lowerRangeForEach(
+                name: name,
+                sequence: sequence,
+                body: body
+            )
+        {
+            return loweredRangeLoop
+        }
+        return [lower(statement: statement)]
     }
 
     private func lower(statement: RangeStatement) -> RangeStatement {
@@ -187,6 +200,62 @@ struct SwiftLoweredProgramAdapter {
                 defaultBody: defaultBody.map(lower(statements:))
             )
         }
+    }
+
+    private func lowerRangeForEach(
+        name: String,
+        sequence: RangeExpression,
+        body: [RangeStatement]
+    ) -> [RangeStatement]? {
+        guard case .binary(let lowerBound, let operatorSymbol, let upperBound) = sequence,
+            operatorSymbol == .rangeUntil || operatorSymbol == .closedRange
+        else {
+            return nil
+        }
+
+        let loweredLowerBound = lower(expression: lowerBound)
+        let loweredUpperBound = lower(expression: upperBound)
+        let comparison: BinaryOperator = operatorSymbol == .rangeUntil ? .less : .lessEqual
+        let indexName = "__range_\(name)_index"
+        let loweredBody = lower(statements: body)
+
+        return [
+            .localBinding(
+                LocalBindingDeclaration(
+                    kind: .mutable,
+                    name: indexName,
+                    hasExplicitTypeAnnotation: true,
+                    type: .named("Int"),
+                    expression: loweredLowerBound
+                )
+            ),
+            .whileLoop(
+                condition: .binary(
+                    lhs: .identifier(indexName),
+                    operatorSymbol: comparison,
+                    rhs: loweredUpperBound
+                ),
+                body: [
+                    .localBinding(
+                        LocalBindingDeclaration(
+                            kind: .constant,
+                            name: name,
+                            hasExplicitTypeAnnotation: true,
+                            type: .named("Int"),
+                            expression: .identifier(indexName)
+                        )
+                    ),
+                    .assignment(
+                        target: .local(indexName),
+                        expression: .binary(
+                            lhs: .identifier(indexName),
+                            operatorSymbol: .addition,
+                            rhs: .integer(1)
+                        )
+                    ),
+                ] + loweredBody
+            ),
+        ]
     }
 
     private func lower(switchCasePattern: SwitchCasePattern) -> SwitchCasePattern {

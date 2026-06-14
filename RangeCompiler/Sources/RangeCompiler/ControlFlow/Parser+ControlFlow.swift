@@ -583,7 +583,10 @@ extension Parser {
         try consume(.leftBrace)
 
         var loopBindings = localBindings
-        loopBindings[name] = LocalBindingSymbol(kind: .constant, type: .named("Never"))
+        loopBindings[name] = LocalBindingSymbol(
+            kind: .constant,
+            type: loopBindingType(for: sequence)
+        )
         var body: [Statement] = []
         while peek() != .rightBrace {
             body.append(try parseStatement(localBindings: &loopBindings))
@@ -591,6 +594,15 @@ extension Parser {
 
         try consume(.rightBrace)
         return .forEach(name: name, sequence: sequence, body: body)
+    }
+
+    private func loopBindingType(for sequence: Expression) -> TypeReference {
+        guard case .binary(_, let operatorSymbol, _) = sequence,
+            operatorSymbol == .rangeUntil || operatorSymbol == .closedRange
+        else {
+            return .named("Never")
+        }
+        return .named("Int")
     }
 
     mutating func parseSwitchCasePattern() throws -> SwitchCasePattern {
