@@ -1,0 +1,32 @@
+function llvmFirstOverTen(limit: Int): Bool {
+    state index: Int(0)
+    state found: Bool(false)
+
+    while index < limit {
+        if index > 10 {
+            state found: true
+            break
+        }
+
+        state index: index + 1
+    }
+
+    return found
+}
+
+function llvmSumOdd(limit: Int): Int {
+    state index: Int(0)
+    state total: Int(0)
+
+    while index < limit {
+        state index: index + 1
+
+        if index % 2 == 0 {
+            continue
+        }
+
+        state total: total + index
+    }
+
+    return total
+}

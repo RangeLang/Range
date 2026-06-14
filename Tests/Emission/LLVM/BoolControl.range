@@ -1,0 +1,16 @@
+function llvmIsLess(lhs: Int, rhs: Int): Bool {
+    return lhs < rhs
+}
+
+function llvmBoth(lhs: Bool, rhs: Bool): Bool {
+    let combined: Bool(lhs && rhs)
+    return !combined
+}
+
+function llvmChoose(flag: Bool, value: Int): Int {
+    if flag {
+        return value
+    } else {
+        return 0
+    }
+}

@@ -1,0 +1,11 @@
+function llvmInvert(value: Bool): Bool {
+    return !value
+}
+
+function llvmChooseLower(lhs: Int, rhs: Int): Int {
+    if llvmIsLess(lhs: lhs, rhs: rhs) {
+        return llvmChoose(flag: llvmInvert(value: false), value: lhs)
+    } else {
+        return llvmChoose(flag: false, value: rhs)
+    }
+}

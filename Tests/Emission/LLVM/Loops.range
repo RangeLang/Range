@@ -1,0 +1,32 @@
+function llvmNestedSum(limit: Int): Int {
+    state outer: Int(0)
+    state total: Int(0)
+
+    while outer < limit {
+        state inner: Int(0)
+
+        while inner < limit {
+            state total: total + outer + inner
+            state inner: inner + 1
+        }
+
+        state outer: outer + 1
+    }
+
+    return total
+}
+
+function llvmReachesThreshold(limit: Int): Bool {
+    state index: Int(0)
+    state found: Bool(false)
+
+    while index < limit {
+        if index > 10 {
+            state found: true
+        }
+
+        state index: index + 1
+    }
+
+    return found
+}

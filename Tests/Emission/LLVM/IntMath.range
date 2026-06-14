@@ -1,0 +1,8 @@
+function llvmAdd(lhs: Int, rhs: Int): Int {
+    return lhs + rhs
+}
+
+function llvmArithmetic(value: Int): Int {
+    let incremented: Int(value + 1)
+    return incremented * 2 - 3
+}

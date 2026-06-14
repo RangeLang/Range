@@ -722,6 +722,106 @@ struct LLVMLoweringEmitterTests {
         #expect(!swift.contains("func chooseLower"))
     }
 
+    @Test("LLVM fixture folder emits documented scalar support")
+    func llvmFixtureFolderEmitsDocumentedScalarSupport() throws {
+        let fixtureFiles = try llvmFixtureFiles()
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            contentsOf: try fixtureFiles.map {
+                SourceInput(
+                    path: $0.path,
+                    source: try String(contentsOf: $0, encoding: .utf8),
+                    role: .project
+                )
+            }
+        )
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let units = program.projectExpandedFiles.compactMap { parsedFile -> LoweredSourceUnit? in
+            guard case .module(let module) = parsedFile.sourceFile else {
+                return nil
+            }
+            let fileName =
+                URL(fileURLWithPath: parsedFile.path).deletingPathExtension().lastPathComponent
+                + ".swift"
+            return LoweredSourceUnit(
+                outputFileName: fileName,
+                enumerations: module.enumerations,
+                declarations: module.constructs,
+                extensions: module.extensions,
+                callables: module.callables,
+                mainBlock: module.mainBlock
+            )
+        }
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMFixtureFolderTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: units
+            ),
+            at: root
+        )
+
+        let irURL = root.appendingPathComponent("LLVM/RangeScalar.ll")
+        let ir = try String(contentsOf: irURL, encoding: .utf8)
+        let sourceDirectory = root.appendingPathComponent("Sources", isDirectory: true)
+        let emittedSwift = try FileManager.default.contentsOfDirectory(
+            at: sourceDirectory,
+            includingPropertiesForKeys: nil
+        )
+        .filter { $0.pathExtension == "swift" && $0.lastPathComponent != "Runtime.swift" }
+        .map { try String(contentsOf: $0, encoding: .utf8) }
+        .joined(separator: "\n")
+
+        let expectedDefinitions = [
+            "define i64 @RangeLLVM_llvmAdd(i64 %lhs, i64 %rhs)",
+            "define i64 @RangeLLVM_llvmArithmetic(i64 %value)",
+            "define i1 @RangeLLVM_llvmIsLess(i64 %lhs, i64 %rhs)",
+            "define i1 @RangeLLVM_llvmBoth(i1 %lhs, i1 %rhs)",
+            "define i64 @RangeLLVM_llvmChoose(i1 %flag, i64 %value)",
+            "define i64 @RangeLLVM_llvmNestedSum(i64 %limit)",
+            "define i1 @RangeLLVM_llvmReachesThreshold(i64 %limit)",
+            "define i1 @RangeLLVM_llvmFirstOverTen(i64 %limit)",
+            "define i64 @RangeLLVM_llvmSumOdd(i64 %limit)",
+            "define i1 @RangeLLVM_llvmInvert(i1 %value)",
+            "define i64 @RangeLLVM_llvmChooseLower(i64 %lhs, i64 %rhs)",
+        ]
+        for definition in expectedDefinitions {
+            #expect(ir.contains(definition))
+        }
+
+        #expect(ir.contains("br label %while.end"))
+        #expect(ir.contains("br label %while.cond"))
+        #expect(ir.contains("call i1 @RangeLLVM_llvmIsLess(i64 %lhs, i64 %rhs)"))
+        #expect(ir.contains("call i64 @RangeLLVM_llvmChoose(i1"))
+
+        let expectedFunctionNames = [
+            "llvmAdd",
+            "llvmArithmetic",
+            "llvmIsLess",
+            "llvmBoth",
+            "llvmChoose",
+            "llvmNestedSum",
+            "llvmReachesThreshold",
+            "llvmFirstOverTen",
+            "llvmSumOdd",
+            "llvmInvert",
+            "llvmChooseLower",
+        ]
+        for functionName in expectedFunctionNames {
+            #expect(!emittedSwift.contains("func \(functionName)"))
+        }
+    }
+
     private func parseCallable(_ source: String) throws -> CallableDeclaration {
         var parser = try Parser(source: source)
         let sourceFile = try parser.parseSourceFile()
@@ -851,6 +951,14 @@ struct LLVMLoweringEmitterTests {
             current.deleteLastPathComponent()
         }
         throw LLVMLoweringEmitterTestError.missingDirectory("repository root")
+    }
+
+    private func llvmFixtureFiles() throws -> [URL] {
+        let root = try repositoryRoot()
+            .appendingPathComponent("Tests", isDirectory: true)
+            .appendingPathComponent("Emission", isDirectory: true)
+            .appendingPathComponent("LLVM", isDirectory: true)
+        return try rangeFiles(in: root, excludingExploration: false)
     }
 
     private func run(_ executableURL: URL, arguments: [String]) throws -> (
