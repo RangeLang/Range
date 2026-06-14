@@ -215,6 +215,37 @@ struct SwiftBackendEmitterLayoutTests {
         #expect(swift.contains("init(a: UInt8, b: Int32, c: UInt8)"))
     }
 
+    @Test("Local mutation does not make value construct methods mutating")
+    func localMutationDoesNotMakeValueConstructMethodsMutating() throws {
+        var parser = try Parser(source: """
+        construct Collector {
+            function collect(): [String] {
+                state files: [String]([])
+                files.append(element: "a")
+                return files
+            }
+        }
+        """)
+        let declaration = try parser.parseConstructDeclaration()
+
+        let swift = try SwiftBackendEmitter().emit(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [declaration],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: []
+            )
+        )
+
+        #expect(swift.contains("func collect() -> [String]"))
+        #expect(!swift.contains("mutating func collect()"))
+        #expect(swift.contains("var files: [String] = []"))
+        #expect(swift.contains("files.append(\"a\")"))
+    }
+
     @Test("Initializer forwarding emits nested construction")
     func initializerForwardingEmitsNestedConstruction() throws {
         var pointParser = try Parser(source: """

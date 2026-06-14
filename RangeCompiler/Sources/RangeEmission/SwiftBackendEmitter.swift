@@ -2655,40 +2655,43 @@ struct SwiftBackendEmitter {
 
     private func methodNeedsMutation(_ callable: CallableDeclaration) -> Bool {
         guard let body = callable.body else { return false }
-        return statementsContainMutation(body) || statementsCallKnownMutatingMember(body)
+        return statementsMutateInstanceSelf(body)
+            || statementsCallKnownMutatingMemberOnInstanceSelf(body)
     }
 
-    private func statementsContainMutation(_ statements: [RangeStatement]) -> Bool {
+    private func statementsMutateInstanceSelf(_ statements: [RangeStatement]) -> Bool {
         for statement in statements {
             switch statement {
-            case .assignment, .compoundAssignment:
-                return true
+            case .assignment(let target, _), .compoundAssignment(let target, _, _):
+                if assignmentTargetReferencesInstanceSelf(target) {
+                    return true
+                }
             case .expand:
                 continue
             case .macroInvocation(_, _, let body),
                 .forEach(_, _, let body),
                 .whileLoop(_, let body),
                 .derived(_, _, let body):
-                if statementsContainMutation(body) {
+                if statementsMutateInstanceSelf(body) {
                     return true
                 }
             case .background(let background):
-                if statementsContainMutation(background.body) {
+                if statementsMutateInstanceSelf(background.body) {
                     return true
                 }
             case .deferBlock(let deferred):
-                if statementsContainMutation(deferred.body) {
+                if statementsMutateInstanceSelf(deferred.body) {
                     return true
                 }
             case .conditional(let branches):
-                if branches.contains(where: { statementsContainMutation($0.body) }) {
+                if branches.contains(where: { statementsMutateInstanceSelf($0.body) }) {
                     return true
                 }
             case .switchStatement(_, let cases, let defaultBody):
-                if cases.contains(where: { statementsContainMutation($0.body) }) {
+                if cases.contains(where: { statementsMutateInstanceSelf($0.body) }) {
                     return true
                 }
-                if let defaultBody, statementsContainMutation(defaultBody) {
+                if let defaultBody, statementsMutateInstanceSelf(defaultBody) {
                     return true
                 }
             case .localBinding, .localCallable, .expression, .return, .break, .continue:
@@ -2699,57 +2702,59 @@ struct SwiftBackendEmitter {
         return false
     }
 
-    private func statementsCallKnownMutatingMember(_ statements: [RangeStatement]) -> Bool {
+    private func statementsCallKnownMutatingMemberOnInstanceSelf(_ statements: [RangeStatement]) -> Bool {
         for statement in statements {
             switch statement {
             case .expression(let expression), .return(let expression?):
-                if expressionCallsKnownMutatingMember(expression) {
+                if expressionCallsKnownMutatingMemberOnInstanceSelf(expression) {
                     return true
                 }
             case .localBinding(let declaration):
-                if expressionCallsKnownMutatingMember(declaration.expression) {
+                if expressionCallsKnownMutatingMemberOnInstanceSelf(declaration.expression) {
                     return true
                 }
             case .assignment(_, let expression), .compoundAssignment(_, _, let expression):
-                if expressionCallsKnownMutatingMember(expression) {
+                if expressionCallsKnownMutatingMemberOnInstanceSelf(expression) {
                     return true
                 }
             case .conditional(let branches):
-                if branches.contains(where: { statementsCallKnownMutatingMember($0.body) }) {
+                if branches.contains(where: {
+                    statementsCallKnownMutatingMemberOnInstanceSelf($0.body)
+                }) {
                     return true
                 }
             case .switchStatement(let expression, let cases, let defaultBody):
-                if expressionCallsKnownMutatingMember(expression) {
+                if expressionCallsKnownMutatingMemberOnInstanceSelf(expression) {
                     return true
                 }
-                if cases.contains(where: { statementsCallKnownMutatingMember($0.body) }) {
+                if cases.contains(where: { statementsCallKnownMutatingMemberOnInstanceSelf($0.body) }) {
                     return true
                 }
-                if let defaultBody, statementsCallKnownMutatingMember(defaultBody) {
+                if let defaultBody, statementsCallKnownMutatingMemberOnInstanceSelf(defaultBody) {
                     return true
                 }
             case .forEach(_, let sequence, let body):
-                if expressionCallsKnownMutatingMember(sequence)
-                    || statementsCallKnownMutatingMember(body)
+                if expressionCallsKnownMutatingMemberOnInstanceSelf(sequence)
+                    || statementsCallKnownMutatingMemberOnInstanceSelf(body)
                 {
                     return true
                 }
             case .whileLoop(let condition, let body):
-                if expressionCallsKnownMutatingMember(condition)
-                    || statementsCallKnownMutatingMember(body)
+                if expressionCallsKnownMutatingMemberOnInstanceSelf(condition)
+                    || statementsCallKnownMutatingMemberOnInstanceSelf(body)
                 {
                     return true
                 }
             case .background(let background):
-                if statementsCallKnownMutatingMember(background.body) {
+                if statementsCallKnownMutatingMemberOnInstanceSelf(background.body) {
                     return true
                 }
             case .deferBlock(let deferred):
-                if statementsCallKnownMutatingMember(deferred.body) {
+                if statementsCallKnownMutatingMemberOnInstanceSelf(deferred.body) {
                     return true
                 }
             case .derived(_, _, let body):
-                if statementsCallKnownMutatingMember(body) {
+                if statementsCallKnownMutatingMemberOnInstanceSelf(body) {
                     return true
                 }
             case .localCallable, .macroInvocation, .expand, .return(nil), .break, .continue:
@@ -2760,31 +2765,33 @@ struct SwiftBackendEmitter {
         return false
     }
 
-    private func expressionCallsKnownMutatingMember(_ expression: RangeExpression) -> Bool {
+    private func expressionCallsKnownMutatingMemberOnInstanceSelf(_ expression: RangeExpression)
+        -> Bool
+    {
         switch expression {
         case .call(let name, let arguments):
-            if name == "appendField" || name.hasSuffix(".appendField") {
+            if name.hasPrefix("self."), name == "self.appendField" || name.hasSuffix(".appendField") {
                 return true
             }
-            return arguments.contains { expressionCallsKnownMutatingMember($0.value) }
+            return arguments.contains { expressionCallsKnownMutatingMemberOnInstanceSelf($0.value) }
         case .block(let statements):
-            return statementsCallKnownMutatingMember(statements)
+            return statementsCallKnownMutatingMemberOnInstanceSelf(statements)
         case .array(let elements):
-            return elements.contains(where: expressionCallsKnownMutatingMember)
+            return elements.contains(where: expressionCallsKnownMutatingMemberOnInstanceSelf)
         case .dictionary(let elements):
             return elements.contains {
-                expressionCallsKnownMutatingMember($0.key)
-                    || expressionCallsKnownMutatingMember($0.value)
+                expressionCallsKnownMutatingMemberOnInstanceSelf($0.key)
+                    || expressionCallsKnownMutatingMemberOnInstanceSelf($0.value)
             }
         case .ternary(let condition, let trueExpression, let falseExpression):
-            return expressionCallsKnownMutatingMember(condition)
-                || expressionCallsKnownMutatingMember(trueExpression)
-                || expressionCallsKnownMutatingMember(falseExpression)
+            return expressionCallsKnownMutatingMemberOnInstanceSelf(condition)
+                || expressionCallsKnownMutatingMemberOnInstanceSelf(trueExpression)
+                || expressionCallsKnownMutatingMemberOnInstanceSelf(falseExpression)
         case .unary(_, let nested):
-            return expressionCallsKnownMutatingMember(nested)
+            return expressionCallsKnownMutatingMemberOnInstanceSelf(nested)
         case .binary(let lhs, _, let rhs):
-            return expressionCallsKnownMutatingMember(lhs)
-                || expressionCallsKnownMutatingMember(rhs)
+            return expressionCallsKnownMutatingMemberOnInstanceSelf(lhs)
+                || expressionCallsKnownMutatingMemberOnInstanceSelf(rhs)
         case .integer, .double, .string, .interpolatedString, .boolean, .nilLiteral,
             .macroInvocation, .identifier, .bindingReference:
             return false
