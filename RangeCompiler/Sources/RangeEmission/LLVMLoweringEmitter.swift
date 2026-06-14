@@ -142,6 +142,7 @@ private final class LLVMStringTable {
     private var namesByValue: [String: String] = [:]
     private var requiresType = false
     private var requiresIntArrayType = false
+    private var requiresMalloc = false
 
     func requireStringType() {
         requiresType = true
@@ -149,6 +150,10 @@ private final class LLVMStringTable {
 
     func requireIntArrayType() {
         requiresIntArrayType = true
+    }
+
+    func requireMalloc() {
+        requiresMalloc = true
     }
 
     func constantName(for value: String) -> String {
@@ -162,7 +167,7 @@ private final class LLVMStringTable {
     }
 
     func supportDefinitions() -> String {
-        guard requiresType || requiresIntArrayType else {
+        guard requiresType || requiresIntArrayType || requiresMalloc else {
             return ""
         }
         var definitions: [String] = []
@@ -171,6 +176,9 @@ private final class LLVMStringTable {
         }
         if requiresIntArrayType {
             definitions.append("%Range.IntArray = type { ptr, i64, i64 }")
+        }
+        if requiresMalloc {
+            definitions.append("declare ptr @malloc(i64)")
         }
         let globals = namesByValue.sorted { $0.value < $1.value }.map { value, name in
             let bytes = Array(value.utf8)
@@ -199,6 +207,7 @@ private struct LLVMFunctionEmitter {
         case byteCount
         case element
         case isEmpty
+        case update
     }
 
     struct CallableSymbol {
@@ -295,8 +304,12 @@ private struct LLVMFunctionEmitter {
             }
             emitBranch(to: target.conditionLabel)
         case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-            .expression, .forEach:
+            .forEach:
             throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
+        case .expression(let expression):
+            guard try emitLowerableSideEffectExpression(expression) else {
+                throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
+            }
         }
     }
 
@@ -603,6 +616,12 @@ private struct LLVMFunctionEmitter {
             )
             return Value(type: resultType, representation: register)
         case .call(let name, let arguments):
+            if let allocation = try emitLowerableIntArrayAllocation(
+                name: name,
+                arguments: arguments
+            ) {
+                return allocation
+            }
             if let memberCall = try emitLowerableMemberCall(name: name, arguments: arguments) {
                 return memberCall
             }
@@ -662,6 +681,8 @@ private struct LLVMFunctionEmitter {
             return Value(type: "i64", representation: countRegister)
         case .element:
             return nil
+        case .update:
+            return nil
         case .isEmpty:
             let resultRegister = freshRegister()
             emit("\(resultRegister) = icmp eq i64 \(countRegister), 0")
@@ -706,6 +727,95 @@ private struct LLVMFunctionEmitter {
         return Value(type: "i64", representation: valueRegister)
     }
 
+    private mutating func emitLowerableIntArrayAllocation(
+        name: String,
+        arguments: [CallArgument]
+    ) throws -> Value? {
+        guard name == "intArray" else {
+            return nil
+        }
+        guard arguments.count == 1 else {
+            throw LLVMLoweringError("LLVM intArray allocation expects one capacity argument.")
+        }
+        guard arguments[0].label == "capacity" || arguments[0].label == nil else {
+            throw LLVMLoweringError("LLVM intArray allocation expects a capacity argument.")
+        }
+
+        let rawCapacity = try emitExpression(arguments[0].value)
+        let capacity = try convert(value: rawCapacity, toLLVMType: "i64")
+        guard capacity.type == "i64" else {
+            throw LLVMLoweringError("LLVM intArray allocation capacity must be i64.")
+        }
+
+        stringTable.requireIntArrayType()
+        stringTable.requireMalloc()
+        let byteCountRegister = freshRegister()
+        emit("\(byteCountRegister) = mul i64 \(capacity.representation), 8")
+        let pointerRegister = freshRegister()
+        emit("\(pointerRegister) = call ptr @malloc(i64 \(byteCountRegister))")
+        let pointerValueRegister = freshRegister()
+        emit(
+            "\(pointerValueRegister) = insertvalue %Range.IntArray undef, ptr \(pointerRegister), 0"
+        )
+        let countValueRegister = freshRegister()
+        emit(
+            "\(countValueRegister) = insertvalue %Range.IntArray \(pointerValueRegister), i64 \(capacity.representation), 1"
+        )
+        let capacityValueRegister = freshRegister()
+        emit(
+            "\(capacityValueRegister) = insertvalue %Range.IntArray \(countValueRegister), i64 \(capacity.representation), 2"
+        )
+        return Value(type: "%Range.IntArray", representation: capacityValueRegister)
+    }
+
+    private mutating func emitLowerableSideEffectExpression(
+        _ expression: RangeCompiler.Expression
+    ) throws -> Bool {
+        guard case .call(let name, let arguments) = expression,
+            let dotIndex = name.lastIndex(of: ".")
+        else {
+            return false
+        }
+        let baseName = String(name[..<dotIndex])
+        let memberName = String(name[name.index(after: dotIndex)...])
+        guard memberName == "update" else {
+            return false
+        }
+        guard arguments.count == 2 else {
+            throw LLVMLoweringError("LLVM Array<Int>.update expects element and index arguments.")
+        }
+
+        let base = try emitIdentifier(named: baseName)
+        guard base.type == "%Range.IntArray" else {
+            return false
+        }
+        guard let elementExpression = argumentValue(labeled: "element", at: 0, in: arguments),
+            let indexExpression = argumentValue(labeled: "index", at: 1, in: arguments)
+        else {
+            throw LLVMLoweringError("LLVM Array<Int>.update expects element and index arguments.")
+        }
+
+        let rawElement = try emitExpression(elementExpression)
+        let element = try convert(value: rawElement, toLLVMType: "i64")
+        guard element.type == "i64" else {
+            throw LLVMLoweringError("LLVM Array<Int>.update element must be i64.")
+        }
+        let rawIndex = try emitExpression(indexExpression)
+        let index = try convert(value: rawIndex, toLLVMType: "i64")
+        guard index.type == "i64" else {
+            throw LLVMLoweringError("LLVM Array<Int>.update index must be i64.")
+        }
+
+        let pointerRegister = freshRegister()
+        emit("\(pointerRegister) = extractvalue %Range.IntArray \(base.representation), 0")
+        let elementPointerRegister = freshRegister()
+        emit(
+            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(index.representation)"
+        )
+        emit("store i64 \(element.representation), ptr \(elementPointerRegister)")
+        return true
+    }
+
     private func lowerableMemberAccess(name: String) -> LowerableMember? {
         switch name {
         case "count":
@@ -723,9 +833,25 @@ private struct LLVMFunctionEmitter {
         switch name {
         case "element":
             return .element
+        case "update":
+            return .update
         default:
             return nil
         }
+    }
+
+    private func argumentValue(
+        labeled label: String,
+        at fallbackIndex: Int,
+        in arguments: [CallArgument]
+    ) -> RangeCompiler.Expression? {
+        if let labeledArgument = arguments.first(where: { $0.label == label }) {
+            return labeledArgument.value
+        }
+        guard arguments.indices.contains(fallbackIndex) else {
+            return nil
+        }
+        return arguments[fallbackIndex].value
     }
 
     private mutating func emitIdentifier(named name: String) throws -> Value {

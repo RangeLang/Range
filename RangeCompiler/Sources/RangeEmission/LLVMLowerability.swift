@@ -227,6 +227,14 @@ enum LLVMLowerability {
                 ) {
                     sawReturn = true
                 }
+            case .expression(let expression):
+                guard canLowerSideEffectExpression(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return false
+                }
             case .return(let expression?):
                 guard canConvert(
                     canLower(
@@ -240,7 +248,7 @@ enum LLVMLowerability {
                 }
                 sawReturn = true
             case .return(nil), .macroInvocation, .expand, .background, .deferBlock, .localCallable,
-                .derived, .expression, .forEach, .break, .continue:
+                .derived, .forEach, .break, .continue:
                 return false
             }
         }
@@ -390,8 +398,14 @@ enum LLVMLowerability {
                 return "uses a local function"
             case .derived:
                 return "uses derived"
-            case .expression:
-                return "uses an expression statement"
+            case .expression(let expression):
+                guard canLowerSideEffectExpression(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return "uses an unsupported expression statement"
+                }
             case .forEach:
                 return "uses forEach"
             case .break:
@@ -611,8 +625,16 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
+            case .expression(let expression):
+                guard canLowerSideEffectExpression(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                ) else {
+                    return false
+                }
             case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-                .expression, .forEach, .return:
+                .forEach, .return:
                 return false
             case .break, .continue:
                 continue
@@ -911,12 +933,23 @@ enum LLVMLowerability {
             }
             return locals[name]
         case .call(let name, let arguments):
+            if lowerableIntArrayAllocation(
+                name: name,
+                arguments: arguments,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) {
+                return .intArray
+            }
             if let memberCall = lowerableMemberCall(
                 name: name,
                 arguments: arguments,
                 locals: locals,
                 lowerableFunctionSignatures: lowerableFunctionSignatures
             ) {
+                guard memberCall.member != .update else {
+                    return nil
+                }
                 return memberCall.result
             }
             guard let signature = lowerableFunctionSignatures[name],
@@ -995,6 +1028,46 @@ enum LLVMLowerability {
         return actual == expected || (actual == .int && expected == .float)
     }
 
+    private static func lowerableIntArrayAllocation(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> Bool {
+        guard name == "intArray", arguments.count == 1 else {
+            return false
+        }
+        guard arguments[0].label == "capacity" || arguments[0].label == nil else {
+            return false
+        }
+        return canConvert(
+            canLower(
+                arguments[0].value,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ),
+            to: .int
+        )
+    }
+
+    private static func canLowerSideEffectExpression(
+        _ expression: Expression,
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> Bool {
+        guard case .call(let name, let arguments) = expression,
+            let memberCall = lowerableMemberCall(
+                name: name,
+                arguments: arguments,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            )
+        else {
+            return false
+        }
+        return memberCall.member == .update
+    }
+
     private struct LowerableMemberAccess {
         let baseName: String
         let baseType: ScalarType
@@ -1007,6 +1080,7 @@ enum LLVMLowerability {
         case byteCount
         case element
         case isEmpty
+        case update
     }
 
     private static func lowerableMemberAccess(
@@ -1062,6 +1136,8 @@ enum LLVMLowerability {
             return .int
         case .isEmpty:
             return .bool
+        case .update:
+            return .intArray
         }
     }
 
@@ -1103,6 +1179,31 @@ enum LLVMLowerability {
             else {
                 return nil
             }
+        case .update:
+            guard arguments.count == 2,
+                canConvert(
+                    argumentValue(labeled: "element", at: 0, in: arguments).flatMap {
+                        canLower(
+                            $0,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures
+                        )
+                    },
+                    to: .int
+                ),
+                canConvert(
+                    argumentValue(labeled: "index", at: 1, in: arguments).flatMap {
+                        canLower(
+                            $0,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures
+                        )
+                    },
+                    to: .int
+                )
+            else {
+                return nil
+            }
         default:
             return nil
         }
@@ -1122,9 +1223,25 @@ enum LLVMLowerability {
         switch (baseType, name) {
         case (.intArray, "element"):
             return .element
+        case (.intArray, "update"):
+            return .update
         default:
             return nil
         }
+    }
+
+    private static func argumentValue(
+        labeled label: String,
+        at fallbackIndex: Int,
+        in arguments: [CallArgument]
+    ) -> Expression? {
+        if let labeledArgument = arguments.first(where: { $0.label == label }) {
+            return labeledArgument.value
+        }
+        guard arguments.indices.contains(fallbackIndex) else {
+            return nil
+        }
+        return arguments[fallbackIndex].value
     }
 
     private static func ternaryResultType(_ lhs: ScalarType, _ rhs: ScalarType) -> ScalarType? {

@@ -72,6 +72,10 @@ construct Array<Element> {
     }
 }
 
+function intArray(capacity: Int): [Int] {
+    return []
+}
+
 extension Array {
     function encode(encoder: Encoder): Result<Void, EncodingError> {
         state container: encoder.unkeyedContainer()

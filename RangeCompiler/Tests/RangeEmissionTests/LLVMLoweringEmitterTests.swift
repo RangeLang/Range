@@ -278,6 +278,47 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i64"))
     }
 
+    @Test("Owned Int array allocation and update lower through LLVM memory")
+    func ownedIntArrayAllocationAndUpdateLowerThroughLLVMMemory() throws {
+        let callable = try parseCallable(
+            """
+            function sumAllocated(limit: Int): Int {
+                let values: [Int](intArray(capacity: limit))
+                state index: Int(0)
+
+                while index < limit {
+                    values.update(element: index, index: index)
+                    state index: index + 1
+                }
+
+                state total: Int(0)
+                state readIndex: Int(0)
+
+                while readIndex < limit {
+                    state total: total + values.element(index: readIndex)
+                    state readIndex: readIndex + 1
+                }
+
+                return total
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("declare ptr @malloc(i64)"))
+        #expect(module.ir.contains("%Range.IntArray = type { ptr, i64, i64 }"))
+        #expect(module.ir.contains("mul i64 %limit, 8"))
+        #expect(module.ir.contains("call ptr @malloc(i64"))
+        #expect(module.ir.contains("insertvalue %Range.IntArray undef, ptr"))
+        #expect(module.ir.contains("store i64"))
+        #expect(module.ir.contains("load i64, ptr"))
+        #expect(module.ir.contains("define i64 @RangeLLVM_sumAllocated(i64 %limit)"))
+    }
+
     @Test("Nested Int while loops lower to LLVM basic blocks")
     func nestedIntWhileLoopsLowerToLLVMBasicBlocks() throws {
         let callable = try parseCallable(
