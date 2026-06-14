@@ -134,6 +134,77 @@ struct LLVMLoweringEmitterTests {
         #expect(emission.ir.contains("call %Range.String @RangeLLVM_echo(%Range.String"))
     }
 
+    @Test("Construct values lower to LLVM aggregate insert and extract")
+    func constructValuesLowerToLLVMAggregateInsertAndExtract() throws {
+        let module = try parseModule(
+            """
+            construct Point {
+                let x: Int
+                let y: Int
+            }
+
+            construct Label {
+                let text: String
+            }
+
+            function sum(point: Point): Int {
+                return point.x + point.y
+            }
+
+            function text(label: Label): String {
+                return label.text
+            }
+
+            function make(): Point {
+                return Point(x: 2, y: 3)
+            }
+
+            function makeSum(): Int {
+                return sum(point: Point(x: 2, y: 3))
+            }
+            """
+        )
+        let layouts = LLVMLowerability.constructLayouts(from: module.constructs)
+        let signatures = Dictionary(
+            uniqueKeysWithValues: module.callables.compactMap { callable in
+                LLVMLowerability.scalarSignature(
+                    for: callable,
+                    constructLayouts: layouts
+                ).map { (callable.name, $0) }
+            }
+        )
+
+        #expect(layouts["Point"]?.fields.map(\.name) == ["x", "y"])
+        #expect(
+            module.callables.allSatisfy {
+                LLVMLowerability.canLower(
+                    $0,
+                    lowerableFunctionSignatures: signatures,
+                    constructLayouts: layouts
+                )
+            }
+        )
+        let emission = try #require(
+            try LLVMLoweringEmitter().emitModule(
+                callables: module.callables,
+                constructLayouts: layouts
+            )
+        )
+
+        #expect(emission.ir.contains("%Range.Point = type { i64, i64 }"))
+        #expect(emission.ir.contains("%Range.Label = type { %Range.String }"))
+        #expect(emission.ir.contains("define i64 @RangeLLVM_sum(%Range.Point %point)"))
+        #expect(emission.ir.contains("extractvalue %Range.Point %point, 0"))
+        #expect(emission.ir.contains("extractvalue %Range.Point %point, 1"))
+        #expect(emission.ir.contains("define %Range.String @RangeLLVM_text(%Range.Label %label)"))
+        #expect(emission.ir.contains("extractvalue %Range.Label %label, 0"))
+        #expect(emission.ir.contains("define %Range.Point @RangeLLVM_make()"))
+        #expect(emission.ir.contains("insertvalue %Range.Point undef, i64 2, 0"))
+        #expect(emission.ir.contains("insertvalue %Range.Point"))
+        #expect(emission.ir.contains("ret %Range.Point"))
+        #expect(emission.ir.contains("call i64 @RangeLLVM_sum(%Range.Point"))
+    }
+
     @Test("String isEmpty member lowers through LLVM count projection")
     func stringIsEmptyMemberLowersThroughLLVMCountProjection() throws {
         let callable = try parseCallable(

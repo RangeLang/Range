@@ -13,7 +13,11 @@ struct LLVMLoweredSymbol: Equatable {
 }
 
 struct LLVMLoweringEmitter {
-    func emitModule(callables lowerableFunctions: [CallableDeclaration], moduleName: String = "RangeScalar") throws
+    func emitModule(
+        callables lowerableFunctions: [CallableDeclaration],
+        constructLayouts: [String: LLVMLowerability.ConstructLayout] = [:],
+        moduleName: String = "RangeScalar"
+    ) throws
         -> LLVMModuleEmission?
     {
         guard !lowerableFunctions.isEmpty else {
@@ -23,7 +27,10 @@ struct LLVMLoweringEmitter {
         let symbolsByName = Dictionary(
             uniqueKeysWithValues: lowerableFunctions.compactMap {
                 callable -> (String, LLVMFunctionEmitter.CallableSymbol)? in
-                guard let signature = LLVMLowerability.scalarSignature(for: callable) else {
+                guard let signature = LLVMLowerability.scalarSignature(
+                    for: callable,
+                    constructLayouts: constructLayouts
+                ) else {
                     return nil
                 }
                 return (
@@ -42,8 +49,26 @@ struct LLVMLoweringEmitter {
         for symbol in symbolsByName.values where symbol.signature.usesIntArray {
             stringTable.requireIntArrayType()
         }
+        for layout in constructLayouts.values {
+            stringTable.requireConstructType(layout)
+            for field in layout.fields {
+                switch field.type {
+                case .string:
+                    stringTable.requireStringType()
+                case .intArray:
+                    stringTable.requireIntArrayType()
+                case .int, .bool, .float, .construct:
+                    break
+                }
+            }
+        }
         let functions = try lowerableFunctions.map {
-            try emitFunction($0, symbolsByName: symbolsByName, stringTable: stringTable)
+            try emitFunction(
+                $0,
+                symbolsByName: symbolsByName,
+                stringTable: stringTable,
+                constructLayouts: constructLayouts
+            )
         }
         .joined(separator: "\n\n")
         let support = stringTable.supportDefinitions()
@@ -67,12 +92,16 @@ struct LLVMLoweringEmitter {
     private func emitFunction(
         _ callable: CallableDeclaration,
         symbolsByName: [String: LLVMFunctionEmitter.CallableSymbol],
-        stringTable: LLVMStringTable
+        stringTable: LLVMStringTable,
+        constructLayouts: [String: LLVMLowerability.ConstructLayout]
     ) throws -> String {
         guard let body = callable.body else {
             throw LLVMLoweringError("LLVM lowering requires function \(callable.name) to have a body.")
         }
-        guard let signature = LLVMLowerability.scalarSignature(for: callable) else {
+        guard let signature = LLVMLowerability.scalarSignature(
+            for: callable,
+            constructLayouts: constructLayouts
+        ) else {
             throw LLVMLoweringError("LLVM lowering requires scalar function \(callable.name).")
         }
 
@@ -80,7 +109,8 @@ struct LLVMLoweringEmitter {
             signature: signature,
             parameters: callable.parameters,
             callableSymbolsByName: symbolsByName,
-            stringTable: stringTable
+            stringTable: stringTable,
+            constructLayouts: constructLayouts
         )
         try function.emitBody(body)
         let parameterList = zip(callable.parameters, signature.parameters)
@@ -100,7 +130,7 @@ struct LLVMLoweringEmitter {
         "RangeLLVM_" + sanitizeSymbol(callable.name)
     }
 
-    private static func sanitizeSymbol(_ value: String) -> String {
+    static func sanitizeSymbol(_ value: String) -> String {
         let scalars = value.unicodeScalars.map { scalar -> Character in
             if CharacterSet.alphanumerics.contains(scalar) || scalar == "_" {
                 return Character(scalar)
@@ -124,6 +154,8 @@ private extension LLVMLowerability.ScalarType {
             return "%Range.String"
         case .intArray:
             return "%Range.IntArray"
+        case .construct(let name):
+            return "%Range.\(LLVMLoweringEmitter.sanitizeSymbol(name))"
         }
     }
 }
@@ -146,6 +178,7 @@ private final class LLVMStringTable {
     private var requiresFree = false
     private var requiresMemcpy = false
     private var requiresTrap = false
+    private var requiredConstructTypes: [String: LLVMLowerability.ConstructLayout] = [:]
 
     func requireStringType() {
         requiresType = true
@@ -171,6 +204,10 @@ private final class LLVMStringTable {
         requiresTrap = true
     }
 
+    func requireConstructType(_ layout: LLVMLowerability.ConstructLayout) {
+        requiredConstructTypes[layout.name] = layout
+    }
+
     func constantName(for value: String) -> String {
         requireStringType()
         if let name = namesByValue[value] {
@@ -182,7 +219,9 @@ private final class LLVMStringTable {
     }
 
     func supportDefinitions() -> String {
-        guard requiresType || requiresIntArrayType || requiresMalloc || requiresFree || requiresMemcpy || requiresTrap else {
+        guard requiresType || requiresIntArrayType || requiresMalloc || requiresFree || requiresMemcpy || requiresTrap
+            || !requiredConstructTypes.isEmpty
+        else {
             return ""
         }
         var definitions: [String] = []
@@ -191,6 +230,12 @@ private final class LLVMStringTable {
         }
         if requiresIntArrayType {
             definitions.append("%Range.IntArray = type { ptr, i64, i64 }")
+        }
+        for layout in requiredConstructTypes.values.sorted(by: { $0.name < $1.name }) {
+            let fieldTypes = layout.fields.map { $0.type.llvmType }.joined(separator: ", ")
+            definitions.append(
+                "%Range.\(LLVMLoweringEmitter.sanitizeSymbol(layout.name)) = type { \(fieldTypes) }"
+            )
         }
         if requiresMalloc {
             definitions.append("declare ptr @malloc(i64)")
@@ -226,13 +271,14 @@ private final class LLVMStringTable {
 private struct LLVMFunctionEmitter {
     private typealias ScalarType = LLVMLowerability.ScalarType
 
-    private enum LowerableMember {
+    private enum LowerableMember: Equatable {
         case count
         case byteCount
         case element
         case isEmpty
         case append
         case update
+        case field(index: Int, type: ScalarType)
     }
 
     struct CallableSymbol {
@@ -254,6 +300,7 @@ private struct LLVMFunctionEmitter {
     private let returnType: ScalarType
     private let callableSymbolsByName: [String: CallableSymbol]
     private let stringTable: LLVMStringTable
+    private let constructLayouts: [String: LLVMLowerability.ConstructLayout]
     private(set) var lines: [String] = []
     private var nextRegister = 0
     private var nextLabel = 0
@@ -264,7 +311,8 @@ private struct LLVMFunctionEmitter {
         signature: LLVMLowerability.ScalarSignature,
         parameters: [RangeFunctionParameter],
         callableSymbolsByName: [String: CallableSymbol],
-        stringTable: LLVMStringTable
+        stringTable: LLVMStringTable,
+        constructLayouts: [String: LLVMLowerability.ConstructLayout]
     ) {
         self.returnType = signature.returnType
         self.symbols = Dictionary(
@@ -275,6 +323,7 @@ private struct LLVMFunctionEmitter {
         )
         self.callableSymbolsByName = callableSymbolsByName
         self.stringTable = stringTable
+        self.constructLayouts = constructLayouts
     }
 
     mutating func emitBody(_ body: [Statement]) throws {
@@ -340,8 +389,11 @@ private struct LLVMFunctionEmitter {
     }
 
     private mutating func emitLocalBinding(_ declaration: LocalBindingDeclaration) throws {
-        guard let scalarType = ScalarType(typeReference: declaration.type) else {
-            throw LLVMLoweringError("LLVM local binding '\(declaration.name)' must be Int, Bool, or Float.")
+        guard let scalarType = ScalarType(
+            typeReference: declaration.type,
+            constructLayouts: constructLayouts
+        ) else {
+            throw LLVMLoweringError("LLVM local binding '\(declaration.name)' must be LLVM lowerable.")
         }
         guard symbols[declaration.name] == nil else {
             throw LLVMLoweringError("LLVM local binding '\(declaration.name)' is already declared.")
@@ -649,6 +701,12 @@ private struct LLVMFunctionEmitter {
             ) {
                 return allocation
             }
+            if let construction = try emitLowerableConstructInitialization(
+                name: name,
+                arguments: arguments
+            ) {
+                return construction
+            }
             if let memberCall = try emitLowerableMemberCall(name: name, arguments: arguments) {
                 return memberCall
             }
@@ -690,12 +748,19 @@ private struct LLVMFunctionEmitter {
         }
         let baseName = String(name[..<dotIndex])
         let memberName = String(name[name.index(after: dotIndex)...])
-        guard let member = lowerableMemberAccess(name: memberName) else {
-            return nil
-        }
 
         let base = try emitIdentifier(named: baseName)
+        if let constructField = constructFieldAccess(baseType: base.type, memberName: memberName) {
+            let register = freshRegister()
+            emit(
+                "\(register) = extractvalue \(base.type) \(base.representation), \(constructField.index)"
+            )
+            return Value(type: constructField.type.llvmType, representation: register)
+        }
         guard base.type == "%Range.String" || base.type == "%Range.IntArray" else {
+            return nil
+        }
+        guard let member = lowerableMemberAccess(name: memberName) else {
             return nil
         }
 
@@ -712,11 +777,39 @@ private struct LLVMFunctionEmitter {
             return nil
         case .update:
             return nil
+        case .field:
+            return nil
         case .isEmpty:
             let resultRegister = freshRegister()
             emit("\(resultRegister) = icmp eq i64 \(countRegister), 0")
             return Value(type: "i1", representation: resultRegister)
         }
+    }
+
+    private mutating func emitLowerableConstructInitialization(
+        name: String,
+        arguments: [CallArgument]
+    ) throws -> Value? {
+        guard let layout = constructLayouts[name] else {
+            return nil
+        }
+        var current = "undef"
+        for (index, field) in layout.fields.enumerated() {
+            guard let expression = argumentValue(labeled: field.name, at: index, in: arguments) else {
+                throw LLVMLoweringError("LLVM construct \(name) expects field \(field.name).")
+            }
+            let rawValue = try emitExpression(expression)
+            let value = try convert(rawValue, to: field.type)
+            guard value.type == field.type.llvmType else {
+                throw LLVMLoweringError("LLVM construct field \(field.name) must be \(field.type.llvmType).")
+            }
+            let register = freshRegister()
+            emit(
+                "\(register) = insertvalue \(ScalarType.construct(name).llvmType) \(current), \(field.type.llvmType) \(value.representation), \(index)"
+            )
+            current = register
+        }
+        return Value(type: ScalarType.construct(name).llvmType, representation: current)
     }
 
     private mutating func emitLowerableMemberCall(
@@ -1092,6 +1185,17 @@ private struct LLVMFunctionEmitter {
             return nil
         }
         return arguments[fallbackIndex].value
+    }
+
+    private func constructFieldAccess(baseType: String, memberName: String) -> (
+        index: Int, type: ScalarType
+    )? {
+        for layout in constructLayouts.values where ScalarType.construct(layout.name).llvmType == baseType {
+            if let field = layout.field(named: memberName) {
+                return (field.index, field.field.type)
+            }
+        }
+        return nil
     }
 
     private mutating func emitIdentifier(named name: String) throws -> Value {

@@ -1,6 +1,23 @@
 import RangeCompiler
 
 enum LLVMLowerability {
+    struct ConstructLayout: Equatable {
+        struct Field: Equatable {
+            var name: String
+            var type: ScalarType
+        }
+
+        var name: String
+        var fields: [Field]
+
+        func field(named name: String) -> (index: Int, field: Field)? {
+            for (index, field) in fields.enumerated() where field.name == name {
+                return (index, field)
+            }
+            return nil
+        }
+    }
+
     struct ScalarSignature {
         var parameters: [ScalarType]
         var returnType: ScalarType
@@ -12,8 +29,9 @@ enum LLVMLowerability {
         case float
         case string
         case intArray
+        case construct(String)
 
-        init?(typeReference: TypeReference) {
+        init?(typeReference: TypeReference, constructLayouts: [String: ConstructLayout] = [:]) {
             switch typeReference.displayName {
             case "Int":
                 self = .int
@@ -26,31 +44,80 @@ enum LLVMLowerability {
             case "[Int]":
                 self = .intArray
             default:
+                if constructLayouts[typeReference.displayName] != nil {
+                    self = .construct(typeReference.displayName)
+                    return
+                }
                 return nil
             }
         }
     }
 
+    static func constructLayouts(from declarations: [ConstructDeclaration]) -> [String: ConstructLayout] {
+        declarations.reduce(into: [:]) { result, declaration in
+            if let layout = constructLayout(for: declaration, knownLayouts: result) {
+                result[layout.name] = layout
+            }
+        }
+    }
+
+    private static func constructLayout(
+        for declaration: ConstructDeclaration,
+        knownLayouts: [String: ConstructLayout]
+    ) -> ConstructLayout? {
+        guard declaration.genericParameters.isEmpty,
+            declaration.states.isEmpty,
+            declaration.bindings.isEmpty,
+            declaration.deriveds.isEmpty
+        else {
+            return nil
+        }
+        let fields = declaration.values.compactMap { value -> ConstructLayout.Field? in
+            guard let type = ScalarType(
+                typeReference: .named(value.typeName),
+                constructLayouts: knownLayouts
+            ) else {
+                return nil
+            }
+            switch type {
+            case .construct, .intArray:
+                return nil
+            case .int, .bool, .float, .string:
+                return ConstructLayout.Field(name: value.name, type: type)
+            }
+        }
+        guard fields.count == declaration.values.count else {
+            return nil
+        }
+        return ConstructLayout(name: declaration.name, fields: fields)
+    }
+
     static func canLower(
         _ callable: CallableDeclaration,
-        lowerableFunctionNames: Set<String> = []
+        lowerableFunctionNames: Set<String> = [],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         let signatures = Dictionary(
             uniqueKeysWithValues: lowerableFunctionNames.map {
                 ($0, ScalarSignature(parameters: [], returnType: .int))
             }
         )
-        return canLower(callable, lowerableFunctionSignatures: signatures)
+        return canLower(
+            callable,
+            lowerableFunctionSignatures: signatures,
+            constructLayouts: constructLayouts
+        )
     }
 
     static func canLower(
         _ callable: CallableDeclaration,
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard callable.targetType == nil,
             callable.receiverType == nil,
             callable.genericParameters.isEmpty,
-            let signature = scalarSignature(for: callable),
+            let signature = scalarSignature(for: callable, constructLayouts: constructLayouts),
             let body = callable.body
         else {
             return false
@@ -64,15 +131,21 @@ enum LLVMLowerability {
             body,
             returnType: signature.returnType,
             locals: &locals,
-            lowerableFunctionSignatures: lowerableFunctionSignatures
+            lowerableFunctionSignatures: lowerableFunctionSignatures,
+            constructLayouts: constructLayouts
         )
     }
 
     static func rejectionReason(
         for callable: CallableDeclaration,
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> String? {
-        if canLower(callable, lowerableFunctionSignatures: lowerableFunctionSignatures) {
+        if canLower(
+            callable,
+            lowerableFunctionSignatures: lowerableFunctionSignatures,
+            constructLayouts: constructLayouts
+        ) {
             return nil
         }
         if callable.targetType != nil {
@@ -87,14 +160,17 @@ enum LLVMLowerability {
         guard let returnType = callable.returnType else {
             return "has no explicit return type"
         }
-        guard let scalarReturnType = ScalarType(typeReference: returnType) else {
+        guard let scalarReturnType = ScalarType(
+            typeReference: returnType,
+            constructLayouts: constructLayouts
+        ) else {
             return "return type \(returnType.displayName) is not an LLVM scalar"
         }
         for parameter in callable.parameters {
             guard let typeReference = parameter.typeReference else {
                 return "parameter \(parameter.name) has no explicit type"
             }
-            guard ScalarType(typeReference: typeReference) != nil else {
+            guard ScalarType(typeReference: typeReference, constructLayouts: constructLayouts) != nil else {
                 return "parameter \(parameter.name) type \(typeReference.displayName) is not an LLVM scalar"
             }
         }
@@ -106,23 +182,34 @@ enum LLVMLowerability {
         }
 
         var locals: [String: ScalarType] = [:]
-        for (parameter, type) in zip(callable.parameters, scalarSignature(for: callable)?.parameters ?? []) {
+        for (parameter, type) in zip(
+            callable.parameters,
+            scalarSignature(for: callable, constructLayouts: constructLayouts)?.parameters ?? []
+        ) {
             locals[parameter.name] = type
         }
         return statementRejectionReason(
             body,
             returnType: scalarReturnType,
             locals: &locals,
-            lowerableFunctionSignatures: lowerableFunctionSignatures
+            lowerableFunctionSignatures: lowerableFunctionSignatures,
+            constructLayouts: constructLayouts
         ) ?? "uses unsupported LLVM shape"
     }
 
-    static func scalarSignature(for callable: CallableDeclaration) -> ScalarSignature? {
-        guard let returnType = callable.returnType.flatMap(ScalarType.init(typeReference:)) else {
+    static func scalarSignature(
+        for callable: CallableDeclaration,
+        constructLayouts: [String: ConstructLayout] = [:]
+    ) -> ScalarSignature? {
+        guard let returnType = callable.returnType.flatMap({
+            ScalarType(typeReference: $0, constructLayouts: constructLayouts)
+        }) else {
             return nil
         }
         let parameters = callable.parameters.compactMap {
-            $0.typeReference.flatMap(ScalarType.init(typeReference:))
+            $0.typeReference.flatMap {
+                ScalarType(typeReference: $0, constructLayouts: constructLayouts)
+            }
         }
         guard parameters.count == callable.parameters.count else {
             return nil
@@ -134,7 +221,8 @@ enum LLVMLowerability {
         _ statements: [Statement],
         returnType: ScalarType,
         locals: inout [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard !statements.isEmpty else {
             return false
@@ -151,7 +239,8 @@ enum LLVMLowerability {
                 guard canLowerLocalBinding(
                     declaration,
                     locals: &locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) else {
                     return false
                 }
@@ -160,7 +249,8 @@ enum LLVMLowerability {
                     target: target,
                     expression: expression,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) else {
                     return false
                 }
@@ -170,7 +260,8 @@ enum LLVMLowerability {
                     operatorSymbol: operatorSymbol,
                     expression: expression,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) else {
                     return false
                 }
@@ -178,7 +269,8 @@ enum LLVMLowerability {
                 guard canLower(
                     condition,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) == .bool else {
                     return false
                 }
@@ -186,7 +278,8 @@ enum LLVMLowerability {
                 guard canLowerLoopBody(
                     body,
                     locals: &bodyLocals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) else {
                     return false
                 }
@@ -195,7 +288,8 @@ enum LLVMLowerability {
                     branches,
                     returnType: returnType,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) else {
                     return false
                 }
@@ -203,7 +297,8 @@ enum LLVMLowerability {
                     branches,
                     returnType: returnType,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) {
                     sawReturn = true
                 }
@@ -214,7 +309,8 @@ enum LLVMLowerability {
                     defaultBody: defaultBody,
                     returnType: returnType,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) else {
                     return false
                 }
@@ -223,7 +319,8 @@ enum LLVMLowerability {
                     defaultBody: defaultBody,
                     returnType: returnType,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) {
                     sawReturn = true
                 }
@@ -231,7 +328,8 @@ enum LLVMLowerability {
                 guard canLowerSideEffectExpression(
                     expression,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ) else {
                     return false
                 }
@@ -240,7 +338,8 @@ enum LLVMLowerability {
                     canLower(
                         expression,
                         locals: locals,
-                        lowerableFunctionSignatures: lowerableFunctionSignatures
+                        lowerableFunctionSignatures: lowerableFunctionSignatures,
+                        constructLayouts: constructLayouts
                     ),
                     to: returnType
                 ) else {
@@ -260,7 +359,8 @@ enum LLVMLowerability {
         _ statements: [Statement],
         returnType: ScalarType,
         locals: inout [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> String? {
         var sawReturn = false
         for statement in statements {
@@ -420,7 +520,8 @@ enum LLVMLowerability {
     private static func loopBodyRejectionReason(
         _ statements: [Statement],
         locals: inout [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> String? {
         if canLowerLoopBody(
             statements,
@@ -435,7 +536,8 @@ enum LLVMLowerability {
     private static func expressionRejectionReason(
         _ expression: Expression,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> String {
         switch expression {
         case .integer, .double, .boolean:
@@ -558,7 +660,8 @@ enum LLVMLowerability {
     private static func canLowerLoopBody(
         _ statements: [Statement],
         locals: inout [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         for statement in statements {
             switch statement {
@@ -650,7 +753,8 @@ enum LLVMLowerability {
         defaultBody: [Statement]?,
         returnType: ScalarType,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         switchRejectionReason(
             expression: expression,
@@ -668,7 +772,8 @@ enum LLVMLowerability {
         defaultBody: [Statement]?,
         returnType: ScalarType,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> String? {
         guard let subjectType = canLower(
             expression,
@@ -743,7 +848,8 @@ enum LLVMLowerability {
         defaultBody: [Statement]?,
         returnType: ScalarType,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard let defaultBody else {
             return false
@@ -791,14 +897,16 @@ enum LLVMLowerability {
     private static func canLowerLocalBinding(
         _ declaration: LocalBindingDeclaration,
         locals: inout [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
-        guard let type = ScalarType(typeReference: declaration.type),
+        guard let type = ScalarType(typeReference: declaration.type, constructLayouts: constructLayouts),
             canConvert(
                 canLower(
                     declaration.expression,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ),
                 to: type
             )
@@ -813,7 +921,8 @@ enum LLVMLowerability {
         target: AssignmentTarget,
         expression: Expression,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard case .local(let name) = target,
             let type = locals[name],
@@ -821,7 +930,8 @@ enum LLVMLowerability {
                 canLower(
                     expression,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ),
                 to: type
             )
@@ -836,7 +946,8 @@ enum LLVMLowerability {
         operatorSymbol: CompoundOperator,
         expression: Expression,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard case .plusEquals = operatorSymbol,
             case .local(let name) = target,
@@ -844,7 +955,8 @@ enum LLVMLowerability {
             let rhsType = canLower(
                 expression,
                 locals: locals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
+                lowerableFunctionSignatures: lowerableFunctionSignatures,
+                constructLayouts: constructLayouts
             ),
             resultType(for: .addition, lhs: type, rhs: rhsType) == type
         else {
@@ -857,7 +969,8 @@ enum LLVMLowerability {
         _ branches: [StatementConditionalBranch],
         returnType: ScalarType,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard !branches.isEmpty else {
             return false
@@ -898,7 +1011,8 @@ enum LLVMLowerability {
         _ branches: [StatementConditionalBranch],
         returnType: ScalarType,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard branches.contains(where: { $0.condition == nil }) else {
             return false
@@ -918,7 +1032,8 @@ enum LLVMLowerability {
     private static func canLower(
         _ expression: Expression,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> ScalarType? {
         switch expression {
         case .integer:
@@ -928,7 +1043,11 @@ enum LLVMLowerability {
         case .boolean:
             return .bool
         case .identifier(let name):
-            if let member = lowerableMemberAccess(name: name, locals: locals) {
+            if let member = lowerableMemberAccess(
+                name: name,
+                locals: locals,
+                constructLayouts: constructLayouts
+            ) {
                 return member.result
             }
             return locals[name]
@@ -937,9 +1056,19 @@ enum LLVMLowerability {
                 name: name,
                 arguments: arguments,
                 locals: locals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
+                lowerableFunctionSignatures: lowerableFunctionSignatures,
+                constructLayouts: constructLayouts
             ) {
                 return .intArray
+            }
+            if let construct = lowerableConstructInitializer(
+                name: name,
+                arguments: arguments,
+                locals: locals,
+                constructLayouts: constructLayouts,
+                lowerableFunctionSignatures: lowerableFunctionSignatures
+            ) {
+                return construct
             }
             if let memberCall = lowerableMemberCall(
                 name: name,
@@ -960,7 +1089,8 @@ enum LLVMLowerability {
                         canLower(
                             argument.value,
                             locals: locals,
-                            lowerableFunctionSignatures: lowerableFunctionSignatures
+                            lowerableFunctionSignatures: lowerableFunctionSignatures,
+                            constructLayouts: constructLayouts
                         ),
                         to: parameterType
                     )
@@ -973,7 +1103,8 @@ enum LLVMLowerability {
             guard canLower(
                 expression,
                 locals: locals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
+                lowerableFunctionSignatures: lowerableFunctionSignatures,
+                constructLayouts: constructLayouts
             ) == .bool else {
                 return nil
             }
@@ -982,12 +1113,14 @@ enum LLVMLowerability {
             guard let lhsType = canLower(
                 lhs,
                 locals: locals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
+                lowerableFunctionSignatures: lowerableFunctionSignatures,
+                constructLayouts: constructLayouts
             ),
                 let rhsType = canLower(
                     rhs,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 )
             else {
                 return nil
@@ -997,17 +1130,20 @@ enum LLVMLowerability {
             guard canLower(
                 condition,
                 locals: locals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
+                lowerableFunctionSignatures: lowerableFunctionSignatures,
+                constructLayouts: constructLayouts
             ) == .bool,
                 let trueType = canLower(
                     trueExpression,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 ),
                 let falseType = canLower(
                     falseExpression,
                     locals: locals,
-                    lowerableFunctionSignatures: lowerableFunctionSignatures
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
                 )
             else {
                 return nil
@@ -1032,7 +1168,8 @@ enum LLVMLowerability {
         name: String,
         arguments: [CallArgument],
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard name == "[Int]" else {
             return false
@@ -1050,16 +1187,49 @@ enum LLVMLowerability {
             canLower(
                 arguments[0].value,
                 locals: locals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
+                lowerableFunctionSignatures: lowerableFunctionSignatures,
+                constructLayouts: constructLayouts
             ),
             to: .int
         )
     }
 
+    private static func lowerableConstructInitializer(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: ScalarType],
+        constructLayouts: [String: ConstructLayout],
+        lowerableFunctionSignatures: [String: ScalarSignature]
+    ) -> ScalarType? {
+        guard let layout = constructLayouts[name],
+            arguments.count == layout.fields.count
+        else {
+            return nil
+        }
+
+        for field in layout.fields {
+            guard let argument = arguments.first(where: { $0.label == field.name }),
+                canConvert(
+                    canLower(
+                        argument.value,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures,
+                        constructLayouts: constructLayouts
+                    ),
+                    to: field.type
+                )
+            else {
+                return nil
+            }
+        }
+        return .construct(name)
+    }
+
     private static func canLowerSideEffectExpression(
         _ expression: Expression,
         locals: [String: ScalarType],
-        lowerableFunctionSignatures: [String: ScalarSignature]
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         guard case .call(let name, let arguments) = expression,
             let memberCall = lowerableMemberCall(
@@ -1081,18 +1251,20 @@ enum LLVMLowerability {
         let result: ScalarType
     }
 
-    private enum LowerableMember {
+    private enum LowerableMember: Equatable {
         case count
         case byteCount
         case element
         case isEmpty
         case append
         case update
+        case field(index: Int)
     }
 
     private static func lowerableMemberAccess(
         name: String,
-        locals: [String: ScalarType]
+        locals: [String: ScalarType],
+        constructLayouts: [String: ConstructLayout] = [:]
     ) -> LowerableMemberAccess? {
         guard let dotIndex = name.lastIndex(of: ".") else {
             return nil
@@ -1101,6 +1273,18 @@ enum LLVMLowerability {
         let memberName = String(name[name.index(after: dotIndex)...])
         guard let baseType = locals[baseName] else {
             return nil
+        }
+
+        if case .construct(let constructName) = baseType,
+            let layout = constructLayouts[constructName],
+            let field = layout.field(named: memberName)
+        {
+            return LowerableMemberAccess(
+                baseName: baseName,
+                baseType: baseType,
+                member: .field(index: field.index),
+                result: field.field.type
+            )
         }
 
         guard let member = lowerableMember(baseType: baseType, name: memberName) else {
@@ -1147,6 +1331,8 @@ enum LLVMLowerability {
             return .intArray
         case .update:
             return .intArray
+        case .field:
+            return .int
         }
     }
 
@@ -1316,6 +1502,8 @@ private extension LLVMLowerability.ScalarType {
         case .int, .float:
             return true
         case .bool, .string, .intArray:
+            return false
+        case .construct:
             return false
         }
     }
