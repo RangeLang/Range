@@ -271,7 +271,14 @@ struct LLVMLoweringEmitterTests {
         )
 
         #expect(module.ir.contains("%Range.IntArray = type { ptr, i64, i64 }"))
+        #expect(module.ir.contains("declare void @llvm.trap() noreturn nounwind"))
         #expect(module.ir.contains("define i64 @RangeLLVM_first(%Range.IntArray %values)"))
+        #expect(module.ir.contains("array.element.bounds.ok."))
+        #expect(module.ir.contains("array.element.bounds.trap."))
+        #expect(module.ir.contains("icmp sge i64 0, 0"))
+        #expect(module.ir.contains("icmp slt i64 0,"))
+        #expect(module.ir.contains("and i1"))
+        #expect(module.ir.contains("call void @llvm.trap()"))
         #expect(module.ir.contains("extractvalue %Range.IntArray %values, 0"))
         #expect(module.ir.contains("getelementptr inbounds i64, ptr"))
         #expect(module.ir.contains("load i64, ptr"))
@@ -319,11 +326,40 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("insertvalue %Range.IntArray"))
         #expect(module.ir.contains("i64 0, 1"))
         #expect(module.ir.contains("icmp slt i64"))
+        #expect(module.ir.contains("array.element.bounds.ok."))
+        #expect(module.ir.contains("array.element.bounds.trap."))
         #expect(module.ir.contains("call void @llvm.trap()"))
         #expect(module.ir.contains("call void @free(ptr"))
         #expect(module.ir.contains("store i64"))
         #expect(module.ir.contains("load i64, ptr"))
         #expect(module.ir.contains("define i64 @RangeLLVM_sumAllocated(i64 %limit)"))
+    }
+
+    @Test("Int array update lowers with LLVM bounds check")
+    func intArrayUpdateLowersWithLLVMBoundsCheck() throws {
+        let callable = try parseCallable(
+            """
+            function replaceFirst(value: Int): Int {
+                state values: [Int](capacity: 1)
+                values.append(element: 0)
+                values.update(element: value, index: 0)
+                return values.element(index: 0)
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("array.update.bounds.ok."))
+        #expect(module.ir.contains("array.update.bounds.trap."))
+        #expect(module.ir.contains("icmp sge i64 0, 0"))
+        #expect(module.ir.contains("icmp slt i64 0,"))
+        #expect(module.ir.contains("call void @llvm.trap()"))
+        #expect(module.ir.contains("store i64 %value, ptr"))
+        #expect(module.ir.contains("call void @free(ptr"))
     }
 
     @Test("Nested Int while loops lower to LLVM basic blocks")

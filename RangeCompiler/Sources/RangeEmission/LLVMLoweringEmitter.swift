@@ -737,11 +737,16 @@ private struct LLVMFunctionEmitter {
             throw LLVMLoweringError("LLVM Array<Int>.element index must be i64.")
         }
 
+        let checkedIndex = try emitIntArrayBoundsCheck(
+            array: base,
+            index: index,
+            operation: "element"
+        )
         let pointerRegister = freshRegister()
         emit("\(pointerRegister) = extractvalue %Range.IntArray \(base.representation), 0")
         let elementPointerRegister = freshRegister()
         emit(
-            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(index.representation)"
+            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(checkedIndex.representation)"
         )
         let valueRegister = freshRegister()
         emit("\(valueRegister) = load i64, ptr \(elementPointerRegister)")
@@ -899,13 +904,52 @@ private struct LLVMFunctionEmitter {
             throw LLVMLoweringError("LLVM Array<Int>.update index must be i64.")
         }
 
+        let checkedIndex = try emitIntArrayBoundsCheck(
+            array: base,
+            index: index,
+            operation: "update"
+        )
         let pointerRegister = freshRegister()
         emit("\(pointerRegister) = extractvalue %Range.IntArray \(base.representation), 0")
         let elementPointerRegister = freshRegister()
         emit(
-            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(index.representation)"
+            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(checkedIndex.representation)"
         )
         emit("store i64 \(element.representation), ptr \(elementPointerRegister)")
+    }
+
+    private mutating func emitIntArrayBoundsCheck(
+        array: Value,
+        index: Value,
+        operation: String
+    ) throws -> Value {
+        guard array.type == "%Range.IntArray", index.type == "i64" else {
+            throw LLVMLoweringError("LLVM Array<Int> bounds check requires Array<Int> and i64 index.")
+        }
+
+        let countRegister = freshRegister()
+        emit("\(countRegister) = extractvalue %Range.IntArray \(array.representation), 1")
+        let nonNegativeRegister = freshRegister()
+        emit("\(nonNegativeRegister) = icmp sge i64 \(index.representation), 0")
+        let belowCountRegister = freshRegister()
+        emit("\(belowCountRegister) = icmp slt i64 \(index.representation), \(countRegister)")
+        let inBoundsRegister = freshRegister()
+        emit("\(inBoundsRegister) = and i1 \(nonNegativeRegister), \(belowCountRegister)")
+
+        let labelID = freshLabelID()
+        let okLabel = "array.\(operation).bounds.ok.\(labelID)"
+        let trapLabel = "array.\(operation).bounds.trap.\(labelID)"
+        emit("br i1 \(inBoundsRegister), label %\(okLabel), label %\(trapLabel)")
+        blockTerminated = true
+
+        stringTable.requireTrap()
+        emitLabel(trapLabel)
+        emit("call void @llvm.trap()")
+        emit("unreachable")
+        blockTerminated = true
+
+        emitLabel(okLabel)
+        return index
     }
 
     private func lowerableMemberAccess(name: String) -> LowerableMember? {
