@@ -143,6 +143,8 @@ private final class LLVMStringTable {
     private var requiresType = false
     private var requiresIntArrayType = false
     private var requiresMalloc = false
+    private var requiresFree = false
+    private var requiresTrap = false
 
     func requireStringType() {
         requiresType = true
@@ -156,6 +158,14 @@ private final class LLVMStringTable {
         requiresMalloc = true
     }
 
+    func requireFree() {
+        requiresFree = true
+    }
+
+    func requireTrap() {
+        requiresTrap = true
+    }
+
     func constantName(for value: String) -> String {
         requireStringType()
         if let name = namesByValue[value] {
@@ -167,7 +177,7 @@ private final class LLVMStringTable {
     }
 
     func supportDefinitions() -> String {
-        guard requiresType || requiresIntArrayType || requiresMalloc else {
+        guard requiresType || requiresIntArrayType || requiresMalloc || requiresFree || requiresTrap else {
             return ""
         }
         var definitions: [String] = []
@@ -179,6 +189,12 @@ private final class LLVMStringTable {
         }
         if requiresMalloc {
             definitions.append("declare ptr @malloc(i64)")
+        }
+        if requiresFree {
+            definitions.append("declare void @free(ptr)")
+        }
+        if requiresTrap {
+            definitions.append("declare void @llvm.trap() noreturn nounwind")
         }
         let globals = namesByValue.sorted { $0.value < $1.value }.map { value, name in
             let bytes = Array(value.utf8)
@@ -207,6 +223,7 @@ private struct LLVMFunctionEmitter {
         case byteCount
         case element
         case isEmpty
+        case append
         case update
     }
 
@@ -217,7 +234,7 @@ private struct LLVMFunctionEmitter {
 
     private enum Symbol {
         case parameter(ScalarType)
-        case stackSlot(pointer: String, type: ScalarType, mutable: Bool)
+        case stackSlot(pointer: String, type: ScalarType, mutable: Bool, ownsStorage: Bool)
     }
 
     private struct Value {
@@ -289,6 +306,7 @@ private struct LLVMFunctionEmitter {
             guard converted.type == returnType.llvmType else {
                 throw LLVMLoweringError("LLVM return value must be \(returnType.llvmType).")
             }
+            try emitOwnedLocalArrayFrees()
             emit("ret \(returnType.llvmType) \(converted.representation)")
             blockTerminated = true
         case .return(nil):
@@ -335,7 +353,8 @@ private struct LLVMFunctionEmitter {
         symbols[declaration.name] = .stackSlot(
             pointer: pointer,
             type: scalarType,
-            mutable: isMutable(declaration.kind)
+            mutable: isMutable(declaration.kind),
+            ownsStorage: isOwnedIntArrayAllocation(declaration.expression)
         )
     }
 
@@ -346,7 +365,7 @@ private struct LLVMFunctionEmitter {
         guard case .local(let name) = target else {
             throw LLVMLoweringError("LLVM assignment currently supports local state only.")
         }
-        guard case .stackSlot(let pointer, let type, let mutable) = symbols[name],
+        guard case .stackSlot(let pointer, let type, let mutable, _) = symbols[name],
             mutable
         else {
             throw LLVMLoweringError("LLVM assignment target '\(name)' is not mutable local state.")
@@ -371,7 +390,7 @@ private struct LLVMFunctionEmitter {
         guard case .local(let name) = target else {
             throw LLVMLoweringError("LLVM compound assignment currently supports local state only.")
         }
-        guard case .stackSlot(let pointer, let type, let mutable) = symbols[name],
+        guard case .stackSlot(let pointer, let type, let mutable, _) = symbols[name],
             mutable
         else {
             throw LLVMLoweringError("LLVM compound assignment target '\(name)' is not mutable local state.")
@@ -579,7 +598,7 @@ private struct LLVMFunctionEmitter {
             switch symbol {
             case .parameter(let type):
                 return Value(type: type.llvmType, representation: "%\(name)")
-            case .stackSlot(let pointer, let type, _):
+            case .stackSlot(let pointer, let type, _, _):
                 let register = freshRegister()
                 emit("\(register) = load \(type.llvmType), ptr \(pointer)")
                 return Value(type: type.llvmType, representation: register)
@@ -681,6 +700,8 @@ private struct LLVMFunctionEmitter {
             return Value(type: "i64", representation: countRegister)
         case .element:
             return nil
+        case .append:
+            return nil
         case .update:
             return nil
         case .isEmpty:
@@ -731,7 +752,7 @@ private struct LLVMFunctionEmitter {
         name: String,
         arguments: [CallArgument]
     ) throws -> Value? {
-        guard name == "intArray" else {
+        guard name == "[Int]" else {
             return nil
         }
         guard arguments.count == 1 else {
@@ -759,7 +780,7 @@ private struct LLVMFunctionEmitter {
         )
         let countValueRegister = freshRegister()
         emit(
-            "\(countValueRegister) = insertvalue %Range.IntArray \(pointerValueRegister), i64 \(capacity.representation), 1"
+            "\(countValueRegister) = insertvalue %Range.IntArray \(pointerValueRegister), i64 0, 1"
         )
         let capacityValueRegister = freshRegister()
         emit(
@@ -778,16 +799,88 @@ private struct LLVMFunctionEmitter {
         }
         let baseName = String(name[..<dotIndex])
         let memberName = String(name[name.index(after: dotIndex)...])
-        guard memberName == "update" else {
+        switch memberName {
+        case "append":
+            try emitLowerableIntArrayAppend(baseName: baseName, arguments: arguments)
+            return true
+        case "update":
+            try emitLowerableIntArrayUpdate(baseName: baseName, arguments: arguments)
+            return true
+        default:
             return false
         }
+    }
+
+    private mutating func emitLowerableIntArrayAppend(
+        baseName: String,
+        arguments: [CallArgument]
+    ) throws {
+        guard arguments.count == 1 else {
+            throw LLVMLoweringError("LLVM Array<Int>.append expects one element argument.")
+        }
+        guard let elementExpression = argumentValue(labeled: "element", at: 0, in: arguments)
+        else {
+            throw LLVMLoweringError("LLVM Array<Int>.append expects an element argument.")
+        }
+
+        let base = try emitMutableIntArray(named: baseName)
+        let rawElement = try emitExpression(elementExpression)
+        let element = try convert(value: rawElement, toLLVMType: "i64")
+        guard element.type == "i64" else {
+            throw LLVMLoweringError("LLVM Array<Int>.append element must be i64.")
+        }
+
+        let countRegister = freshRegister()
+        emit("\(countRegister) = extractvalue %Range.IntArray \(base.value.representation), 1")
+        let capacityRegister = freshRegister()
+        emit("\(capacityRegister) = extractvalue %Range.IntArray \(base.value.representation), 2")
+        let canAppendRegister = freshRegister()
+        emit("\(canAppendRegister) = icmp slt i64 \(countRegister), \(capacityRegister)")
+
+        let labelID = freshLabelID()
+        let appendLabel = "array.append.\(labelID)"
+        let trapLabel = "array.trap.\(labelID)"
+        let endLabel = "array.end.\(labelID)"
+        emit("br i1 \(canAppendRegister), label %\(appendLabel), label %\(trapLabel)")
+        blockTerminated = true
+
+        stringTable.requireTrap()
+        emitLabel(trapLabel)
+        emit("call void @llvm.trap()")
+        emit("unreachable")
+        blockTerminated = true
+
+        emitLabel(appendLabel)
+        let pointerRegister = freshRegister()
+        emit("\(pointerRegister) = extractvalue %Range.IntArray \(base.value.representation), 0")
+        let elementPointerRegister = freshRegister()
+        emit(
+            "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(countRegister)"
+        )
+        emit("store i64 \(element.representation), ptr \(elementPointerRegister)")
+        let nextCountRegister = freshRegister()
+        emit("\(nextCountRegister) = add i64 \(countRegister), 1")
+        let updatedArrayRegister = freshRegister()
+        emit(
+            "\(updatedArrayRegister) = insertvalue %Range.IntArray \(base.value.representation), i64 \(nextCountRegister), 1"
+        )
+        emit("store %Range.IntArray \(updatedArrayRegister), ptr \(base.pointer)")
+        emitBranch(to: endLabel)
+
+        emitLabel(endLabel)
+    }
+
+    private mutating func emitLowerableIntArrayUpdate(
+        baseName: String,
+        arguments: [CallArgument]
+    ) throws {
         guard arguments.count == 2 else {
             throw LLVMLoweringError("LLVM Array<Int>.update expects element and index arguments.")
         }
 
         let base = try emitIdentifier(named: baseName)
         guard base.type == "%Range.IntArray" else {
-            return false
+            throw LLVMLoweringError("LLVM Array<Int>.update requires an Array<Int> base.")
         }
         guard let elementExpression = argumentValue(labeled: "element", at: 0, in: arguments),
             let indexExpression = argumentValue(labeled: "index", at: 1, in: arguments)
@@ -813,7 +906,6 @@ private struct LLVMFunctionEmitter {
             "\(elementPointerRegister) = getelementptr inbounds i64, ptr \(pointerRegister), i64 \(index.representation)"
         )
         emit("store i64 \(element.representation), ptr \(elementPointerRegister)")
-        return true
     }
 
     private func lowerableMemberAccess(name: String) -> LowerableMember? {
@@ -831,6 +923,8 @@ private struct LLVMFunctionEmitter {
 
     private func lowerableMemberCall(name: String) -> LowerableMember? {
         switch name {
+        case "append":
+            return .append
         case "element":
             return .element
         case "update":
@@ -838,6 +932,20 @@ private struct LLVMFunctionEmitter {
         default:
             return nil
         }
+    }
+
+    private mutating func emitMutableIntArray(named name: String) throws -> (
+        pointer: String, value: Value
+    ) {
+        guard case .stackSlot(let pointer, let type, let mutable, _) = symbols[name],
+            type == .intArray,
+            mutable
+        else {
+            throw LLVMLoweringError("LLVM Array<Int>.append target '\(name)' is not mutable local state.")
+        }
+        let register = freshRegister()
+        emit("\(register) = load %Range.IntArray, ptr \(pointer)")
+        return (pointer, Value(type: "%Range.IntArray", representation: register))
     }
 
     private func argumentValue(
@@ -861,10 +969,45 @@ private struct LLVMFunctionEmitter {
         switch symbol {
         case .parameter(let type):
             return Value(type: type.llvmType, representation: "%\(name)")
-        case .stackSlot(let pointer, let type, _):
+        case .stackSlot(let pointer, let type, _, _):
             let register = freshRegister()
             emit("\(register) = load \(type.llvmType), ptr \(pointer)")
             return Value(type: type.llvmType, representation: register)
+        }
+    }
+
+    private func isOwnedIntArrayAllocation(_ expression: RangeCompiler.Expression) -> Bool {
+        guard case .call(let name, let arguments) = expression else {
+            return false
+        }
+        return name == "[Int]"
+            && arguments.count == 1
+            && (arguments[0].label == "capacity" || arguments[0].label == nil)
+    }
+
+    private mutating func emitOwnedLocalArrayFrees() throws {
+        guard returnType != .intArray else {
+            return
+        }
+        let ownedArrays = symbols.sorted { $0.key < $1.key }.compactMap { entry -> String? in
+            guard case .stackSlot(let pointer, let type, _, let ownsStorage) = entry.value,
+                type == .intArray,
+                ownsStorage
+            else {
+                return nil
+            }
+            return pointer
+        }
+        guard !ownedArrays.isEmpty else {
+            return
+        }
+        stringTable.requireFree()
+        for pointer in ownedArrays {
+            let arrayRegister = freshRegister()
+            emit("\(arrayRegister) = load %Range.IntArray, ptr \(pointer)")
+            let storageRegister = freshRegister()
+            emit("\(storageRegister) = extractvalue %Range.IntArray \(arrayRegister), 0")
+            emit("call void @free(ptr \(storageRegister))")
         }
     }
 

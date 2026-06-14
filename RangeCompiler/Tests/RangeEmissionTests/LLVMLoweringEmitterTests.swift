@@ -278,16 +278,16 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i64"))
     }
 
-    @Test("Owned Int array allocation and update lower through LLVM memory")
-    func ownedIntArrayAllocationAndUpdateLowerThroughLLVMMemory() throws {
+    @Test("Owned Int array allocation and append lower through LLVM memory")
+    func ownedIntArrayAllocationAndAppendLowerThroughLLVMMemory() throws {
         let callable = try parseCallable(
             """
             function sumAllocated(limit: Int): Int {
-                let values: [Int](intArray(capacity: limit))
+                state values: [Int](capacity: limit)
                 state index: Int(0)
 
                 while index < limit {
-                    values.update(element: index, index: index)
+                    values.append(element: index)
                     state index: index + 1
                 }
 
@@ -310,10 +310,17 @@ struct LLVMLoweringEmitterTests {
         )
 
         #expect(module.ir.contains("declare ptr @malloc(i64)"))
+        #expect(module.ir.contains("declare void @free(ptr)"))
+        #expect(module.ir.contains("declare void @llvm.trap() noreturn nounwind"))
         #expect(module.ir.contains("%Range.IntArray = type { ptr, i64, i64 }"))
         #expect(module.ir.contains("mul i64 %limit, 8"))
         #expect(module.ir.contains("call ptr @malloc(i64"))
         #expect(module.ir.contains("insertvalue %Range.IntArray undef, ptr"))
+        #expect(module.ir.contains("insertvalue %Range.IntArray"))
+        #expect(module.ir.contains("i64 0, 1"))
+        #expect(module.ir.contains("icmp slt i64"))
+        #expect(module.ir.contains("call void @llvm.trap()"))
+        #expect(module.ir.contains("call void @free(ptr"))
         #expect(module.ir.contains("store i64"))
         #expect(module.ir.contains("load i64, ptr"))
         #expect(module.ir.contains("define i64 @RangeLLVM_sumAllocated(i64 %limit)"))

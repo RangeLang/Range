@@ -1034,7 +1034,7 @@ enum LLVMLowerability {
         locals: [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature]
     ) -> Bool {
-        guard name == "intArray", arguments.count == 1 else {
+        guard name == "[Int]", arguments.count == 1 else {
             return false
         }
         guard arguments[0].label == "capacity" || arguments[0].label == nil else {
@@ -1065,7 +1065,7 @@ enum LLVMLowerability {
         else {
             return false
         }
-        return memberCall.member == .update
+        return memberCall.member == .append || memberCall.member == .update
     }
 
     private struct LowerableMemberAccess {
@@ -1080,6 +1080,7 @@ enum LLVMLowerability {
         case byteCount
         case element
         case isEmpty
+        case append
         case update
     }
 
@@ -1136,6 +1137,8 @@ enum LLVMLowerability {
             return .int
         case .isEmpty:
             return .bool
+        case .append:
+            return .intArray
         case .update:
             return .intArray
         }
@@ -1166,6 +1169,21 @@ enum LLVMLowerability {
         }
 
         switch member {
+        case .append:
+            guard arguments.count == 1,
+                canConvert(
+                    argumentValue(labeled: "element", at: 0, in: arguments).flatMap {
+                        canLower(
+                            $0,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures
+                        )
+                    },
+                    to: .int
+                )
+            else {
+                return nil
+            }
         case .element:
             guard arguments.count == 1,
                 canConvert(
@@ -1221,6 +1239,8 @@ enum LLVMLowerability {
         name: String
     ) -> LowerableMember? {
         switch (baseType, name) {
+        case (.intArray, "append"):
+            return .append
         case (.intArray, "element"):
             return .element
         case (.intArray, "update"):
