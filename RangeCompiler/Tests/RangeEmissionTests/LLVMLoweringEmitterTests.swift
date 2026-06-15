@@ -174,7 +174,7 @@ struct LLVMLoweringEmitterTests {
             }
         )
 
-        #expect(layouts["Point"]?.fields.map(\.name) == ["x", "y"])
+        #expect(layouts["construct:Point"]?.fields.map(\.name) == ["x", "y"])
         #expect(
             module.callables.allSatisfy {
                 LLVMLowerability.canLower(
@@ -203,6 +203,38 @@ struct LLVMLoweringEmitterTests {
         #expect(emission.ir.contains("insertvalue %Range.Point"))
         #expect(emission.ir.contains("ret %Range.Point"))
         #expect(emission.ir.contains("call i64 @RangeLLVM_sum(%Range.Point"))
+    }
+
+    @Test("Duplicate construct display names get distinct LLVM layout identities")
+    func duplicateConstructDisplayNamesGetDistinctLLVMLayoutIdentities() throws {
+        let left = try parseConstruct(
+            """
+            construct Thing {
+                let id: Int
+            }
+            """
+        )
+        let right = try parseConstruct(
+            """
+            construct Thing {
+                let active: Bool
+            }
+            """
+        )
+
+        let layouts = LLVMLowerability.constructLayouts(from: [left, right])
+
+        #expect(Set(layouts.keys) == ["construct:Thing#1", "construct:Thing#2"])
+        #expect(
+            LLVMLoweringEmitter.constructTypeName(
+                identity: "construct:Thing#1",
+                name: "Thing"
+            )
+                != LLVMLoweringEmitter.constructTypeName(
+                    identity: "construct:Thing#2",
+                    name: "Thing"
+                )
+        )
     }
 
     @Test("String isEmpty member lowers through LLVM count projection")
@@ -2120,6 +2152,21 @@ struct LLVMLoweringEmitterTests {
             return try #require(module.callables.first)
         case .construct, .enumeration, .macro, .extensions, .mainBlock:
             Issue.record("Expected module source file with a callable.")
+            throw LLVMLoweringEmitterTestError.expectedCallable
+        }
+    }
+
+    private func parseConstruct(_ source: String) throws -> ConstructDeclaration {
+        var parser = try Parser(source: source)
+        let sourceFile = try parser.parseSourceFile()
+
+        switch sourceFile {
+        case .construct(let construct):
+            return construct
+        case .module(let module):
+            return try #require(module.constructs.first)
+        case .enumeration, .macro, .extensions, .mainBlock:
+            Issue.record("Expected construct source file.")
             throw LLVMLoweringEmitterTestError.expectedCallable
         }
     }

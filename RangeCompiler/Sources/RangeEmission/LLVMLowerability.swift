@@ -7,6 +7,7 @@ enum LLVMLowerability {
             var type: ScalarType
         }
 
+        var identity: String
         var name: String
         var fields: [Field]
 
@@ -29,7 +30,7 @@ enum LLVMLowerability {
         case float
         case string
         case intArray
-        case construct(String)
+        case construct(identity: String, name: String)
 
         init?(typeReference: TypeReference, constructLayouts: [String: ConstructLayout] = [:]) {
             switch typeReference.displayName {
@@ -44,8 +45,11 @@ enum LLVMLowerability {
             case "[Int]":
                 self = .intArray
             default:
-                if constructLayouts[typeReference.displayName] != nil {
-                    self = .construct(typeReference.displayName)
+                let matchingLayouts = constructLayouts.values.filter {
+                    $0.name == typeReference.displayName
+                }
+                if matchingLayouts.count == 1, let layout = matchingLayouts.first {
+                    self = .construct(identity: layout.identity, name: layout.name)
                     return
                 }
                 return nil
@@ -54,11 +58,35 @@ enum LLVMLowerability {
     }
 
     static func constructLayouts(from declarations: [ConstructDeclaration]) -> [String: ConstructLayout] {
-        declarations.reduce(into: [:]) { result, declaration in
+        let nameCounts = declarations.reduce(into: [:]) { counts, declaration in
+            counts[declaration.name, default: 0] += 1
+        }
+        var seenNames: [String: Int] = [:]
+        return declarations.reduce(into: [:]) { result, declaration in
+            let seen = seenNames[declaration.name, default: 0] + 1
+            seenNames[declaration.name] = seen
+            let identity = constructIdentity(
+                for: declaration,
+                ordinal: nameCounts[declaration.name, default: 0] == 1 ? nil : seen
+            )
             if let layout = constructLayout(for: declaration, knownLayouts: result) {
-                result[layout.name] = layout
+                result[identity] = ConstructLayout(
+                    identity: identity,
+                    name: layout.name,
+                    fields: layout.fields
+                )
             }
         }
+    }
+
+    private static func constructIdentity(
+        for declaration: ConstructDeclaration,
+        ordinal: Int?
+    ) -> String {
+        if let ordinal {
+            return "construct:\(declaration.name)#\(ordinal)"
+        }
+        return "construct:\(declaration.name)"
     }
 
     private static func constructLayout(
@@ -89,7 +117,7 @@ enum LLVMLowerability {
         guard fields.count == declaration.values.count else {
             return nil
         }
-        return ConstructLayout(name: declaration.name, fields: fields)
+        return ConstructLayout(identity: "", name: declaration.name, fields: fields)
     }
 
     static func canLower(
@@ -1201,7 +1229,7 @@ enum LLVMLowerability {
         constructLayouts: [String: ConstructLayout],
         lowerableFunctionSignatures: [String: ScalarSignature]
     ) -> ScalarType? {
-        guard let layout = constructLayouts[name],
+        guard let layout = uniqueConstructLayout(named: name, in: constructLayouts),
             arguments.count == layout.fields.count
         else {
             return nil
@@ -1222,7 +1250,7 @@ enum LLVMLowerability {
                 return nil
             }
         }
-        return .construct(name)
+        return .construct(identity: layout.identity, name: layout.name)
     }
 
     private static func canLowerSideEffectExpression(
@@ -1275,8 +1303,8 @@ enum LLVMLowerability {
             return nil
         }
 
-        if case .construct(let constructName) = baseType,
-            let layout = constructLayouts[constructName],
+        if case .construct(let constructIdentity, _) = baseType,
+            let layout = constructLayouts[constructIdentity],
             let field = layout.field(named: memberName)
         {
             return LowerableMemberAccess(
@@ -1297,6 +1325,17 @@ enum LLVMLowerability {
             member: member,
             result: resultType(for: member)
         )
+    }
+
+    private static func uniqueConstructLayout(
+        named name: String,
+        in constructLayouts: [String: ConstructLayout]
+    ) -> ConstructLayout? {
+        let matches = constructLayouts.values.filter { $0.name == name }
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
     }
 
     private static func lowerableMember(

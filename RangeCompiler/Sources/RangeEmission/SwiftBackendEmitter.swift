@@ -1574,7 +1574,7 @@ struct SwiftBackendEmitter {
             return "__RangeLLVMString"
         case .intArray:
             return "__RangeLLVMIntArray"
-        case .construct(let name):
+        case .construct(_, let name):
             return "__RangeLLVM\(LLVMLoweringEmitter.sanitizeSymbol(name))"
         }
     }

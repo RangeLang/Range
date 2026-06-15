@@ -130,6 +130,11 @@ struct LLVMLoweringEmitter {
         "RangeLLVM_" + sanitizeSymbol(callable.name)
     }
 
+    static func constructTypeName(identity: String, name: String) -> String {
+        let suffix = identity == "construct:\(name)" ? "" : "_\(stableShortSuffix(identity))"
+        return "%Range.\(sanitizeSymbol(name))\(suffix)"
+    }
+
     static func sanitizeSymbol(_ value: String) -> String {
         let scalars = value.unicodeScalars.map { scalar -> Character in
             if CharacterSet.alphanumerics.contains(scalar) || scalar == "_" {
@@ -138,6 +143,15 @@ struct LLVMLoweringEmitter {
             return "_"
         }
         return String(scalars)
+    }
+
+    private static func stableShortSuffix(_ value: String) -> String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash &*= 1_099_511_628_211
+        }
+        return String(format: "%08llx", hash & 0xffff_ffff)
     }
 }
 
@@ -154,8 +168,8 @@ private extension LLVMLowerability.ScalarType {
             return "%Range.String"
         case .intArray:
             return "%Range.IntArray"
-        case .construct(let name):
-            return "%Range.\(LLVMLoweringEmitter.sanitizeSymbol(name))"
+        case .construct(let identity, let name):
+            return LLVMLoweringEmitter.constructTypeName(identity: identity, name: name)
         }
     }
 }
@@ -234,7 +248,7 @@ private final class LLVMStringTable {
         for layout in requiredConstructTypes.values.sorted(by: { $0.name < $1.name }) {
             let fieldTypes = layout.fields.map { $0.type.llvmType }.joined(separator: ", ")
             definitions.append(
-                "%Range.\(LLVMLoweringEmitter.sanitizeSymbol(layout.name)) = type { \(fieldTypes) }"
+                "\(LLVMLoweringEmitter.constructTypeName(identity: layout.identity, name: layout.name)) = type { \(fieldTypes) }"
             )
         }
         if requiresMalloc {
@@ -790,7 +804,7 @@ private struct LLVMFunctionEmitter {
         name: String,
         arguments: [CallArgument]
     ) throws -> Value? {
-        guard let layout = constructLayouts[name] else {
+        guard let layout = uniqueConstructLayout(named: name) else {
             return nil
         }
         var current = "undef"
@@ -804,12 +818,17 @@ private struct LLVMFunctionEmitter {
                 throw LLVMLoweringError("LLVM construct field \(field.name) must be \(field.type.llvmType).")
             }
             let register = freshRegister()
+            let constructType = ScalarType.construct(identity: layout.identity, name: layout.name)
+                .llvmType
             emit(
-                "\(register) = insertvalue \(ScalarType.construct(name).llvmType) \(current), \(field.type.llvmType) \(value.representation), \(index)"
+                "\(register) = insertvalue \(constructType) \(current), \(field.type.llvmType) \(value.representation), \(index)"
             )
             current = register
         }
-        return Value(type: ScalarType.construct(name).llvmType, representation: current)
+        return Value(
+            type: ScalarType.construct(identity: layout.identity, name: layout.name).llvmType,
+            representation: current
+        )
     }
 
     private mutating func emitLowerableMemberCall(
@@ -1190,12 +1209,22 @@ private struct LLVMFunctionEmitter {
     private func constructFieldAccess(baseType: String, memberName: String) -> (
         index: Int, type: ScalarType
     )? {
-        for layout in constructLayouts.values where ScalarType.construct(layout.name).llvmType == baseType {
+        for layout in constructLayouts.values
+            where ScalarType.construct(identity: layout.identity, name: layout.name).llvmType == baseType
+        {
             if let field = layout.field(named: memberName) {
                 return (field.index, field.field.type)
             }
         }
         return nil
+    }
+
+    private func uniqueConstructLayout(named name: String) -> LLVMLowerability.ConstructLayout? {
+        let matches = constructLayouts.values.filter { $0.name == name }
+        guard matches.count == 1 else {
+            return nil
+        }
+        return matches[0]
     }
 
     private mutating func emitIdentifier(named name: String) throws -> Value {
