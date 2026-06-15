@@ -62,21 +62,68 @@ enum LLVMLowerability {
             counts[declaration.name, default: 0] += 1
         }
         var seenNames: [String: Int] = [:]
-        return declarations.reduce(into: [:]) { result, declaration in
+        let candidates = declarations.map { declaration -> (identity: String, declaration: ConstructDeclaration) in
             let seen = seenNames[declaration.name, default: 0] + 1
             seenNames[declaration.name] = seen
             let identity = constructIdentity(
                 for: declaration,
                 ordinal: nameCounts[declaration.name, default: 0] == 1 ? nil : seen
             )
-            if let layout = constructLayout(for: declaration, knownLayouts: result) {
-                result[identity] = ConstructLayout(
-                    identity: identity,
-                    name: layout.name,
-                    fields: layout.fields
-                )
-            }
+            return (identity, declaration)
         }
+
+        let declarationsByIdentity = Dictionary(
+            uniqueKeysWithValues: candidates.map { ($0.identity, $0.declaration) }
+        )
+        let identitiesByName = candidates.reduce(into: [String: [String]]()) { result, candidate in
+            result[candidate.declaration.name, default: []].append(candidate.identity)
+        }
+        var builtLayouts: [String: ConstructLayout] = [:]
+        var visiting: Set<String> = []
+
+        func build(_ identity: String) -> ConstructLayout? {
+            if let layout = builtLayouts[identity] {
+                return layout
+            }
+            guard !visiting.contains(identity),
+                let declaration = declarationsByIdentity[identity]
+            else {
+                return nil
+            }
+            visiting.insert(identity)
+            defer { visiting.remove(identity) }
+
+            guard declaration.genericParameters.isEmpty,
+                declaration.states.isEmpty,
+                declaration.bindings.isEmpty,
+                declaration.deriveds.isEmpty
+            else {
+                return nil
+            }
+
+            let fields = declaration.values.compactMap { value -> ConstructLayout.Field? in
+                guard let type = constructFieldType(
+                    named: value.typeName,
+                    identitiesByName: identitiesByName,
+                    build: build
+                ) else {
+                    return nil
+                }
+                return ConstructLayout.Field(name: value.name, type: type)
+            }
+            guard fields.count == declaration.values.count else {
+                return nil
+            }
+
+            let layout = ConstructLayout(identity: identity, name: declaration.name, fields: fields)
+            builtLayouts[identity] = layout
+            return layout
+        }
+
+        for candidate in candidates {
+            _ = build(candidate.identity)
+        }
+        return builtLayouts
     }
 
     private static func constructIdentity(
@@ -89,35 +136,32 @@ enum LLVMLowerability {
         return "construct:\(declaration.name)"
     }
 
-    private static func constructLayout(
-        for declaration: ConstructDeclaration,
-        knownLayouts: [String: ConstructLayout]
-    ) -> ConstructLayout? {
-        guard declaration.genericParameters.isEmpty,
-            declaration.states.isEmpty,
-            declaration.bindings.isEmpty,
-            declaration.deriveds.isEmpty
-        else {
+    private static func constructFieldType(
+        named typeName: String,
+        identitiesByName: [String: [String]],
+        build: (String) -> ConstructLayout?
+    ) -> ScalarType? {
+        switch typeName {
+        case "Int":
+            return .int
+        case "Bool":
+            return .bool
+        case "Float":
+            return .float
+        case "String":
+            return .string
+        case "[Int]":
             return nil
-        }
-        let fields = declaration.values.compactMap { value -> ConstructLayout.Field? in
-            guard let type = ScalarType(
-                typeReference: .named(value.typeName),
-                constructLayouts: knownLayouts
-            ) else {
+        default:
+            guard let identities = identitiesByName[typeName],
+                identities.count == 1,
+                let identity = identities.first,
+                let layout = build(identity)
+            else {
                 return nil
             }
-            switch type {
-            case .construct, .intArray:
-                return nil
-            case .int, .bool, .float, .string:
-                return ConstructLayout.Field(name: value.name, type: type)
-            }
+            return .construct(identity: layout.identity, name: layout.name)
         }
-        guard fields.count == declaration.values.count else {
-            return nil
-        }
-        return ConstructLayout(identity: "", name: declaration.name, fields: fields)
     }
 
     static func canLower(
@@ -1052,7 +1096,8 @@ enum LLVMLowerability {
                 branch.body,
                 returnType: returnType,
                 locals: &branchLocals,
-                lowerableFunctionSignatures: lowerableFunctionSignatures
+                lowerableFunctionSignatures: lowerableFunctionSignatures,
+                constructLayouts: constructLayouts
             )
         }
     }
@@ -1299,7 +1344,11 @@ enum LLVMLowerability {
         }
         let baseName = String(name[..<dotIndex])
         let memberName = String(name[name.index(after: dotIndex)...])
-        guard let baseType = locals[baseName] else {
+        guard let baseType = lowerableIdentifierType(
+            name: baseName,
+            locals: locals,
+            constructLayouts: constructLayouts
+        ) else {
             return nil
         }
 
@@ -1325,6 +1374,21 @@ enum LLVMLowerability {
             member: member,
             result: resultType(for: member)
         )
+    }
+
+    private static func lowerableIdentifierType(
+        name: String,
+        locals: [String: ScalarType],
+        constructLayouts: [String: ConstructLayout]
+    ) -> ScalarType? {
+        if let local = locals[name] {
+            return local
+        }
+        return lowerableMemberAccess(
+            name: name,
+            locals: locals,
+            constructLayouts: constructLayouts
+        )?.result
     }
 
     private static func uniqueConstructLayout(

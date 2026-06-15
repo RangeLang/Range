@@ -237,6 +237,93 @@ struct LLVMLoweringEmitterTests {
         )
     }
 
+    @Test("Nested construct fields lower through LLVM aggregate identities")
+    func nestedConstructFieldsLowerThroughLLVMAggregateIdentities() throws {
+        let module = try parseModule(
+            """
+            construct Name {
+                let value: String
+            }
+
+            construct User {
+                let name: Name
+            }
+
+            function name(user: User): Name {
+                return user.name
+            }
+
+            function value(user: User): String {
+                return user.name.value
+            }
+
+            function make(): User {
+                return User(name: Name(value: "George"))
+            }
+            """
+        )
+        let layouts = LLVMLowerability.constructLayouts(from: module.constructs)
+        let signatures = Dictionary(
+            uniqueKeysWithValues: module.callables.compactMap { callable in
+                LLVMLowerability.scalarSignature(
+                    for: callable,
+                    constructLayouts: layouts
+                ).map { (callable.name, $0) }
+            }
+        )
+
+        #expect(layouts["construct:Name"]?.fields.map(\.name) == ["value"])
+        #expect(layouts["construct:User"]?.fields.map(\.name) == ["name"])
+        #expect(
+            module.callables.allSatisfy {
+                LLVMLowerability.canLower(
+                    $0,
+                    lowerableFunctionSignatures: signatures,
+                    constructLayouts: layouts
+                )
+            }
+        )
+        let emission = try #require(
+            try LLVMLoweringEmitter().emitModule(
+                callables: module.callables,
+                constructLayouts: layouts
+            )
+        )
+
+        #expect(emission.ir.contains("%Range.Name = type { %Range.String }"))
+        #expect(emission.ir.contains("%Range.User = type { %Range.Name }"))
+        #expect(emission.ir.contains("define %Range.Name @RangeLLVM_name(%Range.User %user)"))
+        #expect(emission.ir.contains("extractvalue %Range.User %user, 0"))
+        #expect(emission.ir.contains("define %Range.String @RangeLLVM_value(%Range.User %user)"))
+        #expect(emission.ir.contains("extractvalue %Range.Name"))
+        #expect(emission.ir.contains("define %Range.User @RangeLLVM_make()"))
+        #expect(emission.ir.contains("insertvalue %Range.Name undef, %Range.String"))
+        #expect(emission.ir.contains("insertvalue %Range.User undef, %Range.Name"))
+    }
+
+    @Test("Recursive value construct layouts are not LLVM lowerable")
+    func recursiveValueConstructLayoutsAreNotLLVMLowerable() throws {
+        let module = try parseModule(
+            """
+            construct Node {
+                let next: Node
+            }
+
+            function next(node: Node): Node {
+                return node.next
+            }
+            """
+        )
+        let layouts = LLVMLowerability.constructLayouts(from: module.constructs)
+
+        #expect(layouts["construct:Node"] == nil)
+        #expect(
+            module.callables.allSatisfy {
+                LLVMLowerability.scalarSignature(for: $0, constructLayouts: layouts) == nil
+            }
+        )
+    }
+
     @Test("String isEmpty member lowers through LLVM count projection")
     func stringIsEmptyMemberLowersThroughLLVMCountProjection() throws {
         let callable = try parseCallable(

@@ -219,7 +219,7 @@ private final class LLVMStringTable {
     }
 
     func requireConstructType(_ layout: LLVMLowerability.ConstructLayout) {
-        requiredConstructTypes[layout.name] = layout
+        requiredConstructTypes[layout.identity] = layout
     }
 
     func constantName(for value: String) -> String {
@@ -245,7 +245,7 @@ private final class LLVMStringTable {
         if requiresIntArrayType {
             definitions.append("%Range.IntArray = type { ptr, i64, i64 }")
         }
-        for layout in requiredConstructTypes.values.sorted(by: { $0.name < $1.name }) {
+        for layout in orderedConstructTypes() {
             let fieldTypes = layout.fields.map { $0.type.llvmType }.joined(separator: ", ")
             definitions.append(
                 "\(LLVMLoweringEmitter.constructTypeName(identity: layout.identity, name: layout.name)) = type { \(fieldTypes) }"
@@ -268,6 +268,36 @@ private final class LLVMStringTable {
             return "\(name) = private unnamed_addr constant [\(bytes.count + 1) x i8] c\"\(llvmEscapedCString(bytes))\\00\", align 1"
         }
         return (definitions + globals).joined(separator: "\n")
+    }
+
+    private func orderedConstructTypes() -> [LLVMLowerability.ConstructLayout] {
+        var result: [LLVMLowerability.ConstructLayout] = []
+        var visited: Set<String> = []
+        var visiting: Set<String> = []
+
+        func visit(_ layout: LLVMLowerability.ConstructLayout) {
+            guard !visited.contains(layout.identity), !visiting.contains(layout.identity) else {
+                return
+            }
+            visiting.insert(layout.identity)
+            for field in layout.fields {
+                if case .construct(let identity, _) = field.type,
+                    let dependency = requiredConstructTypes[identity]
+                {
+                    visit(dependency)
+                }
+            }
+            visiting.remove(layout.identity)
+            visited.insert(layout.identity)
+            result.append(layout)
+        }
+
+        for layout in requiredConstructTypes.values.sorted(by: {
+            ($0.name, $0.identity) < ($1.name, $1.identity)
+        }) {
+            visit(layout)
+        }
+        return result
     }
 
     private func llvmEscapedCString(_ bytes: [UInt8]) -> String {
@@ -763,7 +793,7 @@ private struct LLVMFunctionEmitter {
         let baseName = String(name[..<dotIndex])
         let memberName = String(name[name.index(after: dotIndex)...])
 
-        let base = try emitIdentifier(named: baseName)
+        let base = try emitIdentifierOrMemberAccess(named: baseName)
         if let constructField = constructFieldAccess(baseType: base.type, memberName: memberName) {
             let register = freshRegister()
             emit(
@@ -1239,6 +1269,13 @@ private struct LLVMFunctionEmitter {
             emit("\(register) = load \(type.llvmType), ptr \(pointer)")
             return Value(type: type.llvmType, representation: register)
         }
+    }
+
+    private mutating func emitIdentifierOrMemberAccess(named name: String) throws -> Value {
+        if let member = try emitLowerableMemberAccess(name: name) {
+            return member
+        }
+        return try emitIdentifier(named: name)
     }
 
     private func isOwnedIntArrayAllocation(_ expression: RangeCompiler.Expression) -> Bool {
