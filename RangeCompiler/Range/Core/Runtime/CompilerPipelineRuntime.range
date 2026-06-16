@@ -17,12 +17,12 @@ construct CompilerPipelineRuntimeContext {
 construct CompilerPipelineRuntimeResult {
     let hookName: String
     let stage: CompilerPipelineRuntimeStage
-    let diagnostics: [String]
-    let artifacts: [String]
+    let diagnostics: Array<String>
+    let artifacts: Array<String>
 }
 
 @syntax
 construct CompilerPipelineRuntimeHook {
     let name: String
-    let stages: [CompilerPipelineRuntimeStage]
+    let stages: Array<CompilerPipelineRuntimeStage>
 }

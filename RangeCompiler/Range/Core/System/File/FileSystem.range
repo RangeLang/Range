@@ -22,7 +22,7 @@ construct FileTreeNode {
     let path: String
     let name: String
     let kind: FileSystemEntryKind
-    let children: [FileTreeNode]
+    let children: Array<FileTreeNode>
 }
 
 construct FileManager {
@@ -31,11 +31,11 @@ construct FileManager {
     function writeData(path: String, data: Data): Result<Void, FileWriteError>
     function createFile(path: String, text: String): Result<Void, FileWriteError>
     function createFolder(path: String): Result<Void, FileWriteError>
-    function listEntries(path: String): Result<[FileSystemEntry], FileReadError>
+    function listEntries(path: String): Result<Array<FileSystemEntry>, FileReadError>
 }
 
 construct FileTree {
-    function rangeFiles(path: String): [String] {
+    function rangeFiles(path: String): Array<String> {
         switch read(path: path) {
         case .success(let tree):
             return collectRangeFiles(node: tree)
@@ -44,8 +44,8 @@ construct FileTree {
         }
     }
 
-    function collectRangeFiles(node: FileTreeNode): [String] {
-        state files: [String]([])
+    function collectRangeFiles(node: FileTreeNode): Array<String> {
+        state files: Array<String>([])
 
         switch node.kind {
         case .file:
@@ -55,7 +55,7 @@ construct FileTree {
         case .directory:
             state index: 0
             while index < node.children.count {
-                let childFiles: [String](collectRangeFiles(node: node.children.element(index: index)))
+                let childFiles: Array<String>(collectRangeFiles(node: node.children.element(index: index)))
                 state childIndex: 0
                 while childIndex < childFiles.count {
                     files.append(element: childFiles.element(index: childIndex))
@@ -71,7 +71,7 @@ construct FileTree {
     function read(path: String): Result<FileTreeNode, FileReadError> {
         switch FileManager.listEntries(path: path) {
         case .success(let entries):
-            state children: [FileTreeNode]([])
+            state children: Array<FileTreeNode>([])
             state index: 0
 
             while index < entries.count {

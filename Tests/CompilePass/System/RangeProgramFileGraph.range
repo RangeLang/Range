@@ -9,7 +9,7 @@ function renderIdentity(identity: RangeGraphIdentity): String {
     return "\(identity.kind) \(identity.name) [\(identity.id)]"
 }
 
-function renderFiles(files: [FileTreeNode]): String {
+function renderFiles(files: Array<FileTreeNode>): String {
     state output: ""
     state index: 0
 
@@ -26,7 +26,7 @@ function renderRangeGraphTopology(graph: RangeGraphTopology): String {
     return "\(renderRangeGraphNodes(nodes: graph.nodes))\(renderRangeGraphRelationships(relationships: graph.relationships))"
 }
 
-function renderRangeGraphNodes(nodes: [RangeGraphNode]): String {
+function renderRangeGraphNodes(nodes: Array<RangeGraphNode>): String {
     state output: ""
     state index: 0
 
@@ -39,7 +39,7 @@ function renderRangeGraphNodes(nodes: [RangeGraphNode]): String {
     return output
 }
 
-function renderRangeGraphRelationships(relationships: [RangeGraphRelationship]): String {
+function renderRangeGraphRelationships(relationships: Array<RangeGraphRelationship>): String {
     state output: ""
     state index: 0
 
@@ -52,7 +52,7 @@ function renderRangeGraphRelationships(relationships: [RangeGraphRelationship]):
     return output
 }
 
-function renderSyntaxItems(items: [GraphSyntax]): String {
+function renderSyntaxItems(items: Array<GraphSyntax>): String {
     state output: ""
     state index: 0
 

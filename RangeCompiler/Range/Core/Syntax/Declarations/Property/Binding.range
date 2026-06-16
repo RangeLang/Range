@@ -4,12 +4,12 @@
 @graph
 construct Binding<T> {
     let identity: GraphIdentity
-    let parent: GraphIdentity?
-    let macros: [Macro.Application]
+    let parent: Optional<GraphIdentity>
+    let macros: Array<Macro.Application>
     let identifier: Identifier
     let type: TypeReference
-    let getterBody: Block?
-    let setterBody: Block?
+    let getterBody: Optional<Block>
+    let setterBody: Optional<Block>
 
     function getter(transform: (T) -> T)
     function setter(transform: (T) -> T)

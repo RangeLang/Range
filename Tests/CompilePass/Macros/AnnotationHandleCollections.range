@@ -5,6 +5,6 @@ construct AnnotationHandleView {
 }
 
 construct AnnotationHandleStore {
-    state views: [@Token]
-    state accessMacros: [@access]
+    state views: Array<@Token>
+    state accessMacros: Array<@access>
 }

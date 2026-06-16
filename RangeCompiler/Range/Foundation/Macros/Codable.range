@@ -7,7 +7,7 @@ macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: 
     }
 }
 
-macro encodeBody(container: KeyedEncodingContainer, properties: [Let]) -> [Switch] {
+macro encodeBody(container: KeyedEncodingContainer, properties: Array<Let>) -> Array<Switch> {
     #(properties.map { property in
         let codingMacros: Array<Macro.Application>(
             property.macros.filter { application in
@@ -43,7 +43,7 @@ macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, val
     }
 }
 
-macro decodeBody(container: KeyedDecodingContainer, properties: [Let]) -> [Switch] {
+macro decodeBody(container: KeyedDecodingContainer, properties: Array<Let>) -> Array<Switch> {
     #(properties.map { property in
         let codingMacros: Array<Macro.Application>(
             property.macros.filter { application in
@@ -76,7 +76,7 @@ macro codable<let shape: CodingShape = .object>(): @construct { target, diagnost
         diagnostics.error("@codable currently supports object coding only.")
     }
 
-    let properties: [Let](
+    let properties: Array<Let>(
         target.declaration.lets.filter { property in
             let codingMacros: Array<Macro.Application>(
                 property.macros.filter { application in

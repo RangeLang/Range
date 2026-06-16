@@ -10,7 +10,7 @@ construct Dictionary<Key, Value> {
         storage.isEmpty
     }
 
-    function value(key: Key): Value? {
+    function value(key: Key): Optional<Value> {
         return storage.value(key: key)
     }
 
@@ -18,7 +18,7 @@ construct Dictionary<Key, Value> {
         storage.updateValue(value: value, key: key)
     }
 
-    function removeValue(key: Key): Value? {
+    function removeValue(key: Key): Optional<Value> {
         return storage.removeValue(key: key)
     }
 
@@ -26,15 +26,15 @@ construct Dictionary<Key, Value> {
         return storage.contains(key: key)
     }
 
-    function entries(): [DictionaryEntry<Key, Value>] {
+    function entries(): Array<DictionaryEntry<Key, Value>> {
         return storage.entries()
     }
 
-    function filter(include: (DictionaryEntry<Key, Value>) -> Bool): [DictionaryEntry<Key, Value>] {
+    function filter(include: (DictionaryEntry<Key, Value>) -> Bool): Array<DictionaryEntry<Key, Value>> {
         return storage.filter(include: include)
     }
 
-    function first(include: (DictionaryEntry<Key, Value>) -> Bool): DictionaryEntry<Key, Value>? {
+    function first(include: (DictionaryEntry<Key, Value>) -> Bool): Optional<DictionaryEntry<Key, Value>> {
         return storage.first(include: include)
     }
 

@@ -11,7 +11,7 @@ macro caseIterable(): Enum { target, diagnostics in
 
     target.declaration.expand {
         extension #(target.declaration.self) {
-            function allCases(): [Self] {
+            function allCases(): Array<Self> {
                 return #(casesArray)
             }
         }

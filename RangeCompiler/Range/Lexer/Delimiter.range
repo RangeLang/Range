@@ -9,5 +9,5 @@ enum DelimiterRole {
 construct Delimiter {
     let token: Identifier
     let role: DelimiterRole
-    let pairedToken: Identifier?
+    let pairedToken: Optional<Identifier>
 }

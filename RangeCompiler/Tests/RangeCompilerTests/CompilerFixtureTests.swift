@@ -746,14 +746,14 @@ struct CompilerFixtureTests {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
 
         let count = try #require(counter.values.first(where: { $0.name == "count" }))
-        #expect(count.typeName == "Int?")
+        #expect(count.typeName == "Optional<Int>")
         guard case .integer(5)? = count.value else {
             Issue.record("Expected typed construction literal value.")
             return
         }
 
         let widgetCount = try #require(counter.values.first(where: { $0.name == "widgetCount" }))
-        #expect(widgetCount.typeName == "WidgetCount?")
+        #expect(widgetCount.typeName == "Optional<WidgetCount>")
         guard case .call(let widgetCountInitializer, let widgetCountArguments)? = widgetCount.value
         else {
             Issue.record("Expected typed construction value call.")
@@ -935,11 +935,11 @@ struct CompilerFixtureTests {
                 path: "/tmp/MacroMetadataObjectTag.range",
                 source: """
                     construct TagProofBehavior {
-                        let key: String?
+                        let key: Optional<String>
                         let exclude: Bool
                     }
 
-                    macro tagProof<T>(key: String? = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
+                    macro tagProof<T>(key: Optional<String> = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
                         return TagProofBehavior(key: key ?? self.identifier.name, exclude: self.identifier != self.identifier)
                     }
 
@@ -2068,7 +2068,7 @@ struct CompilerFixtureTests {
     @Test("Extension targets require nominal type references")
     func extensionTargetsRequireNominalTypeReferences() throws {
         let source = """
-            extension [Int] { }
+            extension Array<Int> { }
             """
 
         do {

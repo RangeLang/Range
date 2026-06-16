@@ -8,7 +8,7 @@ enum TokenKind {
     case integer(value: String)
     case double(value: String)
     case keyword(value: String)
-    case macroAttribute(name: String, argument: String?)
+    case macroAttribute(name: String, argument: Optional<String>)
     case leftBrace
     case rightBrace
     case leftParen

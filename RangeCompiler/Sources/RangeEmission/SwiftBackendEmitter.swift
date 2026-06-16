@@ -209,7 +209,7 @@ struct SwiftBackendEmitter {
                     {
                         return LLVMRejectedCallable(
                             name: callable.name,
-                            reason: "returns [Int], which is not Swift-LLVM bridgeable yet"
+                            reason: "returns Array<Int>, which is not Swift-LLVM bridgeable yet"
                         )
                     }
                     return LLVMRejectedCallable(
@@ -1903,9 +1903,6 @@ struct SwiftBackendEmitter {
     }
 
     private func emitBindingDefaultValue(forDeclaredTypeName name: String) -> String? {
-        if name.hasPrefix("[") && name.hasSuffix("]") {
-            return "[]"
-        }
         if name.hasPrefix("Array<") && name.hasSuffix(">") {
             return "[]"
         }
@@ -1937,7 +1934,8 @@ struct SwiftBackendEmitter {
         }
         let values = construct.values.compactMap { value -> RangeFunctionParameter? in
             guard !propertyForwardsInitializer(macros: value.macros) else { return nil }
-            let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
+            let defaultValue =
+                value.value ?? (value.typeName.hasPrefix("Optional<") ? .nilLiteral : nil)
             return RangeFunctionParameter(
                 macros: [],
                 name: value.name,
@@ -2200,19 +2198,11 @@ struct SwiftBackendEmitter {
             return specializedTypeName
         }
 
-        if name.hasPrefix("["),
-            name.hasSuffix("]"),
-            name.count > 2
-        {
-            let elementName = String(name.dropFirst().dropLast())
-            return
-                "[\(emitDeclaredTypeName(elementName, genericParameterNames: genericParameterNames))]"
+        if let elementName = singleGenericArgument(in: name, named: "Array") {
+            return "[\(emitDeclaredTypeName(elementName, genericParameterNames: genericParameterNames))]"
         }
 
-        if name.hasSuffix("?"),
-            name.count > 1
-        {
-            let wrappedName = String(name.dropLast())
+        if let wrappedName = singleGenericArgument(in: name, named: "Optional") {
             return
                 "\(emitDeclaredTypeName(wrappedName, genericParameterNames: genericParameterNames))?"
         }
@@ -2252,22 +2242,34 @@ struct SwiftBackendEmitter {
             "\(emitDeclaredTypeName(base, genericParameterNames: genericParameterNames))<\(renderedArguments)>"
     }
 
+    private func singleGenericArgument(in name: String, named baseName: String) -> String? {
+        guard let genericStart = name.firstIndex(of: "<"),
+            name.last == ">",
+            String(name[..<genericStart]) == baseName
+        else {
+            return nil
+        }
+
+        let argumentStart = name.index(after: genericStart)
+        let argumentEnd = name.index(before: name.endIndex)
+        let arguments = splitGenericArgumentNames(String(name[argumentStart..<argumentEnd]))
+        guard arguments.count == 1 else {
+            return nil
+        }
+        return arguments[0]
+    }
+
     private struct SwiftLayoutEstimate {
         let size: Int
         let alignment: Int
     }
 
     private func swiftLayoutEstimate(forDeclaredTypeName name: String) -> SwiftLayoutEstimate? {
-        if name.hasPrefix("["),
-            name.hasSuffix("]"),
-            name.count > 2
-        {
+        if singleGenericArgument(in: name, named: "Array") != nil {
             return SwiftLayoutEstimate(size: 8, alignment: 8)
         }
 
-        if name.hasSuffix("?"),
-            name.count > 1
-        {
+        if singleGenericArgument(in: name, named: "Optional") != nil {
             return SwiftLayoutEstimate(size: 8, alignment: 8)
         }
 

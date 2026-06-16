@@ -1,5 +1,5 @@
 @Statement
 @syntax
 construct Expression {
-    let type: TypeReference?
+    let type: Optional<TypeReference>
 }

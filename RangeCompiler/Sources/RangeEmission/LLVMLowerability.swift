@@ -33,25 +33,27 @@ enum LLVMLowerability {
         case construct(identity: String, name: String)
 
         init?(typeReference: TypeReference, constructLayouts: [String: ConstructLayout] = [:]) {
-            switch typeReference.displayName {
-            case "Int":
+            switch typeReference {
+            case .named("Int"):
                 self = .int
-            case "Bool":
+            case .named("Bool"):
                 self = .bool
-            case "Float":
+            case .named("Float"):
                 self = .float
-            case "String":
+            case .named("String"):
                 self = .string
-            case "[Int]":
+            case .array(.named("Int")):
                 self = .intArray
-            default:
+            case .named(let name):
                 let matchingLayouts = constructLayouts.values.filter {
-                    $0.name == typeReference.displayName
+                    $0.name == name
                 }
                 if matchingLayouts.count == 1, let layout = matchingLayouts.first {
                     self = .construct(identity: layout.identity, name: layout.name)
                     return
                 }
+                return nil
+            case .member, .generic, .array, .function, .optional, .variadic:
                 return nil
             }
         }
@@ -141,17 +143,15 @@ enum LLVMLowerability {
         identitiesByName: [String: [String]],
         build: (String) -> ConstructLayout?
     ) -> ScalarType? {
-        switch typeName {
-        case "Int":
+        switch TypeReference.named(typeName) {
+        case .named("Int"):
             return .int
-        case "Bool":
+        case .named("Bool"):
             return .bool
-        case "Float":
+        case .named("Float"):
             return .float
-        case "String":
+        case .named("String"):
             return .string
-        case "[Int]":
-            return nil
         default:
             guard let identities = identitiesByName[typeName],
                 identities.count == 1,
@@ -1244,7 +1244,7 @@ enum LLVMLowerability {
         lowerableFunctionSignatures: [String: ScalarSignature],
         constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
-        guard name == "[Int]" else {
+        guard name == "Array<Int>" else {
             return false
         }
         if arguments.isEmpty {

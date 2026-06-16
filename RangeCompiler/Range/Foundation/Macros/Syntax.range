@@ -9,9 +9,9 @@ macro syntax(): Construct { target, diagnostics, graph in
 }
 
 macro syntaxCapture(@literal @spliced(delimiter: "") syntax: @syntax): Construct { target, diagnostics, graph in
-    let splicedParameters: [Parameter.Declaration](
+    let splicedParameters: Array<Parameter.Declaration>(
         target.declaration.parameters.filter { parameter in
-            let splicedMacros: [Macro.Application](
+            let splicedMacros: Array<Macro.Application>(
                 parameter.macros.filter { application in
                     application.identifier.name == "spliced"
                 }

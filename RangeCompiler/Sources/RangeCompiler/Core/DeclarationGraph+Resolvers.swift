@@ -1510,12 +1510,7 @@ public struct DeclarationMemberResolver: Sendable {
             return parsed
         }
 
-        var trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.hasSuffix("?") {
-            trimmed.removeLast()
-            return .optional(simpleTypeReference(named: trimmed))
-        }
-        return .named(trimmed)
+        return .named(name.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
     private static func parseConstructTypeReference(from raw: String) -> TypeReference? {

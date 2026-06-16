@@ -181,44 +181,10 @@ extension Parser {
         switch peek() {
         case .identifier(let value), .keyword(let value):
             return value.first?.isUppercase == true
-        case .leftBracket:
-            return isBracketedTypeReferenceAfterColon()
         case .leftParen:
             return isFunctionTypeReferenceAfterColon()
         default:
             return false
-        }
-    }
-
-    func isBracketedTypeReferenceAfterColon() -> Bool {
-        var offset = 1
-        switch peek(offset: offset) {
-        case .identifier(let value) where value.first?.isUppercase == true,
-            .keyword(let value) where value.first?.isUppercase == true:
-            offset += 1
-        case .macroAttribute:
-            offset += 1
-        default:
-            return false
-        }
-
-        var genericDepth = 0
-        while true {
-            switch peek(offset: offset) {
-            case .less:
-                genericDepth += 1
-            case .greater:
-                genericDepth -= 1
-            case .rightBracket where genericDepth == 0:
-                return true
-            case .colon where genericDepth == 0:
-                return false
-            case .eof:
-                return false
-            default:
-                break
-            }
-            offset += 1
         }
     }
 
@@ -292,10 +258,6 @@ extension Parser {
 
     mutating func parseTypeReferenceNode() throws -> TypeReference {
         var result = try parseTypeReferenceBaseNode()
-        while peek() == .question {
-            try consume(.question)
-            result = .optional(result)
-        }
         if peek() == .ellipsis {
             try consume(.ellipsis)
             result = .variadic(result)
@@ -325,13 +287,6 @@ extension Parser {
             return .function(parameters: parameterTypes, returnType: returnType)
         }
 
-        if peek() == .leftBracket {
-            try consume(.leftBracket)
-            let elementType = try parseTypeReferenceNode()
-            try consume(.rightBracket)
-            return .array(elementType)
-        }
-
         let baseName: String
         switch peek() {
         case .macroAttribute(let name, nil):
@@ -359,6 +314,9 @@ extension Parser {
             try consume(.greater)
             if case .named("Optional") = result, genericArguments.count == 1 {
                 return .optional(genericArguments[0])
+            }
+            if case .named("Array") = result, genericArguments.count == 1 {
+                return .array(genericArguments[0])
             }
             result = .generic(base: result, arguments: genericArguments)
         }

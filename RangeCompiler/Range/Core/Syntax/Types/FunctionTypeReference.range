@@ -1,6 +1,6 @@
 @syntax
 construct FunctionTypeReference {
-    let parameters: [TypeReference]
+    let parameters: Array<TypeReference>
     let returnType: TypeReference
 
     function replace(replacement: TypeReference): TypeReference

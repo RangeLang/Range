@@ -6,8 +6,8 @@ construct Macro {
     construct Target {
         let kind: String
         let name: String
-        let type: TypeReference?
-        let elements: [Target]
+        let type: Optional<TypeReference>
+        let elements: Array<Target>
         let written: WrittenSyntax
     }
 
@@ -16,10 +16,10 @@ construct Macro {
         let name: String
         let identifier: Identifier
         let packageVisibility: String
-        let generics: [Generic]
-        let parameters: [Parameter.Declaration]
-        let target: Target?
-        let expansionType: TypeReference?
+        let generics: Array<Generic>
+        let parameters: Array<Parameter.Declaration>
+        let target: Optional<Target>
+        let expansionType: Optional<TypeReference>
         let writtenBody: WrittenSyntax
         let parsedBody: Parsed<Block>
         let body: String
@@ -30,11 +30,11 @@ construct Macro {
     construct Application<Value> {
         let name: String
         let identifier: Identifier
-        let genericArguments: [TypeReference]
+        let genericArguments: Array<TypeReference>
         let argumentClause: String
-        let arguments: [Expression]
+        let arguments: Array<Expression>
         let rawBody: WrittenSyntax
-        let declaration: Declaration?
+        let declaration: Optional<Declaration>
         let packageVisibility: String
         let valueType: TypeReference
         let value: Value

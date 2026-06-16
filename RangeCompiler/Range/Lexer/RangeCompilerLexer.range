@@ -3,12 +3,12 @@ construct RangeCompilerLexing {
         return rangeLexer()
     }
 
-    function tokenize(source: String): Result<[LexicalToken], LexingError> {
+    function tokenize(source: String): Result<Array<LexicalToken>, LexingError> {
         let lexer: Lexer(rangeLexer())
         return lexer.tokenize(source: source)
     }
 
-    function tokenizeFile(path: String): Result<[LexicalToken], LexingError> {
+    function tokenizeFile(path: String): Result<Array<LexicalToken>, LexingError> {
         switch FileManager.readFile(path: path) {
         case .success(let source):
             return tokenize(source: source)

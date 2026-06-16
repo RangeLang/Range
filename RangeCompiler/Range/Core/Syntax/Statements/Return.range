@@ -1,5 +1,5 @@
 @Statement
 @syntax
 construct Return {
-    let expression: Expression?
+    let expression: Optional<Expression>
 }

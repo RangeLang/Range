@@ -1,7 +1,7 @@
 @syntax
 construct Extension {
     let target: NominalTypeReference
-    let conformances: [NominalTypeReference]
-    let functions: [Function.Declaration]
-    let constructs: [Construct.Declaration]
+    let conformances: Array<NominalTypeReference>
+    let functions: Array<Function.Declaration>
+    let constructs: Array<Construct.Declaration>
 }

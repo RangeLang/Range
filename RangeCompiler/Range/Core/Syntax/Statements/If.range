@@ -3,5 +3,5 @@
 construct If {
     let condition: Expression
     let thenBody: Block
-    let elseBody: Block?
+    let elseBody: Optional<Block>
 }

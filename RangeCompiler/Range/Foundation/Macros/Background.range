@@ -1,4 +1,4 @@
-macro block(statements: [@Statement]) -> [@Statement] {
+macro block(statements: Array<@Statement>) -> Array<@Statement> {
     #(statements)
 }
 

@@ -1,8 +1,8 @@
 construct CodingBehavior {
-    let key: String?
+    let key: Optional<String>
     let exclude: Bool
 }
 
-macro codable<T>(key: String? = nil, exclude: Bool = false): @property -> CodingBehavior { target, diagnostics in
+macro codable<T>(key: Optional<String> = nil, exclude: Bool = false): @property -> CodingBehavior { target, diagnostics in
     return CodingBehavior(key: key, exclude: exclude)
 }

@@ -4,7 +4,7 @@ construct Parameter {
     @graph(role: .declaration)
     construct Declaration {
         let identifier: Identifier
-        let macros: [@macro]
+        let macros: Array<@macro>
         let syntax: WrittenSyntax
     }
 

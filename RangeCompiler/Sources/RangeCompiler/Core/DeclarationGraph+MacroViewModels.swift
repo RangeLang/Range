@@ -1,5 +1,15 @@
 import Foundation
 
+private func singleGenericArgument(in typeName: String, named baseName: String) -> String? {
+    let prefix = "\(baseName)<"
+    guard typeName.hasPrefix(prefix), typeName.hasSuffix(">") else {
+        return nil
+    }
+    let start = typeName.index(typeName.startIndex, offsetBy: prefix.count)
+    let end = typeName.index(before: typeName.endIndex)
+    return String(typeName[start..<end]).trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
 struct ParameterMacroSignature {
     let name: String
     let labels: [String?]
@@ -286,17 +296,13 @@ struct RewriteSurfaceView {
             ownerTypeName: String
         ) -> (typeName: String, isArray: Bool)? {
             var text = rawTypeName.trimmingCharacters(in: .whitespacesAndNewlines)
-            if text.hasSuffix("?") {
-                text.removeLast()
-                text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let wrapped = singleGenericArgument(in: text, named: "Optional") {
+                text = wrapped
             }
 
-            let isArray = text.hasPrefix("[") && text.hasSuffix("]")
-            if isArray {
-                text.removeFirst()
-                text.removeLast()
-                text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            }
+            let arrayElement = singleGenericArgument(in: text, named: "Array")
+            let isArray = arrayElement != nil
+            text = arrayElement ?? text
 
             let qualifiedNestedName = "\(ownerTypeName).\(text)"
             if constructsByName[qualifiedNestedName] != nil {
@@ -456,17 +462,13 @@ struct RewriteSurfaceView {
         ownerTypeName: String
     ) -> (typeName: String, isArray: Bool)? {
         var text = rawTypeName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.hasSuffix("?") {
-            text.removeLast()
-            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let wrapped = singleGenericArgument(in: text, named: "Optional") {
+            text = wrapped
         }
 
-        let isArray = text.hasPrefix("[") && text.hasSuffix("]")
-        if isArray {
-            text.removeFirst()
-            text.removeLast()
-            text = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        }
+        let arrayElement = singleGenericArgument(in: text, named: "Array")
+        let isArray = arrayElement != nil
+        text = arrayElement ?? text
 
         let qualifiedNestedName = "\(ownerTypeName).\(text)"
         if constructsByName[qualifiedNestedName] != nil {

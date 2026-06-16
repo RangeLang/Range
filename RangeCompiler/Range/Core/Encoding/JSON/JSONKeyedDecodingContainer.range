@@ -1,5 +1,5 @@
 construct JSONKeyedDecodingContainer {
-    let fields: [JSONField]
+    let fields: Array<JSONField>
 
     function decode(type: Bool.Type, key: String): Result<Bool, DecodingError> {
         switch value(key: key) {

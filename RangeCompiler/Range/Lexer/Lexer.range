@@ -1,17 +1,17 @@
 @syntax
 construct Lexer {
-    let rules: [LexerRule]
+    let rules: Array<LexerRule>
     binding tokens: Array<@lexer>
 
-    function tokenize(source: String): Result<[LexicalToken], LexingError> {
+    function tokenize(source: String): Result<Array<LexicalToken>, LexingError> {
         state cursor: LexerCursor(source: source, foreignBodies: [], rules: rules)
         return cursor.tokenize()
     }
 
     function tokenize(
         source: String,
-        foreignBodies: [LexerForeignBody]
-    ): Result<[LexicalToken], LexingError> {
+        foreignBodies: Array<LexerForeignBody>
+    ): Result<Array<LexicalToken>, LexingError> {
         state cursor: LexerCursor(source: source, foreignBodies: foreignBodies, rules: rules)
         return cursor.tokenize()
     }
@@ -36,14 +36,14 @@ construct LexerPosition {
 
 construct LexerCursor {
     let source: String
-    let foreignBodies: [LexerForeignBody]
-    let rules: [LexerRule]
+    let foreignBodies: Array<LexerForeignBody>
+    let rules: Array<LexerRule>
     state index: Int(0)
     state line: Int(0)
     state column: Int(0)
-    state tokens: [LexicalToken]([])
+    state tokens: Array<LexicalToken>([])
 
-    function tokenize(): Result<[LexicalToken], LexingError> {
+    function tokenize(): Result<Array<LexicalToken>, LexingError> {
         while !isAtEnd() {
             if isWhitespace(currentCharacter()) {
                 advance()
@@ -333,7 +333,7 @@ construct LexerCursor {
         )
     }
 
-    function failure(message: String, start: LexerPosition): Result<[LexicalToken], LexingError> {
+    function failure(message: String, start: LexerPosition): Result<Array<LexicalToken>, LexingError> {
         return .failure(cause: LexingError(message: message, range: range(start: start)))
     }
 

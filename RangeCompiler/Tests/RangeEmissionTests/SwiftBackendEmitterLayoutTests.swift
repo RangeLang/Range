@@ -219,8 +219,8 @@ struct SwiftBackendEmitterLayoutTests {
     func localMutationDoesNotMakeValueConstructMethodsMutating() throws {
         var parser = try Parser(source: """
         construct Collector {
-            function collect(): [String] {
-                state files: [String]([])
+            function collect(): Array<String> {
+                state files: Array<String>([])
                 files.append(element: "a")
                 return files
             }

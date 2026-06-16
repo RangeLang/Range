@@ -4,11 +4,11 @@
 @graph
 construct Let<T> {
   let identity: GraphIdentity
-  let parent: GraphIdentity?
-  let macros: [Macro.Application]
+  let parent: Optional<GraphIdentity>
+  let macros: Array<Macro.Application>
   let identifier: Identifier
   let type: TypeReference
-  let value: Expression?
+  let value: Optional<Expression>
 
   function initializer(transform: (T) -> T)
   function getter(transform: (T) -> T)

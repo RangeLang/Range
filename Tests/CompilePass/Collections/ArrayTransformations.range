@@ -1,8 +1,8 @@
-function maybeNumber(value: Int): Int? {
+function maybeNumber(value: Int): Optional<Int> {
     return value
 }
 
-function duplicate(value: Int): [Int] {
+function duplicate(value: Int): Array<Int> {
     return [value, value]
 }
 

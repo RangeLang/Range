@@ -907,7 +907,7 @@ private struct LLVMFunctionEmitter {
         name: String,
         arguments: [CallArgument]
     ) throws -> Value? {
-        guard name == "[Int]" else {
+        guard name == "Array<Int>" else {
             return nil
         }
         if arguments.isEmpty {
@@ -1282,7 +1282,7 @@ private struct LLVMFunctionEmitter {
         guard case .call(let name, let arguments) = expression else {
             return false
         }
-        return name == "[Int]"
+        return name == "Array<Int>"
             && arguments.count == 1
             && (arguments[0].label == "capacity" || arguments[0].label == nil)
     }

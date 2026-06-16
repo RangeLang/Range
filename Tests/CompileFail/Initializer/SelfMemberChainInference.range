@@ -1,7 +1,7 @@
 construct ChainInferenceBox {
-    state values: [Int]
+    state values: Array<Int>
 
-    init(values: [Int]) {
+    init(values: Array<Int>) {
         state self.values: values
 
         let count: self.values.count

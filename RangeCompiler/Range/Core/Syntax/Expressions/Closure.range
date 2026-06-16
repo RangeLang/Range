@@ -1,6 +1,6 @@
 @syntax
 construct Closure {
-    let type: TypeReference?
+    let type: Optional<TypeReference>
     let parameters: Array<Parameter.Declaration>()
     let body: Block
 

@@ -1,7 +1,7 @@
 @syntax
 construct GenericTypeReference {
     let base: NominalTypeReference
-    let arguments: [TypeReference]
+    let arguments: Array<TypeReference>
 
     function replace(replacement: TypeReference): TypeReference
 }

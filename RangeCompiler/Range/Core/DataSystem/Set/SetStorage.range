@@ -3,9 +3,9 @@ construct SetStorage<Element> {
     derived isEmpty: Bool
     function contains(element: Element): Bool
     function insert(element: Element)
-    function remove(element: Element): Element?
-    function elements(): [Element]
-    function filter(include: (Element) -> Bool): [Element]
-    function first(include: (Element) -> Bool): Element?
+    function remove(element: Element): Optional<Element>
+    function elements(): Array<Element>
+    function filter(include: (Element) -> Bool): Array<Element>
+    function first(include: (Element) -> Bool): Optional<Element>
     function clear()
 }

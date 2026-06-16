@@ -212,9 +212,6 @@ extension ApplicationGraphValidator {
         var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
 
-        while text.hasSuffix("?") {
-            text.removeLast()
-        }
         if text.hasSuffix("...") {
             text.removeLast(3)
         }
@@ -223,7 +220,7 @@ extension ApplicationGraphValidator {
             text = String(text[..<genericStart])
         }
 
-        if text.hasPrefix("[") || text.hasPrefix("(") {
+        if text.hasPrefix("(") {
             return nil
         }
 

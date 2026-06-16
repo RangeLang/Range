@@ -538,7 +538,8 @@ public struct DeclarationGraph {
             if propertyForwardsInitializer(macros: value.macros, macrosByName: macrosByName) {
                 return nil
             }
-            let defaultValue = value.value ?? (value.typeName.hasSuffix("?") ? .nilLiteral : nil)
+            let defaultValue =
+                value.value ?? (value.typeName.hasPrefix("Optional<") ? .nilLiteral : nil)
             return RangeFunctionParameter(
                 macros: [],
                 name: value.name,

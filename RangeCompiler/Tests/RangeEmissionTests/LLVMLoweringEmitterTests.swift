@@ -414,11 +414,11 @@ struct LLVMLoweringEmitterTests {
     func intArrayCountAndIsEmptyLowerThroughLLVM() throws {
         let module = try parseModule(
             """
-            function size(values: [Int]): Int {
+            function size(values: Array<Int>): Int {
                 return values.count
             }
 
-            function empty(values: [Int]): Bool {
+            function empty(values: Array<Int>): Bool {
                 return values.isEmpty
             }
             """
@@ -449,7 +449,7 @@ struct LLVMLoweringEmitterTests {
     func intArrayElementLowersThroughLLVMPointerLoad() throws {
         let callable = try parseCallable(
             """
-            function first(values: [Int]): Int {
+            function first(values: Array<Int>): Int {
                 return values.element(index: 0)
             }
             """
@@ -480,7 +480,7 @@ struct LLVMLoweringEmitterTests {
         let callable = try parseCallable(
             """
             function sumAllocated(limit: Int): Int {
-                state values: [Int](capacity: limit)
+                state values: Array<Int>(capacity: limit)
                 state index: Int(0)
 
                 while index < limit {
@@ -534,7 +534,7 @@ struct LLVMLoweringEmitterTests {
         let callable = try parseCallable(
             """
             function grown(): Int {
-                state values: [Int]
+                state values: Array<Int>
                 values.append(element: 4)
                 values.append(element: 8)
                 return values.element(index: 1)
@@ -566,7 +566,7 @@ struct LLVMLoweringEmitterTests {
         let callable = try parseCallable(
             """
             function replaceFirst(value: Int): Int {
-                state values: [Int](capacity: 1)
+                state values: Array<Int>(capacity: 1)
                 values.append(element: 0)
                 values.update(element: value, index: 0)
                 return values.element(index: 0)
@@ -1847,7 +1847,7 @@ struct LLVMLoweringEmitterTests {
     func swiftWorkspaceEmissionBridgesLLVMIntArrayArguments() throws {
         let source = try parseModule(
             """
-            function first(values: [Int]): Int {
+            function first(values: Array<Int>): Int {
                 return values.element(index: 0)
             }
 

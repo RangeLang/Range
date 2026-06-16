@@ -21,7 +21,7 @@ extension Address {
 construct User {
     let name: String
     let address: Address
-    let scores: [Int]
+    let scores: Array<Int>
 }
 
 extension User {

@@ -19,15 +19,15 @@ construct Array<Element> {
         return storage.element(index: index)
     }
 
-    function first(): Element? {
+    function first(): Optional<Element> {
         return storage.first()
     }
 
-    function first(include: (Element) -> Bool): Element? {
+    function first(include: (Element) -> Bool): Optional<Element> {
         return storage.first(include: include)
     }
 
-    function last(): Element? {
+    function last(): Optional<Element> {
         return storage.last()
     }
 
@@ -43,7 +43,7 @@ construct Array<Element> {
         return storage.remove(index: index)
     }
 
-    function removeLast(): Element? {
+    function removeLast(): Optional<Element> {
         return storage.removeLast()
     }
 
@@ -59,7 +59,7 @@ construct Array<Element> {
         return Array<Output>(storage: storage.map(transform))
     }
 
-    function compactMap<Output>(transform: (Element) -> Output?): Array<Output> {
+    function compactMap<Output>(transform: (Element) -> Optional<Output>): Array<Output> {
         return Array<Output>(storage: storage.compactMap(transform))
     }
 

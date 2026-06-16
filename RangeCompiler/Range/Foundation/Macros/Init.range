@@ -1,8 +1,8 @@
 macro init<
     let value: TypeReference,
-    let delimiter: String? = nil,
-    let wrapper: String? = nil,
-    let length: Int? = nil
+    let delimiter: Optional<String> = nil,
+    let wrapper: Optional<String> = nil,
+    let length: Optional<Int> = nil
 >(
     @capture pattern: Expression
 ): Construct & @syntax { target, diagnostics in
@@ -34,8 +34,8 @@ macro init<
             diagnostics.error("@init delimiter is required.")
         }
         let actualDelimiter: String(delimiter ?? "")
-        let lets: [Let](target.declaration.lets)
-        let states: [State](target.declaration.states)
+        let lets: Array<Let>(target.declaration.lets)
+        let states: Array<State>(target.declaration.states)
         let fieldCount: Int(lets.count + states.count)
 
         if length != nil {

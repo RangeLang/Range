@@ -5,20 +5,20 @@ construct Enum {
     @graph(role: .declaration)
     construct Declaration {
         let self: NominalTypeReference
-        let generics: [Generic]
-        let cases: [Case]
+        let generics: Array<Generic>
+        let cases: Array<Case>
 
-        function expand(expansion: () -> [@syntax])
+        function expand(expansion: () -> Array<@syntax>)
     }
 
     @graph(role: .declaration)
     construct Case {
         let identifier: Identifier
-        let associatedValues: [AssociatedValue]
+        let associatedValues: Array<AssociatedValue>
     }
 
     construct AssociatedValue {
-        let label: String?
+        let label: Optional<String>
         let type: TypeReference
     }
 }

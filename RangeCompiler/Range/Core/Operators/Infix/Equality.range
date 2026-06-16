@@ -5,9 +5,9 @@ function ==(lhs: Int, rhs: Float): Bool
 
 function ==(lhs: Float, rhs: Int): Bool
 
-function ==<Wrapped>(lhs: Wrapped?, rhs: NilLiteral): Bool
+function ==<Wrapped>(lhs: Optional<Wrapped>, rhs: NilLiteral): Bool
 
-function ==<Wrapped>(lhs: NilLiteral, rhs: Wrapped?): Bool
+function ==<Wrapped>(lhs: NilLiteral, rhs: Optional<Wrapped>): Bool
 
 function !=(lhs: Int, rhs: Int): Bool
 
@@ -21,6 +21,6 @@ function !=(lhs: String, rhs: String): Bool
 
 function !=(lhs: Bool, rhs: Bool): Bool
 
-function !=<Wrapped>(lhs: Wrapped?, rhs: NilLiteral): Bool
+function !=<Wrapped>(lhs: Optional<Wrapped>, rhs: NilLiteral): Bool
 
-function !=<Wrapped>(lhs: NilLiteral, rhs: Wrapped?): Bool
+function !=<Wrapped>(lhs: NilLiteral, rhs: Optional<Wrapped>): Bool

@@ -3,13 +3,13 @@ construct RangeProgram {
 }
 
 construct RangeGraph {
-    let files: [FileTreeNode]
-    let sources: [ProgramSourceFile]
-    let lexedSources: [ProgramLexedSource]
-    let artifacts: [ProgramArtifact]
+    let files: Array<FileTreeNode>
+    let sources: Array<ProgramSourceFile>
+    let lexedSources: Array<ProgramLexedSource>
+    let artifacts: Array<ProgramArtifact>
     let topology: RangeGraphTopology
     state main: Optional<@main>
-    state syntax: [@syntax]
+    state syntax: Array<@syntax>
 }
 
 construct ProgramSourceFile {
@@ -19,7 +19,7 @@ construct ProgramSourceFile {
 
 construct ProgramLexedSource {
     let path: String
-    let tokens: [LexicalToken]
+    let tokens: Array<LexicalToken>
 }
 
 construct ProgramArtifact {
@@ -28,14 +28,14 @@ construct ProgramArtifact {
 }
 
 construct RangeGraphTopology {
-    let nodes: [RangeGraphNode]
-    let relationships: [RangeGraphRelationship]
+    let nodes: Array<RangeGraphNode>
+    let relationships: Array<RangeGraphRelationship>
 }
 
 construct RangeGraphNode {
     let identity: RangeGraphIdentity
     let sourcePath: String
-    let labels: [String]
+    let labels: Array<String>
 }
 
 construct RangeGraphRelationship {
@@ -46,8 +46,8 @@ construct RangeGraphRelationship {
 
 construct GraphSyntax {
     let identity: RangeGraphIdentity
-    let declarations: [GraphEntry]
-    let applications: [GraphEntry]
+    let declarations: Array<GraphEntry>
+    let applications: Array<GraphEntry>
 }
 
 enum GraphRole {

@@ -18,19 +18,19 @@ construct Set<Element> {
         storage.insert(element: element)
     }
 
-    function remove(element: Element): Element? {
+    function remove(element: Element): Optional<Element> {
         return storage.remove(element: element)
     }
 
-    function elements(): [Element] {
+    function elements(): Array<Element> {
         return storage.elements()
     }
 
-    function filter(include: (Element) -> Bool): [Element] {
+    function filter(include: (Element) -> Bool): Array<Element> {
         return storage.filter(include: include)
     }
 
-    function first(include: (Element) -> Bool): Element? {
+    function first(include: (Element) -> Bool): Optional<Element> {
         return storage.first(include: include)
     }
 

@@ -6,18 +6,18 @@ construct Function {
     @graph(role: .declaration)
     construct Declaration {
         let identity: GraphIdentity
-        let parent: GraphIdentity?
+        let parent: Optional<GraphIdentity>
         let identifier: Identifier
-        let generics: [Generic]
-        let parameters: [Parameter.Declaration]
-        let returnType: TypeReference?
+        let generics: Array<Generic>
+        let parameters: Array<Parameter.Declaration>
+        let returnType: Optional<TypeReference>
         let body: Block
     }
 
     @graph(role: .application)
     construct Call {
         let identifier: Identifier
-        let arguments: [Parameter.Application]
+        let arguments: Array<Parameter.Application>
 
         function replace(replacement: Expression): Expression
     }

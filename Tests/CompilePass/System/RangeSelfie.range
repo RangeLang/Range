@@ -85,7 +85,7 @@ function tokenKindName(kind: TokenKind): String {
     }
 }
 
-function renderTokens(tokens: [LexicalToken]): String {
+function renderTokens(tokens: Array<LexicalToken>): String {
     state output: ""
     state index: 0
 
