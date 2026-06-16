@@ -139,6 +139,7 @@ function countApplications(graph: RangeGraph): Int {
                         )
                     ]
                 ),
+                main: nil,
                 syntax: [
                     GraphSyntax(
                         identity: RangeGraphIdentity(

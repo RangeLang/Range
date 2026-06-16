@@ -1,0 +1,3 @@
+@main {
+    let text: String(@stringify(value: 1 + 2))
+}

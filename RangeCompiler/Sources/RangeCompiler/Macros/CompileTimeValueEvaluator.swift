@@ -533,7 +533,9 @@ struct CompileTimeValueEvaluator {
         "Enum", "Enum.Declaration", "Enum.Case", "Enum.AssociatedValue", "Identifier", "NamedTypeReference",
         "MemberTypeReference", "ArrayTypeReference", "Let", "State", "Binding", "Derived", "Init.Declaration",
         "Function.Declaration", "Construct.Declaration", "Extension", "TypeGeneric",
-        "Void", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
+        "Macro.Application", "Macro.Declaration", "Macro.Target", "CodingBehavior",
+        "ValueGeneric", "Parameter.Declaration",
+        "Void", "Identity", "UUID", "UUIDStorage", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
         "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
         "WrittenExpression",
         "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook",
@@ -931,7 +933,28 @@ struct CompileTimeValueEvaluator {
                 }
                 return value
             case .expression(let expression):
-                return evaluate(expression, locals: nestedLocals)
+                if case .macroInvocation(let name, let arguments) = expression,
+                    let macro = macroDeclarationsByName[name],
+                    let context
+                {
+                    let resolvedArguments = arguments.map { argument in
+                        if let value = evaluate(argument.value, locals: nestedLocals),
+                            let expression = value.expression
+                        {
+                            return CallArgument(label: argument.label, value: expression)
+                        }
+                        return argument
+                    }
+                    return try? MacroExpander.evaluateFreestandingSyntaxMacro(
+                        macro,
+                        arguments: resolvedArguments,
+                        callerLocals: nestedLocals,
+                        callerSelfValue: selfValue,
+                        context: context
+                    )
+                }
+                let value = evaluate(expression, locals: nestedLocals)
+                return value
             case .return(let expression?):
                 return evaluate(expression, locals: nestedLocals)
             case .switchStatement:

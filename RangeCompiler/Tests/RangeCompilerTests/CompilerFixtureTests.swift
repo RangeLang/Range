@@ -31,7 +31,7 @@ struct CompilerFixtureTests {
     @Test("Compiler diagnostics include macro warnings")
     func compilerDiagnosticsIncludeMacroWarnings() throws {
         let fixture = try fixtureFile(
-            in: "CompilePass",
+            in: "CompileFail",
             path: "Macros/SyntaxProducingMacroIdentifierMemberAccess.range"
         )
         var inputs = try rangeCoreInputs()

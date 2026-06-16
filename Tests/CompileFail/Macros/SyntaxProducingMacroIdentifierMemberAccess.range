@@ -1,5 +1,5 @@
 macro identifierContainerSwitch(container: Identifier, value: Identifier, key: String) -> Switch {
-    switch #(container).encode(#(value), key: key) {
+    switch #(container).encode(#(value), key: #(key)) {
     case .success:
         break
     case .failure(let error):

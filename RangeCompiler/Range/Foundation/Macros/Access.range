@@ -1,4 +1,4 @@
-macro access(accessTarget: AccessTarget): @syntax { target, diagnostics in
+macro access(accessTarget: AccessTarget): Construct { target, diagnostics in
     let accessibleFields: Enum.Declaration(
         self: NamedTypeReference(name: "AccessibleFields"),
         generics: [],
@@ -17,14 +17,13 @@ macro access(accessTarget: AccessTarget): @syntax { target, diagnostics in
         self: NamedTypeReference(name: "AccessibleConstructs"),
         generics: [],
         cases: target.declaration.constructs.map { construct in
-            Enum.Case(identifier: Identifier(name: construct.name.lastComponent()), associatedValues: [])
+            Enum.Case(identifier: construct.identifier, associatedValues: [])
         }
     )
 
     target.declaration.expand {
         extension #(target.declaration.self) {
             #(accessibleFields)
-            #(accessibleMacros)
             #(accessibleMacros)
             #(accessibleConstructs)
         }

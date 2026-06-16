@@ -8,19 +8,15 @@ macro encodeSwitch(container: KeyedEncodingContainer, value: Identifier, key: St
 }
 
 macro emitEncodingSwitch(): Construct { target, diagnostics in
-    let statement: Switch(
-        @encodeSwitch(
-            container: container,
-            value: Identifier(name: "id"),
-            key: "id"
-        )
-    )
-
     target.declaration.expand {
         extension #(target.declaration.self) {
             function encode(encoder: Encoder): Result<Void, EncodingError> {
                 let container: KeyedEncodingContainer(encoder.keyedContainer())
-                #(statement)
+                @encodeSwitch(
+                    container: container,
+                    value: Identifier(name: "id"),
+                    key: "id"
+                )
                 return .success(result: Void())
             }
         }

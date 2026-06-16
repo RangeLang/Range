@@ -44,9 +44,6 @@ indirect enum CompileTimeValue {
                 }
                 return CallArgument(label: label, value: expression)
             }
-            guard arguments.count == fields.count else {
-                return nil
-            }
             return .call(name: typeName, arguments: arguments)
         }
     }

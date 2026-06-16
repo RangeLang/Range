@@ -4,5 +4,5 @@ macro fallbackOne(value: Optional<Int>): Expression { target, diagnostics in
 
 @main {
     let maybe: Optional<Int>(nil)
-    let resolved: Int(@fallbackOne(maybe))
+    let resolved: Int(@fallbackOne(value: maybe))
 }

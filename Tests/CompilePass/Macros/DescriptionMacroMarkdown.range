@@ -1,4 +1,4 @@
-@Description(FixtureConstruct carries macro source)
+@Description(markdown: "FixtureConstruct carries macro source")
 construct FixtureConstruct {
     let number: Int
 }

@@ -8,6 +8,8 @@ function tokenKindName(kind: TokenKind): String {
         return "foreignBody"
     case .stringLiteral:
         return "stringLiteral"
+    case .colorLiteral:
+        return "colorLiteral"
     case .integer:
         return "integer"
     case .double:
@@ -32,6 +34,8 @@ function tokenKindName(kind: TokenKind): String {
         return "asterisk"
     case .dot:
         return "dot"
+    case .dotDotLess:
+        return "dotDotLess"
     case .ellipsis:
         return "ellipsis"
     case .colon:

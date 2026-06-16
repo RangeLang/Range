@@ -1,5 +1,5 @@
 @Token(pattern: "annotationHandleView")
-@access(InternalGraph)
+@access(accessTarget: InternalGraph)
 construct AnnotationHandleView {
     let id: Int
 }

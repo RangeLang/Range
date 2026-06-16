@@ -1,4 +1,4 @@
-@access(InternalGraph)
+@access(accessTarget: InternalGraph)
 construct AccessBoundaryFixture {
     let field: Int
 
