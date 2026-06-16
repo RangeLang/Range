@@ -250,7 +250,7 @@ extension Parser {
 
     func isExpressionStatementStart() -> Bool {
         switch peek() {
-        case .identifier, .integer, .double, .stringLiteral, .colorLiteral, .leftBracket,
+        case .identifier, .integer, .double, .stringLiteral, .leftBracket,
             .leftParen, .dollar, .dot, .bang:
             return true
         case .hash where peek(offset: 1) == .leftParen:
@@ -364,7 +364,7 @@ extension Parser {
 
     func canStartExpression(_ token: Token) -> Bool {
         switch token {
-        case .identifier, .integer, .double, .stringLiteral, .colorLiteral, .macroAttribute,
+        case .identifier, .integer, .double, .stringLiteral, .macroAttribute,
             .leftBracket, .leftParen, .leftBrace, .dollar, .dot, .bang:
             return true
         case .keyword(let value):

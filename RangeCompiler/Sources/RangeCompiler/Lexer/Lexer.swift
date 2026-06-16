@@ -121,13 +121,6 @@ struct RangeAuthoredLexerCursor {
                 if hasCharacter(offset: 1, value: "(") {
                     _ = advance()
                     emit(kind: .hash, start: start)
-                } else if isHexDigitAt(offset: 1) {
-                    switch readHexColorLiteral(start: start) {
-                    case .success(let value):
-                        emit(kind: .colorLiteral(value: value), start: start)
-                    case .failure(let error):
-                        return .failure(error)
-                    }
                 } else {
                     _ = advance()
                     emit(kind: .hash, start: start)
@@ -436,28 +429,6 @@ struct RangeAuthoredLexerCursor {
         return .success(readIdentifier())
     }
 
-    mutating func readHexColorLiteral(
-        start: RangeAuthoredLexerPosition
-    ) -> Result<String, RangeAuthoredLexingError> {
-        _ = advance()
-        var digits = ""
-        while !isAtEnd() && isIdentifierPart(currentCharacter()) {
-            digits += advance()
-        }
-
-        guard digits.count == 6, digits.allSatisfy({ isHexDigit(String($0)) }) else {
-            return .failure(
-                lexicalFailure(
-                    message:
-                        "Invalid hex color literal '#\(digits)'. Expected 6 hexadecimal digits.",
-                    start: start
-                )
-            )
-        }
-
-        return .success(digits)
-    }
-
     mutating func readNumberLiteral(start: RangeAuthoredLexerPosition) -> RangeAuthoredTokenKind {
         while !isAtEnd() && isDigit(currentCharacter()) {
             _ = advance()
@@ -647,23 +618,6 @@ struct RangeAuthoredLexerCursor {
             return false
         }
         return isDigit(characters[position])
-    }
-
-    func isHexDigitAt(offset: Int) -> Bool {
-        let position = index + offset
-        if position >= characters.count {
-            return false
-        }
-        return isHexDigit(characters[position])
-    }
-
-    func isHexDigit(_ value: String) -> Bool {
-        guard let byte = singleASCIIByte(value) else {
-            return false
-        }
-        return (byte >= CharacterBytes.zero && byte <= CharacterBytes.nine)
-            || (byte >= CharacterBytes.lowerA && byte <= CharacterBytes.lowerF)
-            || (byte >= CharacterBytes.upperA && byte <= CharacterBytes.upperF)
     }
 
     func isWhitespace(_ value: String) -> Bool {

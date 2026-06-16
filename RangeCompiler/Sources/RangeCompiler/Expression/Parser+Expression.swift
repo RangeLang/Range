@@ -139,12 +139,6 @@ extension Parser {
                 name: "__syntaxSplice",
                 arguments: [CallArgument(label: nil, value: expression)]
             )
-        case .colorLiteral(let value):
-            advance()
-            return .call(
-                name: "Color",
-                arguments: [CallArgument(label: "hex", value: .string("#\(value)"))]
-            )
         case .identifier(let name), .keyword(let name):
             advance()
             if name == "true" {
@@ -499,7 +493,7 @@ extension Parser {
                 return false
             case .hash, .foreignBody, .macroAttribute, .dollar, .percent, .bang:
                 return false
-            case .identifier, .keyword, .stringLiteral, .colorLiteral, .integer, .double,
+            case .identifier, .keyword, .stringLiteral, .integer, .double,
                 .leftBracket, .leftParen, .asterisk, .dot, .ellipsis, .question, .comma:
                 break
             }

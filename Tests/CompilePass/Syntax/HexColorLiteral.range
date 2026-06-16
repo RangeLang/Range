@@ -1,6 +1,0 @@
-@main {
-    let white: #FFFFFF
-    let dark: #1a2B3c
-    let accent: Color(hex: "#FF8800")
-    let matches: white == Color(hex: "#FFFFFF")
-}

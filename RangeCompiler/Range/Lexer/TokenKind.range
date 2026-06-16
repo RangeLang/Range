@@ -4,7 +4,6 @@ enum TokenKind {
     case identifier(value: String)
     case foreignBody(language: String, text: String)
     case stringLiteral(value: String)
-    case colorLiteral(value: String)
     case integer(value: String)
     case double(value: String)
     case keyword(value: String)

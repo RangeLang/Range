@@ -66,13 +66,6 @@ construct LexerCursor {
                 if hasCharacter(offset: 1, value: "(") {
                     advance()
                     emit(kind: .hash, start: start)
-                } else if hasHexDigit(offset: 1) {
-                    switch readHexColorLiteral(start: start) {
-                    case .success(let value):
-                        emit(kind: .colorLiteral(value: value), start: start)
-                    case .failure(let error):
-                        return .failure(cause: error)
-                    }
                 } else {
                     advance()
                     emit(kind: .hash, start: start)
@@ -396,25 +389,6 @@ construct LexerCursor {
         return .success(result: readIdentifier())
     }
 
-    function readHexColorLiteral(start: LexerPosition): Result<String, LexingError> {
-        advance()
-        state digits: ""
-        while !isAtEnd() && isIdentifierPart(currentCharacter()) {
-            state digits: digits + advance()
-        }
-
-        if digits.count != 6 || !isHexDigits(digits) {
-            return .failure(
-                cause: lexicalFailure(
-                    message: "Invalid hex color literal #\(digits). Expected 6 hexadecimal digits.",
-                    start: start
-                )
-            )
-        }
-
-        return .success(result: digits)
-    }
-
     function readNumberLiteral(start: LexerPosition): TokenKind {
         while !isAtEnd() && isDigit(currentCharacter()) {
             advance()
@@ -606,15 +580,6 @@ construct LexerCursor {
         return isDigit(value)
     }
 
-    function hasHexDigit(offset: Int): Bool {
-        let position: index + offset
-        if position >= source.count {
-            return false
-        }
-        let value: String(source.character(index: position))
-        return isHexDigit(value)
-    }
-
     function isWhitespace(value: String): Bool {
         return value == " " || value == "\n" || value == "\r" || value == "\t"
     }
@@ -632,21 +597,6 @@ construct LexerCursor {
         return value >= "0" && value <= "9"
     }
 
-    function isHexDigit(value: String): Bool {
-        return isDigit(value) || value >= "a" && value <= "f" || value >= "A" && value <= "F"
-    }
-
-    function isHexDigits(value: String): Bool {
-        state position: 0
-        while position < value.count {
-            let character: String(value.character(index: position))
-            if !isHexDigit(character) {
-                return false
-            }
-            state position: position + 1
-        }
-        return true
-    }
 
     function isASCIILetter(value: String): Bool {
         return value >= "a" && value <= "z" || value >= "A" && value <= "Z"

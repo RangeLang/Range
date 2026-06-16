@@ -9,7 +9,6 @@ enum RangeAuthoredTokenKind {
     case identifier(value: String)
     case foreignBody(language: String, text: String)
     case stringLiteral(value: String)
-    case colorLiteral(value: String)
     case integer(value: String)
     case double(value: String)
     case keyword(value: String)
@@ -62,8 +61,6 @@ extension Lexer {
             parserToken = .foreignBody(language: language, text: text)
         case .stringLiteral(let value):
             parserToken = .stringLiteral(value)
-        case .colorLiteral(let value):
-            parserToken = .colorLiteral(value)
         case .integer(let value):
             guard let integer = Int(value) else {
                 throw ParseError("Invalid integer literal \(value).", range: token.range)

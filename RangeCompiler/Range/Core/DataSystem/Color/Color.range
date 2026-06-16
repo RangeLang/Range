@@ -1,9 +1,0 @@
-construct Color {
-    let hex: String
-}
-
-extension Color {
-    function ==(lhs: Self, rhs: Self): Bool {
-        return lhs.hex == rhs.hex
-    }
-}
