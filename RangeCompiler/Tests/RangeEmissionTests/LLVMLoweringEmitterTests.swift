@@ -2303,16 +2303,12 @@ struct LLVMLoweringEmitterTests {
                 in: root.appendingPathComponent("Core", isDirectory: true),
                 excludingExploration: true
             )
-            + rangeFiles(
-                in: root.appendingPathComponent("Foundation/Macros", isDirectory: true),
-                excludingExploration: true
-            )
-            + rangeFiles(
-                in: root.appendingPathComponent("Lexer", isDirectory: true),
-                excludingExploration: true
-            )
+        + rangeFiles(
+            in: root.appendingPathComponent("Foundation/Macros", isDirectory: true),
+            excludingExploration: true
+        )
 
-        return try files.map { file in
+    return try files.map { file in
             SourceInput(
                 path: file.path,
                 source: try String(contentsOf: file, encoding: .utf8),

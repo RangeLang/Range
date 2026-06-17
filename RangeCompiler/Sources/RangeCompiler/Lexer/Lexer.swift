@@ -1,7 +1,7 @@
 import Foundation
 
-// Boundary rule: lexer behavior belongs in RangeCompiler/Range/Lexer/*.range.
-// This Swift file adapts the parser to the Range-authored bootstrap projection.
+// Current compiler lexer. Range-side lexer declarations have been removed while
+// the parser remains Swift-hosted.
 
 struct LexerForeignBody {
     let directive: String
@@ -21,9 +21,9 @@ struct Lexer {
     }
 
     mutating func tokenize() throws -> [LexedToken] {
-        let lexer = RangeAuthoredLexer()
+        let lexer = SwiftLexer()
         let rangeForeignBodies = foreignBodies.map {
-            RangeAuthoredLexerForeignBody(directive: $0.directive, language: $0.language)
+            SwiftLexerForeignBody(directive: $0.directive, language: $0.language)
         }
         switch lexer.tokenize(source: source, foreignBodies: rangeForeignBodies) {
         case .success(let tokens):
@@ -34,13 +34,12 @@ struct Lexer {
     }
 }
 
-// Bootstrap projection of RangeCompiler/Range/Lexer/Lexer.range.
-struct RangeAuthoredLexer {
+struct SwiftLexer {
     func tokenize(
         source: String,
-        foreignBodies: [RangeAuthoredLexerForeignBody]
-    ) -> Result<[RangeAuthoredLexicalToken], RangeAuthoredLexingError> {
-        var cursor = RangeAuthoredLexerCursor(
+        foreignBodies: [SwiftLexerForeignBody]
+    ) -> Result<[SwiftLexicalToken], SwiftLexingError> {
+        var cursor = SwiftLexerCursor(
             source: source,
             foreignBodies: foreignBodies,
             rules: Self.generatedRules
@@ -49,48 +48,48 @@ struct RangeAuthoredLexer {
     }
 }
 
-struct RangeAuthoredLexerRule {
+struct SwiftLexerRule {
     let name: String
     let pattern: String
     let token: String
     let priority: Int
 }
 
-struct RangeAuthoredLexerForeignBody {
+struct SwiftLexerForeignBody {
     let directive: String
     let language: String
 }
 
-struct RangeAuthoredLexingError: Error {
+struct SwiftLexingError: Error {
     let message: String
     let range: RangeSourceRange
 }
 
-struct RangeAuthoredLexerPosition {
+struct SwiftLexerPosition {
     let index: Int
     let location: RangeSourceLocation
 }
 
-struct RangeAuthoredLexicalToken {
-    let kind: RangeAuthoredTokenKind
+struct SwiftLexicalToken {
+    let kind: SwiftTokenKind
     let range: RangeSourceRange
     let source: String
 }
 
-struct RangeAuthoredLexerCursor {
+struct SwiftLexerCursor {
     let source: String
     let characters: [String]
-    let foreignBodies: [RangeAuthoredLexerForeignBody]
-    let rules: [RangeAuthoredLexerRule]
+    let foreignBodies: [SwiftLexerForeignBody]
+    let rules: [SwiftLexerRule]
     var index: Int = 0
     var line: Int = 0
     var column: Int = 0
-    var tokens: [RangeAuthoredLexicalToken] = []
+    var tokens: [SwiftLexicalToken] = []
 
     init(
         source: String,
-        foreignBodies: [RangeAuthoredLexerForeignBody],
-        rules: [RangeAuthoredLexerRule]
+        foreignBodies: [SwiftLexerForeignBody],
+        rules: [SwiftLexerRule]
     ) {
         self.source = source
         self.characters = source.map(String.init)
@@ -98,7 +97,7 @@ struct RangeAuthoredLexerCursor {
         self.rules = rules
     }
 
-    mutating func tokenize() -> Result<[RangeAuthoredLexicalToken], RangeAuthoredLexingError> {
+    mutating func tokenize() -> Result<[SwiftLexicalToken], SwiftLexingError> {
         while !isAtEnd() {
             if isWhitespace(currentCharacter()) {
                 _ = advance()
@@ -188,7 +187,7 @@ struct RangeAuthoredLexerCursor {
         return .success(tokens)
     }
 
-    mutating func matchLexerRuleLiteral(start: RangeAuthoredLexerPosition) -> Bool {
+    mutating func matchLexerRuleLiteral(start: SwiftLexerPosition) -> Bool {
         for rule in rules where isLiteralLexerRule(rule) && hasPrefix(rule.pattern) {
             advancePattern(rule.pattern)
             return emitRuleToken(token: rule.token, start: start)
@@ -196,7 +195,7 @@ struct RangeAuthoredLexerCursor {
         return false
     }
 
-    func isLiteralLexerRule(_ rule: RangeAuthoredLexerRule) -> Bool {
+    func isLiteralLexerRule(_ rule: SwiftLexerRule) -> Bool {
         isLiteralLexerToken(rule.token)
     }
 
@@ -213,7 +212,7 @@ struct RangeAuthoredLexerCursor {
         }
     }
 
-    mutating func emitRuleToken(token: String, start: RangeAuthoredLexerPosition) -> Bool {
+    mutating func emitRuleToken(token: String, start: SwiftLexerPosition) -> Bool {
         switch token {
         case "leftBrace":
             emit(kind: .leftBrace, start: start)
@@ -334,21 +333,21 @@ struct RangeAuthoredLexerCursor {
         RangeSourceLocation(line: line, character: column)
     }
 
-    func currentPosition() -> RangeAuthoredLexerPosition {
-        RangeAuthoredLexerPosition(index: index, location: currentLocation())
+    func currentPosition() -> SwiftLexerPosition {
+        SwiftLexerPosition(index: index, location: currentLocation())
     }
 
-    func range(from start: RangeAuthoredLexerPosition) -> RangeSourceRange {
+    func range(from start: SwiftLexerPosition) -> RangeSourceRange {
         RangeSourceRange(start: start.location, end: currentLocation())
     }
 
-    func sourceSlice(from start: RangeAuthoredLexerPosition) -> String {
+    func sourceSlice(from start: SwiftLexerPosition) -> String {
         characters[start.index..<index].joined()
     }
 
-    mutating func emit(kind: RangeAuthoredTokenKind, start: RangeAuthoredLexerPosition) {
+    mutating func emit(kind: SwiftTokenKind, start: SwiftLexerPosition) {
         tokens.append(
-            RangeAuthoredLexicalToken(
+            SwiftLexicalToken(
                 kind: kind,
                 range: range(from: start),
                 source: sourceSlice(from: start)
@@ -358,16 +357,16 @@ struct RangeAuthoredLexerCursor {
 
     func failure(
         message: String,
-        start: RangeAuthoredLexerPosition
-    ) -> Result<[RangeAuthoredLexicalToken], RangeAuthoredLexingError> {
+        start: SwiftLexerPosition
+    ) -> Result<[SwiftLexicalToken], SwiftLexingError> {
         .failure(lexicalFailure(message: message, start: start))
     }
 
     func lexicalFailure(
         message: String,
-        start: RangeAuthoredLexerPosition
-    ) -> RangeAuthoredLexingError {
-        RangeAuthoredLexingError(message: message, range: range(from: start))
+        start: SwiftLexerPosition
+    ) -> SwiftLexingError {
+        SwiftLexingError(message: message, range: range(from: start))
     }
 
     mutating func match(_ expected: String) -> Bool {
@@ -393,8 +392,8 @@ struct RangeAuthoredLexerCursor {
     }
 
     mutating func readEscapedIdentifier(
-        start: RangeAuthoredLexerPosition
-    ) -> Result<String, RangeAuthoredLexingError> {
+        start: SwiftLexerPosition
+    ) -> Result<String, SwiftLexingError> {
         _ = advance()
         if isAtEnd() || !isIdentifierStart(currentCharacter()) {
             return .failure(lexicalFailure(message: "Expected identifier after `.", start: start))
@@ -411,8 +410,8 @@ struct RangeAuthoredLexerCursor {
     }
 
     mutating func readSigilIdentifier(
-        start: RangeAuthoredLexerPosition
-    ) -> Result<String, RangeAuthoredLexingError> {
+        start: SwiftLexerPosition
+    ) -> Result<String, SwiftLexingError> {
         _ = advance()
         if isAtEnd() {
             return .failure(lexicalFailure(message: "Expected identifier after @.", start: start))
@@ -429,7 +428,7 @@ struct RangeAuthoredLexerCursor {
         return .success(readIdentifier())
     }
 
-    mutating func readNumberLiteral(start: RangeAuthoredLexerPosition) -> RangeAuthoredTokenKind {
+    mutating func readNumberLiteral(start: SwiftLexerPosition) -> SwiftTokenKind {
         while !isAtEnd() && isDigit(currentCharacter()) {
             _ = advance()
         }
@@ -459,8 +458,8 @@ struct RangeAuthoredLexerCursor {
     }
 
     mutating func readString(
-        start: RangeAuthoredLexerPosition
-    ) -> Result<String, RangeAuthoredLexingError> {
+        start: SwiftLexerPosition
+    ) -> Result<String, SwiftLexingError> {
         _ = advance()
         var result = ""
         var interpolationDepth = 0
@@ -517,8 +516,8 @@ struct RangeAuthoredLexerCursor {
     }
 
     mutating func readInterpolatedStringLiteral(
-        start: RangeAuthoredLexerPosition
-    ) -> Result<String, RangeAuthoredLexingError> {
+        start: SwiftLexerPosition
+    ) -> Result<String, SwiftLexingError> {
         var result = "\""
         _ = advance()
 
@@ -554,8 +553,8 @@ struct RangeAuthoredLexerCursor {
 
     mutating func readForeignBodyBlock(
         language: String,
-        start: RangeAuthoredLexerPosition
-    ) -> Result<String, RangeAuthoredLexingError> {
+        start: SwiftLexerPosition
+    ) -> Result<String, SwiftLexingError> {
         var result = ""
 
         if !isAtEnd() && currentCharacter() == "\n" {

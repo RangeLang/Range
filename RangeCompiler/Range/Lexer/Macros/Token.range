@@ -1,3 +1,0 @@
-macro Token(pattern: String): Construct -> Token { target, diagnostics in
-    return Token(pattern: pattern)
-}

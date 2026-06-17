@@ -17,7 +17,7 @@ construct RangeCompilerProgram {
             "|-- Foundation\n" +
             "|   `-- Macros\n" +
             "`-- Lexer\n" +
-            "    `-- Macros\n"
+            "    `-- Swift lexer active\n"
     }
 
     function compilerPipeline(): String {
@@ -25,8 +25,8 @@ construct RangeCompilerProgram {
             "  -> normal compiler pipeline\n" +
             "RangeCompiler/Range/Foundation\n" +
             "  -> bundled compiler-owned features\n" +
-            "RangeCompiler/Range/Lexer\n" +
-            "  -> compiler support layer\n" +
+            "RangeCompiler/Sources/RangeCompiler/Lexer\n" +
+            "  -> Swift-hosted compiler lexer\n" +
             "Project sources\n"
     }
 }

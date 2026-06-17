@@ -1,7 +1,0 @@
-@Token(pattern: "fixtureToken")
-construct FixtureToken {
-}
-
-construct TokenHandleStore {
-    state tokens: Array<@Token>()
-}

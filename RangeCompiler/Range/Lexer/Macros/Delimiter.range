@@ -1,7 +1,0 @@
-macro Delimiter<let role: DelimiterRole>(pairedToken: Identifier): Construct -> Delimiter { target, diagnostics in
-    return Delimiter(
-        token: Identifier(name: target.declaration.self.name),
-        role: role,
-        pairedToken: pairedToken
-    )
-}

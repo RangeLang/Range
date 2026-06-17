@@ -1,22 +1,32 @@
 import Foundation
 
+public struct OperatorBindingRange: Equatable, Sendable {
+    public let lower: Int
+    public let upper: Int
+
+    public init(lower: Int, upper: Int) {
+        self.lower = lower
+        self.upper = upper
+    }
+}
+
 public struct PrecedenceMetadataConcept: Equatable, Sendable {
     public let name: String
-    public let associativity: TokenOperatorAssociativity?
+    public let associativity: OperatorAssociativity?
     public let higherThan: [String]
     public let lowerThan: [String]
     public let assignment: Bool?
     public let step: Int
-    public let binding: TokenOperatorBindingRange
+    public let binding: OperatorBindingRange
 
     public init(
         name: String,
-        associativity: TokenOperatorAssociativity?,
+        associativity: OperatorAssociativity?,
         higherThan: [String],
         lowerThan: [String],
         assignment: Bool?,
         step: Int,
-        binding: TokenOperatorBindingRange
+        binding: OperatorBindingRange
     ) {
         self.name = name
         self.associativity = associativity
@@ -59,7 +69,7 @@ extension DeclarationGraph {
                 lowerThan: group.lowerThan,
                 assignment: group.assignment,
                 step: step,
-                binding: TokenOperatorBindingRange(lower: lower, upper: lower + step)
+                binding: OperatorBindingRange(lower: lower, upper: lower + step)
             )
         }
         .sorted { $0.name < $1.name }
@@ -97,10 +107,7 @@ extension DeclarationGraph {
 
     private static func tokenAssociativity(
         from associativity: OperatorAssociativity?
-    ) -> TokenOperatorAssociativity? {
-        guard let associativity else {
-            return nil
-        }
-        return TokenOperatorAssociativity(rawValue: associativity.rawValue)
+    ) -> OperatorAssociativity? {
+        associativity
     }
 }

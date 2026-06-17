@@ -538,7 +538,7 @@ struct CompileTimeValueEvaluator {
         "Void", "Identity", "UUID", "UUIDStorage", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
         "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
         "WrittenExpression",
-        "ArrayExpression", "EnumCaseExpression", "Lexer", "LexerRule", "LexerRepresentation", "LexicalToken", "TokenKind", "Token", "Delimiter", "OperatorBindingRange", "OperatorBindingMetric", "OperatorBinding", "SourceLocation", "SourceRange", "ASCIILiteral", "ASCII", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook",
+        "ArrayExpression", "EnumCaseExpression", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook",
     ]
 
     private func evaluatePrimitiveConstruction(

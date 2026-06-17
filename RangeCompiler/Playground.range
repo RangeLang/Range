@@ -1,10 +1,3 @@
 @main {
-    let lexing: RangeCompilerLexing(RangeCompilerLexing())
-
-    switch lexing.tokenize(source: "construct RangeCompiler { }") {
-    case .success(let tokens):
-        Logger.info("RangeCompiler lexer tokens: \(tokens.count)")
-    case .failure(let error):
-        Logger.error(error.message)
-    }
+    Logger.info("Range playground ready.")
 }

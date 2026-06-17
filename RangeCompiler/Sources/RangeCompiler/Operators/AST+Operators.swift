@@ -6,7 +6,7 @@ public enum OperatorFixity: String {
     case postfix
 }
 
-public enum OperatorAssociativity: String {
+public enum OperatorAssociativity: String, Sendable {
     case none
     case left
     case right

@@ -305,8 +305,6 @@ struct SwiftBackendProgramBuilder {
                     || (includeSyntaxLexingSupport
                         && isCorePath(parsedFile.path, containing: "Syntax/Lexing/"))
                     || (includeSyntaxLexingSupport
-                        && parsedFile.path.contains("/RangeCompiler/Range/Lexer/"))
-                    || (includeSyntaxLexingSupport
                         && isCorePath(parsedFile.path, containing: "Syntax/Identifier.range"))
                     || (includeSyntaxLexingSupport
                         && isCorePath(parsedFile.path, containing: "Macro/SyntaxEmittable.range"))
@@ -394,17 +392,11 @@ struct SwiftBackendProgramBuilder {
             parsedFile.path.contains("/Syntax/")
                 || parsedFile.source?.contains("Lexer") == true
                 || parsedFile.source?.contains("Lexing") == true
-                || parsedFile.source?.contains("LexicalToken") == true
-                || parsedFile.source?.contains("rangeLexer") == true
         }
     }
 
     private func rangeProgramUsesSyntaxLexingSupport(_ compiledProgram: CompiledProgram) -> Bool {
-        compiledProgram.expandedFiles.contains { parsedFile in
-            compiledProgram.sourceRole(forPath: parsedFile.path) == .core
-                && isCorePath(parsedFile.path, containing: "Syntax/Program/")
-                && parsedFile.source?.contains("LexicalToken") == true
-        }
+        false
     }
 
     private func shouldEmitCoreSupportConstruct(

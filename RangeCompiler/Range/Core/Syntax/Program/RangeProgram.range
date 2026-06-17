@@ -5,7 +5,6 @@ construct RangeProgram {
 construct RangeGraph {
     let files: Array<FileTreeNode>
     let sources: Array<ProgramSourceFile>
-    let lexedSources: Array<ProgramLexedSource>
     let artifacts: Array<ProgramArtifact>
     let topology: RangeGraphTopology
     state main: Optional<@main>
@@ -15,11 +14,6 @@ construct RangeGraph {
 construct ProgramSourceFile {
     let path: String
     let text: String
-}
-
-construct ProgramLexedSource {
-    let path: String
-    let tokens: Array<LexicalToken>
 }
 
 construct ProgramArtifact {

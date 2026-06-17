@@ -1,6 +1,0 @@
-@Token(pattern: "[")
-@Delimiter<.prefix>(pairedToken: RightBracket)
-@Delimiter<.infix>(pairedToken: RightBracket)
-@lexer<.emit>
-construct DuplicateDelimiterToken {
-}

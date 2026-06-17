@@ -1221,239 +1221,6 @@ struct CompilerFixtureTests {
         #expect(graph.syntaxResolver.type(.named("Block"), matchesSyntaxSurface: "block"))
     }
 
-    @Test("Token metadata reads delimiter macros")
-    func tokenMetadataReadsDelimiterMacros() throws {
-        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
-        let tokens = program.declarationGraph.tokenMetadataConcepts
-        let delimiters = program.declarationGraph.tokenDelimiterConcepts
-        let lexerRepresentations = program.declarationGraph.lexerRepresentationConcepts
-
-        #expect(
-            tokens.contains(
-                TokenMetadataConcept(
-                    token: "LeftBracket",
-                    pattern: "[",
-                    delimiter: TokenDelimiterConcept(
-                        token: "LeftBracket",
-                        role: .prefix,
-                        pairedToken: "RightBracket"
-                    ),
-                    operatorBinding: nil
-                )
-            )
-        )
-        #expect(
-            tokens.contains(
-                TokenMetadataConcept(
-                    token: "Comma",
-                    pattern: ",",
-                    delimiter: nil,
-                    operatorBinding: nil
-                )
-            )
-        )
-        #expect(
-            lexerRepresentations.contains(
-                LexerRepresentationConcept(
-                    token: "Whitespace",
-                    pattern: " ",
-                    option: .skip,
-                    delimiter: nil,
-                    operatorBinding: nil
-                )
-            )
-        )
-        #expect(
-            lexerRepresentations.contains(
-                LexerRepresentationConcept(
-                    token: "Comma",
-                    pattern: ",",
-                    option: .emit,
-                    delimiter: nil,
-                    operatorBinding: nil
-                )
-            )
-        )
-        #expect(
-            lexerRepresentations.contains(
-                LexerRepresentationConcept(
-                    token: "LeftBracket",
-                    pattern: "[",
-                    option: .emit,
-                    delimiter: TokenDelimiterConcept(
-                        token: "LeftBracket",
-                        role: .prefix,
-                        pairedToken: "RightBracket"
-                    ),
-                    operatorBinding: nil
-                )
-            )
-        )
-        #expect(
-            delimiters.contains(
-                TokenDelimiterConcept(
-                    token: "LeftBrace",
-                    role: .prefix,
-                    pairedToken: "RightBrace"
-                )
-            )
-        )
-        #expect(
-            delimiters.contains(
-                TokenDelimiterConcept(
-                    token: "LeftParen",
-                    role: .prefix,
-                    pairedToken: "RightParen"
-                )
-            )
-        )
-        #expect(
-            delimiters.contains(
-                TokenDelimiterConcept(
-                    token: "LeftBracket",
-                    role: .prefix,
-                    pairedToken: "RightBracket"
-                )
-            )
-        )
-        #expect(
-            delimiters.contains(
-                TokenDelimiterConcept(
-                    token: "RightBracket",
-                    role: .postfix,
-                    pairedToken: "LeftBracket"
-                )
-            )
-        )
-    }
-
-    @Test("Token metadata reads operator binding ranges")
-    func tokenMetadataReadsOperatorBindingRanges() throws {
-        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
-        let operators = program.declarationGraph.tokenOperatorConcepts
-
-        #expect(
-            operators.contains(
-                TokenOperatorConcept(
-                    token: "Asterisk",
-                    fixity: .infix,
-                    binding: TokenOperatorBindingRange(lower: 70, upper: 80),
-                    step: 10,
-                    delta: -10,
-                    signage: "negative",
-                    associativity: .left
-                )
-            )
-        )
-        #expect(
-            operators.contains(
-                TokenOperatorConcept(
-                    token: "Bang",
-                    fixity: .prefix,
-                    binding: TokenOperatorBindingRange(lower: 90, upper: 100),
-                    step: 10,
-                    delta: -10,
-                    signage: "negative",
-                    associativity: .none
-                )
-            )
-        )
-        #expect(
-            operators.contains(
-                TokenOperatorConcept(
-                    token: "QuestionQuestion",
-                    fixity: .infix,
-                    binding: TokenOperatorBindingRange(lower: 50, upper: 60),
-                    step: 10,
-                    delta: -10,
-                    signage: "negative",
-                    associativity: .right
-                )
-            )
-        )
-        #expect(
-            operators.contains(
-                TokenOperatorConcept(
-                    token: "Plus",
-                    fixity: .infix,
-                    binding: TokenOperatorBindingRange(lower: 60, upper: 70),
-                    step: 10,
-                    delta: -10,
-                    signage: "negative",
-                    associativity: .left
-                )
-            )
-        )
-        #expect(
-            operators.contains(
-                TokenOperatorConcept(
-                    token: "Minus",
-                    fixity: .infix,
-                    binding: TokenOperatorBindingRange(lower: 60, upper: 70),
-                    step: 10,
-                    delta: -10,
-                    signage: "negative",
-                    associativity: .left
-                )
-            )
-        )
-        for comparisonToken in [
-            "BangEqual", "EqualEqual", "Less", "LessEqual", "Greater", "GreaterEqual",
-        ] {
-            #expect(
-                operators.contains(
-                    TokenOperatorConcept(
-                        token: comparisonToken,
-                        fixity: .infix,
-                        binding: TokenOperatorBindingRange(lower: 40, upper: 50),
-                        step: 10,
-                        delta: -10,
-                        signage: "negative",
-                        associativity: .none
-                    )
-                )
-            )
-        }
-        #expect(
-            program.declarationGraph.lexerRepresentationConcepts.contains(
-                LexerRepresentationConcept(
-                    token: "Plus",
-                    pattern: "+",
-                    option: .emit,
-                    delimiter: nil,
-                    operatorBinding: TokenOperatorConcept(
-                        token: "Plus",
-                        fixity: .infix,
-                        binding: TokenOperatorBindingRange(lower: 60, upper: 70),
-                        step: 10,
-                        delta: -10,
-                        signage: "negative",
-                        associativity: .left
-                    )
-                )
-            )
-        )
-        #expect(
-            program.declarationGraph.lexerRepresentationConcepts.contains(
-                LexerRepresentationConcept(
-                    token: "Minus",
-                    pattern: "-",
-                    option: .emit,
-                    delimiter: nil,
-                    operatorBinding: TokenOperatorConcept(
-                        token: "Minus",
-                        fixity: .infix,
-                        binding: TokenOperatorBindingRange(lower: 60, upper: 70),
-                        step: 10,
-                        delta: -10,
-                        signage: "negative",
-                        associativity: .left
-                    )
-                )
-            )
-        )
-    }
-
     @Test("Range formation operators parse as binary expressions")
     func rangeFormationOperatorsParseAsBinaryExpressions() throws {
         var halfOpenParser = try Parser(source: "0..<limit")
@@ -1531,7 +1298,7 @@ struct CompilerFixtureTests {
                     lowerThan: [],
                     assignment: nil,
                     step: 10,
-                    binding: TokenOperatorBindingRange(lower: 50, upper: 60)
+                    binding: OperatorBindingRange(lower: 60, upper: 70)
                 )
             )
         )
@@ -1544,7 +1311,7 @@ struct CompilerFixtureTests {
                     lowerThan: [],
                     assignment: nil,
                     step: 10,
-                    binding: TokenOperatorBindingRange(lower: 60, upper: 70)
+                    binding: OperatorBindingRange(lower: 70, upper: 80)
                 )
             )
         )
@@ -2609,24 +2376,6 @@ struct CompilerFixtureTests {
         }
     }
 
-    @Test("Range runtime hook executes range lexer declaration")
-    func rangeRuntimeHookExecutesRangeLexerDeclaration() throws {
-        let program = try CompilerPipeline().build(
-            inputs: try rangeCoreInputs(),
-            runtimeHooks: [RangeFunctionRuntimeHook(functionName: "rangeLexer")]
-        )
-
-        let result = try #require(
-            program.runtimeHookResults.first { $0.hookName == "range.function.rangeLexer" }
-        )
-        let artifact = try #require(result.artifacts["rangeLexer"])
-
-        #expect(artifact.contains("Lexer("))
-        #expect(artifact.contains("LexerRule("))
-        #expect(artifact.contains("whitespace"))
-        #expect(!artifact.contains("hashAttribute"))
-    }
-
     @Test("FileManager readFile surface validates")
     func fileSystemReadTextSurfaceValidates() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "System/FileManagerReadFile.range")
@@ -2944,10 +2693,6 @@ private func rangeCoreInputs() throws -> [SourceInput] {
         )
         + rangeFiles(
             in: root.appendingPathComponent("Foundation/Macros", isDirectory: true),
-            excludingExploration: true
-        )
-        + rangeFiles(
-            in: root.appendingPathComponent("Lexer", isDirectory: true),
             excludingExploration: true
         )
 

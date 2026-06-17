@@ -31,7 +31,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             in: program.projectParsedFiles,
             closedMacroNames: closedCoreMacroNames
         )
-        try validateLexerRepresentationMetadata(in: program.declarationGraph)
         try validateEnumExtensionCases(in: program.declarationGraph)
         try validatePrimaryDeclarations(in: program.parsedFiles)
         try validateTopLevelStates(in: program.parsedFiles)
@@ -61,64 +60,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                         "Duplicate enum case \(targetName).\(enumCase.name)."
                     )
                 }
-            }
-        }
-    }
-
-    private func validateLexerRepresentationMetadata(in declarationGraph: DeclarationGraph) throws {
-        for declaration in declarationGraph.constructsByName.values {
-            let lexerApplications = declaration.macros.filter { $0.name == "lexer" }
-            guard !lexerApplications.isEmpty else {
-                continue
-            }
-
-            let tokenApplications = declaration.macros.filter { $0.name == "Token" }
-            let delimiterApplications = declaration.macros.filter { $0.name == "Delimiter" }
-            let operatorApplications = declaration.macros.filter { $0.name == "Operator" }
-
-            if tokenApplications.isEmpty {
-                throw SemanticValidationError(
-                    "@lexer requires @Token metadata on \(declaration.name)."
-                )
-            }
-            if tokenApplications.count > 1 {
-                throw SemanticValidationError(
-                    "@lexer found multiple @Token macro metadata on \(declaration.name)."
-                )
-            }
-            if delimiterApplications.count > 1 {
-                throw SemanticValidationError(
-                    "@lexer found multiple @Delimiter macro metadata on \(declaration.name)."
-                )
-            }
-            if operatorApplications.count > 1 {
-                throw SemanticValidationError(
-                    "@lexer found multiple @Operator macro metadata on \(declaration.name)."
-                )
-            }
-            if lexerApplications.count > 1 {
-                throw SemanticValidationError(
-                    "Duplicate @lexer macro on \(declaration.name)."
-                )
-            }
-        }
-
-        for declaration in declarationGraph.constructsByName.values {
-            let operatorApplications = declaration.macros.filter { $0.name == "Operator" }
-            guard !operatorApplications.isEmpty else {
-                continue
-            }
-
-            let tokenApplications = declaration.macros.filter { $0.name == "Token" }
-            if tokenApplications.isEmpty {
-                throw SemanticValidationError(
-                    "@Operator requires @Token metadata on \(declaration.name)."
-                )
-            }
-            if operatorApplications.count > 1 {
-                throw SemanticValidationError(
-                    "Duplicate @Operator macro on \(declaration.name)."
-                )
             }
         }
     }

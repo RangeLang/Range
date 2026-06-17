@@ -1,10 +1,8 @@
 import Foundation
 
-// Bootstrap lexer generated from RangeCompiler/Range/Lexer/*.range.
-// Range lexer source fingerprint: 3041c414bc62e2b2
-// Source of truth: RangeCompiler/Range/Lexer/*.range.
+// Swift token projection for the current compiler lexer.
 
-enum RangeAuthoredTokenKind {
+enum SwiftTokenKind {
     case hash
     case identifier(value: String)
     case foreignBody(language: String, text: String)
@@ -50,7 +48,7 @@ enum RangeAuthoredTokenKind {
 }
 
 extension Lexer {
-    static func convertGenerated(_ token: RangeAuthoredLexicalToken) throws -> LexedToken {
+    static func convertGenerated(_ token: SwiftLexicalToken) throws -> LexedToken {
         let parserToken: Token
         switch token.kind {
         case .hash:
@@ -148,63 +146,63 @@ extension Lexer {
     }
 }
 
-extension RangeAuthoredLexer {
-    static let generatedRules: [RangeAuthoredLexerRule] = [
-        RangeAuthoredLexerRule(
+extension SwiftLexer {
+    static let generatedRules: [SwiftLexerRule] = [
+        SwiftLexerRule(
             name: "whitespace", pattern: "whitespace+", token: "skip", priority: 0),
-        RangeAuthoredLexerRule(name: "leftBrace", pattern: "{", token: "leftBrace", priority: 20),
-        RangeAuthoredLexerRule(name: "rightBrace", pattern: "}", token: "rightBrace", priority: 20),
-        RangeAuthoredLexerRule(name: "leftParen", pattern: "(", token: "leftParen", priority: 20),
-        RangeAuthoredLexerRule(name: "rightParen", pattern: ")", token: "rightParen", priority: 20),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(name: "leftBrace", pattern: "{", token: "leftBrace", priority: 20),
+        SwiftLexerRule(name: "rightBrace", pattern: "}", token: "rightBrace", priority: 20),
+        SwiftLexerRule(name: "leftParen", pattern: "(", token: "leftParen", priority: 20),
+        SwiftLexerRule(name: "rightParen", pattern: ")", token: "rightParen", priority: 20),
+        SwiftLexerRule(
             name: "leftBracket", pattern: "[", token: "leftBracket", priority: 20),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(
             name: "rightBracket", pattern: "]", token: "rightBracket", priority: 20),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(
             name: "dotDotLess", pattern: "..<", token: "dotDotLess", priority: 30),
-        RangeAuthoredLexerRule(name: "ellipsis", pattern: "...", token: "ellipsis", priority: 30),
-        RangeAuthoredLexerRule(name: "dot", pattern: ".", token: "dot", priority: 20),
-        RangeAuthoredLexerRule(name: "arrow", pattern: "->", token: "arrow", priority: 30),
-        RangeAuthoredLexerRule(name: "minus", pattern: "-", token: "minus", priority: 20),
-        RangeAuthoredLexerRule(name: "bangEqual", pattern: "!=", token: "bangEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "bang", pattern: "!", token: "bang", priority: 20),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(name: "ellipsis", pattern: "...", token: "ellipsis", priority: 30),
+        SwiftLexerRule(name: "dot", pattern: ".", token: "dot", priority: 20),
+        SwiftLexerRule(name: "arrow", pattern: "->", token: "arrow", priority: 30),
+        SwiftLexerRule(name: "minus", pattern: "-", token: "minus", priority: 20),
+        SwiftLexerRule(name: "bangEqual", pattern: "!=", token: "bangEqual", priority: 30),
+        SwiftLexerRule(name: "bang", pattern: "!", token: "bang", priority: 20),
+        SwiftLexerRule(
             name: "equalEqual", pattern: "==", token: "equalEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "equal", pattern: "=", token: "equal", priority: 20),
-        RangeAuthoredLexerRule(name: "lessEqual", pattern: "<=", token: "lessEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "less", pattern: "<", token: "less", priority: 20),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(name: "equal", pattern: "=", token: "equal", priority: 20),
+        SwiftLexerRule(name: "lessEqual", pattern: "<=", token: "lessEqual", priority: 30),
+        SwiftLexerRule(name: "less", pattern: "<", token: "less", priority: 20),
+        SwiftLexerRule(
             name: "greaterEqual", pattern: ">=", token: "greaterEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "greater", pattern: ">", token: "greater", priority: 20),
-        RangeAuthoredLexerRule(name: "plusEqual", pattern: "+=", token: "plusEqual", priority: 30),
-        RangeAuthoredLexerRule(name: "plus", pattern: "+", token: "plus", priority: 20),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(name: "greater", pattern: ">", token: "greater", priority: 20),
+        SwiftLexerRule(name: "plusEqual", pattern: "+=", token: "plusEqual", priority: 30),
+        SwiftLexerRule(name: "plus", pattern: "+", token: "plus", priority: 20),
+        SwiftLexerRule(
             name: "questionQuestion", pattern: "??", token: "questionQuestion", priority: 30),
-        RangeAuthoredLexerRule(name: "question", pattern: "?", token: "question", priority: 20),
-        RangeAuthoredLexerRule(name: "andAnd", pattern: "&&", token: "andAnd", priority: 30),
-        RangeAuthoredLexerRule(name: "orOr", pattern: "||", token: "orOr", priority: 30),
-        RangeAuthoredLexerRule(name: "asterisk", pattern: "*", token: "asterisk", priority: 20),
-        RangeAuthoredLexerRule(name: "colon", pattern: ":", token: "colon", priority: 20),
-        RangeAuthoredLexerRule(name: "comma", pattern: ",", token: "comma", priority: 20),
-        RangeAuthoredLexerRule(name: "slash", pattern: "/", token: "slash", priority: 20),
-        RangeAuthoredLexerRule(name: "ampersand", pattern: "&", token: "ampersand", priority: 20),
-        RangeAuthoredLexerRule(name: "dollar", pattern: "$", token: "dollar", priority: 20),
-        RangeAuthoredLexerRule(name: "percent", pattern: "%", token: "percent", priority: 20),
-        RangeAuthoredLexerRule(name: "pipe", pattern: "|", token: "pipe", priority: 20),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(name: "question", pattern: "?", token: "question", priority: 20),
+        SwiftLexerRule(name: "andAnd", pattern: "&&", token: "andAnd", priority: 30),
+        SwiftLexerRule(name: "orOr", pattern: "||", token: "orOr", priority: 30),
+        SwiftLexerRule(name: "asterisk", pattern: "*", token: "asterisk", priority: 20),
+        SwiftLexerRule(name: "colon", pattern: ":", token: "colon", priority: 20),
+        SwiftLexerRule(name: "comma", pattern: ",", token: "comma", priority: 20),
+        SwiftLexerRule(name: "slash", pattern: "/", token: "slash", priority: 20),
+        SwiftLexerRule(name: "ampersand", pattern: "&", token: "ampersand", priority: 20),
+        SwiftLexerRule(name: "dollar", pattern: "$", token: "dollar", priority: 20),
+        SwiftLexerRule(name: "percent", pattern: "%", token: "percent", priority: 20),
+        SwiftLexerRule(name: "pipe", pattern: "|", token: "pipe", priority: 20),
+        SwiftLexerRule(
             name: "stringLiteral", pattern: "quotedString", token: "stringLiteral", priority: 40),
-        RangeAuthoredLexerRule(name: "hash", pattern: "#(", token: "hash", priority: 50),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(name: "hash", pattern: "#(", token: "hash", priority: 50),
+        SwiftLexerRule(
             name: "macroAttribute", pattern: "@identifier", token: "macroAttribute", priority: 40),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(
             name: "escapedIdentifier", pattern: "`identifier`", token: "identifier", priority: 40),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(
             name: "double", pattern: "digits.digits", token: "double", priority: 40),
-        RangeAuthoredLexerRule(name: "integer", pattern: "digits", token: "integer", priority: 30),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(name: "integer", pattern: "digits", token: "integer", priority: 30),
+        SwiftLexerRule(
             name: "keyword", pattern: "keywordIdentifier", token: "keyword", priority: 40),
-        RangeAuthoredLexerRule(
+        SwiftLexerRule(
             name: "identifier", pattern: "identifier", token: "identifier", priority: 30),
-        RangeAuthoredLexerRule(name: "eof", pattern: "end", token: "eof", priority: 0),
+        SwiftLexerRule(name: "eof", pattern: "end", token: "eof", priority: 0),
     ]
 }

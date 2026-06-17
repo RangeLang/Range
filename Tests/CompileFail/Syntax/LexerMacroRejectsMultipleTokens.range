@@ -1,5 +1,0 @@
-@Token(pattern: "a")
-@Token(pattern: "b")
-@lexer<.emit>
-construct DuplicateLexerToken {
-}

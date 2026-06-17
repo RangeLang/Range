@@ -100,7 +100,6 @@ function countApplications(graph: RangeGraph): Int {
             graph: RangeGraph(
                 files: [tree],
                 sources: [],
-                lexedSources: [],
                 artifacts: [],
                 topology: RangeGraphTopology(
                     nodes: [

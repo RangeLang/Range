@@ -1,4 +1,0 @@
-@syntax
-construct Token {
-    let pattern: String
-}
