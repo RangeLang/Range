@@ -45,6 +45,6 @@ open macro splice(@spliced syntax: @syntax): @syntax { target, diagnostics in
     return syntax
 }
 
-open macro map(collection: @syntax, @spliced syntax: @syntax): @syntax { target, diagnostics in
+open macro map<T>(collection: Array<T>, @spliced syntax: @syntax): @syntax { target, diagnostics in
     return syntax
 }
