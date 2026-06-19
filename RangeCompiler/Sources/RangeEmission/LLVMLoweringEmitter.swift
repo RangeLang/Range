@@ -57,7 +57,7 @@ struct LLVMLoweringEmitter {
                     stringTable.requireStringType()
                 case .intArray:
                     stringTable.requireIntArrayType()
-                case .int, .bool, .float, .construct:
+                case .int(_, _), .bool, .float, .construct:
                     break
                 }
             }
@@ -158,8 +158,8 @@ struct LLVMLoweringEmitter {
 private extension LLVMLowerability.ScalarType {
     var llvmType: String {
         switch self {
-        case .int:
-            return "i64"
+        case .int(let bits, _):
+            return "i\(bits)"
         case .bool:
             return "i1"
         case .float:
@@ -172,6 +172,27 @@ private extension LLVMLowerability.ScalarType {
             return LLVMLoweringEmitter.constructTypeName(identity: identity, name: name)
         }
     }
+
+    var isInteger: Bool {
+        if case .int(_, _) = self {
+            return true
+        }
+        return false
+    }
+
+    var isSignedInteger: Bool? {
+        guard case .int(_, let signed) = self else {
+            return nil
+        }
+        return signed
+    }
+}
+
+private func isLLVMIntegerType(_ type: String) -> Bool {
+    guard type.first == "i", type.count > 1 else {
+        return false
+    }
+    return Int(type.dropFirst()) != nil
 }
 
 private extension LLVMLowerability.ScalarSignature {
@@ -338,6 +359,13 @@ private struct LLVMFunctionEmitter {
     private struct Value {
         let type: String
         let representation: String
+        let scalarType: ScalarType?
+
+        init(type: String, representation: String, scalarType: ScalarType? = nil) {
+            self.type = type
+            self.representation = representation
+            self.scalarType = scalarType
+        }
     }
 
     private var symbols: [String: Symbol]
@@ -502,7 +530,11 @@ private struct LLVMFunctionEmitter {
 
         let currentRegister = freshRegister()
         emit("\(currentRegister) = load \(type.llvmType), ptr \(pointer)")
-        let currentValue = Value(type: type.llvmType, representation: currentRegister)
+        let currentValue = Value(
+            type: type.llvmType,
+            representation: currentRegister,
+            scalarType: type
+        )
         let rhsValue = try emitExpression(expression)
         let sum = try emitBinaryExpression(
             lhsValue: currentValue,
@@ -675,11 +707,11 @@ private struct LLVMFunctionEmitter {
     private mutating func emitExpression(_ expression: RangeCompiler.Expression) throws -> Value {
         switch expression {
         case .integer(let value):
-            return Value(type: "i64", representation: String(value))
+            return Value(type: "i64", representation: String(value), scalarType: .defaultInt)
         case .double(let value):
-            return Value(type: "double", representation: llvmDoubleLiteral(value))
+            return Value(type: "double", representation: llvmDoubleLiteral(value), scalarType: .float)
         case .boolean(let value):
-            return Value(type: "i1", representation: value ? "1" : "0")
+            return Value(type: "i1", representation: value ? "1" : "0", scalarType: .bool)
         case .string(let value):
             let name = stringTable.constantName(for: value)
             let byteCount = value.utf8.count
@@ -691,7 +723,7 @@ private struct LLVMFunctionEmitter {
             emit("\(storageRegister) = insertvalue %Range.String undef, ptr \(pointerRegister), 0")
             let countRegister = freshRegister()
             emit("\(countRegister) = insertvalue %Range.String \(storageRegister), i64 \(byteCount), 1")
-            return Value(type: "%Range.String", representation: countRegister)
+            return Value(type: "%Range.String", representation: countRegister, scalarType: .string)
         case .identifier(let name):
             if let member = try emitLowerableMemberAccess(name: name) {
                 return member
@@ -701,11 +733,11 @@ private struct LLVMFunctionEmitter {
             }
             switch symbol {
             case .parameter(let type):
-                return Value(type: type.llvmType, representation: "%\(name)")
+                return Value(type: type.llvmType, representation: "%\(name)", scalarType: type)
             case .stackSlot(let pointer, let type, _, _):
                 let register = freshRegister()
                 emit("\(register) = load \(type.llvmType), ptr \(pointer)")
-                return Value(type: type.llvmType, representation: register)
+                return Value(type: type.llvmType, representation: register, scalarType: type)
             }
         case .unary(.not, let expression):
             let value = try emitExpression(expression)
@@ -714,7 +746,7 @@ private struct LLVMFunctionEmitter {
             }
             let register = freshRegister()
             emit("\(register) = xor i1 \(value.representation), true")
-            return Value(type: "i1", representation: register)
+            return Value(type: "i1", representation: register, scalarType: .bool)
         case .binary(let lhs, let operatorSymbol, let rhs):
             let lhsValue = try emitExpression(lhs)
             let rhsValue = try emitExpression(rhs)
@@ -737,7 +769,11 @@ private struct LLVMFunctionEmitter {
             emit(
                 "\(register) = select i1 \(conditionValue.representation), \(resultType) \(convertedTrue.representation), \(resultType) \(convertedFalse.representation)"
             )
-            return Value(type: resultType, representation: register)
+            return Value(
+                type: resultType,
+                representation: register,
+                scalarType: scalarType(forLLVMType: resultType)
+            )
         case .call(let name, let arguments):
             if let allocation = try emitLowerableIntArrayAllocation(
                 name: name,
@@ -780,7 +816,11 @@ private struct LLVMFunctionEmitter {
             emit(
                 "\(register) = call \(callable.signature.returnType.llvmType) @\(callable.symbolName)(\(argumentsText))"
             )
-            return Value(type: callable.signature.returnType.llvmType, representation: register)
+            return Value(
+                type: callable.signature.returnType.llvmType,
+                representation: register,
+                scalarType: callable.signature.returnType
+            )
         default:
             throw LLVMLoweringError("LLVM lowering does not support expression \(expression).")
         }
@@ -799,7 +839,11 @@ private struct LLVMFunctionEmitter {
             emit(
                 "\(register) = extractvalue \(base.type) \(base.representation), \(constructField.index)"
             )
-            return Value(type: constructField.type.llvmType, representation: register)
+            return Value(
+                type: constructField.type.llvmType,
+                representation: register,
+                scalarType: constructField.type
+            )
         }
         guard base.type == "%Range.String" || base.type == "%Range.IntArray" else {
             return nil
@@ -812,9 +856,9 @@ private struct LLVMFunctionEmitter {
         emit("\(countRegister) = extractvalue \(base.type) \(base.representation), 1")
         switch member {
         case .count:
-            return Value(type: "i64", representation: countRegister)
+            return Value(type: "i64", representation: countRegister, scalarType: .defaultInt)
         case .byteCount:
-            return Value(type: "i64", representation: countRegister)
+            return Value(type: "i64", representation: countRegister, scalarType: .defaultInt)
         case .element:
             return nil
         case .append:
@@ -826,7 +870,7 @@ private struct LLVMFunctionEmitter {
         case .isEmpty:
             let resultRegister = freshRegister()
             emit("\(resultRegister) = icmp eq i64 \(countRegister), 0")
-            return Value(type: "i1", representation: resultRegister)
+            return Value(type: "i1", representation: resultRegister, scalarType: .bool)
         }
     }
 
@@ -857,7 +901,8 @@ private struct LLVMFunctionEmitter {
         }
         return Value(
             type: ScalarType.construct(identity: layout.identity, name: layout.name).llvmType,
-            representation: current
+            representation: current,
+            scalarType: .construct(identity: layout.identity, name: layout.name)
         )
     }
 
@@ -900,7 +945,7 @@ private struct LLVMFunctionEmitter {
         )
         let valueRegister = freshRegister()
         emit("\(valueRegister) = load i64, ptr \(elementPointerRegister)")
-        return Value(type: "i64", representation: valueRegister)
+        return Value(type: "i64", representation: valueRegister, scalarType: .defaultInt)
     }
 
     private mutating func emitLowerableIntArrayAllocation(
@@ -924,7 +969,7 @@ private struct LLVMFunctionEmitter {
             emit(
                 "\(capacityValueRegister) = insertvalue %Range.IntArray \(countValueRegister), i64 0, 2"
             )
-            return Value(type: "%Range.IntArray", representation: capacityValueRegister)
+            return Value(type: "%Range.IntArray", representation: capacityValueRegister, scalarType: .intArray)
         }
         guard arguments.count == 1 else {
             throw LLVMLoweringError("LLVM intArray allocation expects one capacity argument.")
@@ -957,7 +1002,7 @@ private struct LLVMFunctionEmitter {
         emit(
             "\(capacityValueRegister) = insertvalue %Range.IntArray \(countValueRegister), i64 \(capacity.representation), 2"
         )
-        return Value(type: "%Range.IntArray", representation: capacityValueRegister)
+        return Value(type: "%Range.IntArray", representation: capacityValueRegister, scalarType: .intArray)
     }
 
     private mutating func emitLowerableSideEffectExpression(
@@ -1027,7 +1072,11 @@ private struct LLVMFunctionEmitter {
         emitLabel(appendLabel)
         let currentArrayRegister = freshRegister()
         emit("\(currentArrayRegister) = load %Range.IntArray, ptr \(base.pointer)")
-        let currentArray = Value(type: "%Range.IntArray", representation: currentArrayRegister)
+        let currentArray = Value(
+            type: "%Range.IntArray",
+            representation: currentArrayRegister,
+            scalarType: .intArray
+        )
         let currentCountRegister = freshRegister()
         emit("\(currentCountRegister) = extractvalue %Range.IntArray \(currentArray.representation), 1")
         let pointerRegister = freshRegister()
@@ -1102,7 +1151,7 @@ private struct LLVMFunctionEmitter {
         emit(
             "\(capacityArrayRegister) = insertvalue %Range.IntArray \(pointerArrayRegister), i64 \(newCapacityRegister), 2"
         )
-        return Value(type: "%Range.IntArray", representation: capacityArrayRegister)
+        return Value(type: "%Range.IntArray", representation: capacityArrayRegister, scalarType: .intArray)
     }
 
     private mutating func emitLowerableIntArrayUpdate(
@@ -1219,7 +1268,7 @@ private struct LLVMFunctionEmitter {
         }
         let register = freshRegister()
         emit("\(register) = load %Range.IntArray, ptr \(pointer)")
-        return (pointer, Value(type: "%Range.IntArray", representation: register))
+        return (pointer, Value(type: "%Range.IntArray", representation: register, scalarType: .intArray))
     }
 
     private func argumentValue(
@@ -1263,11 +1312,11 @@ private struct LLVMFunctionEmitter {
         }
         switch symbol {
         case .parameter(let type):
-            return Value(type: type.llvmType, representation: "%\(name)")
+            return Value(type: type.llvmType, representation: "%\(name)", scalarType: type)
         case .stackSlot(let pointer, let type, _, _):
             let register = freshRegister()
             emit("\(register) = load \(type.llvmType), ptr \(pointer)")
-            return Value(type: type.llvmType, representation: register)
+            return Value(type: type.llvmType, representation: register, scalarType: type)
         }
     }
 
@@ -1357,24 +1406,28 @@ private struct LLVMFunctionEmitter {
     ) throws -> Value {
         let instruction = try llvmInstruction(
             for: operatorSymbol,
-            lhsType: lhsValue.type,
-            rhsType: rhsValue.type
+            lhsValue: lhsValue,
+            rhsValue: rhsValue
         )
-        let convertedLHS = try convert(value: lhsValue, toLLVMType: instruction.operandType)
-        let convertedRHS = try convert(value: rhsValue, toLLVMType: instruction.operandType)
+        let convertedLHS = try convert(lhsValue, to: instruction.operandScalarType)
+        let convertedRHS = try convert(rhsValue, to: instruction.operandScalarType)
         let register = freshRegister()
         emit(
             "\(register) = \(instruction.mnemonic) \(instruction.operandType) \(convertedLHS.representation), \(convertedRHS.representation)"
         )
-        return Value(type: instruction.resultType, representation: register)
+        return Value(
+            type: instruction.resultType,
+            representation: register,
+            scalarType: instruction.resultScalarType
+        )
     }
 
     private func ternaryLLVMType(_ lhsType: String, _ rhsType: String) throws -> String {
         if lhsType == rhsType {
             return lhsType
         }
-        if (lhsType == "i64" && rhsType == "double")
-            || (lhsType == "double" && rhsType == "i64")
+        if (isLLVMIntegerType(lhsType) && rhsType == "double")
+            || (lhsType == "double" && isLLVMIntegerType(rhsType))
         {
             return "double"
         }
@@ -1382,19 +1435,87 @@ private struct LLVMFunctionEmitter {
     }
 
     private mutating func convert(_ value: Value, to scalarType: ScalarType) throws -> Value {
-        try convert(value: value, toLLVMType: scalarType.llvmType)
+        if value.scalarType == scalarType, value.type == scalarType.llvmType {
+            return value
+        }
+        if case .int(let actualBits, let actualSigned) = value.scalarType,
+            case .int(let expectedBits, _) = scalarType
+        {
+            if actualBits == expectedBits {
+                return Value(
+                    type: scalarType.llvmType,
+                    representation: value.representation,
+                    scalarType: scalarType
+                )
+            }
+            let register = freshRegister()
+            if actualBits < expectedBits {
+                emit(
+                    "\(register) = \(actualSigned ? "sext" : "zext") \(value.type) \(value.representation) to \(scalarType.llvmType)"
+                )
+            } else {
+                emit(
+                    "\(register) = trunc \(value.type) \(value.representation) to \(scalarType.llvmType)"
+                )
+            }
+            return Value(type: scalarType.llvmType, representation: register, scalarType: scalarType)
+        }
+        if value.scalarType?.isInteger == true, scalarType == .float {
+            let register = freshRegister()
+            let mnemonic = value.scalarType?.isSignedInteger == false ? "uitofp" : "sitofp"
+            emit("\(register) = \(mnemonic) \(value.type) \(value.representation) to double")
+            return Value(type: "double", representation: register, scalarType: .float)
+        }
+        return try convert(value: value, toLLVMType: scalarType.llvmType)
     }
 
     private mutating func convert(value: Value, toLLVMType llvmType: String) throws -> Value {
         if value.type == llvmType {
             return value
         }
-        if value.type == "i64", llvmType == "double" {
+        if value.scalarType?.isInteger == true, llvmType == "double" {
             let register = freshRegister()
-            emit("\(register) = sitofp i64 \(value.representation) to double")
-            return Value(type: "double", representation: register)
+            let mnemonic = value.scalarType?.isSignedInteger == false ? "uitofp" : "sitofp"
+            emit("\(register) = \(mnemonic) \(value.type) \(value.representation) to double")
+            return Value(type: "double", representation: register, scalarType: .float)
         }
         return value
+    }
+
+    private func scalarType(forLLVMType llvmType: String) -> ScalarType? {
+        if llvmType == "double" {
+            return .float
+        }
+        if llvmType == "i1" {
+            return .bool
+        }
+        guard isLLVMIntegerType(llvmType),
+            let bits = Int(llvmType.dropFirst())
+        else {
+            return nil
+        }
+        return .int(bits: bits, signed: true)
+    }
+
+    private func commonIntegerScalarType(_ lhs: Value, _ rhs: Value) -> ScalarType? {
+        guard case .int(let lhsBits, let lhsSigned) = lhs.scalarType,
+            case .int(let rhsBits, let rhsSigned) = rhs.scalarType
+        else {
+            return nil
+        }
+        if lhs.scalarType == .defaultInt, Int(lhs.representation) != nil {
+            return rhs.scalarType
+        }
+        if rhs.scalarType == .defaultInt, Int(rhs.representation) != nil {
+            return lhs.scalarType
+        }
+        if lhsBits == rhsBits {
+            return .int(bits: lhsBits, signed: lhsSigned && rhsSigned)
+        }
+        if lhsBits > rhsBits {
+            return lhs.scalarType
+        }
+        return rhs.scalarType
     }
 
     private func switchCaseLiteral(_ pattern: SwitchCasePattern, subjectType: String) throws -> String {
@@ -1402,10 +1523,10 @@ private struct LLVMFunctionEmitter {
             throw LLVMLoweringError("LLVM switch only supports literal expression cases.")
         }
 
-        switch (subjectType, expression) {
-        case ("i64", .integer(let value)):
+        switch expression {
+        case .integer(let value) where isLLVMIntegerType(subjectType):
             return String(value)
-        case ("i1", .boolean(let value)):
+        case .boolean(let value) where subjectType == "i1":
             return value ? "1" : "0"
         default:
             throw LLVMLoweringError("LLVM switch case literal must match the switch subject.")
@@ -1414,56 +1535,77 @@ private struct LLVMFunctionEmitter {
 
     private func llvmInstruction(
         for operatorSymbol: BinaryOperator,
-        lhsType: String,
-        rhsType: String
+        lhsValue: Value,
+        rhsValue: Value
     ) throws -> (
-        mnemonic: String, operandType: String, resultType: String
+        mnemonic: String,
+        operandType: String,
+        operandScalarType: ScalarType,
+        resultType: String,
+        resultScalarType: ScalarType
     ) {
+        let lhsType = lhsValue.type
+        let rhsType = rhsValue.type
         switch operatorSymbol {
         case .addition, .subtraction, .multiplication, .division:
             if lhsType == "double" || rhsType == "double" {
-                return (floatArithmeticMnemonic(for: operatorSymbol), "double", "double")
+                return (floatArithmeticMnemonic(for: operatorSymbol), "double", .float, "double", .float)
             }
-            guard lhsType == "i64", rhsType == "i64" else {
+            guard let intType = commonIntegerScalarType(lhsValue, rhsValue) else {
                 throw LLVMLoweringError(
                     "LLVM \(operatorSymbol.rawValue) operands must be numeric.")
             }
-            return (intArithmeticMnemonic(for: operatorSymbol), "i64", "i64")
+            return (
+                intArithmeticMnemonic(for: operatorSymbol, signed: intType.isSignedInteger != false),
+                intType.llvmType,
+                intType,
+                intType.llvmType,
+                intType
+            )
         case .remainder:
-            guard lhsType == "i64", rhsType == "i64" else {
-                throw LLVMLoweringError("LLVM % operands must be i64.")
+            guard let intType = commonIntegerScalarType(lhsValue, rhsValue) else {
+                throw LLVMLoweringError("LLVM % operands must be integer.")
             }
-            return ("srem", "i64", "i64")
+            return (intType.isSignedInteger == false ? "urem" : "srem", intType.llvmType, intType, intType.llvmType, intType)
         case .equal, .notEqual:
             if lhsType == "double" || rhsType == "double" {
-                return (floatComparisonMnemonic(for: operatorSymbol), "double", "i1")
+                return (floatComparisonMnemonic(for: operatorSymbol), "double", .float, "i1", .bool)
             }
-            if lhsType == "i64", rhsType == "i64" {
-                return (intComparisonMnemonic(for: operatorSymbol), "i64", "i1")
+            if let intType = commonIntegerScalarType(lhsValue, rhsValue) {
+                return (intComparisonMnemonic(for: operatorSymbol, signed: true), intType.llvmType, intType, "i1", .bool)
             }
             if lhsType == "i1", rhsType == "i1" {
-                return (intComparisonMnemonic(for: operatorSymbol), "i1", "i1")
+                return (intComparisonMnemonic(for: operatorSymbol, signed: true), "i1", .bool, "i1", .bool)
             }
             throw LLVMLoweringError("LLVM \(operatorSymbol.rawValue) operands must match.")
         case .less, .lessEqual, .greater, .greaterEqual:
             if lhsType == "double" || rhsType == "double" {
-                return (floatComparisonMnemonic(for: operatorSymbol), "double", "i1")
+                return (floatComparisonMnemonic(for: operatorSymbol), "double", .float, "i1", .bool)
             }
-            guard lhsType == "i64", rhsType == "i64" else {
+            guard let intType = commonIntegerScalarType(lhsValue, rhsValue) else {
                 throw LLVMLoweringError(
                     "LLVM \(operatorSymbol.rawValue) operands must be numeric.")
             }
-            return (intComparisonMnemonic(for: operatorSymbol), "i64", "i1")
+            return (
+                intComparisonMnemonic(
+                    for: operatorSymbol,
+                    signed: intType.isSignedInteger != false
+                ),
+                intType.llvmType,
+                intType,
+                "i1",
+                .bool
+            )
         case .and:
             guard lhsType == "i1", rhsType == "i1" else {
                 throw LLVMLoweringError("LLVM && operands must be i1.")
             }
-            return ("and", "i1", "i1")
+            return ("and", "i1", .bool, "i1", .bool)
         case .or:
             guard lhsType == "i1", rhsType == "i1" else {
                 throw LLVMLoweringError("LLVM || operands must be i1.")
             }
-            return ("or", "i1", "i1")
+            return ("or", "i1", .bool, "i1", .bool)
         case .nilCoalescing:
             throw LLVMLoweringError(
                 "LLVM lowering does not support operator '\(operatorSymbol.rawValue)' yet.")
@@ -1473,7 +1615,7 @@ private struct LLVMFunctionEmitter {
         }
     }
 
-    private func intArithmeticMnemonic(for operatorSymbol: BinaryOperator) -> String {
+    private func intArithmeticMnemonic(for operatorSymbol: BinaryOperator, signed: Bool) -> String {
         switch operatorSymbol {
         case .addition:
             return "add"
@@ -1482,7 +1624,7 @@ private struct LLVMFunctionEmitter {
         case .multiplication:
             return "mul"
         case .division:
-            return "sdiv"
+            return signed ? "sdiv" : "udiv"
         default:
             return ""
         }
@@ -1503,20 +1645,20 @@ private struct LLVMFunctionEmitter {
         }
     }
 
-    private func intComparisonMnemonic(for operatorSymbol: BinaryOperator) -> String {
+    private func intComparisonMnemonic(for operatorSymbol: BinaryOperator, signed: Bool) -> String {
         switch operatorSymbol {
         case .equal:
             return "icmp eq"
         case .notEqual:
             return "icmp ne"
         case .less:
-            return "icmp slt"
+            return signed ? "icmp slt" : "icmp ult"
         case .lessEqual:
-            return "icmp sle"
+            return signed ? "icmp sle" : "icmp ule"
         case .greater:
-            return "icmp sgt"
+            return signed ? "icmp sgt" : "icmp ugt"
         case .greaterEqual:
-            return "icmp sge"
+            return signed ? "icmp sge" : "icmp uge"
         default:
             return ""
         }

@@ -1721,8 +1721,8 @@ struct SwiftBackendEmitter {
 
     private func swiftLLVMBridgeType(for type: LLVMLowerability.ScalarType) -> String {
         switch type {
-        case .int:
-            return "Int64"
+        case .int(_, _):
+            return type.swiftBridgeTypeName ?? "Int64"
         case .bool:
             return "Bool"
         case .float:
@@ -4391,8 +4391,8 @@ struct SwiftBackendEmitter {
     ) throws -> String {
         let rendered = try emitExpression(expression, scope: scope)
         switch type {
-        case .int:
-            return "Int64(\(rendered))"
+        case .int(_, _):
+            return "\(type.swiftBridgeTypeName ?? "Int64")(\(rendered))"
         case .bool:
             return rendered
         case .float:
@@ -4411,7 +4411,7 @@ struct SwiftBackendEmitter {
         type: LLVMLowerability.ScalarType
     ) -> String {
         switch type {
-        case .int:
+        case .int(_, _):
             return "Int(\(call))"
         case .bool:
             return call
@@ -4640,8 +4640,11 @@ struct SwiftBackendEmitter {
 private extension LLVMLowerability.ScalarType {
     var displayName: String {
         switch self {
-        case .int:
-            return "Int"
+        case .int(let bits, let signed):
+            if bits == 64, signed {
+                return "Int"
+            }
+            return "Int<\(bits)\(signed ? "" : ", .unsigned")>"
         case .bool:
             return "Bool"
         case .float:
@@ -4657,7 +4660,9 @@ private extension LLVMLowerability.ScalarType {
 
     var isSwiftBridgeableParameter: Bool {
         switch self {
-        case .int, .bool, .float, .string, .intArray:
+        case .int(_, _):
+            return swiftBridgeTypeName != nil
+        case .bool, .float, .string, .intArray:
             return true
         case .construct:
             return false
@@ -4666,10 +4671,38 @@ private extension LLVMLowerability.ScalarType {
 
     var isSwiftBridgeableReturn: Bool {
         switch self {
-        case .int, .bool, .float, .string:
+        case .int(_, _):
+            return swiftBridgeTypeName != nil
+        case .bool, .float, .string:
             return true
         case .intArray, .construct:
             return false
+        }
+    }
+
+    var swiftBridgeTypeName: String? {
+        guard case .int(let bits, let signed) = self else {
+            return nil
+        }
+        switch (bits, signed) {
+        case (8, true):
+            return "Int8"
+        case (8, false):
+            return "UInt8"
+        case (16, true):
+            return "Int16"
+        case (16, false):
+            return "UInt16"
+        case (32, true):
+            return "Int32"
+        case (32, false):
+            return "UInt32"
+        case (64, true):
+            return "Int64"
+        case (64, false):
+            return "UInt64"
+        default:
+            return nil
         }
     }
 }

@@ -25,7 +25,7 @@ enum LLVMLowerability {
     }
 
     enum ScalarType: Equatable {
-        case int
+        case int(bits: Int, signed: Bool)
         case bool
         case float
         case string
@@ -35,7 +35,12 @@ enum LLVMLowerability {
         init?(typeReference: TypeReference, constructLayouts: [String: ConstructLayout] = [:]) {
             switch typeReference {
             case .named("Int"):
-                self = .int
+                self = .defaultInt
+            case .generic(let base, let arguments) where base == .named("Int"):
+                guard let type = Self.intType(arguments: arguments) else {
+                    return nil
+                }
+                self = type
             case .named("Bool"):
                 self = .bool
             case .named("Float"):
@@ -52,10 +57,48 @@ enum LLVMLowerability {
                     self = .construct(identity: layout.identity, name: layout.name)
                     return
                 }
+                if let type = Self.intType(displayName: name) {
+                    self = type
+                    return
+                }
                 return nil
             case .member, .generic, .array, .function, .optional, .variadic:
                 return nil
             }
+        }
+
+        static let defaultInt = ScalarType.int(bits: 64, signed: true)
+
+        static func intType(arguments: [TypeReference]) -> ScalarType? {
+            guard let bitsArgument = arguments.first,
+                let bits = Int(bitsArgument.displayName),
+                bits > 0
+            else {
+                return nil
+            }
+            let signed = !arguments.dropFirst().contains {
+                $0.displayName == ".unsigned" || $0.displayName.hasSuffix(".unsigned")
+                    || $0.displayName == "unsigned"
+            }
+            return .int(bits: bits, signed: signed)
+        }
+
+        static func intType(displayName: String) -> ScalarType? {
+            guard displayName.hasPrefix("Int<"), displayName.hasSuffix(">") else {
+                return nil
+            }
+            let start = displayName.index(displayName.startIndex, offsetBy: 4)
+            let end = displayName.index(before: displayName.endIndex)
+            let arguments = displayName[start..<end].split(separator: ",").map {
+                $0.trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            guard let bitsText = arguments.first, let bits = Int(bitsText), bits > 0 else {
+                return nil
+            }
+            let signed = !arguments.dropFirst().contains {
+                $0 == ".unsigned" || $0.hasSuffix(".unsigned") || $0 == "unsigned"
+            }
+            return .int(bits: bits, signed: signed)
         }
     }
 
@@ -145,7 +188,7 @@ enum LLVMLowerability {
     ) -> ScalarType? {
         switch TypeReference.named(typeName) {
         case .named("Int"):
-            return .int
+            return .defaultInt
         case .named("Bool"):
             return .bool
         case .named("Float"):
@@ -153,6 +196,9 @@ enum LLVMLowerability {
         case .named("String"):
             return .string
         default:
+            if let intType = ScalarType.intType(displayName: typeName) {
+                return intType
+            }
             guard let identities = identitiesByName[typeName],
                 identities.count == 1,
                 let identity = identities.first,
@@ -171,7 +217,7 @@ enum LLVMLowerability {
     ) -> Bool {
         let signatures = Dictionary(
             uniqueKeysWithValues: lowerableFunctionNames.map {
-                ($0, ScalarSignature(parameters: [], returnType: .int))
+                ($0, ScalarSignature(parameters: [], returnType: .defaultInt))
             }
         )
         return canLower(
@@ -783,7 +829,7 @@ enum LLVMLowerability {
             case .conditional(let branches):
                 guard canLowerConditional(
                     branches,
-                    returnType: .int,
+                    returnType: .defaultInt,
                     locals: locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures
                 ) else {
@@ -794,7 +840,7 @@ enum LLVMLowerability {
                     expression: expression,
                     cases: cases,
                     defaultBody: defaultBody,
-                    returnType: .int,
+                    returnType: .defaultInt,
                     locals: locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures
                 ) else {
@@ -858,7 +904,7 @@ enum LLVMLowerability {
                 lowerableFunctionSignatures: lowerableFunctionSignatures
             )
         }
-        guard subjectType == .int || subjectType == .bool else {
+        guard subjectType.isInteger || subjectType == .bool else {
             return "switch subject \(subjectType) is not Int or Bool"
         }
         guard !cases.isEmpty else {
@@ -957,7 +1003,7 @@ enum LLVMLowerability {
         }
 
         switch (subjectType, expression) {
-        case (.int, .integer(let value)):
+        case (.int(_, _), .integer(let value)):
             return String(value)
         case (.bool, .boolean(let value)):
             return value ? "1" : "0"
@@ -1110,7 +1156,7 @@ enum LLVMLowerability {
     ) -> ScalarType? {
         switch expression {
         case .integer:
-            return .int
+            return .defaultInt
         case .double:
             return .float
         case .boolean:
@@ -1234,7 +1280,13 @@ enum LLVMLowerability {
         guard let actual else {
             return false
         }
-        return actual == expected || (actual == .int && expected == .float)
+        if actual == expected {
+            return true
+        }
+        if actual.isInteger, expected.isInteger {
+            return true
+        }
+        return actual.isInteger && expected == .float
     }
 
     private static func lowerableIntArrayAllocation(
@@ -1263,7 +1315,7 @@ enum LLVMLowerability {
                 lowerableFunctionSignatures: lowerableFunctionSignatures,
                 constructLayouts: constructLayouts
             ),
-            to: .int
+            to: .defaultInt
         )
     }
 
@@ -1423,11 +1475,11 @@ enum LLVMLowerability {
     private static func resultType(for member: LowerableMember) -> ScalarType {
         switch member {
         case .count:
-            return .int
+            return .defaultInt
         case .byteCount:
-            return .int
+            return .defaultInt
         case .element:
-            return .int
+            return .defaultInt
         case .isEmpty:
             return .bool
         case .append:
@@ -1435,7 +1487,7 @@ enum LLVMLowerability {
         case .update:
             return .intArray
         case .field:
-            return .int
+            return .defaultInt
         }
     }
 
@@ -1474,7 +1526,7 @@ enum LLVMLowerability {
                             lowerableFunctionSignatures: lowerableFunctionSignatures
                         )
                     },
-                    to: .int
+                    to: .defaultInt
                 )
             else {
                 return nil
@@ -1487,7 +1539,7 @@ enum LLVMLowerability {
                         locals: locals,
                         lowerableFunctionSignatures: lowerableFunctionSignatures
                     ),
-                    to: .int
+                    to: .defaultInt
                 )
             else {
                 return nil
@@ -1502,7 +1554,7 @@ enum LLVMLowerability {
                             lowerableFunctionSignatures: lowerableFunctionSignatures
                         )
                     },
-                    to: .int
+                    to: .defaultInt
                 ),
                 canConvert(
                     argumentValue(labeled: "index", at: 1, in: arguments).flatMap {
@@ -1512,7 +1564,7 @@ enum LLVMLowerability {
                             lowerableFunctionSignatures: lowerableFunctionSignatures
                         )
                     },
-                    to: .int
+                    to: .defaultInt
                 )
             else {
                 return nil
@@ -1564,7 +1616,10 @@ enum LLVMLowerability {
             return lhs
         }
         if lhs.isNumeric, rhs.isNumeric {
-            return lhs == .float || rhs == .float ? .float : .int
+            if lhs == .float || rhs == .float {
+                return .float
+            }
+            return commonIntegerType(lhs, rhs)
         }
         return nil
     }
@@ -1579,9 +1634,12 @@ enum LLVMLowerability {
             guard lhs.isNumeric, rhs.isNumeric else {
                 return nil
             }
-            return lhs == .float || rhs == .float ? .float : .int
+            if lhs == .float || rhs == .float {
+                return .float
+            }
+            return commonIntegerType(lhs, rhs)
         case .remainder:
-            return lhs == .int && rhs == .int ? .int : nil
+            return commonIntegerType(lhs, rhs)
         case .equal, .notEqual:
             if lhs == rhs, lhs != .string {
                 return .bool
@@ -1602,7 +1660,7 @@ enum LLVMLowerability {
 private extension LLVMLowerability.ScalarType {
     var isNumeric: Bool {
         switch self {
-        case .int, .float:
+        case .int(_, _), .float:
             return true
         case .bool, .string, .intArray:
             return false
@@ -1610,4 +1668,43 @@ private extension LLVMLowerability.ScalarType {
             return false
         }
     }
+
+    var isInteger: Bool {
+        if case .int(_, _) = self {
+            return true
+        }
+        return false
+    }
+
+    var integerWidth: Int? {
+        guard case .int(let bits, _) = self else {
+            return nil
+        }
+        return bits
+    }
+
+    var isSignedInteger: Bool? {
+        guard case .int(_, let signed) = self else {
+            return nil
+        }
+        return signed
+    }
+}
+
+private func commonIntegerType(
+    _ lhs: LLVMLowerability.ScalarType,
+    _ rhs: LLVMLowerability.ScalarType
+) -> LLVMLowerability.ScalarType? {
+    guard case .int(let lhsBits, let lhsSigned) = lhs,
+        case .int(let rhsBits, let rhsSigned) = rhs
+    else {
+        return nil
+    }
+    if lhsBits == rhsBits {
+        return .int(bits: lhsBits, signed: lhsSigned && rhsSigned)
+    }
+    if lhsBits > rhsBits {
+        return lhs
+    }
+    return rhs
 }

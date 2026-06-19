@@ -1,0 +1,11 @@
+macro addable(): Construct { target, diagnostics in
+    let additions: Array<Function.Declaration>(
+        target.declaration.functions.filter { function in
+            return function.identifier.name == "+"
+        }
+    )
+
+    if additions.count == 0 {
+        diagnostics.error("@addable requires a function identified as + to be declared.")
+    }
+}

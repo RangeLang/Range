@@ -5,17 +5,20 @@ struct MacroTargetValueBuilder {
     let macroMetadataByName: [String: MacroMetadataDeclaration]
     let writtenSyntaxByID: [String: CompileTimeValue]
     let knownObjectTypeNames: Set<String>
+    let extensionsByTargetName: [String: [ExtensionDeclaration]]
 
     init(
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroMetadataByName: [String: MacroMetadataDeclaration] = [:],
         writtenSyntaxByID: [String: CompileTimeValue] = [:],
-        knownObjectTypeNames: Set<String> = []
+        knownObjectTypeNames: Set<String> = [],
+        extensionsByTargetName: [String: [ExtensionDeclaration]] = [:]
     ) {
         self.macroDeclarationsByName = macroDeclarationsByName
         self.macroMetadataByName = macroMetadataByName
         self.writtenSyntaxByID = writtenSyntaxByID
         self.knownObjectTypeNames = knownObjectTypeNames
+        self.extensionsByTargetName = extensionsByTargetName
     }
 
     func targetValue(for construct: ConstructDeclaration) -> CompileTimeValue {
@@ -125,6 +128,15 @@ struct MacroTargetValueBuilder {
     func declarationValue(for declaration: ConstructDeclaration, qualifiedName: String)
         -> CompileTimeValue
     {
+        // Extensions targeting this construct contribute their members to the
+        // construct's collected declarations, so extension functions and inits
+        // are not treated differently from members declared in the body.
+        let extensions = extensionsByTargetName[qualifiedName, default: []]
+        let extensionCallables = extensions.flatMap(\.callables)
+        let extensionInitializers = extensions.flatMap(\.initializers)
+        let allCallables = declaration.callables + extensionCallables
+        let allInitializers = declaration.initializers + extensionInitializers
+
         let memberIdentities =
             declaration.values.map {
                 graphIdentity(kind: "let", name: "\(qualifiedName).\($0.name)")
@@ -138,7 +150,7 @@ struct MacroTargetValueBuilder {
             + declaration.deriveds.map {
                 graphIdentity(kind: "derived", name: "\(qualifiedName).\($0.name)")
             }
-            + declaration.callables.map {
+            + allCallables.map {
                 graphIdentity(kind: "function", name: "\(qualifiedName).\($0.name)")
             }
             + declaration.constructs.map {
@@ -156,7 +168,7 @@ struct MacroTargetValueBuilder {
                 "macros": .array(declaration.macros.map(value(for:))),
                 "generics": .array(declaration.genericParameters.map(value(for:))),
                 "conformances": .array(declaration.conformances.map(typeReferenceValue)),
-                "inits": .array(declaration.initializers.map(value(for:))),
+                "inits": .array(allInitializers.map(value(for:))),
                 "lets": .array(
                     declaration.values.map {
                         value(for: $0, ownerConstructName: qualifiedName)
@@ -175,7 +187,7 @@ struct MacroTargetValueBuilder {
                     }),
                 "members": .array(memberIdentities),
                 "functions": .array(
-                    declaration.callables.map {
+                    allCallables.map {
                         value(for: $0, ownerConstructName: qualifiedName)
                     }),
                 "constructs": .array(

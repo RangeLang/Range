@@ -1915,7 +1915,8 @@ extension MacroExpander {
             from: macro,
             targetValue: MacroTargetValueBuilder(
                 macroMetadataByName: context.macroMetadataByName,
-                writtenSyntaxByID: context.graphContext.writtenSyntaxByID
+                writtenSyntaxByID: context.graphContext.writtenSyntaxByID,
+                extensionsByTargetName: context.graphContext.extensionsByTargetName
             ).targetValue(for: construct),
             context: context,
             argumentBindings: argumentBindings

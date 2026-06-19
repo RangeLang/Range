@@ -482,7 +482,9 @@ extension MacroExpander {
                         for: metadata,
                         application: application
                     )
-                    let targetValue = MacroTargetValueBuilder().targetValue(for: construct)
+                    let targetValue = MacroTargetValueBuilder(
+                        extensionsByTargetName: context.graphContext.extensionsByTargetName
+                    ).targetValue(for: construct)
                     try emitMacroMetadataDiagnostics(
                         from: metadata.body,
                         metadata: metadata,
@@ -529,7 +531,8 @@ extension MacroExpander {
                 macro: macro,
                 targetValue: MacroTargetValueBuilder(
                     macroDeclarationsByName: context.macroDeclarationsByName,
-                    macroMetadataByName: context.macroMetadataByName
+                    macroMetadataByName: context.macroMetadataByName,
+                    extensionsByTargetName: context.graphContext.extensionsByTargetName
                 ).targetValue(for: construct),
                 context: context,
                 localBindings: localBindings

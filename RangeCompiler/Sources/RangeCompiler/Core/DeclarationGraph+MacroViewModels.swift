@@ -872,6 +872,7 @@ struct MacroGraphContext {
     let sourcePathByID: [String: String]
     let sourceDirectoryByID: [String: String]
     let knownObjectTypeNames: Set<String>
+    let extensionsByTargetName: [String: [ExtensionDeclaration]]
 
     init(
         declarationGraph: DeclarationGraph,
@@ -885,11 +886,13 @@ struct MacroGraphContext {
             declarationGraph: declarationGraph,
             macroMetadataDeclarationsByName: macroMetadataDeclarationsByName
         )
+        let extensionsByTargetName = declarationGraph.extensionsByTargetName
         let builder = MacroTargetValueBuilder(
             macroDeclarationsByName: macroDeclarationsByName,
             macroMetadataByName: macroMetadataDeclarationsByName,
             writtenSyntaxByID: writtenSyntaxByID,
-            knownObjectTypeNames: knownObjectTypeNames
+            knownObjectTypeNames: knownObjectTypeNames,
+            extensionsByTargetName: extensionsByTargetName
         )
         var declarationsByID: [String: CompileTimeValue] = [:]
         var membersByID: [String: [CompileTimeValue]] = [:]
@@ -996,6 +999,7 @@ struct MacroGraphContext {
         self.writtenSyntaxByID = writtenSyntaxByID
         self.sourcePathByID = sourcePathByID
         self.sourceDirectoryByID = sourceDirectoryByID
+        self.extensionsByTargetName = extensionsByTargetName
         self.knownObjectTypeNames = Self.knownObjectTypeNames(
             seededBy: knownObjectTypeNames,
             declarationsByID: declarationsByID,

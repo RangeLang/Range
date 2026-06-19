@@ -486,6 +486,41 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("llvm macro preserves raw LLVM body on a construct")
+    func llvmMacroPreservesRawBodyOnConstruct() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/LLVMMacro.range",
+                source: """
+                    @llvm {
+                    %r = add i$bits $lhs, $rhs
+                    }
+                    construct Widget {
+                        let value: Int
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let construct = try #require(program.declarationGraph.constructsByName["Widget"])
+        let llvm = try #require(construct.macros.first(where: { $0.name == "llvm" }))
+        #expect(llvm.rawBodyLanguage == "LLVM")
+        #expect(llvm.rawBody?.contains("add i$bits $lhs, $rhs") == true)
+    }
+
+    @Test("Core Int construct carries an llvm lowering body")
+    func coreIntConstructCarriesLLVMBody() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
+        let llvm = try #require(intConstruct.macros.first(where: { $0.name == "llvm" }))
+        #expect(llvm.rawBodyLanguage == "LLVM")
+        #expect(llvm.rawBody?.contains("i$bits") == true)
+    }
+
     @Test("WrittenSyntax macro isolates raw ASCII body")
     func writtenSyntaxMacroIsolatesRawASCIIBody() throws {
         var inputs = try rangeCoreInputs()
@@ -600,6 +635,61 @@ struct CompilerFixtureTests {
             #expect(
                 String(describing: error).contains("used on an extension but targets Construct"))
         }
+    }
+
+    @Test("addable requirement is satisfied by an extension-declared +")
+    func addableRequirementSatisfiedByExtensionFunction() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/AddableExtension.range",
+                source: """
+                    @addable
+                    construct Money {
+                        let cents: Int
+                    }
+
+                    extension Money {
+                        function +(lhs: Self, rhs: Self): Self
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        #expect(program.declarationGraph.constructsByName["Money"] != nil)
+    }
+
+    @Test("addable requirement fails when no + is declared")
+    func addableRequirementFailsWithoutAddition() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/AddableMissing.range",
+                source: """
+                    @addable
+                    construct Money {
+                        let cents: Int
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected @addable to fail when no + function is declared.")
+        } catch {
+            #expect(String(describing: error).contains("@addable requires a function identified as +"))
+        }
+    }
+
+    @Test("Core Int satisfies the addable requirement")
+    func coreIntSatisfiesAddable() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        #expect(program.declarationGraph.constructsByName["Int"] != nil)
     }
 
     @Test("Parser diagnostics point at invalid hash syntax")

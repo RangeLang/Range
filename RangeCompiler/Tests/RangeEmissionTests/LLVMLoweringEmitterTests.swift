@@ -755,6 +755,66 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("ret i1"))
     }
 
+    @Test("Explicit Int width lowers to matching LLVM integer type")
+    func explicitIntWidthLowersToMatchingLLVMIntegerType() throws {
+        let callable = try parseCallable(
+            """
+            function wrapping(value: Int<8, .unsigned>): Int<8, .unsigned> {
+                return value + 1
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i8 @RangeLLVM_wrapping(i8 %value)"))
+        #expect(module.ir.contains("trunc i64 1 to i8"))
+        #expect(module.ir.contains("add i8 %value"))
+        #expect(module.ir.contains("ret i8"))
+    }
+
+    @Test("Unsigned Int comparison and division use unsigned LLVM operations")
+    func unsignedIntComparisonAndDivisionUseUnsignedLLVMOperations() throws {
+        let callable = try parseCallable(
+            """
+            function unsignedOps(lhs: Int<13, .unsigned>, rhs: Int<13, .unsigned>): Bool {
+                return lhs / rhs < rhs
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i1 @RangeLLVM_unsignedOps(i13 %lhs, i13 %rhs)"))
+        #expect(module.ir.contains("udiv i13 %lhs, %rhs"))
+        #expect(module.ir.contains("icmp ult i13"))
+    }
+
+    @Test("Signed custom-width Int comparison uses signed LLVM predicate")
+    func signedCustomWidthIntComparisonUsesSignedLLVMPredicate() throws {
+        let callable = try parseCallable(
+            """
+            function signedLess(lhs: Int<13>, rhs: Int<13>): Bool {
+                return lhs < rhs
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("define i1 @RangeLLVM_signedLess(i13 %lhs, i13 %rhs)"))
+        #expect(module.ir.contains("icmp slt i13 %lhs, %rhs"))
+    }
+
     @Test("Scalar ternary lowers to LLVM select")
     func scalarTernaryLowersToLLVMSelect() throws {
         let callable = try parseCallable(
