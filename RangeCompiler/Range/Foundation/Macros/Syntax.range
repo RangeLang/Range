@@ -40,3 +40,11 @@ open macro spliced(delimiter: String = ""): @parameter -> @syntax { target, diag
         description: target.application.syntax.description
     )
 }
+
+open macro splice(@spliced syntax: @syntax): @syntax { target, diagnostics in
+    return syntax
+}
+
+open macro map(collection: @syntax, @spliced syntax: @syntax): @syntax { target, diagnostics in
+    return syntax
+}

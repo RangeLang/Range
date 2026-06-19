@@ -1656,6 +1656,81 @@ struct LLVMLoweringEmitterTests {
         #expect(!main.contains("func greeting"))
     }
 
+    @Test("Swift workspace emission keeps construct helpers inside LLVM island")
+    func swiftWorkspaceEmissionKeepsConstructHelpersInsideLLVMIsland() throws {
+        let source = try parseModule(
+            """
+            construct Point {
+                let x: Int
+                let y: Int
+            }
+
+            function make(): Point {
+                return Point(x: 2, y: 3)
+            }
+
+            function score(): Int {
+                let point: Point(make())
+                return point.x + point.y
+            }
+
+            @main {
+                score()
+            }
+            """
+        )
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeLLVMConstructIslandTests-\(UUID().uuidString)")
+        defer {
+            try? FileManager.default.removeItem(at: root)
+        }
+
+        try SwiftBackendEmitter().emitWorkspace(
+            program: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: [],
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: [
+                    LoweredSourceUnit(
+                        outputFileName: "Main.swift",
+                        enumerations: source.enumerations,
+                        declarations: source.constructs,
+                        extensions: source.extensions,
+                        callables: source.callables,
+                        mainBlock: source.mainBlock
+                    )
+                ]
+            ),
+            at: root
+        )
+
+        let runtime = try String(
+            contentsOf: root.appendingPathComponent("Sources/Runtime.swift"),
+            encoding: .utf8
+        )
+        let main = try String(
+            contentsOf: root.appendingPathComponent("Sources/Main.swift"),
+            encoding: .utf8
+        )
+        let ir = try String(
+            contentsOf: root.appendingPathComponent("LLVM/RangeScalar.ll"),
+            encoding: .utf8
+        )
+
+        #expect(runtime.contains("func RangeLLVM_score() -> Int64"))
+        #expect(!runtime.contains("func RangeLLVM_make"))
+        #expect(main.contains("Int(RangeLLVM_score())"))
+        #expect(!main.contains("func make"))
+        #expect(!main.contains("func score"))
+        #expect(ir.contains("%Range.Point = type { i64, i64 }"))
+        #expect(ir.contains("define %Range.Point @RangeLLVM_make()"))
+        #expect(ir.contains("define i64 @RangeLLVM_score()"))
+        #expect(ir.contains("call %Range.Point @RangeLLVM_make()"))
+    }
+
     @Test("Swift workspace emission bridges LLVM String arguments")
     func swiftWorkspaceEmissionBridgesLLVMStringArguments() throws {
         let source = try parseModule(

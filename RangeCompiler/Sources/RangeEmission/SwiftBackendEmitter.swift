@@ -21,6 +21,7 @@ struct SwiftBackendEmitter {
         var llvmBridgesByCallableName: [String: LLVMCallableBridge] = [:]
         var llvmConstructLayouts: [String: LLVMLowerability.ConstructLayout] = [:]
         var llvmLoweredCallables: [CallableDeclaration] = []
+        var llvmLoweredCallableNames: Set<String> = []
         var llvmRejectedCallables: [LLVMRejectedCallable] = []
 
         init() {}
@@ -47,6 +48,7 @@ struct SwiftBackendEmitter {
                 from: program,
                 constructLayouts: llvmConstructLayouts
             )
+            self.llvmLoweredCallableNames = Set(llvmLoweredCallables.map(\.name))
             self.llvmBridgesByCallableName = Self.collectLLVMBridges(
                 from: llvmLoweredCallables,
                 constructLayouts: llvmConstructLayouts
@@ -139,7 +141,7 @@ struct SwiftBackendEmitter {
         {
             let callables = llvmCandidateCallables(from: program)
             var seenSymbols: Set<String> = []
-            var loweredCallables: [CallableDeclaration] = []
+            var lowerableCallables: [CallableDeclaration] = []
             var loweredSignatures: [String: LLVMLowerability.ScalarSignature] = [:]
 
             var changed = true
@@ -161,17 +163,43 @@ struct SwiftBackendEmitter {
                     else {
                         continue
                     }
-                    guard llvmSignatureIsSwiftBridgeable(signature) else {
-                        seenSymbols.remove(symbol)
-                        continue
-                    }
-                    loweredCallables.append(callable)
+                    lowerableCallables.append(callable)
                     loweredSignatures[callable.name] = signature
                     changed = true
                 }
             }
 
-            return loweredCallables
+            let lowerableByName = Dictionary(
+                uniqueKeysWithValues: lowerableCallables.map { ($0.name, $0) }
+            )
+            let bridgeableRootNames = lowerableCallables.compactMap { callable -> String? in
+                guard let signature = loweredSignatures[callable.name],
+                    llvmSignatureIsSwiftBridgeable(signature)
+                else {
+                    return nil
+                }
+                return callable.name
+            }
+            var requiredNames = Set<String>()
+
+            func visit(_ name: String) {
+                guard requiredNames.insert(name).inserted,
+                    let callable = lowerableByName[name]
+                else {
+                    return
+                }
+                for dependency in callableDependencies(in: callable)
+                    where lowerableByName[dependency] != nil
+                {
+                    visit(dependency)
+                }
+            }
+
+            for name in bridgeableRootNames {
+                visit(name)
+            }
+
+            return lowerableCallables.filter { requiredNames.contains($0.name) }
         }
 
         private static func collectLLVMRejectedCallables(
@@ -209,7 +237,7 @@ struct SwiftBackendEmitter {
                     {
                         return LLVMRejectedCallable(
                             name: callable.name,
-                            reason: "returns Array<Int>, which is not Swift-LLVM bridgeable yet"
+                            reason: llvmNonBridgeableReason(for: signature)
                         )
                     }
                     return LLVMRejectedCallable(
@@ -237,20 +265,149 @@ struct SwiftBackendEmitter {
                 && signature.parameters.allSatisfy(\.isSwiftBridgeableParameter)
         }
 
+        private static func llvmNonBridgeableReason(
+            for signature: LLVMLowerability.ScalarSignature
+        ) -> String {
+            if !signature.returnType.isSwiftBridgeableReturn {
+                return "returns \(signature.returnType.displayName), which is not Swift-LLVM bridgeable yet"
+            }
+            if let parameter = signature.parameters.first(where: {
+                !$0.isSwiftBridgeableParameter
+            }) {
+                return "accepts \(parameter.displayName), which is not Swift-LLVM bridgeable yet"
+            }
+            return "is not Swift-LLVM bridgeable yet"
+        }
+
         private static func collectLLVMBridges(
             from callables: [CallableDeclaration],
             constructLayouts: [String: LLVMLowerability.ConstructLayout]
         ) -> [String: LLVMCallableBridge] {
             callables.reduce(into: [:]) { result, callable in
+                guard let signature = LLVMLowerability.scalarSignature(
+                    for: callable,
+                    constructLayouts: constructLayouts
+                ),
+                    llvmSignatureIsSwiftBridgeable(signature)
+                else {
+                    return
+                }
                 result[callable.name] = LLVMCallableBridge(
                     symbolName: LLVMLoweringEmitter.symbolName(for: callable),
-                    signature: LLVMLowerability.scalarSignature(
-                        for: callable,
-                        constructLayouts: constructLayouts
-                    )
-                        ?? LLVMLowerability.ScalarSignature(parameters: [], returnType: .int)
+                    signature: signature
                 )
             }
+        }
+
+        private static func callableDependencies(in callable: CallableDeclaration) -> Set<String> {
+            guard let body = callable.body else {
+                return []
+            }
+            var names: Set<String> = []
+
+            func record(_ expression: RangeExpression) {
+                switch expression {
+                case .call(let name, let arguments):
+                    if !name.contains(".") {
+                        names.insert(name)
+                    }
+                    for argument in arguments {
+                        record(argument.value)
+                    }
+                case .block(let statements):
+                    record(statements)
+                case .array(let elements):
+                    elements.forEach(record)
+                case .dictionary(let elements):
+                    for element in elements {
+                        record(element.key)
+                        record(element.value)
+                    }
+                case .interpolatedString(let string):
+                    for segment in string.segments {
+                        if case .expression(let expression) = segment {
+                            record(expression)
+                        }
+                    }
+                case .ternary(let condition, let trueExpression, let falseExpression):
+                    record(condition)
+                    record(trueExpression)
+                    record(falseExpression)
+                case .unary(_, let nested):
+                    record(nested)
+                case .binary(let lhs, _, let rhs):
+                    record(lhs)
+                    record(rhs)
+                case .integer, .double, .string, .boolean, .identifier, .nilLiteral,
+                    .macroInvocation, .bindingReference:
+                    break
+                }
+            }
+
+            func record(_ target: AssignmentTarget) {
+                if case .member(let base, _) = target {
+                    record(base)
+                }
+            }
+
+            func record(_ statements: [Statement]) {
+                for statement in statements {
+                    switch statement {
+                    case .localBinding(let declaration):
+                        record(declaration.expression)
+                    case .assignment(let target, let expression):
+                        record(target)
+                        record(expression)
+                    case .compoundAssignment(let target, _, let expression):
+                        record(target)
+                        record(expression)
+                    case .expression(let expression):
+                        record(expression)
+                    case .return(let expression?):
+                        record(expression)
+                    case .conditional(let branches):
+                        for branch in branches {
+                            if let condition = branch.condition {
+                                record(condition)
+                            }
+                            record(branch.body)
+                        }
+                    case .forEach(_, let sequence, let body):
+                        record(sequence)
+                        record(body)
+                    case .whileLoop(let condition, let body):
+                        record(condition)
+                        record(body)
+                    case .switchStatement(let expression, let cases, let defaultBody):
+                        record(expression)
+                        for switchCase in cases {
+                            if case .expression(let expression) = switchCase.pattern {
+                                record(expression)
+                            }
+                            record(switchCase.body)
+                        }
+                        if let defaultBody {
+                            record(defaultBody)
+                        }
+                    case .background(let background):
+                        record(background.body)
+                    case .deferBlock(let deferred):
+                        record(deferred.body)
+                    case .localCallable(let declaration):
+                        record(declaration.body)
+                    case .derived(_, _, let body):
+                        record(body)
+                    case .macroInvocation(_, _, let body):
+                        record(body)
+                    case .expand, .return(nil), .break, .continue:
+                        break
+                    }
+                }
+            }
+
+            record(body)
+            names.remove(callable.name)
+            return names
         }
 
         private static func allExtensions(in program: LoweredProgram) -> [ExtensionDeclaration] {
@@ -434,7 +591,7 @@ struct SwiftBackendEmitter {
         let allCallables = program.callables + program.declarations.flatMap(\.callables)
         let functions =
             try allCallables
-            .filter { $0.targetType == nil && context.llvmBridgesByCallableName[$0.name] == nil }
+            .filter { $0.targetType == nil && !context.llvmLoweredCallableNames.contains($0.name) }
             .map(emitFunction)
             .joined(separator: "\n\n")
         let enumerations = try program.enumerations.map(emitEnum).joined(separator: "\n\n")
@@ -1623,7 +1780,7 @@ struct SwiftBackendEmitter {
         }
 
         let functions = try unit.callables
-            .filter { $0.targetType == nil && context.llvmBridgesByCallableName[$0.name] == nil }
+            .filter { $0.targetType == nil && !context.llvmLoweredCallableNames.contains($0.name) }
             .map(emitFunction)
             .joined(separator: "\n\n")
 
@@ -4481,6 +4638,23 @@ struct SwiftBackendEmitter {
 }
 
 private extension LLVMLowerability.ScalarType {
+    var displayName: String {
+        switch self {
+        case .int:
+            return "Int"
+        case .bool:
+            return "Bool"
+        case .float:
+            return "Float"
+        case .string:
+            return "String"
+        case .intArray:
+            return "Array<Int>"
+        case .construct(_, let name):
+            return name
+        }
+    }
+
     var isSwiftBridgeableParameter: Bool {
         switch self {
         case .int, .bool, .float, .string, .intArray:
