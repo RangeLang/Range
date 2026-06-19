@@ -1,0 +1,32 @@
+construct ProgramResult {
+    let files: Array<ProgramSourceFile>
+}
+
+construct CoreProgram {
+    let path: String
+    state files: Array<ProgramSourceFile>([])
+
+    function load() {
+        let paths: Array<String>(FileTree.rangeFiles(path: path))
+
+        state index: 0
+        while index < paths.count {
+            let filePath: String(paths.element(index: index))
+
+            switch FileManager.readFile(path: filePath) {
+            case .success(let text):
+                files.append(element: ProgramSourceFile(path: filePath, text: text))
+            case .failure:
+                state index: index
+            }
+
+            state index: index + 1
+        }
+    }
+
+    function reload(): ProgramResult {
+        load()
+
+        return ProgramResult(files: files)
+    }
+}

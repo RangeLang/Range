@@ -1556,6 +1556,10 @@ struct SwiftBackendEmitter {
                     return String(self[lowerBound..<upperBound])
                 }
 
+                func __rangeReplacingOccurrences(of target: String, with replacement: String) -> String {
+                    return self.replacingOccurrences(of: target, with: replacement)
+                }
+
                 func __rangeSnakeCase() -> String {
                     var result = ""
                     var previousWasLowercaseOrDigit = false
@@ -4079,6 +4083,10 @@ struct SwiftBackendEmitter {
             guard let start = argument("start"), let end = argument("end") else { return nil }
             return
                 "\(base).__rangeSubstring(start: \(try emitExpression(start, scope: scope)), end: \(try emitExpression(end, scope: scope)))"
+        case "replacingOccurrences":
+            guard let of = argument("of"), let with = argument("with") else { return nil }
+            return
+                "\(base).__rangeReplacingOccurrences(of: \(try emitExpression(of, scope: scope)), with: \(try emitExpression(with, scope: scope)))"
         case "snakeCase":
             guard arguments.isEmpty else { return nil }
             return "\(base).__rangeSnakeCase()"

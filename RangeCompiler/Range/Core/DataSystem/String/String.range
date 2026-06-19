@@ -26,6 +26,10 @@ construct String {
         return storage.substring(start: start, end: end)
     }
 
+    function replacingOccurrences(of: String, with: String): String {
+        return storage.replacingOccurrences(of: of, with: with)
+    }
+
     function snakeCase(): String {
         return storage.snakeCase()
     }

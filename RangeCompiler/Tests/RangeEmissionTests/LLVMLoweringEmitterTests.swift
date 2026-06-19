@@ -2436,6 +2436,91 @@ struct LLVMLoweringEmitterTests {
         #expect(intTemplate.instantiated(bindings: ["bits": "13"]) == "i13")
     }
 
+    @Test("Concrete @llvm body is collected, written, and run through clang")
+    func concreteLLVMBodyEmitsWritesAndRuns() throws {
+        // A construct whose @llvm body is a complete, concrete LLVM function with
+        // no splices. This proves the emit-and-write loop end to end: Range-authored
+        // @llvm string -> Swift collects -> Swift writes .ll -> clang compiles+runs.
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/ConcreteLLVM.range",
+                source: """
+                    @llvm(body: "define i64 @range_concrete_answer() {\nentry:\n  ret i64 42\n}")
+                    construct ConcreteAnswer {
+                        let value: Int
+                    }
+                    """,
+                role: .project
+            )
+        )
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+
+        var declarations: [ConstructDeclaration] = []
+        for parsedFile in program.expandedFiles {
+            switch parsedFile.sourceFile {
+            case .module(let module):
+                declarations.append(contentsOf: module.constructs)
+            case .construct(let construct):
+                declarations.append(construct)
+            case .enumeration, .macro, .extensions, .mainBlock:
+                continue
+            }
+        }
+
+        let collected = SwiftBackendEmitter.collectedLLVMConstructBodies(
+            from: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: declarations,
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: []
+            )
+        )
+        let answer = try #require(
+            collected.first(where: { $0.constructName == "ConcreteAnswer" })
+        )
+        // No bindings needed: the body is already concrete.
+        let irLines = answer.lines(bindings: [:])
+        let ir = irLines.joined(separator: "\n") + "\n"
+
+        let clang = URL(fileURLWithPath: "/usr/bin/clang")
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeConcreteLLVMTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        let irURL = root.appendingPathComponent("concrete.ll")
+        let harnessURL = root.appendingPathComponent("harness.c")
+        let executableURL = root.appendingPathComponent("concrete")
+
+        try ir.write(to: irURL, atomically: true, encoding: .utf8)
+        try """
+            #include <stdint.h>
+            #include <stdio.h>
+
+            extern int64_t range_concrete_answer(void);
+
+            int main(void) {
+                printf("%lld\\n", (long long)range_concrete_answer());
+                return 0;
+            }
+            """
+            .write(to: harnessURL, atomically: true, encoding: .utf8)
+
+        let compile = try run(
+            clang,
+            arguments: [irURL.path, harnessURL.path, "-O3", "-o", executableURL.path]
+        )
+        #expect(compile.status == 0)
+
+        let runResult = try run(executableURL, arguments: [])
+        #expect(runResult.status == 0)
+        #expect(runResult.stdout.trimmingCharacters(in: .whitespacesAndNewlines) == "42")
+    }
+
     @Test("Multi-line @llvm template splits into instruction lines on newline")
     func multiLineLLVMTemplateSplitsOnNewline() throws {
         let template = SwiftBackendEmitter.CollectedLLVMConstruct(
