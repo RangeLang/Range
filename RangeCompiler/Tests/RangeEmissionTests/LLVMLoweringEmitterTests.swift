@@ -2365,6 +2365,87 @@ struct LLVMLoweringEmitterTests {
         }
     }
 
+    @Test("Construct @llvm lowering bodies are collected from compiled core")
+    func constructLLVMBodiesAreCollected() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        // Int is authored in Range core, so collect across all expanded files,
+        // not just project files.
+        var declarations: [ConstructDeclaration] = []
+        for parsedFile in program.expandedFiles {
+            switch parsedFile.sourceFile {
+            case .module(let module):
+                declarations.append(contentsOf: module.constructs)
+            case .construct(let construct):
+                declarations.append(construct)
+            case .enumeration, .macro, .extensions, .mainBlock:
+                continue
+            }
+        }
+
+        let collected = SwiftBackendEmitter.collectedLLVMConstructBodies(
+            from: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: declarations,
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: []
+            )
+        )
+
+        let intBody = try #require(collected.first(where: { $0.constructName == "Int" }))
+        #expect(intBody.rawBody.contains("i$bits"))
+    }
+
+    @Test("Int LLVM type is emitted from the Range-authored @llvm template")
+    func intTypeEmittedFromCollectedTemplate() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        var declarations: [ConstructDeclaration] = []
+        for parsedFile in program.expandedFiles {
+            switch parsedFile.sourceFile {
+            case .module(let module):
+                declarations.append(contentsOf: module.constructs)
+            case .construct(let construct):
+                declarations.append(construct)
+            case .enumeration, .macro, .extensions, .mainBlock:
+                continue
+            }
+        }
+
+        let collected = SwiftBackendEmitter.collectedLLVMConstructBodies(
+            from: LoweredProgram(
+                macrosByName: [:],
+                callables: [],
+                enumerations: [],
+                declarations: declarations,
+                extensions: [],
+                mainBlock: MainBlockNode(macros: [], body: []),
+                units: []
+            )
+        )
+        let intTemplate = try #require(collected.first(where: { $0.constructName == "Int" }))
+
+        // The LLVM type string is produced by instantiating the Range-authored
+        // `@llvm { i$bits }` template, not by a Swift-hardcoded mapping. For each
+        // width, the template must yield the canonical `i<bits>` form.
+        #expect(intTemplate.instantiated(bindings: ["bits": "64"]) == "i64")
+        #expect(intTemplate.instantiated(bindings: ["bits": "8"]) == "i8")
+        #expect(intTemplate.instantiated(bindings: ["bits": "13"]) == "i13")
+    }
+
+    @Test("Multi-line @llvm template splits into instruction lines on newline")
+    func multiLineLLVMTemplateSplitsOnNewline() throws {
+        let template = SwiftBackendEmitter.CollectedLLVMConstruct(
+            constructName: "Int",
+            rawBody: "%r = add i$bits $lhs, $rhs\nret i$bits %r"
+        )
+        let lines = template.lines(bindings: ["bits": "32", "lhs": "%lhs", "rhs": "%rhs"])
+        #expect(lines == ["%r = add i32 %lhs, %rhs", "ret i32 %r"])
+    }
+
     private func parseCallable(_ source: String) throws -> CallableDeclaration {
         var parser = try Parser(source: source)
         let sourceFile = try parser.parseSourceFile()

@@ -32,6 +32,10 @@ construct String {
 }
 
 extension String {
+    function +(lhs: Self, rhs: Self): Self
+}
+
+extension String {
     function ==(lhs: Self, rhs: Self): Bool
 }
 

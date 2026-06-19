@@ -12,6 +12,64 @@ struct SwiftBackendEmitter {
         let reason: String
     }
 
+    /// A construct-attached `@llvm { ... }` lowering body collected from Range
+    /// source. The raw body text is authored in Range core and forwarded as-is;
+    /// Swift only collects it and does not interpret the LLVM semantics here.
+    struct CollectedLLVMConstruct {
+        let constructName: String
+        let rawBody: String
+
+        /// Instantiates the collected template by substituting `$name` holes with
+        /// the provided bindings. A hole runs while the following characters are
+        /// identifier characters ([A-Za-z0-9_]); everything else is literal text.
+        /// This is the Range-authored lowering: the resulting string is produced
+        /// from the template, not from a Swift-hardcoded mapping.
+        func instantiated(bindings: [String: String]) -> String {
+            var result = ""
+            let characters = Array(rawBody)
+            var index = 0
+            while index < characters.count {
+                let character = characters[index]
+                if character == "$" {
+                    var nameEnd = index + 1
+                    while nameEnd < characters.count, Self.isIdentifierCharacter(characters[nameEnd]) {
+                        nameEnd += 1
+                    }
+                    let name = String(characters[(index + 1)..<nameEnd])
+                    if let value = bindings[name] {
+                        result += value
+                    } else {
+                        result += "$" + name
+                    }
+                    index = nameEnd
+                } else {
+                    result.append(character)
+                    index += 1
+                }
+            }
+            return result.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        /// Instantiates the template, then splits it into LLVM instruction lines
+        /// on newline. Newline is the instruction delimiter, so a multi-line body
+        /// can be authored in a single `String` template. Empty lines are dropped.
+        func lines(bindings: [String: String]) -> [String] {
+            // The template is authored as a Range string literal, so an escaped
+            // newline arrives as the two characters "\n"; normalize it to a real
+            // newline before splitting. Actual newlines are also supported.
+            let normalized = instantiated(bindings: bindings)
+                .replacingOccurrences(of: "\\n", with: "\n")
+            return normalized
+                .split(separator: "\n", omittingEmptySubsequences: false)
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+        }
+
+        private static func isIdentifierCharacter(_ character: Character) -> Bool {
+            character.isLetter || character.isNumber || character == "_"
+        }
+    }
+
     private struct SwiftEmissionContext {
         var failableInitializersByConstructName: [String: [FailableInitializerSignature]] = [:]
         var genericParameterNames: Set<String> = []
@@ -23,6 +81,7 @@ struct SwiftBackendEmitter {
         var llvmLoweredCallables: [CallableDeclaration] = []
         var llvmLoweredCallableNames: Set<String> = []
         var llvmRejectedCallables: [LLVMRejectedCallable] = []
+        var llvmConstructBodies: [CollectedLLVMConstruct] = []
 
         init() {}
 
@@ -58,6 +117,7 @@ struct SwiftBackendEmitter {
                 loweredCallables: llvmLoweredCallables,
                 constructLayouts: llvmConstructLayouts
             )
+            self.llvmConstructBodies = Self.collectLLVMConstructBodies(from: program)
         }
 
         private static func collectGenericParameterNames(from program: LoweredProgram) -> Set<
@@ -102,6 +162,51 @@ struct SwiftBackendEmitter {
                 declarations.append(contentsOf: unit.declarations)
             }
             return declarations
+        }
+
+        /// Read-only collection of construct-attached `@llvm` lowering bodies.
+        /// Swift gathers the Range-authored raw LLVM text and forwards it; it does
+        /// not interpret or rewrite the instruction templates here.
+        private static func collectLLVMConstructBodies(
+            from program: LoweredProgram
+        ) -> [CollectedLLVMConstruct] {
+            var collected: [CollectedLLVMConstruct] = []
+            for declaration in allDeclarations(in: program) {
+                for application in declaration.macros where application.name == "llvm" {
+                    guard let body = llvmBody(from: application) else {
+                        continue
+                    }
+                    collected.append(
+                        CollectedLLVMConstruct(
+                            constructName: declaration.name,
+                            rawBody: body
+                        )
+                    )
+                }
+            }
+            return collected
+        }
+
+        /// Extracts the LLVM template string from an `@llvm` application. The
+        /// template is authored as a labelled quoted `String` argument
+        /// (`@llvm(body: "i$bits")`); a raw foreign body is still accepted for
+        /// forward compatibility. The string content between the first pair of
+        /// double quotes is the template body.
+        private static func llvmBody(from application: MacroApplication) -> String? {
+            if let rawBody = application.rawBody, application.rawBodyLanguage == "LLVM" {
+                return rawBody
+            }
+            guard let clause = application.argumentClause else {
+                return nil
+            }
+            guard let firstQuote = clause.firstIndex(of: "\""),
+                let lastQuote = clause.lastIndex(of: "\""),
+                firstQuote < lastQuote
+            else {
+                return nil
+            }
+            let start = clause.index(after: firstQuote)
+            return String(clause[start..<lastQuote])
         }
 
         private static func collectCallableParameterLabels(
@@ -585,6 +690,15 @@ struct SwiftBackendEmitter {
     func emit(program: LoweredProgram) throws -> String {
         try SwiftBackendEmitter(context: SwiftEmissionContext(program: program))
             .emitProgramWithContext(program)
+    }
+
+    /// Collects construct-attached `@llvm` lowering bodies from a program.
+    /// Exposed for verifying that Range-authored construct lowering metadata is
+    /// gathered by Swift. Read-only: this does not influence emission yet.
+    static func collectedLLVMConstructBodies(
+        from program: LoweredProgram
+    ) -> [CollectedLLVMConstruct] {
+        SwiftEmissionContext(program: program).llvmConstructBodies
     }
 
     private func emitProgramWithContext(_ program: LoweredProgram) throws -> String {

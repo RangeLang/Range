@@ -250,6 +250,49 @@ Important direction:
 - Prefer one Range-authored syntax value/rendering model.
 - Compile-time values and normal values should move toward a unified value model where possible.
 
+## Design Note: Staged Collection Order (syntax -> types -> generics)
+
+This is a design note, not implemented. Captured to fix the ordering before
+building `@llvm` splice resolution on top of it.
+
+Desired direction:
+
+- The Range program graph should collect/resolve in explicit, ordered stages
+  rather than rediscovering structure ad hoc:
+  1. `syntax` - the raw parsed surface (declarations + applications), collected
+     first. This already exists as `RangeGraph.syntax: Array<@syntax>`.
+  2. `types` - main types (constructs/enums) collected/resolved from syntax.
+  3. `generics` - value/type generics collected and filtered as their own stage,
+     run **right after types**, because a generic only has meaning relative to
+     the type that declares it.
+- So the pipeline is: `syntax -> types -> generics`, with generics filtered out
+  of (or derived from) the resolved types as a distinct stage.
+
+Why this matters for `@llvm` lowering:
+
+- Value generics can be treated as compile-time values (evaluated by
+  `CompileTimeValueEvaluator`).
+- BUT on a bare construct declaration `Int<let bits: IntLiteral>`, `bits` is a
+  compile-time *parameter* with no concrete value. It only gets a concrete value
+  at an instantiation use site such as `Int<8>`.
+- Therefore `$bits -> 8` substitution belongs at the instantiation site, not at
+  the construct declaration. A staged `generics` collection gives splice
+  resolution a well-defined place to read "what generics does this type have"
+  and, at instantiation, "what are their concrete values."
+
+Implication for splice resolution:
+
+- Prefer modeling `$bits` as a compile-time value reference (a value-expression)
+  resolved by the evaluator at instantiation, rather than scanning the template
+  as opaque runtime text in a macro body.
+- The char-by-char scanner / `isIdentifierChar` primitive that a text-scanning
+  approach would need is likely the wrong path; it is an artifact of treating
+  splices as text instead of as staged, compile-time value references.
+
+Status: design only. The current `@llvm` macro still returns its body verbatim;
+the staged generics collection and instantiation-time splice resolution are not
+built yet.
+
 ## Identity And Graph Design Discussion
 
 This was design discussion only. The temporary `Let.range` experiment was reverted.

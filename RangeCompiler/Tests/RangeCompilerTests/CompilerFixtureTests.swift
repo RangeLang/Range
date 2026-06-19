@@ -486,16 +486,14 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("llvm macro preserves raw LLVM body on a construct")
-    func llvmMacroPreservesRawBodyOnConstruct() throws {
+    @Test("llvm macro carries an LLVM template string on a construct")
+    func llvmMacroCarriesTemplateOnConstruct() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/LLVMMacro.range",
                 source: """
-                    @llvm {
-                    %r = add i$bits $lhs, $rhs
-                    }
+                    @llvm(body: "%r = add i$bits $lhs, $rhs")
                     construct Widget {
                         let value: Int
                     }
@@ -507,8 +505,33 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let construct = try #require(program.declarationGraph.constructsByName["Widget"])
         let llvm = try #require(construct.macros.first(where: { $0.name == "llvm" }))
-        #expect(llvm.rawBodyLanguage == "LLVM")
-        #expect(llvm.rawBody?.contains("add i$bits $lhs, $rhs") == true)
+        #expect(llvm.argumentClause?.contains("add i$bits $lhs, $rhs") == true)
+    }
+
+    @Test("String supports + concatenation")
+    func stringSupportsConcatenation() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringConcat.range",
+                source: """
+                    function label(): String {
+                        let head: String("i")
+                        let width: String("15")
+                        return head + width
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let stringConstruct = try #require(program.declarationGraph.constructsByName["String"])
+        let hasPlus = program.declarationGraph.extensionsByTargetName["String"]?
+            .flatMap(\.callables)
+            .contains(where: { $0.name == "+" }) ?? false
+        #expect(hasPlus)
+        #expect(stringConstruct.name == "String")
     }
 
     @Test("Core Int construct carries an llvm lowering body")
@@ -517,8 +540,7 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let llvm = try #require(intConstruct.macros.first(where: { $0.name == "llvm" }))
-        #expect(llvm.rawBodyLanguage == "LLVM")
-        #expect(llvm.rawBody?.contains("i$bits") == true)
+        #expect(llvm.argumentClause?.contains("i$bits") == true)
     }
 
     @Test("WrittenSyntax macro isolates raw ASCII body")
