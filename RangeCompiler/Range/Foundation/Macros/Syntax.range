@@ -5,7 +5,8 @@ construct SplicedSyntax {
     let description: String
 }
 
-macro syntax(): Construct { target, diagnostics, graph in
+macro syntax(body: String): Construct -> String { target, diagnostics, graph in
+    return body
 }
 
 macro syntaxCapture(@literal @spliced(delimiter: "") syntax: @syntax): Construct { target, diagnostics, graph in

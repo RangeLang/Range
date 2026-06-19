@@ -2395,45 +2395,47 @@ struct LLVMLoweringEmitterTests {
             )
         )
 
+        // The @llvm macro processes its body in Range (replacing $bits with the
+        // generic name), so the collected body is the macro's output: "ibits".
         let intBody = try #require(collected.first(where: { $0.constructName == "Int" }))
-        #expect(intBody.rawBody.contains("i$bits"))
+        #expect(intBody.rawBody == "ibits")
     }
 
-    @Test("Int LLVM type is emitted from the Range-authored @llvm template")
-    func intTypeEmittedFromCollectedTemplate() throws {
+    @Test("Int @llvm macro evaluated value carries processed splice output")
+    func intLLVMMacroEvaluatedValueCarriesProcessedOutput() throws {
         let inputs = try rangeCoreInputs()
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        var declarations: [ConstructDeclaration] = []
-        for parsedFile in program.expandedFiles {
-            switch parsedFile.sourceFile {
-            case .module(let module):
-                declarations.append(contentsOf: module.constructs)
-            case .construct(let construct):
-                declarations.append(construct)
-            case .enumeration, .macro, .extensions, .mainBlock:
-                continue
-            }
+        let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
+        let llvm = try #require(intConstruct.macros.first(where: { $0.name == "llvm" }))
+        // The macro loops generics and replaces $bits -> bits, yielding "ibits".
+        #expect(llvm.evaluatedStringValue == "ibits")
+    }
+
+    @Test("@int macro branches on signedness at compile time")
+    func intMacroBranchesOnSignedness() throws {
+        func evaluatedInt(signedness: String) throws -> String? {
+            var inputs = try rangeCoreInputs()
+            inputs.append(
+                SourceInput(
+                    path: "/tmp/IntMacroBranch.range",
+                    source: """
+                        @int<64, .\(signedness)>
+                        construct Count\(signedness == "signed" ? "S" : "U") {
+                            let value: Int
+                        }
+                        """,
+                    role: .project
+                )
+            )
+            let program = try CompilerPipeline().buildValidated(inputs: inputs)
+            let name = "Count\(signedness == "signed" ? "S" : "U")"
+            let construct = try #require(program.declarationGraph.constructsByName[name])
+            let intMacro = try #require(construct.macros.first(where: { $0.name == "int" }))
+            return intMacro.evaluatedStringValue
         }
 
-        let collected = SwiftBackendEmitter.collectedLLVMConstructBodies(
-            from: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: declarations,
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: []
-            )
-        )
-        let intTemplate = try #require(collected.first(where: { $0.constructName == "Int" }))
-
-        // The LLVM type string is produced by instantiating the Range-authored
-        // `@llvm { i$bits }` template, not by a Swift-hardcoded mapping. For each
-        // width, the template must yield the canonical `i<bits>` form.
-        #expect(intTemplate.instantiated(bindings: ["bits": "64"]) == "i64")
-        #expect(intTemplate.instantiated(bindings: ["bits": "8"]) == "i8")
-        #expect(intTemplate.instantiated(bindings: ["bits": "13"]) == "i13")
+        #expect(try evaluatedInt(signedness: "signed") == "sdiv")
+        #expect(try evaluatedInt(signedness: "unsigned") == "udiv")
     }
 
     @Test("Concrete @llvm body is collected, written, and run through clang")

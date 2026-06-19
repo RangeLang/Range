@@ -193,6 +193,12 @@ struct SwiftBackendEmitter {
         /// forward compatibility. The string content between the first pair of
         /// double quotes is the template body.
         private static func llvmBody(from application: MacroApplication) -> String? {
+            // Prefer the macro's evaluated output: the Range-authored @llvm macro
+            // processes its template (e.g. splice substitution) and the result is
+            // carried here, so emission consumes the macro's output, not its input.
+            if let processed = application.evaluatedStringValue {
+                return processed
+            }
             if let rawBody = application.rawBody, application.rawBodyLanguage == "LLVM" {
                 return rawBody
             }

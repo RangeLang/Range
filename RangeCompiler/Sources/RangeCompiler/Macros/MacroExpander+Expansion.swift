@@ -336,6 +336,44 @@ extension MacroExpander {
         return extensionDeclaration
     }
 
+    // Evaluates a construct-attached metadata macro and, when it returns a
+    // string, carries that processed result on the application so emission can
+    // consume the macro's Range-authored output instead of the raw argument.
+    static func attachingEvaluatedStringValue(
+        to application: MacroApplication,
+        construct: ConstructDeclaration,
+        context: MacroExpansionContext
+    ) -> MacroApplication {
+        // Any construct-targeting macro that returns a String has its evaluated
+        // output carried here, so emission consumes the macro's processed result.
+        // Not bound to specific macro names.
+        guard let metadata = context.macroMetadataByName[application.name],
+            !metadata.valueType.isMacroMetadataEffect,
+            metadata.valueType == .named("String")
+        else {
+            return application
+        }
+        let targetValue = MacroTargetValueBuilder(
+            macroMetadataByName: context.macroMetadataByName,
+            extensionsByTargetName: context.graphContext.extensionsByTargetName
+        ).targetValue(for: construct)
+        guard
+            let value = try? MacroTargetValueBuilder.evaluateMacroMetadataValue(
+                for: application,
+                metadata: metadata,
+                targetValue: targetValue,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+                context: context
+            ),
+            case .string(let processed) = value
+        else {
+            return application
+        }
+        var updated = application
+        updated.evaluatedStringValue = processed
+        return updated
+    }
+
     static func expand(
         construct: ConstructDeclaration,
         macros: [String: MacroDeclaration],
@@ -359,8 +397,16 @@ extension MacroExpander {
             context: context
         )
 
+        let macrosWithValues = construct.macros.map { application in
+            attachingEvaluatedStringValue(
+                to: application,
+                construct: construct,
+                context: context
+            )
+        }
+
         return ConstructDeclaration(
-            macros: construct.macros,
+            macros: macrosWithValues,
             kind: construct.kind,
             attribute: construct.attribute,
             name: construct.name,

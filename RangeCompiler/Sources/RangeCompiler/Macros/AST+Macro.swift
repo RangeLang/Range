@@ -92,19 +92,26 @@ public struct MacroApplication {
     public let argumentClause: String?
     public let rawBodyLanguage: String?
     public let rawBody: String?
+    // The macro's evaluated string return value, when it produces one. This is
+    // the Range-authored processed result (e.g. an @llvm template after splice
+    // substitution), carried so emission can consume the macro's output rather
+    // than re-deriving it from the raw argument.
+    public var evaluatedStringValue: String?
 
     public init(
         name: String,
         genericArguments: [TypeReference],
         argumentClause: String?,
         rawBodyLanguage: String? = nil,
-        rawBody: String? = nil
+        rawBody: String? = nil,
+        evaluatedStringValue: String? = nil
     ) {
         self.name = name
         self.genericArguments = genericArguments
         self.argumentClause = argumentClause
         self.rawBodyLanguage = rawBodyLanguage
         self.rawBody = rawBody
+        self.evaluatedStringValue = evaluatedStringValue
     }
 }
 

@@ -381,21 +381,11 @@ struct MacroTargetValueBuilder {
 
         var localBindings = initialBindings
         var value: CompileTimeValue?
-        for statement in metadata.body {
-            switch statement {
-            case .localBinding(let declaration):
-                localBindings[declaration.name] = declaration.expression
-            case .return(let expression?):
-                value = evaluator.evaluate(expression, with: localBindings)
-            case .expression(let expression):
-                value = evaluator.evaluate(expression, with: localBindings)
-            default:
-                value = nil
-            }
-            if value != nil {
-                break
-            }
-        }
+        value = Self.evaluateMetadataStatements(
+            metadata.body,
+            localBindings: &localBindings,
+            evaluator: evaluator
+        )
 
         if metadata.valueType == .named("Void") {
             return .object(typeName: "Void", fields: [:])
@@ -412,6 +402,49 @@ struct MacroTargetValueBuilder {
         }
 
         return value
+    }
+
+    // Evaluates a metadata macro body to its value. Handles local bindings,
+    // returns, expressions, and conditionals (if/else) so macros can branch on
+    // generic values (e.g. signedness) and choose what to emit.
+    private static func evaluateMetadataStatements(
+        _ statements: [Statement],
+        localBindings: inout [String: Expression],
+        evaluator: CompileTimeValueEvaluator
+    ) -> CompileTimeValue? {
+        for statement in statements {
+            switch statement {
+            case .localBinding(let declaration):
+                localBindings[declaration.name] = declaration.expression
+            case .return(let expression?):
+                return evaluator.evaluate(expression, with: localBindings)
+            case .expression(let expression):
+                if let value = evaluator.evaluate(expression, with: localBindings) {
+                    return value
+                }
+            case .conditional(let branches):
+                for branch in branches {
+                    if let condition = branch.condition {
+                        guard case .boolean(true) = evaluator.evaluate(condition, with: localBindings)
+                        else {
+                            continue
+                        }
+                    }
+                    var branchBindings = localBindings
+                    if let value = evaluateMetadataStatements(
+                        branch.body,
+                        localBindings: &branchBindings,
+                        evaluator: evaluator
+                    ) {
+                        return value
+                    }
+                    break
+                }
+            default:
+                continue
+            }
+        }
+        return nil
     }
 
     private static func macroMetadataValue(_ value: CompileTimeValue, matches type: TypeReference)

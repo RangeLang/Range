@@ -402,7 +402,7 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        let supportedSuffixes = [".count", ".hasPrefix", ".hasSuffix", ".containsRepeated", ".segment"]
+        let supportedSuffixes = [".count", ".hasPrefix", ".hasSuffix", ".containsRepeated", ".segment", ".replacingOccurrences"]
         guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
             let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
             case .string(let value) = source
@@ -469,6 +469,16 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return .string(segments[index])
+        case ".replacingOccurrences":
+            guard arguments.count == 2,
+                let ofArgument = arguments.first(where: { $0.label == "of" }),
+                let withArgument = arguments.first(where: { $0.label == "with" }),
+                case .string(let needle) = evaluate(ofArgument.value, locals: locals),
+                case .string(let replacement) = evaluate(withArgument.value, locals: locals)
+            else {
+                return nil
+            }
+            return .string(value.replacingOccurrences(of: needle, with: replacement))
         default:
             return nil
         }
