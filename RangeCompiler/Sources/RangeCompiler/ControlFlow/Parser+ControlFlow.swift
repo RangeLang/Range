@@ -78,12 +78,18 @@ extension Parser {
             return .continue
         }
 
-        if isExpressionStatementStart() && !isAssignmentStatementStart() {
-            return .expression(try parseExpression())
+        if isColonAssignmentStatementStart() {
+            let target = try parseAssignmentTarget(localBindings: localBindings)
+            try consume(.colon)
+            return .assignment(target: target, expression: try parseExpression())
         }
 
         if isAssignmentStatementStart() {
-            throw ParseError("Assignment statements use `state target: value`.")
+            throw ParseError("Assignment statements use `target: value`.")
+        }
+
+        if isExpressionStatementStart() {
+            return .expression(try parseExpression())
         }
 
         throw ParseError("Expected statement.")
@@ -246,6 +252,18 @@ extension Parser {
         }
         let next = peek(offset: offset)
         return next == .plusEqual
+    }
+
+    func isColonAssignmentStatementStart() -> Bool {
+        guard case .identifier = peek() else { return false }
+        var offset = 1
+        while peek(offset: offset) == .dot {
+            guard case .identifier = peek(offset: offset + 1) else {
+                return false
+            }
+            offset += 2
+        }
+        return peek(offset: offset) == .colon
     }
 
     func isExpressionStatementStart() -> Bool {

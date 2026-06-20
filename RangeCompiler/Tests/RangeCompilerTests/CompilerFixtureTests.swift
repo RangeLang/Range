@@ -714,6 +714,51 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.constructsByName["Int"] != nil)
     }
 
+    @Test("Value generic macro view exposes effective application value")
+    func valueGenericMacroViewExposesEffectiveApplicationValue() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
+
+        let defaultTarget = MacroTargetValueBuilder().targetValue(for: intConstruct)
+        #expect(valueGenericValue(named: "bits", in: defaultTarget) == "64")
+
+        let appliedTarget = MacroTargetValueBuilder().targetValue(
+            for: intConstruct,
+            applicationArguments: [.named("\"8\"")]
+        )
+        #expect(valueGenericValue(named: "bits", in: appliedTarget) == "8")
+    }
+
+    private func valueGenericValue(
+        named name: String,
+        in target: CompileTimeValue
+    ) -> String? {
+        guard
+            case .object(_, let targetFields) = target,
+            case .object(_, let declarationFields)? = targetFields["declaration"],
+            case .array(let generics)? = declarationFields["generics"]
+        else {
+            return nil
+        }
+
+        for generic in generics {
+            guard
+                case .object("ValueGeneric", let fields) = generic,
+                case .object(_, let identifierFields)? = fields["identifier"],
+                case .string(let identifierName)? = identifierFields["name"],
+                case .string(let value)? = fields["value"]
+            else {
+                continue
+            }
+            guard identifierName == name else {
+                continue
+            }
+            return value
+        }
+        return nil
+    }
+
     @Test("Parser diagnostics point at invalid hash syntax")
     func parserDiagnosticsPointAtInvalidHashSyntax() throws {
         let projectPath = "/tmp/InvalidHashMacro.range"
@@ -1883,6 +1928,7 @@ struct CompilerFixtureTests {
             function update(value: Int): Int {
                 state total: Int(0)
                 state total: total + value
+                total: total + value
                 return total
             }
             """
@@ -1920,7 +1966,7 @@ struct CompilerFixtureTests {
                 let description = String(describing: error)
                 #expect(
                     description.contains("Expected statement")
-                        || description.contains("Assignment statements use `state target: value`")
+                        || description.contains("Assignment statements use `target: value`")
                 )
             }
         }

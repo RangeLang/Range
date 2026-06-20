@@ -3,7 +3,7 @@ open macro llvm(body: String): Construct -> String { target, diagnostics in
 
     for generic in target.declaration.generics {
         let name: String(generic.identifier.name)
-        state llvm: llvm.replacingOccurrences(of: "$" + name, with: name)
+        llvm: llvm.replacingOccurrences(of: "$" + name, with: generic.value)
     }
 
     return llvm

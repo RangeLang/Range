@@ -2396,9 +2396,9 @@ struct LLVMLoweringEmitterTests {
         )
 
         // The @llvm macro processes its body in Range (replacing $bits with the
-        // generic name), so the collected body is the macro's output: "ibits".
+        // default value), so the collected body is the macro's output: "i64".
         let intBody = try #require(collected.first(where: { $0.constructName == "Int" }))
-        #expect(intBody.rawBody == "ibits")
+        #expect(intBody.rawBody == "i64")
     }
 
     @Test("Int @llvm macro evaluated value carries processed splice output")
@@ -2407,9 +2407,8 @@ struct LLVMLoweringEmitterTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let llvm = try #require(intConstruct.macros.first(where: { $0.name == "llvm" }))
-        // The macro loops generics and replaces $<name> with each generic's name.
-        // Int's generics are bits and signedness, so $bits -> bits yields "ibits".
-        #expect(llvm.evaluatedStringValue == "ibits")
+        // The macro replaces $bits with bits's default value (64), yielding "i64".
+        #expect(llvm.evaluatedStringValue == "i64")
     }
 
     @Test("Concrete @llvm body is collected, written, and run through clang")

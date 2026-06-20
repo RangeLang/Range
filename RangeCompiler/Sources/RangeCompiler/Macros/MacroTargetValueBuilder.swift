@@ -21,14 +21,25 @@ struct MacroTargetValueBuilder {
         self.extensionsByTargetName = extensionsByTargetName
     }
 
-    func targetValue(for construct: ConstructDeclaration) -> CompileTimeValue {
+    func targetValue(
+        for construct: ConstructDeclaration,
+        applicationArguments: [TypeReference] = []
+    ) -> CompileTimeValue {
         let id = "construct:\(construct.name)"
         return .object(
             typeName: "Construct",
             fields: [
                 "identity": graphIdentity(kind: "construct", name: construct.name),
                 "written": writtenSyntaxByID[id] ?? writtenSyntax(""),
-                "declaration": declarationValue(for: construct, qualifiedName: construct.name),
+                "declaration": declarationValue(
+                    for: construct,
+                    qualifiedName: construct.name,
+                    applicationArguments: applicationArguments
+                ),
+                "application": constructApplicationValue(
+                    for: construct,
+                    applicationArguments: applicationArguments
+                ),
             ]
         )
     }
@@ -45,7 +56,7 @@ struct MacroTargetValueBuilder {
                     fields: [
                         "identity": graphIdentity(kind: "enum", name: enumeration.name),
                         "self": nominalTypeReference(enumeration.name),
-                        "generics": .array(enumeration.genericParameters.map(value(for:))),
+                        "generics": .array(enumeration.genericParameters.map { value(for: $0) }),
                         "cases": .array(enumeration.cases.map(value(for:))),
                     ]
                 ),
@@ -125,7 +136,11 @@ struct MacroTargetValueBuilder {
         return name
     }
 
-    func declarationValue(for declaration: ConstructDeclaration, qualifiedName: String)
+    func declarationValue(
+        for declaration: ConstructDeclaration,
+        qualifiedName: String,
+        applicationArguments: [TypeReference] = []
+    )
         -> CompileTimeValue
     {
         // Extensions targeting this construct contribute their members to the
@@ -166,7 +181,15 @@ struct MacroTargetValueBuilder {
                 "identifier": identifier(declaration.name),
                 "self": nominalTypeReference(qualifiedName),
                 "macros": .array(declaration.macros.map(value(for:))),
-                "generics": .array(declaration.genericParameters.map(value(for:))),
+                "generics": .array(
+                    declaration.genericParameters.enumerated().map { index, parameter in
+                        value(
+                            for: parameter,
+                            applicationArgument: applicationArguments.indices.contains(index)
+                                ? applicationArguments[index] : nil
+                        )
+                    }
+                ),
                 "conformances": .array(declaration.conformances.map(typeReferenceValue)),
                 "inits": .array(allInitializers.map(value(for:))),
                 "lets": .array(
@@ -202,6 +225,42 @@ struct MacroTargetValueBuilder {
                 "extensions": .array([]),
             ]
         )
+    }
+
+    private func constructApplicationValue(
+        for declaration: ConstructDeclaration,
+        applicationArguments: [TypeReference]
+    ) -> CompileTimeValue {
+        .object(
+            typeName: "Construct.Application",
+            fields: [
+                "type": typeReferenceValue(
+                    constructApplicationType(
+                        name: declaration.name,
+                        arguments: applicationArguments
+                    )
+                ),
+                "arguments": .array(
+                    declaration.genericParameters.enumerated().map { index, parameter in
+                        genericApplicationValue(
+                            for: parameter,
+                            applicationArgument: applicationArguments.indices.contains(index)
+                                ? applicationArguments[index] : nil
+                        )
+                    }
+                ),
+            ]
+        )
+    }
+
+    private func constructApplicationType(
+        name: String,
+        arguments: [TypeReference]
+    ) -> TypeReference {
+        guard !arguments.isEmpty else {
+            return .named(name)
+        }
+        return .generic(base: .named(name), arguments: arguments)
     }
 
     func value(for declaration: ValueDeclaration) -> CompileTimeValue {
@@ -479,7 +538,7 @@ struct MacroTargetValueBuilder {
                     packageVisibilityName(for: declaration.packageVisibility)),
                 "target": declaration.target.map(value(for:)) ?? .nilValue,
                 "expansionType": declaration.expansionType.map(typeReferenceValue) ?? .string(""),
-                "generics": .array(declaration.genericParameters.map(value(for:))),
+                "generics": .array(declaration.genericParameters.map { value(for: $0) }),
                 "parameters": .array(declaration.parameters.map(value(for:))),
                 "writtenBody": writtenSyntax(bodyText),
                 "parsedBody": parsedValue(
@@ -504,7 +563,7 @@ struct MacroTargetValueBuilder {
                     packageVisibilityName(for: metadata.packageVisibility)),
                 "target": value(for: metadata.target),
                 "expansionType": typeReferenceValue(metadata.valueType),
-                "generics": .array(metadata.genericParameters.map(value(for:))),
+                "generics": .array(metadata.genericParameters.map { value(for: $0) }),
                 "parameters": .array(metadata.parameters.map(value(for:))),
                 "writtenBody": writtenSyntax(bodyText),
                 "parsedBody": parsedValue(
@@ -739,6 +798,19 @@ struct MacroTargetValueBuilder {
         switch expression {
         case .string(let value):
             return .string(value)
+        case .integer(let value):
+            return .integer(value)
+        case .double(let value):
+            return .double(value)
+        case .boolean(let value):
+            return .boolean(value)
+        case .call(_, let arguments):
+            // Literal-shaped constructions like String("64") carry their value
+            // as a single unlabeled argument; surface that inner literal.
+            guard arguments.count == 1, arguments[0].label == nil else {
+                return nil
+            }
+            return value(for: arguments[0].value)
         default:
             return nil
         }
@@ -763,7 +835,7 @@ struct MacroTargetValueBuilder {
     ) -> CompileTimeValue {
         var fields: [String: CompileTimeValue] = [
             "identifier": identifier(declaration.name),
-            "generics": .array(declaration.genericParameters.map(value(for:))),
+            "generics": .array(declaration.genericParameters.map { value(for: $0) }),
             "parameters": .array(declaration.parameters.map(value(for:))),
             "returnType": declaration.returnType.map(typeReferenceValue) ?? .string("Void"),
         ]
@@ -778,7 +850,10 @@ struct MacroTargetValueBuilder {
         )
     }
 
-    func value(for parameter: GenericParameter) -> CompileTimeValue {
+    func value(
+        for parameter: GenericParameter,
+        applicationArgument: TypeReference? = nil
+    ) -> CompileTimeValue {
         switch parameter {
         case .type(let name, let constraint, let defaultArgument):
             return .object(
@@ -790,14 +865,79 @@ struct MacroTargetValueBuilder {
                 ]
             )
         case .value(let name, let typeReference, let defaultValue):
+            let defaultString = defaultValue.flatMap(genericDefaultString) ?? ""
+            let effectiveValue = applicationArgument.map(genericArgumentString) ?? defaultString
             return .object(
                 typeName: "ValueGeneric",
                 fields: [
                     "identifier": identifier(name),
                     "type": typeReferenceValue(typeReference),
-                    "default": defaultValue.flatMap(value(for:)) ?? .string(""),
+                    "value": .string(effectiveValue),
+                    "default": .string(defaultString),
                 ]
             )
+        }
+    }
+
+    private func genericApplicationValue(
+        for parameter: GenericParameter,
+        applicationArgument: TypeReference?
+    ) -> CompileTimeValue {
+        let name: String
+        let type: TypeReference
+        let syntax: String
+        switch parameter {
+        case .type(let parameterName, let constraint, let defaultArgument):
+            name = parameterName
+            type = applicationArgument ?? defaultArgument ?? constraint ?? .named("")
+            syntax = type.displayName
+        case .value(let parameterName, let typeReference, let defaultValue):
+            name = parameterName
+            type = typeReference
+            syntax = applicationArgument.map(genericArgumentString)
+                ?? defaultValue.flatMap(genericDefaultString)
+                ?? ""
+        }
+        return .object(
+            typeName: "Parameter.Application",
+            fields: [
+                "identifier": identifier(name),
+                "type": typeReferenceValue(type),
+                "syntax": writtenSyntax(syntax),
+            ]
+        )
+    }
+
+    private func genericDefaultString(_ expression: Expression) -> String {
+        if let value = value(for: expression) {
+            return stringValue(for: value) ?? MacroExpander.renderExpressionForStringify(expression)
+        }
+        return MacroExpander.renderExpressionForStringify(expression)
+    }
+
+    private func genericArgumentString(_ argument: TypeReference) -> String {
+        let text = argument.displayName
+        if text.count >= 2, text.first == "\"", text.last == "\"" {
+            return String(text.dropFirst().dropLast())
+        }
+        if text.hasPrefix(".") {
+            return String(text.dropFirst())
+        }
+        return text
+    }
+
+    private func stringValue(for value: CompileTimeValue) -> String? {
+        switch value {
+        case .string(let string):
+            return string
+        case .integer(let integer):
+            return String(integer)
+        case .double(let double):
+            return String(double)
+        case .boolean(let boolean):
+            return boolean ? "true" : "false"
+        default:
+            return nil
         }
     }
 

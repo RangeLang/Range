@@ -22,13 +22,9 @@ extension Parser {
             let name = try consumeIdentifier()
             try consume(.colon)
             let typeReference = try parseTypeReferenceNode()
-            let defaultValue: Expression?
-            if peek() == .equal {
-                try consume(.equal)
-                defaultValue = try parseExpression(terminatingAt: [.comma, .greater])
-            } else {
-                defaultValue = nil
-            }
+            // Defaults are written as Type(value) or Type.case, no `=`.
+            // e.g. `let bits: String("64")`, `let signedness: Signedness.signed`.
+            let defaultValue = try parseValueGenericDefaultIfPresent(typeReference: typeReference)
             return .value(name: name, typeReference: typeReference, defaultValue: defaultValue)
         }
 
@@ -50,6 +46,44 @@ extension Parser {
         }
 
         return .type(name: name, constraint: constraint, defaultArgument: defaultArgument)
+    }
+
+    // Parses a value-generic default written as Type(value) or Type.case, with no
+    // `=`. The default is the value expression built from the already-parsed type:
+    //   String("64")       -> .call("String", ["64"])
+    //   Signedness.signed   -> .call("Signedness.signed", []) i.e. member reference
+    private mutating func parseValueGenericDefaultIfPresent(
+        typeReference: TypeReference
+    ) throws -> Expression? {
+        let typeName = typeReference.displayName
+        if peek() == .leftParen {
+            let arguments = try parseInvocationArgumentsIfPresent()
+            return .call(name: typeName, arguments: arguments)
+        }
+        if peek() == .dot {
+            try consume(.dot)
+            let caseName = try consumeIdentifier()
+            return .call(name: "\(typeName).\(caseName)", arguments: [])
+        }
+        // Optional<T> with no explicit value defaults to nil by its nature:
+        // `let x: Optional<String>` means nil; `Optional<String>("Hello")` overrides.
+        if isOptional(typeReference) {
+            return .nilLiteral
+        }
+        return nil
+    }
+
+    private func isOptional(_ typeReference: TypeReference) -> Bool {
+        if case .optional = typeReference {
+            return true
+        }
+        if case .generic(let base, _) = typeReference, case .named("Optional") = base {
+            return true
+        }
+        if case .named(let name) = typeReference, name.hasPrefix("Optional<") {
+            return true
+        }
+        return false
     }
 
     mutating func parseDeclarationName(expecting kind: String) throws -> String {
