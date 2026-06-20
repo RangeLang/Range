@@ -2372,7 +2372,7 @@ struct LLVMLoweringEmitterTests {
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let integerMacro = try #require(
             intConstruct.macros.first(where: { $0.name == "integer" }))
-        #expect(integerMacro.evaluatedStringValue == "integer(type: i64, signedness: signed)")
+        #expect(integerMacro.evaluatedStringValue == "int64")
     }
 
     @Test("Int @integer macro evaluated value carries scalar metadata")
@@ -2382,7 +2382,7 @@ struct LLVMLoweringEmitterTests {
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let integerMacro = try #require(
             intConstruct.macros.first(where: { $0.name == "integer" }))
-        #expect(integerMacro.evaluatedStringValue == "integer(type: i64, signedness: signed)")
+        #expect(integerMacro.evaluatedStringValue == "int64")
     }
 
     @Test("Concrete @llvm body is collected, written, and run through clang")

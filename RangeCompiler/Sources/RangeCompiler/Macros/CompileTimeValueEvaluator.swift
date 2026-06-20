@@ -257,8 +257,6 @@ struct CompileTimeValueEvaluator {
             switch (leftValue, rightValue) {
             case (.integer(let left)?, .integer(let right)?):
                 return .integer(left + right)
-            case (.string(let left)?, .string(let right)?):
-                return .string(left + right)
             default:
                 return nil
             }
@@ -433,6 +431,15 @@ struct CompileTimeValueEvaluator {
                     continue
                 case "isEmpty":
                     current = .boolean(value.isEmpty)
+                    continue
+                case "snakeCase":
+                    current = .string(snakeCase(value))
+                    continue
+                case "obfuscated":
+                    current = .string(obfuscated(value))
+                    continue
+                case "lastComponent":
+                    current = .string(value.split(separator: ".").last.map(String.init) ?? value)
                     continue
                 default:
                     break
@@ -647,18 +654,42 @@ struct CompileTimeValueEvaluator {
         }
 
         guard arguments.count == 1,
-            arguments[0].label == nil,
-            let value = evaluate(arguments[0].value, locals: locals)
+            arguments[0].label == nil
         else {
             return nil
         }
 
+        if name == "String" {
+            return evaluateStringConstructionArgument(arguments[0].value, locals: locals)
+        }
+
+        guard let value = evaluate(arguments[0].value, locals: locals) else {
+            return nil
+        }
+
         switch (name, value) {
-        case ("String", .string), ("Int", .integer), ("Bool", .boolean), ("Float", .double):
+        case ("Int", .integer), ("Bool", .boolean), ("Float", .double):
             return value
         default:
             return nil
         }
+    }
+
+    private func evaluateStringConstructionArgument(
+        _ expression: Expression,
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        if case .binary(let lhs, .addition, let rhs) = expression,
+            case .string(let left)? = evaluateStringConstructionArgument(lhs, locals: locals),
+            case .string(let right)? = evaluateStringConstructionArgument(rhs, locals: locals)
+        {
+            return .string(left + right)
+        }
+
+        guard case .string = evaluate(expression, locals: locals) else {
+            return nil
+        }
+        return evaluate(expression, locals: locals)
     }
 
     private func evaluateGraphCall(

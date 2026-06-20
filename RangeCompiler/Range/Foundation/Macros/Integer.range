@@ -1,4 +1,5 @@
 open macro integer(): Construct -> String { target, diagnostics in
+    let integerName: String(target.declaration.identifier.name.snakeCase)
     state bits: String()
     state signedness: String()
     state hasBits: false
@@ -26,5 +27,5 @@ open macro integer(): Construct -> String { target, diagnostics in
         diagnostics.error("@integer requires a value generic named signedness.")
     }
 
-    return "integer(type: i" + bits + ", signedness: " + signedness + ")"
+    return String(integerName + bits)
 }

@@ -618,6 +618,62 @@ struct CompilerFixtureTests {
         #expect(macro.evaluatedStringValue == "")
     }
 
+    @Test("Macro evaluator supports property string transforms")
+    func macroEvaluatorSupportsPropertyStringTransforms() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MacroStringTransform.range",
+                source: """
+                    macro transformedName(): Construct -> String { target, diagnostics in
+                        return target.declaration.identifier.name.snakeCase
+                    }
+
+                    @transformedName
+                    construct UserProfile {
+                        let name: String
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let construct = try #require(program.declarationGraph.constructsByName["UserProfile"])
+        let macro = try #require(construct.macros.first(where: { $0.name == "transformedName" }))
+        #expect(macro.evaluatedStringValue == "user_profile")
+    }
+
+    @Test("Macro evaluator requires String construction for string concatenation")
+    func macroEvaluatorRequiresStringConstructionForStringConcatenation() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MacroRawStringConcat.range",
+                source: """
+                    macro rawConcat(): Construct -> String { target, diagnostics in
+                        let lhs: String("a")
+                        let rhs: String("b")
+                        return lhs + rhs
+                    }
+
+                    @rawConcat
+                    construct User {
+                        let name: String
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected raw string concatenation in a macro return to fail.")
+        } catch {
+            #expect(String(describing: error).contains("could not be evaluated at compile time"))
+        }
+    }
+
     @Test("Extension macros evaluate against extension target")
     func extensionMacrosEvaluateAgainstExtensionTarget() throws {
         var inputs = try rangeCoreInputs()
