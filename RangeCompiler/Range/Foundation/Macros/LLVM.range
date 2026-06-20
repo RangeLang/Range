@@ -1,10 +1,3 @@
-open macro llvm(body: String): Construct -> String { target, diagnostics in
-    state llvm: String(body)
-
-    for generic in target.declaration.generics {
-        let name: String(generic.identifier.name)
-        llvm: llvm.replacingOccurrences(of: "$" + name, with: generic.value)
-    }
-
-    return llvm
+open macro llvm(body: String) -> String { target, diagnostics, graph in
+    return body
 }

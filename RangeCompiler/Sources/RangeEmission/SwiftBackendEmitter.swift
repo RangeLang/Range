@@ -76,10 +76,11 @@ struct SwiftBackendEmitter {
         var constructsByName: [String: ConstructDeclaration] = [:]
         var macrosByName: [String: MacroDeclaration] = [:]
         var callableParameterLabelsByName: [String: [[String]]] = [:]
-        var llvmBridgesByCallableName: [String: LLVMCallableBridge] = [:]
+        var llvmBridgesByCallableKey: [String: LLVMCallableBridge] = [:]
         var llvmConstructLayouts: [String: LLVMLowerability.ConstructLayout] = [:]
+        var llvmScalarTypes: [String: LLVMLowerability.ScalarType] = [:]
         var llvmLoweredCallables: [CallableDeclaration] = []
-        var llvmLoweredCallableNames: Set<String> = []
+        var llvmLoweredCallableKeys: Set<String> = []
         var llvmRejectedCallables: [LLVMRejectedCallable] = []
         var llvmConstructBodies: [CollectedLLVMConstruct] = []
 
@@ -103,19 +104,25 @@ struct SwiftBackendEmitter {
             self.llvmConstructLayouts = LLVMLowerability.constructLayouts(
                 from: Self.allDeclarations(in: program)
             )
+            self.llvmScalarTypes = LLVMLowerability.scalarTypes(
+                from: Self.allDeclarations(in: program)
+            )
             self.llvmLoweredCallables = Self.collectLLVMLoweredCallables(
                 from: program,
-                constructLayouts: llvmConstructLayouts
+                constructLayouts: llvmConstructLayouts,
+                scalarTypes: llvmScalarTypes
             )
-            self.llvmLoweredCallableNames = Set(llvmLoweredCallables.map(\.name))
-            self.llvmBridgesByCallableName = Self.collectLLVMBridges(
+            self.llvmLoweredCallableKeys = Set(llvmLoweredCallables.map(LLVMLoweringEmitter.callableKey(for:)))
+            self.llvmBridgesByCallableKey = Self.collectLLVMBridges(
                 from: llvmLoweredCallables,
-                constructLayouts: llvmConstructLayouts
+                constructLayouts: llvmConstructLayouts,
+                scalarTypes: llvmScalarTypes
             )
             self.llvmRejectedCallables = Self.collectLLVMRejectedCallables(
                 from: program,
                 loweredCallables: llvmLoweredCallables,
-                constructLayouts: llvmConstructLayouts
+                constructLayouts: llvmConstructLayouts,
+                scalarTypes: llvmScalarTypes
             )
             self.llvmConstructBodies = Self.collectLLVMConstructBodies(from: program)
         }
@@ -246,7 +253,8 @@ struct SwiftBackendEmitter {
 
         private static func collectLLVMLoweredCallables(
             from program: LoweredProgram,
-            constructLayouts: [String: LLVMLowerability.ConstructLayout]
+            constructLayouts: [String: LLVMLowerability.ConstructLayout],
+            scalarTypes: [String: LLVMLowerability.ScalarType]
         )
             -> [CallableDeclaration]
         {
@@ -262,87 +270,98 @@ struct SwiftBackendEmitter {
                     where LLVMLowerability.canLower(
                         callable,
                         lowerableFunctionSignatures: loweredSignatures,
-                        constructLayouts: constructLayouts
+                        constructLayouts: constructLayouts,
+                        scalarTypes: scalarTypes
                     )
                 {
                     let symbol = LLVMLoweringEmitter.symbolName(for: callable)
                     guard seenSymbols.insert(symbol).inserted,
                         let signature = LLVMLowerability.scalarSignature(
                             for: callable,
-                            constructLayouts: constructLayouts
+                            constructLayouts: constructLayouts,
+                            scalarTypes: scalarTypes
                         )
                     else {
                         continue
                     }
                     lowerableCallables.append(callable)
-                    loweredSignatures[callable.name] = signature
+                    loweredSignatures[LLVMLoweringEmitter.callableKey(for: callable)] = signature
                     changed = true
                 }
             }
 
-            let lowerableByName = Dictionary(
-                uniqueKeysWithValues: lowerableCallables.map { ($0.name, $0) }
+            let lowerableByKey = Dictionary(
+                uniqueKeysWithValues: lowerableCallables.map {
+                    (LLVMLoweringEmitter.callableKey(for: $0), $0)
+                }
             )
-            let bridgeableRootNames = lowerableCallables.compactMap { callable -> String? in
-                guard let signature = loweredSignatures[callable.name],
+            let bridgeableRootKeys = lowerableCallables.compactMap { callable -> String? in
+                let key = LLVMLoweringEmitter.callableKey(for: callable)
+                guard let signature = loweredSignatures[key],
                     llvmSignatureIsSwiftBridgeable(signature)
                 else {
                     return nil
                 }
-                return callable.name
+                return key
             }
-            var requiredNames = Set<String>()
+            var requiredKeys = Set<String>()
 
-            func visit(_ name: String) {
-                guard requiredNames.insert(name).inserted,
-                    let callable = lowerableByName[name]
+            func visit(_ key: String) {
+                guard requiredKeys.insert(key).inserted,
+                    let callable = lowerableByKey[key]
                 else {
                     return
                 }
                 for dependency in callableDependencies(in: callable)
-                    where lowerableByName[dependency] != nil
+                    where lowerableByKey[dependency] != nil
                 {
                     visit(dependency)
                 }
             }
 
-            for name in bridgeableRootNames {
-                visit(name)
+            for key in bridgeableRootKeys {
+                visit(key)
             }
 
-            return lowerableCallables.filter { requiredNames.contains($0.name) }
+            return lowerableCallables.filter {
+                requiredKeys.contains(LLVMLoweringEmitter.callableKey(for: $0))
+            }
         }
 
         private static func collectLLVMRejectedCallables(
             from program: LoweredProgram,
             loweredCallables: [CallableDeclaration],
-            constructLayouts: [String: LLVMLowerability.ConstructLayout]
+            constructLayouts: [String: LLVMLowerability.ConstructLayout],
+            scalarTypes: [String: LLVMLowerability.ScalarType]
         ) -> [LLVMRejectedCallable] {
-            let loweredNames = Set(loweredCallables.map(\.name))
+            let loweredKeys = Set(loweredCallables.map(LLVMLoweringEmitter.callableKey(for:)))
             let loweredSignatures = Dictionary(
                 uniqueKeysWithValues: loweredCallables.compactMap {
                     callable -> (String, LLVMLowerability.ScalarSignature)? in
                     guard let signature = LLVMLowerability.scalarSignature(
                         for: callable,
-                        constructLayouts: constructLayouts
+                        constructLayouts: constructLayouts,
+                        scalarTypes: scalarTypes
                     ) else {
                         return nil
                     }
-                    return (callable.name, signature)
+                    return (LLVMLoweringEmitter.callableKey(for: callable), signature)
                 }
             )
 
             return llvmCandidateCallables(from: program)
-                .filter { !loweredNames.contains($0.name) }
+                .filter { !loweredKeys.contains(LLVMLoweringEmitter.callableKey(for: $0)) }
                 .map { callable in
                     if let signature = LLVMLowerability.scalarSignature(
                         for: callable,
-                        constructLayouts: constructLayouts
+                        constructLayouts: constructLayouts,
+                        scalarTypes: scalarTypes
                     ),
                         LLVMLowerability.canLower(
                             callable,
                             lowerableFunctionSignatures: loweredSignatures,
-                            constructLayouts: constructLayouts
+                            constructLayouts: constructLayouts,
+                            scalarTypes: scalarTypes
                         ),
                         !llvmSignatureIsSwiftBridgeable(signature)
                     {
@@ -356,7 +375,8 @@ struct SwiftBackendEmitter {
                         reason: LLVMLowerability.rejectionReason(
                             for: callable,
                             lowerableFunctionSignatures: loweredSignatures,
-                            constructLayouts: constructLayouts
+                            constructLayouts: constructLayouts,
+                            scalarTypes: scalarTypes
                         ) ?? "uses unsupported LLVM shape"
                     )
                 }
@@ -366,7 +386,11 @@ struct SwiftBackendEmitter {
         private static func llvmCandidateCallables(from program: LoweredProgram)
             -> [CallableDeclaration]
         {
-            program.callables + program.units.flatMap(\.callables)
+            var callables = program.callables
+            callables.append(contentsOf: program.units.flatMap(\.callables))
+            callables.append(contentsOf: allDeclarations(in: program).flatMap(\.callables))
+            callables.append(contentsOf: allExtensions(in: program).flatMap(\.callables))
+            return callables
         }
 
         private static func llvmSignatureIsSwiftBridgeable(
@@ -392,18 +416,20 @@ struct SwiftBackendEmitter {
 
         private static func collectLLVMBridges(
             from callables: [CallableDeclaration],
-            constructLayouts: [String: LLVMLowerability.ConstructLayout]
+            constructLayouts: [String: LLVMLowerability.ConstructLayout],
+            scalarTypes: [String: LLVMLowerability.ScalarType]
         ) -> [String: LLVMCallableBridge] {
             callables.reduce(into: [:]) { result, callable in
                 guard let signature = LLVMLowerability.scalarSignature(
                     for: callable,
-                    constructLayouts: constructLayouts
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
                 ),
                     llvmSignatureIsSwiftBridgeable(signature)
                 else {
                     return
                 }
-                result[callable.name] = LLVMCallableBridge(
+                result[LLVMLoweringEmitter.callableKey(for: callable)] = LLVMCallableBridge(
                     symbolName: LLVMLoweringEmitter.symbolName(for: callable),
                     signature: signature
                 )
@@ -698,6 +724,20 @@ struct SwiftBackendEmitter {
             .emitProgramWithContext(program)
     }
 
+    func emitLLVMModule(program: LoweredProgram) throws -> LLVMModuleEmission {
+        let context = SwiftEmissionContext(program: program)
+        guard
+            let module = try LLVMLoweringEmitter().emitModule(
+                callables: context.llvmLoweredCallables,
+                constructLayouts: context.llvmConstructLayouts,
+                scalarTypes: context.llvmScalarTypes
+            )
+        else {
+            throw SwiftBackendError("Range program has no LLVM-lowerable declarations.")
+        }
+        return module
+    }
+
     /// Collects construct-attached `@llvm` lowering bodies from a program.
     /// Exposed for verifying that Range-authored construct lowering metadata is
     /// gathered by Swift. Read-only: this does not influence emission yet.
@@ -711,7 +751,10 @@ struct SwiftBackendEmitter {
         let allCallables = program.callables + program.declarations.flatMap(\.callables)
         let functions =
             try allCallables
-            .filter { $0.targetType == nil && !context.llvmLoweredCallableNames.contains($0.name) }
+            .filter {
+                $0.targetType == nil
+                    && !context.llvmLoweredCallableKeys.contains(LLVMLoweringEmitter.callableKey(for: $0))
+            }
             .map(emitFunction)
             .joined(separator: "\n\n")
         let enumerations = try program.enumerations.map(emitEnum).joined(separator: "\n\n")
@@ -745,7 +788,8 @@ struct SwiftBackendEmitter {
 
         let llvmModule = try LLVMLoweringEmitter().emitModule(
             callables: context.llvmLoweredCallables,
-            constructLayouts: context.llvmConstructLayouts
+            constructLayouts: context.llvmConstructLayouts,
+            scalarTypes: context.llvmScalarTypes
         )
         let llvmObjectPath = llvmModule.map { "LLVM/\($0.moduleName).o" }
         let linkerSettings = llvmObjectPath.map {
@@ -1829,7 +1873,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitLLVMBridgeDeclarations() -> String {
-        let bridges = context.llvmBridgesByCallableName.sorted { $0.key < $1.key }.map {
+        let bridges = context.llvmBridgesByCallableKey.sorted { $0.key < $1.key }.map {
             _, bridge in
             let parameters = bridge.signature.parameters.enumerated()
                 .map { index, type in "_ argument\(index): \(swiftLLVMBridgeType(for: type))" }
@@ -1904,7 +1948,10 @@ struct SwiftBackendEmitter {
         }
 
         let functions = try unit.callables
-            .filter { $0.targetType == nil && !context.llvmLoweredCallableNames.contains($0.name) }
+            .filter {
+                $0.targetType == nil
+                    && !context.llvmLoweredCallableKeys.contains(LLVMLoweringEmitter.callableKey(for: $0))
+            }
             .map(emitFunction)
             .joined(separator: "\n\n")
 
@@ -2842,12 +2889,30 @@ struct SwiftBackendEmitter {
             callable.returnType,
             genericParameterNames: genericParameterNames
         )
-        let functionBody = try emitStatements(
-            body,
-            indent: 2,
-            enclosingReturnType: callable.returnType ?? .named("Void"),
-            scope: scope
-        )
+        let bridgeKey = LLVMLoweringEmitter.callableKey(for: callable)
+        let functionBody: String
+        if let bridge = context.llvmBridgesByCallableKey[bridgeKey] {
+            let arguments = callable.parameters.map {
+                CallArgument(label: nil, value: .identifier($0.localName))
+            }
+            let call = try emitLLVMBridgeCallExpression(
+                symbolName: bridge.symbolName,
+                arguments: arguments,
+                parameterTypes: bridge.signature.parameters,
+                scope: scope
+            )
+            functionBody = indentBlock(
+                "return \(emitLLVMBridgeReturn(call, type: bridge.signature.returnType))",
+                level: 2
+            )
+        } else {
+            functionBody = try emitStatements(
+                body,
+                indent: 2,
+                enclosingReturnType: callable.returnType ?? .named("Void"),
+                scope: scope
+            )
+        }
         let isStatic = forceStatic || callableShouldEmitStatic(callable)
         let staticPrefix = isStatic ? "static " : ""
         let mutatingPrefix =
@@ -4455,7 +4520,7 @@ struct SwiftBackendEmitter {
         arguments: [CallArgument],
         scope: EmissionScope
     ) throws -> String? {
-        guard let bridge = context.llvmBridgesByCallableName[name] else {
+        guard let bridge = context.llvmBridgesByCallableKey[name] else {
             return nil
         }
         guard arguments.count == bridge.signature.parameters.count else {

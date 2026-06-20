@@ -34,6 +34,27 @@ public struct SwiftBackend {
 
     public init() {}
 
+    public func emitLLVMIR(
+        project: SwiftBackendProject,
+        compiledProgram: CompiledProgram
+    ) throws -> String {
+        let program = try programBuilder.buildLLVM(project: project, compiledProgram: compiledProgram)
+        let loweredProgram = adapter.adapt(program: program)
+        return try emitter.emitLLVMModule(program: loweredProgram).ir
+    }
+
+    public func emitLLVMIRFile(
+        project: SwiftBackendProject,
+        compiledProgram: CompiledProgram,
+        outputURL: URL
+    ) throws -> URL {
+        let ir = try emitLLVMIR(project: project, compiledProgram: compiledProgram)
+        let parent = outputURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        try ir.write(to: outputURL, atomically: true, encoding: .utf8)
+        return outputURL
+    }
+
     public func emitWorkspace(
         project: SwiftBackendProject,
         compiledProgram: CompiledProgram

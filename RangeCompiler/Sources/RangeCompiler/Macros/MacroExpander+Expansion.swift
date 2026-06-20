@@ -2647,8 +2647,9 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) throws -> CompileTimeValue? {
         let evaluator = CompileTimeValueEvaluator(
-            targetBinding: "__syntax_macro_target__",
+            targetBinding: macro.bindings?.target ?? "__syntax_macro_target__",
             targetValue: .object(typeName: "SyntaxMacro.Target", fields: [:]),
+            graphBinding: macro.bindings?.graph,
             selfValue: MacroTargetValueBuilder(
                 macroDeclarationsByName: context.macroDeclarationsByName,
                 macroMetadataByName: context.macroMetadataByName,

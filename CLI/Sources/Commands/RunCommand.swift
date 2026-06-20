@@ -6,13 +6,13 @@ import RangeCompiler
 extension CLI {
     struct Run: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Run a Range main program."
+            abstract: "Emit, link, and run native LLVM output for a Range program."
         )
 
         @Argument(help: "Project directory or source .range file to run.")
         var input: String?
 
-        @Flag(help: "Build and run the generated Swift workspace in release mode.")
+        @Flag(help: "Accepted for compatibility. Native LLVM linking currently uses clang defaults.")
         var release = false
 
         mutating func run() throws {
@@ -25,18 +25,24 @@ extension CLI {
                     for: project
                 )
                 let backend = SwiftBackend()
-                let workspaceRoot = try backend.emitWorkspace(
+                let buildRoot = project.defaultBuildRoot
+                if FileManager.default.fileExists(atPath: buildRoot.path) {
+                    try FileManager.default.removeItem(at: buildRoot)
+                }
+                let irURL = buildRoot.appendingPathComponent("RangeScalar.ll")
+                _ = try backend.emitLLVMIRFile(
                     project: SwiftBackendProject(
                         projectFiles: project.projectFiles,
                         isSingleFile: project.isSingleFile,
-                        buildRoot: project.defaultBuildRoot
+                        buildRoot: buildRoot
                     ),
-                    compiledProgram: compiledProgram
+                    compiledProgram: compiledProgram,
+                    outputURL: irURL
                 )
-                try backend.run(
-                    workspaceRoot: workspaceRoot,
-                    configuration: release ? .release : .debug
-                )
+                let executableURL = buildRoot.appendingPathComponent(project.packageName)
+                let runner = NativeLLVMRunner()
+                try runner.link(irURL: irURL, executableURL: executableURL)
+                try runner.run(executableURL: executableURL)
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure

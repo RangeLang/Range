@@ -16,6 +16,13 @@ struct SwiftBackendProgramBuilder {
         return try build(compiledProgram: compiledProgram)
     }
 
+    func buildLLVM(
+        project: SwiftBackendProject,
+        compiledProgram: CompiledProgram
+    ) throws -> LoweredProgram {
+        try build(compiledProgram: compiledProgram, requireMain: false)
+    }
+
     private func build(
         fromSingleFile fileURL: URL,
         compiledProgram: CompiledProgram
@@ -104,7 +111,7 @@ struct SwiftBackendProgramBuilder {
         }
     }
 
-    private func build(compiledProgram: CompiledProgram) throws -> LoweredProgram {
+    private func build(compiledProgram: CompiledProgram, requireMain: Bool = true) throws -> LoweredProgram {
         var callables: [CallableDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var declarations: [ConstructDeclaration] = []
@@ -211,9 +218,10 @@ struct SwiftBackendProgramBuilder {
             }
         }
 
-        guard let mainBlock else {
+        if requireMain && mainBlock == nil {
             throw SwiftBackendError("Missing @main block while generating Swift.")
         }
+        let loweredMainBlock = mainBlock ?? MainBlockNode(macros: [], body: [])
 
         let extendedCasesByEnumName = Dictionary(
             grouping: extensions.flatMap { extensionDeclaration in
@@ -247,7 +255,7 @@ struct SwiftBackendProgramBuilder {
             enumerations: loweredEnumerations,
             declarations: declarations,
             extensions: extensions,
-            mainBlock: mainBlock,
+            mainBlock: loweredMainBlock,
             units: loweredUnits
         )
     }

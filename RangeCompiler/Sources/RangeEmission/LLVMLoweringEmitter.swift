@@ -14,27 +14,29 @@ struct LLVMLoweredSymbol: Equatable {
 
 struct LLVMLoweringEmitter {
     func emitModule(
-        callables lowerableFunctions: [CallableDeclaration],
+        callables: [CallableDeclaration],
         constructLayouts: [String: LLVMLowerability.ConstructLayout] = [:],
+        scalarTypes: [String: LLVMLowerability.ScalarType] = [:],
         moduleName: String = "RangeScalar"
     ) throws
         -> LLVMModuleEmission?
     {
-        guard !lowerableFunctions.isEmpty else {
+        guard !callables.isEmpty else {
             return nil
         }
 
         let symbolsByName = Dictionary(
-            uniqueKeysWithValues: lowerableFunctions.compactMap {
+            uniqueKeysWithValues: callables.compactMap {
                 callable -> (String, LLVMFunctionEmitter.CallableSymbol)? in
                 guard let signature = LLVMLowerability.scalarSignature(
                     for: callable,
-                    constructLayouts: constructLayouts
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
                 ) else {
                     return nil
                 }
                 return (
-                    callable.name,
+                    Self.callableKey(for: callable),
                     LLVMFunctionEmitter.CallableSymbol(
                         symbolName: Self.symbolName(for: callable),
                         signature: signature
@@ -62,12 +64,13 @@ struct LLVMLoweringEmitter {
                 }
             }
         }
-        let functions = try lowerableFunctions.map {
+        let functions = try callables.map {
             try emitFunction(
                 $0,
                 symbolsByName: symbolsByName,
                 stringTable: stringTable,
-                constructLayouts: constructLayouts
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
             )
         }
         .joined(separator: "\n\n")
@@ -83,8 +86,11 @@ struct LLVMLoweringEmitter {
         return LLVMModuleEmission(
             moduleName: moduleName,
             ir: ir + "\n",
-            loweredSymbols: lowerableFunctions.map {
-                LLVMLoweredSymbol(rangeName: $0.name, llvmName: Self.symbolName(for: $0))
+            loweredSymbols: callables.map {
+                LLVMLoweredSymbol(
+                    rangeName: Self.callableKey(for: $0),
+                    llvmName: Self.symbolName(for: $0)
+                )
             }
         )
     }
@@ -93,14 +99,16 @@ struct LLVMLoweringEmitter {
         _ callable: CallableDeclaration,
         symbolsByName: [String: LLVMFunctionEmitter.CallableSymbol],
         stringTable: LLVMStringTable,
-        constructLayouts: [String: LLVMLowerability.ConstructLayout]
+        constructLayouts: [String: LLVMLowerability.ConstructLayout],
+        scalarTypes: [String: LLVMLowerability.ScalarType]
     ) throws -> String {
         guard let body = callable.body else {
             throw LLVMLoweringError("LLVM lowering requires function \(callable.name) to have a body.")
         }
         guard let signature = LLVMLowerability.scalarSignature(
             for: callable,
-            constructLayouts: constructLayouts
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
         ) else {
             throw LLVMLoweringError("LLVM lowering requires scalar function \(callable.name).")
         }
@@ -110,7 +118,8 @@ struct LLVMLoweringEmitter {
             parameters: callable.parameters,
             callableSymbolsByName: symbolsByName,
             stringTable: stringTable,
-            constructLayouts: constructLayouts
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
         )
         try function.emitBody(body)
         let parameterList = zip(callable.parameters, signature.parameters)
@@ -127,7 +136,17 @@ struct LLVMLoweringEmitter {
     }
 
     static func symbolName(for callable: CallableDeclaration) -> String {
-        "RangeLLVM_" + sanitizeSymbol(callable.name)
+        if callableKey(for: callable) == "main", callable.parameters.isEmpty {
+            return "main"
+        }
+        return "RangeLLVM_" + sanitizeSymbol(callableKey(for: callable))
+    }
+
+    static func callableKey(for callable: CallableDeclaration) -> String {
+        guard let owner = callable.targetType ?? callable.receiverType else {
+            return callable.name
+        }
+        return "\(owner.displayName).\(callable.name)"
     }
 
     static func constructTypeName(identity: String, name: String) -> String {
@@ -373,6 +392,7 @@ private struct LLVMFunctionEmitter {
     private let callableSymbolsByName: [String: CallableSymbol]
     private let stringTable: LLVMStringTable
     private let constructLayouts: [String: LLVMLowerability.ConstructLayout]
+    private let scalarTypes: [String: LLVMLowerability.ScalarType]
     private(set) var lines: [String] = []
     private var nextRegister = 0
     private var nextLabel = 0
@@ -384,7 +404,8 @@ private struct LLVMFunctionEmitter {
         parameters: [RangeFunctionParameter],
         callableSymbolsByName: [String: CallableSymbol],
         stringTable: LLVMStringTable,
-        constructLayouts: [String: LLVMLowerability.ConstructLayout]
+        constructLayouts: [String: LLVMLowerability.ConstructLayout],
+        scalarTypes: [String: LLVMLowerability.ScalarType]
     ) {
         self.returnType = signature.returnType
         self.symbols = Dictionary(
@@ -396,6 +417,7 @@ private struct LLVMFunctionEmitter {
         self.callableSymbolsByName = callableSymbolsByName
         self.stringTable = stringTable
         self.constructLayouts = constructLayouts
+        self.scalarTypes = scalarTypes
     }
 
     mutating func emitBody(_ body: [Statement]) throws {
@@ -463,7 +485,8 @@ private struct LLVMFunctionEmitter {
     private mutating func emitLocalBinding(_ declaration: LocalBindingDeclaration) throws {
         guard let scalarType = ScalarType(
             typeReference: declaration.type,
-            constructLayouts: constructLayouts
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
         ) else {
             throw LLVMLoweringError("LLVM local binding '\(declaration.name)' must be LLVM lowerable.")
         }

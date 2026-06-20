@@ -434,6 +434,7 @@ struct MacroTargetValueBuilder {
             selfValue: MacroTargetValueBuilder(knownObjectTypeNames: knownObjectTypeNames)
                 .value(for: metadata),
             localBindings: initialBindings,
+            macroDeclarationsByName: context?.macroDeclarationsByName ?? [:],
             knownObjectTypeNames: knownObjectTypeNames,
             context: context
         )

@@ -39,19 +39,28 @@ extension Parser {
             try consume(.arrow)
             let expansionType = try parseTypeReferenceNode()
             let syntaxBody: EmittedCodeBlock?
+            let bindings: MacroBindings?
+            let body: [Statement]
             if signatureOnly {
                 try consume(.leftBrace)
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
                 syntaxBody = nil
+                bindings = nil
+                body = []
+            } else if freestandingMacroBodyStartsWithBindings() {
+                try consume(.leftBrace)
+                let parsedBindings = try parseMacroBodyBindings()
+                syntaxBody = nil
+                bindings = parsedBindings
+                body = try parseFreestandingMacroValueBody(
+                    parameters: parameters,
+                    bindings: parsedBindings
+                )
             } else {
                 try consume(.leftBrace)
                 syntaxBody = try parseEmittedCodeBlock()
-            }
-            let body: [Statement]
-            if syntaxBody == nil, !signatureOnly {
-                body = try parseFreestandingMacroValueBody(parameters: parameters)
-            } else {
+                bindings = nil
                 body = []
             }
             return MacroDeclaration(
@@ -61,7 +70,7 @@ extension Parser {
                 parameters: parameters,
                 target: nil,
                 expansionType: expansionType,
-                bindings: nil,
+                bindings: bindings,
                 body: body,
                 syntaxBody: syntaxBody
             )
@@ -148,6 +157,13 @@ extension Parser {
     mutating func parseFreestandingMacroValueBody(parameters: [RangeFunctionParameter]) throws
         -> [Statement]
     {
+        try parseFreestandingMacroValueBody(parameters: parameters, bindings: nil)
+    }
+
+    mutating func parseFreestandingMacroValueBody(
+        parameters: [RangeFunctionParameter],
+        bindings: MacroBindings?
+    ) throws -> [Statement] {
         var localBindings = Dictionary(
             uniqueKeysWithValues: parameters.map {
                 (
@@ -156,12 +172,37 @@ extension Parser {
                 )
             }
         )
+        if let bindings {
+            localBindings["self"] = .init(kind: .constant, type: .named("Macro.Declaration"))
+            localBindings[bindings.target] = .init(
+                kind: .constant,
+                type: .member(base: .named("Macro"), name: "Target")
+            )
+            localBindings[bindings.diagnostics] = .init(
+                kind: .constant,
+                type: .named("MacroDiagnostics")
+            )
+            if let graph = bindings.graph {
+                localBindings[graph] = .init(kind: .constant, type: .named("GraphContext"))
+            }
+        }
         var statements: [Statement] = []
+        currentMacroBodyDepth += 1
+        defer { currentMacroBodyDepth -= 1 }
         while peek() != .rightBrace {
             statements.append(try parseStatement(localBindings: &localBindings))
         }
         try consume(.rightBrace)
         return statements
+    }
+
+    private func freestandingMacroBodyStartsWithBindings() -> Bool {
+        switch (peek(), peek(offset: 1), peek(offset: 2)) {
+        case (.leftBrace, .identifier, .comma), (.leftBrace, .keyword, .comma):
+            return true
+        default:
+            return false
+        }
     }
     mutating func parseMacroBody() throws -> (bindings: MacroBindings, body: [Statement]) {
         try consume(.leftBrace)

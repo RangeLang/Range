@@ -486,14 +486,18 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("llvm macro carries an LLVM template string on a construct")
-    func llvmMacroCarriesTemplateOnConstruct() throws {
+    @Test("llvm macro returns an LLVM template string")
+    func llvmMacroReturnsTemplateString() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/LLVMMacro.range",
                 source: """
-                    @llvm(body: "%r = add i$bits $lhs, $rhs")
+                    macro lower(): Construct -> String { target, diagnostics in
+                        return @llvm(body: "%r = add i$bits $lhs, $rhs")
+                    }
+
+                    @lower
                     construct Widget {
                         let value: Int
                     }
@@ -504,8 +508,8 @@ struct CompilerFixtureTests {
 
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let construct = try #require(program.declarationGraph.constructsByName["Widget"])
-        let llvm = try #require(construct.macros.first(where: { $0.name == "llvm" }))
-        #expect(llvm.argumentClause?.contains("add i$bits $lhs, $rhs") == true)
+        let lower = try #require(construct.macros.first(where: { $0.name == "lower" }))
+        #expect(lower.evaluatedStringValue == "%r = add i$bits $lhs, $rhs")
     }
 
     @Test("String supports + concatenation")

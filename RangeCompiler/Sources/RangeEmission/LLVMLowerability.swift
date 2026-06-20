@@ -32,10 +32,14 @@ enum LLVMLowerability {
         case intArray
         case construct(identity: String, name: String)
 
-        init?(typeReference: TypeReference, constructLayouts: [String: ConstructLayout] = [:]) {
+        init?(
+            typeReference: TypeReference,
+            constructLayouts: [String: ConstructLayout] = [:],
+            scalarTypes: [String: ScalarType] = [:]
+        ) {
             switch typeReference {
             case .named("Int"):
-                self = .defaultInt
+                self = scalarTypes["Int"] ?? .defaultInt
             case .generic(let base, let arguments) where base == .named("Int"):
                 guard let type = Self.intType(arguments: arguments) else {
                     return nil
@@ -50,6 +54,10 @@ enum LLVMLowerability {
             case .array(.named("Int")):
                 self = .intArray
             case .named(let name):
+                if let scalarType = scalarTypes[name] {
+                    self = scalarType
+                    return
+                }
                 let matchingLayouts = constructLayouts.values.filter {
                     $0.name == name
                 }
@@ -99,6 +107,30 @@ enum LLVMLowerability {
                 $0 == ".unsigned" || $0.hasSuffix(".unsigned") || $0 == "unsigned"
             }
             return .int(bits: bits, signed: signed)
+        }
+
+        init?(integerMacroValue value: String) {
+            let digits = value.reversed().prefix { $0.isNumber }.reversed()
+            guard !digits.isEmpty,
+                let bits = Int(String(digits)),
+                bits > 0
+            else {
+                return nil
+            }
+            self = .int(bits: bits, signed: true)
+        }
+    }
+
+    static func scalarTypes(from declarations: [ConstructDeclaration]) -> [String: ScalarType] {
+        declarations.reduce(into: [:]) { result, declaration in
+            guard
+                let value = declaration.macros.first(where: { $0.name == "integer" })?
+                    .evaluatedStringValue,
+                let scalarType = ScalarType(integerMacroValue: value)
+            else {
+                return
+            }
+            result[declaration.name] = scalarType
         }
     }
 
@@ -213,7 +245,8 @@ enum LLVMLowerability {
     static func canLower(
         _ callable: CallableDeclaration,
         lowerableFunctionNames: Set<String> = [],
-        constructLayouts: [String: ConstructLayout] = [:]
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
     ) -> Bool {
         let signatures = Dictionary(
             uniqueKeysWithValues: lowerableFunctionNames.map {
@@ -223,19 +256,24 @@ enum LLVMLowerability {
         return canLower(
             callable,
             lowerableFunctionSignatures: signatures,
-            constructLayouts: constructLayouts
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
         )
     }
 
     static func canLower(
         _ callable: CallableDeclaration,
         lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
     ) -> Bool {
         guard callable.targetType == nil,
-            callable.receiverType == nil,
             callable.genericParameters.isEmpty,
-            let signature = scalarSignature(for: callable, constructLayouts: constructLayouts),
+            let signature = scalarSignature(
+                for: callable,
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            ),
             let body = callable.body
         else {
             return false
@@ -250,27 +288,27 @@ enum LLVMLowerability {
             returnType: signature.returnType,
             locals: &locals,
             lowerableFunctionSignatures: lowerableFunctionSignatures,
-            constructLayouts: constructLayouts
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
         )
     }
 
     static func rejectionReason(
         for callable: CallableDeclaration,
         lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
     ) -> String? {
         if canLower(
             callable,
             lowerableFunctionSignatures: lowerableFunctionSignatures,
-            constructLayouts: constructLayouts
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
         ) {
             return nil
         }
         if callable.targetType != nil {
             return "has a target type"
-        }
-        if callable.receiverType != nil {
-            return "has a receiver type"
         }
         if !callable.genericParameters.isEmpty {
             return "has generic parameters"
@@ -278,9 +316,11 @@ enum LLVMLowerability {
         guard let returnType = callable.returnType else {
             return "has no explicit return type"
         }
-        guard let scalarReturnType = ScalarType(
-            typeReference: returnType,
-            constructLayouts: constructLayouts
+        guard let scalarReturnType = scalarType(
+            for: returnType,
+            callable: callable,
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
         ) else {
             return "return type \(returnType.displayName) is not an LLVM scalar"
         }
@@ -288,7 +328,12 @@ enum LLVMLowerability {
             guard let typeReference = parameter.typeReference else {
                 return "parameter \(parameter.name) has no explicit type"
             }
-            guard ScalarType(typeReference: typeReference, constructLayouts: constructLayouts) != nil else {
+            guard scalarType(
+                for: typeReference,
+                callable: callable,
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            ) != nil else {
                 return "parameter \(parameter.name) type \(typeReference.displayName) is not an LLVM scalar"
             }
         }
@@ -302,7 +347,11 @@ enum LLVMLowerability {
         var locals: [String: ScalarType] = [:]
         for (parameter, type) in zip(
             callable.parameters,
-            scalarSignature(for: callable, constructLayouts: constructLayouts)?.parameters ?? []
+            scalarSignature(
+                for: callable,
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            )?.parameters ?? []
         ) {
             locals[parameter.name] = type
         }
@@ -311,22 +360,34 @@ enum LLVMLowerability {
             returnType: scalarReturnType,
             locals: &locals,
             lowerableFunctionSignatures: lowerableFunctionSignatures,
-            constructLayouts: constructLayouts
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
         ) ?? "uses unsupported LLVM shape"
     }
 
     static func scalarSignature(
         for callable: CallableDeclaration,
-        constructLayouts: [String: ConstructLayout] = [:]
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
     ) -> ScalarSignature? {
         guard let returnType = callable.returnType.flatMap({
-            ScalarType(typeReference: $0, constructLayouts: constructLayouts)
+            scalarType(
+                for: $0,
+                callable: callable,
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            )
         }) else {
             return nil
         }
         let parameters = callable.parameters.compactMap {
             $0.typeReference.flatMap {
-                ScalarType(typeReference: $0, constructLayouts: constructLayouts)
+                scalarType(
+                    for: $0,
+                    callable: callable,
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                )
             }
         }
         guard parameters.count == callable.parameters.count else {
@@ -335,12 +396,33 @@ enum LLVMLowerability {
         return ScalarSignature(parameters: parameters, returnType: returnType)
     }
 
+    private static func scalarType(
+        for typeReference: TypeReference,
+        callable: CallableDeclaration,
+        constructLayouts: [String: ConstructLayout],
+        scalarTypes: [String: ScalarType]
+    ) -> ScalarType? {
+        if case .named("Self") = typeReference, let receiverType = callable.receiverType {
+            return ScalarType(
+                typeReference: receiverType,
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            )
+        }
+        return ScalarType(
+            typeReference: typeReference,
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
+        )
+    }
+
     private static func canLower(
         _ statements: [Statement],
         returnType: ScalarType,
         locals: inout [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
     ) -> Bool {
         guard !statements.isEmpty else {
             return false
@@ -358,7 +440,8 @@ enum LLVMLowerability {
                     declaration,
                     locals: &locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
                 ) else {
                     return false
                 }
@@ -478,7 +561,8 @@ enum LLVMLowerability {
         returnType: ScalarType,
         locals: inout [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
     ) -> String? {
         var sawReturn = false
         for statement in statements {
@@ -1016,15 +1100,21 @@ enum LLVMLowerability {
         _ declaration: LocalBindingDeclaration,
         locals: inout [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
     ) -> Bool {
-        guard let type = ScalarType(typeReference: declaration.type, constructLayouts: constructLayouts),
+        guard let type = ScalarType(
+            typeReference: declaration.type,
+            constructLayouts: constructLayouts,
+            scalarTypes: scalarTypes
+        ),
             canConvert(
                 canLower(
                     declaration.expression,
                     locals: locals,
                     lowerableFunctionSignatures: lowerableFunctionSignatures,
-                    constructLayouts: constructLayouts
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
                 ),
                 to: type
             )
@@ -1152,7 +1242,8 @@ enum LLVMLowerability {
         _ expression: Expression,
         locals: [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
     ) -> ScalarType? {
         switch expression {
         case .integer:

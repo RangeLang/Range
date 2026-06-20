@@ -22,7 +22,7 @@ struct LoadedProject {
     }
 
     var defaultBuildRoot: URL {
-        projectRoot.appendingPathComponent(".range/Build/swift", isDirectory: true)
+        projectRoot.appendingPathComponent(".range/Build/llvm", isDirectory: true)
     }
 
     var defaultArtifactsRoot: URL {

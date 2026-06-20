@@ -36,6 +36,26 @@ struct LLVMLoweringEmitterTests {
         )
     }
 
+    @Test("Top-level main function lowers to native LLVM entrypoint")
+    func topLevelMainFunctionLowersToNativeLLVMEntrypoint() throws {
+        let callable = try parseCallable(
+            """
+            function main(): Int {
+                return 0
+            }
+            """
+        )
+
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.loweredSymbols == [
+            LLVMLoweredSymbol(rangeName: "main", llvmName: "main")
+        ])
+        #expect(module.ir.contains("define i64 @main()"))
+    }
+
     @Test("String literal return lowers to LLVM UTF8 storage")
     func stringLiteralReturnLowersToLLVMUTF8Storage() throws {
         let callable = try parseCallable(
@@ -2385,17 +2405,111 @@ struct LLVMLoweringEmitterTests {
         #expect(integerMacro.evaluatedStringValue == "int64")
     }
 
+    @Test("LLVM lowerability uses evaluated @integer scalar metadata")
+    func llvmLowerabilityUsesEvaluatedIntegerScalarMetadata() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let declarations = constructDeclarations(in: program.expandedFiles)
+        let scalarTypes = LLVMLowerability.scalarTypes(from: declarations)
+        #expect(scalarTypes["Int"] == .int(bits: 64, signed: true))
+
+        let callable = try parseCallable(
+            """
+            function add(lhs: Int, rhs: Int): Int {
+                return lhs + rhs
+            }
+            """
+        )
+        let signature = try #require(
+            LLVMLowerability.scalarSignature(for: callable, scalarTypes: scalarTypes)
+        )
+        #expect(signature.returnType == .int(bits: 64, signed: true))
+
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(
+                callables: [callable],
+                scalarTypes: scalarTypes
+            )
+        )
+        #expect(module.ir.contains("define i64 @RangeLLVM_add(i64 %lhs, i64 %rhs)"))
+    }
+
+    @Test("Extension member lowers directly through receiver scalar metadata")
+    func extensionMemberLowersDirectlyThroughReceiverScalarMetadata() throws {
+        let extensionDeclaration = try parseExtension(
+            """
+            extension Int {
+                function +(lhs: Self, rhs: Self): Self {
+                    return lhs + rhs
+                }
+            }
+            """
+        )
+        let callable = try #require(extensionDeclaration.callables.first)
+        let scalarTypes: [String: LLVMLowerability.ScalarType] = [
+            "Int": .int(bits: 64, signed: true)
+        ]
+
+        #expect(LLVMLowerability.canLower(callable, scalarTypes: scalarTypes))
+
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(
+                callables: [callable],
+                scalarTypes: scalarTypes
+            )
+        )
+        #expect(module.loweredSymbols == [
+            LLVMLoweredSymbol(rangeName: "Int.+", llvmName: "RangeLLVM_Int__")
+        ])
+        #expect(module.ir.contains("define i64 @RangeLLVM_Int__(i64 %lhs, i64 %rhs)"))
+    }
+
+    @Test("Swift backend public LLVM emission accepts function-only single file")
+    func swiftBackendPublicLLVMEmissionAcceptsFunctionOnlySingleFile() throws {
+        var inputs = try rangeCoreInputs()
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("FunctionOnly-\(UUID().uuidString).range")
+        inputs.append(
+            SourceInput(
+                path: fileURL.path,
+                source: """
+                    function add(lhs: Int, rhs: Int): Int {
+                        return lhs + rhs
+                    }
+                    """,
+                role: .project
+            )
+        )
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let ir = try SwiftBackend().emitLLVMIR(
+            project: SwiftBackendProject(
+                projectFiles: [fileURL],
+                isSingleFile: true,
+                buildRoot: FileManager.default.temporaryDirectory
+                    .appendingPathComponent("RangeLLVM-\(UUID().uuidString)")
+            ),
+            compiledProgram: program
+        )
+
+        #expect(ir.contains("; ModuleID = 'RangeScalar'"))
+        #expect(ir.contains("define i64 @RangeLLVM_add(i64 %lhs, i64 %rhs)"))
+        #expect(!ir.contains("RangeGenerated"))
+    }
+
     @Test("Concrete @llvm body is collected, written, and run through clang")
     func concreteLLVMBodyEmitsWritesAndRuns() throws {
-        // A construct whose @llvm body is a complete, concrete LLVM function with
-        // no splices. This proves the emit-and-write loop end to end: Range-authored
-        // @llvm string -> Swift collects -> Swift writes .ll -> clang compiles+runs.
+        // A Range-authored @llvm string can be returned through an ordinary
+        // String-producing macro, then written to .ll and run through clang.
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/ConcreteLLVM.range",
                 source: """
-                    @llvm(body: "define i64 @range_concrete_answer() {\nentry:\n  ret i64 42\n}")
+                    macro concreteLLVM(): Construct -> String { target, diagnostics in
+                        return @llvm(body: "define i64 @range_concrete_answer() {\nentry:\n  ret i64 42\n}")
+                    }
+
+                    @concreteLLVM
                     construct ConcreteAnswer {
                         let value: Int
                     }
@@ -2404,36 +2518,12 @@ struct LLVMLoweringEmitterTests {
             )
         )
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
-
-        var declarations: [ConstructDeclaration] = []
-        for parsedFile in program.expandedFiles {
-            switch parsedFile.sourceFile {
-            case .module(let module):
-                declarations.append(contentsOf: module.constructs)
-            case .construct(let construct):
-                declarations.append(construct)
-            case .enumeration, .macro, .extensions, .mainBlock:
-                continue
-            }
-        }
-
-        let collected = SwiftBackendEmitter.collectedLLVMConstructBodies(
-            from: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: declarations,
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: []
-            )
+        let construct = try #require(program.declarationGraph.constructsByName["ConcreteAnswer"])
+        let concreteLLVM = try #require(
+            construct.macros.first(where: { $0.name == "concreteLLVM" })?
+                .evaluatedStringValue
         )
-        let answer = try #require(
-            collected.first(where: { $0.constructName == "ConcreteAnswer" })
-        )
-        // No bindings needed: the body is already concrete.
-        let irLines = answer.lines(bindings: [:])
-        let ir = irLines.joined(separator: "\n") + "\n"
+        let ir = concreteLLVM + "\n"
 
         let clang = URL(fileURLWithPath: "/usr/bin/clang")
         let root = FileManager.default.temporaryDirectory
@@ -2521,6 +2611,21 @@ struct LLVMLoweringEmitterTests {
         }
     }
 
+    private func parseExtension(_ source: String) throws -> ExtensionDeclaration {
+        var parser = try Parser(source: source)
+        let sourceFile = try parser.parseSourceFile()
+
+        switch sourceFile {
+        case .extensions(let declarations):
+            return try #require(declarations.first)
+        case .module(let module):
+            return try #require(module.extensions.first)
+        case .construct, .enumeration, .macro, .mainBlock:
+            Issue.record("Expected extension source file.")
+            throw LLVMLoweringEmitterTestError.expectedCallable
+        }
+    }
+
     private func compileCallable(_ source: String) throws -> CallableDeclaration {
         var inputs = try rangeCoreInputs()
         inputs.append(
@@ -2564,6 +2669,19 @@ struct LLVMLoweringEmitterTests {
                 source: try String(contentsOf: file, encoding: .utf8),
                 role: .core
             )
+        }
+    }
+
+    private func constructDeclarations(in files: [ParsedSourceFile]) -> [ConstructDeclaration] {
+        files.flatMap { parsedFile -> [ConstructDeclaration] in
+            switch parsedFile.sourceFile {
+            case .module(let module):
+                return module.constructs
+            case .construct(let construct):
+                return [construct]
+            case .enumeration, .macro, .extensions, .mainBlock:
+                return []
+            }
         }
     }
 
