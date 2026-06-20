@@ -850,6 +850,10 @@ struct MacroExpansionContext {
             return ResolvedRewriteCall(site: .targetDirect, payload: payload)
         }
 
+        if normalizedPath == "\(targetBinding).declaration.replace" {
+            return ResolvedRewriteCall(site: .targetDirect, payload: payload)
+        }
+
         guard let descriptor = rewriteSurfaceView.rewriteSiteDescriptors(
             targetBinding: targetBinding,
             targetType: targetType

@@ -2392,7 +2392,7 @@ struct LLVMLoweringEmitterTests {
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let integerMacro = try #require(
             intConstruct.macros.first(where: { $0.name == "integer" }))
-        #expect(integerMacro.evaluatedStringValue == "int64")
+        #expect(integerMacro.evaluatedStringValue == "i64")
     }
 
     @Test("Int @integer macro evaluated value carries scalar metadata")
@@ -2402,7 +2402,21 @@ struct LLVMLoweringEmitterTests {
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let integerMacro = try #require(
             intConstruct.macros.first(where: { $0.name == "integer" }))
-        #expect(integerMacro.evaluatedStringValue == "int64")
+        #expect(integerMacro.evaluatedStringValue == "i64")
+    }
+
+    @Test("Core Bool carries evaluated @bool scalar metadata")
+    func coreBoolCarriesEvaluatedBoolScalarMetadata() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let boolConstruct = try #require(program.declarationGraph.constructsByName["Bool"])
+        let boolMacro = try #require(
+            boolConstruct.macros.first(where: { $0.name == "bool" }))
+        #expect(boolMacro.evaluatedStringValue == "i1")
+
+        let declarations = constructDeclarations(in: program.expandedFiles)
+        let scalarTypes = LLVMLowerability.scalarTypes(from: declarations)
+        #expect(scalarTypes["Bool"] == .bool)
     }
 
     @Test("LLVM lowerability uses evaluated @integer scalar metadata")
@@ -2494,6 +2508,36 @@ struct LLVMLoweringEmitterTests {
         #expect(ir.contains("; ModuleID = 'RangeScalar'"))
         #expect(ir.contains("define i64 @RangeLLVM_add(i64 %lhs, i64 %rhs)"))
         #expect(!ir.contains("RangeGenerated"))
+    }
+
+    @Test("Swift backend public LLVM emission lowers @main block to main function")
+    func swiftBackendPublicLLVMEmissionLowersMainBlockToMainFunction() throws {
+        var inputs = try rangeCoreInputs()
+        let fileURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("MainBlock-\(UUID().uuidString).range")
+        inputs.append(
+            SourceInput(
+                path: fileURL.path,
+                source: """
+                    @main {
+                    }
+                    """,
+                role: .project
+            )
+        )
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let ir = try SwiftBackend().emitLLVMIR(
+            project: SwiftBackendProject(
+                projectFiles: [fileURL],
+                isSingleFile: true,
+                buildRoot: FileManager.default.temporaryDirectory
+                    .appendingPathComponent("RangeLLVM-\(UUID().uuidString)")
+            ),
+            compiledProgram: program
+        )
+
+        #expect(ir.contains("define i64 @main()"))
+        #expect(ir.contains("ret i64 0"))
     }
 
     @Test("Concrete @llvm body is collected, written, and run through clang")

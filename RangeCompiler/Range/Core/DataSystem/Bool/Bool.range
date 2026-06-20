@@ -1,3 +1,4 @@
+@bool
 construct Bool {
     let storage: BoolStorage
 

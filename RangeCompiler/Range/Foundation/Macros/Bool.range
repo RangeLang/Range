@@ -1,0 +1,3 @@
+open macro bool(): Construct -> String { target, diagnostics in
+    return "i1"
+}

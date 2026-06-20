@@ -192,6 +192,15 @@ extension Parser {
             arguments.append(CallArgument(label: nil, value: try parseClosureExpression()))
         }
 
+        if peek() == .leftBrace, fullName.hasSuffix(".replace") {
+            arguments.append(
+                CallArgument(
+                    label: nil,
+                    value: .block(try parseStatementBlock(baseLocalBindings: [:]))
+                )
+            )
+        }
+
         guard hadArgumentClause || !arguments.isEmpty else {
             return .identifier(fullName)
         }

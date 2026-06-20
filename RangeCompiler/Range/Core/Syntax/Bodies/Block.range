@@ -4,7 +4,10 @@ construct Block {
     let statements: Array<@Statement>
 
     construct Declaration {
+        let body: Array<@Statement>
         let statements: Array<@Statement>
+
+        function replace(replacement: Block): Block
     }
 
     function replace(replacement: Block): Block

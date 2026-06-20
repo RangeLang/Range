@@ -20,7 +20,11 @@ struct SwiftBackendProgramBuilder {
         project: SwiftBackendProject,
         compiledProgram: CompiledProgram
     ) throws -> LoweredProgram {
-        try build(compiledProgram: compiledProgram, requireMain: false)
+        try build(
+            compiledProgram: compiledProgram,
+            requireMain: false,
+            lowerMainBlockToFunction: true
+        )
     }
 
     private func build(
@@ -111,7 +115,11 @@ struct SwiftBackendProgramBuilder {
         }
     }
 
-    private func build(compiledProgram: CompiledProgram, requireMain: Bool = true) throws -> LoweredProgram {
+    private func build(
+        compiledProgram: CompiledProgram,
+        requireMain: Bool = true,
+        lowerMainBlockToFunction: Bool = false
+    ) throws -> LoweredProgram {
         var callables: [CallableDeclaration] = []
         var enumerations: [EnumDeclaration] = []
         var declarations: [ConstructDeclaration] = []
@@ -222,6 +230,26 @@ struct SwiftBackendProgramBuilder {
             throw SwiftBackendError("Missing @main block while generating Swift.")
         }
         let loweredMainBlock = mainBlock ?? MainBlockNode(macros: [], body: [])
+        if lowerMainBlockToFunction, let mainBlock {
+            guard !callables.contains(where: { $0.name == "main" && $0.parameters.isEmpty }) else {
+                throw SwiftBackendError("@main block conflicts with function main().")
+            }
+            callables.append(try nativeMainCallable(from: mainBlock))
+            units = try units.map { unit in
+                guard let unitMainBlock = unit.mainBlock else {
+                    return unit
+                }
+                let mainCallable = try nativeMainCallable(from: unitMainBlock)
+                return LoweredSourceUnit(
+                    outputFileName: unit.outputFileName,
+                    enumerations: unit.enumerations,
+                    declarations: unit.declarations,
+                    extensions: unit.extensions,
+                    callables: unit.callables + [mainCallable],
+                    mainBlock: nil
+                )
+            }
+        }
 
         let extendedCasesByEnumName = Dictionary(
             grouping: extensions.flatMap { extensionDeclaration in
@@ -257,6 +285,39 @@ struct SwiftBackendProgramBuilder {
             extensions: extensions,
             mainBlock: loweredMainBlock,
             units: loweredUnits
+        )
+    }
+
+    private func nativeMainCallable(from mainBlock: MainBlockNode) throws -> CallableDeclaration {
+        let localMain = mainBlock.body.compactMap { statement -> LocalCallableDeclaration? in
+            guard case .localCallable(let declaration) = statement,
+                declaration.name == "main",
+                declaration.parameters.isEmpty
+            else {
+                return nil
+            }
+            return declaration
+        }
+
+        guard localMain.count == 1, let declaration = localMain.first else {
+            throw SwiftBackendError("@main macro must expand to a single function main(): Int.")
+        }
+
+        guard declaration.returnType == .named("Int") else {
+            throw SwiftBackendError("@main macro must expand function main() with Int return type.")
+        }
+
+        return CallableDeclaration(
+            macros: declaration.macros,
+            attribute: declaration.attribute,
+            targetType: nil,
+            receiverType: nil,
+            name: declaration.name,
+            genericParameters: declaration.genericParameters,
+            hasExplicitParameterClause: declaration.hasExplicitParameterClause,
+            parameters: declaration.parameters,
+            returnType: declaration.returnType,
+            body: declaration.body
         )
     }
 

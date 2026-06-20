@@ -19,6 +19,10 @@ extension Parser {
             return try parseLocalBackgroundCallableDeclaration(localBindings: &localBindings)
         }
 
+        if isCallableStart() {
+            return try parseLocalCallableDeclaration(localBindings: &localBindings)
+        }
+
         if isBackgroundStatementStart() {
             return try parseBackgroundStatement(localBindings: &localBindings)
         }
@@ -198,6 +202,28 @@ extension Parser {
 
         throw ParseError(
             "Named @background callables are not supported: \(callableName)."
+        )
+    }
+
+    mutating func parseLocalCallableDeclaration(
+        localBindings: inout [String: LocalBindingSymbol]
+    ) throws -> Statement {
+        _ = localBindings
+        let callable = try parseCallableDeclaration()
+        guard let body = callable.body else {
+            throw ParseError("Local callable \(callable.name) requires a body.")
+        }
+        return .localCallable(
+            LocalCallableDeclaration(
+                macros: callable.macros,
+                attribute: callable.attribute,
+                name: callable.name,
+                genericParameters: callable.genericParameters,
+                hasExplicitParameterClause: callable.hasExplicitParameterClause,
+                parameters: callable.parameters,
+                returnType: callable.returnType,
+                body: body
+            )
         )
     }
 

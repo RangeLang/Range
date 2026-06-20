@@ -46,7 +46,7 @@ enum LLVMLowerability {
                 }
                 self = type
             case .named("Bool"):
-                self = .bool
+                self = scalarTypes["Bool"] ?? .bool
             case .named("Float"):
                 self = .float
             case .named("String"):
@@ -110,8 +110,12 @@ enum LLVMLowerability {
         }
 
         init?(integerMacroValue value: String) {
-            let digits = value.reversed().prefix { $0.isNumber }.reversed()
+            guard value.hasPrefix("i") else {
+                return nil
+            }
+            let digits = value.dropFirst()
             guard !digits.isEmpty,
+                digits.allSatisfy(\.isNumber),
                 let bits = Int(String(digits)),
                 bits > 0
             else {
@@ -119,18 +123,30 @@ enum LLVMLowerability {
             }
             self = .int(bits: bits, signed: true)
         }
+
+        init?(boolMacroValue value: String) {
+            guard value == "i1" else {
+                return nil
+            }
+            self = .bool
+        }
     }
 
     static func scalarTypes(from declarations: [ConstructDeclaration]) -> [String: ScalarType] {
         declarations.reduce(into: [:]) { result, declaration in
-            guard
-                let value = declaration.macros.first(where: { $0.name == "integer" })?
-                    .evaluatedStringValue,
+            if let value = declaration.macros.first(where: { $0.name == "integer" })?
+                .evaluatedStringValue,
                 let scalarType = ScalarType(integerMacroValue: value)
-            else {
-                return
+            {
+                result[declaration.name] = scalarType
             }
-            result[declaration.name] = scalarType
+
+            if let value = declaration.macros.first(where: { $0.name == "bool" })?
+                .evaluatedStringValue,
+                let scalarType = ScalarType(boolMacroValue: value)
+            {
+                result[declaration.name] = scalarType
+            }
         }
     }
 

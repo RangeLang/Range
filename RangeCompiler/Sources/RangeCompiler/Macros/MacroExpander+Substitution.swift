@@ -624,6 +624,7 @@ extension MacroExpander {
     ) -> Bool {
         guard case .identifier(let sequenceName) = sequence,
             sequenceName == "\(targetBinding).declaration.statements"
+                || sequenceName == "\(targetBinding).declaration.body"
                 || sequenceName == "\(targetBinding).statements",
             body.count == 1,
             case .expression(.call("__syntaxSplice", let arguments)) = body[0],
@@ -649,6 +650,7 @@ extension MacroExpander {
             return false
         }
         return sequenceName == "\(targetBinding).declaration.statements"
+            || sequenceName == "\(targetBinding).declaration.body"
             || sequenceName == "\(targetBinding).statements"
     }
 

@@ -4,4 +4,11 @@ open macro main(): @block { target, diagnostics, graph in
     if mainMacros.count > 1 {
         diagnostics.error("A second @main conflicts with the main block already declared in this Range project.")
     }
+
+    target.declaration.replace {
+        function main(): Int {
+            @block(statements: target.declaration.body)
+            return 0
+        }
+    }
 }

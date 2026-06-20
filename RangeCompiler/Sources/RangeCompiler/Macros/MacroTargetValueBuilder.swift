@@ -678,8 +678,12 @@ struct MacroTargetValueBuilder {
             fields: [
                 "declaration": .object(
                     typeName: "Block.Declaration",
-                    fields: ["statements": .array(statementValues)]
+                    fields: [
+                        "body": .array(statementValues),
+                        "statements": .array(statementValues),
+                    ]
                 ),
+                "body": .array(statementValues),
                 "statements": .array(statementValues),
             ]
         )
