@@ -1,4 +1,4 @@
-macro addable(): Construct { target, diagnostics in
+macro addable(): Construct | Extension { target, diagnostics in
     let additions: Array<Function.Declaration>(
         target.declaration.functions.filter { function in
             return function.identifier.name == "+"

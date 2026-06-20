@@ -1,7 +1,0 @@
-open macro int<let bits: IntLiteral, let signedness: Signedness>(): Construct -> String { target, diagnostics in
-    if signedness == .signed {
-        return "sdiv"
-    }
-
-    return "udiv"
-}

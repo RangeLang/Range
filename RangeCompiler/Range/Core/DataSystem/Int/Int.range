@@ -1,4 +1,3 @@
-@addable
 @llvm(body: "i$bits")
 construct Int<let bits: IntLiteral, let signedness: Signedness = .signed> {
     let storage: Memory<self.identifier>
@@ -16,6 +15,7 @@ extension Int {
     function <(lhs: Self, rhs: Self): Bool
 }
 
+@addable
 extension Int {
     function +(lhs: Self, rhs: Self): Self
 }

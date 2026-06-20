@@ -405,8 +405,9 @@ struct MacroTargetValueBuilder {
     }
 
     // Evaluates a metadata macro body to its value. Handles local bindings,
-    // returns, expressions, and conditionals (if/else) so macros can branch on
-    // generic values (e.g. signedness) and choose what to emit.
+    // assignments, returns, expressions, conditionals (if/else), and for-each
+    // loops so macros can scan generics/properties and accumulate output (e.g.
+    // substituting each generic name into a lowering template).
     private static func evaluateMetadataStatements(
         _ statements: [Statement],
         localBindings: inout [String: Expression],
@@ -415,7 +416,13 @@ struct MacroTargetValueBuilder {
         for statement in statements {
             switch statement {
             case .localBinding(let declaration):
-                localBindings[declaration.name] = declaration.expression
+                localBindings[declaration.name] = boundExpression(
+                    for: declaration.expression, evaluator: evaluator, localBindings: localBindings)
+            case .assignment(let target, let expression):
+                if let name = assignmentTargetName(target) {
+                    localBindings[name] = boundExpression(
+                        for: expression, evaluator: evaluator, localBindings: localBindings)
+                }
             case .return(let expression?):
                 return evaluator.evaluate(expression, with: localBindings)
             case .expression(let expression):
@@ -440,11 +447,50 @@ struct MacroTargetValueBuilder {
                     }
                     break
                 }
+            case .forEach(let name, let sequence, let body):
+                guard case .array(let elements)? = evaluator.evaluate(sequence, with: localBindings)
+                else {
+                    continue
+                }
+                for element in elements {
+                    guard let elementExpression = element.expression else { continue }
+                    localBindings[name] = elementExpression
+                    if let value = evaluateMetadataStatements(
+                        body, localBindings: &localBindings, evaluator: evaluator)
+                    {
+                        return value
+                    }
+                }
             default:
                 continue
             }
         }
         return nil
+    }
+
+    // Resolves an expression to a bound expression: if it evaluates to a concrete
+    // value, store that value's expression so later statements/iterations read the
+    // updated result; otherwise keep the raw expression.
+    private static func boundExpression(
+        for expression: Expression,
+        evaluator: CompileTimeValueEvaluator,
+        localBindings: [String: Expression]
+    ) -> Expression {
+        if let value = evaluator.evaluate(expression, with: localBindings),
+            let resolved = value.expression
+        {
+            return resolved
+        }
+        return expression
+    }
+
+    private static func assignmentTargetName(_ target: AssignmentTarget) -> String? {
+        switch target {
+        case .state(let name), .binding(let name), .local(let name):
+            return name
+        case .member:
+            return nil
+        }
     }
 
     private static func macroMetadataValue(_ value: CompileTimeValue, matches type: TypeReference)

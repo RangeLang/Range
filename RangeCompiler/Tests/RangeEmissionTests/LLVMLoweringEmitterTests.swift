@@ -2407,35 +2407,9 @@ struct LLVMLoweringEmitterTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
         let llvm = try #require(intConstruct.macros.first(where: { $0.name == "llvm" }))
-        // The macro loops generics and replaces $bits -> bits, yielding "ibits".
+        // The macro loops generics and replaces $<name> with each generic's name.
+        // Int's generics are bits and signedness, so $bits -> bits yields "ibits".
         #expect(llvm.evaluatedStringValue == "ibits")
-    }
-
-    @Test("@int macro branches on signedness at compile time")
-    func intMacroBranchesOnSignedness() throws {
-        func evaluatedInt(signedness: String) throws -> String? {
-            var inputs = try rangeCoreInputs()
-            inputs.append(
-                SourceInput(
-                    path: "/tmp/IntMacroBranch.range",
-                    source: """
-                        @int<64, .\(signedness)>
-                        construct Count\(signedness == "signed" ? "S" : "U") {
-                            let value: Int
-                        }
-                        """,
-                    role: .project
-                )
-            )
-            let program = try CompilerPipeline().buildValidated(inputs: inputs)
-            let name = "Count\(signedness == "signed" ? "S" : "U")"
-            let construct = try #require(program.declarationGraph.constructsByName[name])
-            let intMacro = try #require(construct.macros.first(where: { $0.name == "int" }))
-            return intMacro.evaluatedStringValue
-        }
-
-        #expect(try evaluatedInt(signedness: "signed") == "sdiv")
-        #expect(try evaluatedInt(signedness: "unsigned") == "udiv")
     }
 
     @Test("Concrete @llvm body is collected, written, and run through clang")
