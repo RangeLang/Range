@@ -92,20 +92,20 @@ struct CompilerFixtureTests {
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 
-    @Test("@Project macro requires a single project declaration")
+    @Test("@project macro requires a single project declaration")
     func projectMacroRequiresSingleProjectDeclaration() throws {
         let inputs = [
             SourceInput(
                 path: "/tmp/DuplicateProjects.range",
                 source: """
-                    open macro Project(): Construct -> Void { target, diagnostics, graph in
+                    open macro project(): Construct -> Void { target, diagnostics, graph in
                         let projectMacros: Array<Macro.Application>(
                             graph.macros.where { entry in
-                                entry.identifier.name == "Project"
+                                entry.identifier.name == "project"
                             }
                         )
                         if projectMacros.count > 1 {
-                            diagnostics.error("A second @Project conflicts with the project already declared in this Range project.")
+                            diagnostics.error("A second @project conflicts with the project already declared in this Range project.")
                         }
                     }
 
@@ -113,11 +113,11 @@ struct CompilerFixtureTests {
                         let name: String
                     }
 
-                    @Project
+                    @project
                     construct FirstProject {
                     }
 
-                    @Project
+                    @project
                     construct SecondProject {
                     }
                     """,
@@ -129,7 +129,7 @@ struct CompilerFixtureTests {
             diagnostics.contains {
                 $0.severity == .error
                     && $0.source == "range-macro"
-                    && $0.message.contains("A second @Project conflicts")
+                    && $0.message.contains("A second @project conflicts")
             }
         )
     }
@@ -2625,6 +2625,54 @@ struct CompilerFixtureTests {
     func fileSystemReadTextSurfaceValidates() throws {
         let fixture = try fixtureFile(in: "CompilePass", path: "System/FileManagerReadFile.range")
         _ = try compile(fixture: fixture, expectedRole: .pass)
+    }
+
+    @Test("FileTree sourceFiles exposes file text to macros")
+    func fileTreeSourceFilesExposesFileTextToMacros() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeFileTreeSourceFiles-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        let aSource = "construct A {\n}\n"
+        let bSource = "construct B {\n}\n"
+        try aSource.write(to: root.appendingPathComponent("A.range"), atomically: true, encoding: .utf8)
+        try bSource.write(to: root.appendingPathComponent("B.range"), atomically: true, encoding: .utf8)
+        try "ignore".write(to: root.appendingPathComponent("README.txt"), atomically: true, encoding: .utf8)
+
+        let escapedRoot = root.path.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/FileTreeSourceFilesMacro.range",
+                source: """
+                    macro collectedSource(path: String): Construct -> String { target, diagnostics in
+                        let files: Array<ProgramSourceFile>(FileTree.sourceFiles(path: path))
+                        let selected: Array<ProgramSourceFile>(files.filter { file in
+                            return file.text.hasPrefix("construct A")
+                        })
+
+                        if selected.count == 1 {
+                            let file: ProgramSourceFile(selected.element(index: 0))
+                            return file.text
+                        }
+
+                        return "missing"
+                    }
+
+                    @collectedSource(path: "\(escapedRoot)")
+                    construct Collector {
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let construct = try #require(program.declarationGraph.constructsByName["Collector"])
+        let macro = try #require(construct.macros.first(where: { $0.name == "collectedSource" }))
+        #expect(macro.evaluatedStringValue == aSource)
     }
 
     @Test("Compiler pipeline runtime hooks run beside Swift pipeline")

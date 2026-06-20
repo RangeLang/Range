@@ -1,4 +1,4 @@
-@Project
+@project
 @compiler
 construct RangeCompiler {
     let name: Title("RangeCompiler")

@@ -1,0 +1,4 @@
+@main {
+    FileManager.createFile(path: ".build/range/scalars.txt", text: scalarBuild())
+    FileManager.createFile(path: ".build/range/RangeScalar.ll", text: scalarLLVM())
+}

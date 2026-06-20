@@ -1,0 +1,23 @@
+open macro float(): Construct -> String { target, diagnostics in
+    state precision: String("64")
+    state hasPrecision: false
+
+    for generic in target.declaration.generics {
+        let name: String(generic.identifier.name)
+
+        if name == "precision" {
+            hasPrecision: true
+            precision: generic.value
+        }
+    }
+
+    if target.declaration.generics.count > 0 && !hasPrecision {
+        diagnostics.error("@float requires a value generic named precision.")
+    }
+
+    if precision == "32" {
+        return "float"
+    }
+
+    return "double"
+}

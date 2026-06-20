@@ -1,0 +1,71 @@
+enum BuildMessageLevel {
+    case info
+    case error
+}
+
+enum BuildError {
+    case missingMain
+    case duplicateMain
+}
+
+construct BuildMessage {
+    let level: BuildMessageLevel
+    let text: String
+}
+
+construct BuildResult {
+    let success: Bool
+    let messages: Array<BuildMessage>
+}
+
+function missingMainMessage(): String {
+    return "Range build requires exactly one @main block."
+}
+
+function duplicateMainMessage(): String {
+    return "A second @main conflicts with the main block already declared in this Range project."
+}
+
+function buildSuccessMessage(): String {
+    return "Range build emitted LLVM IR for clang."
+}
+
+function projectMainCount(path: String): Int {
+    let files: Array<ProgramSourceFile>(FileTree.sourceFiles(path: path))
+    state count: 0
+
+    for file in files {
+        count: count + file.text.count(of: "@main")
+    }
+
+    return count
+}
+
+function build(): BuildResult {
+    let mainCount: Int(projectMainCount(path: "RangeCompiler/Range/Programs/Compiler"))
+
+    if mainCount == 0 {
+        return BuildResult(
+            success: false,
+            messages: [
+                BuildMessage(level: .error, text: missingMainMessage())
+            ]
+        )
+    }
+
+    if mainCount > 1 {
+        return BuildResult(
+            success: false,
+            messages: [
+                BuildMessage(level: .error, text: duplicateMainMessage())
+            ]
+        )
+    }
+
+    return BuildResult(
+        success: true,
+        messages: [
+            BuildMessage(level: .info, text: buildSuccessMessage())
+        ]
+    )
+}

@@ -1,11 +1,11 @@
-open macro Project(): Construct -> Void { target, diagnostics, graph in
+open macro project(): Construct -> Void { target, diagnostics, graph in
     let projectMacros: Array<Macro.Application>(
         graph.macros.where { entry in
-            entry.identifier.name == "Project"
+            entry.identifier.name == "project"
         }
     )
 
     if projectMacros.count > 1 {
-        diagnostics.error("A second @Project conflicts with the project already declared in this Range project.")
+        diagnostics.error("A second @project conflicts with the project already declared in this Range project.")
     }
 }

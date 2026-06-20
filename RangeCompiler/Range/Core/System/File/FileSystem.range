@@ -35,6 +35,27 @@ construct FileManager {
 }
 
 construct FileTree {
+    function sourceFiles(path: String): Array<ProgramSourceFile> {
+        let paths: Array<String>(rangeFiles(path: path))
+        state files: Array<ProgramSourceFile>([])
+        state index: 0
+
+        while index < paths.count {
+            let filePath: String(paths.element(index: index))
+
+            switch FileManager.readFile(path: filePath) {
+            case .success(let text):
+                files.append(element: ProgramSourceFile(path: filePath, text: text))
+            case .failure:
+                state index: index
+            }
+
+            state index: index + 1
+        }
+
+        return files
+    }
+
     function rangeFiles(path: String): Array<String> {
         switch read(path: path) {
         case .success(let tree):

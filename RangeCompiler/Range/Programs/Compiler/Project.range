@@ -1,6 +1,6 @@
 @project
-construct Project {
-    let name: Title("Performance")
+construct Compiler {
+    let name: Title("Compiler")
     let version: Version(0.1.0)
     let author: "George"
 }

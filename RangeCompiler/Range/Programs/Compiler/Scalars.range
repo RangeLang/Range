@@ -1,0 +1,59 @@
+function scalarBuild(): String {
+    state output: String("# Range scalar build file\n")
+
+    let coreFiles: Array<ProgramSourceFile>(FileTree.sourceFiles(path: "RangeCompiler/Range"))
+    for file in coreFiles {
+        let slashCount: Int(file.path.count(of: "/"))
+        let fileName: String(file.path.segment(index: slashCount, delimiter: "/"))
+        let constructName: String(fileName.replacingOccurrences(of: ".range", with: ""))
+
+        if !file.path.contains(value: "/Foundation/Macros/") {
+            if !file.path.contains(value: "/Programs/Compiler/") {
+                if file.text.contains(value: "@integer\nconstruct") {
+                    output: String(output + "scalar\tinteger\t" + constructName + "\t" + file.path + "\n")
+                }
+
+                if file.text.contains(value: "@bool\nconstruct") {
+                    output: String(output + "scalar\tbool\t" + constructName + "\t" + file.path + "\n")
+                }
+
+                if file.text.contains(value: "@boolean\nconstruct") {
+                    output: String(output + "scalar\tboolean\t" + constructName + "\t" + file.path + "\n")
+                }
+
+                if file.text.contains(value: "@float\nconstruct") {
+                    output: String(output + "scalar\tfloat\t" + constructName + "\t" + file.path + "\n")
+                }
+            }
+        }
+    }
+
+    let projectFiles: Array<ProgramSourceFile>(FileTree.sourceFiles(path: "RangeCompiler/Range/Programs/Compiler"))
+    for file in projectFiles {
+        let slashCount: Int(file.path.count(of: "/"))
+        let fileName: String(file.path.segment(index: slashCount, delimiter: "/"))
+        let constructName: String(fileName.replacingOccurrences(of: ".range", with: ""))
+
+        if !file.path.contains(value: "/Foundation/Macros/") {
+            if !file.path.contains(value: "/Programs/Compiler/") {
+                if file.text.contains(value: "@integer\nconstruct") {
+                    output: String(output + "scalar\tinteger\t" + constructName + "\t" + file.path + "\n")
+                }
+
+                if file.text.contains(value: "@bool\nconstruct") {
+                    output: String(output + "scalar\tbool\t" + constructName + "\t" + file.path + "\n")
+                }
+
+                if file.text.contains(value: "@boolean\nconstruct") {
+                    output: String(output + "scalar\tboolean\t" + constructName + "\t" + file.path + "\n")
+                }
+
+                if file.text.contains(value: "@float\nconstruct") {
+                    output: String(output + "scalar\tfloat\t" + constructName + "\t" + file.path + "\n")
+                }
+            }
+        }
+    }
+
+    return output
+}

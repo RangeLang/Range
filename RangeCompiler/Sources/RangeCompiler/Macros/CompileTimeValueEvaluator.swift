@@ -316,12 +316,25 @@ struct CompileTimeValueEvaluator {
         return .boolean(compare(left, right))
     }
 
-    private func enumCaseValue(named name: String) -> CompileTimeValue {
+    private func enumCaseValue(
+        named name: String,
+        associatedValues: [String: CompileTimeValue] = [:]
+    ) -> CompileTimeValue {
         .object(
             typeName: "Enum.Case",
             fields: [
                 "identifier": .object(typeName: "Identifier", fields: ["name": .string(name)]),
-                "associatedValues": .array([]),
+                "associatedValues": .array(
+                    associatedValues.map { label, value in
+                        .object(
+                            typeName: "Enum.AssociatedValue",
+                            fields: [
+                                "name": .string(label),
+                                "value": value,
+                            ]
+                        )
+                    }
+                ),
             ]
         )
     }
@@ -490,7 +503,10 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        let supportedSuffixes = [".count", ".hasPrefix", ".hasSuffix", ".containsRepeated", ".segment", ".replacingOccurrences"]
+        let supportedSuffixes = [
+            ".count", ".contains", ".hasPrefix", ".hasSuffix", ".containsRepeated", ".segment",
+            ".replacingOccurrences",
+        ]
         guard let suffix = supportedSuffixes.first(where: { name.hasSuffix($0) }),
             let source = evaluatePath(String(name.dropLast(suffix.count)), locals: locals),
             case .string(let value) = source
@@ -516,6 +532,14 @@ struct CompileTimeValueEvaluator {
                 searchStart = range.upperBound
             }
             return .integer(count)
+        case ".contains":
+            guard arguments.count == 1 else { return nil }
+            let argument = arguments[0]
+            guard case .string(let needle) = evaluate(argument.value, locals: locals) else {
+                return nil
+            }
+            guard argument.label == "value" else { return nil }
+            return .boolean(value.contains(needle))
         case ".hasPrefix":
             guard arguments.count == 1 else { return nil }
             let argument = arguments[0]
@@ -635,6 +659,7 @@ struct CompileTimeValueEvaluator {
         "ValueGeneric", "Parameter.Declaration",
         "Void", "Identity", "UUID", "UUIDStorage", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
         "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
+        "ProgramSourceFile", "ProgramArtifact", "ProgramResult", "RangeProgram", "RangeGraph",
         "WrittenExpression",
         "ArrayExpression", "EnumCaseExpression", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook",
     ]
@@ -769,38 +794,100 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        guard name == "FileTree.rangeFiles",
-            arguments.count == 1,
+        if name == "FileManager.createFile" {
+            guard arguments.count == 2,
+                let pathArgument = arguments.first(where: { $0.label == "path" }),
+                let textArgument = arguments.first(where: { $0.label == "text" }),
+                case .string(let path) = evaluate(pathArgument.value, locals: locals),
+                case .string(let text) = evaluate(textArgument.value, locals: locals)
+            else {
+                return nil
+            }
+            return createFileResult(path: path, text: text)
+        }
+
+        guard arguments.count == 1,
             arguments[0].label == "path",
             case .string(let path) = evaluate(arguments[0].value, locals: locals)
         else {
             return nil
         }
 
+        if name == "FileManager.readFile" {
+            return readFileResult(path: path)
+        }
+
+        guard name == "FileTree.rangeFiles" || name == "FileTree.sourceFiles" else {
+            return nil
+        }
+
+        let files = rangeFileURLs(in: path)
+        if name == "FileTree.rangeFiles" {
+            return .array(files.map { .string($0.path) })
+        }
+
+        return .array(
+            files.compactMap { url in
+                guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+                    return nil
+                }
+                return .object(
+                    typeName: "ProgramSourceFile",
+                    fields: [
+                        "path": .string(url.path),
+                        "text": .string(text),
+                    ]
+                )
+            }
+        )
+    }
+
+    private func rangeFileURLs(in path: String) -> [URL] {
         let root = URL(fileURLWithPath: path, isDirectory: true)
-        let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(
+        guard let enumerator = FileManager.default.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else {
-            return .array([])
+            return []
         }
 
-        var files: [CompileTimeValue] = []
+        var files: [URL] = []
         for case let url as URL in enumerator {
             guard url.pathExtension == "range" else { continue }
             let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
             guard values?.isRegularFile == true else { continue }
-            files.append(.string(url.path))
+            files.append(url)
         }
 
-        return .array(files.sorted {
-            guard case .string(let left) = $0, case .string(let right) = $1 else {
-                return false
-            }
-            return left < right
-        })
+        return files.sorted { $0.path < $1.path }
+    }
+
+    private func readFileResult(path: String) -> CompileTimeValue {
+        guard let text = try? String(contentsOf: URL(fileURLWithPath: path), encoding: .utf8) else {
+            return enumCaseValue(named: "failure", associatedValues: [
+                "cause": enumCaseValue(named: "unreadable")
+            ])
+        }
+        return enumCaseValue(named: "success", associatedValues: ["result": .string(text)])
+    }
+
+    private func createFileResult(path: String, text: String) -> CompileTimeValue {
+        do {
+            let url = URL(fileURLWithPath: path)
+            try FileManager.default.createDirectory(
+                at: url.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            return enumCaseValue(named: "success", associatedValues: [
+                "result": .object(typeName: "Void", fields: [:])
+            ])
+        } catch {
+            return enumCaseValue(named: "failure", associatedValues: [
+                "cause": enumCaseValue(named: "unwritable")
+            ])
+        }
     }
 
     private func evaluateStringTransform(

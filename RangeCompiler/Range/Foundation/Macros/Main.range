@@ -1,4 +1,5 @@
 open macro main(): @block { target, diagnostics, graph in
+    let llvm: String("; ModuleID = 'RangeScalar'\nsource_filename = \"RangeScalar.range\"\n\ndefine i32 @main() {\nentry:\n  ret i32 0\n}\n")
     let mainMacros: Array<Macro.Application>(graph.macros(named: self.name))
 
     if mainMacros.count > 1 {

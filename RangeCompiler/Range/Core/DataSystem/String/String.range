@@ -1,4 +1,5 @@
 @init<Expression, wrapper: "\"">
+@string
 construct String {
     let storage: StringStorage
 
@@ -24,6 +25,18 @@ construct String {
 
     function substring(start: Int, end: Int): String {
         return storage.substring(start: start, end: end)
+    }
+
+    function contains(value: String): Bool {
+        return storage.contains(value: value)
+    }
+
+    function count(of: String): Int {
+        return storage.count(of: of)
+    }
+
+    function segment(index: Int, delimiter: String): String {
+        return storage.segment(index: index, delimiter: delimiter)
     }
 
     function replacingOccurrences(of: String, with: String): String {

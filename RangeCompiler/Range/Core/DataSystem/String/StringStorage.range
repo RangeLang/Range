@@ -4,6 +4,9 @@ construct StringStorage {
     derived isEmpty: Bool
     function character(index: Int): String
     function substring(start: Int, end: Int): String
+    function contains(value: String): Bool
+    function count(of: String): Int
+    function segment(index: Int, delimiter: String): String
     function replacingOccurrences(of: String, with: String): String
     function snakeCase(): String
 }

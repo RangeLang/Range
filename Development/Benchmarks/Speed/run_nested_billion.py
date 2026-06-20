@@ -130,7 +130,7 @@ def main() -> int:
     run(["cc", "-O3", str(c_source), "-o", str(c_binary)])
 
     project_manifest = """
-        @Project
+        @project
         construct Project {
             let name: Title("RangeNestedBillion")
             let version: Version(0.1.0)

@@ -61,23 +61,10 @@ public struct RangeRuntimeExecutor {
             localBindings: locals
         )
 
-        for statement in body {
-            switch statement {
-            case .localBinding(let declaration):
-                locals[declaration.name] = declaration.expression
-            case .return(let expression?):
-                guard let value = evaluator.evaluate(expression, with: locals) else {
-                    throw RangeRuntimeExecutionError.unsupportedExpression("Range runtime could not evaluate return expression in \(callable.name).")
-                }
-                return RangeRuntimeValue(value)
-            case .expression(let expression):
-                _ = evaluator.evaluate(expression, with: locals)
-            default:
-                throw RangeRuntimeExecutionError.unsupportedStatement("Range runtime execution does not support this statement in \(callable.name).")
-            }
+        guard let value = evaluator.evaluateStatements(body, locals: &locals) else {
+            throw RangeRuntimeExecutionError.missingReturn("Range runtime function \(callable.name) did not return a value.")
         }
-
-        throw RangeRuntimeExecutionError.missingReturn("Range runtime function \(callable.name) did not return a value.")
+        return RangeRuntimeValue(value)
     }
 
     private func findZeroArgumentCallable(

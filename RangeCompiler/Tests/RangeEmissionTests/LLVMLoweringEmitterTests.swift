@@ -2419,6 +2419,21 @@ struct LLVMLoweringEmitterTests {
         #expect(scalarTypes["Bool"] == .bool)
     }
 
+    @Test("Core String carries evaluated @string VM layout metadata")
+    func coreStringCarriesEvaluatedStringVMLayoutMetadata() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let stringConstruct = try #require(program.declarationGraph.constructsByName["String"])
+        let stringMacro = try #require(
+            stringConstruct.macros.first(where: { $0.name == "string" }))
+        let emitted = try #require(stringMacro.evaluatedStringValue)
+        #expect(emitted.contains("%Range.String = type { ptr, i64 }"))
+        #expect(emitted.contains("define %Range.String @RangeString_empty()"))
+        #expect(emitted.contains("define %Range.String @RangeString_fromBytes(ptr %bytes, i64 %length)"))
+        #expect(emitted.contains("define %Range.String @RangeString_concat(%Range.String %lhs, %Range.String %rhs)"))
+        #expect(emitted.contains("ret %Range.String"))
+    }
+
     @Test("LLVM lowerability uses evaluated @integer scalar metadata")
     func llvmLowerabilityUsesEvaluatedIntegerScalarMetadata() throws {
         let inputs = try rangeCoreInputs()
