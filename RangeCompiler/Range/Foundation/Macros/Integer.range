@@ -1,6 +1,6 @@
-open macro int(): Construct -> String { target, diagnostics in
-    state bits: ""
-    state signedness: ""
+open macro integer(): Construct -> String { target, diagnostics in
+    state bits: String()
+    state signedness: String()
     state hasBits: false
     state hasSignedness: false
 
@@ -19,11 +19,11 @@ open macro int(): Construct -> String { target, diagnostics in
     }
 
     if target.declaration.generics.count > 0 && !hasBits {
-        diagnostics.error("@int requires a value generic named bits.")
+        diagnostics.error("@integer requires a value generic named bits.")
     }
 
     if target.declaration.generics.count > 0 && !hasSignedness {
-        diagnostics.error("@int requires a value generic named signedness.")
+        diagnostics.error("@integer requires a value generic named signedness.")
     }
 
     return "integer(type: i" + bits + ", signedness: " + signedness + ")"

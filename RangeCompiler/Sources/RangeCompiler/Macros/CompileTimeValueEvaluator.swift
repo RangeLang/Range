@@ -637,6 +637,15 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
+        if arguments.isEmpty {
+            switch name {
+            case "String":
+                return .string("")
+            default:
+                return nil
+            }
+        }
+
         guard arguments.count == 1,
             arguments[0].label == nil,
             let value = evaluate(arguments[0].value, locals: locals)

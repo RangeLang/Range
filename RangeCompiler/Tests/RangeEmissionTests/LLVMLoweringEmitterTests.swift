@@ -2365,22 +2365,24 @@ struct LLVMLoweringEmitterTests {
         }
     }
 
-    @Test("Core Int carries evaluated @int scalar metadata")
-    func coreIntCarriesEvaluatedIntScalarMetadata() throws {
+    @Test("Core Int carries evaluated @integer scalar metadata")
+    func coreIntCarriesEvaluatedIntegerScalarMetadata() throws {
         let inputs = try rangeCoreInputs()
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
-        let intMacro = try #require(intConstruct.macros.first(where: { $0.name == "int" }))
-        #expect(intMacro.evaluatedStringValue == "integer(type: i64, signedness: signed)")
+        let integerMacro = try #require(
+            intConstruct.macros.first(where: { $0.name == "integer" }))
+        #expect(integerMacro.evaluatedStringValue == "integer(type: i64, signedness: signed)")
     }
 
-    @Test("Int @int macro evaluated value carries scalar metadata")
-    func intMacroEvaluatedValueCarriesScalarMetadata() throws {
+    @Test("Int @integer macro evaluated value carries scalar metadata")
+    func integerMacroEvaluatedValueCarriesScalarMetadata() throws {
         let inputs = try rangeCoreInputs()
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
-        let intMacro = try #require(intConstruct.macros.first(where: { $0.name == "int" }))
-        #expect(intMacro.evaluatedStringValue == "integer(type: i64, signedness: signed)")
+        let integerMacro = try #require(
+            intConstruct.macros.first(where: { $0.name == "integer" }))
+        #expect(integerMacro.evaluatedStringValue == "integer(type: i64, signedness: signed)")
     }
 
     @Test("Concrete @llvm body is collected, written, and run through clang")

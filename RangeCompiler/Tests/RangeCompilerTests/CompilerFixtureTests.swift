@@ -591,6 +591,33 @@ struct CompilerFixtureTests {
         _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
+    @Test("Macro evaluator treats String construction as empty string")
+    func macroEvaluatorTreatsStringConstructionAsEmptyString() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MacroStringConstruction.range",
+                source: """
+                    macro emptyString(): Construct -> String { target, diagnostics in
+                        state value: String()
+                        return value
+                    }
+
+                    @emptyString
+                    construct User {
+                        let name: String
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let construct = try #require(program.declarationGraph.constructsByName["User"])
+        let macro = try #require(construct.macros.first(where: { $0.name == "emptyString" }))
+        #expect(macro.evaluatedStringValue == "")
+    }
+
     @Test("Extension macros evaluate against extension target")
     func extensionMacrosEvaluateAgainstExtensionTarget() throws {
         var inputs = try rangeCoreInputs()
