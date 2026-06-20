@@ -71,7 +71,7 @@ macro decodeBody(container: KeyedDecodingContainer, properties: Array<Let>) -> A
     })
 }
 
-macro codable<let shape: CodingShape.object>(): @construct { target, diagnostics in
+macro codable<shape: CodingShape.object>(): @construct { target, diagnostics in
     if shape != .object {
         diagnostics.error("@codable currently supports object coding only.")
     }

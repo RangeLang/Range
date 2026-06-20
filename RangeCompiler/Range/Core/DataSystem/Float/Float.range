@@ -1,4 +1,4 @@
-construct Float<let width: IntLiteral> {
+construct Float<width: IntLiteral> {
     let storage: FloatStorage
 
     function literal(literal: FloatLiteral): Self {

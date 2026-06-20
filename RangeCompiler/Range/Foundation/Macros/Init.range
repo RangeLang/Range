@@ -1,8 +1,8 @@
 macro init<
-    let value: TypeReference,
-    let delimiter: Optional<String>,
-    let wrapper: Optional<String>,
-    let length: Optional<Int>
+    value: TypeReference,
+    delimiter: Optional<String>,
+    wrapper: Optional<String>,
+    length: Optional<Int>
 >(
     @capture pattern: Expression
 ): Construct & @syntax { target, diagnostics in

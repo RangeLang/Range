@@ -1,0 +1,30 @@
+open macro int(): Construct -> String { target, diagnostics in
+    state bits: ""
+    state signedness: ""
+    state hasBits: false
+    state hasSignedness: false
+
+    for generic in target.declaration.generics {
+        let name: String(generic.identifier.name)
+
+        if name == "bits" {
+            hasBits: true
+            bits: generic.value
+        }
+
+        if name == "signedness" {
+            hasSignedness: true
+            signedness: generic.value
+        }
+    }
+
+    if target.declaration.generics.count > 0 && !hasBits {
+        diagnostics.error("@int requires a value generic named bits.")
+    }
+
+    if target.declaration.generics.count > 0 && !hasSignedness {
+        diagnostics.error("@int requires a value generic named signedness.")
+    }
+
+    return "integer(type: i" + bits + ", signedness: " + signedness + ")"
+}

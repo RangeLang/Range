@@ -909,6 +909,12 @@ struct MacroTargetValueBuilder {
     }
 
     private func genericDefaultString(_ expression: Expression) -> String {
+        if case .call(let name, let arguments) = expression,
+            arguments.isEmpty,
+            let lastComponent = name.split(separator: ".").last
+        {
+            return String(lastComponent)
+        }
         if let value = value(for: expression) {
             return stringValue(for: value) ?? MacroExpander.renderExpressionForStringify(expression)
         }

@@ -2463,17 +2463,17 @@ struct CompilerFixtureTests {
     @Test("Generic parameter clauses are shared across declarations")
     func genericParameterClausesAreSharedAcrossDeclarations() throws {
         let source = """
-            construct Box<T: Comparable, let count: Int = 3> { }
+            construct Box<T, count: Int(3)> { }
 
-            enum Maybe<T: Comparable, let count: Int = 3> {
+            enum Maybe<T, count: Int(3)> {
                 case value(T)
             }
 
-            function identity<T: Comparable, let count: Int = 3>(value: T): T {
+            function identity<T, count: Int(3)>(value: T): T {
                 return value
             }
 
-            macro clamped<T: Comparable, let count: Int = 3>(value: T): State<T> { target, diagnostics in
+            macro clamped<T, count: Int(3)>(value: T): State<T> { target, diagnostics in
                 target.replace(with: value)
             }
             """
@@ -2608,13 +2608,13 @@ private enum FixtureRole {
 private func expectSharedGenericShape(_ parameters: [GenericParameter]) {
     #expect(parameters.count == 2)
 
-    guard case .type(let typeName, let constraint?, let defaultArgument) = parameters[0] else {
-        Issue.record("Expected first generic parameter to be a constrained type parameter.")
+    guard case .type(let typeName, let constraint, let defaultArgument) = parameters[0] else {
+        Issue.record("Expected first generic parameter to be a type parameter.")
         return
     }
 
     #expect(typeName == "T")
-    #expect(constraint.displayName == "Comparable")
+    #expect(constraint == nil)
     #expect(defaultArgument == nil)
 
     guard case .value(let valueName, let typeReference, let defaultValue?) = parameters[1] else {
@@ -2625,8 +2625,12 @@ private func expectSharedGenericShape(_ parameters: [GenericParameter]) {
     #expect(valueName == "count" || valueName == "capacity")
     #expect(typeReference.displayName == "Int")
 
-    guard case .integer(let value) = defaultValue else {
-        Issue.record("Expected generic value default to parse as an integer literal.")
+    guard
+        case .call(let name, let arguments) = defaultValue,
+        name == "Int",
+        case .integer(let value)? = arguments.first?.value
+    else {
+        Issue.record("Expected generic value default to parse as a typed integer value.")
         return
     }
 

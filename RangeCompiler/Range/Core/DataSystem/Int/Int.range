@@ -1,5 +1,5 @@
-@llvm(body: "i$bits")
-construct Int<let bits: String("64"), let signedness: Signedness.signed> {
+@int
+construct Int<bits: String("64"), signedness: Signedness.signed> {
     let storage: Memory<self.identifier>
 
     function literal(literal: IntLiteral): Self {

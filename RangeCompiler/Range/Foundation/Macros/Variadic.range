@@ -2,7 +2,7 @@ enum Delimiter {
     case comma
 }
 
-macro variadic<let delimiter: Delimiter.comma>(): Parameter { target, diagnostics in
+macro variadic<delimiter: Delimiter.comma>(): Parameter { target, diagnostics in
     target.declaration.type.replace(replacement:
         ArrayTypeReference(
             element: target.declaration.type

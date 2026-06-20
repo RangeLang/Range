@@ -2365,50 +2365,22 @@ struct LLVMLoweringEmitterTests {
         }
     }
 
-    @Test("Construct @llvm lowering bodies are collected from compiled core")
-    func constructLLVMBodiesAreCollected() throws {
-        let inputs = try rangeCoreInputs()
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        // Int is authored in Range core, so collect across all expanded files,
-        // not just project files.
-        var declarations: [ConstructDeclaration] = []
-        for parsedFile in program.expandedFiles {
-            switch parsedFile.sourceFile {
-            case .module(let module):
-                declarations.append(contentsOf: module.constructs)
-            case .construct(let construct):
-                declarations.append(construct)
-            case .enumeration, .macro, .extensions, .mainBlock:
-                continue
-            }
-        }
-
-        let collected = SwiftBackendEmitter.collectedLLVMConstructBodies(
-            from: LoweredProgram(
-                macrosByName: [:],
-                callables: [],
-                enumerations: [],
-                declarations: declarations,
-                extensions: [],
-                mainBlock: MainBlockNode(macros: [], body: []),
-                units: []
-            )
-        )
-
-        // The @llvm macro processes its body in Range (replacing $bits with the
-        // default value), so the collected body is the macro's output: "i64".
-        let intBody = try #require(collected.first(where: { $0.constructName == "Int" }))
-        #expect(intBody.rawBody == "i64")
-    }
-
-    @Test("Int @llvm macro evaluated value carries processed splice output")
-    func intLLVMMacroEvaluatedValueCarriesProcessedOutput() throws {
+    @Test("Core Int carries evaluated @int scalar metadata")
+    func coreIntCarriesEvaluatedIntScalarMetadata() throws {
         let inputs = try rangeCoreInputs()
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
-        let llvm = try #require(intConstruct.macros.first(where: { $0.name == "llvm" }))
-        // The macro replaces $bits with bits's default value (64), yielding "i64".
-        #expect(llvm.evaluatedStringValue == "i64")
+        let intMacro = try #require(intConstruct.macros.first(where: { $0.name == "int" }))
+        #expect(intMacro.evaluatedStringValue == "integer(type: i64, signedness: signed)")
+    }
+
+    @Test("Int @int macro evaluated value carries scalar metadata")
+    func intMacroEvaluatedValueCarriesScalarMetadata() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
+        let intMacro = try #require(intConstruct.macros.first(where: { $0.name == "int" }))
+        #expect(intMacro.evaluatedStringValue == "integer(type: i64, signedness: signed)")
     }
 
     @Test("Concrete @llvm body is collected, written, and run through clang")

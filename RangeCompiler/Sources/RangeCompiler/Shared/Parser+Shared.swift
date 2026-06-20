@@ -17,24 +17,22 @@ extension Parser {
     }
 
     mutating func parseGenericParameter() throws -> GenericParameter {
-        if peek() == .keyword(RangeSyntax.Keyword.let.rawValue) {
-            try consumeKeyword(.let)
-            let name = try consumeIdentifier()
-            try consume(.colon)
-            let typeReference = try parseTypeReferenceNode()
-            // Defaults are written as Type(value) or Type.case, no `=`.
-            // e.g. `let bits: String("64")`, `let signedness: Signedness.signed`.
-            let defaultValue = try parseValueGenericDefaultIfPresent(typeReference: typeReference)
-            return .value(name: name, typeReference: typeReference, defaultValue: defaultValue)
-        }
-
         let name = try consumeIdentifier()
-        let constraint: TypeReference?
+
         if peek() == .colon {
             try consume(.colon)
-            constraint = try parseTypeReferenceNode()
-        } else {
-            constraint = nil
+            var typeReference = try parseTypeReferenceNode()
+            // Value generics are written as `name: Type`, `name: Type(value)`,
+            // or `name: Type.case`. Type generics are bare names, e.g. `T`.
+            var defaultValue = try parseValueGenericDefaultIfPresent(
+                typeReference: typeReference)
+            if defaultValue == nil,
+                case .member(let base, let memberName) = typeReference
+            {
+                typeReference = base
+                defaultValue = .call(name: "\(base.displayName).\(memberName)", arguments: [])
+            }
+            return .value(name: name, typeReference: typeReference, defaultValue: defaultValue)
         }
 
         let defaultArgument: TypeReference?
@@ -45,11 +43,11 @@ extension Parser {
             defaultArgument = nil
         }
 
-        return .type(name: name, constraint: constraint, defaultArgument: defaultArgument)
+        return .type(name: name, constraint: nil, defaultArgument: defaultArgument)
     }
 
-    // Parses a value-generic default written as Type(value) or Type.case, with no
-    // `=`. The default is the value expression built from the already-parsed type:
+    // Parses a value-generic default written as Type(value) or Type.case. The
+    // default is the value expression built from the already-parsed type:
     //   String("64")       -> .call("String", ["64"])
     //   Signedness.signed   -> .call("Signedness.signed", []) i.e. member reference
     private mutating func parseValueGenericDefaultIfPresent(
