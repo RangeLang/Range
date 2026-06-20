@@ -38,6 +38,87 @@ struct CompileTimeValueEvaluator {
         evaluate(expression, locals: locals)
     }
 
+    // Unified statement-sequence evaluator. A macro body or a closure body is
+    // ordinary Range syntax: bindings, assignments, conditionals, loops, returns,
+    // expressions. This is the single place statements are executed at compile
+    // time so macro bodies and closures don't each re-implement control flow.
+    // Returns the produced value (from a `return` or value-producing expression),
+    // or nil if the body produced none. `locals` is threaded mutably so
+    // assignments and loop accumulation persist across statements.
+    func evaluateStatements(
+        _ statements: [Statement],
+        locals: inout [String: Expression]
+    ) -> CompileTimeValue? {
+        for statement in statements {
+            switch statement {
+            case .localBinding(let declaration):
+                locals[declaration.name] = boundExpression(declaration.expression, locals: locals)
+            case .assignment(let target, let expression):
+                if let name = Self.assignmentTargetName(target) {
+                    locals[name] = boundExpression(expression, locals: locals)
+                }
+            case .return(let expression?):
+                return evaluate(expression, locals: locals)
+            case .expression(let expression):
+                if let value = evaluate(expression, locals: locals) {
+                    return value
+                }
+            case .switchStatement:
+                if let value = try? MacroExpander.statementSyntaxValue(statement) {
+                    return value
+                }
+            case .conditional(let branches):
+                for branch in branches {
+                    if let condition = branch.condition {
+                        guard case .boolean(true) = evaluate(condition, locals: locals) else {
+                            continue
+                        }
+                    }
+                    if let value = evaluateStatements(branch.body, locals: &locals) {
+                        return value
+                    }
+                    break
+                }
+            case .forEach(let name, let sequence, let body):
+                guard case .array(let elements)? = evaluate(sequence, locals: locals) else {
+                    continue
+                }
+                for element in elements {
+                    guard let elementExpression = element.expression else { continue }
+                    locals[name] = elementExpression
+                    if let value = evaluateStatements(body, locals: &locals) {
+                        return value
+                    }
+                }
+            default:
+                continue
+            }
+        }
+        return nil
+    }
+
+    // Resolves an expression to a bound expression: if it evaluates to a concrete
+    // value, store that value's expression so later statements/iterations read the
+    // updated result; otherwise keep the raw expression.
+    private func boundExpression(
+        _ expression: Expression,
+        locals: [String: Expression]
+    ) -> Expression {
+        if let value = evaluate(expression, locals: locals), let resolved = value.expression {
+            return resolved
+        }
+        return expression
+    }
+
+    static func assignmentTargetName(_ target: AssignmentTarget) -> String? {
+        switch target {
+        case .state(let name), .binding(let name), .local(let name):
+            return name
+        case .member:
+            return nil
+        }
+    }
+
     private func evaluate(
         _ expression: Expression,
         locals: [String: Expression]
