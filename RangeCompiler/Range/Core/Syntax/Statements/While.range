@@ -1,4 +1,4 @@
-@Statement
+@statement
 @syntax
 construct While {
     let condition: Expression

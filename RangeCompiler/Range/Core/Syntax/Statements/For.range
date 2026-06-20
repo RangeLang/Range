@@ -1,4 +1,4 @@
-@Statement
+@statement
 @syntax
 construct For {
     let pattern: Expression

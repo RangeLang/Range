@@ -3417,10 +3417,27 @@ extension MacroExpander {
 
     static func syntaxMacroTypeName(_ type: TypeReference) -> String {
         let name = type.displayName
+        let surfaceName: String
         if name.hasPrefix("@") || name.hasPrefix("#") {
-            return String(name.dropFirst())
+            surfaceName = String(name.dropFirst())
+        } else {
+            surfaceName = name
         }
-        return name
+
+        switch surfaceName {
+        case "block":
+            return "Block"
+        case "expression":
+            return "Expression"
+        case "if":
+            return "If"
+        case "statement":
+            return "Statement"
+        case "switch":
+            return "Switch"
+        default:
+            return surfaceName
+        }
     }
 
     static func statementSyntaxValue(_ statement: Statement) throws -> CompileTimeValue {

@@ -8,7 +8,7 @@ macro compareOrderingProperty<T>(lhs: T, rhs: T, value: Identifier) -> Array<If>
     }
 }
 
-macro comparableBody<T>(lhs: T, rhs: T, properties: Array<Let>) -> Array<@Statement> {
+macro comparableBody<T>(lhs: T, rhs: T, properties: Array<Let>) -> Array<@statement> {
     #(properties.map { property in
         @compareOrderingProperty(lhs: lhs, rhs: rhs, value: property.identifier)
     })

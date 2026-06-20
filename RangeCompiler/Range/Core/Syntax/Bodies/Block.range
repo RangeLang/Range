@@ -1,11 +1,11 @@
 @syntax
 construct Block {
     let declaration: Declaration
-    let statements: Array<@Statement>
+    let statements: Array<@statement>
 
     construct Declaration {
-        let body: Array<@Statement>
-        let statements: Array<@Statement>
+        let body: Array<@statement>
+        let statements: Array<@statement>
 
         function replace(replacement: Block): Block
     }
