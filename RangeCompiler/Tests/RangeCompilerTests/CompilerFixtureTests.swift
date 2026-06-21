@@ -101,7 +101,7 @@ struct CompilerFixtureTests {
                 construct|name=Counter|llvm=%Range.Counter = type { i64 }
                 member|kind=let|name=label|ordinal=0
                 member|kind=value|type=String|current=|ordinal=0
-                member|kind=state|name=count|ordinal=1|llvm=i64
+                member|kind=state|name=count|ordinal=1
                 member|kind=value|type=Int|current=27|ordinal=0
                 member|kind=function|name=increment|result=Bool|body=count: count + amount|ordinal=2
                 member|kind=parameter|name=amount|ordinal=0

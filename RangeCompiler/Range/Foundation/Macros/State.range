@@ -1,36 +1,6 @@
-function stateLLVMType(valueType: String, current: String): String {
-    if valueType == "Int" {
-        @return(value: "i64")
-    }
-
-    if current.contains(value: "Int(") {
-        @return(value: "i64")
-    }
-
-    if valueType == "Bool" {
-        @return(value: "i1")
-    }
-
-    if current.contains(value: "Bool(") {
-        @return(value: "i1")
-    }
-
-    if valueType == "String" {
-        @return(value: "%Range.String")
-    }
-
-    if current.contains(value: "String(") {
-        @return(value: "%Range.String")
-    }
-
-    @return(value: "")
-}
-
 @member
 macro state(name: String): @member -> String { target, diagnostics in
     @state(name: "members", value: "String(\"\")")
-    @state(name: "valueType", value: "String(\"\")")
-    @state(name: "current", value: "String(\"\")")
     @state(name: "index", value: "0")
 
     @while(index < target.declaration.bodyText.count(of: "\n") + 1) {
@@ -41,22 +11,6 @@ macro state(name: String): @member -> String { target, diagnostics in
 
         if !memberLine.isEmpty {
             members: members + "\n" + memberLine
-
-            if memberLine.contains(value: "member|kind=value") {
-                if memberLine.contains(value: "|type=") {
-                    valueType: memberLine.segment(index: 1, delimiter: "|type=")
-                    if valueType.contains(value: "|") {
-                        valueType: valueType.segment(index: 0, delimiter: "|")
-                    }
-                }
-
-                if memberLine.contains(value: "|current=") {
-                    current: memberLine.segment(index: 1, delimiter: "|current=")
-                    if current.contains(value: "|") {
-                        current: current.segment(index: 0, delimiter: "|")
-                    }
-                }
-            }
         }
 
         index: index + 1
@@ -66,7 +20,5 @@ macro state(name: String): @member -> String { target, diagnostics in
         + name
         + "|ordinal="
         + "\(target.ordinal)"
-        + "|llvm="
-        + stateLLVMType(valueType: valueType, current: current)
         + members)
 }

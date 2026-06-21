@@ -1,8 +1,37 @@
+function constructLLVMType(line: String): String {
+    if line.contains(value: "|type=Int") {
+        @return(value: "i64")
+    }
+
+    if line.contains(value: "|current=Int(") {
+        @return(value: "i64")
+    }
+
+    if line.contains(value: "|type=Bool") {
+        @return(value: "i1")
+    }
+
+    if line.contains(value: "|current=Bool(") {
+        @return(value: "i1")
+    }
+
+    if line.contains(value: "|type=String") {
+        @return(value: "%Range.String")
+    }
+
+    if line.contains(value: "|current=String(") {
+        @return(value: "%Range.String")
+    }
+
+    @return(value: "")
+}
+
 macro construct(name: String): @syntax -> String { target, diagnostics in
     @state(name: "fields", value: "String(\"\")")
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
     @state(name: "fieldIndex", value: "0")
+    @state(name: "pendingState", value: "String(\"false\")")
 
     @while(index < target.application.rawBodyText.count(of: "\n") + 1) {
         @state(
@@ -14,6 +43,16 @@ macro construct(name: String): @syntax -> String { target, diagnostics in
         if line.contains(value: "member|kind=state") {
             if line.contains(value: "|llvm=") {
                 lineLLVM: line.segment(index: 1, delimiter: "|llvm=")
+            }
+
+            pendingState: "true"
+        } else {
+            if pendingState == "true" {
+                if line.contains(value: "member|kind=value") {
+                    lineLLVM: constructLLVMType(line: line)
+                }
+
+                pendingState: "false"
             }
         }
 
