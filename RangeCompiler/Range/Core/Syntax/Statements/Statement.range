@@ -1,3 +1,4 @@
 @expression
-macro statement(): @syntax -> String { target, diagnostics in
+macro statement() -> String { target, diagnostics in
+    return "statement|kind=expression|projection=target.declaration"
 }
