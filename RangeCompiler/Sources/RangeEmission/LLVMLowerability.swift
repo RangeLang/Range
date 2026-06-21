@@ -24,12 +24,12 @@ enum LLVMLowerability {
         var returnType: ScalarType
     }
 
-    enum ScalarType: Equatable {
+    indirect enum ScalarType: Equatable, Sendable {
         case int(bits: Int, signed: Bool)
         case bool
         case float
         case string
-        case intArray
+        case array(element: ScalarType)
         case construct(identity: String, name: String)
 
         init?(
@@ -51,8 +51,15 @@ enum LLVMLowerability {
                 self = .float
             case .named("String"):
                 self = .string
-            case .array(.named("Int")):
-                self = .intArray
+            case .array(let element):
+                guard let elementType = ScalarType(
+                    typeReference: element,
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                ) else {
+                    return nil
+                }
+                self = .array(element: elementType)
             case .named(let name):
                 if let scalarType = scalarTypes[name] {
                     self = scalarType
@@ -70,7 +77,7 @@ enum LLVMLowerability {
                     return
                 }
                 return nil
-            case .member, .generic, .array, .function, .optional, .variadic:
+            case .member, .generic, .function, .optional, .variadic:
                 return nil
             }
         }
@@ -1284,14 +1291,15 @@ enum LLVMLowerability {
             }
             return locals[name]
         case .call(let name, let arguments):
-            if lowerableIntArrayAllocation(
+            if let arrayType = lowerableArrayAllocation(
                 name: name,
                 arguments: arguments,
                 locals: locals,
                 lowerableFunctionSignatures: lowerableFunctionSignatures,
-                constructLayouts: constructLayouts
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
             ) {
-                return .intArray
+                return arrayType
             }
             if let construct = lowerableConstructInitializer(
                 name: name,
@@ -1402,26 +1410,33 @@ enum LLVMLowerability {
         return actual.isInteger && expected == .float
     }
 
-    private static func lowerableIntArrayAllocation(
+    private static func lowerableArrayAllocation(
         name: String,
         arguments: [CallArgument],
         locals: [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
-        constructLayouts: [String: ConstructLayout] = [:]
-    ) -> Bool {
-        guard name == "Array<Int>" else {
-            return false
+        constructLayouts: [String: ConstructLayout] = [:],
+        scalarTypes: [String: ScalarType] = [:]
+    ) -> ScalarType? {
+        guard let elementName = arrayElementName(from: name),
+            let elementType = ScalarType(
+                typeReference: .named(elementName),
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            )
+        else {
+            return nil
         }
         if arguments.isEmpty {
-            return true
+            return .array(element: elementType)
         }
         guard arguments.count == 1 else {
-            return false
+            return nil
         }
         guard arguments[0].label == "capacity" || arguments[0].label == nil else {
-            return false
+            return nil
         }
-        return canConvert(
+        guard canConvert(
             canLower(
                 arguments[0].value,
                 locals: locals,
@@ -1429,7 +1444,19 @@ enum LLVMLowerability {
                 constructLayouts: constructLayouts
             ),
             to: .defaultInt
-        )
+        ) else {
+            return nil
+        }
+        return .array(element: elementType)
+    }
+
+    private static func arrayElementName(from callName: String) -> String? {
+        guard callName.hasPrefix("Array<"), callName.hasSuffix(">") else {
+            return nil
+        }
+        let start = callName.index(callName.startIndex, offsetBy: "Array<".count)
+        let end = callName.index(before: callName.endIndex)
+        return String(callName[start..<end])
     }
 
     private static func lowerableConstructInitializer(
@@ -1537,7 +1564,7 @@ enum LLVMLowerability {
             baseName: baseName,
             baseType: baseType,
             member: member,
-            result: resultType(for: member)
+            result: resultType(for: member, baseType: baseType)
         )
     }
 
@@ -1576,29 +1603,32 @@ enum LLVMLowerability {
             return .byteCount
         case (.string, "isEmpty"):
             return .isEmpty
-        case (.intArray, "count"):
+        case (.array, "count"):
             return .count
-        case (.intArray, "isEmpty"):
+        case (.array, "isEmpty"):
             return .isEmpty
         default:
             return nil
         }
     }
 
-    private static func resultType(for member: LowerableMember) -> ScalarType {
+    private static func resultType(for member: LowerableMember, baseType: ScalarType) -> ScalarType {
         switch member {
         case .count:
             return .defaultInt
         case .byteCount:
             return .defaultInt
         case .element:
+            if case .array(let elementType) = baseType {
+                return elementType
+            }
             return .defaultInt
         case .isEmpty:
             return .bool
         case .append:
-            return .intArray
+            return baseType
         case .update:
-            return .intArray
+            return baseType
         case .field:
             return .defaultInt
         }
@@ -1630,6 +1660,9 @@ enum LLVMLowerability {
 
         switch member {
         case .append:
+            guard case .array(let elementType) = baseType else {
+                return nil
+            }
             guard arguments.count == 1,
                 canConvert(
                     argumentValue(labeled: "element", at: 0, in: arguments).flatMap {
@@ -1639,7 +1672,7 @@ enum LLVMLowerability {
                             lowerableFunctionSignatures: lowerableFunctionSignatures
                         )
                     },
-                    to: .defaultInt
+                    to: elementType
                 )
             else {
                 return nil
@@ -1658,6 +1691,9 @@ enum LLVMLowerability {
                 return nil
             }
         case .update:
+            guard case .array(let elementType) = baseType else {
+                return nil
+            }
             guard arguments.count == 2,
                 canConvert(
                     argumentValue(labeled: "element", at: 0, in: arguments).flatMap {
@@ -1667,7 +1703,7 @@ enum LLVMLowerability {
                             lowerableFunctionSignatures: lowerableFunctionSignatures
                         )
                     },
-                    to: .defaultInt
+                    to: elementType
                 ),
                 canConvert(
                     argumentValue(labeled: "index", at: 1, in: arguments).flatMap {
@@ -1690,7 +1726,7 @@ enum LLVMLowerability {
             baseName: baseName,
             baseType: baseType,
             member: member,
-            result: resultType(for: member)
+            result: resultType(for: member, baseType: baseType)
         )
     }
 
@@ -1699,11 +1735,11 @@ enum LLVMLowerability {
         name: String
     ) -> LowerableMember? {
         switch (baseType, name) {
-        case (.intArray, "append"):
+        case (.array, "append"):
             return .append
-        case (.intArray, "element"):
+        case (.array, "element"):
             return .element
-        case (.intArray, "update"):
+        case (.array, "update"):
             return .update
         default:
             return nil
@@ -1775,7 +1811,7 @@ private extension LLVMLowerability.ScalarType {
         switch self {
         case .int(_, _), .float:
             return true
-        case .bool, .string, .intArray:
+        case .bool, .string, .array:
             return false
         case .construct:
             return false

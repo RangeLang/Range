@@ -1899,8 +1899,11 @@ struct SwiftBackendEmitter {
             return "Double"
         case .string:
             return "__RangeLLVMString"
-        case .intArray:
-            return "__RangeLLVMIntArray"
+        case .array(let element):
+            if element == .defaultInt {
+                return "__RangeLLVMIntArray"
+            }
+            return "__RangeLLVMArray"
         case .construct(_, let name):
             return "__RangeLLVM\(LLVMLoweringEmitter.sanitizeSymbol(name))"
         }
@@ -4566,7 +4569,7 @@ struct SwiftBackendEmitter {
                 )
                 return "__RangeLLVMString.withString(\(rendered)) { \(name) in \(nested) }"
             }
-            if type == .intArray {
+            if case .array(let element) = type, element == .defaultInt {
                 let rendered = try emitExpression(argument.value, scope: scope)
                 let name = "__rangeLLVMIntArrayArgument\(index)"
                 let nested = try build(
@@ -4598,7 +4601,7 @@ struct SwiftBackendEmitter {
             return "Double(\(rendered))"
         case .string:
             return rendered
-        case .intArray:
+        case .array:
             return rendered
         case .construct:
             return rendered
@@ -4618,7 +4621,7 @@ struct SwiftBackendEmitter {
             return "Float(\(call))"
         case .string:
             return "__RangeLLVMString.decode(\(call))"
-        case .intArray:
+        case .array:
             return call
         case .construct:
             return call
@@ -4850,8 +4853,8 @@ private extension LLVMLowerability.ScalarType {
             return "Float"
         case .string:
             return "String"
-        case .intArray:
-            return "Array<Int>"
+        case .array(let element):
+            return "Array<\(element.displayName)>"
         case .construct(_, let name):
             return name
         }
@@ -4861,8 +4864,10 @@ private extension LLVMLowerability.ScalarType {
         switch self {
         case .int(_, _):
             return swiftBridgeTypeName != nil
-        case .bool, .float, .string, .intArray:
+        case .bool, .float, .string:
             return true
+        case .array(let element):
+            return element == .defaultInt
         case .construct:
             return false
         }
@@ -4874,7 +4879,7 @@ private extension LLVMLowerability.ScalarType {
             return swiftBridgeTypeName != nil
         case .bool, .float, .string:
             return true
-        case .intArray, .construct:
+        case .array, .construct:
             return false
         }
     }

@@ -608,6 +608,32 @@ struct LLVMLoweringEmitterTests {
         #expect(module.ir.contains("call void @free(ptr"))
     }
 
+    @Test("Bool array lowers with detected element type")
+    func boolArrayLowersWithDetectedElementType() throws {
+        let callable = try parseCallable(
+            """
+            function firstFlag(value: Bool): Bool {
+                state values: Array<Bool>(capacity: 1)
+                values.append(element: value)
+                return values.element(index: 0)
+            }
+            """
+        )
+
+        #expect(LLVMLowerability.canLower(callable))
+        let module = try #require(
+            try LLVMLoweringEmitter().emitModule(callables: [callable])
+        )
+
+        #expect(module.ir.contains("%Range.BoolArray = type { ptr, i64, i64 }"))
+        #expect(module.ir.contains("define i1 @RangeLLVM_firstFlag(i1 %value)"))
+        #expect(module.ir.contains("mul i64 1, 1"))
+        #expect(module.ir.contains("getelementptr inbounds i1, ptr"))
+        #expect(module.ir.contains("store i1 %value, ptr"))
+        #expect(module.ir.contains("load i1, ptr"))
+        #expect(module.ir.contains("ret i1"))
+    }
+
     @Test("Nested Int while loops lower to LLVM basic blocks")
     func nestedIntWhileLoopsLowerToLLVMBasicBlocks() throws {
         let callable = try parseCallable(
