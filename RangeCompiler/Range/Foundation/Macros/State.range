@@ -1,13 +1,25 @@
 function stateLLVMType(type: String, current: String): String {
-    if type == "Int" || current.contains(value: "Int(") {
+    if type == "Int" {
         @return(value: "i64")
     }
 
-    if type == "Bool" || current.contains(value: "Bool(") {
+    if current.contains(value: "Int(") {
+        @return(value: "i64")
+    }
+
+    if type == "Bool" {
         @return(value: "i1")
     }
 
-    if type == "String" || current.contains(value: "String(") {
+    if current.contains(value: "Bool(") {
+        @return(value: "i1")
+    }
+
+    if type == "String" {
+        @return(value: "%Range.String")
+    }
+
+    if current.contains(value: "String(") {
         @return(value: "%Range.String")
     }
 
