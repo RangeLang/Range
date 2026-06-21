@@ -1,0 +1,9 @@
+@member
+macro value(type: String, current: String = ""): @member -> String { target, diagnostics in
+    @return(value: "member|kind=value|type="
+        + type
+        + "|current="
+        + current
+        + "|ordinal="
+        + "\(target.ordinal)")
+}

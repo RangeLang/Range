@@ -170,15 +170,29 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         _ declaration: MacroDeclaration,
         filePath: String
     ) throws {
-        guard declaration.parameters.count == 2,
-            declaration.parameters[0].name == "name",
-            declaration.parameters[0].typeReference == .named("String"),
-            declaration.parameters[1].name == "value",
-            declaration.parameters[1].typeReference == .named("String")
-        else {
+        guard memberMacroParameterShapeIsValid(declaration) else {
             throw SemanticValidationError(
-                "@member macro \(declaration.name) in \(lastPathComponent(of: filePath)) must declare parameters `(name: String, value: String)`."
+                "@member macro \(declaration.name) in \(lastPathComponent(of: filePath)) has an unsupported parameter shape."
             )
+        }
+    }
+
+    private func memberMacroParameterShapeIsValid(_ declaration: MacroDeclaration) -> Bool {
+        switch declaration.name {
+        case "parameter":
+            return declaration.parameters.count == 1
+                && declaration.parameters[0].name == "name"
+                && declaration.parameters[0].typeReference == .named("String")
+        case "value":
+            return declaration.parameters.count >= 1
+                && declaration.parameters[0].name == "type"
+                && declaration.parameters[0].typeReference == .named("String")
+        default:
+            return declaration.parameters.count >= 2
+                && declaration.parameters[0].name == "name"
+                && declaration.parameters[0].typeReference == .named("String")
+                && declaration.parameters[1].name == "value"
+                && declaration.parameters[1].typeReference == .named("String")
         }
     }
 

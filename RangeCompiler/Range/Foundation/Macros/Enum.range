@@ -1,0 +1,19 @@
+macro enum(name: String): @syntax -> String { target, diagnostics in
+    @state(name: "members", value: "String(\"\")")
+    @state(name: "index", value: "0")
+
+    @while(index < target.application.rawBodyText.count(of: "\n") + 1) {
+        @state(
+            name: "line",
+            value: target.application.rawBodyText.segment(index: index, delimiter: "\n")
+        )
+
+        if !line.isEmpty {
+            members: members + "\n" + line
+        }
+
+        index: index + 1
+    }
+
+    @return(value: "enum|name=" + name + members)
+}

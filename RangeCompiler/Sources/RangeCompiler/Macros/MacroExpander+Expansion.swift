@@ -672,21 +672,65 @@ extension MacroExpander {
         context: MacroExpansionContext
     ) -> [String] {
         statements.enumerated().compactMap { offset, statement -> String? in
-            guard case .macroApplication(let name, let arguments) = statement else {
+            let name: String
+            let argumentBindings: [String: Expression]?
+            let targetValue: CompileTimeValue
+            let fallback: String?
+            switch statement {
+            case .macroApplication(let macroName, let arguments):
+                name = macroName
+                fallback = stringyMemberRecord(name: name, arguments: arguments, ordinal: offset)
+                if let macro = macros[name] {
+                    argumentBindings = try? parseMacroArgumentBindings(
+                        for: macro,
+                        arguments: arguments
+                    )
+                } else {
+                    return stringyMemberRecord(name: name, arguments: arguments, ordinal: offset)
+                }
+                targetValue = memberMacroTargetValue(ordinal: offset)
+            case .macroInvocation(let macroName, let argumentClause, let body):
+                name = macroName
+                fallback = renderStatementMacroInvocation(
+                    name: name,
+                    argumentClause: argumentClause,
+                    body: renderStatementsForRawBody(body)
+                )
+                if let macro = macros[name] {
+                    argumentBindings = (try? parseMacroArgumentBindings(
+                        for: macro,
+                        argumentClause: argumentClause
+                    )) ?? singlePositionalMacroArgumentBindings(
+                        for: macro,
+                        argumentClause: argumentClause
+                    )
+                } else {
+                    return renderStatementMacroInvocation(
+                        name: name,
+                        argumentClause: argumentClause,
+                        body: renderStatementsForRawBody(body)
+                    )
+                }
+                targetValue = memberMacroTargetValue(
+                    ordinal: offset,
+                    bodyText: evaluatedStringMacroStatements(
+                        in: body,
+                        macros: macros,
+                        context: context
+                    ).joined(separator: "\n")
+                )
+            default:
                 return nil
             }
             guard let macro = macros[name] else {
-                return stringyMemberRecord(name: name, arguments: arguments, ordinal: offset)
+                return nil
             }
-            guard let argumentBindings = try? parseMacroArgumentBindings(
-                for: macro,
-                arguments: arguments
-            ) else {
-                return stringyMemberRecord(name: name, arguments: arguments, ordinal: offset)
+            guard let argumentBindings else {
+                return nil
             }
             let evaluator = CompileTimeValueEvaluator(
                 targetBinding: macro.bindings?.target ?? "target",
-                targetValue: memberMacroTargetValue(ordinal: offset),
+                targetValue: targetValue,
                 graphBinding: macro.bindings?.graph,
                 selfValue: MacroTargetValueBuilder(
                     macroDeclarationsByName: context.macroDeclarationsByName,
@@ -704,18 +748,27 @@ extension MacroExpander {
                 macro.body,
                 locals: &locals
             ) else {
-                return stringyMemberRecord(name: name, arguments: arguments, ordinal: offset)
+                return fallback
             }
             return processed
         }
     }
 
-    static func memberMacroTargetValue(ordinal: Int) -> CompileTimeValue {
+    static func memberMacroTargetValue(ordinal: Int, bodyText: String = "") -> CompileTimeValue {
         .object(
             typeName: "MemberMacro.Target",
             fields: [
                 "index": .integer(ordinal),
                 "ordinal": .integer(ordinal),
+                "declaration": .object(
+                    typeName: "MemberMacro.Declaration",
+                    fields: [
+                        "bodyText": .string(bodyText),
+                        "text": .string(bodyText),
+                    ]
+                ),
+                "bodyText": .string(bodyText),
+                "text": .string(bodyText),
             ]
         )
     }

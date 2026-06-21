@@ -678,7 +678,7 @@ public struct DeclarationGraph {
 
         let states = lines.dropFirst().compactMap(emittedState)
         let values = lines.dropFirst().compactMap(emittedValue)
-        let callables = lines.dropFirst().compactMap(emittedFunction)
+        let callables = emittedFunctions(from: Array(lines.dropFirst()))
         let macro = MacroApplication(
             name: application.name,
             genericArguments: application.genericArguments,
@@ -742,7 +742,54 @@ public struct DeclarationGraph {
         )
     }
 
-    private static func emittedFunction(from line: String) -> CallableDeclaration? {
+    private static func emittedFunctions(from lines: [String]) -> [CallableDeclaration] {
+        var result: [CallableDeclaration] = []
+        var index = 0
+        while index < lines.count {
+            let fields = emittedRecordFields(in: lines[index])
+            guard fields["kind"] == "function" else {
+                index += 1
+                continue
+            }
+
+            var parameterLines: [String] = []
+            var childIndex = index + 1
+            while childIndex < lines.count {
+                let childFields = emittedRecordFields(in: lines[childIndex])
+                if childFields["kind"] == "parameter" {
+                    parameterLines.append(lines[childIndex])
+                    childIndex += 1
+                    while childIndex < lines.count {
+                        let parameterChildFields = emittedRecordFields(in: lines[childIndex])
+                        guard parameterChildFields["kind"] == "value" else {
+                            break
+                        }
+                        parameterLines.append(lines[childIndex])
+                        childIndex += 1
+                    }
+                    continue
+                }
+                guard childFields["kind"] == "value" else {
+                    break
+                }
+                childIndex += 1
+            }
+
+            if let function = emittedFunction(
+                from: lines[index],
+                parameters: emittedParameters(from: parameterLines)
+            ) {
+                result.append(function)
+            }
+            index = childIndex
+        }
+        return result
+    }
+
+    private static func emittedFunction(
+        from line: String,
+        parameters: [RangeFunctionParameter] = []
+    ) -> CallableDeclaration? {
         let fields = emittedRecordFields(in: line)
         guard fields["kind"] == "function",
             let name = fields["name"],
@@ -759,9 +806,58 @@ public struct DeclarationGraph {
             name: name,
             genericParameters: [],
             hasExplicitParameterClause: true,
-            parameters: [],
+            parameters: parameters,
             returnType: emittedTypeReference(name: fields["result"]),
             body: body
+        )
+    }
+
+    private static func emittedParameters(from lines: [String]) -> [RangeFunctionParameter] {
+        var result: [RangeFunctionParameter] = []
+        var index = 0
+        while index < lines.count {
+            let fields = emittedRecordFields(in: lines[index])
+            guard fields["kind"] == "parameter" else {
+                index += 1
+                continue
+            }
+            let valueLine: String?
+            if index + 1 < lines.count,
+                emittedRecordFields(in: lines[index + 1])["kind"] == "value"
+            {
+                valueLine = lines[index + 1]
+                index += 2
+            } else {
+                valueLine = nil
+                index += 1
+            }
+            if let parameter = emittedParameter(from: lines[index - (valueLine == nil ? 1 : 2)], valueLine: valueLine) {
+                result.append(parameter)
+            }
+        }
+        return result
+    }
+
+    private static func emittedParameter(from line: String, valueLine: String?) -> RangeFunctionParameter? {
+        let fields = emittedRecordFields(in: line)
+        guard fields["kind"] == "parameter",
+            let name = fields["name"],
+            !name.isEmpty
+        else {
+            return nil
+        }
+        let valueFields = valueLine.map(emittedRecordFields) ?? [:]
+        let type = valueFields["type"] ?? fields["value"] ?? ""
+        let defaultValue = valueFields["current"].flatMap { current -> Expression? in
+            current.isEmpty ? nil : .identifier(current)
+        }
+
+        return RangeFunctionParameter(
+            macros: [],
+            name: name,
+            typeReference: emittedTypeReference(value: type, fallback: fields["type"] ?? type),
+            defaultValue: defaultValue,
+            slotName: nil
         )
     }
 
@@ -798,11 +894,74 @@ public struct DeclarationGraph {
     static func collectEnums(from files: [ParsedSourceFile]) -> [String: EnumDeclaration] {
         var registry: [String: EnumDeclaration] = [:]
         for parsedFile in files {
-            for declaration in enumerations(in: parsedFile.sourceFile) {
+            for declaration in emittedEnums(in: parsedFile.sourceFile) {
                 registry[declaration.name] = declaration
             }
         }
         return registry
+    }
+
+    private static func emittedEnums(in sourceFile: SourceFileNode) -> [EnumDeclaration] {
+        guard case .module(let module) = sourceFile else {
+            return []
+        }
+
+        return module.blockMacros.flatMap { blockMacro in
+            blockMacro.macros.compactMap { application in
+                guard let payload = application.evaluatedStringValue else {
+                    return nil
+                }
+                return emittedEnum(from: payload, application: application)
+            }
+        }
+    }
+
+    private static func emittedEnum(
+        from payload: String,
+        application: MacroApplication
+    ) -> EnumDeclaration? {
+        let lines = payload.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        guard let header = lines.first else {
+            return nil
+        }
+        let headerFields = emittedRecordFields(in: header)
+        guard headerFields["kind"] == nil,
+            header.split(separator: "|").first.map(String.init) == "enum",
+            let name = headerFields["name"],
+            !name.isEmpty
+        else {
+            return nil
+        }
+
+        let macro = MacroApplication(
+            name: application.name,
+            genericArguments: application.genericArguments,
+            argumentClause: application.argumentClause,
+            rawBodyLanguage: application.rawBodyLanguage,
+            rawBody: application.rawBody,
+            evaluatedStringValue: payload
+        )
+
+        return EnumDeclaration(
+            macros: [macro],
+            extensibility: .closed,
+            attribute: nil,
+            name: name,
+            genericParameters: [],
+            conformances: [],
+            cases: lines.dropFirst().compactMap(emittedEnumCase)
+        )
+    }
+
+    private static func emittedEnumCase(from line: String) -> EnumCaseDeclaration? {
+        let fields = emittedRecordFields(in: line)
+        guard fields["kind"] == "case",
+            let name = fields["name"],
+            !name.isEmpty
+        else {
+            return nil
+        }
+        return EnumCaseDeclaration(name: name, associatedValues: [])
     }
 
     static func collectMacros(from files: [ParsedSourceFile]) -> [String: MacroDeclaration] {

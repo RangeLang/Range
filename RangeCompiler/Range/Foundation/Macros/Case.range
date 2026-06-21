@@ -1,5 +1,14 @@
 @statement
-macro case(value: String = "") -> String { target, diagnostics in
+macro case(name: String = "", value: String = "") -> String { target, diagnostics in
+    if !name.isEmpty {
+        @return(value: "member|kind=case|name="
+            + name
+            + "|value="
+            + value
+            + "|ordinal="
+            + "\(target.ordinal)")
+    }
+
     @return(value: "statement|kind=case|value="
         + value
         + "|projection=target.declaration.statements")

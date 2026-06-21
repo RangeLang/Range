@@ -71,7 +71,11 @@ struct CompilerFixtureTests {
                     @construct(name: "Counter") {
                         @let(name: "label", value: "String")
                         @state(name: "count", value: "Int(27)")
-                        @function(name: "increment", result: "Bool", body: "count: count + 1")
+                        @function(name: "increment", result: "Bool", body: "count: count + amount") {
+                            @parameter(name: "amount") {
+                                @value(type: "Int")
+                            }
+                        }
                     }
                     """,
                 role: .project
@@ -93,7 +97,9 @@ struct CompilerFixtureTests {
                 construct|name=Counter|llvm=%Range.Counter = type { i64 }
                 member|kind=let|name=label|value=String
                 member|kind=state|name=count|value=Int(27)|ordinal=1|llvm=i64
-                member|kind=function|name=increment|result=Bool|body=count: count + 1|ordinal=2
+                member|kind=function|name=increment|result=Bool|body=count: count + amount|ordinal=2
+                member|kind=parameter|name=amount|ordinal=0
+                member|kind=value|type=Int|current=|ordinal=0
                 """
         )
 
@@ -105,6 +111,11 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.states(onConstruct: "Counter").first?.type.displayName == "Int")
         #expect(program.declarationGraph.callables(onConstruct: "Counter").map(\.name) == ["increment"])
         #expect(program.declarationGraph.callables(onConstruct: "Counter").first?.returnType?.displayName == "Bool")
+        #expect(program.declarationGraph.callables(onConstruct: "Counter").first?.parameters.map(\.name) == ["amount"])
+        #expect(
+            program.declarationGraph.callables(onConstruct: "Counter").first?.parameters.first?
+                .typeReference?.displayName == "Int"
+        )
     }
 
     @Test("Extension macro accepts positional target name")
@@ -144,6 +155,44 @@ struct CompilerFixtureTests {
                 member|kind=function|name=displayName|result=String|body=name|ordinal=0
                 """
         )
+    }
+
+    @Test("Enum macro collects stringy case member records")
+    func enumMacroCollectsStringyCaseMemberRecords() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyEnum.range",
+                source: """
+                    @enum(name: "BuildMessageLevel") {
+                        @case(name: "info")
+                        @case(name: "error", value: "1")
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile else {
+            Issue.record("Expected stringy enum source to parse as a module.")
+            return
+        }
+        let blockMacro = try #require(module.blockMacros.first)
+        let enumMacro = try #require(blockMacro.macros.first)
+
+        #expect(
+            enumMacro.evaluatedStringValue
+                == """
+                enum|name=BuildMessageLevel
+                member|kind=case|name=info|value=|ordinal=0
+                member|kind=case|name=error|value=1|ordinal=1
+                """
+        )
+
+        let declaration = try #require(program.declarationGraph.enumsByName["BuildMessageLevel"])
+        #expect(declaration.cases.map(\.name) == ["info", "error"])
     }
 
     @Test("Statement block macro parses with members")
