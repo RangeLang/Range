@@ -1,5 +1,5 @@
-function stateLLVMType(type: String, current: String): String {
-    if type == "Int" {
+function stateLLVMType(valueType: String, current: String): String {
+    if valueType == "Int" {
         @return(value: "i64")
     }
 
@@ -7,7 +7,7 @@ function stateLLVMType(type: String, current: String): String {
         @return(value: "i64")
     }
 
-    if type == "Bool" {
+    if valueType == "Bool" {
         @return(value: "i1")
     }
 
@@ -15,7 +15,7 @@ function stateLLVMType(type: String, current: String): String {
         @return(value: "i1")
     }
 
-    if type == "String" {
+    if valueType == "String" {
         @return(value: "%Range.String")
     }
 
@@ -29,7 +29,7 @@ function stateLLVMType(type: String, current: String): String {
 @member
 macro state(name: String): @member -> String { target, diagnostics in
     @state(name: "members", value: "String(\"\")")
-    @state(name: "type", value: "String(\"\")")
+    @state(name: "valueType", value: "String(\"\")")
     @state(name: "current", value: "String(\"\")")
     @state(name: "index", value: "0")
 
@@ -44,9 +44,9 @@ macro state(name: String): @member -> String { target, diagnostics in
 
             if memberLine.contains(value: "member|kind=value") {
                 if memberLine.contains(value: "|type=") {
-                    type: memberLine.segment(index: 1, delimiter: "|type=")
-                    if type.contains(value: "|") {
-                        type: type.segment(index: 0, delimiter: "|")
+                    valueType: memberLine.segment(index: 1, delimiter: "|type=")
+                    if valueType.contains(value: "|") {
+                        valueType: valueType.segment(index: 0, delimiter: "|")
                     }
                 }
 
@@ -67,6 +67,6 @@ macro state(name: String): @member -> String { target, diagnostics in
         + "|ordinal="
         + "\(target.ordinal)"
         + "|llvm="
-        + stateLLVMType(type: type, current: current)
+        + stateLLVMType(valueType: valueType, current: current)
         + members)
 }
