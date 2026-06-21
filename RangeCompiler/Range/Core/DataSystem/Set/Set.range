@@ -1,6 +1,6 @@
 @literal
 construct Set<Element> {
-    state storage: SetStorage<Element>()
+    @state storage: SetStorage<Element>()
 
     derived count: Int {
         storage.count

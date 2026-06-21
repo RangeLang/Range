@@ -71,10 +71,4 @@ extension Parser {
         }
     }
 
-    private mutating func consumeMacroAttribute(named expectedName: String) throws {
-        guard case .macroAttribute(let name, nil) = peek(), name == expectedName else {
-            throw ParseError("Expected @\(expectedName).")
-        }
-        advance()
-    }
 }

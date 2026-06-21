@@ -1,0 +1,39 @@
+construct ExtensionMember {
+    @let text: String
+}
+
+construct Extension {
+    @let name: String
+    @let members: Array<ExtensionMember>
+}
+
+function extensionMembers(source: String): Array<ExtensionMember> {
+    state members: Array<ExtensionMember>([])
+    let lineCount: Int(source.count(of: "\n") + 1)
+    state index: 0
+
+    while index < lineCount {
+        let line: String(source.segment(index: index, delimiter: "\n"))
+
+        if !line.isEmpty {
+            members.append(element: ExtensionMember(text: line))
+        }
+
+        index: index + 1
+    }
+
+    return members
+}
+
+function extension(name: String, source: String): Extension {
+    return Extension(name: name, members: extensionMembers(source: source))
+}
+
+function extensionLowering(declaration: Extension): String {
+    return "%Range." + declaration.name + ".extension = type { }"
+}
+
+open macro extension(name: String): @syntax -> String { target, diagnostics in
+    let declaration: Extension(extension(name: name, source: target.application.rawBodyText))
+    return extensionLowering(declaration: declaration)
+}

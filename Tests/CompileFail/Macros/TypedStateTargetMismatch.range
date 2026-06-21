@@ -6,5 +6,5 @@ macro incremented(amount: Int): State<Int> { target, diagnostics in
 
 construct Reader {
     @incremented(amount: 1)
-    state name: String("George")
+    @state name: String("George")
 }

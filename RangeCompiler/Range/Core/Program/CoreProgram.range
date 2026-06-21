@@ -4,7 +4,7 @@ construct ProgramResult {
 
 construct CoreProgram {
     @let path: String
-    state files: Array<ProgramSourceFile>([])
+    @state files: Array<ProgramSourceFile>([])
 
     function load() {
         let project: RangeProject(path: path)

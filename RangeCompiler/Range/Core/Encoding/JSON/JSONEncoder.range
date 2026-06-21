@@ -1,7 +1,7 @@
 construct JSONEncoder {
-    state output: String("")
-    state isObject: Bool(false)
-    state isArray: Bool(false)
+    @state output: String("")
+    @state isObject: Bool(false)
+    @state isArray: Bool(false)
 
     function encode<T>(value: T): Result<String, EncodingError> {
         return .failure(cause: .failed)

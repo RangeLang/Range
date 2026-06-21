@@ -1,6 +1,6 @@
 @literal
 construct Dictionary<Key, Value> {
-    state storage: DictionaryStorage<Key, Value>()
+    @state storage: DictionaryStorage<Key, Value>()
 
     derived count: Int {
         storage.count

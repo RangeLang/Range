@@ -3,7 +3,7 @@ function write(target: binding Int, let: Int) {
 }
 
 construct Counter {
-    state count: Int(0)
+    @state count: Int(0)
 
     init() {
         write($self.count, 3)

@@ -7,8 +7,8 @@ construct RangeGraph {
     @let sources: Array<ProgramSourceFile>
     @let artifacts: Array<ProgramArtifact>
     @let topology: RangeGraphTopology
-    state main: Optional<@main>
-    state syntax: Array<@syntax>
+    @state main: Optional<@main>
+    @state syntax: Array<@syntax>
 }
 
 construct ProgramSourceFile {

@@ -110,6 +110,13 @@ extension Parser {
         return true
     }
 
+    mutating func consumeMacroAttribute(named expectedName: String) throws {
+        guard case .macroAttribute(let name, nil) = peek(), name == expectedName else {
+            throw ParseError("Expected @\(expectedName).")
+        }
+        advance()
+    }
+
     mutating func parseMacroGenericArgumentsIfPresent() throws -> [TypeReference] {
         guard peek() == .less else {
             return []

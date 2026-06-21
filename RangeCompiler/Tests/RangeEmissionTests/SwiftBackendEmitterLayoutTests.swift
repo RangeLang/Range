@@ -266,7 +266,7 @@ struct SwiftBackendEmitterLayoutTests {
         var wrappedParser = try Parser(source: """
         construct PointWithMetadata {
             @initForwarded
-            state point: Point
+            @state point: Point
 
             @let somethingElse: Metadata
         }

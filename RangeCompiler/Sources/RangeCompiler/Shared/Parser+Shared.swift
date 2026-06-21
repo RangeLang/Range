@@ -206,8 +206,8 @@ extension Parser {
 
 
     mutating func skipStateDeclarationForDeclarationDiscovery() throws {
-        _ = try parseMacroApplicationsIfPresent()
-        try consumeKeyword(.state)
+        _ = try parseMacroApplicationsIfPresent(excluding: ["state"])
+        try consumeMacroAttribute(named: "state")
         _ = try consumeIdentifier()
         if peek() == .colon {
             try consume(.colon)

@@ -9,7 +9,7 @@ macro offset(amount: Int): Binding<Int> { target, diagnostics in
 }
 
 construct Box {
-    state age: Int(10)
+    @state age: Int(10)
 
     @offset(amount: 1)
     binding score: Int {

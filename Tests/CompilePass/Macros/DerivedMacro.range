@@ -5,7 +5,7 @@ macro incremented(amount: Int): Derived<Int> { target, diagnostics in
 }
 
 construct Reader {
-    state age: Int(10)
+    @state age: Int(10)
 
     @incremented(amount: 1)
     derived next: Int {

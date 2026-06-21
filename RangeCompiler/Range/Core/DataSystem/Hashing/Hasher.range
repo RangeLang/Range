@@ -1,5 +1,5 @@
 construct Hasher {
-    state storage: HasherStorage()
+    @state storage: HasherStorage()
 
     function combine<T>(value: T) {
         value.hash(hasher: self)

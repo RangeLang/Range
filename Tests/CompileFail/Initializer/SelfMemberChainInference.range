@@ -1,5 +1,5 @@
 construct ChainInferenceBox {
-    state values: Array<Int>
+    @state values: Array<Int>
 
     init(values: Array<Int>) {
         state self.values: values

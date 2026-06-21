@@ -2,13 +2,16 @@ import Foundation
 
 extension Parser {
     func isStateDeclarationStart() -> Bool {
-        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        return peek(offset: offset) == .keyword(RangeSyntax.Keyword.state.rawValue)
+        let offset = macroApplicationLookaheadLength(excluding: ["state"])
+        guard case .macroAttribute(let name, _) = peek(offset: offset), name == "state" else {
+            return false
+        }
+        return tokenCanStartStateName(peek(offset: offset + 1))
     }
 
     mutating func parseState(allowDeclaredStorage: Bool = false) throws -> StateDeclaration {
-        let macros = try parseMacroApplicationsIfPresent()
-        try consumeKeyword(.state)
+        let macros = try parseMacroApplicationsIfPresent(excluding: ["state"])
+        try consumeMacroAttribute(named: "state")
         let name = try consumeIdentifier()
         var explicitType: TypeReference?
         var typedInitializer: Expression?
@@ -69,6 +72,15 @@ extension Parser {
     func canUseExplicitTypeForStoredInitializer(_ expression: Expression) -> Bool {
         switch expression {
         case .call, .unary, .binary, .block:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func tokenCanStartStateName(_ token: Token) -> Bool {
+        switch token {
+        case .identifier, .keyword:
             return true
         default:
             return false

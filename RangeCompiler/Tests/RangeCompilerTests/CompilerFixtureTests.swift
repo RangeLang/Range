@@ -962,7 +962,7 @@ struct CompilerFixtureTests {
             construct Counter {
                 @let count: Optional<Int>(5)
                 @let widgetCount: Optional<WidgetCount>(value: 0.1)
-                state current: Optional<Int>(5)
+                @state current: Optional<Int>(5)
             }
 
             @main {
@@ -1632,7 +1632,7 @@ struct CompilerFixtureTests {
                     @styling
                     @graph
                     construct Panel {
-                        state count: Int(0)
+                        @state count: Int(0)
                         binding selected: Bool {
                             get {
                                 return true

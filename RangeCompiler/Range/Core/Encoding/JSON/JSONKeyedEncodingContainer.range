@@ -1,7 +1,7 @@
 construct JSONKeyedEncodingContainer {
     binding output: String
     binding isObject: Bool
-    state wroteField: Bool(false)
+    @state wroteField: Bool(false)
 
     function encode(value: Bool, key: String): Result<Void, EncodingError> {
         appendField(key: key, value: "\(value)")

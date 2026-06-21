@@ -1,0 +1,3 @@
+open macro state(): @member -> String { target, diagnostics in
+  return
+}

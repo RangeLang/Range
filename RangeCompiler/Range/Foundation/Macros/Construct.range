@@ -29,6 +29,11 @@ function construct(name: String, source: String): Construct {
     return Construct(name: name, members: constructMembers(source: source))
 }
 
-open macro construct(name: String): @syntax -> Void { target, diagnostics in
+function constructLowering(declaration: Construct): String {
+    return "%Range." + declaration.name + " = type { }"
+}
+
+open macro construct(name: String): @syntax -> String { target, diagnostics in
     let declaration: Construct(construct(name: name, source: target.application.rawBodyText))
+    return constructLowering(declaration: declaration)
 }
