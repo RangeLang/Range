@@ -489,6 +489,8 @@ private struct LLVMFunctionEmitter {
 
     private mutating func emitStatement(_ statement: Statement) throws {
         switch statement {
+        case .emitted:
+            return
         case .macroApplication:
             return
         case .localBinding(let declaration):

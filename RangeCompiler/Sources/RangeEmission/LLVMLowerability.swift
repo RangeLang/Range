@@ -458,7 +458,7 @@ enum LLVMLowerability {
             }
 
             switch statement {
-            case .macroApplication:
+            case .emitted, .macroApplication:
                 continue
             case .localBinding(let declaration):
                 guard canLowerLocalBinding(
@@ -595,7 +595,7 @@ enum LLVMLowerability {
                 return "has statements after return"
             }
             switch statement {
-            case .macroApplication:
+            case .emitted, .macroApplication:
                 continue
             case .localBinding(let declaration):
                 guard let type = ScalarType(typeReference: declaration.type) else {
@@ -894,7 +894,7 @@ enum LLVMLowerability {
     ) -> Bool {
         for statement in statements {
             switch statement {
-            case .macroApplication:
+            case .emitted, .macroApplication:
                 continue
             case .localBinding(let declaration):
                 guard canLowerLocalBinding(

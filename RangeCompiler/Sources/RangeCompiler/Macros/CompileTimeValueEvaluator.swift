@@ -281,6 +281,8 @@ struct CompileTimeValueEvaluator {
             switch (leftValue, rightValue) {
             case (.integer(let left)?, .integer(let right)?):
                 return .integer(left + right)
+            case (.string(let left)?, .string(let right)?):
+                return .string(left + right)
             default:
                 return nil
             }

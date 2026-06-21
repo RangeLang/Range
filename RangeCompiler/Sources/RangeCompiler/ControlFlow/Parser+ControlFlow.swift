@@ -31,7 +31,7 @@ extension Parser {
         }
 
         if isMacroApplicationStart() {
-            return try parseMacroApplicationStatement()
+            return try parseMacroApplicationStatement(localBindings: localBindings)
         }
 
         if isDeferStatementStart() {
@@ -102,7 +102,9 @@ extension Parser {
         throw ParseError("Expected statement, found \(peek()).")
     }
 
-    mutating func parseMacroApplicationStatement() throws -> Statement {
+    mutating func parseMacroApplicationStatement(
+        localBindings: [String: LocalBindingSymbol]
+    ) throws -> Statement {
         guard case .macroAttribute(let name, _) = peek() else {
             throw ParseError("Expected macro application statement.")
         }
@@ -111,7 +113,7 @@ extension Parser {
             return .macroInvocation(
                 name: name,
                 argumentClause: nil,
-                body: try parseStatementBlock(baseLocalBindings: [:])
+                body: try parseStatementBlock(baseLocalBindings: localBindings)
             )
         }
         if macroArgumentClauseIsFollowedByBlock() {
@@ -119,7 +121,7 @@ extension Parser {
             return .macroInvocation(
                 name: name,
                 argumentClause: argumentClause,
-                body: try parseStatementBlock(baseLocalBindings: [:])
+                body: try parseStatementBlock(baseLocalBindings: localBindings)
             )
         }
 

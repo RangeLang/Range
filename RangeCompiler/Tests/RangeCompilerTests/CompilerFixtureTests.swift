@@ -127,6 +127,47 @@ struct CompilerFixtureTests {
         #expect(body.count == 1)
     }
 
+    @Test("Statement block macro expands through Range-authored projection")
+    func statementBlockMacroExpandsThroughRangeAuthoredProjection() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyWhile.range",
+                source: """
+                    function spin() {
+                        state x: Int(0)
+                        @while("x > 5") {
+                            x: x + 1
+                        }
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let whileMacro = try #require(program.declarationGraph.macrosByName["while"])
+        #expect(whileMacro.target == nil)
+        #expect(whileMacro.macros.map(\.name) == ["statement"])
+
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let statement = callable.body?.first(where: {
+                if case .emitted = $0 {
+                    return true
+                }
+                return false
+            }),
+            case .emitted(let text) = statement
+        else {
+            Issue.record("Expected @while to expand to an emitted statement string.")
+            return
+        }
+
+        #expect(text == "statement|kind=while|condition=x > 5|projection=target.declaration.statements")
+    }
+
     @Test("CompilePass fixtures validate")
     func compilePassFixturesValidate() throws {
         for fixture in try fixtureFiles(in: "CompilePass") {

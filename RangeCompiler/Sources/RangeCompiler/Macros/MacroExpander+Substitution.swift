@@ -11,6 +11,8 @@ extension MacroExpander {
         bindings: [String: Expression]
     ) -> Statement {
         switch statement {
+        case .emitted:
+            return statement
         case .expand(let targetPath, let emitted):
             return .expand(
                 targetPath: targetPath,

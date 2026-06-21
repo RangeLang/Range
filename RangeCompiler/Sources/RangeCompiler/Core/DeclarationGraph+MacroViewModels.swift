@@ -657,6 +657,7 @@ struct MacroExpansionContext {
     let graphContext: MacroGraphContext
     let macroDeclarationsByName: [String: MacroDeclaration]
     let macroMetadataByName: [String: MacroMetadataDeclaration]
+    let callableDeclarationsByName: [String: [CallableDeclaration]]
     let diagnosticEngine: RangeDiagnosticEngine?
     let currentPath: String?
 
@@ -667,6 +668,7 @@ struct MacroExpansionContext {
             graphContext: graphContext,
             macroDeclarationsByName: macroDeclarationsByName,
             macroMetadataByName: macroMetadataByName,
+            callableDeclarationsByName: callableDeclarationsByName,
             diagnosticEngine: diagnosticEngine,
             currentPath: path
         )

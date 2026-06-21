@@ -1,2 +1,3 @@
-macro statement(): @syntax -> Void { target, diagnostics in
+@expression
+macro statement(): @syntax -> String { target, diagnostics in
 }

@@ -696,7 +696,7 @@ extension MacroExpander {
 
         for statement in statements {
             switch statement {
-            case .macroApplication, .expand, .replace:
+            case .emitted, .macroApplication, .expand, .replace:
                 continue
             case .expression(let expression):
                 expressions.append(expression)

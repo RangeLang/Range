@@ -1,6 +1,7 @@
 import Foundation
 
 public indirect enum Statement {
+    case emitted(String)
     case macroApplication(name: String, arguments: [CallArgument])
     case macroInvocation(name: String, argumentClause: String?, body: [Statement])
     case expand(targetPath: String?, block: EmittedCodeBlock)

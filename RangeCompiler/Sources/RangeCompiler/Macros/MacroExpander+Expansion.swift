@@ -361,6 +361,14 @@ extension MacroExpander {
 
     private static func statementValue(_ statement: Statement) -> CompileTimeValue {
         switch statement {
+        case .emitted(let text):
+            return .object(
+                typeName: "EmittedStatement",
+                fields: [
+                    "written": .string(text),
+                    "text": .string(text),
+                ]
+            )
         case .localBinding(let declaration):
             return .object(
                 typeName: "LocalBinding",
@@ -447,6 +455,8 @@ extension MacroExpander {
 
     private static func renderStatementForBlockValue(_ statement: Statement) -> String {
         switch statement {
+        case .emitted(let text):
+            return text
         case .return(let expression?):
             return "return \(renderExpressionForStringify(expression))"
         case .return(nil):
@@ -456,6 +466,24 @@ extension MacroExpander {
         case .localBinding(let declaration):
             let keyword = declaration.kind == .mutable ? "state" : "let"
             return "\(keyword) \(declaration.name): \(declaration.type.displayName)(\(renderExpressionForStringify(declaration.expression)))"
+        case .assignment(let target, let expression):
+            return "\(renderAssignmentTarget(target)): \(renderExpressionForStringify(expression))"
+        case .break:
+            return "break"
+        case .continue:
+            return "continue"
+        case .macroApplication(let name, let arguments):
+            let renderedArguments = renderArgumentsForStringify(arguments)
+            if renderedArguments.isEmpty {
+                return "@\(name)"
+            }
+            return "@\(name)(\(renderedArguments))"
+        case .macroInvocation(let name, let argumentClause, let body):
+            return renderStatementMacroInvocation(
+                name: name,
+                argumentClause: argumentClause,
+                body: renderStatementsForRawBody(body)
+            )
         default:
             return String(describing: statement)
         }
@@ -611,6 +639,7 @@ extension MacroExpander {
             ).value(for: macro),
             localBindings: argumentBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
+            callableDeclarationsByName: context.callableDeclarationsByName,
             knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
             context: context
         )
@@ -684,6 +713,123 @@ extension MacroExpander {
                 "ordinal": .integer(ordinal),
             ]
         )
+    }
+
+    static func evaluatedStringStatementMacro(
+        name: String,
+        argumentClause: String?,
+        body: [Statement],
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> String {
+        guard let macro = macros[name] else {
+            return renderStatementMacroInvocation(
+                name: name,
+                argumentClause: argumentClause,
+                body: renderStatementsForRawBody(body)
+            )
+        }
+        let application = MacroApplication(
+            name: name,
+            genericArguments: [],
+            argumentClause: argumentClause
+        )
+        guard
+            let argumentBindings = (try? parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: argumentClause
+            )) ?? singlePositionalStatementMacroArgumentBindings(
+                for: macro,
+                argumentClause: argumentClause
+            )
+        else {
+            return renderStatementMacroInvocation(
+                name: name,
+                argumentClause: argumentClause,
+                body: renderStatementsForRawBody(body)
+            )
+        }
+
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: macro.bindings?.target ?? "target",
+            targetValue: statementMacroTargetValue(body: body, application: application),
+            graphBinding: macro.bindings?.graph,
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                constructsByName: context.graphContext.constructsByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
+            localBindings: argumentBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+            context: context
+        )
+        var locals = argumentBindings
+        guard case .string(let processed)? = evaluator.evaluateStatements(macro.body, locals: &locals)
+        else {
+            return renderStatementMacroInvocation(
+                name: name,
+                argumentClause: argumentClause,
+                body: renderStatementsForRawBody(body)
+            )
+        }
+        return processed
+    }
+
+    static func statementMacroTargetValue(
+        body: [Statement],
+        application: MacroApplication
+    ) -> CompileTimeValue {
+        let statementValues = body.map(statementValue)
+        return .object(
+            typeName: "Block",
+            fields: [
+                "application": MacroTargetValueBuilder().value(for: application),
+                "declaration": .object(
+                    typeName: "Block.Declaration",
+                    fields: [
+                        "body": .array(statementValues),
+                        "statements": .array(statementValues),
+                    ]
+                ),
+                "body": .array(statementValues),
+                "statements": .array(statementValues),
+            ]
+        )
+    }
+
+    static func singlePositionalStatementMacroArgumentBindings(
+        for macro: MacroDeclaration,
+        argumentClause: String?
+    ) -> [String: Expression]? {
+        guard macro.parameters.count == 1,
+            let parameter = macro.parameters.first,
+            let argumentClause,
+            let arguments = try? parsedMacroArguments(argumentClause: argumentClause),
+            arguments.count == 1,
+            arguments[0].label == nil
+        else {
+            return nil
+        }
+
+        return [parameter.localName: arguments[0].value]
+    }
+
+    static func renderStatementsForRawBody(_ statements: [Statement]) -> String {
+        statements.map(renderStatementForBlockValue).joined(separator: "\n")
+    }
+
+    static func renderStatementMacroInvocation(
+        name: String,
+        argumentClause: String?,
+        body: String
+    ) -> String {
+        let arguments = argumentClause.map { "(\($0))" } ?? ""
+        guard !body.isEmpty else {
+            return "@\(name)\(arguments)"
+        }
+        return "@\(name)\(arguments) {\n\(body)\n}"
     }
 
     static func stringyMemberRecord(
@@ -1617,18 +1763,23 @@ extension MacroExpander {
         case .expand, .replace:
             return []
         case .macroInvocation(let name, let argumentClause, let body):
+            let expandedBody = try expand(
+                statements: body,
+                expectedReturnType: nil,
+                macros: macros,
+                parameterMacroSignatures: parameterMacroSignatures,
+                literalBridges: literalBridges,
+                context: context,
+                stateEffects: stateEffects
+            )
             return [
-                .macroInvocation(
-                    name: name,
-                    argumentClause: argumentClause,
-                    body: try expand(
-                        statements: body,
-                        expectedReturnType: nil,
+                .emitted(
+                    evaluatedStringStatementMacro(
+                        name: name,
+                        argumentClause: argumentClause,
+                        body: expandedBody,
                         macros: macros,
-                        parameterMacroSignatures: parameterMacroSignatures,
-                        literalBridges: literalBridges,
-                        context: context,
-                        stateEffects: stateEffects
+                        context: context
                     )
                 )
             ]
@@ -2588,7 +2739,7 @@ extension MacroExpander {
                 if let defaultBody {
                     blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
                 }
-            case .macroApplication, .macroInvocation, .assignment, .compoundAssignment, .expression,
+            case .emitted, .macroApplication, .macroInvocation, .assignment, .compoundAssignment, .expression,
                 .return, .break, .continue:
                 continue
             }
@@ -2632,7 +2783,7 @@ extension MacroExpander {
                 if let defaultBody {
                     blocks.append(contentsOf: replacementCodeBlocks(in: defaultBody))
                 }
-            case .macroApplication, .macroInvocation, .assignment, .compoundAssignment, .expression,
+            case .emitted, .macroApplication, .macroInvocation, .assignment, .compoundAssignment, .expression,
                 .return, .break, .continue:
                 continue
             }
@@ -2763,6 +2914,8 @@ extension MacroExpander {
                 locals[declaration.name] =
                     evaluator.evaluate(declaration.expression, with: locals)?.expression
                     ?? declaration.expression
+            case .emitted:
+                continue
             case .expression(let expression):
                 if let diagnostic = try macroDiagnostic(
                     from: expression,

@@ -16,6 +16,7 @@ extension DeclarationGraph {
             ),
             macroDeclarationsByName: macrosByName,
             macroMetadataByName: macroMetadataDeclarationsByName,
+            callableDeclarationsByName: callablesByName,
             diagnosticEngine: diagnosticEngine,
             currentPath: nil
         )
