@@ -1,5 +1,3 @@
-@statement
-@syntax
-construct Expression {
-    @let type: Optional<TypeReference>
+@construct(name: "Expression") {
+    @let(name: "type", value: "Optional<TypeReference>")
 }
