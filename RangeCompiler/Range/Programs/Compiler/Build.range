@@ -25,6 +25,7 @@ construct BuildSpan {
 }
 
 construct BuildBlock {
+    let identifier: Optional<Identifier>
     let spans: Array<BuildSpan>
     let blocks: Array<BuildBlock>
 }
@@ -52,6 +53,7 @@ construct BuildSyntaxPiece {
 }
 
 construct BuildStatement {
+    let identifier: Optional<Identifier>
     let span: BuildSpan
     let syntax: Array<BuildSyntaxPiece>
 }
@@ -84,7 +86,7 @@ function sourceBlock(file: ProgramSourceFile): BuildBlock {
         line: line + 1
     }
 
-    return BuildBlock(spans: spans, blocks: [])
+    return BuildBlock(identifier: Optional<Identifier>(nil), spans: spans, blocks: [])
 }
 
 function projectSourceBlocks(path: String): Array<BuildBlock> {
@@ -159,8 +161,50 @@ function syntaxPieces(span: BuildSpan): Array<BuildSyntaxPiece> {
     return pieces
 }
 
+function statementIdentifier(span: BuildSpan): Optional<Identifier> {
+    let text: String(trimLeadingWhitespace(text: span.text))
+
+    if buildHasPrefix(text: text, prefix: "let ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "let "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "state ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "state "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "binding ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "binding "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "derived ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "derived "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "function ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "function "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "construct ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "construct "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "enum ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "enum "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "extension ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "extension "))
+    }
+
+    return Optional<Identifier>(nil)
+}
+
 function buildStatement(span: BuildSpan): BuildStatement {
-    return BuildStatement(span: span, syntax: syntaxPieces(span: span))
+    return BuildStatement(
+        identifier: statementIdentifier(span: span),
+        span: span,
+        syntax: syntaxPieces(span: span)
+    )
 }
 
 function collectBlockStatements(block: BuildBlock): Array<BuildStatement> {
