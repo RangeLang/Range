@@ -18,6 +18,7 @@ construct Macro {
     @let parameters: Array<Parameter>
     @let target: Optional<MacroTarget>
     @let expansionType: Optional<TypeReference>
+    @let expansionTypeName: String
     @let writtenBody: WrittenSyntax
     @let parsedBody: Parsed<Block>
     @let body: String

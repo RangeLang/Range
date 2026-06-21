@@ -4,9 +4,14 @@ extension Parser {
     func isMacroDeclarationStart() -> Bool {
         let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
         return peek(offset: offset) == .keyword(RangeSyntax.Keyword.macro.rawValue)
+            || isMacroPrefixDeclarationStart(at: 0)
     }
 
     mutating func parseMacroDeclaration(signatureOnly: Bool = false) throws -> MacroDeclaration {
+        if isMacroPrefixDeclarationStart(at: 0) {
+            return try parseMacroPrefixDeclaration(signatureOnly: signatureOnly)
+        }
+
         let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.macro)
 
@@ -91,6 +96,55 @@ extension Parser {
             genericParameters: genericParameters,
             parameters: parameters,
             target: target,
+            expansionType: expansionType,
+            bindings: bindings,
+            body: body,
+            syntaxBody: nil
+        )
+    }
+
+    private func isMacroPrefixDeclarationStart(at offset: Int) -> Bool {
+        guard case .macroAttribute(let name, nil) = peek(offset: offset),
+            name == "macro",
+            peek(offset: offset + 1) == .leftParen
+        else {
+            return false
+        }
+        return true
+    }
+
+    private mutating func parseMacroPrefixDeclaration(signatureOnly: Bool = false) throws
+        -> MacroDeclaration
+    {
+        guard case .macroAttribute(let name, nil) = peek(), name == "macro" else {
+            throw ParseError("Expected @macro declaration.")
+        }
+        advance()
+        let parameters = try parseFunctionParameters(allowSyntaxCapture: true)
+        try consume(.arrow)
+        let expansionType = try parseTypeReferenceNode()
+        let bindings: MacroBindings
+        let body: [Statement]
+        if signatureOnly {
+            if peek() == .leftBrace {
+                try consume(.leftBrace)
+                bindings = try parseMacroBodyBindings()
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+            } else {
+                throw ParseError("Expected macro body.")
+            }
+            body = []
+        } else {
+            (bindings, body) = try parseMacroBody()
+        }
+
+        return MacroDeclaration(
+            macros: [],
+            name: "macro",
+            genericParameters: [],
+            parameters: parameters,
+            target: .macroSurface("macro"),
             expansionType: expansionType,
             bindings: bindings,
             body: body,

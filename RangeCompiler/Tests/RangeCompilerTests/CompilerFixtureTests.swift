@@ -92,6 +92,28 @@ struct CompilerFixtureTests {
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 
+    @Test("@macro prefix declaration parses")
+    func macroPrefixDeclarationParses() throws {
+        var parser = try Parser(source: """
+            @macro() -> String { target, diagnostics in
+                return target.declaration.name
+            }
+            """)
+        let sourceFile = try parser.parseSourceFile()
+        guard case .macro(let declaration) = sourceFile else {
+            Issue.record("Expected @macro prefix declaration to parse as a macro declaration.")
+            return
+        }
+
+        #expect(declaration.name == "macro")
+        #expect(declaration.parameters.isEmpty)
+        #expect(declaration.expansionType == .named("String"))
+        guard case .macroSurface("macro")? = declaration.target else {
+            Issue.record("Expected @macro prefix declaration to target @macro.")
+            return
+        }
+    }
+
     @Test("@project macro requires a single project declaration")
     func projectMacroRequiresSingleProjectDeclaration() throws {
         let inputs = [
