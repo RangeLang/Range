@@ -536,7 +536,7 @@ struct SwiftBackendEmitter {
                         record(body)
                     case .macroInvocation(_, _, let body):
                         record(body)
-                    case .expand, .return(nil), .break, .continue:
+                    case .expand, .replace, .return(nil), .break, .continue:
                         break
                     }
                 }
@@ -2312,7 +2312,7 @@ struct SwiftBackendEmitter {
         var expressions: [RangeExpression] = []
         for statement in statements {
             switch statement {
-            case .expand:
+            case .expand, .replace:
                 continue
             case .expression(let expression):
                 expressions.append(expression)
@@ -3029,7 +3029,7 @@ struct SwiftBackendEmitter {
             return statementsReferenceInstanceSelf(declaration.body)
         case .macroInvocation(_, _, let body):
             return statementsReferenceInstanceSelf(body)
-        case .expand, .break, .continue:
+        case .expand, .replace, .break, .continue:
             return false
         }
     }
@@ -3096,7 +3096,7 @@ struct SwiftBackendEmitter {
                 if assignmentTargetReferencesInstanceSelf(target) {
                     return true
                 }
-            case .expand:
+            case .expand, .replace:
                 continue
             case .macroInvocation(_, _, let body),
                 .forEach(_, _, let body),
@@ -3187,7 +3187,7 @@ struct SwiftBackendEmitter {
                 if statementsCallKnownMutatingMemberOnInstanceSelf(body) {
                     return true
                 }
-            case .localCallable, .macroInvocation, .expand, .return(nil), .break, .continue:
+            case .localCallable, .macroInvocation, .expand, .replace, .return(nil), .break, .continue:
                 continue
             }
         }
@@ -3499,7 +3499,7 @@ struct SwiftBackendEmitter {
         switch statement {
         case .macroInvocation:
             throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
-        case .expand:
+        case .expand, .replace:
             throw SwiftBackendError(
                 "Macro expansion statements must be expanded before Swift emission.")
         case .background(let background):
@@ -4269,7 +4269,7 @@ struct SwiftBackendEmitter {
         switch statement {
         case .macroInvocation:
             throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
-        case .expand:
+        case .expand, .replace:
             throw SwiftBackendError(
                 "Macro expansion statements must be expanded before Swift emission.")
         case .background(let background):

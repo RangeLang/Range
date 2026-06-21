@@ -42,6 +42,37 @@ extension MacroExpander {
                     }
                 )
             )
+        case .replace(let targetPath, let emitted):
+            return .replace(
+                targetPath: targetPath,
+                block:
+                EmittedCodeBlock(
+                    parts: emitted.parts.map { part in
+                        switch part {
+                        case .text:
+                            return part
+                        case .splice(let expression, let expected):
+                            return .splice(
+                                expression: substituteMacroBindings(in: expression, bindings: bindings),
+                                expected: expected
+                            )
+                        case .syntaxMacroInvocation(let name, let arguments):
+                            return .syntaxMacroInvocation(
+                                name: name,
+                                arguments: arguments.map {
+                                    CallArgument(
+                                        label: $0.label,
+                                        value: substituteMacroBindings(
+                                            in: $0.value,
+                                            bindings: bindings
+                                        )
+                                    )
+                                }
+                            )
+                        }
+                    }
+                )
+            )
         case .localBinding(let declaration):
             return .localBinding(
                 LocalBindingDeclaration(

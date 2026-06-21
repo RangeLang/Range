@@ -472,7 +472,7 @@ private struct LLVMFunctionEmitter {
                 throw LLVMLoweringError("LLVM continue requires an enclosing loop.")
             }
             emitBranch(to: target.conditionLabel)
-        case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
+        case .macroInvocation, .expand, .replace, .background, .deferBlock, .localCallable, .derived,
             .forEach:
             throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
         case .expression(let expression):

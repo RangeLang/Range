@@ -765,6 +765,9 @@ struct MacroExpansionContext {
         _ path: String,
         for macro: MacroDeclaration
     ) throws {
+        if path == "\(macro.bindings!.target).declaration" {
+            return
+        }
         guard rewriteSurfaceView.declaredExpansionPathExists(
             path,
             targetBinding: macro.bindings!.target,

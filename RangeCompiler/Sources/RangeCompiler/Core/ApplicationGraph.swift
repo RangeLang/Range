@@ -390,7 +390,7 @@ struct GraphCollector {
         for (index, statement) in statements.enumerated() {
             let statementID = "\(ownerID)/stmt:\(index)"
             switch statement {
-            case .expand:
+            case .expand, .replace:
                 continue
             case .macroInvocation(_, _, let body):
                 analyzeStatements(

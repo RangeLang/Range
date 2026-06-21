@@ -71,6 +71,10 @@ extension MacroExpander {
                     context: context
                 )
             }
+            let replacementDeclarationBundles =
+                try module.constructs.map {
+                    try replacementDeclarations(from: $0, macros: macros, context: context)
+                }
             let emittedDeclarationBundles =
                 try module.constructs.map {
                     try emittedDeclarations(from: $0, macros: macros, context: context)
@@ -112,7 +116,8 @@ extension MacroExpander {
                             literalBridges: literalBridges,
                             context: context
                         )
-                    } + emittedDeclarationBundles.flatMap(\.states),
+                    } + replacementDeclarationBundles.flatMap(\.states)
+                        + emittedDeclarationBundles.flatMap(\.states),
                     callables: try module.callables.map {
                         try expand(
                             callable: $0,
@@ -122,15 +127,24 @@ extension MacroExpander {
                             context: context,
                             stateEffects: moduleStateEffects
                         )
-                    } + emittedDeclarationBundles.flatMap(\.callables),
-                    constructs: expandedConstructs
+                    } + replacementDeclarationBundles.flatMap(\.callables)
+                        + emittedDeclarationBundles.flatMap(\.callables),
+                    constructs: zip(expandedConstructs, replacementDeclarationBundles).flatMap {
+                        expanded, replacement in
+                        replacement.isEmpty ? [expanded] : replacement.constructs
+                    }
                         + emittedDeclarationBundles.flatMap(\.constructs),
                     enumerations: module.enumerations
+                        + replacementDeclarationBundles.flatMap(\.enumerations)
                         + emittedDeclarationBundles.flatMap(\.enumerations),
-                    macros: module.macros + emittedDeclarationBundles.flatMap(\.macros),
+                    macros: module.macros
+                        + replacementDeclarationBundles.flatMap(\.macros)
+                        + emittedDeclarationBundles.flatMap(\.macros),
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
-                    extensions: expandedExtensions + emittedDeclarationBundles.flatMap(\.extensions)
+                    extensions: expandedExtensions
+                        + replacementDeclarationBundles.flatMap(\.extensions)
+                        + emittedDeclarationBundles.flatMap(\.extensions)
                 )
             )
         case .construct(let declaration):
@@ -141,13 +155,19 @@ extension MacroExpander {
                 literalBridges: literalBridges,
                 context: context
             )
+            let replacementBundle = try replacementDeclarations(
+                from: declaration,
+                macros: macros,
+                context: context
+            )
             let emittedBundle = try emittedDeclarations(
                 from: declaration,
                 macros: macros,
                 context: context
             )
             guard
-                !emittedBundle.states.isEmpty
+                !replacementBundle.isEmpty
+                    || !emittedBundle.states.isEmpty
                     || !emittedBundle.callables.isEmpty
                     || !emittedBundle.constructs.isEmpty
                     || !emittedBundle.enumerations.isEmpty
@@ -159,14 +179,16 @@ extension MacroExpander {
             return .module(
                 ModuleFileNode(
                     mainBlock: nil,
-                    states: emittedBundle.states,
-                    callables: emittedBundle.callables,
-                    constructs: [expandedConstruct] + emittedBundle.constructs,
-                    enumerations: emittedBundle.enumerations,
-                    macros: emittedBundle.macros,
+                    states: replacementBundle.states + emittedBundle.states,
+                    callables: replacementBundle.callables + emittedBundle.callables,
+                    constructs: (replacementBundle.isEmpty
+                        ? [expandedConstruct] : replacementBundle.constructs)
+                        + emittedBundle.constructs,
+                    enumerations: replacementBundle.enumerations + emittedBundle.enumerations,
+                    macros: replacementBundle.macros + emittedBundle.macros,
                     precedenceGroups: [],
                     operators: [],
-                    extensions: emittedBundle.extensions
+                    extensions: replacementBundle.extensions + emittedBundle.extensions
                 )
             )
         case .enumeration(let declaration):
@@ -565,7 +587,6 @@ extension MacroExpander {
                 context: context
             )
         }
-
         return ConstructDeclaration(
             macros: macrosWithValues,
             kind: construct.kind,
@@ -1343,7 +1364,7 @@ extension MacroExpander {
         stateEffects: [String: PropertyMacroEffects] = [:]
     ) throws -> [Statement] {
         switch statement {
-        case .expand:
+        case .expand, .replace:
             return []
         case .macroInvocation(let name, let argumentClause, let body):
             _ = argumentClause
@@ -2082,6 +2103,44 @@ extension MacroExpander {
         return emitted
     }
 
+    static func replacementDeclarations(
+        from construct: ConstructDeclaration,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) throws -> EmittedDeclarationBundle {
+        var replacement = EmittedDeclarationBundle()
+
+        for application in construct.macros {
+            guard let macro = macros[application.name],
+                macroTargetAllows(
+                    macro.target!, kind: .construct,
+                    syntaxResolver: context.rewriteSurfaceView.syntaxResolver)
+            else {
+                continue
+            }
+            let argumentBindings = try parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: application.argumentClause
+            )
+            let genericBindings = macroGenericArgumentBindings(
+                for: macro,
+                application: application
+            )
+            replacement.merge(
+                try replacementDeclarations(
+                    from: macro,
+                    construct: construct,
+                    context: context,
+                    argumentBindings: argumentBindings.merging(genericBindings) { _, generic in
+                        generic
+                    }
+                )
+            )
+        }
+
+        return replacement
+    }
+
     static func emittedDeclarations(
         from enumeration: EnumDeclaration,
         macros: [String: MacroDeclaration],
@@ -2130,6 +2189,24 @@ extension MacroExpander {
         )
     }
 
+    static func replacementDeclarations(
+        from macro: MacroDeclaration,
+        construct: ConstructDeclaration,
+        context: MacroExpansionContext,
+        argumentBindings: [String: Expression] = [:]
+    ) throws -> EmittedDeclarationBundle {
+        try replacementDeclarations(
+            from: macro,
+            targetValue: MacroTargetValueBuilder(
+                macroMetadataByName: context.macroMetadataByName,
+                writtenSyntaxByID: context.graphContext.writtenSyntaxByID,
+                extensionsByTargetName: context.graphContext.extensionsByTargetName
+            ).targetValue(for: construct),
+            context: context,
+            argumentBindings: argumentBindings
+        )
+    }
+
     static func emittedDeclarations(
         from macro: MacroDeclaration,
         targetValue: CompileTimeValue,
@@ -2164,6 +2241,51 @@ extension MacroExpander {
         return emitted
     }
 
+    static func replacementDeclarations(
+        from macro: MacroDeclaration,
+        targetValue: CompileTimeValue,
+        context: MacroExpansionContext,
+        argumentBindings: [String: Expression] = [:]
+    ) throws -> EmittedDeclarationBundle {
+        var replacement = EmittedDeclarationBundle()
+
+        let body = substituteMacroBindings(in: macro.body, bindings: argumentBindings)
+        try emitMacroDiagnostics(
+            from: body,
+            macro: macro,
+            targetValue: targetValue,
+            context: context
+        )
+
+        for (targetPath, block, localBindings) in replacementCodeBlocks(in: body) {
+            if let targetPath {
+                try validateReplacementPath(targetPath, for: macro)
+            }
+            replacement.merge(
+                try emittedDeclarationBundle(
+                    from: block,
+                    macro: macro,
+                    targetValue: targetValue,
+                    localBindings: localBindings,
+                    context: context
+                )
+            )
+        }
+
+        return replacement
+    }
+
+    static func validateReplacementPath(_ targetPath: String, for macro: MacroDeclaration) throws {
+        guard let targetBinding = macro.bindings?.target else {
+            throw ParseError("Macro @\(macro.name) cannot replace syntax without a target binding.")
+        }
+        guard targetPath == "\(targetBinding).declaration" else {
+            throw ParseError(
+                "Macro @\(macro.name) can only replace \(targetBinding).declaration in this bootstrap pass."
+            )
+        }
+    }
+
     static func emittedCodeBlocks(in statements: [Statement]) -> [(
         targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression]
     )] {
@@ -2178,6 +2300,8 @@ extension MacroExpander {
                 localBindings[declaration.name] = declaration.expression
             case .expand(let targetPath, let emitted):
                 blocks.append((targetPath, emitted, localBindings))
+            case .replace:
+                continue
             case .conditional(let branches):
                 for branch in branches {
                     blocks.append(contentsOf: emittedCodeBlocks(in: branch.body))
@@ -2196,6 +2320,50 @@ extension MacroExpander {
                 }
                 if let defaultBody {
                     blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
+                }
+            case .macroInvocation, .assignment, .compoundAssignment, .expression,
+                .return, .break, .continue:
+                continue
+            }
+        }
+
+        return blocks
+    }
+
+    static func replacementCodeBlocks(in statements: [Statement]) -> [(
+        targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression]
+    )] {
+        var blocks:
+            [(targetPath: String?, block: EmittedCodeBlock, localBindings: [String: Expression])] =
+                []
+        var localBindings: [String: Expression] = [:]
+
+        for statement in statements {
+            switch statement {
+            case .localBinding(let declaration):
+                localBindings[declaration.name] = declaration.expression
+            case .replace(let targetPath, let emitted):
+                blocks.append((targetPath, emitted, localBindings))
+            case .expand:
+                continue
+            case .conditional(let branches):
+                for branch in branches {
+                    blocks.append(contentsOf: replacementCodeBlocks(in: branch.body))
+                }
+            case .whileLoop(_, let body), .forEach(_, _, let body), .derived(_, _, let body):
+                blocks.append(contentsOf: replacementCodeBlocks(in: body))
+            case .background(let background):
+                blocks.append(contentsOf: replacementCodeBlocks(in: background.body))
+            case .deferBlock(let deferred):
+                blocks.append(contentsOf: replacementCodeBlocks(in: deferred.body))
+            case .localCallable(let declaration):
+                blocks.append(contentsOf: replacementCodeBlocks(in: declaration.body))
+            case .switchStatement(_, let cases, let defaultBody):
+                for switchCase in cases {
+                    blocks.append(contentsOf: replacementCodeBlocks(in: switchCase.body))
+                }
+                if let defaultBody {
+                    blocks.append(contentsOf: replacementCodeBlocks(in: defaultBody))
                 }
             case .macroInvocation, .assignment, .compoundAssignment, .expression,
                 .return, .break, .continue:
@@ -2529,7 +2697,7 @@ extension MacroExpander {
                 default:
                     continue
                 }
-            case .expand, .macroInvocation, .return, .break, .continue:
+            case .expand, .replace, .macroInvocation, .return, .break, .continue:
                 continue
             }
         }
@@ -2658,6 +2826,9 @@ extension MacroExpander {
         do {
             var parser = try Parser(source: rendered)
             sourceFile = try parser.parseSourceFile()
+        } catch let parseError as ParseError {
+            throw ParseError(
+                "Could not parse emitted declarations from @\(macro.name): \(parseError.message).\n\(rendered)")
         } catch {
             throw ParseError(
                 "Could not parse emitted declarations from @\(macro.name).\n\(rendered)")

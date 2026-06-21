@@ -123,7 +123,7 @@ struct SwiftLoweredProgramAdapter {
                 argumentClause: argumentClause,
                 body: lower(statements: body)
             )
-        case .expand:
+        case .expand, .replace:
             return statement
         case .background(let background):
             return .background(

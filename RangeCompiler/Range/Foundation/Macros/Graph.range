@@ -1,3 +1,17 @@
-macro graph(role: Optional<GraphRole>): Construct -> Identity { target, diagnostics in
+closed macro graph(role: GraphRole): Construct -> Identity { target, diagnostics in
+    let rewrittenIdentifier: Identifier(name: "\(target.declaration.identifier.name)\(role == .application ? ".Application" : ".Declaration")")
+
+    target.declaration.replace {
+        construct #(rewrittenIdentifier) {
+            #(target.declaration.lets)
+            #(target.declaration.states)
+            #(target.declaration.bindings)
+            #(target.declaration.deriveds)
+            #(target.declaration.functions)
+            #(target.declaration.constructs)
+            #(target.declaration.extensions)
+        }
+    }
+
     return Identity(uuid: UUID(storage: UUIDStorage()))
 }

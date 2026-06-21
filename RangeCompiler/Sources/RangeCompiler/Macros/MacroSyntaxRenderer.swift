@@ -26,12 +26,16 @@ struct MacroSyntaxRenderer {
             return renderExpressionForSyntax(value)
         case .object(let typeName, _) where typeName == "NamedTypeReference" || typeName == "MemberTypeReference":
             return renderNominalTypeReference(value)
+        case .object(let typeName, _) where typeName == "Let" || typeName == "State"
+            || typeName == "Binding" || typeName == "Derived"
+            || typeName == "Function.Declaration" || typeName == "Construct.Declaration":
+            return renderDeclaration(value)
         case .array(let values):
             let rendered = values.compactMap(renderSyntax)
             guard rendered.count == values.count else {
                 return nil
             }
-            return rendered.joined(separator: " ")
+            return rendered.joined(separator: "\n")
         case .string(let value):
             return value
         default:
@@ -66,6 +70,129 @@ struct MacroSyntaxRenderer {
         default:
             return nil
         }
+    }
+
+    private func renderDeclaration(_ value: CompileTimeValue) -> String? {
+        guard case .object(let typeName, let fields) = value else {
+            return nil
+        }
+
+        switch typeName {
+        case "Let":
+            return renderProperty(keyword: "let", fields: fields)
+        case "State":
+            return renderProperty(keyword: "state", fields: fields)
+        case "Binding":
+            return renderProperty(keyword: "binding", fields: fields)
+        case "Derived":
+            return renderProperty(keyword: "derived", fields: fields)
+        case "Function.Declaration":
+            return renderFunctionDeclaration(fields)
+        case "Construct.Declaration":
+            return renderConstructDeclaration(fields)
+        default:
+            return nil
+        }
+    }
+
+    private func renderProperty(keyword: String, fields: [String: CompileTimeValue]) -> String? {
+        guard let name = renderIdentifierField(fields),
+            let typeValue = fields["type"],
+            let typeName = renderNominalTypeReference(typeValue)
+        else {
+            return nil
+        }
+        return "\(keyword) \(name): \(typeName)"
+    }
+
+    private func renderFunctionDeclaration(_ fields: [String: CompileTimeValue]) -> String? {
+        guard let name = renderIdentifierField(fields) else {
+            return nil
+        }
+        let generics = renderGenerics(fields["generics"]) ?? ""
+        let parameters = renderParameters(fields["parameters"]) ?? ""
+        let returnType = fields["returnType"].flatMap(renderNominalTypeReference) ?? "Void"
+        let suffix = returnType == "Void" ? "" : ": \(returnType)"
+        return "function \(name)\(generics)(\(parameters))\(suffix)"
+    }
+
+    private func renderConstructDeclaration(_ fields: [String: CompileTimeValue]) -> String? {
+        guard let nameValue = fields["self"] ?? fields["identifier"],
+            let name = renderNominalTypeReference(nameValue) ?? renderIdentifier(nameValue)
+        else {
+            return nil
+        }
+        let generics = renderGenerics(fields["generics"]) ?? ""
+        let bodyValues = [
+            fields["lets"],
+            fields["states"],
+            fields["bindings"],
+            fields["deriveds"],
+            fields["functions"],
+            fields["constructs"],
+            fields["extensions"],
+        ]
+        let body = bodyValues.compactMap { $0.flatMap(renderSyntax) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+        return body.isEmpty
+            ? "construct \(name)\(generics) {}"
+            : "construct \(name)\(generics) {\n\(body)\n}"
+    }
+
+    private func renderGenerics(_ value: CompileTimeValue?) -> String? {
+        guard let value else {
+            return ""
+        }
+        guard case .array(let elements) = value else {
+            return nil
+        }
+        let rendered = elements.compactMap(renderGeneric)
+        guard rendered.count == elements.count else {
+            return nil
+        }
+        return rendered.isEmpty ? "" : "<\(rendered.joined(separator: ", "))>"
+    }
+
+    private func renderGeneric(_ value: CompileTimeValue) -> String? {
+        guard case .object(let typeName, let fields) = value,
+            typeName == "TypeGeneric" || typeName == "ValueGeneric",
+            let name = renderIdentifierField(fields)
+        else {
+            return nil
+        }
+        if typeName == "TypeGeneric" {
+            return name
+        }
+        guard let type = fields["type"].flatMap(renderNominalTypeReference) else {
+            return nil
+        }
+        return "\(name): \(type)"
+    }
+
+    private func renderParameters(_ value: CompileTimeValue?) -> String? {
+        guard let value else {
+            return ""
+        }
+        guard case .array(let elements) = value else {
+            return nil
+        }
+        let rendered = elements.compactMap(renderParameter)
+        guard rendered.count == elements.count else {
+            return nil
+        }
+        return rendered.joined(separator: ", ")
+    }
+
+    private func renderParameter(_ value: CompileTimeValue) -> String? {
+        guard case .object(let typeName, let fields) = value,
+            typeName == "Parameter.Declaration",
+            let name = renderIdentifierField(fields),
+            let type = fields["type"].flatMap(renderNominalTypeReference)
+        else {
+            return nil
+        }
+        return "\(name): \(type)"
     }
 
     private func renderEnum(_ value: CompileTimeValue) -> String? {

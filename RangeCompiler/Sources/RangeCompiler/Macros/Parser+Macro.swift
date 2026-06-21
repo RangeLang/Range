@@ -259,7 +259,10 @@ extension Parser {
         throw ParseError("Macro bodies must bind `target, diagnostics in` or `target, diagnostics, graph in`.")
     }
 
-    mutating func parseTargetExpandStatement(targetPath: String) throws -> Statement {
+    mutating func parseTargetEmittedCodeStatement(
+        targetPath: String,
+        operation: String
+    ) throws -> Statement {
         let components = targetPath.split(separator: ".").map(String.init)
         for (index, component) in components.enumerated() {
             if index > 0 {
@@ -268,9 +271,12 @@ extension Parser {
             try consumeIdentifierOrKeyword(component)
         }
         try consume(.dot)
-        try consumeIdentifierOrKeyword("expand")
+        try consumeIdentifierOrKeyword(operation)
         try consume(.leftBrace)
         let emitted = try parseEmittedCodeBlock()
+        if operation == "replace" {
+            return .replace(targetPath: targetPath, block: emitted)
+        }
         return .expand(targetPath: targetPath, block: emitted)
     }
 

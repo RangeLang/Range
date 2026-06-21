@@ -563,8 +563,8 @@ enum LLVMLowerability {
                     return false
                 }
                 sawReturn = true
-            case .return(nil), .macroInvocation, .expand, .background, .deferBlock, .localCallable,
-                .derived, .forEach, .break, .continue:
+            case .return(nil), .macroInvocation, .expand, .replace, .background, .deferBlock,
+                .localCallable, .derived, .forEach, .break, .continue:
                 return false
             }
         }
@@ -706,7 +706,7 @@ enum LLVMLowerability {
                 return "uses bare return"
             case .macroInvocation:
                 return "uses a statement macro invocation"
-            case .expand:
+            case .expand, .replace:
                 return "uses expand"
             case .background:
                 return "uses background"
@@ -954,8 +954,8 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
-            case .macroInvocation, .expand, .background, .deferBlock, .localCallable, .derived,
-                .forEach, .return:
+            case .macroInvocation, .expand, .replace, .background, .deferBlock, .localCallable,
+                .derived, .forEach, .return:
                 return false
             case .break, .continue:
                 continue

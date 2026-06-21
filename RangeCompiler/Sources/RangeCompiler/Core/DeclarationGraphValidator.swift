@@ -32,8 +32,8 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             closedMacroNames: closedCoreMacroNames
         )
         try validateEnumExtensionCases(in: program.declarationGraph)
-        try validatePrimaryDeclarations(in: program.parsedFiles)
-        try validateTopLevelStates(in: program.parsedFiles)
+        try validatePrimaryDeclarations(in: program.expandedFiles)
+        try validateTopLevelStates(in: program.expandedFiles)
     }
 
     private func validateEnumExtensionCases(in declarationGraph: DeclarationGraph) throws {
@@ -326,7 +326,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return expressionMacroUsages(in: deferred.body, declarationName: declarationName)
         case .localCallable(let declaration):
             return expressionMacroUsages(in: declaration.body, declarationName: declaration.name)
-        case .macroInvocation, .expand, .derived, .return(nil), .break, .continue:
+        case .macroInvocation, .expand, .replace, .derived, .return(nil), .break, .continue:
             return []
         }
     }

@@ -51,20 +51,16 @@ extension Parser {
     }
 
     func validateBuilderDeclarations(in declarations: [ConstructDeclaration]) throws {
-        let declarationsByName = Dictionary(
-            uniqueKeysWithValues: declarations.map { ($0.name, $0) })
+        let declarationsByName = Dictionary(grouping: declarations, by: \.name)
 
         for declaration in declarations {
             for derived in declaration.deriveds {
                 guard let builderName = derived.builderName else { continue }
-                guard let builder = declarationsByName[builderName] else {
+                guard let builder = declarationsByName[builderName]?.first(where: {
+                    $0.kind == .builder
+                }) else {
                     throw ParseError(
                         "Derived \(derived.name): \(derived.typeName) references unknown builder \(builderName)."
-                    )
-                }
-                guard builder.kind == .builder else {
-                    throw ParseError(
-                        "Derived \(derived.name): \(derived.typeName) references \(builderName), but it is not declared as a builder."
                     )
                 }
 
@@ -94,7 +90,7 @@ extension Parser {
     func collectBuilderHooks(from statements: [Statement], into hooks: inout Set<String>) {
         for statement in statements {
             switch statement {
-            case .expand:
+            case .expand, .replace:
                 continue
             case .macroInvocation(_, _, let body):
                 collectBuilderHooks(from: body, into: &hooks)

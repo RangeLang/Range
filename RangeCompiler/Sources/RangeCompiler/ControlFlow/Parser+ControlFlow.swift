@@ -8,11 +8,14 @@ extension Parser {
         currentClosureBaseLocalBindings = localBindings
         defer { currentClosureBaseLocalBindings = previousClosureBaseLocalBindings }
 
-        if let targetPath = targetExpandStatementPath() {
+        if let targetStatement = targetEmittedCodeStatement() {
             guard currentMacroBodyDepth > 0 else {
-                throw ParseError("expand is only valid inside macro bodies.")
+                throw ParseError("\(targetStatement.operation) is only valid inside macro bodies.")
             }
-            return try parseTargetExpandStatement(targetPath: targetPath)
+            return try parseTargetEmittedCodeStatement(
+                targetPath: targetStatement.path,
+                operation: targetStatement.operation
+            )
         }
 
         if isLocalBackgroundCallableStart() {
@@ -96,10 +99,10 @@ extension Parser {
             return .expression(try parseExpression())
         }
 
-        throw ParseError("Expected statement.")
+        throw ParseError("Expected statement, found \(peek()).")
     }
 
-    func targetExpandStatementPath() -> String? {
+    func targetEmittedCodeStatement() -> (path: String, operation: String)? {
         guard let first = tokenIdentifierOrKeyword(peek()) else {
             return nil
         }
@@ -115,13 +118,14 @@ extension Parser {
         }
 
         guard components.count > 1,
-            components.last == "expand",
+            let operation = components.last,
+            operation == "expand" || operation == "replace",
             peek(offset: offset) == .leftBrace
         else {
             return nil
         }
 
-        return components.dropLast().joined(separator: ".")
+        return (components.dropLast().joined(separator: "."), operation)
     }
 
     private func tokenIdentifierOrKeyword(_ token: Token) -> String? {

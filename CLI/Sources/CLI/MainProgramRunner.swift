@@ -178,7 +178,7 @@ private struct MainProgramInterpreter {
         switch statement {
         case .macroInvocation:
             throw ValidationError("Macro invocations must be expanded before interpretation.")
-        case .expand:
+        case .expand, .replace:
             throw ValidationError("Macro expansion statements must be expanded before interpretation.")
         case .background:
             throw ValidationError(

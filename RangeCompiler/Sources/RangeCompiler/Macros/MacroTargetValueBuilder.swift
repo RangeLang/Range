@@ -752,6 +752,8 @@ struct MacroTargetValueBuilder {
             return "#\(name)\(arguments) { \(renderStatements(body)) }"
         case .expand(let targetPath, _):
             return [targetPath, "expand"].compactMap { $0 }.joined(separator: ".")
+        case .replace(let targetPath, _):
+            return [targetPath, "replace"].compactMap { $0 }.joined(separator: ".")
         default:
             return String(describing: statement)
         }

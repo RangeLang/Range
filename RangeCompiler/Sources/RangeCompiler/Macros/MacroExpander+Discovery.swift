@@ -120,7 +120,7 @@ extension MacroExpander {
 
     private static func containsMacroRewrite(_ statement: Statement) -> Bool {
         switch statement {
-        case .expand:
+        case .expand, .replace:
             return true
         case .expression(let expression), .return(let expression?):
             return expressionContainsMacroRewrite(expression)

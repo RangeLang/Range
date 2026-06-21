@@ -927,7 +927,7 @@ public struct DeclarationGraph {
             qualifiedConstruct(child, qualifiedName: "\(qualifiedName).\(child.name)")
         }
 
-        registry[qualifiedName] = ConstructDeclaration(
+        let collected = ConstructDeclaration(
             macros: declaration.macros,
             kind: declaration.kind,
             attribute: declaration.attribute,
@@ -942,6 +942,11 @@ public struct DeclarationGraph {
             callables: declaration.callables,
             constructs: qualifiedChildren
         )
+        if let existing = registry[qualifiedName] {
+            registry[qualifiedName] = mergedConstruct(existing, collected)
+        } else {
+            registry[qualifiedName] = collected
+        }
 
         for child in declaration.constructs {
             collectConstruct(
@@ -950,6 +955,27 @@ public struct DeclarationGraph {
                 into: &registry
             )
         }
+    }
+
+    private static func mergedConstruct(
+        _ first: ConstructDeclaration,
+        _ second: ConstructDeclaration
+    ) -> ConstructDeclaration {
+        ConstructDeclaration(
+            macros: first.macros + second.macros,
+            kind: first.kind,
+            attribute: first.attribute ?? second.attribute,
+            name: first.name,
+            genericParameters: first.genericParameters + second.genericParameters,
+            conformances: first.conformances + second.conformances,
+            states: first.states + second.states,
+            bindings: first.bindings + second.bindings,
+            deriveds: first.deriveds + second.deriveds,
+            values: first.values + second.values,
+            initializers: first.initializers + second.initializers,
+            callables: first.callables + second.callables,
+            constructs: first.constructs + second.constructs
+        )
     }
 
     private static func qualifiedConstruct(

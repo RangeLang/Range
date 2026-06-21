@@ -199,7 +199,7 @@ extension Parser {
     mutating func parseConstructHeader() throws
         -> (name: String, genericParameters: [GenericParameter], conformances: [TypeReference])
     {
-        let name = try consumeTypeName()
+        let name = try consumeQualifiedConstructName()
         let genericParameters = try parseGenericParameterClauseIfPresent()
 
         if peek() == .colon || peek() == .leftBrace {
@@ -210,6 +210,15 @@ extension Parser {
         throw ParseError(
             "Expected ':' or '{' after declaration name. Use construct \(name) { ... } or construct \(name): Contract { ... }."
         )
+    }
+
+    mutating func consumeQualifiedConstructName() throws -> String {
+        var components = [try consumeTypeName()]
+        while peek() == .dot {
+            try consume(.dot)
+            components.append(try consumeTypeName())
+        }
+        return components.joined(separator: ".")
     }
 
 }
