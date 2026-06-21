@@ -9,25 +9,25 @@ enum BuildError {
 }
 
 construct BuildMessage {
-    let level: BuildMessageLevel
-    let text: String
+    @let level: BuildMessageLevel
+    @let text: String
 }
 
 construct BuildResult {
-    let success: Bool
-    let messages: Array<BuildMessage>
+    @let success: Bool
+    @let messages: Array<BuildMessage>
 }
 
 construct BuildSpan {
-    let path: String
-    let line: Int
-    let text: String
+    @let path: String
+    @let line: Int
+    @let text: String
 }
 
 construct BuildBlock {
-    let identifier: Optional<Identifier>
-    let spans: Array<BuildSpan>
-    let blocks: Array<BuildBlock>
+    @let identifier: Optional<Identifier>
+    @let spans: Array<BuildSpan>
+    @let blocks: Array<BuildBlock>
 }
 
 enum BuildSpanRoleKind {
@@ -36,26 +36,28 @@ enum BuildSpanRoleKind {
     case extensionDeclaration
     case macroDeclaration
     case functionDeclaration
+    case letMacroInvocation
+    case stateMacroInvocation
     case parameter
     case blockMacroInvocation
 }
 
 construct BuildSpanRole {
-    let kind: BuildSpanRoleKind
-    let path: String
-    let line: Int
-    let name: String
-    let text: String
+    @let kind: BuildSpanRoleKind
+    @let path: String
+    @let line: Int
+    @let name: String
+    @let text: String
 }
 
-construct BuildSyntaxPiece {
-    let text: String
+construct BuildLineSlot {
+    @let text: String
 }
 
 construct BuildStatement {
-    let identifier: Optional<Identifier>
-    let span: BuildSpan
-    let syntax: Array<BuildSyntaxPiece>
+    @let identifier: Optional<Identifier>
+    @let span: BuildSpan
+    @let line: Array<BuildLineSlot>
 }
 
 function missingMainMessage(): String {
@@ -142,9 +144,10 @@ function renderProjectBlocksWithSpaces(path: String): String {
     return renderProjectBlocks(path: path, delimiter: " ")
 }
 
-function syntaxPieces(span: BuildSpan): Array<BuildSyntaxPiece> {
-    state pieces: Array<BuildSyntaxPiece>([])
-    let text: String(trimLeadingWhitespace(text: span.text))
+function lineSlots(span: BuildSpan): Array<BuildLineSlot> {
+    state slots: Array<BuildLineSlot>([])
+    let trimmed: String(trimLeadingWhitespace(text: span.text))
+    let text: String(stripLetMacroPrefix(text: trimmed))
     let pieceCount: Int(text.count(of: " ") + 1)
     state index: 0
 
@@ -152,24 +155,28 @@ function syntaxPieces(span: BuildSpan): Array<BuildSyntaxPiece> {
         let piece: String(text.segment(index: index, delimiter: " "))
 
         if !piece.isEmpty {
-            pieces.append(element: BuildSyntaxPiece(text: piece))
+            slots.append(element: BuildLineSlot(text: piece))
         }
 
         index: index + 1
     }
 
-    return pieces
+    return slots
 }
 
 function statementIdentifier(span: BuildSpan): Optional<Identifier> {
     let text: String(trimLeadingWhitespace(text: span.text))
 
-    if buildHasPrefix(text: text, prefix: "let ") {
-        return Identifier(name: nameAfterPrefix(text: text, prefix: "let "))
-    }
-
     if buildHasPrefix(text: text, prefix: "state ") {
         return Identifier(name: nameAfterPrefix(text: text, prefix: "state "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "@let ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "@let "))
+    }
+
+    if buildHasPrefix(text: text, prefix: "@state ") {
+        return Identifier(name: nameAfterPrefix(text: text, prefix: "@state "))
     }
 
     if buildHasPrefix(text: text, prefix: "binding ") {
@@ -203,7 +210,7 @@ function buildStatement(span: BuildSpan): BuildStatement {
     return BuildStatement(
         identifier: statementIdentifier(span: span),
         span: span,
-        syntax: syntaxPieces(span: span)
+        line: lineSlots(span: span)
     )
 }
 
@@ -245,17 +252,17 @@ function collectProjectStatements(path: String): Array<BuildStatement> {
     return statements
 }
 
-function renderSyntaxPieces(pieces: Array<BuildSyntaxPiece>, delimiter: String): String {
+function renderLineSlots(slots: Array<BuildLineSlot>, delimiter: String): String {
     state output: String("")
     state index: 0
 
-    while index < pieces.count {
+    while index < slots.count {
         if index > 0 {
             output: output + delimiter
         }
 
-        let piece: BuildSyntaxPiece(pieces.element(index: index))
-        output: output + piece.text
+        let slot: BuildLineSlot(slots.element(index: index))
+        output: output + slot.text
         index: index + 1
     }
 
@@ -268,7 +275,7 @@ function renderStatement(buildStatement: BuildStatement): String {
             + ":"
             + "\(buildStatement.span.line)"
             + " "
-            + renderSyntaxPieces(pieces: buildStatement.syntax, delimiter: " ")
+            + renderLineSlots(slots: buildStatement.line, delimiter: " ")
     )
 }
 
@@ -301,6 +308,14 @@ function trimLeadingWhitespace(text: String): String {
     }
 
     return text.substring(start: start, end: text.count)
+}
+
+function stripLetMacroPrefix(text: String): String {
+    if buildHasPrefix(text: text, prefix: "@let ") {
+        return "let " + text.segment(index: 1, delimiter: "@let ")
+    }
+
+    return text
 }
 
 function leadingIdentifier(text: String): String {
@@ -425,7 +440,27 @@ function detectSpanRoles(span: BuildSpan, depth: Int): Array<BuildSpanRole> {
         )
     }
 
-    if text.contains(value: ":") && !buildHasPrefix(text: text, prefix: "case ") && !buildHasPrefix(text: text, prefix: "let ") && !buildHasPrefix(text: text, prefix: "state ") {
+    if buildHasPrefix(text: text, prefix: "@let ") {
+        roles.append(
+            element: spanRole(
+                kind: .letMacroInvocation,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "@let ")
+            )
+        )
+    }
+
+    if buildHasPrefix(text: text, prefix: "@state ") {
+        roles.append(
+            element: spanRole(
+                kind: .stateMacroInvocation,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "@state ")
+            )
+        )
+    }
+
+    if text.contains(value: ":") && !buildHasPrefix(text: text, prefix: "case ") && !buildHasPrefix(text: text, prefix: "state ") && !buildHasPrefix(text: text, prefix: "@let ") && !buildHasPrefix(text: text, prefix: "@state ") {
         roles.append(
             element: spanRole(
                 kind: .parameter,
@@ -498,6 +533,10 @@ function renderSpanRoleKind(kind: BuildSpanRoleKind): String {
         return "macro"
     case .functionDeclaration:
         return "function"
+    case .letMacroInvocation:
+        return "let-macro"
+    case .stateMacroInvocation:
+        return "state-macro"
     case .parameter:
         return "parameter"
     case .blockMacroInvocation:

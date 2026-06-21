@@ -1,6 +1,6 @@
 construct Request {
-    let id: Int
-    let replyTo: Channel<String>
+    @let id: Int
+    @let replyTo: Channel<String>
 }
 
 function fetchUserName(id: Int): String {

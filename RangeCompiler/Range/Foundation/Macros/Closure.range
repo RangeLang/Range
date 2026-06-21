@@ -1,8 +1,8 @@
 @syntax
 construct ClosureSyntax {
-    let syntax: WrittenSyntax
-    let description: String
-    let delimiter: String
+    @let syntax: WrittenSyntax
+    @let description: String
+    @let delimiter: String
 }
 
 open macro closure(delimiter: String = "\n"): @parameter -> @syntax { target, diagnostics in

@@ -1,9 +1,9 @@
 @access(accessTarget: InternalGraph)
 construct AccessBoundaryFixture {
-    let field: Int
+    @let field: Int
 
     construct SharedNode {
-        let value: Int
+        @let value: Int
     }
 }
 

@@ -9,6 +9,6 @@ enum JSONValue {
 }
 
 construct JSONField {
-    let key: String
-    let value: JSONValue
+    @let key: String
+    @let value: JSONValue
 }

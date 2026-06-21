@@ -1,6 +1,6 @@
 @syntax
 construct Parsed<Value> {
-    let written: WrittenSyntax
-    let value: Optional<Value>
-    let diagnostics: Array<String>
+    @let written: WrittenSyntax
+    @let value: Optional<Value>
+    @let diagnostics: Array<String>
 }

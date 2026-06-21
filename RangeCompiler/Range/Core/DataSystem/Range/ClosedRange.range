@@ -1,8 +1,8 @@
 @equatable
 @hashable
 construct ClosedRange<Bound> {
-    let lowerBound: Bound
-    let upperBound: Bound
+    @let lowerBound: Bound
+    @let upperBound: Bound
 
     function contains(value: Bound): Bool {
         return !(value < lowerBound) && !(upperBound < value)

@@ -1,17 +1,17 @@
 construct Point {
-    let x: Int
-    let y: Int
+    @let x: Int
+    @let y: Int
 }
 
 construct Metadata {
-    let title: String
+    @let title: String
 }
 
 construct PointWithMetadata {
     @initForwarded
     state point: Point
 
-    let somethingElse: Metadata
+    @let somethingElse: Metadata
 }
 
 @main {

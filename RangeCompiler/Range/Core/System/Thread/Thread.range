@@ -4,7 +4,7 @@ enum ThreadError {
 }
 
 construct ThreadHandle {
-    let raw: Int
+    @let raw: Int
 }
 
 construct POSIXThread {

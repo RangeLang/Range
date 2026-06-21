@@ -1,6 +1,6 @@
 @float
 construct Float<precision: String("64")> {
-    let storage: FloatStorage
+    @let storage: FloatStorage
 
     function literal(literal: FloatLiteral): Self {
         return Self(storage: literal.storage())

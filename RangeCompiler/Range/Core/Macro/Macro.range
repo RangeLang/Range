@@ -1,40 +1,40 @@
 @syntax
 @graph(role: .declaration)
 construct MacroTarget {
-    let kind: String
-    let name: String
-    let type: Optional<TypeReference>
-    let elements: Array<MacroTarget>
-    let written: WrittenSyntax
+    @let kind: String
+    @let name: String
+    @let type: Optional<TypeReference>
+    @let elements: Array<MacroTarget>
+    @let written: WrittenSyntax
 }
 
 @graph(role: .declaration)
 @syntax
 construct Macro {
-    let name: String
-    let identifier: Identifier
-    let packageVisibility: String
-    let generics: Array<Generic>
-    let parameters: Array<Parameter>
-    let target: Optional<MacroTarget>
-    let expansionType: Optional<TypeReference>
-    let writtenBody: WrittenSyntax
-    let parsedBody: Parsed<Block>
-    let body: String
-    let syntaxBody: String
+    @let name: String
+    @let identifier: Identifier
+    @let packageVisibility: String
+    @let generics: Array<Generic>
+    @let parameters: Array<Parameter>
+    @let target: Optional<MacroTarget>
+    @let expansionType: Optional<TypeReference>
+    @let writtenBody: WrittenSyntax
+    @let parsedBody: Parsed<Block>
+    @let body: String
+    @let syntaxBody: String
 }
 
 @graph(role: .application)
 @syntax
 construct Macro<Value> {
-    let name: String
-    let identifier: Identifier
-    let genericArguments: Array<TypeReference>
-    let argumentClause: String
-    let arguments: Array<Expression>
-    let rawBody: WrittenSyntax
-    let declaration: Optional<Macro>
-    let packageVisibility: String
-    let valueType: TypeReference
-    let value: Value
+    @let name: String
+    @let identifier: Identifier
+    @let genericArguments: Array<TypeReference>
+    @let argumentClause: String
+    @let arguments: Array<Expression>
+    @let rawBody: WrittenSyntax
+    @let declaration: Optional<Macro>
+    @let packageVisibility: String
+    @let valueType: TypeReference
+    @let value: Value
 }

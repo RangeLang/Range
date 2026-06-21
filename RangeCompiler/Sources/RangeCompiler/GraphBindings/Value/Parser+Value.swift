@@ -2,8 +2,8 @@ import Foundation
 
 extension Parser {
     mutating func parseValueDeclaration() throws -> ValueDeclaration {
-        let macros = try parseMacroApplicationsIfPresent()
-        try consumeKeyword(.let)
+        let macros = try parseMacroApplicationsIfPresent(excluding: ["let"])
+        try consumeMacroAttribute(named: "let")
         let name = try parseDeclarationName(expecting: "let")
         try consume(.colon)
         let annotation: (type: TypeReference, initializer: Expression?)?
@@ -48,8 +48,8 @@ extension Parser {
     }
 
     func isValueDeclarationStart() -> Bool {
-        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
-        guard peek(offset: offset) == .keyword(RangeSyntax.Keyword.let.rawValue) else {
+        let offset = macroApplicationLookaheadLength(excluding: ["let"])
+        guard case .macroAttribute(let name, _) = peek(offset: offset), name == "let" else {
             return false
         }
         guard tokenCanStartDeclarationName(peek(offset: offset + 1)) else { return false }
@@ -69,5 +69,12 @@ extension Parser {
         default:
             return false
         }
+    }
+
+    private mutating func consumeMacroAttribute(named expectedName: String) throws {
+        guard case .macroAttribute(let name, nil) = peek(), name == expectedName else {
+            throw ParseError("Expected @\(expectedName).")
+        }
+        advance()
     }
 }

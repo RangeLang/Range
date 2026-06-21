@@ -1,8 +1,8 @@
 @equatable
 construct EquatableMacroFixture {
-    let id: Int
-    let name: String
-    let active: Bool
+    @let id: Int
+    @let name: String
+    @let active: Bool
 }
 
 @equatable

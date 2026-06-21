@@ -1,6 +1,6 @@
 @syntax
 construct VariadicTypeReference {
-    let element: TypeReference
+    @let element: TypeReference
 
     function replace(replacement: TypeReference): TypeReference
 }

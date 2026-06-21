@@ -1,6 +1,6 @@
 construct CodingBehavior {
-    let key: Optional<String>
-    let exclude: Bool
+    @let key: Optional<String>
+    @let exclude: Bool
 }
 
 macro codable<T>(key: Optional<String> = nil, exclude: Bool = false): @property -> CodingBehavior { target, diagnostics in

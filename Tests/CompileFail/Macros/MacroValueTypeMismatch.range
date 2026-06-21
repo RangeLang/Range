@@ -4,5 +4,5 @@ macro badKey<T>(value: Int): Let<T> -> String {
 
 construct MacroValueTypeMismatchFixture {
     @badKey(1)
-    let id: Int
+    @let id: Int
 }

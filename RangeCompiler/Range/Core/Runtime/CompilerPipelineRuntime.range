@@ -10,19 +10,19 @@ enum CompilerPipelineRuntimeStage {
 
 @syntax
 construct CompilerPipelineRuntimeContext {
-    let stage: CompilerPipelineRuntimeStage
+    @let stage: CompilerPipelineRuntimeStage
 }
 
 @syntax
 construct CompilerPipelineRuntimeResult {
-    let hookName: String
-    let stage: CompilerPipelineRuntimeStage
-    let diagnostics: Array<String>
-    let artifacts: Array<String>
+    @let hookName: String
+    @let stage: CompilerPipelineRuntimeStage
+    @let diagnostics: Array<String>
+    @let artifacts: Array<String>
 }
 
 @syntax
 construct CompilerPipelineRuntimeHook {
-    let name: String
-    let stages: Array<CompilerPipelineRuntimeStage>
+    @let name: String
+    @let stages: Array<CompilerPipelineRuntimeStage>
 }

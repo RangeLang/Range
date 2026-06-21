@@ -4,13 +4,13 @@ enum MemoryAccessError {
 }
 
 construct MemoryAddress {
-    let raw: Int
+    @let raw: Int
 }
 
 construct MemoryRegion {
-    let address: MemoryAddress
-    let byteCount: Int
-    let alignment: Int
+    @let address: MemoryAddress
+    @let byteCount: Int
+    @let alignment: Int
 }
 
 construct POSIXMemory {

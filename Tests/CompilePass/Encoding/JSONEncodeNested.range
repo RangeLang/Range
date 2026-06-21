@@ -1,6 +1,6 @@
 construct Address {
-    let city: String
-    let zip: Int
+    @let city: String
+    @let zip: Int
 }
 
 extension Address {
@@ -19,9 +19,9 @@ extension Address {
 }
 
 construct User {
-    let name: String
-    let address: Address
-    let scores: Array<Int>
+    @let name: String
+    @let address: Address
+    @let scores: Array<Int>
 }
 
 extension User {

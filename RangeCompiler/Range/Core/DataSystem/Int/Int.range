@@ -1,6 +1,6 @@
 @integer
 construct Int<bits: String("64"), signedness: Signedness.signed> {
-    let storage: Memory<self.identifier>
+    @let storage: Memory<self.identifier>
 
     function literal(literal: IntLiteral): Self {
         return Self(memory: literal.storage())

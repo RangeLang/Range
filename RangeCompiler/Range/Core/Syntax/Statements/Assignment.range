@@ -1,6 +1,6 @@
 @statement
 @syntax
 construct Assignment {
-    let target: Expression
-    let expression: Expression
+    @let target: Expression
+    @let expression: Expression
 }

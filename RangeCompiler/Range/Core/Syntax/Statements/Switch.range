@@ -1,6 +1,6 @@
 @statement
 @syntax
 construct Switch {
-    let expression: Expression
-    let cases: Array<SwitchCase>
+    @let expression: Expression
+    @let cases: Array<SwitchCase>
 }

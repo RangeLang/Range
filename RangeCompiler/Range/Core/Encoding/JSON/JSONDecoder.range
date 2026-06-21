@@ -1,5 +1,5 @@
 construct JSONDecoder {
-    let value: JSONValue
+    @let value: JSONValue
 
     function decode(type: Bool.Type, value: JSONValue): Result<Bool, DecodingError> {
         let container: JSONSingleValueDecodingContainer(value: value)

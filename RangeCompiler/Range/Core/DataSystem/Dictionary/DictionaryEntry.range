@@ -1,4 +1,4 @@
 construct DictionaryEntry<Key, Value> {
-    let key: Key
-    let value: Value
+    @let key: Key
+    @let value: Value
 }

@@ -1,8 +1,8 @@
 @hashable
 construct HashableMacroFixture {
-    let id: Int
-    let name: String
-    let active: Bool
+    @let id: Int
+    @let name: String
+    @let active: Bool
 }
 
 @hashable

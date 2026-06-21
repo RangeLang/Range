@@ -1,5 +1,5 @@
 construct Data {
-    let storage: DataStorage
+    @let storage: DataStorage
 }
 
 extension Data {

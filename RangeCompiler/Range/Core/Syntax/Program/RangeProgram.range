@@ -1,47 +1,47 @@
 construct RangeProgram {
-    let graph: RangeGraph
+    @let graph: RangeGraph
 }
 
 construct RangeGraph {
-    let files: Array<FileTreeNode>
-    let sources: Array<ProgramSourceFile>
-    let artifacts: Array<ProgramArtifact>
-    let topology: RangeGraphTopology
+    @let files: Array<FileTreeNode>
+    @let sources: Array<ProgramSourceFile>
+    @let artifacts: Array<ProgramArtifact>
+    @let topology: RangeGraphTopology
     state main: Optional<@main>
     state syntax: Array<@syntax>
 }
 
 construct ProgramSourceFile {
-    let path: String
-    let text: String
+    @let path: String
+    @let text: String
 }
 
 construct ProgramArtifact {
-    let path: String
-    let text: String
+    @let path: String
+    @let text: String
 }
 
 construct RangeGraphTopology {
-    let nodes: Array<RangeGraphNode>
-    let relationships: Array<RangeGraphRelationship>
+    @let nodes: Array<RangeGraphNode>
+    @let relationships: Array<RangeGraphRelationship>
 }
 
 construct RangeGraphNode {
-    let identity: RangeGraphIdentity
-    let sourcePath: String
-    let labels: Array<String>
+    @let identity: RangeGraphIdentity
+    @let sourcePath: String
+    @let labels: Array<String>
 }
 
 construct RangeGraphRelationship {
-    let origin: RangeGraphIdentity
-    let destination: RangeGraphIdentity
-    let kind: String
+    @let origin: RangeGraphIdentity
+    @let destination: RangeGraphIdentity
+    @let kind: String
 }
 
 construct GraphSyntax {
-    let identity: RangeGraphIdentity
-    let declarations: Array<GraphEntry>
-    let applications: Array<GraphEntry>
+    @let identity: RangeGraphIdentity
+    @let declarations: Array<GraphEntry>
+    @let applications: Array<GraphEntry>
 }
 
 enum GraphRole {
@@ -50,11 +50,11 @@ enum GraphRole {
 }
 
 construct RangeGraphIdentity {
-    let id: String
-    let kind: String
-    let name: String
+    @let id: String
+    @let kind: String
+    @let name: String
 }
 
 construct GraphEntry {
-    let identity: RangeGraphIdentity
+    @let identity: RangeGraphIdentity
 }

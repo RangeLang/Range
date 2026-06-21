@@ -1,5 +1,5 @@
 construct FixtureDirectInt {
-    let storage: IntStorage
+    @let storage: IntStorage
 
     init(literal: IntLiteral) {
         state self.storage: literal.storage()

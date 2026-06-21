@@ -15,9 +15,9 @@ macro typedExpandAdditionalSlots(): Construct { target, diagnostics in
         }
 
         construct #(Identifier(name: "GeneratedTypedExpandConstruct"))<Wrapped, let count: #(Int)> {
-            let label: #(String)
+            @let label: #(String)
             binding amount: #(Int)
-            let externalText: #(String)
+            @let externalText: #(String)
         }
 
         extension #(target.declaration.self) {

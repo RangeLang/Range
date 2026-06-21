@@ -1,8 +1,8 @@
 @syntax
 construct SplicedSyntax {
-    let delimiter: String
-    let syntax: WrittenSyntax
-    let description: String
+    @let delimiter: String
+    @let syntax: WrittenSyntax
+    @let description: String
 }
 
 macro syntax(body: String): Construct -> String { target, diagnostics, graph in

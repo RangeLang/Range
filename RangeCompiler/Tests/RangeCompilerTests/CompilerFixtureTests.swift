@@ -110,7 +110,7 @@ struct CompilerFixtureTests {
                     }
 
                     construct Identifier {
-                        let name: String
+                        @let name: String
                     }
 
                     @project
@@ -148,7 +148,7 @@ struct CompilerFixtureTests {
 
                     @reportBody
                     construct SourceReadable {
-                        let value: Int
+                        @let value: Int
                     }
                     """,
                 role: .project
@@ -228,15 +228,15 @@ struct CompilerFixtureTests {
             @tracked("root")
             construct User {
                 @tracked("name")
-                let name: String
-                let age: Int
+                @let name: String
+                @let age: Int
 
                 function displayName(): String {
                     return name
                 }
 
                 construct Nested {
-                    let value: Int
+                    @let value: Int
                 }
             }
             """
@@ -471,7 +471,7 @@ struct CompilerFixtureTests {
 
                     @graphNamed
                     construct User {
-                        let name: String
+                        @let name: String
                     }
                     """,
                 role: .project
@@ -499,7 +499,7 @@ struct CompilerFixtureTests {
 
                     @lower
                     construct Widget {
-                        let value: Int
+                        @let value: Int
                     }
                     """,
                 role: .project
@@ -559,7 +559,7 @@ struct CompilerFixtureTests {
                     @@@ raw ascii stays isolated
                     }
                     construct User {
-                        let name: String
+                        @let name: String
                     }
                     """,
                 role: .project
@@ -585,7 +585,7 @@ struct CompilerFixtureTests {
 
                     @graphName
                     construct User {
-                        let name: String
+                        @let name: String
                     }
                     """,
                 role: .project
@@ -609,7 +609,7 @@ struct CompilerFixtureTests {
 
                     @emptyString
                     construct User {
-                        let name: String
+                        @let name: String
                     }
                     """,
                 role: .project
@@ -635,7 +635,7 @@ struct CompilerFixtureTests {
 
                     @transformedName
                     construct UserProfile {
-                        let name: String
+                        @let name: String
                     }
                     """,
                 role: .project
@@ -663,7 +663,7 @@ struct CompilerFixtureTests {
 
                     @rawConcat
                     construct User {
-                        let name: String
+                        @let name: String
                     }
                     """,
                 role: .project
@@ -690,7 +690,7 @@ struct CompilerFixtureTests {
                     }
 
                     construct User {
-                        let name: String
+                        @let name: String
                     }
 
                     @extensionTargetName
@@ -723,7 +723,7 @@ struct CompilerFixtureTests {
                     }
 
                     construct User {
-                        let name: String
+                        @let name: String
                     }
 
                     @constructOnly
@@ -755,7 +755,7 @@ struct CompilerFixtureTests {
                 source: """
                     @addable
                     construct Money {
-                        let cents: Int
+                        @let cents: Int
                     }
 
                     extension Money {
@@ -779,7 +779,7 @@ struct CompilerFixtureTests {
                 source: """
                     @addable
                     construct Money {
-                        let cents: Int
+                        @let cents: Int
                     }
                     """,
                 role: .project
@@ -908,7 +908,7 @@ struct CompilerFixtureTests {
                 path: projectPath,
                 source: """
                     construct Version {
-                        let value: String
+                        @let value: String
 
                         init(value: String) {
                             self.value = value
@@ -937,8 +937,8 @@ struct CompilerFixtureTests {
                 path: "/tmp/DirectConstructApplication.range",
                 source: """
                     construct User {
-                        let id: Int
-                        let name: String
+                        @let id: Int
+                        @let name: String
                     }
 
                     @main {
@@ -956,12 +956,12 @@ struct CompilerFixtureTests {
     func typedConstructionAnnotationsCanBeOptional() throws {
         let source = """
             construct WidgetCount {
-                let value: Double
+                @let value: Double
             }
 
             construct Counter {
-                let count: Optional<Int>(5)
-                let widgetCount: Optional<WidgetCount>(value: 0.1)
+                @let count: Optional<Int>(5)
+                @let widgetCount: Optional<WidgetCount>(value: 0.1)
                 state current: Optional<Int>(5)
             }
 
@@ -1100,8 +1100,8 @@ struct CompilerFixtureTests {
                 path: projectPath,
                 source: """
                     construct User {
-                        let id: Int
-                        let name: String
+                        @let id: Int
+                        @let name: String
                     }
 
                     @main {
@@ -1133,7 +1133,7 @@ struct CompilerFixtureTests {
 
                     @styling
                     construct Panel {
-                        let title: String
+                        @let title: String
                     }
                     """,
                 role: .project
@@ -1158,7 +1158,7 @@ struct CompilerFixtureTests {
 
                     @persisted(prefix: "settings")
                     construct Profile {
-                        let displayName: String
+                        @let displayName: String
                     }
                     """,
                 role: .project
@@ -1179,8 +1179,8 @@ struct CompilerFixtureTests {
                 path: "/tmp/MacroMetadataObjectTag.range",
                 source: """
                     construct TagProofBehavior {
-                        let key: Optional<String>
-                        let exclude: Bool
+                        @let key: Optional<String>
+                        @let exclude: Bool
                     }
 
                     macro tagProof<T>(key: Optional<String> = nil, exclude: Bool = false): Let<T> -> TagProofBehavior { target, diagnostics in
@@ -1217,7 +1217,7 @@ struct CompilerFixtureTests {
                     @selfFiltered
                     construct Profile {
                         @tagProof(key: "id")
-                        let userId: Int
+                        @let userId: Int
                     }
                     """,
                 role: .project
@@ -1258,10 +1258,10 @@ struct CompilerFixtureTests {
                 source: """
                     @package
                     construct Project {
-                        let name: Title("Example")
-                        let version: Version(0.1.0)
-                        let author: "George"
-                        let modules: ["acme/logger"]
+                        @let name: Title("Example")
+                        @let version: Version(0.1.0)
+                        @let author: "George"
+                        @let modules: ["acme/logger"]
                     }
                     """,
                 role: .project
@@ -1283,7 +1283,7 @@ struct CompilerFixtureTests {
                 source: """
                     @Missing
                     construct Panel {
-                        let title: String
+                        @let title: String
                     }
                     """,
                 role: .project
@@ -1605,8 +1605,8 @@ struct CompilerFixtureTests {
                 source: """
                     @package
                     construct Project {
-                        let packageName: String("Registry Snapshot")
-                        let modules: ["acme/registry-snapshot"]
+                        @let packageName: String("Registry Snapshot")
+                        @let modules: ["acme/registry-snapshot"]
                     }
 
                     macro styling(): Construct -> Void { target, diagnostics in
@@ -1626,7 +1626,7 @@ struct CompilerFixtureTests {
                     state globalCount: Int(0)
 
                     construct Address {
-                        let street: String
+                        @let street: String
                     }
 
                     @styling
@@ -1644,8 +1644,8 @@ struct CompilerFixtureTests {
                         derived label: String {
                             return title
                         }
-                        let title: String
-                        let address: Address
+                        @let title: String
+                        @let address: Address
 
                         function render(title: String): String {
                             return title
@@ -1656,7 +1656,7 @@ struct CompilerFixtureTests {
                         }
 
                         construct Nested {
-                            let value: Int
+                            @let value: Int
                         }
                     }
 
@@ -1798,7 +1798,7 @@ struct CompilerFixtureTests {
                             }
 
                             construct Box {
-                                let number: Int
+                                @let number: Int
                             }
                         }
                     }
@@ -1828,14 +1828,14 @@ struct CompilerFixtureTests {
 
                     @semantic
                     construct Language {
-                        let defaultLocale: String("en")
+                        @let defaultLocale: String("en")
 
                         function identifier(): String {
                             return defaultLocale
                         }
 
                         construct Token {
-                            let raw: String
+                            @let raw: String
                         }
                     }
 
@@ -1953,7 +1953,7 @@ struct CompilerFixtureTests {
                         }
 
                         construct Box {
-                            let number: Int
+                            @let number: Int
                         }
                     }
                     """,
@@ -1987,7 +1987,7 @@ struct CompilerFixtureTests {
         let sources = [
             """
             construct Box {
-                let external internal: String("value")
+                @let external internal: String("value")
             }
             """,
             """

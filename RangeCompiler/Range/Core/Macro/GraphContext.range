@@ -1,5 +1,5 @@
 construct GraphContext {
-    let macros: Array<Macro<Void>>
+    @let macros: Array<Macro<Void>>
 
     function declaration(identity: GraphIdentity): GraphEntry
     function parent(identity: GraphIdentity): Optional<GraphIdentity>

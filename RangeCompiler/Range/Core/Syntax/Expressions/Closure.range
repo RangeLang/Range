@@ -1,8 +1,8 @@
 @syntax
 construct Closure {
-    let type: Optional<TypeReference>
-    let parameters: Array<Parameter>()
-    let body: Block
+    @let type: Optional<TypeReference>
+    @let parameters: Array<Parameter>()
+    @let body: Block
 
     function replace(replacement: Expression): Expression
 }

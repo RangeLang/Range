@@ -10,7 +10,7 @@ macro shifted(amount: Int): Let<Int> { target, diagnostics in
 
 construct Holder {
     @shifted(amount: 2)
-    let count: Int(10)
+    @let count: Int(10)
 
     function current(): Int {
         return count

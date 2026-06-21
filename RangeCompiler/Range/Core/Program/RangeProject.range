@@ -1,5 +1,5 @@
 construct RangeProject {
-    let path: String
+    @let path: String
 
     function rangeFiles(): Array<String> {
         return FileTree.rangeFiles(path: path)

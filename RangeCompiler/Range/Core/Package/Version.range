@@ -1,4 +1,3 @@
-@init<Int<.unsigned>, delimiter: ".">
 construct Version {
     state major: Int<.unsigned>
     state minor: Int<.unsigned>

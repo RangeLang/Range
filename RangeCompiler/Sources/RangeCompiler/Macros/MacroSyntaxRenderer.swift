@@ -79,7 +79,7 @@ struct MacroSyntaxRenderer {
 
         switch typeName {
         case "Let":
-            return renderProperty(keyword: "let", fields: fields)
+            return renderProperty(keyword: "@let", fields: fields)
         case "State":
             return renderProperty(keyword: "state", fields: fields)
         case "Binding":

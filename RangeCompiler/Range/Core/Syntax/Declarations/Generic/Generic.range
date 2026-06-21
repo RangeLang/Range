@@ -1,4 +1,4 @@
 @syntax
 construct Generic {
-    let identifier: Identifier
+    @let identifier: Identifier
 }

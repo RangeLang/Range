@@ -1,15 +1,15 @@
 construct ScalarApplication {
-    let macroName: String
-    let targetName: String
-    let path: String
-    let source: String
+    @let macroName: String
+    @let targetName: String
+    @let path: String
+    @let source: String
 }
 
 construct ScalarDeclaration {
-    let macroName: String
-    let targetName: String
-    let llvmType: String
-    let path: String
+    @let macroName: String
+    @let targetName: String
+    @let llvmType: String
+    @let path: String
 }
 
 function scalarBuild(): String {

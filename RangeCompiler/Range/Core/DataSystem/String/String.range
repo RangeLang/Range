@@ -1,7 +1,6 @@
-@init<Expression, wrapper: "\"">
 @string
 construct String {
-    let storage: StringStorage
+    @let storage: StringStorage
 
     function literal(literal: StringLiteral): Self {
         return Self(storage: literal.storage())

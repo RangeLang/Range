@@ -1,7 +1,7 @@
 @syntax
 construct ArrayExpression {
-    let type: Optional<TypeReference>
-    let elements: Array<Expression>
+    @let type: Optional<TypeReference>
+    @let elements: Array<Expression>
 
     function replace(replacement: Expression): Expression
 }

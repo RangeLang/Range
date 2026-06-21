@@ -7,7 +7,7 @@ construct StringDecodable {
 }
 
 construct User {
-    let name: String
+    @let name: String
 
     init(value: String) -> Result<Self, ParseError> {
         state self.name: value

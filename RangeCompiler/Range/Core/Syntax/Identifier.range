@@ -9,5 +9,5 @@ macro identifierSyntaxName(): Init { target, diagnostics in
 @syntax
 @identifierSyntaxName
 construct Identifier {
-    let name: String
+    @let name: String
 }

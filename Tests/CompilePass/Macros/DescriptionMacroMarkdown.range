@@ -1,6 +1,6 @@
 @Description(markdown: "FixtureConstruct carries macro source")
 construct FixtureConstruct {
-    let number: Int
+    @let number: Int
 }
 
 @main {

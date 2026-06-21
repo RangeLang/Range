@@ -3,7 +3,7 @@ enum DecodeError {
 }
 
 construct DecodedUser {
-    let name: String
+    @let name: String
 
     init(name: String) -> Result<Self, DecodeError> {
         if name == "" {

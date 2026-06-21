@@ -1,5 +1,5 @@
 @syntax
 construct SwitchCase {
-    let pattern: Expression
-    let body: Block
+    @let pattern: Expression
+    @let body: Block
 }

@@ -1,19 +1,19 @@
 @graph(role: .declaration)
 @syntax
 construct Construct {
-    let identifier: Identifier
-    let self: NominalTypeReference
-    let macros: Array<Macro>
-    let generics: Array<Generic>
-    let conformances: Array<NominalTypeReference>
-    let lets: Array<Let>
-    let states: Array<State>
-    let bindings: Array<Binding>
-    let deriveds: Array<Derived>
-    let members: Array<GraphIdentity>
-    let functions: Array<Function>
-    let constructs: Array<Construct>
-    let extensions: Array<Extension>
+    @let identifier: Identifier
+    @let self: NominalTypeReference
+    @let macros: Array<Macro>
+    @let generics: Array<Generic>
+    @let conformances: Array<NominalTypeReference>
+    @let lets: Array<Let>
+    @let states: Array<State>
+    @let bindings: Array<Binding>
+    @let deriveds: Array<Derived>
+    @let members: Array<GraphIdentity>
+    @let functions: Array<Function>
+    @let constructs: Array<Construct>
+    @let extensions: Array<Extension>
 
     function expand(expansion: () -> Array<@syntax>)
 }
@@ -21,8 +21,8 @@ construct Construct {
 @graph(role: .application)
 @syntax
 construct Construct {
-    let type: TypeReference
-    let arguments: Array<Parameter>
+    @let type: TypeReference
+    @let arguments: Array<Parameter>
 
     function replace(replacement: Expression): Expression
 }

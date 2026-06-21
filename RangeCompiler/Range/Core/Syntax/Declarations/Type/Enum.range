@@ -1,9 +1,9 @@
 @graph(role: .declaration)
 @syntax
 construct Enum {
-    let self: NominalTypeReference
-    let generics: Array<Generic>
-    let cases: Array<EnumCase>
+    @let self: NominalTypeReference
+    @let generics: Array<Generic>
+    @let cases: Array<EnumCase>
 
     function expand(expansion: () -> Array<@syntax>)
 }
@@ -11,12 +11,12 @@ construct Enum {
 @graph(role: .declaration)
 @syntax
 construct EnumCase {
-    let identifier: Identifier
-    let associatedValues: Array<EnumAssociatedValue>
+    @let identifier: Identifier
+    @let associatedValues: Array<EnumAssociatedValue>
 }
 
 @syntax
 construct EnumAssociatedValue {
-    let label: Optional<String>
-    let type: TypeReference
+    @let label: Optional<String>
+    @let type: TypeReference
 }

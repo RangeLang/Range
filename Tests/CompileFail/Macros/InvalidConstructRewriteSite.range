@@ -4,5 +4,5 @@ macro badConstructRewrite(): Construct { target, diagnostics in
 
 @badConstructRewrite
 construct BrokenConstruct {
-    let number: Int
+    @let number: Int
 }

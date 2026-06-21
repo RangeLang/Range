@@ -99,6 +99,18 @@ extension MacroExpander {
         var currentArguments = callArguments
         var changed = false
 
+        if target.macros.isEmpty,
+            target.rewriteInitTarget.constructName != target.initTarget.constructName
+        {
+            return .call(
+                name: target.rewriteInitTarget.constructName,
+                arguments: zip(target.rewriteInitTarget.parameterLabels, currentArguments).map {
+                    label, argument in
+                    CallArgument(label: label, value: argument.value)
+                }
+            )
+        }
+
         for macroApplication in target.macros {
             guard let macro = macros[macroApplication.name],
                 macroTargetAllows(macro.target!, kind: .initializer, syntaxResolver: context.rewriteSurfaceView.syntaxResolver)

@@ -10,7 +10,7 @@ enum DecodeInput {
 }
 
 construct ExtensionDecodedUser {
-    let name: String
+    @let name: String
 }
 
 extension ExtensionDecodedUser {

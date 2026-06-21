@@ -19,7 +19,7 @@ macro codableCases(): Construct { target, diagnostics in
 @codableCases
 construct LetMacroApplicationsSurfaceFixture {
     @codable(key: "user_id")
-    let id: Int
+    @let id: Int
 
-    let name: String
+    @let name: String
 }

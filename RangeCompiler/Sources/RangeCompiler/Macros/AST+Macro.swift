@@ -126,9 +126,6 @@ public indirect enum MacroTarget {
         case .syntax(let typeReference):
             return typeReference
         case .macroSurface(let name):
-            if name == "construct" {
-                return .named("Construct")
-            }
             return .named("@\(name)")
         case .anyOf(let targets), .allOf(let targets):
             return targets.first?.typeReference ?? .named("Unknown")

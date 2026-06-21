@@ -1,15 +1,15 @@
 @graph(role: .declaration)
 @syntax
 construct Parameter {
-    let identifier: Identifier
-    let macros: Array<@macro>
-    let syntax: WrittenSyntax
+    @let identifier: Identifier
+    @let macros: Array<@macro>
+    @let syntax: WrittenSyntax
 }
 
 @graph(role: .application)
 @syntax
 construct Parameter {
-    let identifier: Identifier
-    let type: TypeReference
-    let syntax: WrittenSyntax
+    @let identifier: Identifier
+    @let type: TypeReference
+    @let syntax: WrittenSyntax
 }

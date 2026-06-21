@@ -7,7 +7,7 @@ macro forwardOnlyArgument(): Init { target, diagnostics in
 }
 
 construct SingleInitRewriteFixture {
-    let number: Int
+    @let number: Int
 
     @forwardOnlyArgument
     init(number: Int) {

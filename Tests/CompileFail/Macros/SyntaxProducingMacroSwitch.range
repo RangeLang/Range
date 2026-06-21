@@ -25,5 +25,5 @@ macro emitEncodingSwitch(): Construct { target, diagnostics in
 
 @emitEncodingSwitch
 construct SyntaxProducingMacroSwitchFixture {
-    let id: Int
+    @let id: Int
 }

@@ -1,7 +1,7 @@
 @syntax
 construct Block {
-    let body: Array<@statement>
-    let statements: Array<@statement>
+    @let body: Array<@statement>
+    @let statements: Array<@statement>
 
     function replace(replacement: Block): Block
 }

@@ -1,5 +1,5 @@
 @syntax
 construct WrittenSyntax {
-    let text: String
-    let range: Optional<SourceRange>
+    @let text: String
+    @let range: Optional<SourceRange>
 }

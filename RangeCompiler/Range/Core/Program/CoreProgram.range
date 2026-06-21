@@ -1,9 +1,9 @@
 construct ProgramResult {
-    let files: Array<ProgramSourceFile>
+    @let files: Array<ProgramSourceFile>
 }
 
 construct CoreProgram {
-    let path: String
+    @let path: String
     state files: Array<ProgramSourceFile>([])
 
     function load() {

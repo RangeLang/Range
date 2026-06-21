@@ -1,7 +1,7 @@
 @statement
 @syntax
 construct If {
-    let condition: Expression
-    let thenBody: Block
-    let elseBody: Optional<Block>
+    @let condition: Expression
+    @let thenBody: Block
+    @let elseBody: Optional<Block>
 }

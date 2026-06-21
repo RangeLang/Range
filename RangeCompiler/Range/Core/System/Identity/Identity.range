@@ -1,5 +1,5 @@
 construct Identity {
-    let uuid: UUID
+    @let uuid: UUID
 }
 
 macro identity(): Construct -> Identity { target, diagnostics in

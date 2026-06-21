@@ -3,12 +3,12 @@
 @member
 @graph(role: .declaration)
 construct Derived<T> {
-    let identity: GraphIdentity
-    let parent: Optional<GraphIdentity>
-    let macros: Array<Macro>
-    let identifier: Identifier
-    let type: TypeReference
-    let body: Optional<Block>
+    @let identity: GraphIdentity
+    @let parent: Optional<GraphIdentity>
+    @let macros: Array<Macro>
+    @let identifier: Identifier
+    @let type: TypeReference
+    @let body: Optional<Block>
 
     function getter(transform: (T) -> T)
 }

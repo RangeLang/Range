@@ -1,5 +1,5 @@
 construct ChannelStorage<Element> {
-    let capacity: Int(0)
+    @let capacity: Int(0)
     function send(element: Element)
     function receive(): Element
     function close()

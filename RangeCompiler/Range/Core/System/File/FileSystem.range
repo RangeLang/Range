@@ -13,16 +13,16 @@ enum FileSystemEntryKind {
 }
 
 construct FileSystemEntry {
-    let path: String
-    let name: String
-    let kind: FileSystemEntryKind
+    @let path: String
+    @let name: String
+    @let kind: FileSystemEntryKind
 }
 
 construct FileTreeNode {
-    let path: String
-    let name: String
-    let kind: FileSystemEntryKind
-    let children: Array<FileTreeNode>
+    @let path: String
+    @let name: String
+    @let kind: FileSystemEntryKind
+    @let children: Array<FileTreeNode>
 }
 
 construct FileManager {

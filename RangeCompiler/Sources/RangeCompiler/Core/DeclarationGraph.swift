@@ -1122,6 +1122,29 @@ public struct DeclarationGraph {
                 )
             }
 
+            for callable in construct.callables {
+                guard callable.macros.contains(where: { $0.name == "init" }),
+                    let returnType = callable.returnType
+                else {
+                    continue
+                }
+                targets.append(
+                    RealizedInitMacroTarget(
+                        initTarget: RealizedInitTarget(
+                            constructName: returnType.displayName,
+                            parameterLabels: callable.parameters.map { Optional($0.name) },
+                            isCore: callable.isCore || construct.isCore
+                        ),
+                        rewriteInitTarget: RealizedInitTarget(
+                            constructName: callable.name,
+                            parameterLabels: callable.parameters.map { Optional($0.name) },
+                            isCore: callable.isCore || construct.isCore
+                        ),
+                        macros: []
+                    )
+                )
+            }
+
             return targets
         }
     }

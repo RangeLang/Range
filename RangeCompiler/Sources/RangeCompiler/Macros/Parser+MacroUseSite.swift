@@ -8,10 +8,10 @@ extension Parser {
         return false
     }
 
-    func macroApplicationLookaheadLength() -> Int {
+    func macroApplicationLookaheadLength(excluding excludedNames: Set<String> = []) -> Int {
         var offset = 0
         while true {
-            guard macroApplicationName(at: offset) != nil else {
+            guard macroApplicationName(at: offset, excluding: excludedNames) != nil else {
                 break
             }
 
@@ -64,11 +64,11 @@ extension Parser {
         return offset
     }
 
-    mutating func parseMacroApplicationsIfPresent() throws -> [MacroApplication] {
+    mutating func parseMacroApplicationsIfPresent(excluding excludedNames: Set<String> = []) throws -> [MacroApplication] {
         var macros: [MacroApplication] = []
 
         while true {
-            guard let name = macroApplicationName(at: 0) else {
+            guard let name = macroApplicationName(at: 0, excluding: excludedNames) else {
                 break
             }
 
@@ -90,9 +90,10 @@ extension Parser {
         return macros
     }
 
-    func macroApplicationName(at offset: Int) -> String? {
+    func macroApplicationName(at offset: Int, excluding excludedNames: Set<String> = []) -> String? {
         switch peek(offset: offset) {
-        case .macroAttribute(let name, _) where isMacroApplicationAttribute(name, offset: offset):
+        case .macroAttribute(let name, _) where !excludedNames.contains(name)
+            && isMacroApplicationAttribute(name, offset: offset):
             return name
         default:
             return nil

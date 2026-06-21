@@ -2,7 +2,7 @@ macro inspectConstruct(): Construct { target, diagnostics in }
 
 @inspectConstruct
 construct FixtureConstruct {
-    let number: Int
+    @let number: Int
 }
 
 @main {

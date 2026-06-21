@@ -3,12 +3,12 @@
 @member
 @graph(role: .declaration)
 construct State<T> {
-    let identity: GraphIdentity
-    let parent: Optional<GraphIdentity>
-    let macros: Array<Macro>
-    let identifier: Identifier
-    let type: TypeReference
-    let value: Optional<Expression>
+    @let identity: GraphIdentity
+    @let parent: Optional<GraphIdentity>
+    @let macros: Array<Macro>
+    @let identifier: Identifier
+    @let type: TypeReference
+    @let value: Optional<Expression>
 
     function initializer(transform: (T) -> T)
     function getter(transform: (T) -> T)

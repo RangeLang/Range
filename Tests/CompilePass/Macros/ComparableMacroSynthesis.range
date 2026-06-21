@@ -1,8 +1,8 @@
 @comparable
 construct ComparableMacroFixture {
-    let major: Int
-    let minor: Int
-    let patch: Int
+    @let major: Int
+    @let minor: Int
+    @let patch: Int
 }
 
 @comparable

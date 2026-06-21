@@ -186,9 +186,9 @@ struct SwiftBackendEmitterLayoutTests {
     func valueConstructFieldsEmitInDescendingLayoutAlignment() throws {
         let source = """
         construct Packed {
-            let a: Int<8, .unsigned>
-            let b: Int<32>
-            let c: Int<8, .unsigned>
+            @let a: Int<8, .unsigned>
+            @let b: Int<32>
+            @let c: Int<8, .unsigned>
         }
         """
 
@@ -250,15 +250,15 @@ struct SwiftBackendEmitterLayoutTests {
     func initializerForwardingEmitsNestedConstruction() throws {
         var pointParser = try Parser(source: """
         construct Point {
-            let x: Int
-            let y: Int
+            @let x: Int
+            @let y: Int
         }
         """)
         let point = try pointParser.parseConstructDeclaration()
 
         var metadataParser = try Parser(source: """
         construct Metadata {
-            let title: String
+            @let title: String
         }
         """)
         let metadata = try metadataParser.parseConstructDeclaration()
@@ -268,7 +268,7 @@ struct SwiftBackendEmitterLayoutTests {
             @initForwarded
             state point: Point
 
-            let somethingElse: Metadata
+            @let somethingElse: Metadata
         }
         """)
         let wrapped = try wrappedParser.parseConstructDeclaration()

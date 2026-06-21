@@ -1,6 +1,6 @@
 @identity
 construct UUID {
-    let storage: UUIDStorage
+    @let storage: UUIDStorage
 
     
     function parse(uuidString: String): Result<Self, DecodingError> {

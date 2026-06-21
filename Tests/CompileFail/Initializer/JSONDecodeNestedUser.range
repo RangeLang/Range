@@ -1,5 +1,5 @@
 construct NestedAddress {
-    let city: String
+    @let city: String
 }
 
 extension NestedAddress {
@@ -18,8 +18,8 @@ extension NestedAddress {
 }
 
 construct NestedDecodedUser {
-    let id: Int
-    let address: NestedAddress
+    @let id: Int
+    @let address: NestedAddress
 }
 
 extension NestedDecodedUser {

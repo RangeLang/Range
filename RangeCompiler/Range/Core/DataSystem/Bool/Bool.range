@@ -1,6 +1,6 @@
 @bool
 construct Bool {
-    let storage: BoolStorage
+    @let storage: BoolStorage
 
     function literal(literal: BoolLiteral): Self {
         return Self(storage: literal.storage())

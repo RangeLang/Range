@@ -1,7 +1,7 @@
 @syntax
 construct ValueGeneric {
-    let identifier: Identifier
-    let type: TypeReference
-    let value: String
-    let default: Optional<String>
+    @let identifier: Identifier
+    @let type: TypeReference
+    @let value: String
+    @let default: Optional<String>
 }

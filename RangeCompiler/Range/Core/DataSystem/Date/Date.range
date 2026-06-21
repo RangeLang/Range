@@ -1,5 +1,5 @@
 construct Date {
-    let storage: DateStorage
+    @let storage: DateStorage
 
     
     function parse(iso8601String: String): Result<Self, DecodingError> {

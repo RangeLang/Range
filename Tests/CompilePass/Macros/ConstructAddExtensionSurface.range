@@ -30,7 +30,7 @@ macro extendConstructSurface(): Construct { target, diagnostics in
 
 @extendConstructSurface
 construct ExtendableFixture {
-    let number: Int
+    @let number: Int
 }
 
 @main {

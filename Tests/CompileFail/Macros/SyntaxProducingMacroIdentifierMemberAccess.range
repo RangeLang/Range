@@ -25,5 +25,5 @@ macro emitIdentifierContainerSwitch(): Construct { target, diagnostics in
 
 @emitIdentifierContainerSwitch
 construct SyntaxProducingMacroIdentifierMemberAccessFixture {
-    let id: Int
+    @let id: Int
 }

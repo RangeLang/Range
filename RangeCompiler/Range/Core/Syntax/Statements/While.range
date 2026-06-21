@@ -1,6 +1,6 @@
 @statement
 @syntax
 construct While {
-    let condition: Expression
-    let body: Block
+    @let condition: Expression
+    @let body: Block
 }

@@ -14,5 +14,5 @@ macro warnOnConstruct(): Construct { target, diagnostics in
 
 @warnOnConstruct
 construct MacroDiagnosticsWarningFixture {
-    let value: Int
+    @let value: Int
 }

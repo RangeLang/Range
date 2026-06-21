@@ -17,6 +17,6 @@ macro enumSyntaxValue(): Construct { target, diagnostics in
 
 @enumSyntaxValue
 construct SyntaxValueEnumFixture {
-    let id: Int
-    let name: String
+    @let id: Int
+    @let name: String
 }

@@ -1,6 +1,6 @@
 construct User {
-    let id: Int
-    let name: String
+    @let id: Int
+    @let name: String
 }
 
 extension User {

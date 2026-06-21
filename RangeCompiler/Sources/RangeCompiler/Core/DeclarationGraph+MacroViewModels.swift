@@ -145,9 +145,6 @@ func macroTargetKinds(
         if name == "syntax" {
             return syntaxSurfaceTargetKinds(syntaxResolver: syntaxResolver)
         }
-        if name == "construct" {
-            return [.construct]
-        }
         if name == "property" {
             return [.property]
         }
@@ -168,9 +165,6 @@ func macroTargetAllows(
     case .macroSurface(let name):
         if name == "syntax" {
             return syntaxSurfaceTargetKinds(syntaxResolver: syntaxResolver).contains(kind)
-        }
-        if name == "construct" {
-            return kind == .construct
         }
         if name == "property" {
             return kind == .property
@@ -274,6 +268,9 @@ struct RewriteSurfaceView {
                 "\(targetBinding).application.replace",
                 "\(targetBinding).application.arguments[].expression.replace",
             ]
+        }
+        if case .named(let name) = targetType, name.hasPrefix("@") {
+            return ["\(targetBinding).application.replace"]
         }
 
         guard var targetName = syntaxResolver.nominalName(of: targetType) else {
@@ -380,6 +377,9 @@ struct RewriteSurfaceView {
         if macroTargetKind(for: targetType, syntaxResolver: syntaxResolver) == .initializer {
             return normalizedPath == "\(targetBinding).application.replace"
                 || normalizedPath == "\(targetBinding).application.arguments[].expression.replace"
+        }
+        if case .named(let name) = targetType, name.hasPrefix("@") {
+            return normalizedPath == "\(targetBinding).application.replace"
         }
 
         guard var targetName = syntaxResolver.nominalName(of: targetType) else {
@@ -1459,6 +1459,13 @@ extension RewriteSurfaceView {
             default:
                 return nil
             }
+        case .expression, .block, .construct, .enumeration, .typeExtension, .other:
+            switch relativePath {
+            case "application.replace":
+                return .targetDirect
+            default:
+                return nil
+            }
         case .function:
             switch relativePath {
             case "call.replace":
@@ -1479,8 +1486,7 @@ extension RewriteSurfaceView {
             default:
                 return nil
             }
-        case .expression, .state, .immutable, .binding, .derived, .property, .block, .construct,
-            .enumeration, .typeExtension, .other:
+        case .state, .immutable, .binding, .derived, .property:
             return nil
         }
     }

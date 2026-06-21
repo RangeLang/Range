@@ -1,7 +1,7 @@
 @syntax
 construct EnumCaseExpression {
-    let type: Optional<TypeReference>
-    let identifier: Identifier
+    @let type: Optional<TypeReference>
+    @let identifier: Identifier
 
     function replace(replacement: Expression): Expression
 }

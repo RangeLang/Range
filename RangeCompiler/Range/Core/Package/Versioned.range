@@ -1,5 +1,5 @@
 construct Versioned<Value> {
-    let current: Value
-    let next: Optional<Value>
-    let version: Version
+    @let current: Value
+    @let next: Optional<Value>
+    @let version: Version
 }

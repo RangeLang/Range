@@ -159,12 +159,12 @@ struct LLVMLoweringEmitterTests {
         let module = try parseModule(
             """
             construct Point {
-                let x: Int
-                let y: Int
+                @let x: Int
+                @let y: Int
             }
 
             construct Label {
-                let text: String
+                @let text: String
             }
 
             function sum(point: Point): Int {
@@ -230,14 +230,14 @@ struct LLVMLoweringEmitterTests {
         let left = try parseConstruct(
             """
             construct Thing {
-                let id: Int
+                @let id: Int
             }
             """
         )
         let right = try parseConstruct(
             """
             construct Thing {
-                let active: Bool
+                @let active: Bool
             }
             """
         )
@@ -262,11 +262,11 @@ struct LLVMLoweringEmitterTests {
         let module = try parseModule(
             """
             construct Name {
-                let value: String
+                @let value: String
             }
 
             construct User {
-                let name: Name
+                @let name: Name
             }
 
             function name(user: User): Name {
@@ -326,7 +326,7 @@ struct LLVMLoweringEmitterTests {
         let module = try parseModule(
             """
             construct Node {
-                let next: Node
+                @let next: Node
             }
 
             function next(node: Node): Node {
@@ -1741,8 +1741,8 @@ struct LLVMLoweringEmitterTests {
         let source = try parseModule(
             """
             construct Point {
-                let x: Int
-                let y: Int
+                @let x: Int
+                @let y: Int
             }
 
             function make(): Point {
@@ -2742,7 +2742,7 @@ struct LLVMLoweringEmitterTests {
 
                     @concreteLLVM
                     construct ConcreteAnswer {
-                        let value: Int
+                        @let value: Int
                     }
                     """,
                 role: .project
