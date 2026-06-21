@@ -12,7 +12,7 @@ function functionBodyLLVM(body: String): String {
     state index: 0
     state instructionIndex: 0
 
-    while index < lineCount {
+    @while(index < lineCount) {
         let line: String(body.segment(index: index, delimiter: "\n"))
         let llvm: String(functionLineLLVM(line: line))
 

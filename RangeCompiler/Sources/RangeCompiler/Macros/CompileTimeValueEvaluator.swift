@@ -62,6 +62,20 @@ struct CompileTimeValueEvaluator {
                 }
             case .return(let expression?):
                 return evaluate(expression, locals: locals)
+            case .macroApplication(let name, let arguments) where name == "return":
+                guard let valueArgument = arguments.first(where: { $0.label == "value" }) else {
+                    return .object(typeName: "Void", fields: [:])
+                }
+                return evaluate(valueArgument.value, locals: locals)
+            case .macroInvocation(let name, let argumentClause, let body) where name == "while":
+                guard let condition = macroConditionExpression(argumentClause: argumentClause) else {
+                    continue
+                }
+                while case .boolean(true) = evaluate(condition, locals: locals) {
+                    if let value = evaluateStatements(body, locals: &locals) {
+                        return value
+                    }
+                }
             case .expression(let expression):
                 if let value = evaluate(expression, locals: locals) {
                     return value
@@ -98,6 +112,21 @@ struct CompileTimeValueEvaluator {
             }
         }
         return nil
+    }
+
+    private func macroConditionExpression(argumentClause: String?) -> Expression? {
+        guard let argumentClause = argumentClause?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !argumentClause.isEmpty,
+            let arguments = try? MacroExpander.parsedMacroArguments(argumentClause: argumentClause)
+        else {
+            return .boolean(true)
+        }
+
+        if let condition = arguments.first(where: { $0.label == "condition" }) {
+            return condition.value
+        }
+
+        return arguments.first?.value
     }
 
     // Resolves an expression to a bound expression: if it evaluates to a concrete

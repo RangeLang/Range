@@ -342,7 +342,11 @@ extension ApplicationGraphValidator {
 
         for statement in statements {
             switch statement {
-            case .emitted, .macroApplication, .expand, .replace:
+            case .emitted, .expand, .replace:
+                continue
+            case .macroApplication(let name, let arguments) where name == "return":
+                expressions.append(macroReturnExpression(arguments: arguments))
+            case .macroApplication:
                 continue
             case .macroInvocation(_, _, let body):
                 expressions.append(contentsOf: collectReturnExpressions(in: body))
@@ -436,6 +440,8 @@ extension ApplicationGraphValidator {
                 memberResolver: memberResolver,
                 operatorResolver: operatorResolver
             )
+        case .macroApplication(let name, let arguments) where name == "return":
+            return macroReturnExpression(arguments: arguments) != nil
         case .return(let expression):
             return expression != nil
         case .conditional(let branches):
@@ -500,6 +506,10 @@ extension ApplicationGraphValidator {
         default:
             return false
         }
+    }
+
+    private func macroReturnExpression(arguments: [CallArgument]) -> Expression? {
+        arguments.first(where: { $0.label == "value" })?.value
     }
 
     func switchCoversAllEnumCases(

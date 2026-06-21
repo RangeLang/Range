@@ -828,6 +828,7 @@ extension MacroExpander {
         application: MacroApplication
     ) -> CompileTimeValue {
         let statementValues = body.map(statementValue)
+        let bodyText = renderStatementsForRawBody(body)
         return .object(
             typeName: "Block",
             fields: [
@@ -837,10 +838,14 @@ extension MacroExpander {
                     fields: [
                         "body": .array(statementValues),
                         "statements": .array(statementValues),
+                        "bodyText": .string(bodyText),
+                        "text": .string(bodyText),
                     ]
                 ),
                 "body": .array(statementValues),
                 "statements": .array(statementValues),
+                "bodyText": .string(bodyText),
+                "text": .string(bodyText),
             ]
         )
     }

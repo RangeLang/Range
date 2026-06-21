@@ -627,6 +627,8 @@ extension Parser {
             switch statement {
             case .macroInvocation(_, _, let body):
                 expressions.append(contentsOf: collectReturnExpressions(in: body))
+            case .macroApplication(let name, let arguments) where name == "return":
+                expressions.append(macroReturnExpression(arguments: arguments))
             case .return(let expression):
                 expressions.append(expression)
 
@@ -675,6 +677,8 @@ extension Parser {
         switch statement {
         case .macroInvocation(_, _, let body):
             return blockAlwaysReturnsValue(body)
+        case .macroApplication(let name, let arguments) where name == "return":
+            return macroReturnExpression(arguments: arguments) != nil
         case .return(let expression):
             return expression != nil
 
@@ -696,6 +700,10 @@ extension Parser {
         default:
             return false
         }
+    }
+
+    private func macroReturnExpression(arguments: [CallArgument]) -> Expression? {
+        arguments.first(where: { $0.label == "value" })?.value
     }
 
     func validateInitializerDeclarations(

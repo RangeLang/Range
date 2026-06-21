@@ -1,4 +1,4 @@
 @statement
 macro continue() -> String { target, diagnostics in
-    return "statement|kind=continue|projection=target.declaration|llvm=br label %loop.condition"
+    @return(value: "statement|kind=continue|projection=target.declaration|llvm=br label %loop.condition")
 }

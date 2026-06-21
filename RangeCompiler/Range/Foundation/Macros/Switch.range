@@ -1,6 +1,15 @@
+function switchChildStatementRecords(target: Block): String {
+    if target.declaration.bodyText.isEmpty {
+        return ""
+    }
+
+    return "\n" + target.declaration.bodyText
+}
+
 @statement
 macro switch(value: String = "") -> String { target, diagnostics in
     return "statement|kind=switch|value="
         + value
         + "|projection=target.declaration.statements"
+        + switchChildStatementRecords(target: target)
 }

@@ -165,7 +165,13 @@ struct CompilerFixtureTests {
             return
         }
 
-        #expect(text == "statement|kind=while|condition=x > 5|projection=target.declaration.statements")
+        #expect(
+            text
+                == """
+                statement|kind=while|condition=x > 5|projection=target.declaration.statements
+                x: x + 1
+                """
+        )
     }
 
     @Test("If statement block macro expands through Range-authored projection")
@@ -205,7 +211,13 @@ struct CompilerFixtureTests {
             return
         }
 
-        #expect(text == "statement|kind=if|condition=x > 5|projection=target.declaration.statements")
+        #expect(
+            text
+                == """
+                statement|kind=if|condition=x > 5|projection=target.declaration.statements
+                statement|kind=return|value=x|projection=target.declaration|llvm=ret x
+                """
+        )
     }
 
     @Test("Return statement macro expands through Range-authored projection")
@@ -324,8 +336,14 @@ struct CompilerFixtureTests {
 
         #expect(
             emitted == [
-                "statement|kind=for|binding=item|sequence=items|projection=target.declaration.statements",
-                "statement|kind=switch|value=mode|projection=target.declaration.statements",
+                """
+                statement|kind=for|binding=item|sequence=items|projection=target.declaration.statements
+                statement|kind=continue|projection=target.declaration|llvm=br label %loop.condition
+                """,
+                """
+                statement|kind=switch|value=mode|projection=target.declaration.statements
+                statement|kind=break|projection=target.declaration|llvm=br label %loop.end
+                """,
             ]
         )
     }
@@ -375,6 +393,92 @@ struct CompilerFixtureTests {
                 "statement|kind=continue|projection=target.declaration|llvm=br label %loop.condition",
             ]
         )
+    }
+
+    @Test("If branch statement macros expand as child records")
+    func ifBranchStatementMacrosExpandAsChildRecords() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyIfBranches.range",
+                source: """
+                    function branch() {
+                        @if("x > 0") {
+                            @elseif("x == 0") {
+                                @return(value: "Int(0)")
+                            }
+                            @else {
+                                @return(value: "Int(-1)")
+                            }
+                        }
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let elseMacro = try #require(program.declarationGraph.macrosByName["else"])
+        let elseifMacro = try #require(program.declarationGraph.macrosByName["elseif"])
+        #expect(elseMacro.macros.map(\.name) == ["statement"])
+        #expect(elseifMacro.macros.map(\.name) == ["statement"])
+
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let statement = callable.body?.first,
+            case .emitted(let text) = statement
+        else {
+            Issue.record("Expected @if branch records to expand to an emitted statement string.")
+            return
+        }
+
+        #expect(text.contains("statement|kind=if|condition=x > 0|projection=target.declaration.statements"))
+        #expect(text.contains("statement|kind=elseif|condition=x == 0|projection=target.declaration.statements"))
+        #expect(text.contains("statement|kind=else|projection=target.declaration.statements"))
+    }
+
+    @Test("Switch case statement macros expand as child records")
+    func switchCaseStatementMacrosExpandAsChildRecords() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringySwitchCases.range",
+                source: """
+                    function choose() {
+                        @switch(value: "mode") {
+                            @case(value: ".ready") {
+                                @return(value: "Int(1)")
+                            }
+                            @default {
+                                @return(value: "Int(0)")
+                            }
+                        }
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let caseMacro = try #require(program.declarationGraph.macrosByName["case"])
+        let defaultMacro = try #require(program.declarationGraph.macrosByName["default"])
+        #expect(caseMacro.macros.map(\.name) == ["statement"])
+        #expect(defaultMacro.macros.map(\.name) == ["statement"])
+
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let statement = callable.body?.first,
+            case .emitted(let text) = statement
+        else {
+            Issue.record("Expected @switch case records to expand to an emitted statement string.")
+            return
+        }
+
+        #expect(text.contains("statement|kind=switch|value=mode|projection=target.declaration.statements"))
+        #expect(text.contains("statement|kind=case|value=.ready|projection=target.declaration.statements"))
+        #expect(text.contains("statement|kind=default|projection=target.declaration.statements"))
     }
 
     @Test("CompilePass fixtures validate")
