@@ -31,7 +31,7 @@ extension Parser {
         }
 
         if isMacroApplicationStart() {
-            return .expression(try parseExpression())
+            return try parseMacroApplicationStatement()
         }
 
         if isDeferStatementStart() {
@@ -100,6 +100,19 @@ extension Parser {
         }
 
         throw ParseError("Expected statement, found \(peek()).")
+    }
+
+    mutating func parseMacroApplicationStatement() throws -> Statement {
+        guard case .macroAttribute(let name, _) = peek() else {
+            throw ParseError("Expected macro application statement.")
+        }
+        advance()
+        var fullName = name
+        try appendPostfixAccesses(to: &fullName)
+        return .macroApplication(
+            name: fullName,
+            arguments: try parseInvocationArgumentsIfPresent()
+        )
     }
 
     func targetEmittedCodeStatement() -> (path: String, operation: String)? {

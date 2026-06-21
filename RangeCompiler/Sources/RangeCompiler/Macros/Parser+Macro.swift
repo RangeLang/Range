@@ -211,7 +211,6 @@ extension Parser {
             }
         )
         if let bindings {
-            localBindings["self"] = .init(kind: .constant, type: .named("Macro.Declaration"))
             localBindings[bindings.target] = .init(
                 kind: .constant,
                 type: .member(base: .named("Macro"), name: "Target")
@@ -248,7 +247,6 @@ extension Parser {
         let bindings = try parseMacroBodyBindings()
 
         var localBindings: [String: LocalBindingSymbol] = [
-            "self": .init(kind: .constant, type: .named("Macro.Declaration")),
             bindings.target: .init(
                 kind: .constant,
                 type: .member(base: .named("Macro"), name: "Target")

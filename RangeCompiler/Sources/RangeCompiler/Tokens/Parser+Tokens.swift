@@ -73,10 +73,10 @@ extension Parser {
         switch peek() {
         case .identifier(let value):
             advance()
-            return value
+            return try consumeCallableNameSuffixes(after: value)
         case .keyword(let value):
             advance()
-            return value
+            return try consumeCallableNameSuffixes(after: value)
         case .plus:
             advance()
             return "+"
@@ -122,6 +122,21 @@ extension Parser {
         default:
             throw ParseError("Expected callable name.", range: currentRange())
         }
+    }
+
+    private mutating func consumeCallableNameSuffixes(after baseName: String) throws -> String {
+        var name = baseName
+        while peek() == .dot {
+            advance()
+            switch peek() {
+            case .identifier(let value), .keyword(let value):
+                advance()
+                name += ".\(value)"
+            default:
+                throw ParseError("Expected callable name segment after '.'.", range: currentRange())
+            }
+        }
+        return name
     }
 
     mutating func consumeStringLiteral() throws -> String {

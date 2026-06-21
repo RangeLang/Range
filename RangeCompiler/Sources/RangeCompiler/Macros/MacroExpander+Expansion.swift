@@ -1370,6 +1370,8 @@ extension MacroExpander {
             _ = argumentClause
             _ = body
             throw ParseError("Block macros like #\(name) { ... } are no longer supported.")
+        case .macroApplication:
+            return [statement]
         case .background(let background):
             let expandedBody = try expand(
                 statements: background.body,
@@ -2321,7 +2323,7 @@ extension MacroExpander {
                 if let defaultBody {
                     blocks.append(contentsOf: emittedCodeBlocks(in: defaultBody))
                 }
-            case .macroInvocation, .assignment, .compoundAssignment, .expression,
+            case .macroApplication, .macroInvocation, .assignment, .compoundAssignment, .expression,
                 .return, .break, .continue:
                 continue
             }
@@ -2365,7 +2367,7 @@ extension MacroExpander {
                 if let defaultBody {
                     blocks.append(contentsOf: replacementCodeBlocks(in: defaultBody))
                 }
-            case .macroInvocation, .assignment, .compoundAssignment, .expression,
+            case .macroApplication, .macroInvocation, .assignment, .compoundAssignment, .expression,
                 .return, .break, .continue:
                 continue
             }
@@ -2697,7 +2699,7 @@ extension MacroExpander {
                 default:
                     continue
                 }
-            case .expand, .replace, .macroInvocation, .return, .break, .continue:
+            case .macroApplication, .expand, .replace, .macroInvocation, .return, .break, .continue:
                 continue
             }
         }
@@ -3003,6 +3005,29 @@ extension MacroExpander {
                     locals[declaration.name] =
                         evaluator.evaluate(declaration.expression, with: locals)?.expression
                         ?? declaration.expression
+                case .macroApplication(let name, let arguments):
+                    guard let invokedMacro = context.macroDeclarationsByName[name] else {
+                        return nil
+                    }
+                    let resolvedArguments = arguments.map { argument in
+                        if let value = evaluator.evaluate(argument.value, with: locals),
+                            let expression = value.expression
+                        {
+                            return CallArgument(label: argument.label, value: expression)
+                        }
+                        return argument
+                    }
+                    return try? evaluateFreestandingSyntaxMacro(
+                        invokedMacro,
+                        arguments: resolvedArguments,
+                        callerLocals: locals,
+                        callerSelfValue: MacroTargetValueBuilder(
+                            macroDeclarationsByName: context.macroDeclarationsByName,
+                            macroMetadataByName: context.macroMetadataByName,
+                            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+                        ).value(for: macro),
+                        context: context
+                    )
                 case .macroInvocation(let name, let argumentClause, _):
                     guard let invokedMacro = context.macroDeclarationsByName[name] else {
                         return nil

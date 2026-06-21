@@ -1,0 +1,11 @@
+macro self(): Construct -> String { target, diagnostics in
+    return target.declaration.identifier.name
+}
+
+macro self.lets(): Construct -> Array<Let> { target, diagnostics in
+    return target.declaration.lets
+}
+
+macro self.states(): Construct -> Array<State> { target, diagnostics in
+    return target.declaration.states
+}

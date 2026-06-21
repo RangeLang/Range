@@ -117,6 +117,8 @@ struct SwiftLoweredProgramAdapter {
 
     private func lower(statement: RangeStatement) -> RangeStatement {
         switch statement {
+        case .macroApplication:
+            return statement
         case .macroInvocation(let name, let argumentClause, let body):
             return .macroInvocation(
                 name: name,

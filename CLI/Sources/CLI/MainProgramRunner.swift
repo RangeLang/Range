@@ -176,6 +176,8 @@ private struct MainProgramInterpreter {
 
     private mutating func executeStatement(_ statement: Statement) throws -> ControlFlow {
         switch statement {
+        case .macroApplication:
+            return .none
         case .macroInvocation:
             throw ValidationError("Macro invocations must be expanded before interpretation.")
         case .expand, .replace:

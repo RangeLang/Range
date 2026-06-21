@@ -298,6 +298,8 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             return expressionMacroUsages(in: deferred.body, declarationName: declarationName)
         case .localCallable(let declaration):
             return expressionMacroUsages(in: declaration.body, declarationName: declaration.name)
+        case .macroApplication(_, let arguments):
+            return arguments.flatMap { expressionMacroUsages(in: $0.value, declarationName: declarationName) }
         case .macroInvocation, .expand, .replace, .derived, .return(nil), .break, .continue:
             return []
         }

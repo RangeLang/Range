@@ -465,8 +465,6 @@ struct CompileTimeValueEvaluator {
         let value: CompileTimeValue?
         if root == targetBinding {
             value = targetValue
-        } else if root == "self" {
-            value = selfValue
         } else if root == graphBinding {
             value = .object(
                 typeName: "GraphContext",
@@ -1255,6 +1253,25 @@ struct CompileTimeValueEvaluator {
             switch statement {
             case .localBinding(let declaration):
                 nestedLocals[declaration.name] = declaration.expression
+            case .macroApplication(let name, let arguments):
+                guard let macro = macroDeclarationsByName[name], let context else {
+                    return nil
+                }
+                let resolvedArguments = arguments.map { argument in
+                    if let value = evaluate(argument.value, locals: nestedLocals),
+                        let expression = value.expression
+                    {
+                        return CallArgument(label: argument.label, value: expression)
+                    }
+                    return argument
+                }
+                return try? MacroExpander.evaluateFreestandingSyntaxMacro(
+                    macro,
+                    arguments: resolvedArguments,
+                    callerLocals: nestedLocals,
+                    callerSelfValue: selfValue,
+                    context: context
+                )
             case .macroInvocation(let name, let argumentClause, _):
                 guard let macro = macroDeclarationsByName[name] else {
                     return nil

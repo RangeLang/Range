@@ -172,6 +172,16 @@ extension MacroExpander {
                 argumentClause: argumentClause,
                 body: substituteMacroBindings(in: body, bindings: bindings)
             )
+        case .macroApplication(let name, let arguments):
+            return .macroApplication(
+                name: name,
+                arguments: arguments.map { argument in
+                    CallArgument(
+                        label: argument.label,
+                        value: substituteMacroBindings(in: argument.value, bindings: bindings)
+                    )
+                }
+            )
         case .break, .continue:
             return statement
         }

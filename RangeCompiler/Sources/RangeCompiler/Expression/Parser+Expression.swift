@@ -126,8 +126,10 @@ extension Parser {
             return try parseCapturedSyntaxExpressionMacroInvocation(name: name)
         case .macroAttribute(let name, _) where isMacroApplicationAttribute(name):
             advance()
+            var fullName = name
+            try appendPostfixAccesses(to: &fullName)
             return .macroInvocation(
-                name: name,
+                name: fullName,
                 arguments: try parseInvocationArgumentsIfPresent()
             )
         case .hash where peek(offset: 1) == .leftParen:

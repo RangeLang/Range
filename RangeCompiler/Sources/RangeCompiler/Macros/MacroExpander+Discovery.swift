@@ -139,6 +139,8 @@ extension MacroExpander {
         case .switchStatement(_, let cases, let defaultBody):
             return cases.contains { $0.body.contains(where: containsMacroRewrite) }
                 || (defaultBody?.contains(where: containsMacroRewrite) ?? false)
+        case .macroApplication(_, let arguments):
+            return arguments.contains { expressionContainsMacroRewrite($0.value) }
         case .localBinding, .assignment, .compoundAssignment, .return, .break, .continue:
             return false
         }

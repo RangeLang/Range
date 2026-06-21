@@ -89,7 +89,7 @@ extension MacroExpander {
         return bindings[name]
     }
 
-    private static func renderArgumentsForStringify(_ arguments: [CallArgument]) -> String {
+    static func renderArgumentsForStringify(_ arguments: [CallArgument]) -> String {
         arguments.map { argument in
             let renderedValue = renderExpressionForStringify(argument.value)
             if let label = argument.label {

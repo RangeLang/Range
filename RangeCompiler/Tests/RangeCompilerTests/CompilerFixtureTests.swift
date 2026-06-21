@@ -114,6 +114,53 @@ struct CompilerFixtureTests {
         }
     }
 
+    @Test("@self dotted construct metadata macro parses in construct function")
+    func selfDottedConstructMetadataMacroParses() throws {
+        var parser = try Parser(source: """
+            construct User {
+                @let name: String
+
+                function inspect() {
+                    @self.lets.filter
+                }
+            }
+            """)
+        let sourceFile = try parser.parseSourceFile()
+        guard case .construct(let declaration) = sourceFile,
+            let function = declaration.callables.first,
+            let body = function.body,
+            let statement = body.first,
+            case .macroApplication(let name, let arguments) = statement
+        else {
+            Issue.record("Expected @self.lets.filter to parse as a macro application statement.")
+            return
+        }
+
+        #expect(name == "self.lets.filter")
+        #expect(arguments.isEmpty)
+    }
+
+    @Test("dotted self macro can return structured property arrays")
+    func dottedSelfMacroReturnsStructuredPropertyArrays() throws {
+        var parser = try Parser(source: """
+            macro self.lets(): Construct -> Array<Let> { target, diagnostics in
+                return target.declaration.lets
+            }
+            """)
+        let sourceFile = try parser.parseSourceFile()
+        guard case .macro(let declaration) = sourceFile else {
+            Issue.record("Expected dotted self macro declaration.")
+            return
+        }
+
+        #expect(declaration.name == "self.lets")
+        guard case .syntax(.named("Construct"))? = declaration.target else {
+            Issue.record("Expected dotted self macro to target Construct.")
+            return
+        }
+        #expect(declaration.expansionType == .array(.named("Let")))
+    }
+
     @Test("@project macro requires a single project declaration")
     func projectMacroRequiresSingleProjectDeclaration() throws {
         let inputs = [

@@ -735,6 +735,12 @@ struct MacroTargetValueBuilder {
             return "return"
         case .expression(let expression):
             return MacroExpander.renderExpressionForStringify(expression)
+        case .macroApplication(let name, let arguments):
+            let renderedArguments = MacroExpander.renderArgumentsForStringify(arguments)
+            if renderedArguments.isEmpty {
+                return "@\(name)"
+            }
+            return "@\(name)(\(renderedArguments))"
         case .macroInvocation(let name, let argumentClause, let body):
             let arguments = argumentClause.map { "(\($0))" } ?? ""
             return "#\(name)\(arguments) { \(renderStatements(body)) }"
