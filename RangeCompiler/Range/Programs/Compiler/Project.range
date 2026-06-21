@@ -1,6 +1,5 @@
-@project
-construct Compiler {
-    @let name: Title("Compiler")
-    @let version: Version(0.1.0)
-    @let author: "George"
+@construct(name: "Compiler") {
+    @let(name: "name", value: "Title(\"Compiler\")")
+    @let(name: "version", value: "Version(0.1.0)")
+    @let(name: "author", value: "\"George\"")
 }

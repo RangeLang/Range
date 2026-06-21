@@ -22,22 +22,9 @@ extension ApplicationGraphValidator {
             let fileName = lastPathComponent(of: parsedFile.path)
 
             switch parsedFile.sourceFile {
-            case .construct(let declaration):
-                try validateValueBindings(
-                    in: declaration,
-                    declarationGraph: declarationGraph,
-                    bindingConstructNames: bindingConstructNames,
-                    fileName: fileName
-                )
+            case .construct:
+                break
             case .module(let module):
-                for declaration in module.constructs {
-                    try validateValueBindings(
-                        in: declaration,
-                        declarationGraph: declarationGraph,
-                        bindingConstructNames: bindingConstructNames,
-                        fileName: fileName
-                    )
-                }
                 if let mainBlock = module.mainBlock {
                     try validateValueDeclarations(
                         in: mainBlock.body,

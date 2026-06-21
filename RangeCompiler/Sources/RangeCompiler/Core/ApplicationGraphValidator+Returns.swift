@@ -14,16 +14,8 @@ extension ApplicationGraphValidator {
             let fileName = lastPathComponent(of: parsedFile.path)
 
             switch parsedFile.sourceFile {
-            case .construct(let declaration):
-                try validateCallableReturnSemantics(
-                    in: declaration,
-                    declarationGraph: declarationGraph,
-                    resolver: resolver,
-                    memberResolver: memberResolver,
-                    operatorResolver: operatorResolver,
-                    typeCompatibilityResolver: typeCompatibilityResolver,
-                    fileName: fileName
-                )
+            case .construct:
+                break
             case .module(let module):
                 let topLevelAccessibleTypes = Dictionary(
                     uniqueKeysWithValues: registryView.topLevelStates(inFilePath: parsedFile.path).map {
@@ -44,17 +36,6 @@ extension ApplicationGraphValidator {
                     )
                 }
 
-                for declaration in module.constructs {
-                    try validateCallableReturnSemantics(
-                        in: declaration,
-                        declarationGraph: declarationGraph,
-                        resolver: resolver,
-                        memberResolver: memberResolver,
-                        operatorResolver: operatorResolver,
-                        typeCompatibilityResolver: typeCompatibilityResolver,
-                        fileName: fileName
-                    )
-                }
             case .mainBlock, .enumeration, .macro, .extensions:
                 break
             }

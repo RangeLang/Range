@@ -74,10 +74,8 @@ extension ApplicationGraphValidator {
 
     func declarations(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
         switch sourceFile {
-        case .construct(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.constructs
+        case .construct, .module:
+            return []
         case .mainBlock, .extensions, .enumeration, .macro:
             return []
         }

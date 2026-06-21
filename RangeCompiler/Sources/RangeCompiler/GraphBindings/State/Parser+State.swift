@@ -174,7 +174,7 @@ extension Parser {
         }
 
         if let explicitType,
-            case .call = expression
+            canUseExplicitTypeForStoredInitializer(expression)
         {
             return explicitType
         }

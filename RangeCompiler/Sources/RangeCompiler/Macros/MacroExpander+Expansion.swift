@@ -62,24 +62,8 @@ extension MacroExpander {
                 macros: macros,
                 context: context
             )
-            let expandedConstructs = try module.constructs.map {
-                try expand(
-                    construct: $0,
-                    macros: macros,
-                    parameterMacroSignatures: parameterMacroSignatures,
-                    literalBridges: literalBridges,
-                    context: context
-                )
-            }
-            let replacementDeclarationBundles =
-                try module.constructs.map {
-                    try replacementDeclarations(from: $0, macros: macros, context: context)
-                }
             let emittedDeclarationBundles =
-                try module.constructs.map {
-                    try emittedDeclarations(from: $0, macros: macros, context: context)
-                }
-                + module.enumerations.map {
+                try module.enumerations.map {
                     try emittedDeclarations(from: $0, macros: macros, context: context)
                 }
             let expandedExtensions = try module.extensions.map {
@@ -127,8 +111,7 @@ extension MacroExpander {
                             literalBridges: literalBridges,
                             context: context
                         )
-                    } + replacementDeclarationBundles.flatMap(\.states)
-                        + emittedDeclarationBundles.flatMap(\.states),
+                    } + emittedDeclarationBundles.flatMap(\.states),
                     callables: try module.callables.map {
                         try expand(
                             callable: $0,
@@ -138,70 +121,20 @@ extension MacroExpander {
                             context: context,
                             stateEffects: moduleStateEffects
                         )
-                    } + replacementDeclarationBundles.flatMap(\.callables)
-                        + emittedDeclarationBundles.flatMap(\.callables),
-                    constructs: zip(expandedConstructs, replacementDeclarationBundles).flatMap {
-                        expanded, replacement in
-                        replacement.isEmpty ? [expanded] : replacement.constructs
-                    }
-                        + emittedDeclarationBundles.flatMap(\.constructs),
+                    } + emittedDeclarationBundles.flatMap(\.callables),
+                    constructs: emittedDeclarationBundles.flatMap(\.constructs),
                     enumerations: module.enumerations
-                        + replacementDeclarationBundles.flatMap(\.enumerations)
                         + emittedDeclarationBundles.flatMap(\.enumerations),
                     macros: module.macros
-                        + replacementDeclarationBundles.flatMap(\.macros)
                         + emittedDeclarationBundles.flatMap(\.macros),
                     precedenceGroups: module.precedenceGroups,
                     operators: module.operators,
                     extensions: expandedExtensions
-                        + replacementDeclarationBundles.flatMap(\.extensions)
                         + emittedDeclarationBundles.flatMap(\.extensions)
                 )
             )
-        case .construct(let declaration):
-            let expandedConstruct = try expand(
-                construct: declaration,
-                macros: macros,
-                parameterMacroSignatures: parameterMacroSignatures,
-                literalBridges: literalBridges,
-                context: context
-            )
-            let replacementBundle = try replacementDeclarations(
-                from: declaration,
-                macros: macros,
-                context: context
-            )
-            let emittedBundle = try emittedDeclarations(
-                from: declaration,
-                macros: macros,
-                context: context
-            )
-            guard
-                !replacementBundle.isEmpty
-                    || !emittedBundle.states.isEmpty
-                    || !emittedBundle.callables.isEmpty
-                    || !emittedBundle.constructs.isEmpty
-                    || !emittedBundle.enumerations.isEmpty
-                    || !emittedBundle.macros.isEmpty
-                    || !emittedBundle.extensions.isEmpty
-            else {
-                return .construct(expandedConstruct)
-            }
-            return .module(
-                ModuleFileNode(
-                    mainBlock: nil,
-                    states: replacementBundle.states + emittedBundle.states,
-                    callables: replacementBundle.callables + emittedBundle.callables,
-                    constructs: (replacementBundle.isEmpty
-                        ? [expandedConstruct] : replacementBundle.constructs)
-                        + emittedBundle.constructs,
-                    enumerations: replacementBundle.enumerations + emittedBundle.enumerations,
-                    macros: replacementBundle.macros + emittedBundle.macros,
-                    precedenceGroups: [],
-                    operators: [],
-                    extensions: replacementBundle.extensions + emittedBundle.extensions
-                )
-            )
+        case .construct:
+            return sourceFile
         case .enumeration(let declaration):
             let emittedBundle = try emittedDeclarations(
                 from: declaration,

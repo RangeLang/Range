@@ -11,47 +11,14 @@ extension Parser {
         try consumeKeyword(.typeExtension)
         let target = try parseExtensionTarget()
         let conformances = try parseConformanceListIfPresent()
-        var initializers: [InitializerDeclaration] = []
-        var callables: [CallableDeclaration] = []
-        var constructs: [ConstructDeclaration] = []
-        var enumerations: [EnumDeclaration] = []
-        var enumCases: [EnumCaseDeclaration] = []
+        let initializers: [InitializerDeclaration] = []
+        let callables: [CallableDeclaration] = []
+        let constructs: [ConstructDeclaration] = []
+        let enumerations: [EnumDeclaration] = []
+        let enumCases: [EnumCaseDeclaration] = []
         if peek() == .leftBrace {
             try consume(.leftBrace)
-            let outerSelfAvailable = currentSelfAvailable
-            let outerSelfType = currentSelfType
-            currentSelfAvailable = true
-            currentSelfType = target.type
-            while isCallableStart()
-                || isInitializerDeclarationStart()
-                || isConstructDeclarationStart()
-                || isBuilderDeclarationStart()
-                || isEnumDeclarationStart()
-                || isCaseDeclarationStart()
-            {
-                if isCallableStart() {
-                    callables.append(try parseCallableDeclaration())
-                    continue
-                }
-                if isInitializerDeclarationStart() {
-                    initializers.append(try parseInitializerDeclaration())
-                    continue
-                }
-                if isConstructDeclarationStart() || isBuilderDeclarationStart() {
-                    constructs.append(try parseConstructDeclaration(requiresEOF: false))
-                    continue
-                }
-                if isEnumDeclarationStart() {
-                    enumerations.append(try parseEnumDeclaration(requiresEOF: false))
-                    continue
-                }
-                if isCaseDeclarationStart() {
-                    enumCases.append(contentsOf: try parseEnumCaseLine())
-                    continue
-                }
-            }
-            currentSelfAvailable = outerSelfAvailable
-            currentSelfType = outerSelfType
+            try skipUnknownBlockBody()
             try consume(.rightBrace)
         }
         try validateInitializerDeclarations(initializers, availableDeriveds: [])

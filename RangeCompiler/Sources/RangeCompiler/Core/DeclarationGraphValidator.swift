@@ -348,26 +348,21 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
     private func attributedConstructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
         switch sourceFile {
-        case .construct(let declaration):
-            return [declaration] + declaration.constructs.flatMap {
-                attributedConstructs(in: .construct($0))
-            }
         case .module(let module):
-            return module.constructs.flatMap { attributedConstructs(in: .construct($0)) }
-                + module.extensions.flatMap { attributedConstructs(in: $0) }
+            return module.extensions.flatMap { attributedConstructs(in: $0) }
         case .extensions(let declarations):
             return declarations.flatMap { attributedConstructs(in: $0) }
-        case .mainBlock, .enumeration, .macro:
+        case .construct, .mainBlock, .enumeration, .macro:
             return []
         }
     }
 
     private func attributedConstructs(in declaration: ExtensionDeclaration) -> [ConstructDeclaration] {
-        declaration.constructs.flatMap { attributedConstructs(in: .construct($0)) }
+        []
     }
 
     private func declarations(in declaration: ExtensionDeclaration) -> [ConstructDeclaration] {
-        declaration.constructs + declaration.constructs.flatMap { declarations(in: .construct($0)) }
+        []
     }
 
     private func callables(in declaration: ExtensionDeclaration) -> [CallableDeclaration] {
@@ -381,10 +376,8 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
     private func declarations(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
         switch sourceFile {
-        case .construct(let declaration):
-            return [declaration]
-        case .module(let module):
-            return module.constructs
+        case .construct, .module:
+            return []
         case .mainBlock, .extensions, .enumeration, .macro:
             return []
         }

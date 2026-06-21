@@ -14,16 +14,8 @@ extension ApplicationGraphValidator {
             let fileName = lastPathComponent(of: parsedFile.path)
 
             switch parsedFile.sourceFile {
-            case .construct(let declaration):
-                try validateLiteralBridgeCompatibility(
-                    in: declaration,
-                    declarationGraph: declarationGraph,
-                    resolver: resolver,
-                    memberResolver: memberResolver,
-                    operatorResolver: operatorResolver,
-                    typeCompatibilityResolver: typeCompatibilityResolver,
-                    fileName: fileName
-                )
+            case .construct:
+                break
             case .module(let module):
                 try validateLiteralBridgeCompatibility(
                     in: registryView.topLevelStates(inFilePath: parsedFile.path),
@@ -53,17 +45,6 @@ extension ApplicationGraphValidator {
                     )
                 }
 
-                for declaration in module.constructs {
-                    try validateLiteralBridgeCompatibility(
-                        in: declaration,
-                        declarationGraph: declarationGraph,
-                        resolver: resolver,
-                        memberResolver: memberResolver,
-                        operatorResolver: operatorResolver,
-                        typeCompatibilityResolver: typeCompatibilityResolver,
-                        fileName: fileName
-                    )
-                }
             case .mainBlock, .enumeration, .macro, .extensions:
                 break
             }

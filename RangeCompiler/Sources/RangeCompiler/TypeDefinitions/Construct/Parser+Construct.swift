@@ -28,79 +28,17 @@ extension Parser {
         let genericParameters = header.genericParameters
         let conformances = header.conformances
 
-        var states: [StateDeclaration] = []
-        var bindings: [BindingDeclaration] = []
-        var deriveds: [DerivedDeclaration] = []
-        var values: [ValueDeclaration] = []
-        var initializers: [InitializerDeclaration] = []
-        var callables: [CallableDeclaration] = []
-        var constructs: [ConstructDeclaration] = []
+        let states: [StateDeclaration] = []
+        let bindings: [BindingDeclaration] = []
+        let deriveds: [DerivedDeclaration] = []
+        let values: [ValueDeclaration] = []
+        let initializers: [InitializerDeclaration] = []
+        let callables: [CallableDeclaration] = []
+        let constructs: [ConstructDeclaration] = []
 
         if peek() == .leftBrace {
             try consume(.leftBrace)
-
-            let outerStateTypes = currentStateTypes
-            let outerCallableReturnTypes = currentCallableReturnTypes
-            let outerSelfAvailable = currentSelfAvailable
-            let outerSelfType = currentSelfType
-            currentStateTypes = outerStateTypes
-            currentCallableReturnTypes = outerCallableReturnTypes
-            currentSelfAvailable = true
-            currentSelfType = .named(name)
-            while isStateDeclarationStart()
-                || isBindingDeclarationStart()
-                || isDerivedDeclarationStart()
-                || isValueDeclarationStart()
-                || isInitializerDeclarationStart()
-                || isCallableStart()
-                || isConstructDeclarationStart()
-            {
-                syncCurrentDeclarationSymbols(
-                    states: states,
-                    bindings: bindings
-                )
-                if isValueDeclarationStart() {
-                    values.append(try parseValueDeclaration())
-                    continue
-                }
-                if isBindingDeclarationStart() {
-                    bindings.append(try parseBindingDeclaration())
-                    continue
-                }
-                if isDerivedDeclarationStart() {
-                    deriveds.append(try parseDerivedDeclaration())
-                    continue
-                }
-                if isInitializerDeclarationStart() {
-                    initializers.append(try parseInitializerDeclaration())
-                    continue
-                }
-                if isCallableStart() {
-                    callables.append(try parseCallableDeclaration())
-                    continue
-                }
-                if isConstructDeclarationStart() || isBuilderDeclarationStart() {
-                    constructs.append(try parseConstructDeclaration(requiresEOF: false))
-                    continue
-                }
-
-                let state = try parseState(allowDeclaredStorage: true)
-                states.append(state)
-                currentStateTypes[state.name] = state.type
-            }
-
-            if peek() != .rightBrace {
-                throw ParseError(
-                    "Construct render bodies are no longer supported in RangeCompiler. Use declarations only."
-                )
-            }
-
-            currentStateTypes = outerStateTypes
-            currentCallableReturnTypes = outerCallableReturnTypes
-            currentSelfAvailable = outerSelfAvailable
-            currentSelfType = outerSelfType
-            clearCurrentDeclarationSymbols()
-
+            try skipUnknownBlockBody()
             try consume(.rightBrace)
         }
 

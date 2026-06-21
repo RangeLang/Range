@@ -633,16 +633,6 @@ public struct DeclarationGraph {
     ) -> [String: ConstructDeclaration] {
         var registry: [String: ConstructDeclaration] = [:]
         for parsedFile in files {
-            for declaration in constructs(
-                in: parsedFile.sourceFile,
-                metadataSlotMacros: metadataSlotMacros
-            ) {
-                collectConstruct(
-                    declaration,
-                    qualifiedName: declaration.name,
-                    into: &registry
-                )
-            }
             for declaration in emittedConstructs(in: parsedFile.sourceFile) {
                 collectConstruct(
                     declaration,

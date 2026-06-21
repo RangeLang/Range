@@ -25,44 +25,121 @@ enum PackageManifestLoader {
             throw ValidationError("Project.range must declare @project construct Name { ... }.")
         case .extensions:
             throw ValidationError("Project.range must declare @project construct Name { ... }.")
-        case .module:
-            throw ValidationError("Project.range must declare @project construct Name { ... }.")
-        case .construct(let declaration):
-            guard declaration.attribute == nil else {
-                throw ValidationError("Project.range cannot use declaration attributes.")
+        case .module(let module):
+            if let manifest = try blockMacroManifest(from: module, fileURL: fileURL) {
+                return manifest
             }
-            let usesProjectMacroMetadata = declaration.macros.contains { $0.name == "project" }
-            let usesPackageMacro = declaration.macros.contains { $0.name == "package" }
-            guard usesProjectMacroMetadata || usesPackageMacro else {
-                throw ValidationError(
-                    "Project.range must declare @project construct Name { ... }.")
-            }
-
-            let name =
-                try titleValue(named: "name", in: declaration.values)
-                ?? (usesProjectMacroMetadata || usesPackageMacro ? declaration.name : nil)
-                ?? requiredTitleValue(named: "name", in: declaration.values)
-            let version = try requiredVersionValue(named: "version", in: declaration.values)
-            let author = try requiredStringValue(named: "author", in: declaration.values)
-            let remote = stringValue(named: "remote", in: declaration.values)
-            let remoteURLs = remoteURLs(remote: remote, in: declaration.values)
-            let resolvedRemoteURLs =
-                remoteURLs.isEmpty && (usesProjectMacroMetadata || usesPackageMacro)
-                ? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
-                : remoteURLs
-            return PackageManifest(
-                name: name,
-                version: version,
-                author: author,
-                remote: remote,
-                remoteURLs: resolvedRemoteURLs,
-                declaration: declaration
-            )
+            throw ValidationError("Project.range must declare @construct(name: \"Name\") { ... }.")
+        case .construct:
+            throw ValidationError("Project.range must declare @construct(name: \"Name\") { ... }.")
         case .enumeration:
             throw ValidationError("Project.range must declare @project construct Name { ... }.")
         case .macro:
             throw ValidationError("Project.range must declare @project construct Name { ... }.")
         }
+    }
+
+    private static func blockMacroManifest(
+        from module: ModuleFileNode,
+        fileURL: URL
+    ) throws -> PackageManifest? {
+        guard let block = module.blockMacros.first,
+            let application = block.macros.first,
+            application.name == "construct"
+        else {
+            return nil
+        }
+
+        let declarationName = constructName(from: application.argumentClause) ?? "Package"
+        let members = blockMemberValues(in: block)
+        let name = try titleString(from: members["name"]) ?? declarationName
+        let version = try versionString(from: members["version"])
+        let author = try quotedString(from: members["author"])
+        let remote = try members["remote"].map(quotedString(from:)) ?? nil
+        let remoteURLs =
+            remote.map { [$0] } ?? gitRemoteURLs(in: fileURL.deletingLastPathComponent())
+
+        return PackageManifest(
+            name: name,
+            version: version,
+            author: author,
+            remote: remote,
+            remoteURLs: remoteURLs,
+            declaration: nil
+        )
+    }
+
+    private static func blockMemberValues(in block: BlockMacroNode) -> [String: String] {
+        var values: [String: String] = [:]
+        for statement in block.body {
+            guard case .macroApplication(let name, let arguments) = statement,
+                name == "let",
+                let memberName = stringArgument(named: "name", in: arguments),
+                let value = stringArgument(named: "value", in: arguments)
+            else {
+                continue
+            }
+            values[memberName] = value
+        }
+        return values
+    }
+
+    private static func constructName(from argumentClause: String?) -> String? {
+        guard let argumentClause else {
+            return nil
+        }
+        let prefix = "name"
+        guard let nameRange = argumentClause.range(of: prefix),
+            let quoteStart = argumentClause[nameRange.upperBound...].firstIndex(of: "\""),
+            let quoteEnd = argumentClause[argumentClause.index(after: quoteStart)...].firstIndex(of: "\"")
+        else {
+            return nil
+        }
+        return String(argumentClause[argumentClause.index(after: quoteStart)..<quoteEnd])
+    }
+
+    private static func stringArgument(
+        named name: String,
+        in arguments: [CallArgument]
+    ) -> String? {
+        arguments.first { $0.label == name }.flatMap { argument in
+            guard case .string(let value) = argument.value else {
+                return nil
+            }
+            return value
+        }
+    }
+
+    private static func titleString(from value: String?) throws -> String? {
+        guard let value else {
+            return nil
+        }
+        guard value.hasPrefix("Title("), value.hasSuffix(")") else {
+            throw ValidationError("Project.range requires @let name value Title(\"...\").")
+        }
+        return try quotedString(from: String(value.dropFirst("Title(".count).dropLast()))
+    }
+
+    private static func versionString(from value: String?) throws -> String {
+        guard let value else {
+            throw ValidationError("Project.range requires @let version value Version(0.1.0).")
+        }
+        guard value.hasPrefix("Version("), value.hasSuffix(")") else {
+            throw ValidationError("Project.range requires @let version value Version(0.1.0).")
+        }
+        let raw = String(value.dropFirst("Version(".count).dropLast())
+        _ = try SemanticVersion.parse(raw)
+        return raw
+    }
+
+    private static func quotedString(from value: String?) throws -> String {
+        guard let value else {
+            throw ValidationError("Project.range requires quoted string value.")
+        }
+        guard value.hasPrefix("\""), value.hasSuffix("\""), value.count >= 2 else {
+            return value
+        }
+        return String(value.dropFirst().dropLast())
     }
 
     private static func requiredStringValue(

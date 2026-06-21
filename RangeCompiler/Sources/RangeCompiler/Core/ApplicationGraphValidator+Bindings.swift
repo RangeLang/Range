@@ -10,12 +10,8 @@ extension ApplicationGraphValidator {
             let fileName = lastPathComponent(of: parsedFile.path)
 
             switch parsedFile.sourceFile {
-            case .construct(let declaration):
-                try validateBindingReferences(
-                    in: declaration,
-                    declarationGraph: declarationGraph,
-                    fileName: fileName
-                )
+            case .construct:
+                break
             case .module(let module):
                 let topLevelMutable = Set(
                     registryView.topLevelStates(inFilePath: parsedFile.path).map(\.name)
@@ -43,13 +39,6 @@ extension ApplicationGraphValidator {
                             currentConstructName: nil,
                             parameters: callable.parameters
                         ),
-                        fileName: fileName
-                    )
-                }
-                for declaration in module.constructs {
-                    try validateBindingReferences(
-                        in: declaration,
-                        declarationGraph: declarationGraph,
                         fileName: fileName
                     )
                 }

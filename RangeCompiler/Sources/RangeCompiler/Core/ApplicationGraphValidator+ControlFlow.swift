@@ -6,8 +6,8 @@ extension ApplicationGraphValidator {
             let fileName = lastPathComponent(of: parsedFile.path)
 
             switch parsedFile.sourceFile {
-            case .construct(let declaration):
-                try validateControlFlow(in: declaration, fileName: fileName)
+            case .construct:
+                break
             case .module(let module):
                 if let mainBlock = module.mainBlock {
                     try validateControlFlow(
@@ -29,9 +29,6 @@ extension ApplicationGraphValidator {
                     )
                 }
 
-                for declaration in module.constructs {
-                    try validateControlFlow(in: declaration, fileName: fileName)
-                }
             case .mainBlock(let mainBlock):
                 try validateControlFlow(
                     in: mainBlock.body,

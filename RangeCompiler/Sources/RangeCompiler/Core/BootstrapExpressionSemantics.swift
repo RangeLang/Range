@@ -266,6 +266,14 @@ public enum ExpressionTypeSemantics {
         switch type {
         case .typed(let typeReference):
             return typeReference
+        case .intLiteral:
+            return .named("Int")
+        case .floatLiteral:
+            return .named("Float")
+        case .stringLiteral:
+            return .named("String")
+        case .boolLiteral:
+            return .named("Bool")
         default:
             return resolver.defaultDestinationType(for: type.displayName)
         }
@@ -308,6 +316,9 @@ public enum ExpressionTypeSemantics {
                     typeCompatibilityResolver: typeCompatibilityResolver
                 )
             }
+            if primitiveLiteralDestination(for: actual) == expected {
+                return true
+            }
             return resolver.isCompatible(
                 expected: expected,
                 carrierTypeName: actual.displayName
@@ -316,6 +327,21 @@ public enum ExpressionTypeSemantics {
             return actualType == expected
                 || isCompatibleNamedType(expected: expected, actual: actualType)
                 || typeCompatibilityResolver.isAssignable(actual: actualType, expected: expected)
+        }
+    }
+
+    private static func primitiveLiteralDestination(for type: BootstrapLiteralType) -> TypeReference? {
+        switch type {
+        case .intLiteral:
+            return .named("Int")
+        case .floatLiteral:
+            return .named("Float")
+        case .stringLiteral:
+            return .named("String")
+        case .boolLiteral:
+            return .named("Bool")
+        default:
+            return nil
         }
     }
 

@@ -244,7 +244,7 @@ public struct DeclarationSyntaxResolver {
     }
 
     private func syntaxBoundaryTypeNames() -> [String] {
-        constructsByName.keys.filter {
+        Array(Self.bootstrapSyntaxBoundaryTypeNames) + constructsByName.keys.filter {
             declarationIsSyntaxBoundary(named: $0)
         }
     }
@@ -259,11 +259,38 @@ public struct DeclarationSyntaxResolver {
     }
 
     public func declarationIsSyntaxBoundary(named name: String) -> Bool {
+        if Self.bootstrapSyntaxBoundaryTypeNames.contains(name) {
+            return true
+        }
         if constructsByName[name]?.macros.contains(where: { $0.name == "syntax" }) == true {
             return true
         }
         return false
     }
+
+    private static let bootstrapSyntaxBoundaryTypeNames: Set<String> = [
+        "ArrayExpression",
+        "Assignment",
+        "Background",
+        "Block",
+        "Break",
+        "Closure",
+        "Defer",
+        "EnumCaseExpression",
+        "Expression",
+        "ExpressionStatement",
+        "For",
+        "Identifier",
+        "If",
+        "LocalBinding",
+        "Return",
+        "Switch",
+        "SwitchCase",
+        "TypeReference",
+        "While",
+        "WrittenExpression",
+        "WrittenSyntax",
+    ]
 
     private static func emittedSyntaxMacroName(forTypeName typeName: String) -> String {
         snakeCase(typeName)
