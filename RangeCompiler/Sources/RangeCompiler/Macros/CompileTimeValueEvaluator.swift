@@ -81,6 +81,15 @@ struct CompileTimeValueEvaluator {
                         return value
                     }
                 }
+            case .macroInvocation(let name, let argumentClause, let body) where name == "if":
+                guard let condition = macroConditionExpression(argumentClause: argumentClause),
+                    case .boolean(true) = evaluate(condition, locals: locals)
+                else {
+                    continue
+                }
+                if let value = evaluateStatements(body, locals: &locals) {
+                    return value
+                }
             case .expression(let expression):
                 if let value = evaluate(expression, locals: locals) {
                     return value

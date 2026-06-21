@@ -7,22 +7,22 @@ macro integer(): Construct -> String { target, diagnostics in
     for generic in target.declaration.generics {
         let name: String(generic.identifier.name)
 
-        if name == "bits" {
+        @if(name == "bits") {
             hasBits: true
             bits: generic.value
         }
 
-        if name == "signedness" {
+        @if(name == "signedness") {
             hasSignedness: true
             signedness: generic.value
         }
     }
 
-    if target.declaration.generics.count > 0 && !hasBits {
+    @if(target.declaration.generics.count > 0 && !hasBits) {
         diagnostics.error("@integer requires a value generic named bits.")
     }
 
-    if target.declaration.generics.count > 0 && !hasSignedness {
+    @if(target.declaration.generics.count > 0 && !hasSignedness) {
         diagnostics.error("@integer requires a value generic named signedness.")
     }
 

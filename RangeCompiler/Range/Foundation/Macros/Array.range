@@ -8,11 +8,11 @@ macro array(): Construct -> String { target, diagnostics in
     for generic in target.application.generics {
         let typeName: String(generic.name)
 
-        if !typeName.isEmpty {
+        @if(!typeName.isEmpty) {
             hasElement: true
             elementName: typeName
 
-            if !generic.llvm.isEmpty {
+            @if(!generic.llvm.isEmpty) {
                 elementLLVM: generic.llvm
             }
         }

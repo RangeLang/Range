@@ -5,17 +5,17 @@ macro float(): Construct -> String { target, diagnostics in
     for generic in target.declaration.generics {
         let name: String(generic.identifier.name)
 
-        if name == "precision" {
+        @if(name == "precision") {
             hasPrecision: true
             precision: generic.value
         }
     }
 
-    if target.declaration.generics.count > 0 && !hasPrecision {
+    @if(target.declaration.generics.count > 0 && !hasPrecision) {
         diagnostics.error("@float requires a value generic named precision.")
     }
 
-    if precision == "32" {
+    @if(precision == "32") {
         @return(value: "float")
     }
 

@@ -5,7 +5,7 @@ macro addable(): Construct | Extension { target, diagnostics in
         }
     )
 
-    if additions.count == 0 {
+    @if(additions.count == 0) {
         diagnostics.error("@addable requires a function identified as + to be declared.")
     }
 }

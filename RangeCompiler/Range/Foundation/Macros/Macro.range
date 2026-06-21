@@ -21,7 +21,7 @@ function macroProperties(source: String): Array<MacroProperty> {
     @while(index < lineCount) {
         let line: String(source.segment(index: index, delimiter: "\n"))
 
-        if !line.isEmpty {
+        @if(!line.isEmpty) {
             properties.append(element: MacroProperty(text: line))
         }
 

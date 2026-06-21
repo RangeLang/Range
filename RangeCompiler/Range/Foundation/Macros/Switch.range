@@ -1,8 +1,13 @@
 @statement
-macro switch(value: String = "") -> String { target, diagnostics in
+macro switch -> String {
+    @parameter(name: "value") {
+        @value(type: "String", current: "String()")
+    }
+
+    target, diagnostics in
     @state(name: "children", value: "String(\"\")")
 
-    if !target.declaration.bodyText.isEmpty {
+    @if(!target.declaration.bodyText.isEmpty) {
         children: "\n" + target.declaration.bodyText
     }
 

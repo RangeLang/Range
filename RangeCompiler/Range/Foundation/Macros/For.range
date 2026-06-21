@@ -1,8 +1,16 @@
 @statement
-macro for(binding: String = "", sequence: String = "") -> String { target, diagnostics in
+macro for -> String {
+    @parameter(name: "binding") {
+        @value(type: "String", current: "String()")
+    }
+    @parameter(name: "sequence") {
+        @value(type: "String", current: "String()")
+    }
+
+    target, diagnostics in
     @state(name: "children", value: "String(\"\")")
 
-    if !target.declaration.bodyText.isEmpty {
+    @if(!target.declaration.bodyText.isEmpty) {
         children: "\n" + target.declaration.bodyText
     }
 

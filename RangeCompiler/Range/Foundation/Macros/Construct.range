@@ -1,32 +1,37 @@
 function constructLLVMType(line: String): String {
-    if line.contains(value: "|type=Int") {
+    @if(line.contains(value: "|type=Int")) {
         @return(value: "i64")
     }
 
-    if line.contains(value: "|current=Int(") {
+    @if(line.contains(value: "|current=Int(")) {
         @return(value: "i64")
     }
 
-    if line.contains(value: "|type=Bool") {
+    @if(line.contains(value: "|type=Bool")) {
         @return(value: "i1")
     }
 
-    if line.contains(value: "|current=Bool(") {
+    @if(line.contains(value: "|current=Bool(")) {
         @return(value: "i1")
     }
 
-    if line.contains(value: "|type=String") {
+    @if(line.contains(value: "|type=String")) {
         @return(value: "%Range.String")
     }
 
-    if line.contains(value: "|current=String(") {
+    @if(line.contains(value: "|current=String(")) {
         @return(value: "%Range.String")
     }
 
     @return(value: "")
 }
 
-macro construct(name: String): @syntax -> String { target, diagnostics in
+macro construct: @syntax -> String {
+    @parameter(name: "name") {
+        @value(type: "String")
+    }
+
+    target, diagnostics in
     @state(name: "fields", value: "String(\"\")")
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
@@ -39,25 +44,26 @@ macro construct(name: String): @syntax -> String { target, diagnostics in
             value: target.application.rawBodyText.segment(index: index, delimiter: "\n")
         )
         @state(name: "lineLLVM", value: "String(\"\")")
+        @state(name: "wasPendingState", value: "pendingState")
 
-        if line.contains(value: "member|kind=state") {
-            if line.contains(value: "|llvm=") {
+        @if(line.contains(value: "member|kind=state")) {
+            @if(line.contains(value: "|llvm=")) {
                 lineLLVM: line.segment(index: 1, delimiter: "|llvm=")
             }
 
             pendingState: "true"
-        } else {
-            if pendingState == "true" {
-                if line.contains(value: "member|kind=value") {
-                    lineLLVM: constructLLVMType(line: line)
-                }
-
-                pendingState: "false"
-            }
         }
 
-        if !lineLLVM.isEmpty {
-            if fieldIndex > 0 {
+        @if(wasPendingState == "true") {
+            @if(line.contains(value: "member|kind=value")) {
+                lineLLVM: constructLLVMType(line: line)
+            }
+
+            pendingState: "false"
+        }
+
+        @if(!lineLLVM.isEmpty) {
+            @if(fieldIndex > 0) {
                 fields: fields + ", "
             }
 
@@ -65,7 +71,7 @@ macro construct(name: String): @syntax -> String { target, diagnostics in
             fieldIndex: fieldIndex + 1
         }
 
-        if !line.isEmpty {
+        @if(!line.isEmpty) {
             members: members + "\n" + line
         }
 

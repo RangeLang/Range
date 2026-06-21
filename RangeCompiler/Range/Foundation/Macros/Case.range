@@ -1,6 +1,14 @@
 @statement
-macro case(name: String = "", value: String = "") -> String { target, diagnostics in
-    if !name.isEmpty {
+macro case -> String {
+    @parameter(name: "name") {
+        @value(type: "String", current: "String()")
+    }
+    @parameter(name: "value") {
+        @value(type: "String", current: "String()")
+    }
+
+    target, diagnostics in
+    @if(!name.isEmpty) {
         @return(value: "member|kind=case|name="
             + name
             + "|value="

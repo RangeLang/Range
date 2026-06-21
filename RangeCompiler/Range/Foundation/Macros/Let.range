@@ -1,5 +1,10 @@
 @member
-macro let(name: String): @member -> String { target, diagnostics in
+macro let: @member -> String {
+    @parameter(name: "name") {
+        @value(type: "String")
+    }
+
+    target, diagnostics in
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
 
@@ -9,7 +14,7 @@ macro let(name: String): @member -> String { target, diagnostics in
             value: target.declaration.bodyText.segment(index: index, delimiter: "\n")
         )
 
-        if !memberLine.isEmpty {
+        @if(!memberLine.isEmpty) {
             members: members + "\n" + memberLine
         }
 

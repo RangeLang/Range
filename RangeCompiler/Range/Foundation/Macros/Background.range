@@ -3,7 +3,7 @@ macro block(statements: Array<@statement>) -> Array<@statement> {
 }
 
 macro background(): @block & @syntax { target, diagnostics, graph in
-    if target.declaration.statements.count == 0 {
+    @if(target.declaration.statements.count == 0) {
         diagnostics.error("@background block must not be empty.")
     }
 

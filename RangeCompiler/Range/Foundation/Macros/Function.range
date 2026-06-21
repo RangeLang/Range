@@ -1,4 +1,15 @@
-macro function(name: String, result: String, body: String = ""): @member -> String { target, diagnostics in
+macro function: @member -> String {
+    @parameter(name: "name") {
+        @value(type: "String")
+    }
+    @parameter(name: "result") {
+        @value(type: "String")
+    }
+    @parameter(name: "body") {
+        @value(type: "String", current: "String()")
+    }
+
+    target, diagnostics in
     @state(name: "llvm", value: "String(\"\")")
     @state(name: "records", value: "String(\"\")")
     @state(name: "members", value: "String(\"\")")
@@ -6,7 +17,7 @@ macro function(name: String, result: String, body: String = ""): @member -> Stri
     @state(name: "index", value: "0")
     @state(name: "instructionIndex", value: "0")
 
-    if body.contains(value: "statement|") {
+    @if(body.contains(value: "statement|")) {
         bodyField: "records"
     }
 
@@ -14,12 +25,12 @@ macro function(name: String, result: String, body: String = ""): @member -> Stri
         @state(name: "line", value: body.segment(index: index, delimiter: "\n"))
         @state(name: "lineLLVM", value: "String(\"\")")
 
-        if line.contains(value: "|llvm=") {
+        @if(line.contains(value: "|llvm=")) {
             lineLLVM: line.segment(index: 1, delimiter: "|llvm=")
         }
 
-        if !lineLLVM.isEmpty {
-            if instructionIndex > 0 {
+        @if(!lineLLVM.isEmpty) {
+            @if(instructionIndex > 0) {
                 llvm: llvm + "; "
             }
 
@@ -27,8 +38,8 @@ macro function(name: String, result: String, body: String = ""): @member -> Stri
             instructionIndex: instructionIndex + 1
         }
 
-        if body.contains(value: "statement|") {
-            if !line.isEmpty {
+        @if(body.contains(value: "statement|")) {
+            @if(!line.isEmpty) {
                 records: records + "\n" + line
             }
         }
@@ -43,14 +54,14 @@ macro function(name: String, result: String, body: String = ""): @member -> Stri
             value: target.declaration.bodyText.segment(index: index, delimiter: "\n")
         )
 
-        if !memberLine.isEmpty {
+        @if(!memberLine.isEmpty) {
             members: members + "\n" + memberLine
         }
 
         index: index + 1
     }
 
-    if llvm.isEmpty {
+    @if(llvm.isEmpty) {
         @return(value: "member|kind=function|name="
             + name
             + "|result="

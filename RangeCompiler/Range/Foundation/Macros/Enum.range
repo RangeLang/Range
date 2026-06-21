@@ -1,4 +1,9 @@
-macro enum(name: String): @syntax -> String { target, diagnostics in
+macro enum: @syntax -> String {
+    @parameter(name: "name") {
+        @value(type: "String")
+    }
+
+    target, diagnostics in
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
 
@@ -8,7 +13,7 @@ macro enum(name: String): @syntax -> String { target, diagnostics in
             value: target.application.rawBodyText.segment(index: index, delimiter: "\n")
         )
 
-        if !line.isEmpty {
+        @if(!line.isEmpty) {
             members: members + "\n" + line
         }
 
