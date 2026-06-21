@@ -2606,6 +2606,29 @@ struct LLVMLoweringEmitterTests {
         #expect(emitted.contains("ret %Range.String"))
     }
 
+    @Test("Core Array carries evaluated @array LLVM layout metadata")
+    func coreArrayCarriesEvaluatedArrayLLVMLayoutMetadata() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let arrayConstruct = try #require(program.declarationGraph.constructsByName["Array"])
+        let arrayMacro = try #require(
+            arrayConstruct.macros.first(where: { $0.name == "array" }))
+        let emitted = try #require(arrayMacro.evaluatedStringValue)
+        #expect(emitted.contains("; range.array.generics = "))
+        #expect(emitted.contains("; range.array.elements = Element"))
+        #expect(emitted.contains("; range.array.lowering = lane-per-element"))
+        #expect(emitted.contains("; range.array.layout = { ptr, count, capacity }"))
+        #expect(emitted.contains("%Range.IntArray = type { ptr, i64, i64 }"))
+        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_empty()"))
+        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_withCapacity(i64 %capacity)"))
+        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_fromBuffer(ptr %elements, i64 %count)"))
+        #expect(emitted.contains("define i64 @RangeIntArray_count(%Range.IntArray %array)"))
+        #expect(emitted.contains("define i1 @RangeIntArray_isEmpty(%Range.IntArray %array)"))
+        #expect(emitted.contains("define i64 @RangeIntArray_element(%Range.IntArray %array, i64 %index)"))
+        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_update(%Range.IntArray %array, i64 %index, i64 %element)"))
+        #expect(emitted.contains("define %Range.IntArray @RangeIntArray_append(%Range.IntArray %array, i64 %element)"))
+    }
+
     @Test("LLVM lowerability uses evaluated @integer scalar metadata")
     func llvmLowerabilityUsesEvaluatedIntegerScalarMetadata() throws {
         let inputs = try rangeCoreInputs()

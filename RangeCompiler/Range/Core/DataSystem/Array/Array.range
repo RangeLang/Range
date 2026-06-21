@@ -1,3 +1,4 @@
+@array
 @literal
 @syntax
 construct Array<Element> {
