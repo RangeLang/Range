@@ -6,8 +6,6 @@ macro value: @member -> String {
     @parameter(name: "current") {
         @value(type: "String", current: "String()")
     }
-
-    target, diagnostics in
     @return(value: "member|kind=value|type="
         + type
         + "|current="

@@ -5,7 +5,6 @@ construct CodingBehavior {
 
 macro codable(key: Optional<String> = nil, exclude: Bool = false): @property -> CodingBehavior {
     @generic(name: "T")
-
     target, diagnostics in
     @return(value: CodingBehavior(key: key, exclude: exclude))
 }

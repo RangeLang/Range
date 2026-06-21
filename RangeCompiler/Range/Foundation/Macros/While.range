@@ -3,8 +3,6 @@ macro while -> String {
     @parameter(name: "condition") {
         @value(type: "String", current: "true")
     }
-
-    target, diagnostics in
     @state(name: "children", value: "String(\"\")")
 
     @if(!target.declaration.bodyText.isEmpty) {

@@ -8,8 +8,6 @@ macro function: @member -> String {
     @parameter(name: "body") {
         @value(type: "String", current: "String()")
     }
-
-    target, diagnostics in
     @state(name: "llvm", value: "String(\"\")")
     @state(name: "records", value: "String(\"\")")
     @state(name: "members", value: "String(\"\")")

@@ -2,8 +2,6 @@ macro extension: @syntax -> String {
     @parameter(name: "name") {
         @value(type: "String")
     }
-
-    target, diagnostics in
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
 

@@ -6,8 +6,6 @@ macro variadic: Parameter {
     @generic(name: "delimiter") {
         @value(type: "Delimiter", current: "Delimiter.comma")
     }
-
-    target, diagnostics in
     target.declaration.type.replace(replacement:
         ArrayTypeReference(
             element: target.declaration.type

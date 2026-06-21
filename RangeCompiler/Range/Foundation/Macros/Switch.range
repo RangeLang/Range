@@ -3,8 +3,6 @@ macro switch -> String {
     @parameter(name: "value") {
         @value(type: "String", current: "String()")
     }
-
-    target, diagnostics in
     @state(name: "children", value: "String(\"\")")
 
     @if(!target.declaration.bodyText.isEmpty) {

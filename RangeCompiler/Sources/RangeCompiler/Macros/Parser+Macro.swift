@@ -57,6 +57,13 @@ extension Parser {
                         parameters: parameters,
                         bindings: parsedBindings
                     )
+                } else if macroBodyStartsWithMacroStatement() {
+                    syntaxBody = nil
+                    bindings = nil
+                    body = try parseFreestandingMacroValueBody(
+                        parameters: parameters,
+                        bindings: nil
+                    )
                 } else {
                     syntaxBody = try parseEmittedCodeBlock()
                     bindings = nil
@@ -85,7 +92,7 @@ extension Parser {
         } else {
             expansionType = nil
         }
-        let bindings: MacroBindings
+        let bindings: MacroBindings?
         let body: [Statement]
         var memberGenericParameters: [GenericParameter] = []
         var memberParameters: [RangeFunctionParameter] = []
@@ -154,7 +161,7 @@ extension Parser {
         let parameters = try parseFunctionParameters(allowSyntaxCapture: true)
         try consume(.arrow)
         let expansionType = try parseTypeReferenceNode()
-        let bindings: MacroBindings
+        let bindings: MacroBindings?
         let body: [Statement]
         if signatureOnly {
             if peek() == .leftBrace {
@@ -276,9 +283,16 @@ extension Parser {
         }
     }
 
+    private func macroBodyStartsWithMacroStatement() -> Bool {
+        if case .macroAttribute = peek() {
+            return true
+        }
+        return false
+    }
+
     mutating func parseMacroBody(declaredParameters: [RangeFunctionParameter] = []) throws
         -> (
-            bindings: MacroBindings,
+            bindings: MacroBindings?,
             body: [Statement],
             parameters: [RangeFunctionParameter],
             genericParameters: [GenericParameter]
@@ -288,17 +302,21 @@ extension Parser {
 
         let genericParameters = try parseMacroMemberGenerics()
         let parameters = try parseMacroMemberParameters()
-        let bindings = try parseMacroBodyBindings()
+        let bindings = macroBodyStartsWithBindings() ? try parseMacroBodyBindings() : nil
 
-        var localBindings: [String: LocalBindingSymbol] = [
-            bindings.target: .init(
+        var localBindings: [String: LocalBindingSymbol] = [:]
+        if let bindings {
+            localBindings[bindings.target] = .init(
                 kind: .constant,
                 type: .member(base: .named("Macro"), name: "Target")
-            ),
-            bindings.diagnostics: .init(kind: .constant, type: .named("MacroDiagnostics")),
-        ]
-        if let graph = bindings.graph {
-            localBindings[graph] = .init(kind: .constant, type: .named("GraphContext"))
+            )
+            localBindings[bindings.diagnostics] = .init(
+                kind: .constant,
+                type: .named("MacroDiagnostics")
+            )
+            if let graph = bindings.graph {
+                localBindings[graph] = .init(kind: .constant, type: .named("GraphContext"))
+            }
         }
         for parameter in declaredParameters + parameters {
             localBindings[parameter.localName] = .init(

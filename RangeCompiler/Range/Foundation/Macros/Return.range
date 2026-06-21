@@ -3,8 +3,6 @@ macro return -> String {
     @parameter(name: "value") {
         @value(type: "String", current: "String()")
     }
-
-    target, diagnostics in
     @state(name: "llvm", value: "\"ret \" + value")
 
     @if(value.isEmpty) {

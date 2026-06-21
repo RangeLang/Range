@@ -6,8 +6,6 @@ macro case -> String {
     @parameter(name: "value") {
         @value(type: "String", current: "String()")
     }
-
-    target, diagnostics in
     @if(!name.isEmpty) {
         @return(value: "member|kind=case|name="
             + name

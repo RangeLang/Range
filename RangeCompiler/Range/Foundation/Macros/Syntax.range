@@ -48,7 +48,5 @@ macro splice(@spliced syntax: @syntax): @syntax { target, diagnostics in
 
 macro map(collection: Array<T>, @spliced syntax: @syntax): @syntax {
     @generic(name: "T")
-
-    target, diagnostics in
     @return(value: syntax)
 }

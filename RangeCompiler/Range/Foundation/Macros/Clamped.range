@@ -1,6 +1,5 @@
 macro clamped(min: T, max: T): State<T> {
     @generic(name: "T")
-
     target, diagnostics in
     target.initializer { value in
         Math.clamp(value: value, min: min, max: max)
