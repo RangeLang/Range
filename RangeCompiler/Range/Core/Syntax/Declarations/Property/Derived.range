@@ -3,12 +3,24 @@
 @member
 @graph(role: .declaration)
 @construct(name: "Derived<T>") {
-    @let(name: "identity", value: "GraphIdentity")
-    @let(name: "parent", value: "Optional<GraphIdentity>")
-    @let(name: "macros", value: "Array<Macro>")
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "type", value: "TypeReference")
-    @let(name: "body", value: "Optional<Block>")
+    @let(name: "identity") {
+        @value(type: "GraphIdentity")
+    }
+    @let(name: "parent") {
+        @value(type: "Optional<GraphIdentity>")
+    }
+    @let(name: "macros") {
+        @value(type: "Array<Macro>")
+    }
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "type") {
+        @value(type: "TypeReference")
+    }
+    @let(name: "body") {
+        @value(type: "Optional<Block>")
+    }
 
     @function(name: "getter", result: "Void", body: "")
 }

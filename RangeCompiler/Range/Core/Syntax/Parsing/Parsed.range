@@ -1,6 +1,12 @@
 @syntax
 @construct(name: "Parsed<Value>") {
-    @let(name: "written", value: "WrittenSyntax")
-    @let(name: "value", value: "Optional<Value>")
-    @let(name: "diagnostics", value: "Array<String>")
+    @let(name: "written") {
+        @value(type: "WrittenSyntax")
+    }
+    @let(name: "value") {
+        @value(type: "Optional<Value>")
+    }
+    @let(name: "diagnostics") {
+        @value(type: "Array<String>")
+    }
 }

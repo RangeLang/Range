@@ -1,7 +1,15 @@
 @syntax
 @construct(name: "ValueGeneric") {
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "type", value: "TypeReference")
-    @let(name: "value", value: "String")
-    @let(name: "default", value: "Optional<String>")
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "type") {
+        @value(type: "TypeReference")
+    }
+    @let(name: "value") {
+        @value(type: "String")
+    }
+    @let(name: "default") {
+        @value(type: "Optional<String>")
+    }
 }

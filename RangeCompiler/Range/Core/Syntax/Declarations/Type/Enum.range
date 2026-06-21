@@ -1,9 +1,15 @@
 @graph(role: .declaration)
 @syntax
 @construct(name: "Enum") {
-    @let(name: "self", value: "NominalTypeReference")
-    @let(name: "generics", value: "Array<Generic>")
-    @let(name: "cases", value: "Array<EnumCase>")
+    @let(name: "self") {
+        @value(type: "NominalTypeReference")
+    }
+    @let(name: "generics") {
+        @value(type: "Array<Generic>")
+    }
+    @let(name: "cases") {
+        @value(type: "Array<EnumCase>")
+    }
 
     @function(name: "expand", result: "Void", body: "")
 }
@@ -11,12 +17,20 @@
 @graph(role: .declaration)
 @syntax
 @construct(name: "EnumCase") {
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "associatedValues", value: "Array<EnumAssociatedValue>")
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "associatedValues") {
+        @value(type: "Array<EnumAssociatedValue>")
+    }
 }
 
 @syntax
 @construct(name: "EnumAssociatedValue") {
-    @let(name: "label", value: "Optional<String>")
-    @let(name: "type", value: "TypeReference")
+    @let(name: "label") {
+        @value(type: "Optional<String>")
+    }
+    @let(name: "type") {
+        @value(type: "TypeReference")
+    }
 }

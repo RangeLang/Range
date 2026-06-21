@@ -1,6 +1,8 @@
 @syntax
 @construct(name: "OptionalTypeReference") {
-    @let(name: "wrapped", value: "TypeReference")
+    @let(name: "wrapped") {
+        @value(type: "TypeReference")
+    }
 
     @function(name: "replace", result: "TypeReference", body: "")
 }

@@ -1,7 +1,11 @@
 @syntax
 @construct(name: "MemberTypeReference") {
-    @let(name: "base", value: "NominalTypeReference")
-    @let(name: "name", value: "String")
+    @let(name: "base") {
+        @value(type: "NominalTypeReference")
+    }
+    @let(name: "name") {
+        @value(type: "String")
+    }
 
     @function(name: "replace", result: "TypeReference", body: "")
 }

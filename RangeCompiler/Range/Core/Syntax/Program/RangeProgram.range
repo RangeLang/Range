@@ -1,47 +1,91 @@
 @construct(name: "RangeProgram") {
-    @let(name: "graph", value: "RangeGraph")
+    @let(name: "graph") {
+        @value(type: "RangeGraph")
+    }
 }
 
 @construct(name: "RangeGraph") {
-    @let(name: "files", value: "Array<FileTreeNode>")
-    @let(name: "sources", value: "Array<ProgramSourceFile>")
-    @let(name: "artifacts", value: "Array<ProgramArtifact>")
-    @let(name: "topology", value: "RangeGraphTopology")
-    @state(name: "main", value: "Optional<@main>")
-    @state(name: "syntax", value: "Array<@syntax>")
+    @let(name: "files") {
+        @value(type: "Array<FileTreeNode>")
+    }
+    @let(name: "sources") {
+        @value(type: "Array<ProgramSourceFile>")
+    }
+    @let(name: "artifacts") {
+        @value(type: "Array<ProgramArtifact>")
+    }
+    @let(name: "topology") {
+        @value(type: "RangeGraphTopology")
+    }
+    @state(name: "main") {
+        @value(type: "Optional<@main>")
+    }
+    @state(name: "syntax") {
+        @value(type: "Array<@syntax>")
+    }
 }
 
 @construct(name: "ProgramSourceFile") {
-    @let(name: "path", value: "String")
-    @let(name: "text", value: "String")
+    @let(name: "path") {
+        @value(type: "String")
+    }
+    @let(name: "text") {
+        @value(type: "String")
+    }
 }
 
 @construct(name: "ProgramArtifact") {
-    @let(name: "path", value: "String")
-    @let(name: "text", value: "String")
+    @let(name: "path") {
+        @value(type: "String")
+    }
+    @let(name: "text") {
+        @value(type: "String")
+    }
 }
 
 @construct(name: "RangeGraphTopology") {
-    @let(name: "nodes", value: "Array<RangeGraphNode>")
-    @let(name: "relationships", value: "Array<RangeGraphRelationship>")
+    @let(name: "nodes") {
+        @value(type: "Array<RangeGraphNode>")
+    }
+    @let(name: "relationships") {
+        @value(type: "Array<RangeGraphRelationship>")
+    }
 }
 
 @construct(name: "RangeGraphNode") {
-    @let(name: "identity", value: "RangeGraphIdentity")
-    @let(name: "sourcePath", value: "String")
-    @let(name: "labels", value: "Array<String>")
+    @let(name: "identity") {
+        @value(type: "RangeGraphIdentity")
+    }
+    @let(name: "sourcePath") {
+        @value(type: "String")
+    }
+    @let(name: "labels") {
+        @value(type: "Array<String>")
+    }
 }
 
 @construct(name: "RangeGraphRelationship") {
-    @let(name: "origin", value: "RangeGraphIdentity")
-    @let(name: "destination", value: "RangeGraphIdentity")
-    @let(name: "kind", value: "String")
+    @let(name: "origin") {
+        @value(type: "RangeGraphIdentity")
+    }
+    @let(name: "destination") {
+        @value(type: "RangeGraphIdentity")
+    }
+    @let(name: "kind") {
+        @value(type: "String")
+    }
 }
 
 @construct(name: "GraphSyntax") {
-    @let(name: "identity", value: "RangeGraphIdentity")
-    @let(name: "declarations", value: "Array<GraphEntry>")
-    @let(name: "applications", value: "Array<GraphEntry>")
+    @let(name: "identity") {
+        @value(type: "RangeGraphIdentity")
+    }
+    @let(name: "declarations") {
+        @value(type: "Array<GraphEntry>")
+    }
+    @let(name: "applications") {
+        @value(type: "Array<GraphEntry>")
+    }
 }
 
 enum GraphRole {
@@ -50,11 +94,19 @@ enum GraphRole {
 }
 
 @construct(name: "RangeGraphIdentity") {
-    @let(name: "id", value: "String")
-    @let(name: "kind", value: "String")
-    @let(name: "name", value: "String")
+    @let(name: "id") {
+        @value(type: "String")
+    }
+    @let(name: "kind") {
+        @value(type: "String")
+    }
+    @let(name: "name") {
+        @value(type: "String")
+    }
 }
 
 @construct(name: "GraphEntry") {
-    @let(name: "identity", value: "RangeGraphIdentity")
+    @let(name: "identity") {
+        @value(type: "RangeGraphIdentity")
+    }
 }

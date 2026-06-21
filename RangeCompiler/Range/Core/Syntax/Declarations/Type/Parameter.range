@@ -1,15 +1,27 @@
 @graph(role: .declaration)
 @syntax
 @construct(name: "Parameter") {
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "macros", value: "Array<@macro>")
-    @let(name: "syntax", value: "WrittenSyntax")
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "macros") {
+        @value(type: "Array<@macro>")
+    }
+    @let(name: "syntax") {
+        @value(type: "WrittenSyntax")
+    }
 }
 
 @graph(role: .application)
 @syntax
 @construct(name: "Parameter") {
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "type", value: "TypeReference")
-    @let(name: "syntax", value: "WrittenSyntax")
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "type") {
+        @value(type: "TypeReference")
+    }
+    @let(name: "syntax") {
+        @value(type: "WrittenSyntax")
+    }
 }

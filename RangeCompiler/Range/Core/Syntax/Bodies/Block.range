@@ -1,7 +1,11 @@
 @syntax
 @construct(name: "Block") {
-    @let(name: "body", value: "Array<@statement>")
-    @let(name: "statements", value: "Array<@statement>")
+    @let(name: "body") {
+        @value(type: "Array<@statement>")
+    }
+    @let(name: "statements") {
+        @value(type: "Array<@statement>")
+    }
 
     @function(name: "replace", result: "Block", body: "")
 }

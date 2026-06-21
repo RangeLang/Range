@@ -1,20 +1,38 @@
 @graph(role: .declaration)
 @syntax
 @construct(name: "Function") {
-    @let(name: "identity", value: "GraphIdentity")
-    @let(name: "parent", value: "Optional<GraphIdentity>")
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "generics", value: "Array<Generic>")
-    @let(name: "parameters", value: "Array<Parameter>")
-    @let(name: "returnType", value: "Optional<TypeReference>")
-    @let(name: "body", value: "Block")
+    @let(name: "identity") {
+        @value(type: "GraphIdentity")
+    }
+    @let(name: "parent") {
+        @value(type: "Optional<GraphIdentity>")
+    }
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "generics") {
+        @value(type: "Array<Generic>")
+    }
+    @let(name: "parameters") {
+        @value(type: "Array<Parameter>")
+    }
+    @let(name: "returnType") {
+        @value(type: "Optional<TypeReference>")
+    }
+    @let(name: "body") {
+        @value(type: "Block")
+    }
 }
 
 @graph(role: .application)
 @syntax
 @construct(name: "Function") {
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "arguments", value: "Array<Parameter>")
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "arguments") {
+        @value(type: "Array<Parameter>")
+    }
 
     @function(name: "replace", result: "Expression", body: "")
 }

@@ -1,7 +1,13 @@
 @statement
 @syntax
 @construct(name: "If") {
-    @let(name: "condition", value: "Expression")
-    @let(name: "thenBody", value: "Block")
-    @let(name: "elseBody", value: "Optional<Block>")
+    @let(name: "condition") {
+        @value(type: "Expression")
+    }
+    @let(name: "thenBody") {
+        @value(type: "Block")
+    }
+    @let(name: "elseBody") {
+        @value(type: "Optional<Block>")
+    }
 }

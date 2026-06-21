@@ -3,12 +3,24 @@
 @member
 @graph(role: .declaration)
 @construct(name: "State<T>") {
-    @let(name: "identity", value: "GraphIdentity")
-    @let(name: "parent", value: "Optional<GraphIdentity>")
-    @let(name: "macros", value: "Array<Macro>")
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "type", value: "TypeReference")
-    @let(name: "value", value: "Optional<Expression>")
+    @let(name: "identity") {
+        @value(type: "GraphIdentity")
+    }
+    @let(name: "parent") {
+        @value(type: "Optional<GraphIdentity>")
+    }
+    @let(name: "macros") {
+        @value(type: "Array<Macro>")
+    }
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "type") {
+        @value(type: "TypeReference")
+    }
+    @let(name: "value") {
+        @value(type: "Optional<Expression>")
+    }
 
     @function(name: "initializer", result: "Void", body: "")
     @function(name: "getter", result: "Void", body: "")

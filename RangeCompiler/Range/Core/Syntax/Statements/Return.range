@@ -1,5 +1,7 @@
 @statement
 @syntax
 @construct(name: "Return") {
-    @let(name: "expression", value: "Optional<Expression>")
+    @let(name: "expression") {
+        @value(type: "Optional<Expression>")
+    }
 }

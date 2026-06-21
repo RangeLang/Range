@@ -1,6 +1,10 @@
 @statement
 @syntax
 @construct(name: "While") {
-    @let(name: "condition", value: "Expression")
-    @let(name: "body", value: "Block")
+    @let(name: "condition") {
+        @value(type: "Expression")
+    }
+    @let(name: "body") {
+        @value(type: "Block")
+    }
 }

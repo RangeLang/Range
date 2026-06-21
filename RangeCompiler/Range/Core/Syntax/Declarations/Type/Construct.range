@@ -1,19 +1,45 @@
 @graph(role: .declaration)
 @syntax
 @construct(name: "Construct") {
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "self", value: "NominalTypeReference")
-    @let(name: "macros", value: "Array<Macro>")
-    @let(name: "generics", value: "Array<Generic>")
-    @let(name: "conformances", value: "Array<NominalTypeReference>")
-    @let(name: "lets", value: "Array<Let>")
-    @let(name: "states", value: "Array<State>")
-    @let(name: "bindings", value: "Array<Binding>")
-    @let(name: "deriveds", value: "Array<Derived>")
-    @let(name: "members", value: "Array<GraphIdentity>")
-    @let(name: "functions", value: "Array<Function>")
-    @let(name: "constructs", value: "Array<Construct>")
-    @let(name: "extensions", value: "Array<Extension>")
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "self") {
+        @value(type: "NominalTypeReference")
+    }
+    @let(name: "macros") {
+        @value(type: "Array<Macro>")
+    }
+    @let(name: "generics") {
+        @value(type: "Array<Generic>")
+    }
+    @let(name: "conformances") {
+        @value(type: "Array<NominalTypeReference>")
+    }
+    @let(name: "lets") {
+        @value(type: "Array<Let>")
+    }
+    @let(name: "states") {
+        @value(type: "Array<State>")
+    }
+    @let(name: "bindings") {
+        @value(type: "Array<Binding>")
+    }
+    @let(name: "deriveds") {
+        @value(type: "Array<Derived>")
+    }
+    @let(name: "members") {
+        @value(type: "Array<GraphIdentity>")
+    }
+    @let(name: "functions") {
+        @value(type: "Array<Function>")
+    }
+    @let(name: "constructs") {
+        @value(type: "Array<Construct>")
+    }
+    @let(name: "extensions") {
+        @value(type: "Array<Extension>")
+    }
 
     @function(name: "expand", result: "Void", body: "")
 }
@@ -21,9 +47,15 @@
 @graph(role: .application)
 @syntax
 @construct(name: "Construct") {
-    @let(name: "type", value: "TypeReference")
-    @let(name: "arguments", value: "Array<Parameter>")
-    @let(name: "generics", value: "Array<Parameter>")
+    @let(name: "type") {
+        @value(type: "TypeReference")
+    }
+    @let(name: "arguments") {
+        @value(type: "Array<Parameter>")
+    }
+    @let(name: "generics") {
+        @value(type: "Array<Parameter>")
+    }
 
     @function(name: "replace", result: "Expression", body: "")
 }

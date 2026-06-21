@@ -9,5 +9,7 @@ macro identifierSyntaxName(): Init { target, diagnostics in
 @syntax
 @identifierSyntaxName
 @construct(name: "Identifier") {
-    @let(name: "name", value: "String")
+    @let(name: "name") {
+        @value(type: "String")
+    }
 }

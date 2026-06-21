@@ -1,7 +1,11 @@
 @syntax
 @construct(name: "WrittenExpression") {
-    @let(name: "type", value: "Optional<TypeReference>")
-    @let(name: "written", value: "WrittenSyntax")
+    @let(name: "type") {
+        @value(type: "Optional<TypeReference>")
+    }
+    @let(name: "written") {
+        @value(type: "WrittenSyntax")
+    }
 
     @function(name: "replace", result: "Expression", body: "")
 }

@@ -1,7 +1,11 @@
 @syntax
 @construct(name: "FunctionTypeReference") {
-    @let(name: "parameters", value: "Array<TypeReference>")
-    @let(name: "returnType", value: "TypeReference")
+    @let(name: "parameters") {
+        @value(type: "Array<TypeReference>")
+    }
+    @let(name: "returnType") {
+        @value(type: "TypeReference")
+    }
 
     @function(name: "replace", result: "TypeReference", body: "")
 }

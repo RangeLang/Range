@@ -1,5 +1,9 @@
 @syntax
 @construct(name: "TypeReference") {
-    @let(name: "name", value: "String")
-    @let(name: "llvm", value: "String")
+    @let(name: "name") {
+        @value(type: "String")
+    }
+    @let(name: "llvm") {
+        @value(type: "String")
+    }
 }

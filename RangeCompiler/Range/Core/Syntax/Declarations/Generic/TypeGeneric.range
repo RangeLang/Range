@@ -1,7 +1,13 @@
 @syntax
 @construct(name: "TypeGeneric") {
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "constraint", value: "Optional<TypeReference>")
-    @let(name: "default", value: "Optional<TypeReference>")
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "constraint") {
+        @value(type: "Optional<TypeReference>")
+    }
+    @let(name: "default") {
+        @value(type: "Optional<TypeReference>")
+    }
 }
 

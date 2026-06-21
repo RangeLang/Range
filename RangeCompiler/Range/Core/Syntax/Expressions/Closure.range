@@ -1,8 +1,14 @@
 @syntax
 @construct(name: "Closure") {
-    @let(name: "type", value: "Optional<TypeReference>")
-    @let(name: "parameters", value: "Array<Parameter>()")
-    @let(name: "body", value: "Block")
+    @let(name: "type") {
+        @value(type: "Optional<TypeReference>")
+    }
+    @let(name: "parameters") {
+        @value(type: "Array<Parameter>", current: "Array<Parameter>()")
+    }
+    @let(name: "body") {
+        @value(type: "Block")
+    }
 
     @function(name: "replace", result: "Expression", body: "")
 }

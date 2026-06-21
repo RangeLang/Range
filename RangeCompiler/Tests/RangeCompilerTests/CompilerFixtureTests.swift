@@ -69,8 +69,12 @@ struct CompilerFixtureTests {
                 path: "/tmp/StringyConstruct.range",
                 source: """
                     @construct(name: "Counter") {
-                        @let(name: "label", value: "String")
-                        @state(name: "count", value: "Int(27)")
+                        @let(name: "label") {
+                            @value(type: "String")
+                        }
+                        @state(name: "count") {
+                            @value(type: "Int", current: "27")
+                        }
                         @function(name: "increment", result: "Bool", body: "count: count + amount") {
                             @parameter(name: "amount") {
                                 @value(type: "Int")
@@ -95,8 +99,10 @@ struct CompilerFixtureTests {
             constructMacro.evaluatedStringValue
                 == """
                 construct|name=Counter|llvm=%Range.Counter = type { i64 }
-                member|kind=let|name=label|value=String
-                member|kind=state|name=count|value=Int(27)|ordinal=1|llvm=i64
+                member|kind=let|name=label|ordinal=0
+                member|kind=value|type=String|current=|ordinal=0
+                member|kind=state|name=count|ordinal=1|llvm=i64
+                member|kind=value|type=Int|current=27|ordinal=0
                 member|kind=function|name=increment|result=Bool|body=count: count + amount|ordinal=2
                 member|kind=parameter|name=amount|ordinal=0
                 member|kind=value|type=Int|current=|ordinal=0
@@ -126,7 +132,9 @@ struct CompilerFixtureTests {
                 path: "/tmp/StringyExtension.range",
                 source: """
                     @construct(name: "User") {
-                        @let(name: "name", value: "String")
+                        @let(name: "name") {
+                            @value(type: "String")
+                        }
                     }
 
                     @extension("User") {

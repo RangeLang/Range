@@ -1,4 +1,24 @@
 @member
-macro let(name: String, value: String): @member -> String { target, diagnostics in
-    @return(value: "member|kind=let|name=" + name + "|value=" + value)
+macro let(name: String): @member -> String { target, diagnostics in
+    @state(name: "members", value: "String(\"\")")
+    @state(name: "index", value: "0")
+
+    @while(index < target.declaration.bodyText.count(of: "\n") + 1) {
+        @state(
+            name: "memberLine",
+            value: target.declaration.bodyText.segment(index: index, delimiter: "\n")
+        )
+
+        if !memberLine.isEmpty {
+            members: members + "\n" + memberLine
+        }
+
+        index: index + 1
+    }
+
+    @return(value: "member|kind=let|name="
+        + name
+        + "|ordinal="
+        + "\(target.ordinal)"
+        + members)
 }

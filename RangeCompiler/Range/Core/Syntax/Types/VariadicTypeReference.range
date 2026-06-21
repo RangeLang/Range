@@ -1,6 +1,8 @@
 @syntax
 @construct(name: "VariadicTypeReference") {
-    @let(name: "element", value: "TypeReference")
+    @let(name: "element") {
+        @value(type: "TypeReference")
+    }
 
     @function(name: "replace", result: "TypeReference", body: "")
 }

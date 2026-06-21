@@ -1,6 +1,10 @@
 @statement
 @syntax
 @construct(name: "Switch") {
-    @let(name: "expression", value: "Expression")
-    @let(name: "cases", value: "Array<SwitchCase>")
+    @let(name: "expression") {
+        @value(type: "Expression")
+    }
+    @let(name: "cases") {
+        @value(type: "Array<SwitchCase>")
+    }
 }

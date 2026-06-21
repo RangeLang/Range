@@ -676,9 +676,10 @@ public struct DeclarationGraph {
             return nil
         }
 
-        let states = lines.dropFirst().compactMap(emittedState)
-        let values = lines.dropFirst().compactMap(emittedValue)
-        let callables = emittedFunctions(from: Array(lines.dropFirst()))
+        let memberLines = Array(lines.dropFirst())
+        let states = emittedStates(from: memberLines)
+        let values = emittedValues(from: memberLines)
+        let callables = emittedFunctions(from: memberLines)
         let macro = MacroApplication(
             name: application.name,
             genericArguments: application.genericArguments,
@@ -705,7 +706,36 @@ public struct DeclarationGraph {
         )
     }
 
-    private static func emittedState(from line: String) -> StateDeclaration? {
+    private static func emittedStates(from lines: [String]) -> [StateDeclaration] {
+        var result: [StateDeclaration] = []
+        var index = 0
+        while index < lines.count {
+            let fields = emittedRecordFields(in: lines[index])
+            guard fields["kind"] == "state" else {
+                index += 1
+                continue
+            }
+
+            let stateLine = lines[index]
+            let valueLine: String?
+            if index + 1 < lines.count,
+                emittedRecordFields(in: lines[index + 1])["kind"] == "value"
+            {
+                valueLine = lines[index + 1]
+                index += 2
+            } else {
+                valueLine = nil
+                index += 1
+            }
+
+            if let state = emittedState(from: stateLine, valueLine: valueLine) {
+                result.append(state)
+            }
+        }
+        return result
+    }
+
+    private static func emittedState(from line: String, valueLine: String?) -> StateDeclaration? {
         let fields = emittedRecordFields(in: line)
         guard fields["kind"] == "state",
             let name = fields["name"],
@@ -713,18 +743,49 @@ public struct DeclarationGraph {
         else {
             return nil
         }
-        let value = fields["value"] ?? ""
+        let valueFields = valueLine.map(emittedRecordFields) ?? [:]
+        let type = valueFields["type"] ?? fields["type"] ?? ""
+        let current = valueFields["current"] ?? fields["value"] ?? ""
 
         return StateDeclaration(
             macros: [],
             name: name,
             hasExplicitTypeAnnotation: true,
-            type: emittedTypeReference(value: value, fallback: fields["type"]),
-            storage: value.isEmpty ? .declared : .stored(.identifier(value))
+            type: emittedTypeReference(value: current, fallback: type),
+            storage: current.isEmpty ? .declared : .stored(.identifier(current))
         )
     }
 
-    private static func emittedValue(from line: String) -> ValueDeclaration? {
+    private static func emittedValues(from lines: [String]) -> [ValueDeclaration] {
+        var result: [ValueDeclaration] = []
+        var index = 0
+        while index < lines.count {
+            let fields = emittedRecordFields(in: lines[index])
+            guard fields["kind"] == "let" else {
+                index += 1
+                continue
+            }
+
+            let letLine = lines[index]
+            let valueLine: String?
+            if index + 1 < lines.count,
+                emittedRecordFields(in: lines[index + 1])["kind"] == "value"
+            {
+                valueLine = lines[index + 1]
+                index += 2
+            } else {
+                valueLine = nil
+                index += 1
+            }
+
+            if let value = emittedValue(from: letLine, valueLine: valueLine) {
+                result.append(value)
+            }
+        }
+        return result
+    }
+
+    private static func emittedValue(from line: String, valueLine: String?) -> ValueDeclaration? {
         let fields = emittedRecordFields(in: line)
         guard fields["kind"] == "let",
             let name = fields["name"],
@@ -732,13 +793,15 @@ public struct DeclarationGraph {
         else {
             return nil
         }
-        let value = fields["value"] ?? ""
+        let valueFields = valueLine.map(emittedRecordFields) ?? [:]
+        let type = valueFields["type"] ?? fields["type"] ?? fields["value"] ?? ""
+        let current = valueFields["current"] ?? ""
 
         return ValueDeclaration(
             macros: [],
             name: name,
-            typeName: emittedTypeReference(value: value, fallback: fields["type"] ?? value).displayName,
-            value: nil
+            typeName: emittedTypeReference(value: current, fallback: type).displayName,
+            value: current.isEmpty ? nil : .identifier(current)
         )
     }
 

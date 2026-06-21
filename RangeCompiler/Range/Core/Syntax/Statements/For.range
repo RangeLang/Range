@@ -1,7 +1,13 @@
 @statement
 @syntax
 @construct(name: "For") {
-    @let(name: "pattern", value: "Expression")
-    @let(name: "sequence", value: "Expression")
-    @let(name: "body", value: "Block")
+    @let(name: "pattern") {
+        @value(type: "Expression")
+    }
+    @let(name: "sequence") {
+        @value(type: "Expression")
+    }
+    @let(name: "body") {
+        @value(type: "Block")
+    }
 }

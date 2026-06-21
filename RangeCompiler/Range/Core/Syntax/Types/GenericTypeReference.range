@@ -1,7 +1,11 @@
 @syntax
 @construct(name: "GenericTypeReference") {
-    @let(name: "base", value: "NominalTypeReference")
-    @let(name: "arguments", value: "Array<TypeReference>")
+    @let(name: "base") {
+        @value(type: "NominalTypeReference")
+    }
+    @let(name: "arguments") {
+        @value(type: "Array<TypeReference>")
+    }
 
     @function(name: "replace", result: "TypeReference", body: "")
 }

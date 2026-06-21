@@ -179,7 +179,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
 
     private func memberMacroParameterShapeIsValid(_ declaration: MacroDeclaration) -> Bool {
         switch declaration.name {
-        case "parameter":
+        case "let", "parameter", "state":
             return declaration.parameters.count == 1
                 && declaration.parameters[0].name == "name"
                 && declaration.parameters[0].typeReference == .named("String")

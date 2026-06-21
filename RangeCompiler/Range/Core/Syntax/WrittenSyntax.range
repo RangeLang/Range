@@ -1,5 +1,9 @@
 @syntax
 @construct(name: "WrittenSyntax") {
-    @let(name: "text", value: "String")
-    @let(name: "range", value: "Optional<SourceRange>")
+    @let(name: "text") {
+        @value(type: "String")
+    }
+    @let(name: "range") {
+        @value(type: "Optional<SourceRange>")
+    }
 }

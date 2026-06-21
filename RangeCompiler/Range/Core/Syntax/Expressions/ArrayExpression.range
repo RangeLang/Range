@@ -1,7 +1,11 @@
 @syntax
 @construct(name: "ArrayExpression") {
-    @let(name: "type", value: "Optional<TypeReference>")
-    @let(name: "elements", value: "Array<Expression>")
+    @let(name: "type") {
+        @value(type: "Optional<TypeReference>")
+    }
+    @let(name: "elements") {
+        @value(type: "Array<Expression>")
+    }
 
     @function(name: "replace", result: "Expression", body: "")
 }

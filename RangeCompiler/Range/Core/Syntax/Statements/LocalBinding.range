@@ -1,8 +1,16 @@
 @statement
 @syntax
 @construct(name: "LocalBinding") {
-    @let(name: "mutable", value: "Bool")
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "type", value: "TypeReference")
-    @let(name: "expression", value: "WrittenSyntax")
+    @let(name: "mutable") {
+        @value(type: "Bool")
+    }
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "type") {
+        @value(type: "TypeReference")
+    }
+    @let(name: "expression") {
+        @value(type: "WrittenSyntax")
+    }
 }

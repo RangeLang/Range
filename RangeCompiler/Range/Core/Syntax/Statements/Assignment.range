@@ -1,6 +1,10 @@
 @statement
 @syntax
 @construct(name: "Assignment") {
-    @let(name: "target", value: "Expression")
-    @let(name: "expression", value: "Expression")
+    @let(name: "target") {
+        @value(type: "Expression")
+    }
+    @let(name: "expression") {
+        @value(type: "Expression")
+    }
 }

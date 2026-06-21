@@ -3,13 +3,27 @@
 @member
 @graph(role: .declaration)
 @construct(name: "Binding<T>") {
-    @let(name: "identity", value: "GraphIdentity")
-    @let(name: "parent", value: "Optional<GraphIdentity>")
-    @let(name: "macros", value: "Array<Macro>")
-    @let(name: "identifier", value: "Identifier")
-    @let(name: "type", value: "TypeReference")
-    @let(name: "getterBody", value: "Optional<Block>")
-    @let(name: "setterBody", value: "Optional<Block>")
+    @let(name: "identity") {
+        @value(type: "GraphIdentity")
+    }
+    @let(name: "parent") {
+        @value(type: "Optional<GraphIdentity>")
+    }
+    @let(name: "macros") {
+        @value(type: "Array<Macro>")
+    }
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
+    @let(name: "type") {
+        @value(type: "TypeReference")
+    }
+    @let(name: "getterBody") {
+        @value(type: "Optional<Block>")
+    }
+    @let(name: "setterBody") {
+        @value(type: "Optional<Block>")
+    }
 
     @function(name: "getter", result: "Void", body: "")
     @function(name: "setter", result: "Void", body: "")

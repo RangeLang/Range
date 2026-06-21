@@ -1,5 +1,11 @@
 @construct(name: "Compiler") {
-    @let(name: "name", value: "Title(\"Compiler\")")
-    @let(name: "version", value: "Version(0.1.0)")
-    @let(name: "author", value: "\"George\"")
+    @let(name: "name") {
+        @value(type: "Title", current: "Title(\"Compiler\")")
+    }
+    @let(name: "version") {
+        @value(type: "Version", current: "Version(0.1.0)")
+    }
+    @let(name: "author") {
+        @value(type: "String", current: "\"George\"")
+    }
 }

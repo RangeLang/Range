@@ -1,7 +1,11 @@
 @syntax
 @construct(name: "EnumCaseExpression") {
-    @let(name: "type", value: "Optional<TypeReference>")
-    @let(name: "identifier", value: "Identifier")
+    @let(name: "type") {
+        @value(type: "Optional<TypeReference>")
+    }
+    @let(name: "identifier") {
+        @value(type: "Identifier")
+    }
 
     @function(name: "replace", result: "Expression", body: "")
 }

@@ -1,4 +1,6 @@
 @statement
 @construct(name: "Expression") {
-    @let(name: "type", value: "Optional<TypeReference>")
+    @let(name: "type") {
+        @value(type: "Optional<TypeReference>")
+    }
 }

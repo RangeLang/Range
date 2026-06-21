@@ -1,5 +1,7 @@
 @statement
 @syntax
 @construct(name: "Background") {
-    @let(name: "body", value: "Block")
+    @let(name: "body") {
+        @value(type: "Block")
+    }
 }

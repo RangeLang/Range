@@ -1,8 +1,16 @@
 @graph(role: .declaration)
 @syntax
 @construct(name: "Extension") {
-    @let(name: "target", value: "NominalTypeReference")
-    @let(name: "conformances", value: "Array<NominalTypeReference>")
-    @let(name: "functions", value: "Array<Function>")
-    @let(name: "constructs", value: "Array<Construct>")
+    @let(name: "target") {
+        @value(type: "NominalTypeReference")
+    }
+    @let(name: "conformances") {
+        @value(type: "Array<NominalTypeReference>")
+    }
+    @let(name: "functions") {
+        @value(type: "Array<Function>")
+    }
+    @let(name: "constructs") {
+        @value(type: "Array<Construct>")
+    }
 }

@@ -1,6 +1,12 @@
 @syntax
 @construct(name: "GraphIdentity") {
-    @let(name: "id", value: "String")
-    @let(name: "kind", value: "String")
-    @let(name: "name", value: "String")
+    @let(name: "id") {
+        @value(type: "String")
+    }
+    @let(name: "kind") {
+        @value(type: "String")
+    }
+    @let(name: "name") {
+        @value(type: "String")
+    }
 }
