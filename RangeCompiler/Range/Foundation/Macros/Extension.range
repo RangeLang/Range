@@ -24,15 +24,11 @@ function extensionMembersLowering(source: String): String {
     @return(value: output)
 }
 
-function extensionLowering(name: String, source: String): String {
+macro extension(name: String): @syntax -> String { target, diagnostics in
     @return(value: "extension|name="
         + name
         + "|llvm=%Range."
         + name
         + ".extension = type { }"
-        + extensionMembersLowering(source: source))
-}
-
-macro extension(name: String): @syntax -> String { target, diagnostics in
-    @return(value: extensionLowering(name: name, source: target.application.rawBodyText))
+        + extensionMembersLowering(source: target.application.rawBodyText))
 }

@@ -1,6 +1,8 @@
 function constructLineLLVM(line: String): String {
-    if line.contains(value: "member|kind=state") && line.contains(value: "|llvm=") {
-        @return(value: line.segment(index: 1, delimiter: "|llvm="))
+    if line.contains(value: "member|kind=state") {
+        if line.contains(value: "|llvm=") {
+            @return(value: line.segment(index: 1, delimiter: "|llvm="))
+        }
     }
 
     @return(value: "")

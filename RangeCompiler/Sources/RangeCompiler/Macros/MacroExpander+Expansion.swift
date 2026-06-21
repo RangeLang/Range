@@ -616,7 +616,10 @@ extension MacroExpander {
 
         let targetValue = blockMacroTargetValue(rawBody: rawBody, application: applicationWithBody)
         guard
-            let argumentBindings = try? parseMacroArgumentBindings(
+            let argumentBindings = (try? parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: application.argumentClause
+            )) ?? singlePositionalMacroArgumentBindings(
                 for: macro,
                 argumentClause: application.argumentClause
             )
@@ -740,7 +743,7 @@ extension MacroExpander {
             let argumentBindings = (try? parseMacroArgumentBindings(
                 for: macro,
                 argumentClause: argumentClause
-            )) ?? singlePositionalStatementMacroArgumentBindings(
+            )) ?? singlePositionalMacroArgumentBindings(
                 for: macro,
                 argumentClause: argumentClause
             )
@@ -852,7 +855,7 @@ extension MacroExpander {
         )
     }
 
-    static func singlePositionalStatementMacroArgumentBindings(
+    static func singlePositionalMacroArgumentBindings(
         for macro: MacroDeclaration,
         argumentClause: String?
     ) -> [String: Expression]? {

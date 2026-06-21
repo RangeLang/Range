@@ -84,7 +84,7 @@ extension MacroExpander {
         guard let firstTarget = macro.target else {
             return nil
         }
-        if case .macroSurface("block") = firstTarget {
+        if case .macroSurface = firstTarget {
             return nil
         }
         guard macro.expansionType != nil else {

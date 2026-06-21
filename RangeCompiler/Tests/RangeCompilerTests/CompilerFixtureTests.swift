@@ -103,6 +103,45 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.callables(onConstruct: "Counter").first?.returnType?.displayName == "Bool")
     }
 
+    @Test("Extension macro accepts positional target name")
+    func extensionMacroAcceptsPositionalTargetName() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyExtension.range",
+                source: """
+                    @construct(name: "User") {
+                        @let(name: "name", value: "String")
+                    }
+
+                    @extension("User") {
+                        @function(name: "displayName", result: "String", body: "name")
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile else {
+            Issue.record("Expected stringy extension source to parse as a module.")
+            return
+        }
+        let blockMacro = try #require(module.blockMacros.first(where: { blockMacro in
+            blockMacro.macros.first?.name == "extension"
+        }))
+        let extensionMacro = try #require(blockMacro.macros.first)
+
+        #expect(
+            extensionMacro.evaluatedStringValue
+                == """
+                extension|name=User|llvm=%Range.User.extension = type { }
+                member|kind=function|name=displayName|result=String|body=name|ordinal=0
+                """
+        )
+    }
+
     @Test("Statement block macro parses with members")
     func statementBlockMacroParsesWithMembers() throws {
         var parser = try Parser(source: """
@@ -283,7 +322,7 @@ struct CompilerFixtureTests {
         #expect(
             constructMacro.evaluatedStringValue
                 == """
-                construct|name=Answer
+                construct|name=Answer|llvm=%Range.Answer = type {  }
                 member|kind=function|name=answer|result=Int|body=records|ordinal=0|llvm=ret i64 42
                 statement|kind=return|value=Int(42)|projection=target.declaration|llvm=ret i64 42
                 """
