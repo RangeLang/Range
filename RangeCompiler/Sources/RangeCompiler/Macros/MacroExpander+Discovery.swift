@@ -107,7 +107,6 @@ extension MacroExpander {
         }
 
         return MacroMetadataDeclaration(
-            packageVisibility: macro.packageVisibility,
             name: macro.name,
             genericParameters: macro.genericParameters,
             parameters: macro.parameters,

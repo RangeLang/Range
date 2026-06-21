@@ -414,26 +414,6 @@ function detectSpanRoles(span: BuildSpan, depth: Int): Array<BuildSpanRole> {
         )
     }
 
-    if depth == 0 && buildHasPrefix(text: text, prefix: "open macro ") {
-        roles.append(
-            element: spanRole(
-                kind: .macroDeclaration,
-                span: span,
-                name: nameAfterPrefix(text: text, prefix: "open macro ")
-            )
-        )
-    }
-
-    if depth == 0 && buildHasPrefix(text: text, prefix: "closed macro ") {
-        roles.append(
-            element: spanRole(
-                kind: .macroDeclaration,
-                span: span,
-                name: nameAfterPrefix(text: text, prefix: "closed macro ")
-            )
-        )
-    }
-
     if buildHasPrefix(text: text, prefix: "#(") {
         roles.append(
             element: spanRole(

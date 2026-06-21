@@ -1,3 +1,18 @@
-open macro let(): @member -> String { target, diagnostics in
-  return
+construct LetMember {
+  @let name: String
+  @let value: String
+}
+
+function letMember(name: String, value: String): LetMember {
+  return LetMember(name: name, value: value)
+}
+
+function letLowering(member: LetMember): String {
+  return member.name + " = " + member.value
+}
+
+@member
+macro let(name: String, value: String): @member -> String { target, diagnostics in
+  let member: LetMember(letMember(name: name, value: value))
+  return letLowering(member: member)
 }

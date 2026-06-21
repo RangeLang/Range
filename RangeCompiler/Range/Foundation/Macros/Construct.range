@@ -33,7 +33,7 @@ function constructLowering(declaration: Construct): String {
     return "%Range." + declaration.name + " = type { }"
 }
 
-open macro construct(name: String): @syntax -> String { target, diagnostics in
+macro construct(name: String): @syntax -> String { target, diagnostics in
     let declaration: Construct(construct(name: name, source: target.application.rawBodyText))
     return constructLowering(declaration: declaration)
 }

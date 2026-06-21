@@ -23,7 +23,7 @@ macro syntaxCapture(@literal @spliced(delimiter: "") syntax: @syntax): Construct
     )
 
     target.declaration.expand {
-        closed macro #(target.declaration.identifier)(
+        macro #(target.declaration.identifier)(
             #(splicedParameters)
         ): #(target.declaration.self) { target, diagnostics, graph in
         }
@@ -34,7 +34,7 @@ macro syntaxCapture(@literal @spliced(delimiter: "") syntax: @syntax): Construct
     }
 }
 
-open macro spliced(delimiter: String = ""): @parameter -> @syntax { target, diagnostics in
+macro spliced(delimiter: String = ""): @parameter -> @syntax { target, diagnostics in
     return SplicedSyntax(
         delimiter: delimiter,
         syntax: target.application.syntax,
@@ -42,10 +42,10 @@ open macro spliced(delimiter: String = ""): @parameter -> @syntax { target, diag
     )
 }
 
-open macro splice(@spliced syntax: @syntax): @syntax { target, diagnostics in
+macro splice(@spliced syntax: @syntax): @syntax { target, diagnostics in
     return syntax
 }
 
-open macro map<T>(collection: Array<T>, @spliced syntax: @syntax): @syntax { target, diagnostics in
+macro map<T>(collection: Array<T>, @spliced syntax: @syntax): @syntax { target, diagnostics in
     return syntax
 }

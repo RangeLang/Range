@@ -1,4 +1,4 @@
-closed macro graph(role: GraphRole): Construct -> Identity { target, diagnostics in
+macro graph(role: GraphRole): Construct -> Identity { target, diagnostics in
     let rewrittenIdentifier: Identifier(name: "\(target.declaration.identifier.name)\(role == .application ? ".Application" : ".Declaration")")
 
     target.declaration.replace {

@@ -1418,6 +1418,7 @@ private struct SyntaxProjectionAccumulator {
         let macroID = "\(parentID)/macro:\(declaration.name)"
         addEntity(id: macroID, kind: .macro, label: declaration.name)
         addRelation(from: parentID, to: macroID, kind: .contains)
+        addMacroApplications(declaration.macros, parentID: macroID)
         if let target = declaration.target {
             addTypeReferences(target.typeReferences, from: macroID, kind: .targetsMacro)
         }

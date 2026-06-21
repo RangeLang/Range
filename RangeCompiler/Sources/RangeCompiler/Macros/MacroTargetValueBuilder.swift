@@ -390,15 +390,6 @@ struct MacroTargetValueBuilder {
         member.hasPrefix("\(owner).") ? member : "\(owner).\(member)"
     }
 
-    private func packageVisibilityName(for packageVisibility: PackageVisibility) -> String {
-        switch packageVisibility {
-        case .open:
-            return "open"
-        case .closed:
-            return "closed"
-        }
-    }
-
     static func evaluateMacroMetadataValue(
         for application: MacroApplication,
         metadata: MacroMetadataDeclaration,
@@ -505,8 +496,6 @@ struct MacroTargetValueBuilder {
             fields["declaration"] = value(for: declaration)
         }
         if let metadata = macroMetadataByName[application.name] {
-            fields["packageVisibility"] = .string(
-                packageVisibilityName(for: metadata.packageVisibility))
             fields["valueType"] = typeReferenceValue(metadata.valueType)
             fields["valueTypeName"] = .string(metadata.valueType.displayName)
             if metadata.valueType.isMacroMetadataEffect {
@@ -535,8 +524,7 @@ struct MacroTargetValueBuilder {
             fields: [
                 "name": .string(declaration.name),
                 "identifier": identifier(declaration.name),
-                "packageVisibility": .string(
-                    packageVisibilityName(for: declaration.packageVisibility)),
+                "macros": .array(declaration.macros.map(value(for:))),
                 "target": declaration.target.map(value(for:)) ?? .nilValue,
                 "expansionType": declaration.expansionType.map(typeReferenceValue) ?? .string(""),
                 "generics": .array(declaration.genericParameters.map { value(for: $0) }),
@@ -560,8 +548,6 @@ struct MacroTargetValueBuilder {
             fields: [
                 "name": .string(metadata.name),
                 "identifier": identifier(metadata.name),
-                "packageVisibility": .string(
-                    packageVisibilityName(for: metadata.packageVisibility)),
                 "target": value(for: metadata.target),
                 "expansionType": typeReferenceValue(metadata.valueType),
                 "generics": .array(metadata.genericParameters.map { value(for: $0) }),

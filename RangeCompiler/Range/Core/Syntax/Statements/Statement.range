@@ -1,2 +1,2 @@
-open macro statement(): @syntax -> Void { target, diagnostics in
+macro statement(): @syntax -> Void { target, diagnostics in
 }

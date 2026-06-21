@@ -274,7 +274,7 @@ struct SwiftBackendEmitterLayoutTests {
         let wrapped = try wrappedParser.parseConstructDeclaration()
 
         var macroParser = try Parser(source: """
-        open macro initForwarded(): Let | State { target, diagnostics in
+        macro initForwarded(): Let | State { target, diagnostics in
             target.initializer.forward()
         }
         """)

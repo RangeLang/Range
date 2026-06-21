@@ -13,7 +13,7 @@ construct MacroTarget {
 construct Macro {
     @let name: String
     @let identifier: Identifier
-    @let packageVisibility: String
+    @let macros: Array<Macro.Application>
     @let generics: Array<Generic>
     @let parameters: Array<Parameter>
     @let target: Optional<MacroTarget>
@@ -34,7 +34,6 @@ construct Macro<Value> {
     @let arguments: Array<Expression>
     @let rawBody: WrittenSyntax
     @let declaration: Optional<Macro>
-    @let packageVisibility: String
     @let valueType: TypeReference
     @let value: Value
 }

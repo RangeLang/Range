@@ -98,7 +98,7 @@ struct CompilerFixtureTests {
             SourceInput(
                 path: "/tmp/DuplicateProjects.range",
                 source: """
-                    open macro project(): Construct -> Void { target, diagnostics, graph in
+                    macro project(): Construct -> Void { target, diagnostics, graph in
                         let projectMacros: Array<Macro.Application>(
                             graph.macros.where { entry in
                                 entry.identifier.name == "project"
@@ -256,7 +256,7 @@ struct CompilerFixtureTests {
             ]
         )
         let trackedMacro = MacroDeclaration(
-            packageVisibility: .open,
+            macros: [],
             name: "tracked",
             genericParameters: [],
             parameters: [],
@@ -2584,14 +2584,14 @@ struct CompilerFixtureTests {
         expectSharedGenericShape(module.macros[0].genericParameters)
     }
 
-    @Test("Closed macros cannot be used outside declaring package")
-    func closedMacrosCannotBeUsedOutsideDeclaringPackage() throws {
+    @Test("Core macros can be used outside declaring package")
+    func coreMacrosCanBeUsedOutsideDeclaringPackage() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
-                path: "/test/ClosedMacro.range",
+                path: "/test/CoreMacro.range",
                 source: """
-                    closed macro coreOnly(): Construct { target, diagnostics in
+                    macro coreOnly(): Construct { target, diagnostics in
                         target.declaration.expand {
                         }
                     }
@@ -2601,24 +2601,17 @@ struct CompilerFixtureTests {
         )
         inputs.append(
             SourceInput(
-                path: "/test/UseClosedMacro.range",
+                path: "/test/UseCoreMacro.range",
                 source: """
                     @coreOnly
-                    construct UseClosedMacro {
+                    construct UseCoreMacro {
                     }
                     """,
                 role: .project
             )
         )
 
-        do {
-            _ = try CompilerPipeline().buildValidated(inputs: inputs)
-            Issue.record("Expected closed macro use outside its package to fail.")
-        } catch {
-            #expect(
-                String(describing: error).contains(
-                    "Closed macro @coreOnly can only be used inside its declaring package"))
-        }
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
     }
 
     @Test("FileManager readFile surface validates")

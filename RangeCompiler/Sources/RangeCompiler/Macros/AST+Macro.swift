@@ -1,7 +1,7 @@
 import Foundation
 
 public struct MacroDeclaration {
-    public let packageVisibility: PackageVisibility
+    public let macros: [MacroApplication]
     public let name: String
     public let genericParameters: [GenericParameter]
     public let parameters: [RangeFunctionParameter]
@@ -12,13 +12,7 @@ public struct MacroDeclaration {
     public let syntaxBody: EmittedCodeBlock?
 }
 
-public enum PackageVisibility {
-    case open
-    case closed
-}
-
 public struct MacroMetadataDeclaration {
-    public let packageVisibility: PackageVisibility
     public let name: String
     public let genericParameters: [GenericParameter]
     public let parameters: [RangeFunctionParameter]

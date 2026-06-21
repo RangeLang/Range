@@ -1,0 +1,50 @@
+construct FunctionProperty {
+    @let text: String
+}
+
+construct ValueBlock {
+    @let text: String
+}
+
+construct Function {
+    @let name: String
+    @let properties: Array<FunctionProperty>
+    @let type: String
+    @let body: ValueBlock
+}
+
+function functionProperties(source: String): Array<FunctionProperty> {
+    state properties: Array<FunctionProperty>([])
+    let lineCount: Int(source.count(of: "\n") + 1)
+    state index: 0
+
+    while index < lineCount {
+        let line: String(source.segment(index: index, delimiter: "\n"))
+
+        if !line.isEmpty {
+            properties.append(element: FunctionProperty(text: line))
+        }
+
+        index: index + 1
+    }
+
+    return properties
+}
+
+function function(name: String, type: String, source: String): Function {
+    return Function(
+        name: name,
+        properties: functionProperties(source: source),
+        type: type,
+        body: ValueBlock(text: source)
+    )
+}
+
+function functionLowering(declaration: Function): String {
+    return "define " + declaration.type + " @Range." + declaration.name + "() {\n" + declaration.body.text + "\n}"
+}
+
+macro function(name: String, type: String): @syntax -> String { target, diagnostics in
+    let declaration: Function(function(name: name, type: type, source: target.application.rawBodyText))
+    return functionLowering(declaration: declaration)
+}

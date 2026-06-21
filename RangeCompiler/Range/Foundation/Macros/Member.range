@@ -1,2 +1,2 @@
-open macro member(): Construct -> Void { target, diagnostics in
+macro member(): Construct | @macro -> Void { target, diagnostics in
 }

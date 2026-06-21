@@ -1,4 +1,4 @@
-open macro float(): Construct -> String { target, diagnostics in
+macro float(): Construct -> String { target, diagnostics in
     state precision: String("64")
     state hasPrecision: false
 

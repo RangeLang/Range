@@ -33,7 +33,7 @@ function extensionLowering(declaration: Extension): String {
     return "%Range." + declaration.name + ".extension = type { }"
 }
 
-open macro extension(name: String): @syntax -> String { target, diagnostics in
+macro extension(name: String): @syntax -> String { target, diagnostics in
     let declaration: Extension(extension(name: name, source: target.application.rawBodyText))
     return extensionLowering(declaration: declaration)
 }

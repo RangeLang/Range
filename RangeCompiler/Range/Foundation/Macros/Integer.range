@@ -1,4 +1,4 @@
-open macro integer(): Construct -> String { target, diagnostics in
+macro integer(): Construct -> String { target, diagnostics in
     state bits: String()
     state signedness: String()
     state hasBits: false

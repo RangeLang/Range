@@ -1,4 +1,4 @@
-open macro expand(
+macro expand(
     expansionTarget: @syntax,
     @closure expansion: @syntax
 ): @syntax -> Void { target, diagnostics, graph in

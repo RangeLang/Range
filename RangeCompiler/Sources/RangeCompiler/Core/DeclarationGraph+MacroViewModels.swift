@@ -36,6 +36,7 @@ enum MacroTargetKind: Hashable {
     case construct
     case enumeration
     case typeExtension
+    case macro
     case other(String)
 }
 
@@ -68,6 +69,7 @@ func macroTargetKindPriority() -> [MacroTargetKind] {
         .construct,
         .enumeration,
         .typeExtension,
+        .macro,
     ]
 }
 
@@ -128,6 +130,8 @@ func macroTargetKind(
         return .enumeration
     case "Extension":
         return .typeExtension
+    case "Macro":
+        return .macro
     default:
         return .other(name)
     }
@@ -147,6 +151,9 @@ func macroTargetKinds(
         }
         if name == "property" {
             return [.property]
+        }
+        if name == "macro" {
+            return [.macro]
         }
         return [macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver)]
     case .anyOf(let targets), .allOf(let targets):
@@ -168,6 +175,9 @@ func macroTargetAllows(
         }
         if name == "property" {
             return kind == .property
+        }
+        if name == "macro" {
+            return kind == .macro
         }
         return macroTargetKind(for: .named("@\(name)"), syntaxResolver: syntaxResolver) == kind
     case .anyOf(let targets):
@@ -1486,7 +1496,7 @@ extension RewriteSurfaceView {
             default:
                 return nil
             }
-        case .state, .immutable, .binding, .derived, .property:
+        case .state, .immutable, .binding, .derived, .property, .macro:
             return nil
         }
     }

@@ -10,27 +10,7 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             in: program.projectParsedFiles,
             declarationGraph: program.declarationGraph
         )
-        let coreParsedFiles = program.parsedFiles.filter { program.sourceRole(forPath: $0.path) == .core }
-        let closedCoreMacroMetadataNames = Set(
-            MacroExpander.collectMacroMetadata(from: coreParsedFiles)
-                .values
-                .filter { $0.packageVisibility == .closed }
-                .map(\.name)
-        )
-        let closedCoreMacroNames = Set(
-            coreParsedFiles
-                .flatMap { macroDeclarations(in: $0.sourceFile) }
-                .filter { $0.packageVisibility == .closed }
-                .map(\.name)
-        )
-        try validateClosedAttachedMacroUsage(
-            in: program.projectParsedFiles,
-            closedMacroMetadataNames: closedCoreMacroMetadataNames
-        )
-        try validateClosedMacroUsage(
-            in: program.projectParsedFiles,
-            closedMacroNames: closedCoreMacroNames
-        )
+        try validateMemberMacroDeclarations(in: program.parsedFiles)
         try validateEnumExtensionCases(in: program.declarationGraph)
         try validatePrimaryDeclarations(in: program.expandedFiles)
         try validateTopLevelStates(in: program.expandedFiles)
@@ -144,6 +124,13 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                     filePath: parsedFile.path
                 )
             }
+            for declaration in macroDeclarations(in: parsedFile.sourceFile) {
+                try validateBuiltinAttachedMacroUsage(
+                    declaration.macros,
+                    declarationName: declaration.name,
+                    filePath: parsedFile.path
+                )
+            }
         }
     }
 
@@ -170,6 +157,31 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
         }
     }
 
+    private func validateMemberMacroDeclarations(in parsedFiles: [ParsedSourceFile]) throws {
+        for parsedFile in parsedFiles {
+            for declaration in macroDeclarations(in: parsedFile.sourceFile)
+            where declaration.macros.contains(where: { $0.name == "member" }) {
+                try validateMemberMacroDeclaration(declaration, filePath: parsedFile.path)
+            }
+        }
+    }
+
+    private func validateMemberMacroDeclaration(
+        _ declaration: MacroDeclaration,
+        filePath: String
+    ) throws {
+        guard declaration.parameters.count == 2,
+            declaration.parameters[0].name == "name",
+            declaration.parameters[0].typeReference == .named("String"),
+            declaration.parameters[1].name == "value",
+            declaration.parameters[1].typeReference == .named("String")
+        else {
+            throw SemanticValidationError(
+                "@member macro \(declaration.name) in \(lastPathComponent(of: filePath)) must declare parameters `(name: String, value: String)`."
+            )
+        }
+    }
+
     private func validateBuiltinAttachedMacroUsage(
         _ macros: [MacroApplication],
         declarationName: String,
@@ -179,46 +191,6 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
             throw SemanticValidationError(
                 "@syntax can only be used in RangeCore. Remove @syntax from \(declarationName) in \(lastPathComponent(of: filePath))."
             )
-        }
-    }
-
-    private func validateClosedAttachedMacroUsage(
-        in parsedFiles: [ParsedSourceFile],
-        closedMacroMetadataNames: Set<String>
-    ) throws {
-        guard !closedMacroMetadataNames.isEmpty else {
-            return
-        }
-
-        for parsedFile in parsedFiles {
-            for usage in attachedMacroUsages(in: parsedFile.sourceFile) {
-                guard let macro = usage.macros.first(where: { closedMacroMetadataNames.contains($0.name) }) else {
-                    continue
-                }
-                throw SemanticValidationError(
-                    "Closed macro @\(macro.name) can only be used inside its declaring package. Remove #\(macro.name) from \(usage.declarationName) in \(lastPathComponent(of: parsedFile.path))."
-                )
-            }
-        }
-    }
-
-    private func validateClosedMacroUsage(
-        in parsedFiles: [ParsedSourceFile],
-        closedMacroNames: Set<String>
-    ) throws {
-        guard !closedMacroNames.isEmpty else {
-            return
-        }
-
-        for parsedFile in parsedFiles {
-            for usage in macroUsages(in: parsedFile.sourceFile) {
-                guard let macro = usage.macros.first(where: { closedMacroNames.contains($0.name) }) else {
-                    continue
-                }
-                throw SemanticValidationError(
-                    "Closed macro @\(macro.name) can only be used inside its declaring package. Remove #\(macro.name) from \(usage.declarationName) in \(lastPathComponent(of: parsedFile.path))."
-                )
-            }
         }
     }
 
@@ -242,8 +214,8 @@ public struct DeclarationGraphValidator: CompiledProgramValidationPass {
                 + module.extensions.flatMap(attachedMacroUsages(in:))
         case .mainBlock(let mainBlock):
             return [AttachedMacroUsage(macros: mainBlock.macros, declarationName: "@main")]
-        case .macro:
-            return []
+        case .macro(let declaration):
+            return [AttachedMacroUsage(macros: declaration.macros, declarationName: declaration.name)]
         }
     }
 

@@ -5,7 +5,7 @@ construct ClosureSyntax {
     @let delimiter: String
 }
 
-open macro closure(delimiter: String = "\n"): @parameter -> @syntax { target, diagnostics in
+macro closure(delimiter: String = "\n"): @parameter -> @syntax { target, diagnostics in
     return ClosureSyntax(
         syntax: target.application.syntax,
         description: target.application.syntax.description,

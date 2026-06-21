@@ -2,28 +2,12 @@ import Foundation
 
 extension Parser {
     func isMacroDeclarationStart() -> Bool {
-        if peek() == .keyword(RangeSyntax.Keyword.macro.rawValue) {
-            return true
-        }
-        if peek() == .keyword(RangeSyntax.Keyword.open.rawValue)
-            || peek() == .keyword(RangeSyntax.Keyword.closed.rawValue)
-        {
-            return peek(offset: 1) == .keyword(RangeSyntax.Keyword.macro.rawValue)
-        }
-        return false
+        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        return peek(offset: offset) == .keyword(RangeSyntax.Keyword.macro.rawValue)
     }
 
     mutating func parseMacroDeclaration(signatureOnly: Bool = false) throws -> MacroDeclaration {
-        let packageVisibility: PackageVisibility
-        if peek() == .keyword(RangeSyntax.Keyword.closed.rawValue) {
-            try consumeKeyword(.closed)
-            packageVisibility = .closed
-        } else if peek() == .keyword(RangeSyntax.Keyword.open.rawValue) {
-            try consumeKeyword(.open)
-            packageVisibility = .open
-        } else {
-            packageVisibility = .open
-        }
+        let macros = try parseMacroApplicationsIfPresent()
         try consumeKeyword(.macro)
 
         let name = try consumeCallableName()
@@ -64,7 +48,7 @@ extension Parser {
                 body = []
             }
             return MacroDeclaration(
-                packageVisibility: packageVisibility,
+                macros: macros,
                 name: name,
                 genericParameters: genericParameters,
                 parameters: parameters,
@@ -102,7 +86,7 @@ extension Parser {
         }
 
         return MacroDeclaration(
-            packageVisibility: packageVisibility,
+            macros: macros,
             name: name,
             genericParameters: genericParameters,
             parameters: parameters,
