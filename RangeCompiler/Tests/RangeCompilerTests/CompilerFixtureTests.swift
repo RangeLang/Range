@@ -103,6 +103,30 @@ struct CompilerFixtureTests {
         #expect(program.declarationGraph.callables(onConstruct: "Counter").first?.returnType?.displayName == "Bool")
     }
 
+    @Test("Statement block macro parses with members")
+    func statementBlockMacroParsesWithMembers() throws {
+        var parser = try Parser(source: """
+            function spin() {
+                @while {
+                    continue
+                }
+            }
+            """)
+        let sourceFile = try parser.parseSourceFile()
+        guard case .module(let module) = sourceFile,
+            let callable = module.callables.first,
+            let statement = callable.body?.first,
+            case .macroInvocation(let name, let argumentClause, let body) = statement
+        else {
+            Issue.record("Expected @while { ... } to parse as a statement block macro.")
+            return
+        }
+
+        #expect(name == "while")
+        #expect(argumentClause == nil)
+        #expect(body.count == 1)
+    }
+
     @Test("CompilePass fixtures validate")
     func compilePassFixturesValidate() throws {
         for fixture in try fixtureFiles(in: "CompilePass") {

@@ -1,0 +1,9 @@
+function whileLowering(body: String): String {
+    return "statement|kind=while|llvm=br label %while.cond\nwhile.cond:\n  br i1 true, label %while.body, label %while.end\nwhile.body:\n"
+        + body
+        + "\n  br label %while.cond\nwhile.end:"
+}
+
+macro while(): @statement -> String { target, diagnostics in
+    return whileLowering(body: target.application.rawBodyText)
+}

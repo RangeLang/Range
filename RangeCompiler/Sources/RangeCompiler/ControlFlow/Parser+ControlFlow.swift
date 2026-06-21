@@ -107,12 +107,52 @@ extension Parser {
             throw ParseError("Expected macro application statement.")
         }
         advance()
+        if peek() == .leftBrace {
+            return .macroInvocation(
+                name: name,
+                argumentClause: nil,
+                body: try parseStatementBlock(baseLocalBindings: [:])
+            )
+        }
+        if macroArgumentClauseIsFollowedByBlock() {
+            let argumentClause = try parseMacroArgumentClauseIfPresent()
+            return .macroInvocation(
+                name: name,
+                argumentClause: argumentClause,
+                body: try parseStatementBlock(baseLocalBindings: [:])
+            )
+        }
+
         var fullName = name
         try appendPostfixAccesses(to: &fullName)
         return .macroApplication(
             name: fullName,
             arguments: try parseInvocationArgumentsIfPresent()
         )
+    }
+
+    func macroArgumentClauseIsFollowedByBlock() -> Bool {
+        guard peek() == .leftParen else {
+            return false
+        }
+
+        var depth = 0
+        var offset = 0
+        repeat {
+            switch peek(offset: offset) {
+            case .leftParen:
+                depth += 1
+            case .rightParen:
+                depth -= 1
+            case .eof:
+                return false
+            default:
+                break
+            }
+            offset += 1
+        } while depth > 0
+
+        return peek(offset: offset) == .leftBrace
     }
 
     func targetEmittedCodeStatement() -> (path: String, operation: String)? {
@@ -767,6 +807,9 @@ extension Parser {
             return true
         }
         if isBackgroundStatementStart() {
+            return true
+        }
+        if isMacroApplicationStart() {
             return true
         }
         if peek() == .keyword(RangeSyntax.Keyword.ifStatement.rawValue) {

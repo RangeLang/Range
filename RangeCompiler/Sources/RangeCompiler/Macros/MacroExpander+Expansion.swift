@@ -1617,9 +1617,21 @@ extension MacroExpander {
         case .expand, .replace:
             return []
         case .macroInvocation(let name, let argumentClause, let body):
-            _ = argumentClause
-            _ = body
-            throw ParseError("Block macros like #\(name) { ... } are no longer supported.")
+            return [
+                .macroInvocation(
+                    name: name,
+                    argumentClause: argumentClause,
+                    body: try expand(
+                        statements: body,
+                        expectedReturnType: nil,
+                        macros: macros,
+                        parameterMacroSignatures: parameterMacroSignatures,
+                        literalBridges: literalBridges,
+                        context: context,
+                        stateEffects: stateEffects
+                    )
+                )
+            ]
         case .macroApplication:
             return [statement]
         case .background(let background):

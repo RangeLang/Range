@@ -747,7 +747,7 @@ struct MacroTargetValueBuilder {
             return "@\(name)(\(renderedArguments))"
         case .macroInvocation(let name, let argumentClause, let body):
             let arguments = argumentClause.map { "(\($0))" } ?? ""
-            return "#\(name)\(arguments) { \(renderStatements(body)) }"
+            return "@\(name)\(arguments) { \(renderStatements(body)) }"
         case .expand(let targetPath, _):
             return [targetPath, "expand"].compactMap { $0 }.joined(separator: ".")
         case .replace(let targetPath, _):
