@@ -1,2 +1,5 @@
 @syntax
-construct TypeReference {}
+construct TypeReference {
+    @let name: String
+    @let llvm: String
+}

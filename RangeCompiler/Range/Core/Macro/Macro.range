@@ -31,6 +31,7 @@ construct Macro<Value> {
     @let name: String
     @let identifier: Identifier
     @let genericArguments: Array<TypeReference>
+    @let generics: Array<TypeReference>
     @let argumentClause: String
     @let arguments: Array<Expression>
     @let rawBody: WrittenSyntax

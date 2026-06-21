@@ -23,6 +23,7 @@ construct Construct {
 construct Construct {
     @let type: TypeReference
     @let arguments: Array<Parameter>
+    @let generics: Array<Parameter>
 
     function replace(replacement: Expression): Expression
 }

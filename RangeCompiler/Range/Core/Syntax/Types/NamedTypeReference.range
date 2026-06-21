@@ -1,6 +1,7 @@
 @syntax
 construct NamedTypeReference {
     @let name: String
+    @let llvm: String
 
     function replace(replacement: TypeReference): TypeReference
 }

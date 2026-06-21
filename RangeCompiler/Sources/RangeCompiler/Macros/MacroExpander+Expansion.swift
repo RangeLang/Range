@@ -494,6 +494,7 @@ extension MacroExpander {
         }
         let targetValue = MacroTargetValueBuilder(
             macroMetadataByName: context.macroMetadataByName,
+            constructsByName: context.graphContext.constructsByName,
             extensionsByTargetName: context.graphContext.extensionsByTargetName
         ).targetValue(for: construct)
         guard
@@ -2163,6 +2164,7 @@ extension MacroExpander {
                     from: macro,
                     targetValue: MacroTargetValueBuilder(
                         macroMetadataByName: context.macroMetadataByName,
+                        constructsByName: context.graphContext.constructsByName,
                         writtenSyntaxByID: context.graphContext.writtenSyntaxByID
                     ).targetValue(for: enumeration),
                     context: context
@@ -2183,6 +2185,7 @@ extension MacroExpander {
             from: macro,
             targetValue: MacroTargetValueBuilder(
                 macroMetadataByName: context.macroMetadataByName,
+                constructsByName: context.graphContext.constructsByName,
                 writtenSyntaxByID: context.graphContext.writtenSyntaxByID,
                 extensionsByTargetName: context.graphContext.extensionsByTargetName
             ).targetValue(for: construct),
@@ -2201,6 +2204,7 @@ extension MacroExpander {
             from: macro,
             targetValue: MacroTargetValueBuilder(
                 macroMetadataByName: context.macroMetadataByName,
+                constructsByName: context.graphContext.constructsByName,
                 writtenSyntaxByID: context.graphContext.writtenSyntaxByID,
                 extensionsByTargetName: context.graphContext.extensionsByTargetName
             ).targetValue(for: construct),

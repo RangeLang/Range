@@ -5,6 +5,62 @@ import Testing
 
 @Suite("Compiler fixtures")
 struct CompilerFixtureTests {
+    @Test("Construct application generics expose type LLVM metadata")
+    func constructApplicationGenericsExposeTypeLLVMMetadata() throws {
+        let int = ConstructDeclaration(
+            macros: [
+                MacroApplication(
+                    name: "integer",
+                    genericArguments: [],
+                    argumentClause: nil,
+                    evaluatedStringValue: "i64"
+                )
+            ],
+            kind: .declaration,
+            attribute: nil,
+            name: "Int",
+            genericParameters: [],
+            conformances: [],
+            states: [],
+            bindings: [],
+            deriveds: [],
+            values: [],
+            initializers: [],
+            callables: [],
+            constructs: []
+        )
+        let array = ConstructDeclaration(
+            macros: [],
+            kind: .declaration,
+            attribute: nil,
+            name: "Array",
+            genericParameters: [.type(name: "Element", constraint: nil, defaultArgument: nil)],
+            conformances: [],
+            states: [],
+            bindings: [],
+            deriveds: [],
+            values: [],
+            initializers: [],
+            callables: [],
+            constructs: []
+        )
+
+        let target = MacroTargetValueBuilder(
+            constructsByName: ["Array": array, "Int": int]
+        ).targetValue(for: array, applicationArguments: [.named("Int")])
+        let application = try #require(target.field("application"))
+        let generics = try #require(application.field("generics"))
+        guard case .array(let values) = generics else {
+            Issue.record("Expected target.application.generics to be an array.")
+            return
+        }
+        let generic = try #require(values.first)
+        let type = try #require(generic.field("type"))
+
+        #expect(stringField(type, "name") == "Int")
+        #expect(stringField(type, "llvm") == "i64")
+    }
+
     @Test("CompilePass fixtures validate")
     func compilePassFixturesValidate() throws {
         for fixture in try fixtureFiles(in: "CompilePass") {
@@ -3101,6 +3157,13 @@ private func repositoryRoot() throws -> URL {
         current.deleteLastPathComponent()
     }
     throw FixtureError.repositoryRootNotFound
+}
+
+private func stringField(_ value: CompileTimeValue, _ name: String) -> String? {
+    guard case .string(let text)? = value.field(name) else {
+        return nil
+    }
+    return text
 }
 
 private enum FixtureError: Error, CustomStringConvertible {

@@ -3,6 +3,7 @@ import Foundation
 struct MacroTargetValueBuilder {
     let macroDeclarationsByName: [String: MacroDeclaration]
     let macroMetadataByName: [String: MacroMetadataDeclaration]
+    let constructsByName: [String: ConstructDeclaration]
     let writtenSyntaxByID: [String: CompileTimeValue]
     let knownObjectTypeNames: Set<String>
     let extensionsByTargetName: [String: [ExtensionDeclaration]]
@@ -10,12 +11,14 @@ struct MacroTargetValueBuilder {
     init(
         macroDeclarationsByName: [String: MacroDeclaration] = [:],
         macroMetadataByName: [String: MacroMetadataDeclaration] = [:],
+        constructsByName: [String: ConstructDeclaration] = [:],
         writtenSyntaxByID: [String: CompileTimeValue] = [:],
         knownObjectTypeNames: Set<String> = [],
         extensionsByTargetName: [String: [ExtensionDeclaration]] = [:]
     ) {
         self.macroDeclarationsByName = macroDeclarationsByName
         self.macroMetadataByName = macroMetadataByName
+        self.constructsByName = constructsByName
         self.writtenSyntaxByID = writtenSyntaxByID
         self.knownObjectTypeNames = knownObjectTypeNames
         self.extensionsByTargetName = extensionsByTargetName
@@ -231,7 +234,14 @@ struct MacroTargetValueBuilder {
         for declaration: ConstructDeclaration,
         applicationArguments: [TypeReference]
     ) -> CompileTimeValue {
-        .object(
+        let generics = declaration.genericParameters.enumerated().map { index, parameter in
+            genericApplicationValue(
+                for: parameter,
+                applicationArgument: applicationArguments.indices.contains(index)
+                    ? applicationArguments[index] : nil
+            )
+        }
+        return .object(
             typeName: "Construct.Application",
             fields: [
                 "type": typeReferenceValue(
@@ -240,15 +250,8 @@ struct MacroTargetValueBuilder {
                         arguments: applicationArguments
                     )
                 ),
-                "arguments": .array(
-                    declaration.genericParameters.enumerated().map { index, parameter in
-                        genericApplicationValue(
-                            for: parameter,
-                            applicationArgument: applicationArguments.indices.contains(index)
-                                ? applicationArguments[index] : nil
-                        )
-                    }
-                ),
+                "arguments": .array(generics),
+                "generics": .array(generics),
             ]
         )
     }
@@ -485,6 +488,7 @@ struct MacroTargetValueBuilder {
             "name": .string(application.name),
             "identifier": identifier(application.name),
             "genericArguments": .array(application.genericArguments.map(typeReferenceValue)),
+            "generics": .array(application.genericArguments.map(typeReferenceValue)),
             "argumentClause": .string(application.argumentClause ?? ""),
             "rawBodyLanguage": .string(application.rawBodyLanguage ?? ""),
             "rawBody": writtenSyntax(rawBody),
@@ -986,7 +990,15 @@ struct MacroTargetValueBuilder {
     }
 
     private func nominalTypeReference(_ name: String) -> CompileTimeValue {
-        .object(typeName: "NamedTypeReference", fields: ["name": .string(name)])
+        var fields: [String: CompileTimeValue] = [
+            "name": .string(name),
+            "llvm": .string(""),
+        ]
+        let declarationName = name.split(separator: "<", maxSplits: 1).first.map(String.init) ?? name
+        if let llvm = constructsByName[declarationName]?.macros.compactMap(\.evaluatedStringValue).first {
+            fields["llvm"] = .string(llvm)
+        }
+        return .object(typeName: "NamedTypeReference", fields: fields)
     }
 
     private func identifier(_ name: String) -> CompileTimeValue {
