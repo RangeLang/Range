@@ -69,6 +69,7 @@ struct CompilerFixtureTests {
                 path: "/tmp/StringyConstruct.range",
                 source: """
                     @construct(name: "Counter") {
+                        @let(name: "label", value: "String")
                         @state(name: "count", value: "Int(27)")
                         @function(name: "increment", result: "Bool", body: "count: count + 1")
                     }
@@ -90,13 +91,16 @@ struct CompilerFixtureTests {
             constructMacro.evaluatedStringValue
                 == """
                 construct|name=Counter|llvm=%Range.Counter = type { i64 }
-                member|kind=state|name=count|value=Int(27)|ordinal=0|llvm=i64
-                member|kind=function|name=increment|result=Bool|body=count: count + 1|ordinal=1
+                member|kind=let|name=label|value=String
+                member|kind=state|name=count|value=Int(27)|ordinal=1|llvm=i64
+                member|kind=function|name=increment|result=Bool|body=count: count + 1|ordinal=2
                 """
         )
 
         let emittedConstruct = try #require(program.declarationGraph.constructsByName["Counter"])
         #expect(emittedConstruct.macros.first?.evaluatedStringValue == constructMacro.evaluatedStringValue)
+        #expect(program.declarationGraph.values(onConstruct: "Counter").map(\.name) == ["label"])
+        #expect(program.declarationGraph.values(onConstruct: "Counter").first?.typeName == "String")
         #expect(program.declarationGraph.states(onConstruct: "Counter").map(\.name) == ["count"])
         #expect(program.declarationGraph.states(onConstruct: "Counter").first?.type.displayName == "Int")
         #expect(program.declarationGraph.callables(onConstruct: "Counter").map(\.name) == ["increment"])

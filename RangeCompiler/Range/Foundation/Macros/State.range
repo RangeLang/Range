@@ -14,23 +14,14 @@ function stateLLVMType(value: String): String {
     @return(value: "")
 }
 
-function stateLowering(name: String, value: String, ordinal: String, llvm: String): String {
+@member
+macro state(name: String, value: String): @member -> String { target, diagnostics in
     @return(value: "member|kind=state|name="
         + name
         + "|value="
         + value
         + "|ordinal="
-        + ordinal
+        + "\(target.ordinal)"
         + "|llvm="
-        + llvm)
-}
-
-@member
-macro state(name: String, value: String): @member -> String { target, diagnostics in
-    @return(value: stateLowering(
-        name: name,
-        value: value,
-        ordinal: "\(target.ordinal)",
-        llvm: stateLLVMType(value: value)
-    ))
+        + stateLLVMType(value: value))
 }

@@ -1,34 +1,24 @@
-function extensionLineLLVM(line: String): String {
-    if line.contains(value: "|llvm=") {
-        @return(value: line.segment(index: 1, delimiter: "|llvm="))
-    }
+macro extension(name: String): @syntax -> String { target, diagnostics in
+    @state(name: "members", value: "String(\"\")")
+    @state(name: "index", value: "0")
 
-    @return(value: "")
-}
-
-function extensionMembersLowering(source: String): String {
-    state output: String("")
-    let lineCount: Int(source.count(of: "\n") + 1)
-    state index: 0
-
-    @while(index < lineCount) {
-        let line: String(source.segment(index: index, delimiter: "\n"))
+    @while(index < target.application.rawBodyText.count(of: "\n") + 1) {
+        @state(
+            name: "line",
+            value: target.application.rawBodyText.segment(index: index, delimiter: "\n")
+        )
 
         if !line.isEmpty {
-            output: output + "\n" + line
+            members: members + "\n" + line
         }
 
         index: index + 1
     }
 
-    @return(value: output)
-}
-
-macro extension(name: String): @syntax -> String { target, diagnostics in
     @return(value: "extension|name="
         + name
         + "|llvm=%Range."
         + name
         + ".extension = type { }"
-        + extensionMembersLowering(source: target.application.rawBodyText))
+        + members)
 }

@@ -1,15 +1,13 @@
-function whileChildStatementRecords(target: Block): String {
-    if target.declaration.bodyText.isEmpty {
-        @return(value: "")
-    }
-
-    @return(value: "\n" + target.declaration.bodyText)
-}
-
 @statement
 macro while(condition: String = "true") -> String { target, diagnostics in
+    @state(name: "children", value: "String(\"\")")
+
+    if !target.declaration.bodyText.isEmpty {
+        children: "\n" + target.declaration.bodyText
+    }
+
     @return(value: "statement|kind=while|condition="
         + condition
         + "|projection=target.declaration.statements"
-        + whileChildStatementRecords(target: target))
+        + children)
 }

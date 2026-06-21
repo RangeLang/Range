@@ -677,6 +677,7 @@ public struct DeclarationGraph {
         }
 
         let states = lines.dropFirst().compactMap(emittedState)
+        let values = lines.dropFirst().compactMap(emittedValue)
         let callables = lines.dropFirst().compactMap(emittedFunction)
         let macro = MacroApplication(
             name: application.name,
@@ -697,7 +698,7 @@ public struct DeclarationGraph {
             states: states,
             bindings: [],
             deriveds: [],
-            values: [],
+            values: values,
             initializers: [],
             callables: callables,
             constructs: []
@@ -720,6 +721,24 @@ public struct DeclarationGraph {
             hasExplicitTypeAnnotation: true,
             type: emittedTypeReference(value: value, fallback: fields["type"]),
             storage: value.isEmpty ? .declared : .stored(.identifier(value))
+        )
+    }
+
+    private static func emittedValue(from line: String) -> ValueDeclaration? {
+        let fields = emittedRecordFields(in: line)
+        guard fields["kind"] == "let",
+            let name = fields["name"],
+            !name.isEmpty
+        else {
+            return nil
+        }
+        let value = fields["value"] ?? ""
+
+        return ValueDeclaration(
+            macros: [],
+            name: name,
+            typeName: emittedTypeReference(value: value, fallback: fields["type"] ?? value).displayName,
+            value: nil
         )
     }
 

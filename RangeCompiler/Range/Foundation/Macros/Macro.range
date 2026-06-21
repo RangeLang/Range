@@ -40,10 +40,6 @@ function macroDefinition(name: String, type: String, source: String): MacroDefin
     ))
 }
 
-function macroLowering(declaration: MacroDefinition): String {
-    @return(value: "macro " + declaration.name + " -> " + declaration.type + " {\n" + declaration.body.text + "\n}")
-}
-
 @macro() -> String { target, diagnostics in
     let macroName: String(target.declaration.name.replacingOccurrences(of: "@", with: ""))
     let declaration: MacroDefinition(
@@ -53,5 +49,11 @@ function macroLowering(declaration: MacroDefinition): String {
             source: target.declaration.body
         )
     )
-    @return(value: macroLowering(declaration: declaration))
+    @return(value: "macro "
+        + declaration.name
+        + " -> "
+        + declaration.type
+        + " {\n"
+        + declaration.body.text
+        + "\n}")
 }

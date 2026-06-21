@@ -1,8 +1,4 @@
-function letLowering(name: String, value: String): String {
-    @return(value: "member|kind=let|name=" + name + "|value=" + value)
-}
-
 @member
 macro let(name: String, value: String): @member -> String { target, diagnostics in
-    @return(value: letLowering(name: name, value: value))
+    @return(value: "member|kind=let|name=" + name + "|value=" + value)
 }

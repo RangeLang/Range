@@ -67,6 +67,11 @@ struct CompileTimeValueEvaluator {
                     return .object(typeName: "Void", fields: [:])
                 }
                 return evaluate(valueArgument.value, locals: locals)
+            case .macroApplication(let name, let arguments) where name == "state" || name == "let":
+                guard let binding = macroLocalBinding(arguments: arguments, locals: locals) else {
+                    continue
+                }
+                locals[binding.name] = binding.expression
             case .macroInvocation(let name, let argumentClause, let body) where name == "while":
                 guard let condition = macroConditionExpression(argumentClause: argumentClause) else {
                     continue
@@ -112,6 +117,38 @@ struct CompileTimeValueEvaluator {
             }
         }
         return nil
+    }
+
+    private func macroLocalBinding(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> (name: String, expression: Expression)? {
+        guard let nameArgument = arguments.first(where: { $0.label == "name" }),
+            let valueArgument = arguments.first(where: { $0.label == "value" }),
+            case .string(let name) = evaluate(nameArgument.value, locals: locals)
+        else {
+            return nil
+        }
+        return (name, macroLocalValueExpression(valueArgument.value, locals: locals))
+    }
+
+    private func macroLocalValueExpression(
+        _ expression: Expression,
+        locals: [String: Expression]
+    ) -> Expression {
+        if case .string(let source) = expression,
+            let parsed = try? parseMacroLocalValueSource(source)
+        {
+            return boundExpression(parsed, locals: locals)
+        }
+        return boundExpression(expression, locals: locals)
+    }
+
+    private func parseMacroLocalValueSource(_ source: String) throws -> Expression {
+        var parser = try Parser(source: StringLiteral.decodeEscapes(source))
+        let expression = try parser.parseExpression()
+        try parser.consume(.eof)
+        return expression
     }
 
     private func macroConditionExpression(argumentClause: String?) -> Expression? {

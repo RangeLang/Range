@@ -31,7 +31,7 @@ extension Parser {
         }
 
         if isMacroApplicationStart() {
-            return try parseMacroApplicationStatement(localBindings: localBindings)
+            return try parseMacroApplicationStatement(localBindings: &localBindings)
         }
 
         if isDeferStatementStart() {
@@ -103,7 +103,7 @@ extension Parser {
     }
 
     mutating func parseMacroApplicationStatement(
-        localBindings: [String: LocalBindingSymbol]
+        localBindings: inout [String: LocalBindingSymbol]
     ) throws -> Statement {
         guard case .macroAttribute(let name, _) = peek() else {
             throw ParseError("Expected macro application statement.")
@@ -127,9 +127,34 @@ extension Parser {
 
         var fullName = name
         try appendPostfixAccesses(to: &fullName)
+        let arguments = try parseInvocationArgumentsIfPresent()
+        registerMacroLocalBindingIfPresent(
+            macroName: fullName,
+            arguments: arguments,
+            localBindings: &localBindings
+        )
         return .macroApplication(
             name: fullName,
-            arguments: try parseInvocationArgumentsIfPresent()
+            arguments: arguments
+        )
+    }
+
+    private func registerMacroLocalBindingIfPresent(
+        macroName: String,
+        arguments: [CallArgument],
+        localBindings: inout [String: LocalBindingSymbol]
+    ) {
+        guard currentMacroBodyDepth > 0,
+            macroName == "state" || macroName == "let",
+            let nameArgument = arguments.first(where: { $0.label == "name" }),
+            case .string(let name) = nameArgument.value,
+            !name.isEmpty
+        else {
+            return
+        }
+        localBindings[name] = LocalBindingSymbol(
+            kind: macroName == "state" ? .mutable : .constant,
+            type: .named("Unknown")
         )
     }
 
