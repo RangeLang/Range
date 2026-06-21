@@ -1,6 +1,6 @@
 @syntax
-construct GraphIdentity {
-    @let id: String
-    @let kind: String
-    @let name: String
+@construct(name: "GraphIdentity") {
+    @let(name: "id", value: "String")
+    @let(name: "kind", value: "String")
+    @let(name: "name", value: "String")
 }

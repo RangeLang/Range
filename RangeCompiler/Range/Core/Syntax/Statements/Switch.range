@@ -1,6 +1,6 @@
 @statement
 @syntax
-construct Switch {
-    @let expression: Expression
-    @let cases: Array<SwitchCase>
+@construct(name: "Switch") {
+    @let(name: "expression", value: "Expression")
+    @let(name: "cases", value: "Array<SwitchCase>")
 }

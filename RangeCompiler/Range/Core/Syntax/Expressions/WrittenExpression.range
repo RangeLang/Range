@@ -1,7 +1,7 @@
 @syntax
-construct WrittenExpression {
-    @let type: Optional<TypeReference>
-    @let written: WrittenSyntax
+@construct(name: "WrittenExpression") {
+    @let(name: "type", value: "Optional<TypeReference>")
+    @let(name: "written", value: "WrittenSyntax")
 
-    function replace(replacement: Expression): Expression
+    @function(name: "replace", result: "Expression", body: "")
 }

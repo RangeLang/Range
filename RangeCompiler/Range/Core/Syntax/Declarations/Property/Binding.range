@@ -2,15 +2,15 @@
 @property
 @member
 @graph(role: .declaration)
-construct Binding<T> {
-    @let identity: GraphIdentity
-    @let parent: Optional<GraphIdentity>
-    @let macros: Array<Macro>
-    @let identifier: Identifier
-    @let type: TypeReference
-    @let getterBody: Optional<Block>
-    @let setterBody: Optional<Block>
+@construct(name: "Binding<T>") {
+    @let(name: "identity", value: "GraphIdentity")
+    @let(name: "parent", value: "Optional<GraphIdentity>")
+    @let(name: "macros", value: "Array<Macro>")
+    @let(name: "identifier", value: "Identifier")
+    @let(name: "type", value: "TypeReference")
+    @let(name: "getterBody", value: "Optional<Block>")
+    @let(name: "setterBody", value: "Optional<Block>")
 
-    function getter(transform: (T) -> T)
-    function setter(transform: (T) -> T)
+    @function(name: "getter", result: "Void", body: "")
+    @function(name: "setter", result: "Void", body: "")
 }

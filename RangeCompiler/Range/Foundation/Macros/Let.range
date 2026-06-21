@@ -1,17 +1,8 @@
-construct LetMember {
-  @let name: String
-  @let value: String
-}
-
-function letMember(name: String, value: String): LetMember {
-  return LetMember(name: name, value: value)
-}
-
-function letLowering(member: LetMember): String {
-  return "member|kind=let|name=" + member.name + "|value=" + member.value
+function letLowering(name: String, value: String): String {
+    return "member|kind=let|name=" + name + "|value=" + value
 }
 
 @member
 macro let(name: String, value: String): @member -> String { target, diagnostics in
-  return String("member|kind=let|name=" + name + "|value=" + value)
+    return letLowering(name: name, value: value)
 }

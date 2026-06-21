@@ -1,7 +1,7 @@
 @statement
 @syntax
-construct If {
-    @let condition: Expression
-    @let thenBody: Block
-    @let elseBody: Optional<Block>
+@construct(name: "If") {
+    @let(name: "condition", value: "Expression")
+    @let(name: "thenBody", value: "Block")
+    @let(name: "elseBody", value: "Optional<Block>")
 }

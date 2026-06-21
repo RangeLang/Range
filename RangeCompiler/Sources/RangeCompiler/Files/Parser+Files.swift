@@ -9,50 +9,7 @@ extension Parser {
     }
 
     func isTopLevelBlockMacroStart() -> Bool {
-        guard case .macroAttribute(let name, _) = peek(),
-            name != "main",
-            isMacroApplicationAttribute(name)
-        else {
-            return false
-        }
-
-        var offset = 1
-        if peek(offset: offset) == .less {
-            var depth = 1
-            offset += 1
-            while depth > 0 {
-                switch peek(offset: offset) {
-                case .less:
-                    depth += 1
-                case .greater:
-                    depth -= 1
-                case .eof:
-                    return false
-                default:
-                    break
-                }
-                offset += 1
-            }
-        }
-        if peek(offset: offset) == .leftParen {
-            var depth = 1
-            offset += 1
-            while depth > 0 {
-                switch peek(offset: offset) {
-                case .leftParen:
-                    depth += 1
-                case .rightParen:
-                    depth -= 1
-                case .eof:
-                    return false
-                default:
-                    break
-                }
-                offset += 1
-            }
-        }
-
-        return peek(offset: offset) == .leftBrace
+        topLevelBlockMacroOffset() != nil
     }
 
     public mutating func parseMainBlock(requiresEOF: Bool = true) throws -> MainBlockNode {
@@ -71,53 +28,142 @@ extension Parser {
     }
 
     mutating func parseTopLevelBlockMacro() throws -> BlockMacroNode {
-        guard case .macroAttribute(let name, _) = peek(), name != "main" else {
+        guard isTopLevelBlockMacroStart() else {
             throw ParseError("Expected top-level block macro.")
         }
-        advance()
-        let genericArguments = try parseMacroGenericArgumentsIfPresent()
-        let argumentClause = try parseMacroArgumentClauseIfPresent()
-        let rawBody = try renderUpcomingBlockBody()
-        let body = try parseStatementBlock(baseLocalBindings: [:])
-        return BlockMacroNode(
-            macros: [
+        var applications: [MacroApplication] = []
+        while true {
+            guard case .macroAttribute(let name, _) = peek(), name != "main" else {
+                throw ParseError("Expected top-level block macro.")
+            }
+            let blockFollows = currentMacroApplicationIsFollowedByBlock()
+            advance()
+            let genericArguments = try parseMacroGenericArgumentsIfPresent()
+            let argumentClause = try parseMacroArgumentClauseIfPresent()
+            if blockFollows {
+                let rawBody = try renderUpcomingBlockBody()
+                let body = try parseStatementBlock(baseLocalBindings: [:])
+                applications.append(
+                    MacroApplication(
+                        name: name,
+                        genericArguments: genericArguments,
+                        argumentClause: argumentClause,
+                        rawBody: rawBody
+                    )
+                )
+                return BlockMacroNode(macros: applications, body: body, rawBody: rawBody)
+            }
+            applications.append(
                 MacroApplication(
                     name: name,
                     genericArguments: genericArguments,
-                    argumentClause: argumentClause,
-                    rawBody: rawBody
+                    argumentClause: argumentClause
                 )
-            ],
-            body: body,
-            rawBody: rawBody
-        )
+            )
+        }
     }
 
     mutating func skipTopLevelBlockMacroForDeclarationDiscovery() throws {
         guard isTopLevelBlockMacroStart() else {
             throw ParseError("Expected top-level block macro.")
         }
-        advance()
-        try skipGenericParameterClauseIfPresent()
-        if peek() == .leftParen {
-            var depth = 0
-            repeat {
-                switch peek() {
+        while true {
+            guard case .macroAttribute(let name, _) = peek(), name != "main" else {
+                throw ParseError("Expected top-level block macro.")
+            }
+            let blockFollows = currentMacroApplicationIsFollowedByBlock()
+            advance()
+            try skipGenericParameterClauseIfPresent()
+            if peek() == .leftParen {
+                try skipParenthesizedClause()
+            }
+            if blockFollows {
+                try consume(.leftBrace)
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+                return
+            }
+        }
+    }
+
+    private func topLevelBlockMacroOffset() -> Int? {
+        var offset = 0
+        while case .macroAttribute(let name, _) = peek(offset: offset),
+            name != "main",
+            isMacroApplicationAttribute(name)
+        {
+            guard let endOffset = macroApplicationEndOffset(startingAt: offset) else {
+                return nil
+            }
+            if peek(offset: endOffset) == .leftBrace {
+                return offset
+            }
+            offset = endOffset
+        }
+        return nil
+    }
+
+    private func currentMacroApplicationIsFollowedByBlock() -> Bool {
+        guard let endOffset = macroApplicationEndOffset(startingAt: 0) else {
+            return false
+        }
+        return peek(offset: endOffset) == .leftBrace
+    }
+
+    private func macroApplicationEndOffset(startingAt startOffset: Int) -> Int? {
+        var offset = startOffset + 1
+        if peek(offset: offset) == .less {
+            var depth = 1
+            offset += 1
+            while depth > 0 {
+                switch peek(offset: offset) {
+                case .less:
+                    depth += 1
+                case .greater:
+                    depth -= 1
+                case .eof:
+                    return nil
+                default:
+                    break
+                }
+                offset += 1
+            }
+        }
+        if peek(offset: offset) == .leftParen {
+            var depth = 1
+            offset += 1
+            while depth > 0 {
+                switch peek(offset: offset) {
                 case .leftParen:
                     depth += 1
                 case .rightParen:
                     depth -= 1
                 case .eof:
-                    throw ParseError("Unterminated macro argument clause.")
+                    return nil
                 default:
                     break
                 }
-                advance()
-            } while depth > 0
+                offset += 1
+            }
         }
-        try consume(.leftBrace)
-        try skipUnknownBlockBody()
-        try consume(.rightBrace)
+        return offset
+    }
+
+    private mutating func skipParenthesizedClause() throws {
+        var depth = 0
+        repeat {
+            switch peek() {
+            case .leftParen:
+                depth += 1
+            case .rightParen:
+                depth -= 1
+            case .eof:
+                throw ParseError("Unterminated macro argument clause.")
+            default:
+                break
+            }
+            advance()
+        } while depth > 0
     }
 
     private func renderUpcomingBlockBody() throws -> String {

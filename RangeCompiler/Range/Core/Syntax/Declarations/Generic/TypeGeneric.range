@@ -1,7 +1,7 @@
 @syntax
-construct TypeGeneric {
-    @let identifier: Identifier
-    @let constraint: Optional<TypeReference>
-    @let default: Optional<TypeReference>
+@construct(name: "TypeGeneric") {
+    @let(name: "identifier", value: "Identifier")
+    @let(name: "constraint", value: "Optional<TypeReference>")
+    @let(name: "default", value: "Optional<TypeReference>")
 }
 

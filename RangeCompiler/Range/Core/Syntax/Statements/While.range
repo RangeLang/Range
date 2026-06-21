@@ -1,6 +1,6 @@
 @statement
 @syntax
-construct While {
-    @let condition: Expression
-    @let body: Block
+@construct(name: "While") {
+    @let(name: "condition", value: "Expression")
+    @let(name: "body", value: "Block")
 }

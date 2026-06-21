@@ -1,7 +1,7 @@
 @syntax
-construct ValueGeneric {
-    @let identifier: Identifier
-    @let type: TypeReference
-    @let value: String
-    @let default: Optional<String>
+@construct(name: "ValueGeneric") {
+    @let(name: "identifier", value: "Identifier")
+    @let(name: "type", value: "TypeReference")
+    @let(name: "value", value: "String")
+    @let(name: "default", value: "Optional<String>")
 }

@@ -1,7 +1,7 @@
 @syntax
-construct EnumCaseExpression {
-    @let type: Optional<TypeReference>
-    @let identifier: Identifier
+@construct(name: "EnumCaseExpression") {
+    @let(name: "type", value: "Optional<TypeReference>")
+    @let(name: "identifier", value: "Identifier")
 
-    function replace(replacement: Expression): Expression
+    @function(name: "replace", result: "Expression", body: "")
 }

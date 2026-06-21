@@ -1,0 +1,4 @@
+@statement
+macro continue() -> String { target, diagnostics in
+    return "statement|kind=continue|projection=target.declaration"
+}

@@ -1,0 +1,6 @@
+@statement
+macro return(value: String = "") -> String { target, diagnostics in
+    return "statement|kind=return|value="
+        + value
+        + "|projection=target.declaration"
+}

@@ -1,8 +1,8 @@
 @graph(role: .declaration)
 @syntax
-construct Extension {
-    @let target: NominalTypeReference
-    @let conformances: Array<NominalTypeReference>
-    @let functions: Array<Function>
-    @let constructs: Array<Construct>
+@construct(name: "Extension") {
+    @let(name: "target", value: "NominalTypeReference")
+    @let(name: "conformances", value: "Array<NominalTypeReference>")
+    @let(name: "functions", value: "Array<Function>")
+    @let(name: "constructs", value: "Array<Construct>")
 }

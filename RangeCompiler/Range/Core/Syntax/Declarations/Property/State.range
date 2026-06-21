@@ -2,15 +2,15 @@
 @property
 @member
 @graph(role: .declaration)
-construct State<T> {
-    @let identity: GraphIdentity
-    @let parent: Optional<GraphIdentity>
-    @let macros: Array<Macro>
-    @let identifier: Identifier
-    @let type: TypeReference
-    @let value: Optional<Expression>
+@construct(name: "State<T>") {
+    @let(name: "identity", value: "GraphIdentity")
+    @let(name: "parent", value: "Optional<GraphIdentity>")
+    @let(name: "macros", value: "Array<Macro>")
+    @let(name: "identifier", value: "Identifier")
+    @let(name: "type", value: "TypeReference")
+    @let(name: "value", value: "Optional<Expression>")
 
-    function initializer(transform: (T) -> T)
-    function getter(transform: (T) -> T)
-    function setter(transform: (T) -> T)
+    @function(name: "initializer", result: "Void", body: "")
+    @function(name: "getter", result: "Void", body: "")
+    @function(name: "setter", result: "Void", body: "")
 }

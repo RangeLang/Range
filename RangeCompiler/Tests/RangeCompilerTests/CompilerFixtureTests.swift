@@ -168,6 +168,178 @@ struct CompilerFixtureTests {
         #expect(text == "statement|kind=while|condition=x > 5|projection=target.declaration.statements")
     }
 
+    @Test("If statement block macro expands through Range-authored projection")
+    func ifStatementBlockMacroExpandsThroughRangeAuthoredProjection() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyIf.range",
+                source: """
+                    function branch() {
+                        @if("x > 5") {
+                            @return(value: "x")
+                        }
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let ifMacro = try #require(program.declarationGraph.macrosByName["if"])
+        #expect(ifMacro.target == nil)
+        #expect(ifMacro.macros.map(\.name) == ["statement"])
+
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let statement = callable.body?.first(where: {
+                if case .emitted = $0 {
+                    return true
+                }
+                return false
+            }),
+            case .emitted(let text) = statement
+        else {
+            Issue.record("Expected @if to expand to an emitted statement string.")
+            return
+        }
+
+        #expect(text == "statement|kind=if|condition=x > 5|projection=target.declaration.statements")
+    }
+
+    @Test("Return statement macro expands through Range-authored projection")
+    func returnStatementMacroExpandsThroughRangeAuthoredProjection() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyReturn.range",
+                source: """
+                    function answer() {
+                        @return(value: "Int(42)")
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let returnMacro = try #require(program.declarationGraph.macrosByName["return"])
+        #expect(returnMacro.target == nil)
+        #expect(returnMacro.macros.map(\.name) == ["statement"])
+
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let statement = callable.body?.first,
+            case .emitted(let text) = statement
+        else {
+            Issue.record("Expected @return to expand to an emitted statement string.")
+            return
+        }
+
+        #expect(text == "statement|kind=return|value=Int(42)|projection=target.declaration")
+    }
+
+    @Test("For and switch statement macros expand through Range-authored projection")
+    func forAndSwitchStatementMacrosExpandThroughRangeAuthoredProjection() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyControlFlow.range",
+                source: """
+                    function walk() {
+                        @for(binding: "item", sequence: "items") {
+                            @continue()
+                        }
+
+                        @switch(value: "mode") {
+                            @break()
+                        }
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let forMacro = try #require(program.declarationGraph.macrosByName["for"])
+        let switchMacro = try #require(program.declarationGraph.macrosByName["switch"])
+        #expect(forMacro.target == nil)
+        #expect(switchMacro.target == nil)
+        #expect(forMacro.macros.map(\.name) == ["statement"])
+        #expect(switchMacro.macros.map(\.name) == ["statement"])
+
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first
+        else {
+            Issue.record("Expected expanded module with walk function.")
+            return
+        }
+
+        let emitted = callable.body?.compactMap { statement -> String? in
+            guard case .emitted(let text) = statement else {
+                return nil
+            }
+            return text
+        } ?? []
+
+        #expect(
+            emitted == [
+                "statement|kind=for|binding=item|sequence=items|projection=target.declaration.statements",
+                "statement|kind=switch|value=mode|projection=target.declaration.statements",
+            ]
+        )
+    }
+
+    @Test("Break and continue statement macros expand through Range-authored projection")
+    func breakAndContinueStatementMacrosExpandThroughRangeAuthoredProjection() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyBreakContinue.range",
+                source: """
+                    function flow() {
+                        @break()
+                        @continue()
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let breakMacro = try #require(program.declarationGraph.macrosByName["break"])
+        let continueMacro = try #require(program.declarationGraph.macrosByName["continue"])
+        #expect(breakMacro.target == nil)
+        #expect(continueMacro.target == nil)
+        #expect(breakMacro.macros.map(\.name) == ["statement"])
+        #expect(continueMacro.macros.map(\.name) == ["statement"])
+
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first
+        else {
+            Issue.record("Expected expanded module with flow function.")
+            return
+        }
+
+        let emitted = callable.body?.compactMap { statement -> String? in
+            guard case .emitted(let text) = statement else {
+                return nil
+            }
+            return text
+        } ?? []
+
+        #expect(
+            emitted == [
+                "statement|kind=break|projection=target.declaration",
+                "statement|kind=continue|projection=target.declaration",
+            ]
+        )
+    }
+
     @Test("CompilePass fixtures validate")
     func compilePassFixturesValidate() throws {
         for fixture in try fixtureFiles(in: "CompilePass") {

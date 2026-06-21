@@ -1,3 +1,4 @@
+@statement
 @construct(name: "Expression") {
     @let(name: "type", value: "Optional<TypeReference>")
 }

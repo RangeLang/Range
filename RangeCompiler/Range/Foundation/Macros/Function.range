@@ -1,22 +1,12 @@
-construct FunctionMember {
-    @let name: String
-    @let result: String
-    @let body: String
-}
-
-function functionMember(name: String, result: String, body: String): FunctionMember {
-    return FunctionMember(name: name, result: result, body: body)
-}
-
-function functionLowering(member: FunctionMember): String {
+function functionLowering(name: String, result: String, body: String): String {
     return "member|kind=function|name="
-        + member.name
+        + name
         + "|result="
-        + member.result
+        + result
         + "|body="
-        + member.body
+        + body
 }
 
 macro function(name: String, result: String, body: String): @member -> String { target, diagnostics in
-    return String("member|kind=function|name=" + name + "|result=" + result + "|body=" + body)
+    return functionLowering(name: name, result: result, body: body)
 }

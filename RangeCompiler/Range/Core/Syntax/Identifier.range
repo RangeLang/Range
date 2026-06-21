@@ -8,6 +8,6 @@ macro identifierSyntaxName(): Init { target, diagnostics in
 
 @syntax
 @identifierSyntaxName
-construct Identifier {
-    @let name: String
+@construct(name: "Identifier") {
+    @let(name: "name", value: "String")
 }

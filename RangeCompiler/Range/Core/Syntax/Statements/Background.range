@@ -1,5 +1,5 @@
 @statement
 @syntax
-construct Background {
-    @let body: Block
+@construct(name: "Background") {
+    @let(name: "body", value: "Block")
 }

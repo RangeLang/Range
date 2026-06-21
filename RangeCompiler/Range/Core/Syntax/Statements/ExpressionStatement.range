@@ -1,5 +1,5 @@
 @statement
 @syntax
-construct ExpressionStatement {
-    @let expression: Expression
+@construct(name: "ExpressionStatement") {
+    @let(name: "expression", value: "Expression")
 }

@@ -1,0 +1,8 @@
+@statement
+macro for(binding: String = "", sequence: String = "") -> String { target, diagnostics in
+    return "statement|kind=for|binding="
+        + binding
+        + "|sequence="
+        + sequence
+        + "|projection=target.declaration.statements"
+}

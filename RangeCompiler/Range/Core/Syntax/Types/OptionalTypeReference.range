@@ -1,6 +1,6 @@
 @syntax
-construct OptionalTypeReference {
-    @let wrapped: TypeReference
+@construct(name: "OptionalTypeReference") {
+    @let(name: "wrapped", value: "TypeReference")
 
-    function replace(replacement: TypeReference): TypeReference
+    @function(name: "replace", result: "TypeReference", body: "")
 }

@@ -2,13 +2,13 @@
 @property
 @member
 @graph(role: .declaration)
-construct Derived<T> {
-    @let identity: GraphIdentity
-    @let parent: Optional<GraphIdentity>
-    @let macros: Array<Macro>
-    @let identifier: Identifier
-    @let type: TypeReference
-    @let body: Optional<Block>
+@construct(name: "Derived<T>") {
+    @let(name: "identity", value: "GraphIdentity")
+    @let(name: "parent", value: "Optional<GraphIdentity>")
+    @let(name: "macros", value: "Array<Macro>")
+    @let(name: "identifier", value: "Identifier")
+    @let(name: "type", value: "TypeReference")
+    @let(name: "body", value: "Optional<Block>")
 
-    function getter(transform: (T) -> T)
+    @function(name: "getter", result: "Void", body: "")
 }

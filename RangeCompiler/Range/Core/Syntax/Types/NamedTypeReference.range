@@ -1,7 +1,7 @@
 @syntax
-construct NamedTypeReference {
-    @let name: String
-    @let llvm: String
+@construct(name: "NamedTypeReference") {
+    @let(name: "name", value: "String")
+    @let(name: "llvm", value: "String")
 
-    function replace(replacement: TypeReference): TypeReference
+    @function(name: "replace", result: "TypeReference", body: "")
 }

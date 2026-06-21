@@ -1,6 +1,6 @@
 @syntax
-construct ArrayTypeReference {
-    @let element: TypeReference
+@construct(name: "ArrayTypeReference") {
+    @let(name: "element", value: "TypeReference")
 
-    function replace(replacement: TypeReference): TypeReference
+    @function(name: "replace", result: "TypeReference", body: "")
 }

@@ -1,4 +1,4 @@
 @syntax
-construct Generic {
-    @let identifier: Identifier
+@construct(name: "Generic") {
+    @let(name: "identifier", value: "Identifier")
 }

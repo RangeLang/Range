@@ -1,8 +1,8 @@
 @syntax
-construct Closure {
-    @let type: Optional<TypeReference>
-    @let parameters: Array<Parameter>()
-    @let body: Block
+@construct(name: "Closure") {
+    @let(name: "type", value: "Optional<TypeReference>")
+    @let(name: "parameters", value: "Array<Parameter>()")
+    @let(name: "body", value: "Block")
 
-    function replace(replacement: Expression): Expression
+    @function(name: "replace", result: "Expression", body: "")
 }

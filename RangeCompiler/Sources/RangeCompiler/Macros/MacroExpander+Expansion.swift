@@ -777,6 +777,50 @@ extension MacroExpander {
         return processed
     }
 
+    static func evaluatedStringStatementMacro(
+        name: String,
+        arguments: [CallArgument],
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> String {
+        let statement = Statement.macroApplication(name: name, arguments: arguments)
+        guard let macro = macros[name],
+            let argumentBindings = try? parseMacroArgumentBindings(
+                for: macro,
+                arguments: arguments
+            )
+        else {
+            return renderStatementForBlockValue(statement)
+        }
+
+        let application = MacroApplication(
+            name: name,
+            genericArguments: [],
+            argumentClause: renderArgumentsForStringify(arguments)
+        )
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: macro.bindings?.target ?? "target",
+            targetValue: statementMacroTargetValue(body: [], application: application),
+            graphBinding: macro.bindings?.graph,
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                constructsByName: context.graphContext.constructsByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
+            localBindings: argumentBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+            context: context
+        )
+        var locals = argumentBindings
+        guard case .string(let processed)? = evaluator.evaluateStatements(macro.body, locals: &locals)
+        else {
+            return renderStatementForBlockValue(statement)
+        }
+        return processed
+    }
+
     static func statementMacroTargetValue(
         body: [Statement],
         application: MacroApplication
@@ -1783,7 +1827,19 @@ extension MacroExpander {
                     )
                 )
             ]
-        case .macroApplication:
+        case .macroApplication(let name, let arguments):
+            if macros[name]?.macros.contains(where: { $0.name == "statement" }) == true {
+                return [
+                    .emitted(
+                        evaluatedStringStatementMacro(
+                            name: name,
+                            arguments: arguments,
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                ]
+            }
             return [statement]
         case .background(let background):
             let expandedBody = try expand(

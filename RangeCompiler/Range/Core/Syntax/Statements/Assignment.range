@@ -1,6 +1,6 @@
 @statement
 @syntax
-construct Assignment {
-    @let target: Expression
-    @let expression: Expression
+@construct(name: "Assignment") {
+    @let(name: "target", value: "Expression")
+    @let(name: "expression", value: "Expression")
 }

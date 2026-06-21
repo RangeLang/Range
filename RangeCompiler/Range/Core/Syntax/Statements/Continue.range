@@ -1,0 +1,4 @@
+@statement
+@syntax
+@construct(name: "Continue") {
+}

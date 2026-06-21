@@ -1,4 +1,4 @@
 @statement
 @syntax
-construct Break {
+@construct(name: "Break") {
 }

@@ -1,47 +1,47 @@
-construct RangeProgram {
-    @let graph: RangeGraph
+@construct(name: "RangeProgram") {
+    @let(name: "graph", value: "RangeGraph")
 }
 
-construct RangeGraph {
-    @let files: Array<FileTreeNode>
-    @let sources: Array<ProgramSourceFile>
-    @let artifacts: Array<ProgramArtifact>
-    @let topology: RangeGraphTopology
-    @state main: Optional<@main>
-    @state syntax: Array<@syntax>
+@construct(name: "RangeGraph") {
+    @let(name: "files", value: "Array<FileTreeNode>")
+    @let(name: "sources", value: "Array<ProgramSourceFile>")
+    @let(name: "artifacts", value: "Array<ProgramArtifact>")
+    @let(name: "topology", value: "RangeGraphTopology")
+    @state(name: "main", value: "Optional<@main>")
+    @state(name: "syntax", value: "Array<@syntax>")
 }
 
-construct ProgramSourceFile {
-    @let path: String
-    @let text: String
+@construct(name: "ProgramSourceFile") {
+    @let(name: "path", value: "String")
+    @let(name: "text", value: "String")
 }
 
-construct ProgramArtifact {
-    @let path: String
-    @let text: String
+@construct(name: "ProgramArtifact") {
+    @let(name: "path", value: "String")
+    @let(name: "text", value: "String")
 }
 
-construct RangeGraphTopology {
-    @let nodes: Array<RangeGraphNode>
-    @let relationships: Array<RangeGraphRelationship>
+@construct(name: "RangeGraphTopology") {
+    @let(name: "nodes", value: "Array<RangeGraphNode>")
+    @let(name: "relationships", value: "Array<RangeGraphRelationship>")
 }
 
-construct RangeGraphNode {
-    @let identity: RangeGraphIdentity
-    @let sourcePath: String
-    @let labels: Array<String>
+@construct(name: "RangeGraphNode") {
+    @let(name: "identity", value: "RangeGraphIdentity")
+    @let(name: "sourcePath", value: "String")
+    @let(name: "labels", value: "Array<String>")
 }
 
-construct RangeGraphRelationship {
-    @let origin: RangeGraphIdentity
-    @let destination: RangeGraphIdentity
-    @let kind: String
+@construct(name: "RangeGraphRelationship") {
+    @let(name: "origin", value: "RangeGraphIdentity")
+    @let(name: "destination", value: "RangeGraphIdentity")
+    @let(name: "kind", value: "String")
 }
 
-construct GraphSyntax {
-    @let identity: RangeGraphIdentity
-    @let declarations: Array<GraphEntry>
-    @let applications: Array<GraphEntry>
+@construct(name: "GraphSyntax") {
+    @let(name: "identity", value: "RangeGraphIdentity")
+    @let(name: "declarations", value: "Array<GraphEntry>")
+    @let(name: "applications", value: "Array<GraphEntry>")
 }
 
 enum GraphRole {
@@ -49,12 +49,12 @@ enum GraphRole {
     case application
 }
 
-construct RangeGraphIdentity {
-    @let id: String
-    @let kind: String
-    @let name: String
+@construct(name: "RangeGraphIdentity") {
+    @let(name: "id", value: "String")
+    @let(name: "kind", value: "String")
+    @let(name: "name", value: "String")
 }
 
-construct GraphEntry {
-    @let identity: RangeGraphIdentity
+@construct(name: "GraphEntry") {
+    @let(name: "identity", value: "RangeGraphIdentity")
 }

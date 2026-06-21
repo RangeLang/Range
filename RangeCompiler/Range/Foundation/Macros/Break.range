@@ -1,0 +1,4 @@
+@statement
+macro break() -> String { target, diagnostics in
+    return "statement|kind=break|projection=target.declaration"
+}

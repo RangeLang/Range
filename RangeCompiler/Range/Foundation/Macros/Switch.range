@@ -1,0 +1,6 @@
+@statement
+macro switch(value: String = "") -> String { target, diagnostics in
+    return "statement|kind=switch|value="
+        + value
+        + "|projection=target.declaration.statements"
+}

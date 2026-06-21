@@ -1,5 +1,5 @@
 @statement
 @syntax
-construct Defer {
-    @let body: Block
+@construct(name: "Defer") {
+    @let(name: "body", value: "Block")
 }

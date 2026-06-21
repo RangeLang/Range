@@ -1,7 +1,7 @@
 @syntax
-construct Block {
-    @let body: Array<@statement>
-    @let statements: Array<@statement>
+@construct(name: "Block") {
+    @let(name: "body", value: "Array<@statement>")
+    @let(name: "statements", value: "Array<@statement>")
 
-    function replace(replacement: Block): Block
+    @function(name: "replace", result: "Block", body: "")
 }

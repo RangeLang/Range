@@ -1,50 +1,20 @@
-construct ConstructMember {
-    @let text: String
-}
-
-construct Construct {
-    @let name: String
-    @let members: Array<ConstructMember>
-}
-
-function constructMembers(source: String): Array<ConstructMember> {
-    state members: Array<ConstructMember>([])
-    let lineCount: Int(source.count(of: "\n") + 1)
-    state index: 0
-
-    while index < lineCount {
-        let line: String(source.segment(index: index, delimiter: "\n"))
-
-        if !line.isEmpty {
-            members.append(element: ConstructMember(text: line))
-        }
-
-        index: index + 1
-    }
-
-    return members
-}
-
-function construct(name: String, source: String): Construct {
-    return Construct(name: name, members: constructMembers(source: source))
-}
-
-function constructMemberLLVM(member: ConstructMember): String {
-    if member.text.contains(value: "|llvm=") {
-        return member.text.segment(index: 1, delimiter: "|llvm=")
+function constructLineLLVM(line: String): String {
+    if line.contains(value: "|llvm=") {
+        return line.segment(index: 1, delimiter: "|llvm=")
     }
 
     return ""
 }
 
-function constructLLVMFields(declaration: Construct): String {
+function constructLLVMFields(source: String): String {
     state output: String("")
+    let lineCount: Int(source.count(of: "\n") + 1)
     state index: 0
     state fieldIndex: 0
 
-    while index < declaration.members.count {
-        let member: ConstructMember(declaration.members.element(index: index))
-        let llvm: String(constructMemberLLVM(member: member))
+    while index < lineCount {
+        let line: String(source.segment(index: index, delimiter: "\n"))
+        let llvm: String(constructLineLLVM(line: line))
 
         if !llvm.isEmpty {
             if fieldIndex > 0 {
@@ -61,28 +31,35 @@ function constructLLVMFields(declaration: Construct): String {
     return output
 }
 
-function constructLowering(declaration: Construct): String {
+function constructMembersLowering(source: String): String {
     state output: String("")
-    output: "construct|name="
-        + declaration.name
-        + "|llvm=%Range."
-        + declaration.name
-        + " = type { "
-        + constructLLVMFields(declaration: declaration)
-        + " }"
+    let lineCount: Int(source.count(of: "\n") + 1)
     state index: 0
 
-    while index < declaration.members.count {
-        let member: ConstructMember(declaration.members.element(index: index))
-        output: output + "\n" + member.text
+    while index < lineCount {
+        let line: String(source.segment(index: index, delimiter: "\n"))
+
+        if !line.isEmpty {
+            output: output + "\n" + line
+        }
+
         index: index + 1
     }
 
     return output
 }
 
+function constructLowering(name: String, source: String): String {
+    return "construct|name="
+        + name
+        + "|llvm=%Range."
+        + name
+        + " = type { "
+        + constructLLVMFields(source: source)
+        + " }"
+        + constructMembersLowering(source: source)
+}
+
 macro construct(name: String): @syntax -> String { target, diagnostics in
-    return constructLowering(
-        declaration: construct(name: name, source: target.application.rawBodyText)
-    )
+    return constructLowering(name: name, source: target.application.rawBodyText)
 }

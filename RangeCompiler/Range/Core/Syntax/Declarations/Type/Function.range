@@ -1,20 +1,20 @@
 @graph(role: .declaration)
 @syntax
-construct Function {
-    @let identity: GraphIdentity
-    @let parent: Optional<GraphIdentity>
-    @let identifier: Identifier
-    @let generics: Array<Generic>
-    @let parameters: Array<Parameter>
-    @let returnType: Optional<TypeReference>
-    @let body: Block
+@construct(name: "Function") {
+    @let(name: "identity", value: "GraphIdentity")
+    @let(name: "parent", value: "Optional<GraphIdentity>")
+    @let(name: "identifier", value: "Identifier")
+    @let(name: "generics", value: "Array<Generic>")
+    @let(name: "parameters", value: "Array<Parameter>")
+    @let(name: "returnType", value: "Optional<TypeReference>")
+    @let(name: "body", value: "Block")
 }
 
 @graph(role: .application)
 @syntax
-construct Function {
-    @let identifier: Identifier
-    @let arguments: Array<Parameter>
+@construct(name: "Function") {
+    @let(name: "identifier", value: "Identifier")
+    @let(name: "arguments", value: "Array<Parameter>")
 
-    function replace(replacement: Expression): Expression
+    @function(name: "replace", result: "Expression", body: "")
 }

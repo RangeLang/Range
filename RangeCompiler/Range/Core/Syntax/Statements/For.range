@@ -1,7 +1,7 @@
 @statement
 @syntax
-construct For {
-    @let pattern: Expression
-    @let sequence: Expression
-    @let body: Block
+@construct(name: "For") {
+    @let(name: "pattern", value: "Expression")
+    @let(name: "sequence", value: "Expression")
+    @let(name: "body", value: "Block")
 }

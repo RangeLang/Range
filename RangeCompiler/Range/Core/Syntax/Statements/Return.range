@@ -1,5 +1,5 @@
 @statement
 @syntax
-construct Return {
-    @let expression: Optional<Expression>
+@construct(name: "Return") {
+    @let(name: "expression", value: "Optional<Expression>")
 }

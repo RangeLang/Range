@@ -1,5 +1,5 @@
 @syntax
-construct WrittenSyntax {
-    @let text: String
-    @let range: Optional<SourceRange>
+@construct(name: "WrittenSyntax") {
+    @let(name: "text", value: "String")
+    @let(name: "range", value: "Optional<SourceRange>")
 }

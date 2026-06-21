@@ -1,0 +1,6 @@
+@statement
+macro if(condition: String = "true") -> String { target, diagnostics in
+    return "statement|kind=if|condition="
+        + condition
+        + "|projection=target.declaration.statements"
+}

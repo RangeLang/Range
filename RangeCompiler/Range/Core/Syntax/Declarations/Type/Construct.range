@@ -1,29 +1,29 @@
 @graph(role: .declaration)
 @syntax
-construct Construct {
-    @let identifier: Identifier
-    @let self: NominalTypeReference
-    @let macros: Array<Macro>
-    @let generics: Array<Generic>
-    @let conformances: Array<NominalTypeReference>
-    @let lets: Array<Let>
-    @let states: Array<State>
-    @let bindings: Array<Binding>
-    @let deriveds: Array<Derived>
-    @let members: Array<GraphIdentity>
-    @let functions: Array<Function>
-    @let constructs: Array<Construct>
-    @let extensions: Array<Extension>
+@construct(name: "Construct") {
+    @let(name: "identifier", value: "Identifier")
+    @let(name: "self", value: "NominalTypeReference")
+    @let(name: "macros", value: "Array<Macro>")
+    @let(name: "generics", value: "Array<Generic>")
+    @let(name: "conformances", value: "Array<NominalTypeReference>")
+    @let(name: "lets", value: "Array<Let>")
+    @let(name: "states", value: "Array<State>")
+    @let(name: "bindings", value: "Array<Binding>")
+    @let(name: "deriveds", value: "Array<Derived>")
+    @let(name: "members", value: "Array<GraphIdentity>")
+    @let(name: "functions", value: "Array<Function>")
+    @let(name: "constructs", value: "Array<Construct>")
+    @let(name: "extensions", value: "Array<Extension>")
 
-    function expand(expansion: () -> Array<@syntax>)
+    @function(name: "expand", result: "Void", body: "")
 }
 
 @graph(role: .application)
 @syntax
-construct Construct {
-    @let type: TypeReference
-    @let arguments: Array<Parameter>
-    @let generics: Array<Parameter>
+@construct(name: "Construct") {
+    @let(name: "type", value: "TypeReference")
+    @let(name: "arguments", value: "Array<Parameter>")
+    @let(name: "generics", value: "Array<Parameter>")
 
-    function replace(replacement: Expression): Expression
+    @function(name: "replace", result: "Expression", body: "")
 }
