@@ -1,6 +1,6 @@
 macro compareProperty<T>(lhs: T, rhs: T, value: Identifier) -> If {
     if lhs.#(value) != rhs.#(value) {
-        return false
+        @return(value: false)
     }
 }
 
@@ -9,7 +9,7 @@ macro equatableBody<T>(lhs: T, rhs: T, properties: Array<Let>) -> Array<@stateme
         @compareProperty(lhs: lhs, rhs: rhs, value: property.identifier)
     })
 
-    return true
+    @return(value: true)
 }
 
 macro equatable(): Construct { target, diagnostics in

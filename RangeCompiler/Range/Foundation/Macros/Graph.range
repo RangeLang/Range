@@ -13,5 +13,5 @@ macro graph(role: GraphRole): Construct -> Identity { target, diagnostics in
         }
     }
 
-    return Identity(uuid: UUID(storage: UUIDStorage()))
+    @return(value: Identity(uuid: UUID(storage: UUIDStorage())))
 }

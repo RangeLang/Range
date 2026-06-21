@@ -1,36 +1,36 @@
 function stateLLVMType(value: String): String {
     if value.contains(value: "Int(") {
-        return "i64"
+        @return(value: "i64")
     }
 
     if value.contains(value: "Bool(") {
-        return "i1"
+        @return(value: "i1")
     }
 
     if value.contains(value: "String(") {
-        return "%Range.String"
+        @return(value: "%Range.String")
     }
 
-    return ""
+    @return(value: "")
 }
 
 function stateLowering(name: String, value: String, ordinal: String, llvm: String): String {
-    return "member|kind=state|name="
+    @return(value: "member|kind=state|name="
         + name
         + "|value="
         + value
         + "|ordinal="
         + ordinal
         + "|llvm="
-        + llvm
+        + llvm)
 }
 
 @member
 macro state(name: String, value: String): @member -> String { target, diagnostics in
-    return stateLowering(
+    @return(value: stateLowering(
         name: name,
         value: value,
         ordinal: "\(target.ordinal)",
         llvm: stateLLVMType(value: value)
-    )
+    ))
 }

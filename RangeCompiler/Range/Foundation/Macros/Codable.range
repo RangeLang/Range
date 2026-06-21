@@ -3,7 +3,7 @@ macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: 
     case .success:
         break
     case .failure(let error):
-        return .failure(cause: error)
+        @return(value: .failure(cause: error))
     }
 }
 
@@ -39,7 +39,7 @@ macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, val
     case .success(let #(value)):
         state self.#(value): #(value)
     case .failure(let error):
-        return .failure(cause: error)
+        @return(value: .failure(cause: error))
     }
 }
 
@@ -93,7 +93,7 @@ macro codable<shape: CodingShape.object>(): @construct { target, diagnostics in
                 behavior.exclude
                 }
             )
-            return excluded.count == 0
+            @return(value: excluded.count == 0)
         }
     )
 
@@ -105,7 +105,7 @@ macro codable<shape: CodingShape.object>(): @construct { target, diagnostics in
                     container: container,
                     properties: properties
                 )
-                return .success(result: Void())
+                @return(value: .success(result: Void()))
             }
 
             function decode(decoder: Decoder): Result<Self, DecodingError> {
@@ -114,7 +114,7 @@ macro codable<shape: CodingShape.object>(): @construct { target, diagnostics in
                     container: container,
                     properties: properties
                 )
-                return .success(result: self)
+                @return(value: .success(result: self))
             }
         }
     }

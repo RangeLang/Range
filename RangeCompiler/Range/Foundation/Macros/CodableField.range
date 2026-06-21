@@ -4,5 +4,5 @@ construct CodingBehavior {
 }
 
 macro codable<T>(key: Optional<String> = nil, exclude: Bool = false): @property -> CodingBehavior { target, diagnostics in
-    return CodingBehavior(key: key, exclude: exclude)
+    @return(value: CodingBehavior(key: key, exclude: exclude))
 }

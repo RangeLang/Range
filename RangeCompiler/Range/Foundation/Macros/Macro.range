@@ -18,7 +18,7 @@ function macroProperties(source: String): Array<MacroProperty> {
     let lineCount: Int(source.count(of: "\n") + 1)
     state index: 0
 
-    while index < lineCount {
+    @while(index < lineCount) {
         let line: String(source.segment(index: index, delimiter: "\n"))
 
         if !line.isEmpty {
@@ -28,20 +28,20 @@ function macroProperties(source: String): Array<MacroProperty> {
         index: index + 1
     }
 
-    return properties
+    @return(value: properties)
 }
 
 function macroDefinition(name: String, type: String, source: String): MacroDefinition {
-    return MacroDefinition(
+    @return(value: MacroDefinition(
         name: name,
         properties: macroProperties(source: source),
         type: type,
         body: MacroBody(text: source)
-    )
+    ))
 }
 
 function macroLowering(declaration: MacroDefinition): String {
-    return "macro " + declaration.name + " -> " + declaration.type + " {\n" + declaration.body.text + "\n}"
+    @return(value: "macro " + declaration.name + " -> " + declaration.type + " {\n" + declaration.body.text + "\n}")
 }
 
 @macro() -> String { target, diagnostics in
@@ -53,5 +53,5 @@ function macroLowering(declaration: MacroDefinition): String {
             source: target.declaration.body
         )
     )
-    return macroLowering(declaration: declaration)
+    @return(value: macroLowering(declaration: declaration))
 }

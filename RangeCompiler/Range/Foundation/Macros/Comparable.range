@@ -1,10 +1,10 @@
 macro compareOrderingProperty<T>(lhs: T, rhs: T, value: Identifier) -> Array<If> {
     if lhs.#(value) < rhs.#(value) {
-        return true
+        @return(value: true)
     }
 
     if rhs.#(value) < lhs.#(value) {
-        return false
+        @return(value: false)
     }
 }
 
@@ -13,7 +13,7 @@ macro comparableBody<T>(lhs: T, rhs: T, properties: Array<Let>) -> Array<@statem
         @compareOrderingProperty(lhs: lhs, rhs: rhs, value: property.identifier)
     })
 
-    return false
+    @return(value: false)
 }
 
 macro comparable(): Construct { target, diagnostics in

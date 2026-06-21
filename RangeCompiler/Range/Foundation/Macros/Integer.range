@@ -26,5 +26,5 @@ macro integer(): Construct -> String { target, diagnostics in
         diagnostics.error("@integer requires a value generic named signedness.")
     }
 
-    return String("i" + bits)
+    @return(value: String("i" + bits))
 }

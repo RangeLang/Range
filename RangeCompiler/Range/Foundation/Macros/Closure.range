@@ -6,9 +6,9 @@ construct ClosureSyntax {
 }
 
 macro closure(delimiter: String = "\n"): @parameter -> @syntax { target, diagnostics in
-    return ClosureSyntax(
+    @return(value: ClosureSyntax(
         syntax: target.application.syntax,
         description: target.application.syntax.description,
         delimiter: delimiter
-    )
+    ))
 }

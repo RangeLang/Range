@@ -5,5 +5,5 @@ macro main(): @block -> String { target, diagnostics, graph in
         diagnostics.error("A second @main conflicts with the main block already declared in this Range project.")
     }
 
-    return llvmMain(body: target.declaration.body)
+    @return(value: llvmMain(body: target.declaration.body))
 }

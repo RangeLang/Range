@@ -1284,6 +1284,11 @@ struct CompileTimeValueEvaluator {
             switch statement {
             case .localBinding(let declaration):
                 nestedLocals[declaration.name] = declaration.expression
+            case .macroApplication(let name, let arguments) where name == "return":
+                guard let valueArgument = arguments.first(where: { $0.label == "value" }) else {
+                    return .object(typeName: "Void", fields: [:])
+                }
+                return evaluate(valueArgument.value, locals: nestedLocals)
             case .macroApplication(let name, let arguments):
                 guard let macro = macroDeclarationsByName[name], let context else {
                     return nil

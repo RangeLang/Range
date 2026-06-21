@@ -16,8 +16,8 @@ macro float(): Construct -> String { target, diagnostics in
     }
 
     if precision == "32" {
-        return "float"
+        @return(value: "float")
     }
 
-    return "double"
+    @return(value: "double")
 }

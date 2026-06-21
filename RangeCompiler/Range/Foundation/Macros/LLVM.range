@@ -1,3 +1,3 @@
 macro llvm(body: String) -> String { target, diagnostics, graph in
-    return body
+    @return(value: body)
 }
