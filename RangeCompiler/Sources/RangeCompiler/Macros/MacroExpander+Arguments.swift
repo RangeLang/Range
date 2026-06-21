@@ -62,6 +62,18 @@ extension MacroExpander {
         }
     }
 
+    static func parseMacroArgumentBindings(
+        for macro: MacroDeclaration,
+        arguments: [CallArgument]
+    ) throws -> [String: Expression] {
+        try argumentBindings(
+            kind: "Macro",
+            name: macro.name,
+            parameters: macro.parameters,
+            arguments: arguments
+        )
+    }
+
     static func parseMacroMetadataArgumentBindings(
         for metadata: MacroMetadataDeclaration,
         argumentClause: String?,

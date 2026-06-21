@@ -19,8 +19,21 @@ public struct MainBlockNode {
     }
 }
 
+public struct BlockMacroNode {
+    public let macros: [MacroApplication]
+    public let body: [Statement]
+    public let rawBody: String
+
+    public init(macros: [MacroApplication], body: [Statement], rawBody: String) {
+        self.macros = macros
+        self.body = body
+        self.rawBody = rawBody
+    }
+}
+
 public struct ModuleFileNode {
     public let mainBlock: MainBlockNode?
+    public let blockMacros: [BlockMacroNode]
     public let states: [StateDeclaration]
     public let callables: [CallableDeclaration]
     public let constructs: [ConstructDeclaration]
@@ -32,6 +45,7 @@ public struct ModuleFileNode {
 
     public init(
         mainBlock: MainBlockNode?,
+        blockMacros: [BlockMacroNode] = [],
         states: [StateDeclaration],
         callables: [CallableDeclaration],
         constructs: [ConstructDeclaration],
@@ -42,6 +56,7 @@ public struct ModuleFileNode {
         extensions: [ExtensionDeclaration]
     ) {
         self.mainBlock = mainBlock
+        self.blockMacros = blockMacros
         self.states = states
         self.callables = callables
         self.constructs = constructs

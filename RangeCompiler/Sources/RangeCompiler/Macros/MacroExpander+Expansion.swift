@@ -105,9 +105,20 @@ extension MacroExpander {
                     body: expandedBody
                 )
             }
+            let expandedBlockMacros = try module.blockMacros.map {
+                try expand(
+                    blockMacro: $0,
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: moduleStateEffects
+                )
+            }
             return .module(
                 ModuleFileNode(
                     mainBlock: expandedMainBlock,
+                    blockMacros: expandedBlockMacros,
                     states: try module.states.map {
                         try expand(
                             state: $0,
@@ -222,6 +233,40 @@ extension MacroExpander {
         case .macro:
             return sourceFile
         }
+    }
+
+    static func expand(
+        blockMacro: BlockMacroNode,
+        macros: [String: MacroDeclaration],
+        parameterMacroSignatures: [ParameterMacroSignature],
+        literalBridges: [RealizedLiteralBridge],
+        context: MacroExpansionContext,
+        stateEffects: [String: PropertyMacroEffects] = [:]
+    ) throws -> BlockMacroNode {
+        let expandedBody = try expand(
+            statements: blockMacro.body,
+            expectedReturnType: nil,
+            macros: macros,
+            parameterMacroSignatures: parameterMacroSignatures,
+            literalBridges: literalBridges,
+            context: context,
+            stateEffects: stateEffects
+        )
+        let memberText = evaluatedStringMacroStatements(
+            in: blockMacro.body,
+            macros: macros,
+            context: context
+        ).joined(separator: "\n")
+        let rawBody = memberText.isEmpty ? blockMacro.rawBody : memberText
+        let applications = blockMacro.macros.map {
+            attachingEvaluatedStringValue(
+                to: $0,
+                rawBody: rawBody,
+                macros: macros,
+                context: context
+            )
+        }
+        return BlockMacroNode(macros: applications, body: expandedBody, rawBody: rawBody)
     }
 
     static func expandMainBlockBody(
@@ -354,6 +399,29 @@ extension MacroExpander {
                 ),
                 "body": .array(statementValues),
                 "statements": .array(statementValues),
+            ]
+        )
+    }
+
+    static func blockMacroTargetValue(
+        rawBody: String,
+        application: MacroApplication
+    ) -> CompileTimeValue {
+        .object(
+            typeName: "Block",
+            fields: [
+                "application": MacroTargetValueBuilder().value(for: application),
+                "declaration": .object(
+                    typeName: "Block.Declaration",
+                    fields: [
+                        "body": .array([]),
+                        "statements": .array([]),
+                    ]
+                ),
+                "body": .array([]),
+                "statements": .array([]),
+                "rawBody": .string(rawBody),
+                "rawBodyText": .string(rawBody),
             ]
         )
     }
@@ -555,6 +623,191 @@ extension MacroExpander {
             var updated = application
             updated.evaluatedStringValue = processed
             return updated
+        }
+    }
+
+    static func attachingEvaluatedStringValue(
+        to application: MacroApplication,
+        rawBody: String,
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> MacroApplication {
+        let applicationWithBody = MacroApplication(
+            name: application.name,
+            genericArguments: application.genericArguments,
+            argumentClause: application.argumentClause,
+            rawBodyLanguage: application.rawBodyLanguage,
+            rawBody: rawBody,
+            evaluatedStringValue: application.evaluatedStringValue
+        )
+        guard let macro = macros[application.name] else {
+            var updated = applicationWithBody
+            updated.evaluatedStringValue = stringyBlockRecord(
+                name: application.name,
+                argumentClause: application.argumentClause,
+                rawBody: rawBody
+            )
+            return updated
+        }
+        let targetBinding = macro.bindings?.target ?? "target"
+
+        let targetValue = blockMacroTargetValue(rawBody: rawBody, application: applicationWithBody)
+        guard
+            let argumentBindings = try? parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: application.argumentClause
+            )
+        else {
+            var updated = applicationWithBody
+            updated.evaluatedStringValue = stringyBlockRecord(
+                name: application.name,
+                argumentClause: application.argumentClause,
+                rawBody: rawBody
+            )
+            return updated
+        }
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: targetBinding,
+            targetValue: targetValue,
+            graphBinding: macro.bindings?.graph,
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                macroMetadataByName: context.macroMetadataByName,
+                constructsByName: context.graphContext.constructsByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: macro),
+            localBindings: argumentBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+            context: context
+        )
+
+        var locals = argumentBindings
+        guard case .string(let processed)? = evaluator.evaluateStatements(macro.body, locals: &locals)
+        else {
+            var updated = applicationWithBody
+            updated.evaluatedStringValue = stringyBlockRecord(
+                name: application.name,
+                argumentClause: application.argumentClause,
+                rawBody: rawBody
+            )
+            return updated
+        }
+
+        var updated = applicationWithBody
+        updated.evaluatedStringValue = processed
+        return updated
+    }
+
+    static func evaluatedStringMacroStatements(
+        in statements: [Statement],
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> [String] {
+        statements.compactMap { statement -> String? in
+            guard case .macroApplication(let name, let arguments) = statement else {
+                return nil
+            }
+            guard let macro = macros[name] else {
+                return stringyMemberRecord(name: name, arguments: arguments)
+            }
+            guard let argumentBindings = try? parseMacroArgumentBindings(
+                for: macro,
+                arguments: arguments
+            ) else {
+                return stringyMemberRecord(name: name, arguments: arguments)
+            }
+            let evaluator = CompileTimeValueEvaluator(
+                targetBinding: macro.bindings?.target ?? "target",
+                targetValue: .object(typeName: "MemberMacro.Target", fields: [:]),
+                graphBinding: macro.bindings?.graph,
+                selfValue: MacroTargetValueBuilder(
+                    macroDeclarationsByName: context.macroDeclarationsByName,
+                    macroMetadataByName: context.macroMetadataByName,
+                    constructsByName: context.graphContext.constructsByName,
+                    knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+                ).value(for: macro),
+                localBindings: argumentBindings,
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+                context: context
+            )
+            var locals = argumentBindings
+            guard case .string(let processed)? = evaluator.evaluateStatements(
+                macro.body,
+                locals: &locals
+            ) else {
+                return stringyMemberRecord(name: name, arguments: arguments)
+            }
+            return processed
+        }
+    }
+
+    static func stringyMemberRecord(name: String, arguments: [CallArgument]) -> String {
+        var fields = ["member|kind=\(name)"]
+        for argument in arguments {
+            guard let label = argument.label else {
+                continue
+            }
+            fields.append("\(label)=\(stringyArgumentValue(argument.value))")
+        }
+        return fields.joined(separator: "|")
+    }
+
+    static func stringyBlockRecord(
+        name: String,
+        argumentClause: String?,
+        rawBody: String
+    ) -> String {
+        let fields = stringyArgumentFields(argumentClause: argumentClause)
+        let header = ([name] + fields).joined(separator: "|")
+        return rawBody.isEmpty ? header : header + "\n" + rawBody
+    }
+
+    static func stringyArgumentFields(argumentClause: String?) -> [String] {
+        guard let argumentClause, !argumentClause.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            let arguments = try? parsedMacroArguments(argumentClause: argumentClause)
+        else {
+            return []
+        }
+        return arguments.compactMap { argument in
+            guard let label = argument.label else {
+                return nil
+            }
+            return "\(label)=\(stringyArgumentValue(argument.value))"
+        }
+    }
+
+    static func parsedMacroArguments(argumentClause: String) throws -> [CallArgument] {
+        var parser = try Parser(source: "macro(\(argumentClause))")
+        _ = try parser.consumeCallableName()
+        let arguments = try parser.parseInvocationArgumentsIfPresent()
+        try parser.consume(Token.eof)
+        return arguments
+    }
+
+    static func stringyArgumentValue(_ expression: Expression) -> String {
+        switch expression {
+        case .string(let value):
+            return value
+        case .integer(let value):
+            return String(value)
+        case .double(let value):
+            return String(value)
+        case .boolean(let value):
+            return value ? "true" : "false"
+        case .identifier(let name):
+            return name
+        case .call(let name, let arguments):
+            let renderedArguments = arguments.map { argument in
+                if let label = argument.label {
+                    return "\(label): \(stringyArgumentValue(argument.value))"
+                }
+                return stringyArgumentValue(argument.value)
+            }.joined(separator: ", ")
+            return "\(name)(\(renderedArguments))"
+        default:
+            return MacroExpander.renderExpressionForStringify(expression)
         }
     }
 

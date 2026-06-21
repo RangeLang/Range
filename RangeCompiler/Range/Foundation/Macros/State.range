@@ -1,3 +1,17 @@
-macro state(): @member -> String { target, diagnostics in
-  return
+construct StateMember {
+    @let name: String
+    @let value: String
+}
+
+function stateMember(name: String, value: String): StateMember {
+    return StateMember(name: name, value: value)
+}
+
+function stateLowering(member: StateMember): String {
+    return "member|kind=state|name=" + member.name + "|value=" + member.value
+}
+
+@member
+macro state(name: String, value: String): @member -> String { target, diagnostics in
+    return String("member|kind=state|name=" + name + "|value=" + value)
 }

@@ -8,11 +8,10 @@ function letMember(name: String, value: String): LetMember {
 }
 
 function letLowering(member: LetMember): String {
-  return member.name + " = " + member.value
+  return "member|kind=let|name=" + member.name + "|value=" + member.value
 }
 
 @member
 macro let(name: String, value: String): @member -> String { target, diagnostics in
-  let member: LetMember(letMember(name: name, value: value))
-  return letLowering(member: member)
+  return String("member|kind=let|name=" + name + "|value=" + value)
 }

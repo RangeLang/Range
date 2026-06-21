@@ -61,6 +61,41 @@ struct CompilerFixtureTests {
         #expect(stringField(type, "llvm") == "i64")
     }
 
+    @Test("Construct macro collects stringy member macro records")
+    func constructMacroCollectsStringyMemberMacroRecords() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyConstruct.range",
+                source: """
+                    @construct(name: "Counter") {
+                        @state(name: "count", value: "Int(27)")
+                        @function(name: "increment", result: "Bool", body: "count: count + 1")
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile else {
+            Issue.record("Expected stringy construct source to parse as a module.")
+            return
+        }
+        let blockMacro = try #require(module.blockMacros.first)
+        let constructMacro = try #require(blockMacro.macros.first)
+
+        #expect(
+            constructMacro.evaluatedStringValue
+                == """
+                construct|name=Counter
+                member|kind=state|name=count|value=Int(27)
+                member|kind=function|name=increment|result=Bool|body=count: count + 1
+                """
+        )
+    }
+
     @Test("CompilePass fixtures validate")
     func compilePassFixturesValidate() throws {
         for fixture in try fixtureFiles(in: "CompilePass") {

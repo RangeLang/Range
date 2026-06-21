@@ -258,6 +258,7 @@ public struct Parser {
         currentCallableReturnTypes = discoveredCallableReturnTypes
 
         var mainBlock: MainBlockNode?
+        var blockMacros: [BlockMacroNode] = []
         var topLevelStates: [StateDeclaration] = []
         var topLevelCallables: [CallableDeclaration] = []
         var constructs: [ConstructDeclaration] = []
@@ -273,6 +274,11 @@ public struct Parser {
                     throw ParseError("Only one @main block is allowed per file.")
                 }
                 mainBlock = try parseMainBlock(requiresEOF: false)
+                continue
+            }
+
+            if isTopLevelBlockMacroStart() {
+                blockMacros.append(try parseTopLevelBlockMacro())
                 continue
             }
 
@@ -339,7 +345,8 @@ public struct Parser {
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
-            extensions.isEmpty
+            extensions.isEmpty,
+            blockMacros.isEmpty
         {
             return .mainBlock(mainBlock)
         }
@@ -350,7 +357,8 @@ public struct Parser {
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
-            extensions.isEmpty
+            extensions.isEmpty,
+            blockMacros.isEmpty
         {
             return .construct(constructs[0])
         }
@@ -359,7 +367,8 @@ public struct Parser {
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
-            enumerations.count == 1, extensions.isEmpty
+            enumerations.count == 1, extensions.isEmpty,
+            blockMacros.isEmpty
         {
             return .enumeration(enumerations[0])
         }
@@ -369,7 +378,8 @@ public struct Parser {
             macros.count == 1,
             precedenceGroups.isEmpty,
             operators.isEmpty,
-            extensions.isEmpty
+            extensions.isEmpty,
+            blockMacros.isEmpty
         {
             return .macro(macros[0])
         }
@@ -379,7 +389,8 @@ public struct Parser {
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
-            !extensions.isEmpty
+            !extensions.isEmpty,
+            blockMacros.isEmpty
         {
             return .extensions(extensions)
         }
@@ -389,13 +400,15 @@ public struct Parser {
             macros.isEmpty,
             precedenceGroups.isEmpty,
             operators.isEmpty,
-            extensions.isEmpty
+            extensions.isEmpty,
+            blockMacros.isEmpty
         {
         }
 
         return .module(
             ModuleFileNode(
                 mainBlock: mainBlock,
+                blockMacros: blockMacros,
                 states: topLevelStates,
                 callables: topLevelCallables,
                 constructs: constructs,
@@ -422,6 +435,11 @@ public struct Parser {
         while peek() != .eof {
             if isMainBlockStart() {
                 try skipMainBlockForDeclarationDiscovery()
+                continue
+            }
+
+            if isTopLevelBlockMacroStart() {
+                try skipTopLevelBlockMacroForDeclarationDiscovery()
                 continue
             }
 

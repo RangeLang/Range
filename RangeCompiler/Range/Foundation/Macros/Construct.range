@@ -30,10 +30,19 @@ function construct(name: String, source: String): Construct {
 }
 
 function constructLowering(declaration: Construct): String {
-    return "%Range." + declaration.name + " = type { }"
+    state output: String("")
+    output: "construct|name=" + declaration.name
+    state index: 0
+
+    while index < declaration.members.count {
+        let member: ConstructMember(declaration.members.element(index: index))
+        output: output + "\n" + member.text
+        index: index + 1
+    }
+
+    return output
 }
 
 macro construct(name: String): @syntax -> String { target, diagnostics in
-    let declaration: Construct(construct(name: name, source: target.application.rawBodyText))
-    return constructLowering(declaration: declaration)
+    return "construct|name=" + name + "\n" + target.application.rawBodyText
 }
