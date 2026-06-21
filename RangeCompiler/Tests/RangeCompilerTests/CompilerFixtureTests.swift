@@ -89,11 +89,18 @@ struct CompilerFixtureTests {
         #expect(
             constructMacro.evaluatedStringValue
                 == """
-                construct|name=Counter
-                member|kind=state|name=count|value=Int(27)
-                member|kind=function|name=increment|result=Bool|body=count: count + 1
+                construct|name=Counter|llvm=%Range.Counter = type { i64 }
+                member|kind=state|name=count|value=Int(27)|ordinal=0|llvm=i64
+                member|kind=function|name=increment|result=Bool|body=count: count + 1|ordinal=1
                 """
         )
+
+        let emittedConstruct = try #require(program.declarationGraph.constructsByName["Counter"])
+        #expect(emittedConstruct.macros.first?.evaluatedStringValue == constructMacro.evaluatedStringValue)
+        #expect(program.declarationGraph.states(onConstruct: "Counter").map(\.name) == ["count"])
+        #expect(program.declarationGraph.states(onConstruct: "Counter").first?.type.displayName == "Int")
+        #expect(program.declarationGraph.callables(onConstruct: "Counter").map(\.name) == ["increment"])
+        #expect(program.declarationGraph.callables(onConstruct: "Counter").first?.returnType?.displayName == "Bool")
     }
 
     @Test("CompilePass fixtures validate")

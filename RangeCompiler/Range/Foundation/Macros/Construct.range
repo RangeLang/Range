@@ -29,9 +29,47 @@ function construct(name: String, source: String): Construct {
     return Construct(name: name, members: constructMembers(source: source))
 }
 
+function constructMemberLLVM(member: ConstructMember): String {
+    if member.text.contains(value: "|llvm=") {
+        return member.text.segment(index: 1, delimiter: "|llvm=")
+    }
+
+    return ""
+}
+
+function constructLLVMFields(declaration: Construct): String {
+    state output: String("")
+    state index: 0
+    state fieldIndex: 0
+
+    while index < declaration.members.count {
+        let member: ConstructMember(declaration.members.element(index: index))
+        let llvm: String(constructMemberLLVM(member: member))
+
+        if !llvm.isEmpty {
+            if fieldIndex > 0 {
+                output: output + ", "
+            }
+
+            output: output + llvm
+            fieldIndex: fieldIndex + 1
+        }
+
+        index: index + 1
+    }
+
+    return output
+}
+
 function constructLowering(declaration: Construct): String {
     state output: String("")
-    output: "construct|name=" + declaration.name
+    output: "construct|name="
+        + declaration.name
+        + "|llvm=%Range."
+        + declaration.name
+        + " = type { "
+        + constructLLVMFields(declaration: declaration)
+        + " }"
     state index: 0
 
     while index < declaration.members.count {
@@ -44,5 +82,7 @@ function constructLowering(declaration: Construct): String {
 }
 
 macro construct(name: String): @syntax -> String { target, diagnostics in
-    return "construct|name=" + name + "\n" + target.application.rawBodyText
+    return constructLowering(
+        declaration: construct(name: name, source: target.application.rawBodyText)
+    )
 }

@@ -643,8 +643,147 @@ public struct DeclarationGraph {
                     into: &registry
                 )
             }
+            for declaration in emittedConstructs(in: parsedFile.sourceFile) {
+                collectConstruct(
+                    declaration,
+                    qualifiedName: declaration.name,
+                    into: &registry
+                )
+            }
         }
         return registry
+    }
+
+    private static func emittedConstructs(in sourceFile: SourceFileNode) -> [ConstructDeclaration] {
+        guard case .module(let module) = sourceFile else {
+            return []
+        }
+
+        return module.blockMacros.flatMap { blockMacro in
+            blockMacro.macros.compactMap { application in
+                guard let payload = application.evaluatedStringValue else {
+                    return nil
+                }
+                return emittedConstruct(from: payload, application: application)
+            }
+        }
+    }
+
+    private static func emittedConstruct(
+        from payload: String,
+        application: MacroApplication
+    ) -> ConstructDeclaration? {
+        let lines = payload.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+        guard let header = lines.first else {
+            return nil
+        }
+        let headerFields = emittedRecordFields(in: header)
+        guard headerFields["kind"] == nil,
+            header.split(separator: "|").first.map(String.init) == "construct",
+            let name = headerFields["name"],
+            !name.isEmpty
+        else {
+            return nil
+        }
+
+        let states = lines.dropFirst().compactMap(emittedState)
+        let callables = lines.dropFirst().compactMap(emittedFunction)
+        let macro = MacroApplication(
+            name: application.name,
+            genericArguments: application.genericArguments,
+            argumentClause: application.argumentClause,
+            rawBodyLanguage: application.rawBodyLanguage,
+            rawBody: application.rawBody,
+            evaluatedStringValue: payload
+        )
+
+        return ConstructDeclaration(
+            macros: [macro],
+            kind: .declaration,
+            attribute: nil,
+            name: name,
+            genericParameters: [],
+            conformances: [],
+            states: states,
+            bindings: [],
+            deriveds: [],
+            values: [],
+            initializers: [],
+            callables: callables,
+            constructs: []
+        )
+    }
+
+    private static func emittedState(from line: String) -> StateDeclaration? {
+        let fields = emittedRecordFields(in: line)
+        guard fields["kind"] == "state",
+            let name = fields["name"],
+            !name.isEmpty
+        else {
+            return nil
+        }
+        let value = fields["value"] ?? ""
+
+        return StateDeclaration(
+            macros: [],
+            name: name,
+            hasExplicitTypeAnnotation: true,
+            type: emittedTypeReference(value: value, fallback: fields["type"]),
+            storage: value.isEmpty ? .declared : .stored(.identifier(value))
+        )
+    }
+
+    private static func emittedFunction(from line: String) -> CallableDeclaration? {
+        let fields = emittedRecordFields(in: line)
+        guard fields["kind"] == "function",
+            let name = fields["name"],
+            !name.isEmpty
+        else {
+            return nil
+        }
+        let body = fields["body"].map { [Statement.expression(.identifier($0))] }
+
+        return CallableDeclaration(
+            macros: [],
+            attribute: nil,
+            targetType: nil,
+            name: name,
+            genericParameters: [],
+            hasExplicitParameterClause: true,
+            parameters: [],
+            returnType: emittedTypeReference(name: fields["result"]),
+            body: body
+        )
+    }
+
+    private static func emittedRecordFields(in line: String) -> [String: String] {
+        var fields: [String: String] = [:]
+        let parts = line.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+        for part in parts.dropFirst() {
+            let pieces = part.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard pieces.count == 2 else {
+                continue
+            }
+            fields[String(pieces[0])] = String(pieces[1])
+        }
+        return fields
+    }
+
+    private static func emittedTypeReference(value: String, fallback: String?) -> TypeReference {
+        if let fallback, !fallback.isEmpty {
+            return emittedTypeReference(name: fallback) ?? .named(fallback)
+        }
+        if let paren = value.firstIndex(of: "("), paren > value.startIndex {
+            return .named(String(value[..<paren]))
+        }
+        return .named("Unknown")
+    }
+
+    private static func emittedTypeReference(name: String?) -> TypeReference? {
+        guard let name, !name.isEmpty else {
+            return nil
+        }
+        return .named(name)
     }
 
     static func collectEnums(from files: [ParsedSourceFile]) -> [String: EnumDeclaration] {

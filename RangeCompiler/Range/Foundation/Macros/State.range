@@ -1,17 +1,49 @@
 construct StateMember {
     @let name: String
     @let value: String
+    @let ordinal: String
+    @let llvm: String
 }
 
-function stateMember(name: String, value: String): StateMember {
-    return StateMember(name: name, value: value)
+function stateMember(name: String, value: String, ordinal: String, llvm: String): StateMember {
+    return StateMember(name: name, value: value, ordinal: ordinal, llvm: llvm)
+}
+
+function stateLLVMType(value: String): String {
+    if value.contains(value: "Int(") {
+        return "i64"
+    }
+
+    if value.contains(value: "Bool(") {
+        return "i1"
+    }
+
+    if value.contains(value: "String(") {
+        return "%Range.String"
+    }
+
+    return ""
 }
 
 function stateLowering(member: StateMember): String {
-    return "member|kind=state|name=" + member.name + "|value=" + member.value
+    return "member|kind=state|name="
+        + member.name
+        + "|value="
+        + member.value
+        + "|ordinal="
+        + member.ordinal
+        + "|llvm="
+        + member.llvm
 }
 
 @member
 macro state(name: String, value: String): @member -> String { target, diagnostics in
-    return String("member|kind=state|name=" + name + "|value=" + value)
+    return stateLowering(
+        member: stateMember(
+            name: name,
+            value: value,
+            ordinal: "\(target.ordinal)",
+            llvm: stateLLVMType(value: value)
+        )
+    )
 }

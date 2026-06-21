@@ -704,22 +704,22 @@ extension MacroExpander {
         macros: [String: MacroDeclaration],
         context: MacroExpansionContext
     ) -> [String] {
-        statements.compactMap { statement -> String? in
+        statements.enumerated().compactMap { offset, statement -> String? in
             guard case .macroApplication(let name, let arguments) = statement else {
                 return nil
             }
             guard let macro = macros[name] else {
-                return stringyMemberRecord(name: name, arguments: arguments)
+                return stringyMemberRecord(name: name, arguments: arguments, ordinal: offset)
             }
             guard let argumentBindings = try? parseMacroArgumentBindings(
                 for: macro,
                 arguments: arguments
             ) else {
-                return stringyMemberRecord(name: name, arguments: arguments)
+                return stringyMemberRecord(name: name, arguments: arguments, ordinal: offset)
             }
             let evaluator = CompileTimeValueEvaluator(
                 targetBinding: macro.bindings?.target ?? "target",
-                targetValue: .object(typeName: "MemberMacro.Target", fields: [:]),
+                targetValue: memberMacroTargetValue(ordinal: offset),
                 graphBinding: macro.bindings?.graph,
                 selfValue: MacroTargetValueBuilder(
                     macroDeclarationsByName: context.macroDeclarationsByName,
@@ -737,19 +737,44 @@ extension MacroExpander {
                 macro.body,
                 locals: &locals
             ) else {
-                return stringyMemberRecord(name: name, arguments: arguments)
+                return stringyMemberRecord(name: name, arguments: arguments, ordinal: offset)
             }
             return processed
         }
     }
 
-    static func stringyMemberRecord(name: String, arguments: [CallArgument]) -> String {
+    static func memberMacroTargetValue(ordinal: Int) -> CompileTimeValue {
+        .object(
+            typeName: "MemberMacro.Target",
+            fields: [
+                "index": .integer(ordinal),
+                "ordinal": .integer(ordinal),
+            ]
+        )
+    }
+
+    static func stringyMemberRecord(
+        name: String,
+        arguments: [CallArgument],
+        ordinal: Int? = nil
+    ) -> String {
         var fields = ["member|kind=\(name)"]
+        var valueField: String?
         for argument in arguments {
             guard let label = argument.label else {
                 continue
             }
-            fields.append("\(label)=\(stringyArgumentValue(argument.value))")
+            let value = stringyArgumentValue(argument.value)
+            if label == "value" {
+                valueField = value
+            }
+            fields.append("\(label)=\(value)")
+        }
+        if let ordinal {
+            fields.append("ordinal=\(ordinal)")
+        }
+        if name == "state", let valueField {
+            fields.append("llvm=\(stringyLLVMType(value: valueField))")
         }
         return fields.joined(separator: "|")
     }
@@ -760,8 +785,46 @@ extension MacroExpander {
         rawBody: String
     ) -> String {
         let fields = stringyArgumentFields(argumentClause: argumentClause)
-        let header = ([name] + fields).joined(separator: "|")
+        let llvmFields = stringyMemberLLVMFields(rawBody: rawBody)
+        let llvm = llvmFields.isEmpty
+            ? ""
+            : "%Range.\(stringyBlockDisplayName(fields: fields, fallback: name)) = type { \(llvmFields.joined(separator: ", ")) }"
+        let headerFields = llvm.isEmpty ? [name] + fields : [name] + fields + ["llvm=\(llvm)"]
+        let header = headerFields.joined(separator: "|")
         return rawBody.isEmpty ? header : header + "\n" + rawBody
+    }
+
+    static func stringyBlockDisplayName(fields: [String], fallback: String) -> String {
+        for field in fields {
+            guard field.hasPrefix("name=") else {
+                continue
+            }
+            return String(field.dropFirst("name=".count))
+        }
+        return fallback
+    }
+
+    static func stringyMemberLLVMFields(rawBody: String) -> [String] {
+        rawBody.split(separator: "\n").compactMap { line in
+            guard let range = line.range(of: "|llvm=") else {
+                return nil
+            }
+            let llvm = line[range.upperBound...]
+            return llvm.isEmpty ? nil : String(llvm)
+        }
+    }
+
+    static func stringyLLVMType(value: String) -> String {
+        if value.contains("Int(") {
+            return "i64"
+        }
+        if value.contains("Bool(") {
+            return "i1"
+        }
+        if value.contains("String(") {
+            return "%Range.String"
+        }
+        return ""
     }
 
     static func stringyArgumentFields(argumentClause: String?) -> [String] {
