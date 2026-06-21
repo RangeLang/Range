@@ -1,10 +1,80 @@
+function functionLineLLVM(line: String): String {
+    if line.contains(value: "|llvm=") {
+        return line.segment(index: 1, delimiter: "|llvm=")
+    }
+
+    return ""
+}
+
+function functionBodyLLVM(body: String): String {
+    state output: String("")
+    let lineCount: Int(body.count(of: "\n") + 1)
+    state index: 0
+    state instructionIndex: 0
+
+    while index < lineCount {
+        let line: String(body.segment(index: index, delimiter: "\n"))
+        let llvm: String(functionLineLLVM(line: line))
+
+        if !llvm.isEmpty {
+            if instructionIndex > 0 {
+                output: output + "; "
+            }
+
+            output: output + llvm
+            instructionIndex: instructionIndex + 1
+        }
+
+        index: index + 1
+    }
+
+    return output
+}
+
+function functionBodyField(body: String): String {
+    if body.contains(value: "statement|") {
+        return "records"
+    }
+
+    return body
+}
+
+function functionBodyRecordsLowering(body: String): String {
+    if !body.contains(value: "statement|") {
+        return ""
+    }
+
+    state output: String("")
+    let lineCount: Int(body.count(of: "\n") + 1)
+    state index: 0
+
+    while index < lineCount {
+        let line: String(body.segment(index: index, delimiter: "\n"))
+
+        if !line.isEmpty {
+            output: output + "\n" + line
+        }
+
+        index: index + 1
+    }
+
+    return output
+}
+
 function functionLowering(name: String, result: String, body: String): String {
-    return "member|kind=function|name="
+    let llvm: String(functionBodyLLVM(body: body))
+    let base: String("member|kind=function|name="
         + name
         + "|result="
         + result
         + "|body="
-        + body
+        + functionBodyField(body: body))
+
+    if llvm.isEmpty {
+        return base + functionBodyRecordsLowering(body: body)
+    }
+
+    return base + "|llvm=" + llvm + functionBodyRecordsLowering(body: body)
 }
 
 macro function(name: String, result: String, body: String): @member -> String { target, diagnostics in

@@ -762,6 +762,7 @@ extension MacroExpander {
             ).value(for: macro),
             localBindings: argumentBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
+            callableDeclarationsByName: context.callableDeclarationsByName,
             knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
             context: context
         )
@@ -810,6 +811,7 @@ extension MacroExpander {
             ).value(for: macro),
             localBindings: argumentBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
+            callableDeclarationsByName: context.callableDeclarationsByName,
             knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
             context: context
         )
@@ -883,6 +885,7 @@ extension MacroExpander {
     ) -> String {
         var fields = ["member|kind=\(name)"]
         var valueField: String?
+        var functionBody: String?
         for argument in arguments {
             guard let label = argument.label else {
                 continue
@@ -891,6 +894,11 @@ extension MacroExpander {
             if label == "value" {
                 valueField = value
             }
+            if name == "function", label == "body", value.contains("statement|") {
+                functionBody = value
+                fields.append("\(label)=records")
+                continue
+            }
             fields.append("\(label)=\(value)")
         }
         if let ordinal {
@@ -898,6 +906,13 @@ extension MacroExpander {
         }
         if name == "state", let valueField {
             fields.append("llvm=\(stringyLLVMType(value: valueField))")
+        }
+        if name == "function", let functionBody {
+            let llvm = stringyStatementLLVMFields(rawBody: functionBody).joined(separator: "; ")
+            if !llvm.isEmpty {
+                fields.append("llvm=\(llvm)")
+            }
+            return fields.joined(separator: "|") + "\n" + functionBody
         }
         return fields.joined(separator: "|")
     }
@@ -928,6 +943,19 @@ extension MacroExpander {
     }
 
     static func stringyMemberLLVMFields(rawBody: String) -> [String] {
+        rawBody.split(separator: "\n").compactMap { line in
+            guard line.contains("member|kind=state") else {
+                return nil
+            }
+            guard let range = line.range(of: "|llvm=") else {
+                return nil
+            }
+            let llvm = line[range.upperBound...]
+            return llvm.isEmpty ? nil : String(llvm)
+        }
+    }
+
+    static func stringyStatementLLVMFields(rawBody: String) -> [String] {
         rawBody.split(separator: "\n").compactMap { line in
             guard let range = line.range(of: "|llvm=") else {
                 return nil

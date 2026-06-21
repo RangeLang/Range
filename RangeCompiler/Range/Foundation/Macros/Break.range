@@ -1,4 +1,4 @@
 @statement
 macro break() -> String { target, diagnostics in
-    return "statement|kind=break|projection=target.declaration"
+    return "statement|kind=break|projection=target.declaration|llvm=br label %loop.end"
 }

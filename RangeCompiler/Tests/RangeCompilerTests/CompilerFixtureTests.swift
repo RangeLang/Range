@@ -238,7 +238,44 @@ struct CompilerFixtureTests {
             return
         }
 
-        #expect(text == "statement|kind=return|value=Int(42)|projection=target.declaration")
+        #expect(
+            text
+                == "statement|kind=return|value=Int(42)|projection=target.declaration|llvm=ret i64 42"
+        )
+    }
+
+    @Test("Function macro collects statement body LLVM records")
+    func functionMacroCollectsStatementBodyLLVMRecords() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/StringyFunctionBody.range",
+                source: """
+                    @construct(name: "Answer") {
+                        @function(name: "answer", result: "Int", body: "statement|kind=return|value=Int(42)|projection=target.declaration|llvm=ret i64 42")
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile else {
+            Issue.record("Expected stringy function body source to parse as a module.")
+            return
+        }
+        let blockMacro = try #require(module.blockMacros.first)
+        let constructMacro = try #require(blockMacro.macros.first)
+
+        #expect(
+            constructMacro.evaluatedStringValue
+                == """
+                construct|name=Answer
+                member|kind=function|name=answer|result=Int|body=records|ordinal=0|llvm=ret i64 42
+                statement|kind=return|value=Int(42)|projection=target.declaration|llvm=ret i64 42
+                """
+        )
     }
 
     @Test("For and switch statement macros expand through Range-authored projection")
@@ -334,8 +371,8 @@ struct CompilerFixtureTests {
 
         #expect(
             emitted == [
-                "statement|kind=break|projection=target.declaration",
-                "statement|kind=continue|projection=target.declaration",
+                "statement|kind=break|projection=target.declaration|llvm=br label %loop.end",
+                "statement|kind=continue|projection=target.declaration|llvm=br label %loop.condition",
             ]
         )
     }

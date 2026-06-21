@@ -1,6 +1,29 @@
+function returnLLVM(value: String): String {
+    if value.isEmpty {
+        return "ret void"
+    }
+
+    if value.contains(value: "Int(") {
+        let suffix: String(value.segment(index: 1, delimiter: "Int("))
+        return "ret i64 " + suffix.segment(index: 0, delimiter: ")")
+    }
+
+    if value.contains(value: "Bool(true)") {
+        return "ret i1 1"
+    }
+
+    if value.contains(value: "Bool(false)") {
+        return "ret i1 0"
+    }
+
+    return "ret " + value
+}
+
 @statement
 macro return(value: String = "") -> String { target, diagnostics in
     return "statement|kind=return|value="
         + value
         + "|projection=target.declaration"
+        + "|llvm="
+        + returnLLVM(value: value)
 }
