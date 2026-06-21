@@ -1,6 +1,6 @@
 @statement
 macro case(value: String = "") -> String { target, diagnostics in
-    return "statement|kind=case|value="
+    @return(value: "statement|kind=case|value="
         + value
-        + "|projection=target.declaration.statements"
+        + "|projection=target.declaration.statements")
 }

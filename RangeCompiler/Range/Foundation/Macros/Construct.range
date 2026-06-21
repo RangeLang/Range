@@ -1,9 +1,9 @@
 function constructLineLLVM(line: String): String {
     if line.contains(value: "member|kind=state") && line.contains(value: "|llvm=") {
-        return line.segment(index: 1, delimiter: "|llvm=")
+        @return(value: line.segment(index: 1, delimiter: "|llvm="))
     }
 
-    return ""
+    @return(value: "")
 }
 
 function constructLLVMFields(source: String): String {
@@ -12,7 +12,7 @@ function constructLLVMFields(source: String): String {
     state index: 0
     state fieldIndex: 0
 
-    while index < lineCount {
+    @while(index < lineCount) {
         let line: String(source.segment(index: index, delimiter: "\n"))
         let llvm: String(constructLineLLVM(line: line))
 
@@ -28,7 +28,7 @@ function constructLLVMFields(source: String): String {
         index: index + 1
     }
 
-    return output
+    @return(value: output)
 }
 
 function constructMembersLowering(source: String): String {
@@ -36,7 +36,7 @@ function constructMembersLowering(source: String): String {
     let lineCount: Int(source.count(of: "\n") + 1)
     state index: 0
 
-    while index < lineCount {
+    @while(index < lineCount) {
         let line: String(source.segment(index: index, delimiter: "\n"))
 
         if !line.isEmpty {
@@ -46,20 +46,20 @@ function constructMembersLowering(source: String): String {
         index: index + 1
     }
 
-    return output
+    @return(value: output)
 }
 
 function constructLowering(name: String, source: String): String {
-    return "construct|name="
+    @return(value: "construct|name="
         + name
         + "|llvm=%Range."
         + name
         + " = type { "
         + constructLLVMFields(source: source)
         + " }"
-        + constructMembersLowering(source: source)
+        + constructMembersLowering(source: source))
 }
 
 macro construct(name: String): @syntax -> String { target, diagnostics in
-    return constructLowering(name: name, source: target.application.rawBodyText)
+    @return(value: constructLowering(name: name, source: target.application.rawBodyText))
 }

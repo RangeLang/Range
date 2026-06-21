@@ -1,9 +1,9 @@
 function functionLineLLVM(line: String): String {
     if line.contains(value: "|llvm=") {
-        return line.segment(index: 1, delimiter: "|llvm=")
+        @return(value: line.segment(index: 1, delimiter: "|llvm="))
     }
 
-    return ""
+    @return(value: "")
 }
 
 function functionBodyLLVM(body: String): String {
@@ -28,27 +28,27 @@ function functionBodyLLVM(body: String): String {
         index: index + 1
     }
 
-    return output
+    @return(value: output)
 }
 
 function functionBodyField(body: String): String {
     if body.contains(value: "statement|") {
-        return "records"
+        @return(value: "records")
     }
 
-    return body
+    @return(value: body)
 }
 
 function functionBodyRecordsLowering(body: String): String {
     if !body.contains(value: "statement|") {
-        return ""
+        @return(value: "")
     }
 
     state output: String("")
     let lineCount: Int(body.count(of: "\n") + 1)
     state index: 0
 
-    while index < lineCount {
+    @while(index < lineCount) {
         let line: String(body.segment(index: index, delimiter: "\n"))
 
         if !line.isEmpty {
@@ -58,7 +58,7 @@ function functionBodyRecordsLowering(body: String): String {
         index: index + 1
     }
 
-    return output
+    @return(value: output)
 }
 
 function functionLowering(name: String, result: String, body: String): String {
@@ -71,12 +71,12 @@ function functionLowering(name: String, result: String, body: String): String {
         + functionBodyField(body: body))
 
     if llvm.isEmpty {
-        return base + functionBodyRecordsLowering(body: body)
+        @return(value: base + functionBodyRecordsLowering(body: body))
     }
 
-    return base + "|llvm=" + llvm + functionBodyRecordsLowering(body: body)
+    @return(value: base + "|llvm=" + llvm + functionBodyRecordsLowering(body: body))
 }
 
 macro function(name: String, result: String, body: String): @member -> String { target, diagnostics in
-    return functionLowering(name: name, result: result, body: body)
+    @return(value: functionLowering(name: name, result: result, body: body))
 }

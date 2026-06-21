@@ -1,15 +1,15 @@
 function ifChildStatementRecords(target: Block): String {
     if target.declaration.bodyText.isEmpty {
-        return ""
+        @return(value: "")
     }
 
-    return "\n" + target.declaration.bodyText
+    @return(value: "\n" + target.declaration.bodyText)
 }
 
 @statement
 macro if(condition: String = "true") -> String { target, diagnostics in
-    return "statement|kind=if|condition="
+    @return(value: "statement|kind=if|condition="
         + condition
         + "|projection=target.declaration.statements"
-        + ifChildStatementRecords(target: target)
+        + ifChildStatementRecords(target: target))
 }

@@ -1,17 +1,17 @@
 function forChildStatementRecords(target: Block): String {
     if target.declaration.bodyText.isEmpty {
-        return ""
+        @return(value: "")
     }
 
-    return "\n" + target.declaration.bodyText
+    @return(value: "\n" + target.declaration.bodyText)
 }
 
 @statement
 macro for(binding: String = "", sequence: String = "") -> String { target, diagnostics in
-    return "statement|kind=for|binding="
+    @return(value: "statement|kind=for|binding="
         + binding
         + "|sequence="
         + sequence
         + "|projection=target.declaration.statements"
-        + forChildStatementRecords(target: target)
+        + forChildStatementRecords(target: target))
 }

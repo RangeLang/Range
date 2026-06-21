@@ -99,6 +99,7 @@ extension MacroExpander {
                     stateEffects: moduleStateEffects
                 )
             }
+            let preservesImplementationStatementMacros = !module.macros.isEmpty
             return .module(
                 ModuleFileNode(
                     mainBlock: expandedMainBlock,
@@ -119,7 +120,8 @@ extension MacroExpander {
                             parameterMacroSignatures: parameterMacroSignatures,
                             literalBridges: literalBridges,
                             context: context,
-                            stateEffects: moduleStateEffects
+                            stateEffects: moduleStateEffects,
+                            preserveStatementMacroApplications: preservesImplementationStatementMacros
                         )
                     } + emittedDeclarationBundles.flatMap(\.callables),
                     constructs: emittedDeclarationBundles.flatMap(\.constructs),
@@ -1145,7 +1147,8 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: PropertyMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:],
+        preserveStatementMacroApplications: Bool = false
     ) throws -> CallableDeclaration {
         CallableDeclaration(
             macros: callable.macros,
@@ -1166,7 +1169,8 @@ extension MacroExpander {
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
-                    stateEffects: stateEffects
+                    stateEffects: stateEffects,
+                    preserveStatementMacroApplications: preserveStatementMacroApplications
                 )
             }
         )
@@ -1809,7 +1813,8 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: PropertyMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:],
+        preserveStatementMacroApplications: Bool = false
     ) throws -> [Statement] {
         var expanded: [Statement] = []
         for statement in statements {
@@ -1821,7 +1826,8 @@ extension MacroExpander {
                     parameterMacroSignatures: parameterMacroSignatures,
                     literalBridges: literalBridges,
                     context: context,
-                    stateEffects: stateEffects
+                    stateEffects: stateEffects,
+                    preserveStatementMacroApplications: preserveStatementMacroApplications
                 ))
         }
         return expanded
@@ -1834,12 +1840,18 @@ extension MacroExpander {
         parameterMacroSignatures: [ParameterMacroSignature],
         literalBridges: [RealizedLiteralBridge],
         context: MacroExpansionContext,
-        stateEffects: [String: PropertyMacroEffects] = [:]
+        stateEffects: [String: PropertyMacroEffects] = [:],
+        preserveStatementMacroApplications: Bool = false
     ) throws -> [Statement] {
         switch statement {
         case .expand, .replace:
             return []
         case .macroInvocation(let name, let argumentClause, let body):
+            if preserveStatementMacroApplications,
+                macros[name]?.macros.contains(where: { $0.name == "statement" }) == true
+            {
+                return [statement]
+            }
             let expandedBody = try expand(
                 statements: body,
                 expectedReturnType: nil,
@@ -1847,7 +1859,8 @@ extension MacroExpander {
                 parameterMacroSignatures: parameterMacroSignatures,
                 literalBridges: literalBridges,
                 context: context,
-                stateEffects: stateEffects
+                stateEffects: stateEffects,
+                preserveStatementMacroApplications: preserveStatementMacroApplications
             )
             return [
                 .emitted(
@@ -1861,6 +1874,11 @@ extension MacroExpander {
                 )
             ]
         case .macroApplication(let name, let arguments):
+            if preserveStatementMacroApplications,
+                macros[name]?.macros.contains(where: { $0.name == "statement" }) == true
+            {
+                return [statement]
+            }
             if macros[name]?.macros.contains(where: { $0.name == "statement" }) == true {
                 return [
                     .emitted(
