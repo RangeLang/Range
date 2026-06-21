@@ -18,6 +18,44 @@ construct BuildResult {
     let messages: Array<BuildMessage>
 }
 
+construct BuildSpan {
+    let path: String
+    let line: Int
+    let text: String
+}
+
+construct BuildBlock {
+    let spans: Array<BuildSpan>
+    let blocks: Array<BuildBlock>
+}
+
+enum BuildSpanRoleKind {
+    case constructDeclaration
+    case enumDeclaration
+    case extensionDeclaration
+    case macroDeclaration
+    case functionDeclaration
+    case parameter
+    case blockMacroInvocation
+}
+
+construct BuildSpanRole {
+    let kind: BuildSpanRoleKind
+    let path: String
+    let line: Int
+    let name: String
+    let text: String
+}
+
+construct BuildSyntaxPiece {
+    let text: String
+}
+
+construct BuildStatement {
+    let span: BuildSpan
+    let syntax: Array<BuildSyntaxPiece>
+}
+
 function missingMainMessage(): String {
     return "Range build requires exactly one @main block."
 }
@@ -30,12 +68,441 @@ function buildSuccessMessage(): String {
     return "Range build emitted LLVM IR for clang."
 }
 
+function sourceBlock(file: ProgramSourceFile): BuildBlock {
+    state spans: Array<BuildSpan>([])
+    let lineCount: Int(file.text.count(of: "\n") + 1)
+    state line: 0
+
+    while line < lineCount {
+        spans.append(
+            element: BuildSpan(
+                path: file.path,
+                line: line,
+                text: file.text.segment(index: line, delimiter: "\n")
+            )
+        )
+        line: line + 1
+    }
+
+    return BuildBlock(spans: spans, blocks: [])
+}
+
+function projectSourceBlocks(path: String): Array<BuildBlock> {
+    let project: RangeProject(path: path)
+    let files: Array<ProgramSourceFile>(project.sourceFiles())
+    state blocks: Array<BuildBlock>([])
+
+    for file in files {
+        blocks.append(element: sourceBlock(file: file))
+    }
+
+    return blocks
+}
+
+function renderSpan(span: BuildSpan): String {
+    return span.text
+}
+
+function renderBlock(block: BuildBlock, delimiter: String): String {
+    state output: String("")
+    state index: 0
+
+    while index < block.spans.count {
+        if index > 0 {
+            output: output + delimiter
+        }
+
+        output: output + renderSpan(span: block.spans.element(index: index))
+        index: index + 1
+    }
+
+    return output
+}
+
+function renderProjectBlocks(path: String, delimiter: String): String {
+    let blocks: Array<BuildBlock>(projectSourceBlocks(path: path))
+    state output: String("")
+    state index: 0
+
+    while index < blocks.count {
+        if index > 0 {
+            output: output + delimiter
+        }
+
+        output: output + renderBlock(block: blocks.element(index: index), delimiter: delimiter)
+        index: index + 1
+    }
+
+    return output
+}
+
+function renderProjectBlocksWithSpaces(path: String): String {
+    return renderProjectBlocks(path: path, delimiter: " ")
+}
+
+function syntaxPieces(span: BuildSpan): Array<BuildSyntaxPiece> {
+    state pieces: Array<BuildSyntaxPiece>([])
+    let text: String(trimLeadingWhitespace(text: span.text))
+    let pieceCount: Int(text.count(of: " ") + 1)
+    state index: 0
+
+    while index < pieceCount {
+        let piece: String(text.segment(index: index, delimiter: " "))
+
+        if !piece.isEmpty {
+            pieces.append(element: BuildSyntaxPiece(text: piece))
+        }
+
+        index: index + 1
+    }
+
+    return pieces
+}
+
+function buildStatement(span: BuildSpan): BuildStatement {
+    return BuildStatement(span: span, syntax: syntaxPieces(span: span))
+}
+
+function collectBlockStatements(block: BuildBlock): Array<BuildStatement> {
+    state statements: Array<BuildStatement>([])
+    state index: 0
+
+    while index < block.spans.count {
+        let span: BuildSpan(block.spans.element(index: index))
+        let trimmed: String(trimLeadingWhitespace(text: span.text))
+
+        if !trimmed.isEmpty {
+            statements.append(element: buildStatement(span: span))
+        }
+
+        index: index + 1
+    }
+
+    return statements
+}
+
+function collectProjectStatements(path: String): Array<BuildStatement> {
+    let blocks: Array<BuildBlock>(projectSourceBlocks(path: path))
+    state statements: Array<BuildStatement>([])
+    state index: 0
+
+    while index < blocks.count {
+        let blockStatements: Array<BuildStatement>(collectBlockStatements(block: blocks.element(index: index)))
+        state statementIndex: 0
+
+        while statementIndex < blockStatements.count {
+            statements.append(element: blockStatements.element(index: statementIndex))
+            statementIndex: statementIndex + 1
+        }
+
+        index: index + 1
+    }
+
+    return statements
+}
+
+function renderSyntaxPieces(pieces: Array<BuildSyntaxPiece>, delimiter: String): String {
+    state output: String("")
+    state index: 0
+
+    while index < pieces.count {
+        if index > 0 {
+            output: output + delimiter
+        }
+
+        let piece: BuildSyntaxPiece(pieces.element(index: index))
+        output: output + piece.text
+        index: index + 1
+    }
+
+    return output
+}
+
+function renderStatement(buildStatement: BuildStatement): String {
+    return String(
+        buildStatement.span.path
+            + ":"
+            + "\(buildStatement.span.line)"
+            + " "
+            + renderSyntaxPieces(pieces: buildStatement.syntax, delimiter: " ")
+    )
+}
+
+function renderProjectStatements(path: String, delimiter: String): String {
+    let statements: Array<BuildStatement>(collectProjectStatements(path: path))
+    state output: String("")
+    state index: 0
+
+    while index < statements.count {
+        if index > 0 {
+            output: output + delimiter
+        }
+
+        output: output + renderStatement(buildStatement: statements.element(index: index))
+        index: index + 1
+    }
+
+    return output
+}
+
+function renderProjectStatementsWithSpaces(path: String): String {
+    return renderProjectStatements(path: path, delimiter: " ")
+}
+
+function trimLeadingWhitespace(text: String): String {
+    state start: 0
+
+    while start < text.count && (text.character(index: start) == " " || text.character(index: start) == "\t") {
+        start: start + 1
+    }
+
+    return text.substring(start: start, end: text.count)
+}
+
+function leadingIdentifier(text: String): String {
+    state end: 0
+
+    while end < text.count {
+        let character: String(text.character(index: end))
+
+        if character == " " || character == "\t" || character == "(" || character == "<" || character == ":" || character == "{" {
+            return text.substring(start: 0, end: end)
+        }
+
+        end: end + 1
+    }
+
+    return text
+}
+
+function buildHasPrefix(text: String, prefix: String): Bool {
+    if text.count < prefix.count {
+        return false
+    }
+
+    return text.substring(start: 0, end: prefix.count) == prefix
+}
+
+function nameAfterPrefix(text: String, prefix: String): String {
+    return leadingIdentifier(text: text.segment(index: 1, delimiter: prefix))
+}
+
+function spanRole(kind: BuildSpanRoleKind, span: BuildSpan, name: String): BuildSpanRole {
+    return BuildSpanRole(
+        kind: kind,
+        path: span.path,
+        line: span.line,
+        name: name,
+        text: span.text
+    )
+}
+
+function detectSpanRoles(span: BuildSpan, depth: Int): Array<BuildSpanRole> {
+    state roles: Array<BuildSpanRole>([])
+    let text: String(trimLeadingWhitespace(text: span.text))
+
+    if depth == 0 && buildHasPrefix(text: text, prefix: "construct ") {
+        roles.append(
+            element: spanRole(
+                kind: .constructDeclaration,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "construct ")
+            )
+        )
+    }
+
+    if depth == 0 && buildHasPrefix(text: text, prefix: "enum ") {
+        roles.append(
+            element: spanRole(
+                kind: .enumDeclaration,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "enum ")
+            )
+        )
+    }
+
+    if depth == 0 && buildHasPrefix(text: text, prefix: "extension ") {
+        roles.append(
+            element: spanRole(
+                kind: .extensionDeclaration,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "extension ")
+            )
+        )
+    }
+
+    if depth == 0 && buildHasPrefix(text: text, prefix: "function ") {
+        roles.append(
+            element: spanRole(
+                kind: .functionDeclaration,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "function ")
+            )
+        )
+    }
+
+    if depth == 0 && buildHasPrefix(text: text, prefix: "macro ") {
+        roles.append(
+            element: spanRole(
+                kind: .macroDeclaration,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "macro ")
+            )
+        )
+    }
+
+    if depth == 0 && buildHasPrefix(text: text, prefix: "open macro ") {
+        roles.append(
+            element: spanRole(
+                kind: .macroDeclaration,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "open macro ")
+            )
+        )
+    }
+
+    if depth == 0 && buildHasPrefix(text: text, prefix: "closed macro ") {
+        roles.append(
+            element: spanRole(
+                kind: .macroDeclaration,
+                span: span,
+                name: nameAfterPrefix(text: text, prefix: "closed macro ")
+            )
+        )
+    }
+
+    if buildHasPrefix(text: text, prefix: "#(") {
+        roles.append(
+            element: spanRole(
+                kind: .blockMacroInvocation,
+                span: span,
+                name: "#"
+            )
+        )
+    }
+
+    if text.contains(value: ":") && !buildHasPrefix(text: text, prefix: "case ") && !buildHasPrefix(text: text, prefix: "let ") && !buildHasPrefix(text: text, prefix: "state ") {
+        roles.append(
+            element: spanRole(
+                kind: .parameter,
+                span: span,
+                name: leadingIdentifier(text: text)
+            )
+        )
+    }
+
+    return roles
+}
+
+function collectBlockSpanRoles(block: BuildBlock): Array<BuildSpanRole> {
+    state roles: Array<BuildSpanRole>([])
+    state depth: 0
+    state index: 0
+
+    while index < block.spans.count {
+        let span: BuildSpan(block.spans.element(index: index))
+        let detected: Array<BuildSpanRole>(detectSpanRoles(span: span, depth: depth))
+        state detectedIndex: 0
+
+        while detectedIndex < detected.count {
+            roles.append(element: detected.element(index: detectedIndex))
+            detectedIndex: detectedIndex + 1
+        }
+
+        depth: depth + span.text.count(of: "{")
+        depth: depth - span.text.count(of: "}")
+
+        if depth < 0 {
+            depth: 0
+        }
+
+        index: index + 1
+    }
+
+    return roles
+}
+
+function collectProjectSpanRoles(path: String): Array<BuildSpanRole> {
+    let blocks: Array<BuildBlock>(projectSourceBlocks(path: path))
+    state roles: Array<BuildSpanRole>([])
+    state index: 0
+
+    while index < blocks.count {
+        let blockRoles: Array<BuildSpanRole>(collectBlockSpanRoles(block: blocks.element(index: index)))
+        state roleIndex: 0
+
+        while roleIndex < blockRoles.count {
+            roles.append(element: blockRoles.element(index: roleIndex))
+            roleIndex: roleIndex + 1
+        }
+
+        index: index + 1
+    }
+
+    return roles
+}
+
+function renderSpanRoleKind(kind: BuildSpanRoleKind): String {
+    switch kind {
+    case .constructDeclaration:
+        return "construct"
+    case .enumDeclaration:
+        return "enum"
+    case .extensionDeclaration:
+        return "extension"
+    case .macroDeclaration:
+        return "macro"
+    case .functionDeclaration:
+        return "function"
+    case .parameter:
+        return "parameter"
+    case .blockMacroInvocation:
+        return "block-macro"
+    }
+}
+
+function renderSpanRole(role: BuildSpanRole): String {
+    return String(
+        renderSpanRoleKind(kind: role.kind)
+            + " "
+            + role.name
+            + " "
+            + role.path
+            + ":"
+            + "\(role.line)"
+    )
+}
+
+function renderProjectSpanRoles(path: String, delimiter: String): String {
+    let roles: Array<BuildSpanRole>(collectProjectSpanRoles(path: path))
+    state output: String("")
+    state index: 0
+
+    while index < roles.count {
+        if index > 0 {
+            output: output + delimiter
+        }
+
+        output: output + renderSpanRole(role: roles.element(index: index))
+        index: index + 1
+    }
+
+    return output
+}
+
+function renderProjectSpanRolesWithSpaces(path: String): String {
+    return renderProjectSpanRoles(path: path, delimiter: " ")
+}
+
 function projectMainCount(path: String): Int {
-    let files: Array<ProgramSourceFile>(FileTree.sourceFiles(path: path))
+    let project: RangeProject(path: path)
+    let files: Array<ProgramSourceFile>(project.sourceFiles())
+    let mainMarker: String("@main")
+    let blockMarker: String(mainMarker + " {")
     state count: 0
 
     for file in files {
-        count: count + file.text.count(of: "@main")
+        count: count + file.text.count(of: blockMarker)
     }
 
     return count

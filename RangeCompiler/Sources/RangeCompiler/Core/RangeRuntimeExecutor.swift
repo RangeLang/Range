@@ -37,16 +37,16 @@ public struct RangeRuntimeExecutor {
 
     public func execute(function name: String, in program: CompiledProgram) throws -> RangeRuntimeValue {
         let callable = try findZeroArgumentCallable(named: name, in: program.expandedFiles)
-        return try execute(callable: callable)
+        return try execute(callable: callable, in: program.expandedFiles)
     }
 
     func execute(function name: String, in context: CompilerPipelineRuntimeContext) throws -> RangeRuntimeValue {
         let files = context.expandedFiles.isEmpty ? context.parsedFiles : context.expandedFiles
         let callable = try findZeroArgumentCallable(named: name, in: files)
-        return try execute(callable: callable)
+        return try execute(callable: callable, in: files)
     }
 
-    private func execute(callable: CallableDeclaration) throws -> RangeRuntimeValue {
+    private func execute(callable: CallableDeclaration, in files: [ParsedSourceFile]) throws -> RangeRuntimeValue {
         guard callable.parameters.isEmpty else {
             throw RangeRuntimeExecutionError.unsupportedCallable("Range runtime execution only supports zero-argument functions today: \(callable.name).")
         }
@@ -58,7 +58,9 @@ public struct RangeRuntimeExecutor {
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: "target",
             targetValue: .object(typeName: "Runtime.Target", fields: [:]),
-            localBindings: locals
+            localBindings: locals,
+            callableDeclarationsByName: Dictionary(grouping: files.flatMap { callables(in: $0.sourceFile) }, by: \.name),
+            knownObjectTypeNames: knownObjectTypeNames(in: files)
         )
 
         guard let value = evaluator.evaluateStatements(body, locals: &locals) else {
@@ -82,14 +84,35 @@ public struct RangeRuntimeExecutor {
     private func callables(in sourceFile: SourceFileNode) -> [CallableDeclaration] {
         switch sourceFile {
         case .module(let module):
-            return module.callables
+            return module.callables + module.constructs.flatMap { callables(in: .construct($0)) }
         case .construct(let construct):
-            return construct.callables
+            return construct.callables + construct.constructs.flatMap { callables(in: .construct($0)) }
         case .extensions(let extensions):
-            return extensions.flatMap(\.callables)
+            return extensions.flatMap { $0.callables + $0.constructs.flatMap { callables(in: .construct($0)) } }
         default:
             return []
         }
+    }
+
+    private func knownObjectTypeNames(in files: [ParsedSourceFile]) -> Set<String> {
+        Set(files.flatMap { constructNames(in: $0.sourceFile) })
+    }
+
+    private func constructNames(in sourceFile: SourceFileNode) -> [String] {
+        switch sourceFile {
+        case .module(let module):
+            return module.constructs.flatMap { constructNames(in: $0) }
+        case .construct(let construct):
+            return constructNames(in: construct)
+        case .extensions(let extensions):
+            return extensions.flatMap { $0.constructs.flatMap(constructNames(in:)) }
+        case .enumeration, .macro, .mainBlock:
+            return []
+        }
+    }
+
+    private func constructNames(in construct: ConstructDeclaration) -> [String] {
+        [construct.name] + construct.constructs.flatMap(constructNames(in:))
     }
 }
 

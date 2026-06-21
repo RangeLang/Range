@@ -1,5 +1,5 @@
 open macro project(): Construct -> Void { target, diagnostics, graph in
-    let projectMacros: Array<Macro.Application>(
+    let projectMacros: Array<Macro>(
         graph.macros.where { entry in
             entry.identifier.name == "project"
         }

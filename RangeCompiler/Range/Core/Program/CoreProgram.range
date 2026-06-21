@@ -7,7 +7,8 @@ construct CoreProgram {
     state files: Array<ProgramSourceFile>([])
 
     function load() {
-        let paths: Array<String>(FileTree.rangeFiles(path: path))
+        let project: RangeProject(path: path)
+        let paths: Array<String>(project.rangeFiles())
 
         state index: 0
         while index < paths.count {

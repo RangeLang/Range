@@ -2419,6 +2419,178 @@ struct LLVMLoweringEmitterTests {
         #expect(scalarTypes["Bool"] == .bool)
     }
 
+    @Test("Capability LLVM emitter gathers scalar applications before declarations")
+    func capabilityLLVMEmitterGathersScalarApplicationsBeforeDeclarations() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+
+        let emitter = CapabilityLLVMEmitter()
+        let applications = emitter.collectScalarApplications(files: program.expandedFiles)
+        let declarations = emitter.resolveScalarDeclarations(applications: applications)
+
+        #expect(
+            applications.contains {
+                $0.macroName == "integer" && $0.targetName == "Int" && $0.resolvedValue == "i64"
+            }
+        )
+        #expect(
+            applications.contains {
+                $0.macroName == "bool" && $0.targetName == "Bool" && $0.resolvedValue == "i1"
+            }
+        )
+        #expect(
+            applications.contains {
+                $0.macroName == "float" && $0.targetName == "Float" && $0.resolvedValue == "double"
+            }
+        )
+        #expect(
+            declarations.contains {
+                $0.macroName == "integer" && $0.targetName == "Int" && $0.llvmType == "i64"
+            }
+        )
+        #expect(
+            declarations.contains {
+                $0.macroName == "bool" && $0.targetName == "Bool" && $0.llvmType == "i1"
+            }
+        )
+        #expect(
+            declarations.contains {
+                $0.macroName == "float" && $0.targetName == "Float" && $0.llvmType == "double"
+            }
+        )
+    }
+
+    @Test("Capability LLVM emitter keeps scalar declarations out of emitted IR")
+    func capabilityLLVMEmitterKeepsScalarDeclarationsOutOfEmittedIR() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let module = CapabilityLLVMEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.scalarDeclarations.contains {
+                $0.targetName == "Int" && $0.llvmType == "i64"
+            }
+        )
+        #expect(
+            module.scalarDeclarations.contains {
+                $0.targetName == "Bool" && $0.llvmType == "i1"
+            }
+        )
+        #expect(
+            module.scalarDeclarations.contains {
+                $0.targetName == "Float" && $0.llvmType == "double"
+            }
+        )
+        #expect(!module.ir.contains("range.scalar"))
+        #expect(!module.ir.contains("%Range.Int"))
+        #expect(!module.ir.contains("%Range.Bool"))
+        #expect(!module.ir.contains("%Range.Float"))
+        #expect(module.ir.contains("define i3 @main()"))
+        #expect(module.ir.contains("ret i3 0"))
+    }
+
+    @Test("Capability LLVM emitter lowers Range integer add function")
+    func capabilityLLVMEmitterLowersRangeIntegerAddFunction() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/CapabilityIntegerAdd.range",
+                source: """
+                    function add(lhs: Int, rhs: Int): Int {
+                        return lhs + rhs
+                    }
+                    """,
+                role: .project
+            )
+        )
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let module = CapabilityLLVMEmitter().emitModule(compiledProgram: program)
+
+        #expect(
+            module.functions.contains {
+                $0.rangeName == "add" && $0.returnType == "i64"
+            }
+        )
+        #expect(
+            module.ir.contains(
+                """
+                define i64 @RangeLLVM_add(i64 %lhs, i64 %rhs) {
+                entry:
+                  %1 = add i64 %lhs, %rhs
+                  ret i64 %1
+                }
+                """
+            )
+        )
+        #expect(module.ir.contains("call i64 @RangeLLVM_add(i64 1, i64 2)"))
+        #expect(module.ir.contains("ret i3 %2"))
+
+        let clang = URL(fileURLWithPath: "/usr/bin/clang")
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeCapabilityLLVMAddTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        let irURL = root.appendingPathComponent("RangeScalar.ll")
+        let executableURL = root.appendingPathComponent("integer-add")
+        try module.ir.write(to: irURL, atomically: true, encoding: .utf8)
+
+        let compile = try run(
+            clang,
+            arguments: [irURL.path, "-O3", "-o", executableURL.path]
+        )
+        #expect(compile.status == 0)
+
+        let runResult = try run(executableURL, arguments: [])
+        #expect(runResult.status == 3)
+    }
+
+    @Test("Range @main macro lowers integer add statements to LLVM")
+    func rangeMainMacroLowersIntegerAddStatementsToLLVM() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/MainIntegerAdd.range",
+                source: """
+                    @main {
+                        let x: Int(1)
+                        let y: Int(2)
+                        return x + y
+                    }
+                    """,
+                role: .project
+            )
+        )
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let module = CapabilityLLVMEmitter().emitModule(compiledProgram: program)
+
+        let mainIR = try #require(module.mainIR)
+        #expect(mainIR.contains("define i3 @main()"))
+        #expect(mainIR.contains("%x = add i64 0, 1"))
+        #expect(mainIR.contains("%y = add i64 0, 2"))
+        #expect(mainIR.contains("add i64 %x, %y"))
+        #expect(mainIR.contains("ret i3"))
+
+        let clang = URL(fileURLWithPath: "/usr/bin/clang")
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("RangeMainMacroLLVMAddTests-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+
+        let irURL = root.appendingPathComponent("RangeScalar.ll")
+        let executableURL = root.appendingPathComponent("main-integer-add")
+        try module.ir.write(to: irURL, atomically: true, encoding: .utf8)
+
+        let compile = try run(
+            clang,
+            arguments: [irURL.path, "-O3", "-o", executableURL.path]
+        )
+        #expect(compile.status == 0)
+
+        let runResult = try run(executableURL, arguments: [])
+        #expect(runResult.status == 3)
+    }
+
     @Test("Core String carries evaluated @string VM layout metadata")
     func coreStringCarriesEvaluatedStringVMLayoutMetadata() throws {
         let inputs = try rangeCoreInputs()

@@ -1,15 +1,9 @@
-open macro main(): @block { target, diagnostics, graph in
-    let llvm: String("; ModuleID = 'RangeScalar'\nsource_filename = \"RangeScalar.range\"\n\ndefine i32 @main() {\nentry:\n  ret i32 0\n}\n")
-    let mainMacros: Array<Macro.Application>(graph.macros(named: self.name))
+open macro main(): @block -> String { target, diagnostics, graph in
+    let mainMacros: Array<Macro>(graph.macros(named: self.name))
 
     if mainMacros.count > 1 {
         diagnostics.error("A second @main conflicts with the main block already declared in this Range project.")
     }
 
-    target.declaration.replace {
-        function main(): Int {
-            @block(statements: target.declaration.body)
-            return 0
-        }
-    }
+    return llvmMain(body: target.declaration.body)
 }

@@ -1,11 +1,11 @@
 @syntax
 @property
 @member
-@graph
+@graph(role: .declaration)
 construct Let<T> {
   let identity: GraphIdentity
   let parent: Optional<GraphIdentity>
-  let macros: Array<Macro.Application>
+  let macros: Array<Macro>
   let identifier: Identifier
   let type: TypeReference
   let value: Optional<Expression>

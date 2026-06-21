@@ -1,23 +1,23 @@
 macro access(accessTarget: AccessTarget): Construct { target, diagnostics in
-    let accessibleFields: Enum.Declaration(
+    let accessibleFields: Enum(
         self: NamedTypeReference(name: "AccessibleFields"),
         generics: [],
         cases: target.declaration.lets.map { field in
-            Enum.Case(identifier: field.identifier, associatedValues: [])
+            EnumCase(identifier: field.identifier, associatedValues: [])
         }
     )
-    let accessibleMacros: Enum.Declaration(
+    let accessibleMacros: Enum(
         self: NamedTypeReference(name: "AccessibleMacros"),
         generics: [],
         cases: target.declaration.macros.map { macro in
-            Enum.Case(identifier: macro.identifier, associatedValues: [])
+            EnumCase(identifier: macro.identifier, associatedValues: [])
         }
     )
-    let accessibleConstructs: Enum.Declaration(
+    let accessibleConstructs: Enum(
         self: NamedTypeReference(name: "AccessibleConstructs"),
         generics: [],
         cases: target.declaration.constructs.map { construct in
-            Enum.Case(identifier: construct.identifier, associatedValues: [])
+            EnumCase(identifier: construct.identifier, associatedValues: [])
         }
     )
 

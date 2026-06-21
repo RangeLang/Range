@@ -1,0 +1,11 @@
+construct RangeProject {
+    let path: String
+
+    function rangeFiles(): Array<String> {
+        return FileTree.rangeFiles(path: path)
+    }
+
+    function sourceFiles(): Array<ProgramSourceFile> {
+        return FileTree.sourceFiles(path: path)
+    }
+}

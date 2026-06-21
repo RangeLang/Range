@@ -6,13 +6,13 @@ import RangeCompiler
 extension CLI {
     struct Compile: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Emit LLVM IR for Range source files and projects."
+            abstract: "Validate Range source files and emit a native LLVM runner script."
         )
 
         @Argument(help: "Project directory or source .range file to validate.")
         var input: String?
 
-        @Argument(help: "LLVM IR output path. Prints to stdout when omitted.")
+        @Argument(help: "Runner script output path. Prints to stdout when omitted.")
         var output: String?
 
         mutating func run() throws {
@@ -24,35 +24,55 @@ extension CLI {
                 let compiledProgram = try ProjectSourceValidator.validatedCompiledProgram(
                     for: project
                 )
+                let emitter = CapabilityLLVMEmitter()
+                let script = validationScript(for: emitter.emitModule(compiledProgram: compiledProgram).ir)
                 if let output {
-                    let backend = SwiftBackend()
                     let outputURL = URL(fileURLWithPath: output).standardizedFileURL
-                    _ = try backend.emitLLVMIRFile(
-                        project: SwiftBackendProject(
-                            projectFiles: project.projectFiles,
-                            isSingleFile: project.isSingleFile,
-                            buildRoot: project.defaultBuildRoot
-                        ),
-                        compiledProgram: compiledProgram,
-                        outputURL: outputURL
+                    try FileManager.default.createDirectory(
+                        at: outputURL.deletingLastPathComponent(),
+                        withIntermediateDirectories: true
                     )
-                    TerminalLog.out("Generated LLVM IR at \(output).", level: .success)
+                    try script.write(to: outputURL, atomically: true, encoding: .utf8)
+                    try FileManager.default.setAttributes(
+                        [.posixPermissions: 0o755],
+                        ofItemAtPath: outputURL.path
+                    )
+                    TerminalLog.out("Generated validation script at \(output).", level: .success)
                 } else {
-                    let backend = SwiftBackend()
-                    let ir = try backend.emitLLVMIR(
-                        project: SwiftBackendProject(
-                            projectFiles: project.projectFiles,
-                            isSingleFile: project.isSingleFile,
-                            buildRoot: project.defaultBuildRoot
-                        ),
-                        compiledProgram: compiledProgram
-                    )
-                    print(ir, terminator: "")
+                    print(script, terminator: "")
                 }
             } catch {
                 ErrorPresenter.printError(error)
                 throw ExitCode.failure
             }
+        }
+
+        private func validationScript(for ir: String) -> String {
+            let delimiter = heredocDelimiter(for: ir)
+            return """
+                #!/usr/bin/env bash
+                set -euo pipefail
+
+                SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+                IR_FILE="${RANGE_LLVM_IR_FILE:-$SCRIPT_DIR/RangeScalar.ll}"
+                EXECUTABLE="${RANGE_EXECUTABLE:-$SCRIPT_DIR/Compiler}"
+
+                mkdir -p "$(dirname "$IR_FILE")"
+                cat > "$IR_FILE" <<'\(delimiter)'
+                \(ir)
+                \(delimiter)
+
+                clang "$IR_FILE" -o "$EXECUTABLE"
+                "$EXECUTABLE" "$@"
+                """
+        }
+
+        private func heredocDelimiter(for text: String) -> String {
+            var delimiter = "__RANGE_LLVM_IR__"
+            while text.contains(delimiter) {
+                delimiter += "_END"
+            }
+            return delimiter
         }
     }
 }

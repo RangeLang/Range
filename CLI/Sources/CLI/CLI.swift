@@ -9,6 +9,7 @@ struct CLI: ParsableCommand {
         subcommands: [
             Create.self,
             Link.self,
+            Build.self,
             Run.self,
             Compile.self,
             Graph.self,

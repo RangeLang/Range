@@ -1,1 +1,5 @@
-construct LLVM { }
+construct LLVM {
+    function main(body: Array<@statement>): String
+}
+
+function llvmMain(body: Array<@statement>): String

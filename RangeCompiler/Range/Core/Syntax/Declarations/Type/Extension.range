@@ -1,7 +1,8 @@
+@graph(role: .declaration)
 @syntax
 construct Extension {
     let target: NominalTypeReference
     let conformances: Array<NominalTypeReference>
-    let functions: Array<Function.Declaration>
-    let constructs: Array<Construct.Declaration>
+    let functions: Array<Function>
+    let constructs: Array<Construct>
 }

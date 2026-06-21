@@ -1,24 +1,20 @@
+@graph(role: .declaration)
 @syntax
 construct Function {
-    let declaration: Declaration
-    let call: Call
+    let identity: GraphIdentity
+    let parent: Optional<GraphIdentity>
+    let identifier: Identifier
+    let generics: Array<Generic>
+    let parameters: Array<Parameter>
+    let returnType: Optional<TypeReference>
+    let body: Block
+}
 
-    @graph(role: .declaration)
-    construct Declaration {
-        let identity: GraphIdentity
-        let parent: Optional<GraphIdentity>
-        let identifier: Identifier
-        let generics: Array<Generic>
-        let parameters: Array<Parameter.Declaration>
-        let returnType: Optional<TypeReference>
-        let body: Block
-    }
+@graph(role: .application)
+@syntax
+construct Function {
+    let identifier: Identifier
+    let arguments: Array<Parameter>
 
-    @graph(role: .application)
-    construct Call {
-        let identifier: Identifier
-        let arguments: Array<Parameter.Application>
-
-        function replace(replacement: Expression): Expression
-    }
+    function replace(replacement: Expression): Expression
 }

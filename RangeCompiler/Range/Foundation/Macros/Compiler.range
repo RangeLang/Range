@@ -1,5 +1,5 @@
 macro compiler(): Construct & @syntax { target, diagnostics, graph in
-    let compilerMacros: Array<Macro.Application>(graph.macros(named: self.name))
+    let compilerMacros: Array<Macro>(graph.macros(named: self.name))
 
     if compilerMacros.count > 1 {
         diagnostics.error("A second @compiler conflicts with the compiler already declared in this Range project.")

@@ -27,7 +27,8 @@ function scalarBuild(): String {
 }
 
 function scalarSourceFiles(): Array<ProgramSourceFile> {
-    return FileTree.sourceFiles(path: "RangeCompiler/Range/Core/DataSystem")
+    let project: RangeProject(path: "RangeCompiler/Range/Core/DataSystem")
+    return project.sourceFiles()
 }
 
 function collectScalarApplications(files: Array<ProgramSourceFile>): Array<ScalarApplication> {

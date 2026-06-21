@@ -1,42 +1,40 @@
 @syntax
+@graph(role: .declaration)
+construct MacroTarget {
+    let kind: String
+    let name: String
+    let type: Optional<TypeReference>
+    let elements: Array<MacroTarget>
+    let written: WrittenSyntax
+}
+
+@graph(role: .declaration)
+@syntax
 construct Macro {
+    let name: String
+    let identifier: Identifier
+    let packageVisibility: String
+    let generics: Array<Generic>
+    let parameters: Array<Parameter>
+    let target: Optional<MacroTarget>
+    let expansionType: Optional<TypeReference>
+    let writtenBody: WrittenSyntax
+    let parsedBody: Parsed<Block>
+    let body: String
+    let syntaxBody: String
+}
 
-    @syntax
-    @graph(role: .declaration)
-    construct Target {
-        let kind: String
-        let name: String
-        let type: Optional<TypeReference>
-        let elements: Array<Target>
-        let written: WrittenSyntax
-    }
-
-    @graph(role: .declaration)
-    construct Declaration {
-        let name: String
-        let identifier: Identifier
-        let packageVisibility: String
-        let generics: Array<Generic>
-        let parameters: Array<Parameter.Declaration>
-        let target: Optional<Target>
-        let expansionType: Optional<TypeReference>
-        let writtenBody: WrittenSyntax
-        let parsedBody: Parsed<Block>
-        let body: String
-        let syntaxBody: String
-    }
-
-    @graph(role: .application)
-    construct Application<Value> {
-        let name: String
-        let identifier: Identifier
-        let genericArguments: Array<TypeReference>
-        let argumentClause: String
-        let arguments: Array<Expression>
-        let rawBody: WrittenSyntax
-        let declaration: Optional<Declaration>
-        let packageVisibility: String
-        let valueType: TypeReference
-        let value: Value
-    }
+@graph(role: .application)
+@syntax
+construct Macro<Value> {
+    let name: String
+    let identifier: Identifier
+    let genericArguments: Array<TypeReference>
+    let argumentClause: String
+    let arguments: Array<Expression>
+    let rawBody: WrittenSyntax
+    let declaration: Optional<Macro>
+    let packageVisibility: String
+    let valueType: TypeReference
+    let value: Value
 }

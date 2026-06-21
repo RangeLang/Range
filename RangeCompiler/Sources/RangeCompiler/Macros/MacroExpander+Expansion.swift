@@ -35,17 +35,23 @@ extension MacroExpander {
     ) throws -> SourceFileNode {
         switch sourceFile {
         case .mainBlock(let mainBlock):
+            let expandedBody = try expandMainBlockBody(
+                mainBlock,
+                expectedReturnType: nil,
+                macros: macros,
+                parameterMacroSignatures: parameterMacroSignatures,
+                literalBridges: literalBridges,
+                context: context
+            )
             return .mainBlock(
                 MainBlockNode(
-                    macros: mainBlock.macros,
-                    body: try expandMainBlockBody(
-                        mainBlock,
-                        expectedReturnType: nil,
+                    macros: attachingEvaluatedStringValues(
+                        to: mainBlock.macros,
+                        body: expandedBody,
                         macros: macros,
-                        parameterMacroSignatures: parameterMacroSignatures,
-                        literalBridges: literalBridges,
                         context: context
-                    ))
+                    ),
+                    body: expandedBody)
             )
         case .module(let module):
             let moduleStateEffects = try propertyMacroEffects(
@@ -75,21 +81,29 @@ extension MacroExpander {
             let expandedExtensions = try module.extensions.map {
                 try expand(extensionDeclaration: $0, macros: macros, context: context)
             }
+            let expandedMainBlock = try module.mainBlock.map { mainBlock in
+                let expandedBody = try expandMainBlockBody(
+                    mainBlock,
+                    expectedReturnType: nil,
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: moduleStateEffects
+                )
+                return MainBlockNode(
+                    macros: attachingEvaluatedStringValues(
+                        to: mainBlock.macros,
+                        body: expandedBody,
+                        macros: macros,
+                        context: context
+                    ),
+                    body: expandedBody
+                )
+            }
             return .module(
                 ModuleFileNode(
-                    mainBlock: try module.mainBlock.map {
-                        MainBlockNode(
-                            macros: $0.macros,
-                            body: try expandMainBlockBody(
-                                $0,
-                                expectedReturnType: nil,
-                                macros: macros,
-                                parameterMacroSignatures: parameterMacroSignatures,
-                                literalBridges: literalBridges,
-                                context: context,
-                                stateEffects: moduleStateEffects
-                            ))
-                    },
+                    mainBlock: expandedMainBlock,
                     states: try module.states.map {
                         try expand(
                             state: $0,
@@ -305,10 +319,7 @@ extension MacroExpander {
     }
 
     static func blockMacroTargetValue(_ statements: [Statement]) -> CompileTimeValue {
-        let statementValues = statements.map { statement in
-            _ = statement
-            return CompileTimeValue.string("")
-        }
+        let statementValues = statements.map(statementValue)
         return .object(
             typeName: "Block",
             fields: [
@@ -323,6 +334,108 @@ extension MacroExpander {
                 "statements": .array(statementValues),
             ]
         )
+    }
+
+    private static func statementValue(_ statement: Statement) -> CompileTimeValue {
+        switch statement {
+        case .localBinding(let declaration):
+            return .object(
+                typeName: "LocalBinding",
+                fields: [
+                    "kind": .string(declaration.kind == .mutable ? "state" : "let"),
+                    "name": .string(declaration.name),
+                    "mutable": .boolean(declaration.kind == .mutable),
+                    "type": .string(declaration.type.displayName),
+                    "expression": expressionValue(declaration.expression),
+                ]
+            )
+        case .return(let expression):
+            return .object(
+                typeName: "Return",
+                fields: [
+                    "expression": expression.map(expressionValue) ?? .nilValue
+                ]
+            )
+        case .expression(let expression):
+            return .object(
+                typeName: "ExpressionStatement",
+                fields: [
+                    "expression": expressionValue(expression)
+                ]
+            )
+        default:
+            return .object(
+                typeName: "UnsupportedStatement",
+                fields: [
+                    "written": .string(renderStatementForBlockValue(statement))
+                ]
+            )
+        }
+    }
+
+    private static func expressionValue(_ expression: Expression) -> CompileTimeValue {
+        switch expression {
+        case .integer(let value):
+            return .object(typeName: "IntegerLiteralExpression", fields: ["value": .integer(value)])
+        case .double(let value):
+            return .object(typeName: "DoubleLiteralExpression", fields: ["value": .double(value)])
+        case .string(let value):
+            return .object(typeName: "StringLiteralExpression", fields: ["value": .string(value)])
+        case .boolean(let value):
+            return .object(typeName: "BooleanLiteralExpression", fields: ["value": .boolean(value)])
+        case .identifier(let name):
+            return .object(typeName: "IdentifierExpression", fields: ["name": .string(name)])
+        case .call(let name, let arguments):
+            return .object(
+                typeName: "CallExpression",
+                fields: [
+                    "name": .string(name),
+                    "arguments": .array(arguments.map(callArgumentValue)),
+                ]
+            )
+        case .binary(let lhs, let operatorSymbol, let rhs):
+            return .object(
+                typeName: "BinaryExpression",
+                fields: [
+                    "lhs": expressionValue(lhs),
+                    "operator": .string(operatorSymbol.rawValue),
+                    "rhs": expressionValue(rhs),
+                ]
+            )
+        default:
+            return .object(
+                typeName: "WrittenExpression",
+                fields: [
+                    "text": .string(renderExpressionForStringify(expression))
+                ]
+            )
+        }
+    }
+
+    private static func callArgumentValue(_ argument: CallArgument) -> CompileTimeValue {
+        .object(
+            typeName: "CallArgument",
+            fields: [
+                "label": argument.label.map { .string($0) } ?? .nilValue,
+                "value": expressionValue(argument.value),
+            ]
+        )
+    }
+
+    private static func renderStatementForBlockValue(_ statement: Statement) -> String {
+        switch statement {
+        case .return(let expression?):
+            return "return \(renderExpressionForStringify(expression))"
+        case .return(nil):
+            return "return"
+        case .expression(let expression):
+            return renderExpressionForStringify(expression)
+        case .localBinding(let declaration):
+            let keyword = declaration.kind == .mutable ? "state" : "let"
+            return "\(keyword) \(declaration.name): \(declaration.type.displayName)(\(renderExpressionForStringify(declaration.expression)))"
+        default:
+            return String(describing: statement)
+        }
     }
 
     static func expand(
@@ -376,6 +489,50 @@ extension MacroExpander {
         var updated = application
         updated.evaluatedStringValue = processed
         return updated
+    }
+
+    static func attachingEvaluatedStringValues(
+        to applications: [MacroApplication],
+        body: [Statement],
+        macros: [String: MacroDeclaration],
+        context: MacroExpansionContext
+    ) -> [MacroApplication] {
+        applications.map { application in
+            guard let macro = macros[application.name],
+                macro.expansionType == .named("String"),
+                let bindings = macro.bindings
+            else {
+                return application
+            }
+
+            let targetValue = blockMacroTargetValue(body)
+            let evaluator = CompileTimeValueEvaluator(
+                targetBinding: bindings.target,
+                targetValue: targetValue,
+                graphBinding: bindings.graph,
+                selfValue: MacroTargetValueBuilder(
+                    macroDeclarationsByName: context.macroDeclarationsByName,
+                    macroMetadataByName: context.macroMetadataByName,
+                    knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+                ).value(for: macro),
+                localBindings: [:],
+                macroDeclarationsByName: context.macroDeclarationsByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+                context: context
+            )
+
+            var localBindings: [String: Expression] = [:]
+            guard case .string(let processed)? = evaluator.evaluateStatements(
+                macro.body,
+                locals: &localBindings
+            ) else {
+                return application
+            }
+
+            var updated = application
+            updated.evaluatedStringValue = processed
+            return updated
+        }
     }
 
     static func expand(

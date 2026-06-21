@@ -9,7 +9,7 @@ macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: 
 
 macro encodeBody(container: KeyedEncodingContainer, properties: Array<Let>) -> Array<Switch> {
     #(properties.map { property in
-        let codingMacros: Array<Macro.Application>(
+        let codingMacros: Array<Macro>(
             property.macros.filter { application in
             application.identifier.name == "codable"
             }
@@ -45,7 +45,7 @@ macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, val
 
 macro decodeBody(container: KeyedDecodingContainer, properties: Array<Let>) -> Array<Switch> {
     #(properties.map { property in
-        let codingMacros: Array<Macro.Application>(
+        let codingMacros: Array<Macro>(
             property.macros.filter { application in
             application.identifier.name == "codable"
             }
@@ -78,7 +78,7 @@ macro codable<shape: CodingShape.object>(): @construct { target, diagnostics in
 
     let properties: Array<Let>(
         target.declaration.lets.filter { property in
-            let codingMacros: Array<Macro.Application>(
+            let codingMacros: Array<Macro>(
                 property.macros.filter { application in
                 application.identifier.name == "codable"
                 }

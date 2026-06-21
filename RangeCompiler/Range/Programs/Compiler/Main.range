@@ -1,4 +1,5 @@
 @main {
-    build()
-    return 0
+    let x: Int(1)
+    let y: Int(2)
+    return x + y
 }

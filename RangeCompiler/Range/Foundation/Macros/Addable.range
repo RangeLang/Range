@@ -1,5 +1,5 @@
 macro addable(): Construct | Extension { target, diagnostics in
-    let additions: Array<Function.Declaration>(
+    let additions: Array<Function>(
         target.declaration.functions.filter { function in
             return function.identifier.name == "+"
         }
