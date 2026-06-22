@@ -1120,7 +1120,7 @@ struct MacroGraphContext {
 
     func declaration(for identity: CompileTimeValue) -> CompileTimeValue? {
         guard let id = identityID(identity) else { return nil }
-        return declarationsByID[id]
+        return declarationsByID[id] ?? .nilValue
     }
 
     func members(of identity: CompileTimeValue) -> CompileTimeValue? {
@@ -1130,7 +1130,7 @@ struct MacroGraphContext {
 
     func parent(of identity: CompileTimeValue) -> CompileTimeValue? {
         guard let id = identityID(identity) else { return nil }
-        return parentByID[id]
+        return parentByID[id] ?? .nilValue
     }
 
     func macros(on identity: CompileTimeValue) -> CompileTimeValue? {
@@ -1158,6 +1158,15 @@ struct MacroGraphContext {
     func sourceDirectory(of identity: CompileTimeValue) -> CompileTimeValue? {
         guard let id = identityID(identity), let path = sourceDirectoryByID[id] else { return nil }
         return .string(path)
+    }
+
+    func unknownCall(name: String, arguments: [CallArgument]) -> CompileTimeValue {
+        switch name {
+        case "members", "macros":
+            return .array([])
+        default:
+            return .nilValue
+        }
     }
 
     private static func writtenSyntaxByID(for graph: DeclarationGraph) -> [String: CompileTimeValue] {

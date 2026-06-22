@@ -904,7 +904,7 @@ struct CompileTimeValueEvaluator {
             else {
                 return nil
             }
-            return context.graphContext.sourcePath(of: identity)
+            return context.graphContext.sourcePath(of: identity) ?? .nilValue
         case "\(graphRoot).sourceDirectory":
             guard arguments.count == 1,
                 arguments[0].label == "of",
@@ -912,7 +912,7 @@ struct CompileTimeValueEvaluator {
             else {
                 return nil
             }
-            return context.graphContext.sourceDirectory(of: identity)
+            return context.graphContext.sourceDirectory(of: identity) ?? .nilValue
         case "\(graphRoot).macros":
             guard arguments.count == 1 else {
                 return nil
@@ -929,7 +929,10 @@ struct CompileTimeValueEvaluator {
             }
             return nil
         default:
-            return nil
+            return context.graphContext.unknownCall(
+                name: String(name.dropFirst(graphRoot.count + 1)),
+                arguments: arguments
+            )
         }
     }
 
