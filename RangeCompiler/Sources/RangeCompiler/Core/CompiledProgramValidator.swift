@@ -3,7 +3,6 @@ import Foundation
 public struct CompiledProgramValidator {
     private let passes: [any CompiledProgramValidationPass] = [
         DeclarationGraphValidator(),
-        ApplicationGraphValidator(),
     ]
 
     public init() {}
