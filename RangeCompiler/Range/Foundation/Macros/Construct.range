@@ -26,6 +26,10 @@ function constructLLVMType(line: String): String {
     @return(value: "")
 }
 
+macro construct.application.rawBodyText -> String { target, diagnostics in
+    @return(value: target.application.rawBodyText)
+}
+
 macro construct: @syntax -> String {
     @parameter(name: "name") {
         @value(type: "String")
@@ -35,11 +39,12 @@ macro construct: @syntax -> String {
     @state(name: "index", value: "0")
     @state(name: "fieldIndex", value: "0")
     @state(name: "pendingState", value: "String(\"false\")")
+    @state(name: "source", value: "@construct.application.rawBodyText")
 
-    @while(index < target.application.rawBodyText.count(of: "\n") + 1) {
+    @while(index < source.count(of: "\n") + 1) {
         @state(
             name: "line",
-            value: target.application.rawBodyText.segment(index: index, delimiter: "\n")
+            value: "source.segment(index: index, delimiter: \"\n\")"
         )
         @state(name: "lineLLVM", value: "String(\"\")")
         @state(name: "wasPendingState", value: "pendingState")

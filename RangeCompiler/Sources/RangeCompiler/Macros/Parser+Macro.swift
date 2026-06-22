@@ -101,7 +101,7 @@ extension Parser {
                 try consume(.leftBrace)
                 memberGenericParameters = try parseMacroMemberGenerics()
                 memberParameters = try parseMacroMemberParameters()
-                bindings = try parseMacroBodyBindings()
+                bindings = macroBodyStartsWithBindings() ? try parseMacroBodyBindings() : nil
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
             } else {
@@ -167,7 +167,7 @@ extension Parser {
             if peek() == .leftBrace {
                 try consume(.leftBrace)
                 _ = try parseMacroMemberParameters()
-                bindings = try parseMacroBodyBindings()
+                bindings = macroBodyStartsWithBindings() ? try parseMacroBodyBindings() : nil
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
             } else {

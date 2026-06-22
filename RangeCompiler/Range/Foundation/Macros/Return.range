@@ -24,7 +24,8 @@ macro return -> String {
 
     @return(value: "statement|kind=return|value="
         + value
-        + "|projection=target.declaration"
+        + "|projection="
+        + @statement.declarationProjection
         + "|llvm="
         + llvm)
 }

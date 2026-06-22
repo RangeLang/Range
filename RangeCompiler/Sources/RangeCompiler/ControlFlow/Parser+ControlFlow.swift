@@ -30,7 +30,12 @@ extension Parser {
             return try parseBackgroundStatement(localBindings: &localBindings)
         }
 
-        if isMacroApplicationStart() {
+        if isMacroApplicationStart()
+            || (currentMacroBodyDepth > 0 && {
+                if case .macroAttribute = peek() { return true }
+                return false
+            }())
+        {
             return try parseMacroApplicationStatement(localBindings: &localBindings)
         }
 

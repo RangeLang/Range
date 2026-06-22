@@ -11,5 +11,5 @@ macro value: @member -> String {
         + "|current="
         + current
         + "|ordinal="
-        + "\(target.ordinal)")
+        + @member.ordinal)
 }

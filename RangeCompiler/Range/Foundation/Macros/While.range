@@ -3,14 +3,16 @@ macro while -> String {
     @parameter(name: "condition") {
         @value(type: "String", current: "true")
     }
+    @state(name: "bodyText", value: "@statement.bodyText")
     @state(name: "children", value: "String(\"\")")
 
-    @if(!target.declaration.bodyText.isEmpty) {
-        children: "\n" + target.declaration.bodyText
+    @if(!bodyText.isEmpty) {
+        children: "\n" + bodyText
     }
 
     @return(value: "statement|kind=while|condition="
         + condition
-        + "|projection=target.declaration.statements"
+        + "|projection="
+        + @statement.projection
         + children)
 }

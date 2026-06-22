@@ -222,6 +222,8 @@ struct CompileTimeValueEvaluator {
                     macro,
                     arguments: arguments,
                     callerLocals: locals,
+                    callerTargetBinding: targetBinding,
+                    callerTargetValue: targetValue,
                     callerSelfValue: selfValue,
                     context: context
                 )
@@ -1351,6 +1353,8 @@ struct CompileTimeValueEvaluator {
                     macro,
                     arguments: resolvedArguments,
                     callerLocals: nestedLocals,
+                    callerTargetBinding: targetBinding,
+                    callerTargetValue: targetValue,
                     callerSelfValue: selfValue,
                     context: context
                 )
@@ -1379,6 +1383,8 @@ struct CompileTimeValueEvaluator {
                         macro,
                         arguments: arguments,
                         callerLocals: nestedLocals,
+                        callerTargetBinding: targetBinding,
+                        callerTargetValue: targetValue,
                         callerSelfValue: selfValue,
                         context: context
                     )
@@ -1403,6 +1409,8 @@ struct CompileTimeValueEvaluator {
                         macro,
                         arguments: resolvedArguments,
                         callerLocals: nestedLocals,
+                        callerTargetBinding: targetBinding,
+                        callerTargetValue: targetValue,
                         callerSelfValue: selfValue,
                         context: context
                     )

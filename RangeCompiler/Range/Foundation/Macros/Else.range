@@ -1,4 +1,4 @@
 @statement
-macro else() -> String { target, diagnostics in
-    @return(value: "statement|kind=else|projection=target.declaration.statements")
+macro else -> String {
+    @return(value: "statement|kind=else|projection=" + @statement.projection)
 }

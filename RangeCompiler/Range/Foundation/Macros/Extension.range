@@ -4,11 +4,12 @@ macro extension: @syntax -> String {
     }
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
+    @state(name: "source", value: "@construct.application.rawBodyText")
 
-    @while(index < target.application.rawBodyText.count(of: "\n") + 1) {
+    @while(index < source.count(of: "\n") + 1) {
         @state(
             name: "line",
-            value: target.application.rawBodyText.segment(index: index, delimiter: "\n")
+            value: "source.segment(index: index, delimiter: \"\n\")"
         )
 
         @if(!line.isEmpty) {

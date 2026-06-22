@@ -13,6 +13,7 @@ macro function: @member -> String {
     @state(name: "members", value: "String(\"\")")
     @state(name: "bodyField", value: "body")
     @state(name: "index", value: "0")
+    @state(name: "memberBodyText", value: "@member.declaration.bodyText")
     @state(name: "instructionIndex", value: "0")
 
     @if(body.contains(value: "statement|")) {
@@ -46,10 +47,10 @@ macro function: @member -> String {
     }
 
     index: 0
-    @while(index < target.declaration.bodyText.count(of: "\n") + 1) {
+    @while(index < memberBodyText.count(of: "\n") + 1) {
         @state(
             name: "memberLine",
-            value: target.declaration.bodyText.segment(index: index, delimiter: "\n")
+            value: "memberBodyText.segment(index: index, delimiter: \"\n\")"
         )
 
         @if(!memberLine.isEmpty) {
@@ -67,7 +68,7 @@ macro function: @member -> String {
             + "|body="
             + bodyField
             + "|ordinal="
-            + "\(target.ordinal)"
+            + @member.ordinal
             + members
             + records)
     }
@@ -79,7 +80,7 @@ macro function: @member -> String {
         + "|body="
         + bodyField
         + "|ordinal="
-        + "\(target.ordinal)"
+        + @member.ordinal
         + "|llvm="
         + llvm
         + members

@@ -3536,6 +3536,9 @@ extension MacroExpander {
             return try evaluateFreestandingSyntaxMacroValueBody(
                 macro,
                 localBindings: bindings,
+                callerTargetBinding: callerTargetBinding,
+                callerTargetValue: callerTargetValue,
+                callerSelfValue: callerSelfValue,
                 context: context
             )
         }
@@ -3559,113 +3562,29 @@ extension MacroExpander {
     static func evaluateFreestandingSyntaxMacroValueBody(
         _ macro: MacroDeclaration,
         localBindings: [String: Expression],
+        callerTargetBinding: String,
+        callerTargetValue: CompileTimeValue,
+        callerSelfValue: CompileTimeValue?,
         context: MacroExpansionContext
     ) throws -> CompileTimeValue? {
+        let targetBinding = macro.bindings?.target ?? callerTargetBinding
+        let targetValue = callerTargetValue
+        let selfValue = MacroTargetValueBuilder(
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            macroMetadataByName: context.macroMetadataByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+        ).value(for: macro)
         let evaluator = CompileTimeValueEvaluator(
-            targetBinding: macro.bindings?.target ?? "__syntax_macro_target__",
-            targetValue: .object(typeName: "SyntaxMacro.Target", fields: [:]),
+            targetBinding: targetBinding,
+            targetValue: targetValue,
             graphBinding: macro.bindings?.graph,
-            selfValue: MacroTargetValueBuilder(
-                macroDeclarationsByName: context.macroDeclarationsByName,
-                macroMetadataByName: context.macroMetadataByName,
-                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
-            ).value(for: macro),
+            selfValue: selfValue,
             localBindings: localBindings,
             macroDeclarationsByName: context.macroDeclarationsByName,
             context: context
         )
-
-        func evaluateStatements(
-            _ statements: [Statement],
-            locals initialLocals: [String: Expression]
-        ) -> CompileTimeValue? {
-            var locals = initialLocals
-            for statement in statements {
-                switch statement {
-                case .localBinding(let declaration):
-                    locals[declaration.name] =
-                        evaluator.evaluate(declaration.expression, with: locals)?.expression
-                        ?? declaration.expression
-                case .macroApplication(let name, let arguments):
-                    guard let invokedMacro = context.macroDeclarationsByName[name] else {
-                        return nil
-                    }
-                    let resolvedArguments = arguments.map { argument in
-                        if let value = evaluator.evaluate(argument.value, with: locals),
-                            let expression = value.expression
-                        {
-                            return CallArgument(label: argument.label, value: expression)
-                        }
-                        return argument
-                    }
-                    return try? evaluateFreestandingSyntaxMacro(
-                        invokedMacro,
-                        arguments: resolvedArguments,
-                        callerLocals: locals,
-                        callerSelfValue: MacroTargetValueBuilder(
-                            macroDeclarationsByName: context.macroDeclarationsByName,
-                            macroMetadataByName: context.macroMetadataByName,
-                            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
-                        ).value(for: macro),
-                        context: context
-                    )
-                case .macroInvocation(let name, let argumentClause, _):
-                    guard let invokedMacro = context.macroDeclarationsByName[name] else {
-                        return nil
-                    }
-                    let arguments: [CallArgument]
-                    if let argumentClause = argumentClause?.trimmingCharacters(
-                        in: .whitespacesAndNewlines),
-                        !argumentClause.isEmpty
-                    {
-                        var parser = try? Parser(source: "macro(\(argumentClause))")
-                        guard parser != nil else {
-                            return nil
-                        }
-                        _ = try? parser?.consumeCallableName()
-                        guard let parsedArguments = try? parser?.parseInvocationArgumentsIfPresent()
-                        else {
-                            return nil
-                        }
-                        arguments = parsedArguments
-                    } else {
-                        arguments = []
-                    }
-                    return try? evaluateFreestandingSyntaxMacro(
-                        invokedMacro,
-                        arguments: arguments,
-                        callerLocals: locals,
-                        callerSelfValue: MacroTargetValueBuilder(
-                            macroDeclarationsByName: context.macroDeclarationsByName,
-                            macroMetadataByName: context.macroMetadataByName,
-                            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
-                        ).value(for: macro),
-                        context: context
-                    )
-                case .return(let expression?):
-                    return evaluator.evaluate(expression, with: locals)
-                case .expression(let expression):
-                    return evaluator.evaluate(expression, with: locals)
-                case .switchStatement:
-                    return try? statementSyntaxValue(statement)
-                case .conditional(let branches):
-                    for branch in branches {
-                        if let condition = branch.condition {
-                            guard case .boolean(true) = evaluator.evaluate(condition, with: locals)
-                            else {
-                                continue
-                            }
-                        }
-                        return evaluateStatements(branch.body, locals: locals)
-                    }
-                default:
-                    return nil
-                }
-            }
-            return nil
-        }
-
-        return evaluateStatements(macro.body, locals: localBindings)
+        var locals = localBindings
+        return evaluator.evaluateStatements(macro.body, locals: &locals)
     }
 
     static func resolvedSyntaxMacroArgument(

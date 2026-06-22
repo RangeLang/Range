@@ -1,6 +1,11 @@
 @statement
-macro elseif(condition: String = "true") -> String { target, diagnostics in
+macro elseif -> String {
+    @parameter(name: "condition") {
+        @value(type: "String", current: "true")
+    }
+
     @return(value: "statement|kind=elseif|condition="
         + condition
-        + "|projection=target.declaration.statements")
+        + "|projection="
+        + @statement.projection)
 }

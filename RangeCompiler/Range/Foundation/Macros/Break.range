@@ -1,4 +1,6 @@
 @statement
-macro break() -> String { target, diagnostics in
-    @return(value: "statement|kind=break|projection=target.declaration|llvm=br label %loop.end")
+macro break -> String {
+    @return(value: "statement|kind=break|projection="
+        + @statement.declarationProjection
+        + "|llvm=br label %loop.end")
 }

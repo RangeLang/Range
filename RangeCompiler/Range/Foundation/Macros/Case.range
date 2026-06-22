@@ -12,10 +12,11 @@ macro case -> String {
             + "|value="
             + value
             + "|ordinal="
-            + "\(target.ordinal)")
+            + @statement.ordinal)
     }
 
     @return(value: "statement|kind=case|value="
         + value
-        + "|projection=target.declaration.statements")
+        + "|projection="
+        + @statement.projection)
 }

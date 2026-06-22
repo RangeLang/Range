@@ -40,6 +40,18 @@ function macroDefinition(name: String, type: String, source: String): MacroDefin
     ))
 }
 
+macro macro.declaration.name -> String { target, diagnostics in
+    @return(value: target.declaration.name)
+}
+
+macro macro.declaration.expansionTypeName -> String { target, diagnostics in
+    @return(value: target.declaration.expansionTypeName)
+}
+
+macro macro.declaration.body -> String { target, diagnostics in
+    @return(value: target.declaration.body)
+}
+
 @macro() -> String { target, diagnostics in
     let macroName: String(target.declaration.name.replacingOccurrences(of: "@", with: ""))
     let declaration: MacroDefinition(

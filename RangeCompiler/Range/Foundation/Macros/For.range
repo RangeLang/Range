@@ -6,16 +6,18 @@ macro for -> String {
     @parameter(name: "sequence") {
         @value(type: "String", current: "String()")
     }
+    @state(name: "bodyText", value: "@statement.bodyText")
     @state(name: "children", value: "String(\"\")")
 
-    @if(!target.declaration.bodyText.isEmpty) {
-        children: "\n" + target.declaration.bodyText
+    @if(!bodyText.isEmpty) {
+        children: "\n" + bodyText
     }
 
     @return(value: "statement|kind=for|binding="
         + binding
         + "|sequence="
         + sequence
-        + "|projection=target.declaration.statements"
+        + "|projection="
+        + @statement.projection
         + children)
 }

@@ -5,11 +5,12 @@ macro let: @member -> String {
     }
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
+    @state(name: "memberBodyText", value: "@member.declaration.bodyText")
 
-    @while(index < target.declaration.bodyText.count(of: "\n") + 1) {
+    @while(index < memberBodyText.count(of: "\n") + 1) {
         @state(
             name: "memberLine",
-            value: target.declaration.bodyText.segment(index: index, delimiter: "\n")
+            value: "memberBodyText.segment(index: index, delimiter: \"\n\")"
         )
 
         @if(!memberLine.isEmpty) {
@@ -22,6 +23,6 @@ macro let: @member -> String {
     @return(value: "member|kind=let|name="
         + name
         + "|ordinal="
-        + "\(target.ordinal)"
+        + @member.ordinal
         + members)
 }
