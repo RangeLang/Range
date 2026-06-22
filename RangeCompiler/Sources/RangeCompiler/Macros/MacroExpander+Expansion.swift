@@ -2962,9 +2962,7 @@ extension MacroExpander {
         context: MacroExpansionContext,
         localBindings: [String: Expression] = [:]
     ) throws {
-        guard let bindings = macro.bindings else {
-            return
-        }
+        let bindings = macro.bindings ?? .implicit
         try emitDiagnostics(
             from: statements,
             diagnosticOwnerName: macro.name,
@@ -2982,9 +2980,7 @@ extension MacroExpander {
         context: MacroExpansionContext,
         localBindings: [String: Expression] = [:]
     ) throws {
-        guard let bindings = metadata.bindings else {
-            return
-        }
+        let bindings = metadata.bindings ?? .implicit
         try emitDiagnostics(
             from: statements,
             diagnosticOwnerName: metadata.name,

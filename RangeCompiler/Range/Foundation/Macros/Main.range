@@ -1,9 +1,9 @@
-macro main(): @block -> String { target, diagnostics, graph in
-    let mainMacros: Array<Macro>(graph.macros(named: target.declaration.identifier.name))
+macro main(): @block -> String {
+    let mainMacros: Array<Macro>(graph.macros(named: declaration.identifier.name))
 
     @if(mainMacros.count > 1) {
         diagnostics.error("A second @main conflicts with the main block already declared in this Range project.")
     }
 
-    @return(value: llvmMain(body: target.declaration.body))
+    @return(value: llvmMain(body: declaration.body))
 }

@@ -1,4 +1,4 @@
-macro encoding(): Construct -> Void { target, diagnostics in
+macro encoding(): Construct -> Void {
 }
 
 @encoding

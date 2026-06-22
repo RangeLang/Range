@@ -544,7 +544,9 @@ struct CompileTimeValueEvaluator {
         let value: CompileTimeValue?
         if root == targetBinding {
             value = targetValue
-        } else if root == graphBinding {
+        } else if let contextValue = targetValue.field(root) {
+            value = contextValue
+        } else if root == graphBinding || (graphBinding == nil && root == "graph") {
             value = .object(
                 typeName: "GraphContext",
                 fields: [
@@ -864,22 +866,22 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> CompileTimeValue? {
-        guard let graphBinding,
-            let context,
-            name.hasPrefix("\(graphBinding).")
+        let graphRoot = graphBinding ?? "graph"
+        guard let context,
+            name.hasPrefix("\(graphRoot).")
         else {
             return nil
         }
 
         switch name {
-        case "\(graphBinding).declaration":
+        case "\(graphRoot).declaration":
             guard arguments.count == 1,
                 let identity = evaluate(arguments[0].value, locals: locals)
             else {
                 return nil
             }
             return context.graphContext.declaration(for: identity)
-        case "\(graphBinding).parent":
+        case "\(graphRoot).parent":
             guard arguments.count == 1,
                 arguments[0].label == "of",
                 let identity = evaluate(arguments[0].value, locals: locals)
@@ -887,7 +889,7 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return context.graphContext.parent(of: identity)
-        case "\(graphBinding).members":
+        case "\(graphRoot).members":
             guard arguments.count == 1,
                 arguments[0].label == "of",
                 let identity = evaluate(arguments[0].value, locals: locals)
@@ -895,7 +897,7 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return context.graphContext.members(of: identity)
-        case "\(graphBinding).sourcePath":
+        case "\(graphRoot).sourcePath":
             guard arguments.count == 1,
                 arguments[0].label == "of",
                 let identity = evaluate(arguments[0].value, locals: locals)
@@ -903,7 +905,7 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return context.graphContext.sourcePath(of: identity)
-        case "\(graphBinding).sourceDirectory":
+        case "\(graphRoot).sourceDirectory":
             guard arguments.count == 1,
                 arguments[0].label == "of",
                 let identity = evaluate(arguments[0].value, locals: locals)
@@ -911,7 +913,7 @@ struct CompileTimeValueEvaluator {
                 return nil
             }
             return context.graphContext.sourceDirectory(of: identity)
-        case "\(graphBinding).macros":
+        case "\(graphRoot).macros":
             guard arguments.count == 1 else {
                 return nil
             }

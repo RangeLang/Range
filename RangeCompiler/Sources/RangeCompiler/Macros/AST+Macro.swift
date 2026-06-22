@@ -151,10 +151,16 @@ public indirect enum MacroTarget {
     }
 }
 
-public struct MacroBindings {
+public struct MacroBindings: Sendable {
     public let target: String
     public let diagnostics: String
     public let graph: String?
+
+    static let implicit = MacroBindings(
+        target: "target",
+        diagnostics: "diagnostics",
+        graph: "graph"
+    )
 }
 
 extension TypeReference {

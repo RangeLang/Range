@@ -1,10 +1,10 @@
-macro member(): Construct | @macro -> Void { target, diagnostics in
+macro member(): Construct | @macro -> Void {
 }
 
-macro member.declaration.bodyText -> String { target, diagnostics in
-    @return(value: target.declaration.bodyText)
+macro member.declaration.bodyText -> String {
+    @return(value: declaration.bodyText)
 }
 
-macro member.ordinal -> String { target, diagnostics in
-    @return(value: "\(target.ordinal)")
+macro member.ordinal -> String {
+    @return(value: "\(ordinal)")
 }

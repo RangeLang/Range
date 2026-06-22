@@ -1,2 +1,2 @@
-macro property(): Construct -> Void { target, diagnostics in
+macro property(): Construct -> Void {
 }

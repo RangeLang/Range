@@ -1,2 +1,2 @@
-macro init(): Function -> Void { target, diagnostics in
+macro init(): Function -> Void {
 }

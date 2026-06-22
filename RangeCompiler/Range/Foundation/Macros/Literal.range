@@ -1,2 +1,2 @@
-macro literal(): Construct { target, diagnostics in
+macro literal(): Construct {
 }

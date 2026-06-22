@@ -1,8 +1,8 @@
-macro float(): Construct -> String { target, diagnostics in
+macro float(): Construct -> String {
     state precision: String("64")
     state hasPrecision: false
 
-    for generic in target.declaration.generics {
+    for generic in declaration.generics {
         let name: String(generic.identifier.name)
 
         @if(name == "precision") {
@@ -11,7 +11,7 @@ macro float(): Construct -> String { target, diagnostics in
         }
     }
 
-    @if(target.declaration.generics.count > 0 && !hasPrecision) {
+    @if(declaration.generics.count > 0 && !hasPrecision) {
         diagnostics.error("@float requires a value generic named precision.")
     }
 

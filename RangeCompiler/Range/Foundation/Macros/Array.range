@@ -1,11 +1,11 @@
 @syntax
-macro array(): Construct -> String { target, diagnostics in
+macro array(): Construct -> String {
     state elementName: String("Element")
     state elementLLVM: String("${Element.llvm}")
     state elementStride: String("${Element.stride}")
     state hasElement: false
 
-    for generic in target.application.generics {
+    for generic in application.generics {
         let typeName: String(generic.name)
 
         @if(!typeName.isEmpty) {

@@ -1,11 +1,11 @@
-macro self(): Construct -> String { target, diagnostics in
-    @return(value: target.declaration.identifier.name)
+macro self(): Construct -> String {
+    @return(value: declaration.identifier.name)
 }
 
-macro self.lets(): Construct -> String { target, diagnostics in
-    @return(value: "\(target.declaration.lets)")
+macro self.lets(): Construct -> String {
+    @return(value: "\(declaration.lets)")
 }
 
-macro self.states(): Construct -> String { target, diagnostics in
-    @return(value: "\(target.declaration.states)")
+macro self.states(): Construct -> String {
+    @return(value: "\(declaration.states)")
 }

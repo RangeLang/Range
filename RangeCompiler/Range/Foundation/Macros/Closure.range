@@ -5,10 +5,10 @@ construct ClosureSyntax {
     @let delimiter: String
 }
 
-macro closure(delimiter: String = "\n"): @parameter -> @syntax { target, diagnostics in
+macro closure(delimiter: String = "\n"): @parameter -> @syntax {
     @return(value: ClosureSyntax(
-        syntax: target.application.syntax,
-        description: target.application.syntax.description,
+        syntax: application.syntax,
+        description: application.syntax.description,
         delimiter: delimiter
     ))
 }
