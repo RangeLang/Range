@@ -671,8 +671,8 @@ struct CompilerFixtureTests {
     @Test("@macro prefix declaration parses")
     func macroPrefixDeclarationParses() throws {
         var parser = try Parser(source: """
-            @macro() -> String { target, diagnostics in
-                return target.declaration.name
+            @macro() -> String {
+                @return(value: declaration.name)
             }
             """)
         let sourceFile = try parser.parseSourceFile()
@@ -688,6 +688,60 @@ struct CompilerFixtureTests {
             Issue.record("Expected @macro prefix declaration to target @macro.")
             return
         }
+    }
+
+    @Test("@macro entrypoint lowers macro declarations to stringy records")
+    func macroEntrypointLowersMacroDeclarationsToStringyRecords() throws {
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
+        let macrosByName = program.declarationGraph.macrosByName
+        let entrypoint = try #require(macrosByName["macro"])
+
+        var parser = try Parser(source: """
+            macro decorate -> String {
+                @return(value: "ok")
+            }
+            """)
+        let sourceFile = try parser.parseSourceFile()
+        guard case .macro(let declaration) = sourceFile else {
+            Issue.record("Expected sample macro declaration to parse.")
+            return
+        }
+
+        let context = program.declarationGraph.macroExpansionContext(macrosByName: macrosByName)
+        let targetValue = MacroTargetValueBuilder(
+            macroDeclarationsByName: macrosByName,
+            macroMetadataByName: context.macroMetadataByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+        ).value(for: declaration)
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: entrypoint.bindings?.target ?? "declaration",
+            targetValue: targetValue,
+            graphBinding: entrypoint.bindings?.graph,
+            selfValue: MacroTargetValueBuilder(
+                macroDeclarationsByName: macrosByName,
+                macroMetadataByName: context.macroMetadataByName,
+                knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+            ).value(for: entrypoint),
+            localBindings: [:],
+            macroDeclarationsByName: macrosByName,
+            context: context
+        )
+        var locals: [String: RangeCompiler.Expression] = [:]
+        guard case .string(let record)? = evaluator.evaluateStatements(
+            entrypoint.body,
+            locals: &locals
+        ) else {
+            Issue.record("Expected @macro entrypoint to emit a stringy macro record.")
+            return
+        }
+
+        #expect(
+            record
+                == """
+                macro|name=decorate|result=String
+                @return(value: "ok")
+                """
+        )
     }
 
     @Test("@self dotted construct metadata macro parses in construct function")

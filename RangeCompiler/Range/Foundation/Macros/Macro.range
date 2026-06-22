@@ -1,71 +1,10 @@
-construct MacroProperty {
-    @let text: String
-}
-
-construct MacroBody {
-    @let text: String
-}
-
-construct MacroDefinition {
-    @let name: String
-    @let properties: Array<MacroProperty>
-    @let type: String
-    @let body: MacroBody
-}
-
-function macroProperties(source: String): Array<MacroProperty> {
-    state properties: Array<MacroProperty>([])
-    let lineCount: Int(source.count(of: "\n") + 1)
-    state index: 0
-
-    @while(index < lineCount) {
-        let line: String(source.segment(index: index, delimiter: "\n"))
-
-        @if(!line.isEmpty) {
-            properties.append(element: MacroProperty(text: line))
-        }
-
-        index: index + 1
-    }
-
-    @return(value: properties)
-}
-
-function macroDefinition(name: String, type: String, source: String): MacroDefinition {
-    @return(value: MacroDefinition(
-        name: name,
-        properties: macroProperties(source: source),
-        type: type,
-        body: MacroBody(text: source)
-    ))
-}
-
-macro macro.declaration.name -> String { target, diagnostics in
-    @return(value: target.declaration.name)
-}
-
-macro macro.declaration.expansionTypeName -> String { target, diagnostics in
-    @return(value: target.declaration.expansionTypeName)
-}
-
-macro macro.declaration.body -> String { target, diagnostics in
-    @return(value: target.declaration.body)
-}
-
-@macro() -> String { target, diagnostics in
-    let macroName: String(target.declaration.name.replacingOccurrences(of: "@", with: ""))
-    let declaration: MacroDefinition(
-        macroDefinition(
-            name: macroName,
-            type: target.declaration.expansionTypeName,
-            source: target.declaration.body
-        )
-    )
-    @return(value: "macro "
+@macro() -> String {
+    @return(value: "macro"
+        + "|name="
         + declaration.name
-        + " -> "
-        + declaration.type
-        + " {\n"
-        + declaration.body.text
-        + "\n}")
+        + "|result="
+        + declaration.expansionTypeName
+        + "\n"
+        + declaration.body
+    )
 }
