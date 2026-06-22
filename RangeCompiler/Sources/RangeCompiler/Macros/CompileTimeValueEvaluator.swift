@@ -546,6 +546,8 @@ struct CompileTimeValueEvaluator {
             value = targetValue
         } else if let contextValue = targetValue.field(root) {
             value = contextValue
+        } else if root == "context" {
+            value = macroContextValue()
         } else if root == graphBinding || (graphBinding == nil && root == "graph") {
             value = .object(
                 typeName: "GraphContext",
@@ -610,6 +612,39 @@ struct CompileTimeValueEvaluator {
         }
 
         return current
+    }
+
+    private func macroContextValue() -> CompileTimeValue {
+        .object(
+            typeName: "MacroContext",
+            fields: [
+                "current": currentGraphIdentity() ?? .nilValue,
+                "graph": graphContextValue(),
+            ]
+        )
+    }
+
+    private func graphContextValue() -> CompileTimeValue {
+        .object(
+            typeName: "GraphContext",
+            fields: [
+                "main": context?.graphContext.mainMacro() ?? .nilValue,
+                "macros": context?.graphContext.macros() ?? .array([]),
+            ]
+        )
+    }
+
+    private func currentGraphIdentity() -> CompileTimeValue? {
+        if let identity = targetValue.field("identity") {
+            return identity
+        }
+        if let identity = targetValue.field("declaration")?.field("identity") {
+            return identity
+        }
+        if let identity = selfValue?.field("identity") {
+            return identity
+        }
+        return nil
     }
 
     private func evaluateStringCall(

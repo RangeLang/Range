@@ -1,0 +1,4 @@
+construct MacroContext {
+    @let current: GraphIdentity
+    @let graph: GraphContext
+}

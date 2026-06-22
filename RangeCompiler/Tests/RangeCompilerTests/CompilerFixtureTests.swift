@@ -744,30 +744,62 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("@self dotted construct metadata macro parses in construct function")
-    func selfDottedConstructMetadataMacroParses() throws {
-        var parser = try Parser(source: """
-            construct User {
-                @let name: String
-
-                function inspect() {
-                    @self.lets.filter
-                }
-            }
-            """)
-        let sourceFile = try parser.parseSourceFile()
-        guard case .construct(let declaration) = sourceFile,
-            let function = declaration.callables.first,
-            let body = function.body,
-            let statement = body.first,
-            case .macroApplication(let name, let arguments) = statement
+    @Test("@self macro parses as value expression")
+    func selfMacroParsesAsValueExpression() throws {
+        var parser = try Parser(source: "@self")
+        let expression = try parser.parseExpression()
+        guard case .macroInvocation(let name, let arguments) = expression
         else {
-            Issue.record("Expected @self.lets.filter to parse as a macro application statement.")
+            Issue.record("Expected @self to parse as a value macro expression.")
             return
         }
 
-        #expect(name == "self.lets.filter")
+        #expect(name == "self")
         #expect(arguments.isEmpty)
+    }
+
+    @Test("@self resolves through macro context current identity")
+    func selfMacroResolvesThroughMacroContextCurrentIdentity() throws {
+        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
+        let macrosByName = MacroExpander.collectMacroDeclarations(from: program.parsedFiles)
+        _ = try #require(macrosByName["self"])
+
+        var parser = try Parser(source: """
+            construct User {
+                @let name: String
+            }
+            """)
+        let sourceFile = try parser.parseSourceFile()
+        guard case .construct(let construct) = sourceFile else {
+            Issue.record("Expected construct.")
+            return
+        }
+
+        let context = program.declarationGraph.macroExpansionContext(macrosByName: macrosByName)
+        let target = MacroTargetValueBuilder(
+            macroDeclarationsByName: macrosByName,
+            macroMetadataByName: context.macroMetadataByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
+        ).targetValue(for: construct)
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: "target",
+            targetValue: target,
+            localBindings: [:],
+            macroDeclarationsByName: macrosByName,
+            context: context
+        )
+
+        guard
+            case .object("GraphIdentity", let fields)? = evaluator.evaluate(
+                .macroInvocation(name: "self", arguments: [])
+            ),
+            case .string("construct:User")? = fields["id"],
+            case .string("construct")? = fields["kind"],
+            case .string("User")? = fields["name"]
+        else {
+            Issue.record("Expected @self to resolve to the current construct graph identity.")
+            return
+        }
     }
 
     @Test("@project macro requires a single project declaration")

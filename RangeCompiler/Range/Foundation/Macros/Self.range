@@ -1,11 +1,15 @@
-macro self(): Construct -> String {
-    @return(value: declaration.identifier.name)
+macro self() -> GraphIdentity {
+    @return(value: context.current)
 }
 
-macro self.lets(): Construct -> String {
-    @return(value: "\(declaration.lets)")
+macro self.declaration() -> GraphEntry {
+    @return(value: graph.declaration(context.current))
 }
 
-macro self.states(): Construct -> String {
-    @return(value: "\(declaration.states)")
+macro self.parent() -> Optional<GraphIdentity> {
+    @return(value: graph.parent(of: context.current))
+}
+
+macro self.members() -> Array<GraphIdentity> {
+    @return(value: graph.members(of: context.current))
 }
