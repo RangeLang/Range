@@ -1,0 +1,16 @@
+@statement
+macro assignment -> String {
+    @parameter(name: "target") {
+        @value(type: "String", current: "String()")
+    }
+    @parameter(name: "value") {
+        @value(type: "String", current: "String()")
+    }
+
+    @return(value: "statement|kind=assign|target="
+        + target
+        + "|value="
+        + value
+        + "|projection="
+        + @statement.declarationProjection)
+}

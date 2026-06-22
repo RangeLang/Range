@@ -1,0 +1,31 @@
+@statement
+macro localBinding -> String {
+    @parameter(name: "name") {
+        @value(type: "String", current: "String()")
+    }
+    @parameter(name: "type") {
+        @value(type: "String", current: "Unknown")
+    }
+    @parameter(name: "value") {
+        @value(type: "String", current: "String()")
+    }
+    @parameter(name: "mutable") {
+        @value(type: "Bool", current: "false")
+    }
+    @state(name: "mutableText", value: "\"false\"")
+
+    @if(mutable) {
+        mutableText: "true"
+    }
+
+    @return(value: "statement|kind=local|name="
+        + name
+        + "|type="
+        + type
+        + "|mutable="
+        + mutableText
+        + "|value="
+        + value
+        + "|projection="
+        + @statement.declarationProjection)
+}

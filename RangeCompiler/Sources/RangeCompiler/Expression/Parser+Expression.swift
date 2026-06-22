@@ -38,7 +38,7 @@ extension Parser {
         return CallArgument(label: nil, value: try parseExpression())
     }
 
-    mutating func parseExpression() throws -> Expression {
+    public mutating func parseExpression() throws -> Expression {
         try parseTernaryExpression()
     }
 

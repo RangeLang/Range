@@ -2201,6 +2201,50 @@ extension MacroExpander {
                 )
             ]
         case .localBinding(let declaration):
+            let expandedExpression = try expand(
+                expression: declaration.expression,
+                expectedType: declaration.hasExplicitTypeAnnotation
+                    ? declaration.type : nil,
+                macros: macros,
+                parameterMacroSignatures: parameterMacroSignatures,
+                literalBridges: literalBridges,
+                context: context,
+                stateEffects: stateEffects
+            )
+            if expectedReturnType != nil,
+                !preserveStatementMacroApplications,
+                statementMacroAvailable("localBinding", in: macros)
+            {
+                return [
+                    .emitted(
+                        evaluatedStringStatementMacro(
+                            name: "localBinding",
+                            arguments: [
+                                CallArgument(label: "name", value: .string(declaration.name)),
+                                CallArgument(
+                                    label: "type",
+                                    value: .string(declaration.type.displayName)
+                                ),
+                                CallArgument(
+                                    label: "value",
+                                    value: .string(
+                                        renderStatementRecordValue(
+                                            expandedExpression,
+                                            expectedType: declaration.type
+                                        )
+                                    )
+                                ),
+                                CallArgument(
+                                    label: "mutable",
+                                    value: .boolean(declaration.kind == .mutable)
+                                ),
+                            ],
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                ]
+            }
             return [
                 .localBinding(
                     LocalBindingDeclaration(
@@ -2208,16 +2252,7 @@ extension MacroExpander {
                         name: declaration.name,
                         hasExplicitTypeAnnotation: declaration.hasExplicitTypeAnnotation,
                         type: declaration.type,
-                        expression: try expand(
-                            expression: declaration.expression,
-                            expectedType: declaration.hasExplicitTypeAnnotation
-                                ? declaration.type : nil,
-                            macros: macros,
-                            parameterMacroSignatures: parameterMacroSignatures,
-                            literalBridges: literalBridges,
-                            context: context,
-                            stateEffects: stateEffects
-                        )
+                        expression: expandedExpression
                     )
                 )
             ]
@@ -2227,18 +2262,43 @@ extension MacroExpander {
                 expression: expression,
                 stateEffects: stateEffects
             )
+            let expandedExpression = try expand(
+                expression: rewrittenExpression,
+                expectedType: expectedType(for: target, stateEffects: stateEffects),
+                macros: macros,
+                parameterMacroSignatures: parameterMacroSignatures,
+                literalBridges: literalBridges,
+                context: context,
+                stateEffects: stateEffects
+            )
+            if expectedReturnType != nil,
+                !preserveStatementMacroApplications,
+                statementMacroAvailable("assignment", in: macros)
+            {
+                return [
+                    .emitted(
+                        evaluatedStringStatementMacro(
+                            name: "assignment",
+                            arguments: [
+                                CallArgument(
+                                    label: "target",
+                                    value: .string(renderAssignmentTarget(target))
+                                ),
+                                CallArgument(
+                                    label: "value",
+                                    value: .string(renderStatementRecordValue(expandedExpression))
+                                ),
+                            ],
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                ]
+            }
             return [
                 .assignment(
                     target: target,
-                    expression: try expand(
-                        expression: rewrittenExpression,
-                        expectedType: expectedType(for: target, stateEffects: stateEffects),
-                        macros: macros,
-                        parameterMacroSignatures: parameterMacroSignatures,
-                        literalBridges: literalBridges,
-                        context: context,
-                        stateEffects: stateEffects
-                    )
+                    expression: expandedExpression
                 )
             ]
         case .compoundAssignment(let target, let operatorSymbol, let expression):
@@ -2299,7 +2359,9 @@ extension MacroExpander {
                         context: context,
                         stateEffects: stateEffects)
                 }
-                let value = expandedExpression.map(renderExpressionForStringify) ?? ""
+                let value = expandedExpression.map {
+                    renderStatementRecordValue($0, expectedType: expectedReturnType)
+                } ?? ""
                 return [
                     .emitted(
                         evaluatedStringStatementMacro(
@@ -4529,6 +4591,24 @@ extension MacroExpander {
         case .member(let base, let name):
             return "\(renderAssignmentTarget(base)).\(name)"
         }
+    }
+
+    static func renderStatementRecordValue(
+        _ expression: Expression,
+        expectedType: TypeReference? = nil
+    ) -> String {
+        if let expectedType {
+            switch (expectedType, expression) {
+            case (.named("Int"), .integer), (.named("String"), .string),
+                (.named("Bool"), .boolean), (.named("Float"), .double):
+                return "\(expectedType.displayName)(\(renderExpressionForStringify(expression)))"
+            case (.generic(.named("Int"), _), .integer):
+                return "\(expectedType.displayName)(\(renderExpressionForStringify(expression)))"
+            default:
+                break
+            }
+        }
+        return stringyArgumentValue(expression)
     }
 
     static func emittedSyntaxKind(

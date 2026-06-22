@@ -1,32 +1,5 @@
 import RangeCompiler
 
-enum StringyStatementRecord {
-    static func returnLLVM(in text: String) -> String? {
-        for line in text.split(separator: "\n") {
-            guard line.hasPrefix("statement|kind=return"),
-                let llvm = field("llvm", in: String(line)),
-                llvm.hasPrefix("ret ")
-            else {
-                continue
-            }
-            return llvm
-        }
-        return nil
-    }
-
-    private static func field(_ name: String, in line: String) -> String? {
-        let prefix = "\(name)="
-        guard let range = line.range(of: prefix) else {
-            return nil
-        }
-        let afterPrefix = line[range.upperBound...]
-        if let end = afterPrefix.firstIndex(of: "|") {
-            return String(afterPrefix[..<end])
-        }
-        return String(afterPrefix)
-    }
-}
-
 enum LLVMLowerability {
     struct ConstructLayout: Equatable {
         struct Field: Equatable {
@@ -486,10 +459,17 @@ enum LLVMLowerability {
 
             switch statement {
             case .emitted(let text):
-                guard StringyStatementRecord.returnLLVM(in: text) != nil else {
+                guard let recordReturn = canLowerStringyRecords(
+                    StringyStatementRecord.records(in: text),
+                    returnType: returnType,
+                    locals: &locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                ) else {
                     continue
                 }
-                sawReturn = true
+                sawReturn = recordReturn
             case .macroApplication:
                 continue
             case .localBinding(let declaration):
@@ -611,6 +591,243 @@ enum LLVMLowerability {
         }
 
         return sawReturn
+    }
+
+    private static func canLowerStringyRecords(
+        _ records: [StringyStatementRecord],
+        returnType: ScalarType,
+        locals: inout [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout],
+        scalarTypes: [String: ScalarType]
+    ) -> Bool? {
+        guard !records.isEmpty else {
+            return nil
+        }
+
+        var sawReturn = false
+        for record in records {
+            if sawReturn {
+                return nil
+            }
+
+            switch record {
+            case .returnStatement(let value?, let llvm):
+                if concreteReturnLLVM(llvm, matches: returnType) {
+                    sawReturn = true
+                    continue
+                }
+                guard canConvert(
+                    canLower(
+                        value,
+                        locals: locals,
+                        lowerableFunctionSignatures: lowerableFunctionSignatures,
+                        constructLayouts: constructLayouts
+                    ),
+                    to: returnType
+                ) else {
+                    return nil
+                }
+                sawReturn = true
+            case .returnStatement(nil, let llvm):
+                guard concreteReturnLLVM(llvm, matches: returnType) else {
+                    return nil
+                }
+                sawReturn = true
+            case .local(let name, let typeName, _, let value):
+                let type = ScalarType(
+                    typeReference: .named(typeName),
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                )
+                guard let type,
+                    canConvert(
+                        canLower(
+                            value,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures,
+                            constructLayouts: constructLayouts
+                        ),
+                        to: type
+                    )
+                else {
+                    return nil
+                }
+                locals[name] = type
+            case .assignment(let target, let value):
+                guard let type = locals[target],
+                    canConvert(
+                        canLower(
+                            value,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures,
+                            constructLayouts: constructLayouts
+                        ),
+                        to: type
+                    )
+                else {
+                    return nil
+                }
+            case .whileLoop(let condition, let body):
+                guard canLower(
+                    condition,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
+                ) == .bool else {
+                    return nil
+                }
+                var bodyLocals = locals
+                guard canLowerStringyLoopBody(
+                    body,
+                    locals: &bodyLocals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                ) else {
+                    return nil
+                }
+            case .conditional(let condition, let body):
+                guard canLower(
+                    condition,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
+                ) == .bool else {
+                    return nil
+                }
+                var branchLocals = locals
+                _ = canLowerStringyRecords(
+                    body,
+                    returnType: returnType,
+                    locals: &branchLocals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                )
+            case .breakStatement, .continueStatement:
+                return nil
+            }
+        }
+
+        return sawReturn
+    }
+
+    private static func canLowerStringyLoopBody(
+        _ records: [StringyStatementRecord],
+        locals: inout [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout],
+        scalarTypes: [String: ScalarType]
+    ) -> Bool {
+        for record in records {
+            switch record {
+            case .returnStatement:
+                return false
+            case .local(let name, let typeName, _, let value):
+                guard let type = ScalarType(
+                    typeReference: .named(typeName),
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                ),
+                    canConvert(
+                        canLower(
+                            value,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures,
+                            constructLayouts: constructLayouts
+                        ),
+                        to: type
+                    )
+                else {
+                    return false
+                }
+                locals[name] = type
+            case .assignment(let target, let value):
+                guard let type = locals[target],
+                    canConvert(
+                        canLower(
+                            value,
+                            locals: locals,
+                            lowerableFunctionSignatures: lowerableFunctionSignatures,
+                            constructLayouts: constructLayouts
+                        ),
+                        to: type
+                    )
+                else {
+                    return false
+                }
+            case .whileLoop(let condition, let body):
+                guard canLower(
+                    condition,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
+                ) == .bool else {
+                    return false
+                }
+                var bodyLocals = locals
+                guard canLowerStringyLoopBody(
+                    body,
+                    locals: &bodyLocals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                ) else {
+                    return false
+                }
+            case .conditional(let condition, let body):
+                guard canLower(
+                    condition,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
+                ) == .bool else {
+                    return false
+                }
+                var branchLocals = locals
+                _ = canLowerStringyLoopBody(
+                    body,
+                    locals: &branchLocals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                )
+            case .breakStatement, .continueStatement:
+                continue
+            }
+        }
+        return true
+    }
+
+    private static func concreteReturnLLVM(_ llvm: String, matches returnType: ScalarType) -> Bool {
+        if llvm == "ret void" {
+            return false
+        }
+        return llvm.hasPrefix("ret \(llvmTypeName(returnType)) ")
+    }
+
+    private static func llvmTypeName(_ type: ScalarType) -> String {
+        switch type {
+        case .int(let bits, _):
+            return "i\(bits)"
+        case .bool:
+            return "i1"
+        case .float:
+            return "double"
+        case .string:
+            return "%RangeString"
+        case .array:
+            return "%RangeArray"
+        case .construct(let identity, let name):
+            return "%\(sanitizeLLVMTypeName(identity.isEmpty ? name : identity))"
+        }
+    }
+
+    private static func sanitizeLLVMTypeName(_ value: String) -> String {
+        value.map { character in
+            character.isLetter || character.isNumber || character == "_" ? String(character) : "_"
+        }.joined()
     }
 
     private static func statementRejectionReason(
@@ -1311,6 +1528,8 @@ enum LLVMLowerability {
             return .defaultInt
         case .double:
             return .float
+        case .string:
+            return .string
         case .boolean:
             return .bool
         case .identifier(let name):
@@ -1332,6 +1551,16 @@ enum LLVMLowerability {
                 scalarTypes: scalarTypes
             ) {
                 return arrayType
+            }
+            if let scalar = lowerableScalarConstructor(
+                name: name,
+                arguments: arguments,
+                locals: locals,
+                lowerableFunctionSignatures: lowerableFunctionSignatures,
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            ) {
+                return scalar
             }
             if let construct = lowerableConstructInitializer(
                 name: name,
@@ -1421,8 +1650,6 @@ enum LLVMLowerability {
                 return nil
             }
             return ternaryResultType(trueType, falseType)
-        case .string:
-            return .string
         case .interpolatedString, .nilLiteral, .macroInvocation, .block,
             .bindingReference, .array, .dictionary:
             return nil
@@ -1489,6 +1716,51 @@ enum LLVMLowerability {
         let start = callName.index(callName.startIndex, offsetBy: "Array<".count)
         let end = callName.index(before: callName.endIndex)
         return String(callName[start..<end])
+    }
+
+    private static func lowerableScalarConstructor(
+        name: String,
+        arguments: [CallArgument],
+        locals: [String: ScalarType],
+        lowerableFunctionSignatures: [String: ScalarSignature],
+        constructLayouts: [String: ConstructLayout],
+        scalarTypes: [String: ScalarType]
+    ) -> ScalarType? {
+        guard arguments.count == 1, arguments[0].label == nil else {
+            return nil
+        }
+        let target: ScalarType?
+        switch name {
+        case "Int":
+            target = scalarTypes["Int"] ?? .defaultInt
+        case "Bool":
+            target = scalarTypes["Bool"] ?? .bool
+        case "Float":
+            target = .float
+        case "String":
+            target = .string
+        default:
+            target = ScalarType(
+                typeReference: .named(name),
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            )
+        }
+        guard let target,
+            canConvert(
+                canLower(
+                    arguments[0].value,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts,
+                    scalarTypes: scalarTypes
+                ),
+                to: target
+            )
+        else {
+            return nil
+        }
+        return target
     }
 
     private static func lowerableConstructInitializer(

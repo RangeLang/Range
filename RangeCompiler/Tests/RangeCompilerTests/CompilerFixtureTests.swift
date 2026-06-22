@@ -436,6 +436,84 @@ struct CompilerFixtureTests {
                 ])
     }
 
+    @Test("Scalar locals and assignments lower through Range-authored statement macros")
+    func scalarLocalsAndAssignmentsLowerThroughRangeAuthoredStatementMacros() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/ScalarLocalAssignmentStatementRecords.range",
+                source: """
+                    function count(): Int {
+                        state x: Int(0)
+                        x: x + 1
+                        return x
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let body = callable.body
+        else {
+            Issue.record("Expected function body.")
+            return
+        }
+
+        let emitted = body.compactMap { statement -> String? in
+            guard case .emitted(let text) = statement else { return nil }
+            return text
+        }
+        #expect(
+            emitted
+                == [
+                    "statement|kind=local|name=x|type=Int|mutable=true|value=Int(0)|projection=target.declaration",
+                    "statement|kind=assign|target=x|value=x + 1|projection=target.declaration",
+                    "statement|kind=return|value=x|projection=target.declaration|llvm=ret x",
+                ])
+    }
+
+    @Test("Scalar string locals keep constructor-shaped values in statement records")
+    func scalarStringLocalsKeepConstructorShapedValuesInStatementRecords() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/ScalarStringStatementRecords.range",
+                source: """
+                    function greeting(): String {
+                        let text: String("Hello World")
+                        return text
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let body = callable.body
+        else {
+            Issue.record("Expected function body.")
+            return
+        }
+
+        let emitted = body.compactMap { statement -> String? in
+            guard case .emitted(let text) = statement else { return nil }
+            return text
+        }
+        #expect(
+            emitted
+                == [
+                    "statement|kind=local|name=text|type=String|mutable=false|value=String(\"Hello World\")|projection=target.declaration",
+                    "statement|kind=return|value=text|projection=target.declaration|llvm=ret text",
+                ])
+    }
+
     @Test("Function macro collects statement body LLVM records")
     func functionMacroCollectsStatementBodyLLVMRecords() throws {
         var inputs = try rangeCoreInputs()

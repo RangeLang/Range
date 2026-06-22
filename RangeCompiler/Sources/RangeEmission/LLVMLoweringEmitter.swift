@@ -490,12 +490,12 @@ private struct LLVMFunctionEmitter {
     private mutating func emitStatement(_ statement: Statement) throws {
         switch statement {
         case .emitted(let text):
-            guard let llvm = StringyStatementRecord.returnLLVM(in: text) else {
-                return
+            for record in StringyStatementRecord.records(in: text) {
+                try emitStringyRecord(record)
+                if blockTerminated {
+                    break
+                }
             }
-            try emitOwnedLocalArrayFrees()
-            emit(llvm)
-            blockTerminated = true
             return
         case .macroApplication:
             return
@@ -544,6 +544,63 @@ private struct LLVMFunctionEmitter {
                 throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
             }
         }
+    }
+
+    private mutating func emitStringyRecord(_ record: StringyStatementRecord) throws {
+        switch record {
+        case .returnStatement(let value?, let llvm):
+            if concreteReturnLLVM(llvm) {
+                try emitOwnedLocalArrayFrees()
+                emit(llvm)
+                blockTerminated = true
+                return
+            }
+            let emittedValue = try emitExpression(value)
+            let converted = try convert(emittedValue, to: returnType)
+            guard converted.type == returnType.llvmType else {
+                throw LLVMLoweringError("LLVM return value must be \(returnType.llvmType).")
+            }
+            try emitOwnedLocalArrayFrees()
+            emit("ret \(returnType.llvmType) \(converted.representation)")
+            blockTerminated = true
+        case .returnStatement(nil, let llvm):
+            guard concreteReturnLLVM(llvm) else {
+                throw LLVMLoweringError("LLVM return record is missing a lowerable value.")
+            }
+            try emitOwnedLocalArrayFrees()
+            emit(llvm)
+            blockTerminated = true
+        case .local(let name, let typeName, let mutable, let value):
+            try emitLocalBinding(
+                LocalBindingDeclaration(
+                    kind: mutable ? .mutable : .constant,
+                    name: name,
+                    hasExplicitTypeAnnotation: true,
+                    type: .named(typeName),
+                    expression: value
+                )
+            )
+        case .assignment(let target, let value):
+            try emitAssignment(target: .local(target), expression: value)
+        case .whileLoop(let condition, let body):
+            try emitStringyWhileLoop(condition: condition, body: body)
+        case .conditional(let condition, let body):
+            try emitStringyConditional(condition: condition, body: body)
+        case .breakStatement:
+            guard let target = loopTargets.last else {
+                throw LLVMLoweringError("LLVM break requires an enclosing loop.")
+            }
+            emitBranch(to: target.endLabel)
+        case .continueStatement:
+            guard let target = loopTargets.last else {
+                throw LLVMLoweringError("LLVM continue requires an enclosing loop.")
+            }
+            emitBranch(to: target.conditionLabel)
+        }
+    }
+
+    private func concreteReturnLLVM(_ llvm: String) -> Bool {
+        llvm == "ret void" || llvm.hasPrefix("ret \(returnType.llvmType) ")
     }
 
     private mutating func emitLocalBinding(_ declaration: LocalBindingDeclaration) throws {
@@ -671,6 +728,42 @@ private struct LLVMFunctionEmitter {
         emitLabel(endLabel)
     }
 
+    private mutating func emitStringyWhileLoop(
+        condition: RangeCompiler.Expression,
+        body: [StringyStatementRecord]
+    ) throws {
+        let labelID = freshLabelID()
+        let conditionLabel = "while.cond.\(labelID)"
+        let bodyLabel = "while.body.\(labelID)"
+        let endLabel = "while.end.\(labelID)"
+
+        emitBranch(to: conditionLabel)
+        emitLabel(conditionLabel)
+        let conditionValue = try emitExpression(condition)
+        guard conditionValue.type == "i1" else {
+            throw LLVMLoweringError("LLVM while condition must be i1.")
+        }
+        emit("br i1 \(conditionValue.representation), label %\(bodyLabel), label %\(endLabel)")
+        blockTerminated = true
+
+        emitLabel(bodyLabel)
+        loopTargets.append((conditionLabel: conditionLabel, endLabel: endLabel))
+        defer {
+            _ = loopTargets.popLast()
+        }
+        for record in body {
+            try emitStringyRecord(record)
+            if blockTerminated {
+                break
+            }
+        }
+        if !blockTerminated {
+            emitBranch(to: conditionLabel)
+        }
+
+        emitLabel(endLabel)
+    }
+
     private mutating func emitConditional(_ branches: [StatementConditionalBranch]) throws {
         guard !branches.isEmpty else {
             throw LLVMLoweringError("LLVM conditional requires at least one branch.")
@@ -726,6 +819,35 @@ private struct LLVMFunctionEmitter {
         } else {
             emitLabel(endLabel)
         }
+    }
+
+    private mutating func emitStringyConditional(
+        condition: RangeCompiler.Expression,
+        body: [StringyStatementRecord]
+    ) throws {
+        let labelID = freshLabelID()
+        let bodyLabel = "if.body.\(labelID).0"
+        let endLabel = "if.end.\(labelID)"
+
+        let conditionValue = try emitExpression(condition)
+        guard conditionValue.type == "i1" else {
+            throw LLVMLoweringError("LLVM if condition must be i1.")
+        }
+        emit("br i1 \(conditionValue.representation), label %\(bodyLabel), label %\(endLabel)")
+        blockTerminated = true
+
+        emitLabel(bodyLabel)
+        for record in body {
+            try emitStringyRecord(record)
+            if blockTerminated {
+                break
+            }
+        }
+        if !blockTerminated {
+            emitBranch(to: endLabel)
+        }
+
+        emitLabel(endLabel)
     }
 
     private mutating func emitSwitch(
@@ -868,6 +990,9 @@ private struct LLVMFunctionEmitter {
             ) {
                 return allocation
             }
+            if let scalar = try emitLowerableScalarConstructor(name: name, arguments: arguments) {
+                return scalar
+            }
             if let construction = try emitLowerableConstructInitialization(
                 name: name,
                 arguments: arguments
@@ -991,6 +1116,42 @@ private struct LLVMFunctionEmitter {
             representation: current,
             scalarType: .construct(identity: layout.identity, name: layout.name)
         )
+    }
+
+    private mutating func emitLowerableScalarConstructor(
+        name: String,
+        arguments: [CallArgument]
+    ) throws -> Value? {
+        guard arguments.count == 1, arguments[0].label == nil else {
+            return nil
+        }
+        let target: ScalarType?
+        switch name {
+        case "Int":
+            target = scalarTypes["Int"] ?? .defaultInt
+        case "Bool":
+            target = scalarTypes["Bool"] ?? .bool
+        case "Float":
+            target = .float
+        case "String":
+            target = .string
+        default:
+            target = ScalarType(
+                typeReference: .named(name),
+                constructLayouts: constructLayouts,
+                scalarTypes: scalarTypes
+            )
+        }
+        guard let target else {
+            return nil
+        }
+
+        let rawValue = try emitExpression(arguments[0].value)
+        let converted = try convert(rawValue, to: target)
+        guard converted.type == target.llvmType else {
+            throw LLVMLoweringError("LLVM scalar construction \(name) must produce \(target.llvmType).")
+        }
+        return converted
     }
 
     private mutating func emitLowerableMemberCall(
