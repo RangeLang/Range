@@ -342,7 +342,9 @@ extension ApplicationGraphValidator {
 
         for statement in statements {
             switch statement {
-            case .emitted, .expand, .replace:
+            case .emitted:
+                continue
+            case .expand, .replace:
                 continue
             case .macroApplication(let name, let arguments) where name == "return":
                 expressions.append(macroReturnExpression(arguments: arguments))

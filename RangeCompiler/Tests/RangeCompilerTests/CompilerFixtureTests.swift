@@ -356,6 +356,86 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Bare return lowers through Range-authored statement macro")
+    func bareReturnLowersThroughRangeAuthoredStatementMacro() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/BareReturnStatementRecord.range",
+                source: """
+                    function answer(): Int {
+                        return Int(42)
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let statement = callable.body?.first,
+            case .emitted(let text) = statement
+        else {
+            Issue.record("Expected bare return to expand to a Range-authored statement record.")
+            return
+        }
+
+        #expect(
+            text
+                == "statement|kind=return|value=Int(42)|projection=target.declaration|llvm=ret i64 42"
+        )
+    }
+
+    @Test("Bare if and while lower through Range-authored statement macros")
+    func bareIfAndWhileLowerThroughRangeAuthoredStatementMacros() throws {
+        var inputs = try rangeCoreInputs()
+        inputs.append(
+            SourceInput(
+                path: "/tmp/BareControlFlowStatementRecords.range",
+                source: """
+                    function branch(x: Int) {
+                        if x > 5 {
+                            return x
+                        }
+                        while x > 0 {
+                            break
+                        }
+                    }
+                    """,
+                role: .project
+            )
+        )
+
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let projectFile = try #require(program.projectExpandedFiles.first)
+        guard case .module(let module) = projectFile.sourceFile,
+            let callable = module.callables.first,
+            let body = callable.body
+        else {
+            Issue.record("Expected function body.")
+            return
+        }
+
+        let emitted = body.compactMap { statement -> String? in
+            guard case .emitted(let text) = statement else { return nil }
+            return text
+        }
+        #expect(
+            emitted
+                == [
+                    """
+                    statement|kind=if|condition=x > 5|projection=target.declaration.statements
+                    statement|kind=return|value=x|projection=target.declaration|llvm=ret x
+                    """,
+                    """
+                    statement|kind=while|condition=x > 0|projection=target.declaration.statements
+                    statement|kind=break|projection=target.declaration|llvm=br label %loop.end
+                    """,
+                ])
+    }
+
     @Test("Function macro collects statement body LLVM records")
     func functionMacroCollectsStatementBodyLLVMRecords() throws {
         var inputs = try rangeCoreInputs()

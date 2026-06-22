@@ -881,6 +881,26 @@ extension MacroExpander {
         return processed
     }
 
+    private static func statementMacroAvailable(
+        _ name: String,
+        in macros: [String: MacroDeclaration]
+    ) -> Bool {
+        macros[name]?.macros.contains(where: { $0.name == "statement" }) == true
+    }
+
+    private static func quotedStatementMacroArgument(_ value: String) -> String {
+        "\"\(escapedStatementMacroString(value))\""
+    }
+
+    private static func escapedStatementMacroString(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\t", with: "\\t")
+    }
+
     static func statementMacroTargetValue(
         body: [Statement],
         application: MacroApplication
@@ -2060,6 +2080,40 @@ extension MacroExpander {
                     ))
             ]
         case .whileLoop(let condition, let body):
+            if !preserveStatementMacroApplications,
+                statementMacroAvailable("while", in: macros)
+            {
+                let expandedCondition = try expand(
+                    expression: condition,
+                    expectedType: .named("Bool"),
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                )
+                let expandedBody = try expand(
+                    statements: body,
+                    expectedReturnType: expectedReturnType,
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context
+                )
+                return [
+                    .emitted(
+                        evaluatedStringStatementMacro(
+                            name: "while",
+                            argumentClause: quotedStatementMacroArgument(
+                                renderExpressionForStringify(expandedCondition)
+                            ),
+                            body: expandedBody,
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                ]
+            }
             return [
                 .whileLoop(
                     condition: try expand(
@@ -2081,6 +2135,44 @@ extension MacroExpander {
                     ))
             ]
         case .conditional(let branches):
+            if !preserveStatementMacroApplications,
+                branches.count == 1,
+                let branch = branches.first,
+                let condition = branch.condition,
+                statementMacroAvailable("if", in: macros)
+            {
+                let expandedCondition = try expand(
+                    expression: condition,
+                    expectedType: .named("Bool"),
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                )
+                let expandedBody = try expand(
+                    statements: branch.body,
+                    expectedReturnType: expectedReturnType,
+                    macros: macros,
+                    parameterMacroSignatures: parameterMacroSignatures,
+                    literalBridges: literalBridges,
+                    context: context,
+                    stateEffects: stateEffects
+                )
+                return [
+                    .emitted(
+                        evaluatedStringStatementMacro(
+                            name: "if",
+                            argumentClause: quotedStatementMacroArgument(
+                                renderExpressionForStringify(expandedCondition)
+                            ),
+                            body: expandedBody,
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                ]
+            }
             return [
                 .conditional(
                     try branches.map { branch in
@@ -2194,6 +2286,31 @@ extension MacroExpander {
                         context: context))
             ]
         case .return(let expression):
+            if !preserveStatementMacroApplications,
+                statementMacroAvailable("return", in: macros)
+            {
+                let expandedExpression = try expression.map {
+                    try expand(
+                        expression: $0,
+                        expectedType: expectedReturnType,
+                        macros: macros,
+                        parameterMacroSignatures: parameterMacroSignatures,
+                        literalBridges: literalBridges,
+                        context: context,
+                        stateEffects: stateEffects)
+                }
+                let value = expandedExpression.map(renderExpressionForStringify) ?? ""
+                return [
+                    .emitted(
+                        evaluatedStringStatementMacro(
+                            name: "return",
+                            arguments: [CallArgument(label: "value", value: .string(value))],
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                ]
+            }
             return [
                 .return(
                     try expression.map {
@@ -2207,6 +2324,38 @@ extension MacroExpander {
                             stateEffects: stateEffects)
                     })
             ]
+        case .break:
+            if !preserveStatementMacroApplications,
+                statementMacroAvailable("break", in: macros)
+            {
+                return [
+                    .emitted(
+                        evaluatedStringStatementMacro(
+                            name: "break",
+                            arguments: [],
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                ]
+            }
+            return [statement]
+        case .continue:
+            if !preserveStatementMacroApplications,
+                statementMacroAvailable("continue", in: macros)
+            {
+                return [
+                    .emitted(
+                        evaluatedStringStatementMacro(
+                            name: "continue",
+                            arguments: [],
+                            macros: macros,
+                            context: context
+                        )
+                    )
+                ]
+            }
+            return [statement]
         case .switchStatement(let expression, let cases, let defaultBody):
             return [
                 .switchStatement(
