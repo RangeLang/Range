@@ -489,7 +489,13 @@ private struct LLVMFunctionEmitter {
 
     private mutating func emitStatement(_ statement: Statement) throws {
         switch statement {
-        case .emitted:
+        case .emitted(let text):
+            guard let llvm = StringyStatementRecord.returnLLVM(in: text) else {
+                return
+            }
+            try emitOwnedLocalArrayFrees()
+            emit(llvm)
+            blockTerminated = true
             return
         case .macroApplication:
             return

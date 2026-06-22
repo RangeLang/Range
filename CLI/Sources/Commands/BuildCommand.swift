@@ -5,7 +5,7 @@ import RangeCompiler
 extension CLI {
     struct Build: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Validate a Range project by running its Range-authored build function."
+            abstract: "Validate a Range project through the current emission pipeline."
         )
 
         @Argument(help: "Project directory or source .range file to build.")

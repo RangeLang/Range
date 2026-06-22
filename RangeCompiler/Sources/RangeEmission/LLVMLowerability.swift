@@ -1,5 +1,32 @@
 import RangeCompiler
 
+enum StringyStatementRecord {
+    static func returnLLVM(in text: String) -> String? {
+        for line in text.split(separator: "\n") {
+            guard line.hasPrefix("statement|kind=return"),
+                let llvm = field("llvm", in: String(line)),
+                llvm.hasPrefix("ret ")
+            else {
+                continue
+            }
+            return llvm
+        }
+        return nil
+    }
+
+    private static func field(_ name: String, in line: String) -> String? {
+        let prefix = "\(name)="
+        guard let range = line.range(of: prefix) else {
+            return nil
+        }
+        let afterPrefix = line[range.upperBound...]
+        if let end = afterPrefix.firstIndex(of: "|") {
+            return String(afterPrefix[..<end])
+        }
+        return String(afterPrefix)
+    }
+}
+
 enum LLVMLowerability {
     struct ConstructLayout: Equatable {
         struct Field: Equatable {
@@ -458,7 +485,12 @@ enum LLVMLowerability {
             }
 
             switch statement {
-            case .emitted, .macroApplication:
+            case .emitted(let text):
+                guard StringyStatementRecord.returnLLVM(in: text) != nil else {
+                    continue
+                }
+                sawReturn = true
+            case .macroApplication:
                 continue
             case .localBinding(let declaration):
                 guard canLowerLocalBinding(
