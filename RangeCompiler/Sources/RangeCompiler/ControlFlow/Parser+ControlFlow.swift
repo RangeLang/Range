@@ -43,36 +43,52 @@ extension Parser {
             return try parseDeferStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(RangeSyntax.Keyword.ifStatement.rawValue) = peek() {
+        if currentMacroBodyDepth == 0, isBareStatementSyntaxStart() {
+            throw ParseError(
+                "Bare statement syntax is not Range source. Use explicit @statement macros such as @return, @if, @while, @break, @continue, @let, @state, or @assignment."
+            )
+        }
+
+        if currentMacroBodyDepth > 0,
+            case .keyword(RangeSyntax.Keyword.ifStatement.rawValue) = peek()
+        {
             return try parseIfStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(RangeSyntax.Keyword.whileLoop.rawValue) = peek() {
+        if currentMacroBodyDepth > 0,
+            case .keyword(RangeSyntax.Keyword.whileLoop.rawValue) = peek()
+        {
             return try parseWhileStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(RangeSyntax.Keyword.forLoop.rawValue) = peek() {
+        if currentMacroBodyDepth > 0,
+            case .keyword(RangeSyntax.Keyword.forLoop.rawValue) = peek()
+        {
             return try parseForStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(RangeSyntax.Keyword.switchStatement.rawValue) = peek() {
+        if currentMacroBodyDepth > 0,
+            case .keyword(RangeSyntax.Keyword.switchStatement.rawValue) = peek()
+        {
             return try parseSwitchStatement(localBindings: &localBindings)
         }
 
-        if case .keyword(RangeSyntax.Keyword.let.rawValue) = peek() {
+        if currentMacroBodyDepth > 0, case .keyword(RangeSyntax.Keyword.let.rawValue) = peek() {
             advance()
             return try parseLocalDeclaration(kind: .constant, localBindings: &localBindings)
         }
-        if case .keyword(RangeSyntax.Keyword.state.rawValue) = peek() {
+        if currentMacroBodyDepth > 0, case .keyword(RangeSyntax.Keyword.state.rawValue) = peek() {
             advance()
             return try parseLocalStateStatement(localBindings: &localBindings)
         }
-        if case .keyword(RangeSyntax.Keyword.derived.rawValue) = peek() {
+        if currentMacroBodyDepth > 0, case .keyword(RangeSyntax.Keyword.derived.rawValue) = peek() {
             advance()
             return try parseLocalDerived(localBindings: &localBindings)
         }
 
-        if case .keyword(RangeSyntax.Keyword.returnStatement.rawValue) = peek() {
+        if currentMacroBodyDepth > 0,
+            case .keyword(RangeSyntax.Keyword.returnStatement.rawValue) = peek()
+        {
             advance()
             if peek() == .rightBrace {
                 return .return(nil)
@@ -80,23 +96,27 @@ extension Parser {
             return .return(try parseExpression())
         }
 
-        if case .keyword(RangeSyntax.Keyword.breakStatement.rawValue) = peek() {
+        if currentMacroBodyDepth > 0,
+            case .keyword(RangeSyntax.Keyword.breakStatement.rawValue) = peek()
+        {
             advance()
             return .break
         }
 
-        if case .keyword(RangeSyntax.Keyword.continueStatement.rawValue) = peek() {
+        if currentMacroBodyDepth > 0,
+            case .keyword(RangeSyntax.Keyword.continueStatement.rawValue) = peek()
+        {
             advance()
             return .continue
         }
 
-        if isColonAssignmentStatementStart() {
+        if currentMacroBodyDepth > 0, isColonAssignmentStatementStart() {
             let target = try parseAssignmentTarget(localBindings: localBindings)
             try consume(.colon)
             return .assignment(target: target, expression: try parseExpression())
         }
 
-        if isAssignmentStatementStart() {
+        if currentMacroBodyDepth > 0, isAssignmentStatementStart() {
             throw ParseError("Assignment statements use `target: value`.")
         }
 
@@ -105,6 +125,24 @@ extension Parser {
         }
 
         throw ParseError("Expected statement, found \(peek()).")
+    }
+
+    private func isBareStatementSyntaxStart() -> Bool {
+        switch peek() {
+        case .keyword(RangeSyntax.Keyword.ifStatement.rawValue),
+            .keyword(RangeSyntax.Keyword.whileLoop.rawValue),
+            .keyword(RangeSyntax.Keyword.forLoop.rawValue),
+            .keyword(RangeSyntax.Keyword.switchStatement.rawValue),
+            .keyword(RangeSyntax.Keyword.let.rawValue),
+            .keyword(RangeSyntax.Keyword.state.rawValue),
+            .keyword(RangeSyntax.Keyword.derived.rawValue),
+            .keyword(RangeSyntax.Keyword.returnStatement.rawValue),
+            .keyword(RangeSyntax.Keyword.breakStatement.rawValue),
+            .keyword(RangeSyntax.Keyword.continueStatement.rawValue):
+            return true
+        default:
+            return isColonAssignmentStatementStart() || isAssignmentStatementStart()
+        }
     }
 
     mutating func parseMacroApplicationStatement(

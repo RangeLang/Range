@@ -63,7 +63,7 @@ struct CompilerFixtureTests {
 
     @Test("Construct macro collects stringy member macro records")
     func constructMacroCollectsStringyMemberMacroRecords() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyConstruct.range",
@@ -126,7 +126,7 @@ struct CompilerFixtureTests {
 
     @Test("Extension macro accepts positional target name")
     func extensionMacroAcceptsPositionalTargetName() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyExtension.range",
@@ -167,7 +167,7 @@ struct CompilerFixtureTests {
 
     @Test("Enum macro collects stringy case member records")
     func enumMacroCollectsStringyCaseMemberRecords() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyEnum.range",
@@ -229,15 +229,15 @@ struct CompilerFixtureTests {
 
     @Test("Statement block macro expands through Range-authored projection")
     func statementBlockMacroExpandsThroughRangeAuthoredProjection() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyWhile.range",
                 source: """
                     function spin() {
-                        state x: Int(0)
+                        @state(name: "x", type: "Int", value: "Int(0)")
                         @while("x > 5") {
-                            x: x + 1
+                            @assignment(target: "x", value: "x + 1")
                         }
                     }
                     """,
@@ -254,8 +254,8 @@ struct CompilerFixtureTests {
         guard case .module(let module) = projectFile.sourceFile,
             let callable = module.callables.first,
             let statement = callable.body?.first(where: {
-                if case .emitted = $0 {
-                    return true
+                if case .emitted(let text) = $0 {
+                    return text.contains("statement|kind=while")
                 }
                 return false
             }),
@@ -269,14 +269,14 @@ struct CompilerFixtureTests {
             text
                 == """
                 statement|kind=while|condition=x > 5|projection=target.declaration.statements
-                x: x + 1
+                statement|kind=assign|target=x|value=x + 1|projection=target.declaration
                 """
         )
     }
 
     @Test("If statement block macro expands through Range-authored projection")
     func ifStatementBlockMacroExpandsThroughRangeAuthoredProjection() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyIf.range",
@@ -322,7 +322,7 @@ struct CompilerFixtureTests {
 
     @Test("Return statement macro expands through Range-authored projection")
     func returnStatementMacroExpandsThroughRangeAuthoredProjection() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyReturn.range",
@@ -356,9 +356,9 @@ struct CompilerFixtureTests {
         )
     }
 
-    @Test("Bare return lowers through Range-authored statement macro")
-    func bareReturnLowersThroughRangeAuthoredStatementMacro() throws {
-        var inputs = try rangeCoreInputs()
+    @Test("Bare return is rejected as Swift-owned statement syntax")
+    func bareReturnIsRejectedAsSwiftOwnedStatementSyntax() throws {
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/BareReturnStatementRecord.range",
@@ -371,26 +371,17 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
-            let statement = callable.body?.first,
-            case .emitted(let text) = statement
-        else {
-            Issue.record("Expected bare return to expand to a Range-authored statement record.")
-            return
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected bare return syntax to fail parsing.")
+        } catch {
+            #expect(String(describing: error).contains("Bare statement syntax is not Range source"))
         }
-
-        #expect(
-            text
-                == "statement|kind=return|value=Int(42)|projection=target.declaration|llvm=ret i64 42"
-        )
     }
 
-    @Test("Bare if and while lower through Range-authored statement macros")
-    func bareIfAndWhileLowerThroughRangeAuthoredStatementMacros() throws {
-        var inputs = try rangeCoreInputs()
+    @Test("Bare if and while are rejected as Swift-owned statement syntax")
+    func bareIfAndWhileAreRejectedAsSwiftOwnedStatementSyntax() throws {
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/BareControlFlowStatementRecords.range",
@@ -408,45 +399,25 @@ struct CompilerFixtureTests {
             )
         )
 
-        let program = try CompilerPipeline().buildValidated(inputs: inputs)
-        let projectFile = try #require(program.projectExpandedFiles.first)
-        guard case .module(let module) = projectFile.sourceFile,
-            let callable = module.callables.first,
-            let body = callable.body
-        else {
-            Issue.record("Expected function body.")
-            return
+        do {
+            _ = try CompilerPipeline().buildValidated(inputs: inputs)
+            Issue.record("Expected bare control-flow syntax to fail parsing.")
+        } catch {
+            #expect(String(describing: error).contains("Bare statement syntax is not Range source"))
         }
-
-        let emitted = body.compactMap { statement -> String? in
-            guard case .emitted(let text) = statement else { return nil }
-            return text
-        }
-        #expect(
-            emitted
-                == [
-                    """
-                    statement|kind=if|condition=x > 5|projection=target.declaration.statements
-                    statement|kind=return|value=x|projection=target.declaration|llvm=ret x
-                    """,
-                    """
-                    statement|kind=while|condition=x > 0|projection=target.declaration.statements
-                    statement|kind=break|projection=target.declaration|llvm=br label %loop.end
-                    """,
-                ])
     }
 
     @Test("Scalar members and assignments lower through Range-authored statement macros")
     func scalarMembersAndAssignmentsLowerThroughRangeAuthoredStatementMacros() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/ScalarLocalAssignmentStatementRecords.range",
                 source: """
                     function count(): Int {
-                        state x: Int(0)
-                        x: x + 1
-                        return x
+                        @state(name: "x", type: "Int", value: "Int(0)")
+                        @assignment(target: "x", value: "x + 1")
+                        @return(value: "x")
                     }
                     """,
                 role: .project
@@ -470,7 +441,7 @@ struct CompilerFixtureTests {
         #expect(
             emitted
                 == [
-                    "member|kind=state|name=x|type=Int|value=Int(0)|host=function.block|ordinal=0",
+                    "@state(name: \"x\", type: \"Int\", value: \"Int(0)\")",
                     "statement|kind=assign|target=x|value=x + 1|projection=target.declaration",
                     "statement|kind=return|value=x|projection=target.declaration|llvm=ret x",
                 ])
@@ -478,14 +449,14 @@ struct CompilerFixtureTests {
 
     @Test("Scalar string members keep constructor-shaped values in statement records")
     func scalarStringMembersKeepConstructorShapedValuesInStatementRecords() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/ScalarStringStatementRecords.range",
                 source: """
                     function greeting(): String {
-                        let text: String("Hello World")
-                        return text
+                        @let(name: "text", type: "String", value: "String(\\"Hello World\\")")
+                        @return(value: "text")
                     }
                     """,
                 role: .project
@@ -509,14 +480,14 @@ struct CompilerFixtureTests {
         #expect(
             emitted
                 == [
-                    "member|kind=let|name=text|type=String|value=String(\"Hello World\")|host=function.block|ordinal=0",
+                    "@let(name: \"text\", type: \"String\", value: \"String(\\\"Hello World\\\")\")",
                     "statement|kind=return|value=text|projection=target.declaration|llvm=ret text",
                 ])
     }
 
     @Test("Function macro collects statement body LLVM records")
     func functionMacroCollectsStatementBodyLLVMRecords() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyFunctionBody.range",
@@ -550,7 +521,7 @@ struct CompilerFixtureTests {
 
     @Test("For and switch statement macros expand through Range-authored projection")
     func forAndSwitchStatementMacrosExpandThroughRangeAuthoredProjection() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyControlFlow.range",
@@ -608,7 +579,7 @@ struct CompilerFixtureTests {
 
     @Test("Break and continue statement macros expand through Range-authored projection")
     func breakAndContinueStatementMacrosExpandThroughRangeAuthoredProjection() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyBreakContinue.range",
@@ -655,7 +626,7 @@ struct CompilerFixtureTests {
 
     @Test("If branch statement macros expand as child records")
     func ifBranchStatementMacrosExpandAsChildRecords() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringyIfBranches.range",
@@ -698,7 +669,7 @@ struct CompilerFixtureTests {
 
     @Test("Switch case statement macros expand as child records")
     func switchCaseStatementMacrosExpandAsChildRecords() throws {
-        var inputs = try rangeCoreInputs()
+        var inputs = try rangeFoundationMacroInputs()
         inputs.append(
             SourceInput(
                 path: "/tmp/StringySwitchCases.range",
@@ -853,7 +824,7 @@ struct CompilerFixtureTests {
 
     @Test("@macro entrypoint lowers macro declarations to stringy records")
     func macroEntrypointLowersMacroDeclarationsToStringyRecords() throws {
-        let program = try CompilerPipeline().build(inputs: rangeCoreInputs())
+        let program = try CompilerPipeline().build(inputs: rangeFoundationMacroInputs())
         let macrosByName = program.declarationGraph.macrosByName
         let entrypoint = try #require(macrosByName["macro"])
 
@@ -2868,14 +2839,13 @@ struct CompilerFixtureTests {
         }
     }
 
-    @Test("State transitions use colon syntax")
-    func stateTransitionsUseColonSyntax() throws {
+    @Test("State transitions use explicit statement macros")
+    func stateTransitionsUseExplicitStatementMacros() throws {
         let validSource = """
             function update(value: Int): Int {
-                state total: Int(0)
-                state total: total + value
-                total: total + value
-                return total
+                @state(name: "total", type: "Int", value: "Int(0)")
+                @assignment(target: "total", value: "total + value")
+                @return(value: "total")
             }
             """
 
@@ -2883,7 +2853,7 @@ struct CompilerFixtureTests {
             var parser = try Parser(source: validSource)
             _ = try parser.parseSourceFile()
         } catch {
-            Issue.record("Expected state transition syntax to parse, got \(error).")
+            Issue.record("Expected explicit state transition macros to parse, got \(error).")
         }
 
         let invalidSources = [
@@ -2892,6 +2862,13 @@ struct CompilerFixtureTests {
                 state total: Int(0)
                 set total value
                 return total
+            }
+            """,
+            """
+            function update(value: Int): Int {
+                @state(name: "total", type: "Int", value: "Int(0)")
+                total: total + value
+                @return(value: "total")
             }
             """,
             """
@@ -2907,11 +2884,12 @@ struct CompilerFixtureTests {
             do {
                 var parser = try Parser(source: source)
                 _ = try parser.parseSourceFile()
-                Issue.record("Expected assignment-style syntax to fail parsing.")
+                Issue.record("Expected bare assignment/control-flow syntax to fail parsing.")
             } catch {
                 let description = String(describing: error)
                 #expect(
-                    description.contains("Expected statement")
+                    description.contains("Bare statement syntax is not Range source")
+                        || description.contains("Expected statement")
                         || description.contains("Assignment statements use `target: value`")
                 )
             }
@@ -3840,12 +3818,55 @@ private func rangeCoreInputs() throws -> [SourceInput] {
             in: root.appendingPathComponent("Core", isDirectory: true),
             excludingExploration: true
         )
-        + rangeFiles(
+        + (try rangeFiles(
             in: root.appendingPathComponent("Foundation/Macros", isDirectory: true),
             excludingExploration: true
-        )
+        ))
 
     return try files.map { file in
+        SourceInput(
+            path: file.path,
+            source: try String(contentsOf: file, encoding: .utf8),
+            role: .core
+        )
+    }
+}
+
+private func rangeFoundationMacroInputs() throws -> [SourceInput] {
+    let root = try repositoryRoot()
+        .appendingPathComponent("RangeCompiler", isDirectory: true)
+        .appendingPathComponent("Range", isDirectory: true)
+    let macroRoot = root.appendingPathComponent("Foundation/Macros", isDirectory: true)
+    let files =
+        [
+            root
+                .appendingPathComponent("Core", isDirectory: true)
+                .appendingPathComponent("Syntax", isDirectory: true)
+                .appendingPathComponent("Statements", isDirectory: true)
+                .appendingPathComponent("Statement.range"),
+            macroRoot.appendingPathComponent("Macro.range"),
+            macroRoot.appendingPathComponent("Member.range"),
+            macroRoot.appendingPathComponent("Value.range"),
+            macroRoot.appendingPathComponent("Let.range"),
+            macroRoot.appendingPathComponent("State.range"),
+            macroRoot.appendingPathComponent("Parameter.range"),
+            macroRoot.appendingPathComponent("Construct.range"),
+            macroRoot.appendingPathComponent("Function.range"),
+            macroRoot.appendingPathComponent("Assignment.range"),
+            macroRoot.appendingPathComponent("Return.range"),
+            macroRoot.appendingPathComponent("If.range"),
+            macroRoot.appendingPathComponent("While.range"),
+            macroRoot.appendingPathComponent("For.range"),
+            macroRoot.appendingPathComponent("Break.range"),
+            macroRoot.appendingPathComponent("Continue.range"),
+            macroRoot.appendingPathComponent("Switch.range"),
+            macroRoot.appendingPathComponent("Case.range"),
+            macroRoot.appendingPathComponent("Default.range"),
+            macroRoot.appendingPathComponent("Else.range"),
+            macroRoot.appendingPathComponent("Elseif.range"),
+        ]
+
+    return try files.sorted(by: rangeCoreFilePrecedence).map { file in
         SourceInput(
             path: file.path,
             source: try String(contentsOf: file, encoding: .utf8),
