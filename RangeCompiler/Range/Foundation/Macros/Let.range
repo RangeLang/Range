@@ -1,6 +1,6 @@
 @statement
 @member
-macro let: @member -> String {
+macro let -> String {
     @parameter(name: "name") {
         @value(type: "String")
     }

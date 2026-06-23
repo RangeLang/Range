@@ -1,6 +1,6 @@
 @statement
 @member
-macro state: @member -> String {
+macro state -> String {
     @parameter(name: "name") {
         @value(type: "String")
     }
