@@ -2,7 +2,7 @@ import RangeCompiler
 
 enum StringyStatementRecord {
     case returnStatement(value: Expression?, llvm: String)
-    case local(name: String, typeName: String, mutable: Bool, value: Expression)
+    case member(kind: String, name: String, typeName: String, value: Expression)
     case assignment(target: String, value: Expression)
     case whileLoop(condition: Expression, body: [StringyStatementRecord])
     case conditional(condition: Expression, body: [StringyStatementRecord])
@@ -45,7 +45,7 @@ enum StringyStatementRecord {
     }
 
     private static func parseLine(_ line: String) -> StringyStatementRecord? {
-        guard line.hasPrefix("statement|"),
+        guard (line.hasPrefix("statement|") || line.hasPrefix("member|")),
             let kind = field("kind", in: line)
         else {
             return nil
@@ -58,7 +58,7 @@ enum StringyStatementRecord {
             }
             let value = field("value", in: line).flatMap(parseExpression)
             return .returnStatement(value: value, llvm: llvm)
-        case "local":
+        case "let", "state":
             guard let name = field("name", in: line),
                 let typeName = field("type", in: line),
                 let valueText = field("value", in: line),
@@ -66,10 +66,10 @@ enum StringyStatementRecord {
             else {
                 return nil
             }
-            return .local(
+            return .member(
+                kind: kind,
                 name: name,
                 typeName: typeName,
-                mutable: field("mutable", in: line) == "true",
                 value: value
             )
         case "assign":

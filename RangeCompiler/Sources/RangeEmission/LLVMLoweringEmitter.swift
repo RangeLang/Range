@@ -570,10 +570,10 @@ private struct LLVMFunctionEmitter {
             try emitOwnedLocalArrayFrees()
             emit(llvm)
             blockTerminated = true
-        case .local(let name, let typeName, let mutable, let value):
+        case .member(let kind, let name, let typeName, let value):
             try emitLocalBinding(
                 LocalBindingDeclaration(
-                    kind: mutable ? .mutable : .constant,
+                    kind: kind == "state" ? .mutable : .constant,
                     name: name,
                     hasExplicitTypeAnnotation: true,
                     type: .named(typeName),

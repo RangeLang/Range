@@ -436,8 +436,8 @@ struct CompilerFixtureTests {
                 ])
     }
 
-    @Test("Scalar locals and assignments lower through Range-authored statement macros")
-    func scalarLocalsAndAssignmentsLowerThroughRangeAuthoredStatementMacros() throws {
+    @Test("Scalar members and assignments lower through Range-authored statement macros")
+    func scalarMembersAndAssignmentsLowerThroughRangeAuthoredStatementMacros() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
@@ -470,14 +470,14 @@ struct CompilerFixtureTests {
         #expect(
             emitted
                 == [
-                    "statement|kind=local|name=x|type=Int|mutable=true|value=Int(0)|projection=target.declaration",
+                    "member|kind=state|name=x|type=Int|value=Int(0)|host=function.block|ordinal=0",
                     "statement|kind=assign|target=x|value=x + 1|projection=target.declaration",
                     "statement|kind=return|value=x|projection=target.declaration|llvm=ret x",
                 ])
     }
 
-    @Test("Scalar string locals keep constructor-shaped values in statement records")
-    func scalarStringLocalsKeepConstructorShapedValuesInStatementRecords() throws {
+    @Test("Scalar string members keep constructor-shaped values in statement records")
+    func scalarStringMembersKeepConstructorShapedValuesInStatementRecords() throws {
         var inputs = try rangeCoreInputs()
         inputs.append(
             SourceInput(
@@ -509,7 +509,7 @@ struct CompilerFixtureTests {
         #expect(
             emitted
                 == [
-                    "statement|kind=local|name=text|type=String|mutable=false|value=String(\"Hello World\")|projection=target.declaration",
+                    "member|kind=let|name=text|type=String|value=String(\"Hello World\")|host=function.block|ordinal=0",
                     "statement|kind=return|value=text|projection=target.declaration|llvm=ret text",
                 ])
     }

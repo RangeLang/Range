@@ -1,3 +1,4 @@
+@statement
 @member
 macro state: @member -> String {
     @parameter(name: "name") {

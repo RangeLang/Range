@@ -2211,36 +2211,19 @@ extension MacroExpander {
                 context: context,
                 stateEffects: stateEffects
             )
+            let bindingMacroName = declaration.kind == .mutable ? "state" : "let"
             if expectedReturnType != nil,
                 !preserveStatementMacroApplications,
-                statementMacroAvailable("localBinding", in: macros)
+                statementMacroAvailable(bindingMacroName, in: macros)
             {
                 return [
                     .emitted(
-                        evaluatedStringStatementMacro(
-                            name: "localBinding",
-                            arguments: [
-                                CallArgument(label: "name", value: .string(declaration.name)),
-                                CallArgument(
-                                    label: "type",
-                                    value: .string(declaration.type.displayName)
-                                ),
-                                CallArgument(
-                                    label: "value",
-                                    value: .string(
-                                        renderStatementRecordValue(
-                                            expandedExpression,
-                                            expectedType: declaration.type
-                                        )
-                                    )
-                                ),
-                                CallArgument(
-                                    label: "mutable",
-                                    value: .boolean(declaration.kind == .mutable)
-                                ),
-                            ],
-                            macros: macros,
-                            context: context
+                        memberStatementRecord(
+                            kind: bindingMacroName,
+                            name: declaration.name,
+                            type: declaration.type,
+                            value: expandedExpression,
+                            host: "function.block"
                         )
                     )
                 ]
@@ -4609,6 +4592,18 @@ extension MacroExpander {
             }
         }
         return stringyArgumentValue(expression)
+    }
+
+    static func memberStatementRecord(
+        kind: String,
+        name: String,
+        type: TypeReference,
+        value: Expression,
+        host: String
+    ) -> String {
+        "member|kind=\(kind)|name=\(name)|type=\(type.displayName)|value="
+            + renderStatementRecordValue(value, expectedType: type)
+            + "|host=\(host)|ordinal=0"
     }
 
     static func emittedSyntaxKind(

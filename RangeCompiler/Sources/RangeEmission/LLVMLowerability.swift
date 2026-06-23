@@ -634,7 +634,7 @@ enum LLVMLowerability {
                     return nil
                 }
                 sawReturn = true
-            case .local(let name, let typeName, _, let value):
+            case .member(_, let name, let typeName, let value):
                 let type = ScalarType(
                     typeReference: .named(typeName),
                     constructLayouts: constructLayouts,
@@ -724,7 +724,7 @@ enum LLVMLowerability {
             switch record {
             case .returnStatement:
                 return false
-            case .local(let name, let typeName, _, let value):
+            case .member(_, let name, let typeName, let value):
                 guard let type = ScalarType(
                     typeReference: .named(typeName),
                     constructLayouts: constructLayouts,

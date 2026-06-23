@@ -1,3 +1,4 @@
+@statement
 @member
 macro let: @member -> String {
     @parameter(name: "name") {
