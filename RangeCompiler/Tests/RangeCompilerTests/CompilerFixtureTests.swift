@@ -826,10 +826,13 @@ struct CompilerFixtureTests {
         _ = try compile(fixture: fixture, expectedRole: .pass)
     }
 
-    @Test("@macro prefix declaration parses")
+    @Test("@macro bootstrap declaration parses")
     func macroPrefixDeclarationParses() throws {
         var parser = try Parser(source: """
-            @macro() -> String {
+            @macro -> String {
+                @parameter(name: "name") {
+                    @value(type: "String")
+                }
                 @return(value: declaration.name)
             }
             """)
@@ -840,7 +843,7 @@ struct CompilerFixtureTests {
         }
 
         #expect(declaration.name == "macro")
-        #expect(declaration.parameters.isEmpty)
+        #expect(declaration.parameters.map(\.name) == ["name"])
         #expect(declaration.expansionType == .named("String"))
         guard case .macroSurface("macro")? = declaration.target else {
             Issue.record("Expected @macro prefix declaration to target @macro.")
@@ -854,26 +857,10 @@ struct CompilerFixtureTests {
         let macrosByName = program.declarationGraph.macrosByName
         let entrypoint = try #require(macrosByName["macro"])
 
-        var parser = try Parser(source: """
-            macro decorate -> String {
-                @return(value: "ok")
-            }
-            """)
-        let sourceFile = try parser.parseSourceFile()
-        guard case .macro(let declaration) = sourceFile else {
-            Issue.record("Expected sample macro declaration to parse.")
-            return
-        }
-
         let context = program.declarationGraph.macroExpansionContext(macrosByName: macrosByName)
-        let targetValue = MacroTargetValueBuilder(
-            macroDeclarationsByName: macrosByName,
-            macroMetadataByName: context.macroMetadataByName,
-            knownObjectTypeNames: context.graphContext.knownObjectTypeNames
-        ).value(for: declaration)
         let evaluator = CompileTimeValueEvaluator(
             targetBinding: entrypoint.bindings?.target ?? "declaration",
-            targetValue: targetValue,
+            targetValue: .object(typeName: "MacroDeclaration", fields: [:]),
             graphBinding: entrypoint.bindings?.graph,
             selfValue: MacroTargetValueBuilder(
                 macroDeclarationsByName: macrosByName,
@@ -884,7 +871,11 @@ struct CompilerFixtureTests {
             macroDeclarationsByName: macrosByName,
             context: context
         )
-        var locals: [String: RangeCompiler.Expression] = [:]
+        var locals: [String: RangeCompiler.Expression] = [
+            "name": .string("decorate"),
+            "result": .string("String"),
+            "body": .string("@return(value: \"ok\")"),
+        ]
         guard case .string(let record)? = evaluator.evaluateStatements(
             entrypoint.body,
             locals: &locals
@@ -3893,7 +3884,16 @@ private func rangeFiles(in root: URL, excludingExploration: Bool) throws -> [URL
         files.append(url)
     }
 
-    return files.sorted { $0.path < $1.path }
+    return files.sorted(by: rangeCoreFilePrecedence)
+}
+
+private func rangeCoreFilePrecedence(_ lhs: URL, _ rhs: URL) -> Bool {
+    let lhsPriority = lhs.path.hasSuffix("/Range/Foundation/Macros/Macro.range") ? 0 : 1
+    let rhsPriority = rhs.path.hasSuffix("/Range/Foundation/Macros/Macro.range") ? 0 : 1
+    if lhsPriority != rhsPriority {
+        return lhsPriority < rhsPriority
+    }
+    return lhs.path < rhs.path
 }
 
 private func repositoryRoot() throws -> URL {

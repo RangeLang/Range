@@ -277,11 +277,6 @@ public struct Parser {
                 continue
             }
 
-            if isTopLevelBlockMacroStart() {
-                blockMacros.append(try parseTopLevelBlockMacro())
-                continue
-            }
-
             if isExtensionDeclarationStart() {
                 extensions.append(try parseExtensionDeclaration())
                 continue
@@ -308,6 +303,11 @@ public struct Parser {
                 let declaration = try parseMacroDeclaration()
                 macros.append(declaration)
                 registerMacroDeclaration(declaration)
+                continue
+            }
+
+            if isTopLevelBlockMacroStart() {
+                blockMacros.append(try parseTopLevelBlockMacro())
                 continue
             }
 
@@ -438,11 +438,6 @@ public struct Parser {
                 continue
             }
 
-            if isTopLevelBlockMacroStart() {
-                try skipTopLevelBlockMacroForDeclarationDiscovery()
-                continue
-            }
-
             if isStateDeclarationStart() {
                 try skipStateDeclarationForDeclarationDiscovery()
                 continue
@@ -457,6 +452,11 @@ public struct Parser {
                 let declaration = try parseMacroDeclaration(signatureOnly: true)
                 macros.append(declaration)
                 registerMacroDeclaration(declaration)
+                continue
+            }
+
+            if isTopLevelBlockMacroStart() {
+                try skipTopLevelBlockMacroForDeclarationDiscovery()
                 continue
             }
 

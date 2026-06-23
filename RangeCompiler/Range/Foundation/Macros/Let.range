@@ -1,6 +1,6 @@
 @statement
 @member
-macro let -> String {
+@macro(name: "let", result: "String") {
     @parameter(name: "name") {
         @value(type: "String")
     }

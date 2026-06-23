@@ -609,6 +609,10 @@ extension Parser {
             throw ParseError("Cannot assign to derived state '\(name)'.")
         }
 
+        if currentMacroBodyDepth > 0 {
+            return .local(name)
+        }
+
         throw ParseError("Unknown mutable symbol '\(name)'. Declare it with let or state.")
     }
 

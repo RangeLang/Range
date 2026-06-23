@@ -79,6 +79,15 @@ public struct CompiledProgram {
 public struct CompilerPipeline {
     public init() {}
 
+    private func inputPriority(_ input: SourceInput) -> Int {
+        guard input.role == .core,
+            input.path.hasSuffix("/Range/Foundation/Macros/Macro.range")
+        else {
+            return 1
+        }
+        return 0
+    }
+
     public func build(
         inputs: [SourceInput],
         diagnosticEngine: RangeDiagnosticEngine? = nil,
@@ -87,6 +96,11 @@ public struct CompilerPipeline {
         let orderedInputs = inputs.sorted { lhs, rhs in
             if lhs.role != rhs.role {
                 return lhs.role == .core
+            }
+            let lhsPriority = inputPriority(lhs)
+            let rhsPriority = inputPriority(rhs)
+            if lhsPriority != rhsPriority {
+                return lhsPriority < rhsPriority
             }
             return lhs.path < rhs.path
         }

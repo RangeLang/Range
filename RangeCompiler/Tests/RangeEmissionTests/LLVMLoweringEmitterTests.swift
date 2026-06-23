@@ -2995,7 +2995,16 @@ struct LLVMLoweringEmitterTests {
             files.append(url)
         }
 
-        return files.sorted { $0.path < $1.path }
+        return files.sorted(by: rangeCoreFilePrecedence)
+    }
+
+    private func rangeCoreFilePrecedence(_ lhs: URL, _ rhs: URL) -> Bool {
+        let lhsPriority = lhs.path.hasSuffix("/Range/Foundation/Macros/Macro.range") ? 0 : 1
+        let rhsPriority = rhs.path.hasSuffix("/Range/Foundation/Macros/Macro.range") ? 0 : 1
+        if lhsPriority != rhsPriority {
+            return lhsPriority < rhsPriority
+        }
+        return lhs.path < rhs.path
     }
 
     private func repositoryRoot() throws -> URL {

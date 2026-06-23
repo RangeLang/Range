@@ -2,9 +2,10 @@ import Foundation
 
 extension Parser {
     func isMacroDeclarationStart() -> Bool {
-        let offset = isMacroApplicationStart() ? macroApplicationLookaheadLength() : 0
+        let offset = macroApplicationLookaheadLength(excluding: ["macro"])
         return peek(offset: offset) == .keyword(RangeSyntax.Keyword.macro.rawValue)
             || isMacroPrefixDeclarationStart(at: 0)
+            || isMacroPrefixDeclarationStart(at: offset)
     }
 
     mutating func parseMacroDeclaration(signatureOnly: Bool = false) throws -> MacroDeclaration {
@@ -12,7 +13,13 @@ extension Parser {
             return try parseMacroPrefixDeclaration(signatureOnly: signatureOnly)
         }
 
-        let macros = try parseMacroApplicationsIfPresent()
+        let macros = try parseMacroApplicationsIfPresent(excluding: ["macro"])
+        if isMacroPrefixDeclarationStart(at: 0) {
+            return try parseMacroPrefixDeclaration(
+                attachedMacros: macros,
+                signatureOnly: signatureOnly
+            )
+        }
         try consumeKeyword(.macro)
 
         let name = try consumeCallableName()
@@ -143,30 +150,47 @@ extension Parser {
 
     private func isMacroPrefixDeclarationStart(at offset: Int) -> Bool {
         guard case .macroAttribute(let name, nil) = peek(offset: offset),
-            name == "macro",
-            peek(offset: offset + 1) == .leftParen
+            name == "macro"
         else {
             return false
         }
-        return true
+        return peek(offset: offset + 1) == .leftParen || peek(offset: offset + 1) == .arrow
     }
 
     private mutating func parseMacroPrefixDeclaration(signatureOnly: Bool = false) throws
+        -> MacroDeclaration
+    {
+        try parseMacroPrefixDeclaration(attachedMacros: [], signatureOnly: signatureOnly)
+    }
+
+    private mutating func parseMacroPrefixDeclaration(
+        attachedMacros: [MacroApplication],
+        signatureOnly: Bool = false
+    ) throws
         -> MacroDeclaration
     {
         guard case .macroAttribute(let name, nil) = peek(), name == "macro" else {
             throw ParseError("Expected @macro declaration.")
         }
         advance()
-        let parameters = try parseFunctionParameters(allowSyntaxCapture: true)
+        if peek() == .leftParen {
+            return try parseHostedMacroDeclaration(
+                attachedMacros: attachedMacros,
+                signatureOnly: signatureOnly
+            )
+        }
+
         try consume(.arrow)
         let expansionType = try parseTypeReferenceNode()
         let bindings: MacroBindings?
         let body: [Statement]
+        let parameters: [RangeFunctionParameter]
+        let genericParameters: [GenericParameter]
         if signatureOnly {
             if peek() == .leftBrace {
                 try consume(.leftBrace)
-                _ = try parseMacroMemberParameters()
+                genericParameters = try parseMacroMemberGenerics()
+                parameters = try parseMacroMemberParameters()
                 bindings = macroBodyStartsWithBindings() ? try parseMacroBodyBindings() : nil
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
@@ -175,15 +199,17 @@ extension Parser {
             }
             body = []
         } else {
-            let parsedBody = try parseMacroBody(declaredParameters: parameters)
+            let parsedBody = try parseHostedMacroValueBody()
             bindings = parsedBody.bindings
             body = parsedBody.body
+            parameters = parsedBody.parameters
+            genericParameters = parsedBody.genericParameters
         }
 
         return MacroDeclaration(
-            macros: [],
+            macros: attachedMacros,
             name: "macro",
-            genericParameters: [],
+            genericParameters: genericParameters,
             parameters: parameters,
             target: .macroSurface("macro"),
             expansionType: expansionType,
@@ -191,6 +217,129 @@ extension Parser {
             body: body,
             syntaxBody: nil
         )
+    }
+
+    private mutating func parseHostedMacroDeclaration(
+        attachedMacros: [MacroApplication],
+        signatureOnly: Bool
+    ) throws -> MacroDeclaration {
+        guard let bootstrap = macroDeclarationsByName["macro"] else {
+            throw ParseError("@macro declarations require the bootstrap @macro declaration.")
+        }
+        var arguments = try parseInvocationArgumentsIfPresent()
+        if bootstrap.parameters.contains(where: { $0.localName == "body" }),
+            !arguments.contains(where: { $0.label == "body" })
+        {
+            arguments.append(CallArgument(label: "body", value: .string("")))
+        }
+        let argumentBindings = try MacroExpander.expressionMacroArgumentBindings(
+            for: bootstrap,
+            arguments: arguments
+        )
+        let macroName = try stringMacroDeclarationField(
+            "name",
+            in: argumentBindings,
+            declarationName: "@macro"
+        )
+        let resultName = try optionalStringMacroDeclarationField(
+            "result",
+            in: argumentBindings,
+            declarationName: "@macro"
+        )
+        let expansionType = try resultName.map(parseMacroMemberTypeReference)
+        let bindings: MacroBindings?
+        let body: [Statement]
+        let parameters: [RangeFunctionParameter]
+        let genericParameters: [GenericParameter]
+
+        if signatureOnly {
+            if peek() == .leftBrace {
+                try consume(.leftBrace)
+                genericParameters = try parseMacroMemberGenerics()
+                parameters = try parseMacroMemberParameters()
+                bindings = macroBodyStartsWithBindings() ? try parseMacroBodyBindings() : nil
+                try skipUnknownBlockBody()
+                try consume(.rightBrace)
+            } else {
+                throw ParseError("Expected macro body.")
+            }
+            body = []
+        } else {
+            let parsedBody = try parseHostedMacroValueBody()
+            bindings = parsedBody.bindings
+            body = parsedBody.body
+            parameters = parsedBody.parameters
+            genericParameters = parsedBody.genericParameters
+        }
+
+        return MacroDeclaration(
+            macros: attachedMacros,
+            name: macroName,
+            genericParameters: genericParameters,
+            parameters: parameters,
+            target: nil,
+            expansionType: expansionType,
+            bindings: bindings,
+            body: body,
+            syntaxBody: nil
+        )
+    }
+
+    private mutating func parseHostedMacroValueBody() throws
+        -> (
+            bindings: MacroBindings?,
+            body: [Statement],
+            parameters: [RangeFunctionParameter],
+            genericParameters: [GenericParameter]
+        )
+    {
+        try consume(.leftBrace)
+        let genericParameters = try parseMacroMemberGenerics()
+        let parameters = try parseMacroMemberParameters()
+        let bindings: MacroBindings?
+        let body: [Statement]
+
+        if macroBodyStartsWithBindings() {
+            let parsedBindings = try parseMacroBodyBindings()
+            bindings = parsedBindings
+            body = try parseFreestandingMacroValueBody(
+                parameters: parameters,
+                bindings: parsedBindings
+            )
+        } else {
+            bindings = nil
+            body = try parseFreestandingMacroValueBody(
+                parameters: parameters,
+                bindings: nil
+            )
+        }
+
+        return (bindings, body, parameters, genericParameters)
+    }
+
+    private func stringMacroDeclarationField(
+        _ name: String,
+        in bindings: [String: Expression],
+        declarationName: String
+    ) throws -> String {
+        guard case .string(let value)? = bindings[name] else {
+            throw ParseError("\(declarationName) requires \(name): String.")
+        }
+        return value
+    }
+
+    private func optionalStringMacroDeclarationField(
+        _ name: String,
+        in bindings: [String: Expression],
+        declarationName: String
+    ) throws -> String? {
+        guard let expression = bindings[name] else {
+            return nil
+        }
+        guard case .string(let value) = expression else {
+            throw ParseError("\(declarationName) field \(name) must be String.")
+        }
+        return value.isEmpty ? nil : value
     }
 
     mutating func parseMacroTarget() throws -> MacroTarget {

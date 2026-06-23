@@ -141,7 +141,7 @@ enum RangeCoreLoader {
             files.append(contentsOf: try coreFiles(in: coreRoot))
         }
 
-        return files.sorted { $0.path < $1.path }
+        return files.sorted(by: coreFilePrecedence)
     }
 
     private static func coreFiles(in coreRoot: URL) throws -> [URL] {
@@ -171,7 +171,16 @@ enum RangeCoreLoader {
             files.append(fileURL)
         }
 
-        return files.sorted { $0.path < $1.path }
+        return files.sorted(by: coreFilePrecedence)
+    }
+
+    private static func coreFilePrecedence(_ lhs: URL, _ rhs: URL) -> Bool {
+        let lhsPriority = lhs.path.hasSuffix("/Range/Foundation/Macros/Macro.range") ? 0 : 1
+        let rhsPriority = rhs.path.hasSuffix("/Range/Foundation/Macros/Macro.range") ? 0 : 1
+        if lhsPriority != rhsPriority {
+            return lhsPriority < rhsPriority
+        }
+        return lhs.path < rhs.path
     }
 
     static func sourceInputs() throws -> [SourceInput] {
