@@ -52,34 +52,34 @@ function constructLLVMType(line: String): String {
 
         @if(line.contains(value: "member|kind=state")) {
             @if(line.contains(value: "|llvm=")) {
-                lineLLVM: line.segment(index: 1, delimiter: "|llvm=")
+                @set(name: "lineLLVM", value: line.segment(index: 1, delimiter: "|llvm="))
             }
 
-            pendingState: "true"
+            @set(name: "pendingState", value: String("true"))
         }
 
         @if(wasPendingState == "true") {
             @if(line.contains(value: "member|kind=value")) {
-                lineLLVM: constructLLVMType(line: line)
+                @set(name: "lineLLVM", value: constructLLVMType(line: line))
             }
 
-            pendingState: "false"
+            @set(name: "pendingState", value: String("false"))
         }
 
         @if(!lineLLVM.isEmpty) {
             @if(fieldIndex > 0) {
-                fields: fields + ", "
+                @set(name: "fields", value: fields + ", ")
             }
 
-            fields: fields + lineLLVM
-            fieldIndex: fieldIndex + 1
+            @set(name: "fields", value: fields + lineLLVM)
+            @set(name: "fieldIndex", value: fieldIndex + 1)
         }
 
         @if(!line.isEmpty) {
-            members: members + "\n" + line
+            @set(name: "members", value: members + "\n" + line)
         }
 
-        index: index + 1
+        @set(name: "index", value: index + 1)
     }
 
     @return(value: "construct|name="

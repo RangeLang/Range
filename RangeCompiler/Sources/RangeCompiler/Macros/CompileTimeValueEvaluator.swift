@@ -60,6 +60,11 @@ struct CompileTimeValueEvaluator {
                 if let name = Self.assignmentTargetName(target) {
                     locals[name] = boundExpression(expression, locals: locals)
                 }
+            case .emitted(let text):
+                guard let assignment = emittedMacroLocalAssignment(text, locals: locals) else {
+                    continue
+                }
+                locals[assignment.name] = assignment.expression
             case .return(let expression?):
                 return evaluate(expression, locals: locals)
             case .macroApplication(let name, let arguments) where name == "return":
@@ -72,6 +77,11 @@ struct CompileTimeValueEvaluator {
                     continue
                 }
                 locals[binding.name] = binding.expression
+            case .macroApplication(let name, let arguments) where name == "assignment" || name == "set":
+                guard let assignment = macroLocalAssignment(arguments: arguments, locals: locals) else {
+                    continue
+                }
+                locals[assignment.name] = assignment.expression
             case .macroInvocation(let name, let argumentClause, let body) where name == "while":
                 guard let condition = macroConditionExpression(argumentClause: argumentClause) else {
                     continue
@@ -139,6 +149,48 @@ struct CompileTimeValueEvaluator {
             return nil
         }
         return (name, macroLocalValueExpression(valueArgument.value, locals: locals))
+    }
+
+    private func macroLocalAssignment(
+        arguments: [CallArgument],
+        locals: [String: Expression]
+    ) -> (name: String, expression: Expression)? {
+        guard let targetArgument = arguments.first(where: { $0.label == "target" })
+            ?? arguments.first(where: { $0.label == "name" }),
+            let valueArgument = arguments.first(where: { $0.label == "value" }),
+            case .string(let name) = evaluate(targetArgument.value, locals: locals),
+            !name.isEmpty
+        else {
+            return nil
+        }
+
+        return (name, boundExpression(valueArgument.value, locals: locals))
+    }
+
+    private func emittedMacroLocalAssignment(
+        _ text: String,
+        locals: [String: Expression]
+    ) -> (name: String, expression: Expression)? {
+        guard text.hasPrefix("statement|kind=assign|") else {
+            return nil
+        }
+
+        let fields = Dictionary(
+            uniqueKeysWithValues: text.split(separator: "|").compactMap { part -> (String, String)? in
+                let pieces = part.split(separator: "=", maxSplits: 1).map(String.init)
+                guard pieces.count == 2 else { return nil }
+                return (pieces[0], pieces[1])
+            }
+        )
+        guard let name = fields["target"],
+            let value = fields["value"],
+            !name.isEmpty,
+            let expression = try? parseMacroLocalValueSource(value)
+        else {
+            return nil
+        }
+
+        return (name, boundExpression(expression, locals: locals))
     }
 
     private func macroLocalValueExpression(

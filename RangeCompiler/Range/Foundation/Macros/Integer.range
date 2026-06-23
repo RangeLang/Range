@@ -11,16 +11,16 @@
         @let(name: "name", value: generic.identifier.name)
 
         @if(name == "bits") {
-            hasBits: true
-            bits: generic.value
+            @set(name: "hasBits", value: true)
+            @set(name: "bits", value: generic.value)
         }
 
         @if(name == "signedness") {
-            hasSignedness: true
-            signedness: generic.value
+            @set(name: "hasSignedness", value: true)
+            @set(name: "signedness", value: generic.value)
         }
 
-        index: index + 1
+        @set(name: "index", value: index + 1)
     }
 
     @if(declaration.generics.count > 0 && !hasBits) {

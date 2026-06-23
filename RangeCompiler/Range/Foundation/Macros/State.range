@@ -15,10 +15,10 @@
         )
 
         @if(!memberLine.isEmpty) {
-            members: members + "\n" + memberLine
+            @set(name: "members", value: members + "\n" + memberLine)
         }
 
-        index: index + 1
+        @set(name: "index", value: index + 1)
     }
 
     @return(value: "member|kind=state|name="

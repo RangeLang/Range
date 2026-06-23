@@ -17,7 +17,7 @@
     @state(name: "instructionIndex", value: "0")
 
     @if(body.contains(value: "statement|")) {
-        bodyField: "records"
+        @set(name: "bodyField", value: String("records"))
     }
 
     @while(index < body.count(of: "\n") + 1) {
@@ -25,28 +25,28 @@
         @state(name: "lineLLVM", value: "String(\"\")")
 
         @if(line.contains(value: "|llvm=")) {
-            lineLLVM: line.segment(index: 1, delimiter: "|llvm=")
+            @set(name: "lineLLVM", value: line.segment(index: 1, delimiter: "|llvm="))
         }
 
         @if(!lineLLVM.isEmpty) {
             @if(instructionIndex > 0) {
-                llvm: llvm + "; "
+                @set(name: "llvm", value: llvm + "; ")
             }
 
-            llvm: llvm + lineLLVM
-            instructionIndex: instructionIndex + 1
+            @set(name: "llvm", value: llvm + lineLLVM)
+            @set(name: "instructionIndex", value: instructionIndex + 1)
         }
 
         @if(body.contains(value: "statement|")) {
             @if(!line.isEmpty) {
-                records: records + "\n" + line
+                @set(name: "records", value: records + "\n" + line)
             }
         }
 
-        index: index + 1
+        @set(name: "index", value: index + 1)
     }
 
-    index: 0
+    @set(name: "index", value: 0)
     @while(index < memberBodyText.count(of: "\n") + 1) {
         @state(
             name: "memberLine",
@@ -54,10 +54,10 @@
         )
 
         @if(!memberLine.isEmpty) {
-            members: members + "\n" + memberLine
+            @set(name: "members", value: members + "\n" + memberLine)
         }
 
-        index: index + 1
+        @set(name: "index", value: index + 1)
     }
 
     @if(llvm.isEmpty) {

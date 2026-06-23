@@ -9,11 +9,11 @@
         @let(name: "name", value: generic.identifier.name)
 
         @if(name == "precision") {
-            hasPrecision: true
-            precision: generic.value
+            @set(name: "hasPrecision", value: true)
+            @set(name: "precision", value: generic.value)
         }
 
-        index: index + 1
+        @set(name: "index", value: index + 1)
     }
 
     @if(declaration.generics.count > 0 && !hasPrecision) {

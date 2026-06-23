@@ -171,6 +171,9 @@ extension Parser {
         var fullName = name
         try appendPostfixAccesses(to: &fullName)
         let arguments = try parseInvocationArgumentsIfPresent()
+        if currentMacroBodyDepth > 0, fullName == "assignment" || fullName == "set" {
+            return try macroLocalAssignmentStatement(arguments: arguments)
+        }
         registerMacroLocalBindingIfPresent(
             macroName: fullName,
             arguments: arguments,
@@ -180,6 +183,21 @@ extension Parser {
             name: fullName,
             arguments: arguments
         )
+    }
+
+    private func macroLocalAssignmentStatement(arguments: [CallArgument]) throws -> Statement {
+        guard let targetArgument = arguments.first(where: { $0.label == "target" })
+            ?? arguments.first(where: { $0.label == "name" }),
+            case .string(let name) = targetArgument.value,
+            !name.isEmpty
+        else {
+            throw ParseError("@set in a macro body requires name: \"name\".")
+        }
+        guard let valueArgument = arguments.first(where: { $0.label == "value" }) else {
+            throw ParseError("@set in a macro body requires a value argument.")
+        }
+
+        return .assignment(target: .local(name), expression: valueArgument.value)
     }
 
     private func registerMacroLocalBindingIfPresent(
