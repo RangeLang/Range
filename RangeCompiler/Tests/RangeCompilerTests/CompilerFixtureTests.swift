@@ -2890,10 +2890,42 @@ struct CompilerFixtureTests {
                 #expect(
                     description.contains("Bare statement syntax is not Range source")
                         || description.contains("Expected statement")
-                        || description.contains("Assignment statements use `target: value`")
                 )
             }
         }
+    }
+
+    @Test("Bare assignment is rejected inside macro bodies")
+    func bareAssignmentIsRejectedInsideMacroBodies() throws {
+        try expectBareMacroBodySyntaxRejected(
+            """
+            value: "updated"
+            @return(value: value)
+            """
+        )
+    }
+
+    @Test("Bare control flow is rejected inside macro bodies")
+    func bareControlFlowIsRejectedInsideMacroBodies() throws {
+        try expectBareMacroBodySyntaxRejected(
+            """
+            if true {
+                @return(value: "ok")
+            }
+            """
+        )
+        try expectBareMacroBodySyntaxRejected(
+            """
+            while true {
+                break
+            }
+            """
+        )
+        try expectBareMacroBodySyntaxRejected(
+            """
+            return "ok"
+            """
+        )
     }
 
     @Test("Protocol declarations are not language surface")
@@ -3871,6 +3903,38 @@ private func rangeFoundationMacroInputs() throws -> [SourceInput] {
             path: file.path,
             source: try String(contentsOf: file, encoding: .utf8),
             role: .core
+        )
+    }
+}
+
+private func expectBareMacroBodySyntaxRejected(
+    _ body: String,
+    sourceLocation: SourceLocation = #_sourceLocation
+) throws {
+    var inputs = try rangeFoundationMacroInputs()
+    inputs.append(
+        SourceInput(
+            path: "/tmp/BareMacroBodySyntax.range",
+            source: """
+                @macro(name: "sample", result: "String") {
+                    @state(name: "value", value: "String()")
+                \(body)
+                }
+                """,
+            role: .project
+        )
+    )
+
+    do {
+        _ = try CompilerPipeline().buildValidated(inputs: inputs)
+        Issue.record(
+            "Expected bare macro-body syntax to fail parsing.",
+            sourceLocation: sourceLocation
+        )
+    } catch {
+        #expect(
+            String(describing: error).contains("Expected statement"),
+            sourceLocation: sourceLocation
         )
     }
 }
