@@ -1,3 +1,4 @@
-@macro(name: "bool", result: "String"): Construct{
+@construct
+@macro(name: "bool", result: "String"){
     @return(value: "i1")
 }

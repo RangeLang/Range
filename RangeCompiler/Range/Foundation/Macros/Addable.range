@@ -1,4 +1,6 @@
-@macro(name: "addable"): Construct | Extension { target, diagnostics in
+@construct
+@extension
+@macro(name: "addable"){ target, diagnostics in
     @let(
         name: "additions",
         value: target.declaration.functions.filter { function in

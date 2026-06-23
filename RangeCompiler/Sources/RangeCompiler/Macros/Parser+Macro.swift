@@ -260,7 +260,7 @@ extension Parser {
             try consume(.colon)
             target = try parseMacroTarget()
         } else {
-            target = nil
+            target = attachedMacroTarget(from: attachedMacros)
         }
         let expansionType: TypeReference?
         if let resultName {
@@ -410,6 +410,51 @@ extension Parser {
             throw ParseError("\(declarationName) field \(name) must be String.")
         }
         return value.isEmpty ? nil : value
+    }
+
+    private func attachedMacroTarget(from macros: [MacroApplication]) -> MacroTarget? {
+        let targets = macros.compactMap(attachedMacroTarget)
+        guard !targets.isEmpty else {
+            return nil
+        }
+        return targets.count == 1 ? targets[0] : .anyOf(targets)
+    }
+
+    private func attachedMacroTarget(from macro: MacroApplication) -> MacroTarget? {
+        switch macro.name {
+        case "block", "syntax", "statement", "member", "property", "macro":
+            return .macroSurface(macro.name)
+        case "construct":
+            return .syntax(attachedMacroTargetType("Construct", genericArguments: macro.genericArguments))
+        case "extension":
+            return .syntax(attachedMacroTargetType("Extension", genericArguments: macro.genericArguments))
+        case "enum":
+            return .syntax(attachedMacroTargetType("Enum", genericArguments: macro.genericArguments))
+        case "function":
+            return .syntax(attachedMacroTargetType("Function", genericArguments: macro.genericArguments))
+        case "init":
+            return .syntax(attachedMacroTargetType("Init", genericArguments: macro.genericArguments))
+        case "parameter":
+            return .syntax(attachedMacroTargetType("Parameter", genericArguments: macro.genericArguments))
+        case "let":
+            return .syntax(attachedMacroTargetType("Let", genericArguments: macro.genericArguments))
+        case "state":
+            return .syntax(attachedMacroTargetType("State", genericArguments: macro.genericArguments))
+        case "expression":
+            return .syntax(attachedMacroTargetType("Expression", genericArguments: macro.genericArguments))
+        default:
+            return nil
+        }
+    }
+
+    private func attachedMacroTargetType(
+        _ name: String,
+        genericArguments: [TypeReference]
+    ) -> TypeReference {
+        guard !genericArguments.isEmpty else {
+            return .named(name)
+        }
+        return .generic(base: .named(name), arguments: genericArguments)
     }
 
     mutating func parseMacroTarget() throws -> MacroTarget {

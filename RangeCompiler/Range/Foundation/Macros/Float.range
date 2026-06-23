@@ -1,4 +1,5 @@
-@macro(name: "float", result: "String"): Construct{
+@construct
+@macro(name: "float", result: "String"){
     @state(name: "precision", value: String("64"))
     @state(name: "hasPrecision", value: false)
     @state(name: "index", value: 0)

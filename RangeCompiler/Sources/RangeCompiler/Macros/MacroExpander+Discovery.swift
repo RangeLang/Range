@@ -84,7 +84,7 @@ extension MacroExpander {
         guard let firstTarget = macro.target else {
             return nil
         }
-        if case .macroSurface = firstTarget {
+        if isMacroSurfaceOnlyTarget(firstTarget) {
             return nil
         }
         guard macro.expansionType != nil else {
@@ -115,6 +115,17 @@ extension MacroExpander {
             bindings: macro.bindings,
             body: macro.body
         )
+    }
+
+    private static func isMacroSurfaceOnlyTarget(_ target: MacroTarget) -> Bool {
+        switch target {
+        case .macroSurface:
+            return true
+        case .anyOf(let targets), .allOf(let targets):
+            return targets.allSatisfy(isMacroSurfaceOnlyTarget)
+        case .syntax:
+            return false
+        }
     }
 
     private static func containsMacroRewrite(_ statement: Statement) -> Bool {

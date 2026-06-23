@@ -1,4 +1,5 @@
-@macro(name: "main", result: "String"): @block{
+@block
+@macro(name: "main", result: "String"){
     @let(name: "mainMacros", value: graph.macros(named: declaration.identifier.name))
 
     @if(mainMacros.count > 1) {

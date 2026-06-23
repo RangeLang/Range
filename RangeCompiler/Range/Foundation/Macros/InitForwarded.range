@@ -1,3 +1,5 @@
-@macro(name: "initForwarded"): Let | State { target, diagnostics in
+@let
+@state
+@macro(name: "initForwarded"){ target, diagnostics in
     target.initializer.forward()
 }

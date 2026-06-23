@@ -1,4 +1,5 @@
-@macro(name: "project", result: "Void"): Construct{ target, diagnostics, graph in
+@construct
+@macro(name: "project", result: "Void"){ target, diagnostics, graph in
     @let(
         name: "projectMacros",
         value: "Array<Macro>(graph.macros.where { entry in @return(value: entry.identifier.name == \"project\") })"

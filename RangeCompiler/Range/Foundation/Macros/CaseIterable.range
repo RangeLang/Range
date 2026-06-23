@@ -1,4 +1,5 @@
-@macro(name: "caseIterable"): Enum { target, diagnostics in
+@enum
+@macro(name: "caseIterable"){ target, diagnostics in
     @let(
         name: "casesArray",
         value: ArrayExpression(

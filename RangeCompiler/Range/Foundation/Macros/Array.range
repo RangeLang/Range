@@ -1,5 +1,6 @@
 @syntax
-@macro(name: "array", result: "String"): Construct{
+@construct
+@macro(name: "array", result: "String"){
     @state(name: "elementName", value: String("Element"))
     @state(name: "elementLLVM", value: String("${Element.llvm}"))
     @state(name: "elementStride", value: String("${Element.stride}"))

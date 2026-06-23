@@ -30,7 +30,8 @@ function constructLLVMType(line: String): String {
     @return(value: application.rawBodyText)
 }
 
-@macro(name: "construct", result: "String"): @syntax{
+@syntax
+@macro(name: "construct", result: "String"){
     @parameter(name: "name") {
         @value(type: "String")
     }

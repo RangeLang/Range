@@ -1,2 +1,3 @@
-@macro(name: "property", result: "Void"): Construct{
+@construct
+@macro(name: "property", result: "Void"){
 }

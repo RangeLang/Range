@@ -8,7 +8,8 @@
     })
 }
 
-@macro(name: "hash")(algorithm: HashAlgorithm): Construct { target, diagnostics, graph in
+@construct
+@macro(name: "hash")(algorithm: HashAlgorithm) { target, diagnostics, graph in
     switch algorithm {
     case .sha256:
         target.declaration.expand {
@@ -20,7 +21,8 @@
     }
 }
 
-@macro(name: "hashable"): Construct { target, diagnostics in
+@construct
+@macro(name: "hashable") { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
             function hash(hasher: Hasher) {

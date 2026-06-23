@@ -1,4 +1,5 @@
-@macro(name: "tuple"): Construct { target, diagnostics in
+@construct
+@macro(name: "tuple"){ target, diagnostics in
     @let(name: "bindings", value: target.declaration.bindings)
 
     @if(bindings.count != 2) {

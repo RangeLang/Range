@@ -1,4 +1,5 @@
-@macro(name: "clamped")(min: T, max: T): State<T> {
+@state<T>
+@macro(name: "clamped")(min: T, max: T){
     @generic(name: "T")
     target, diagnostics in
     target.initializer { value in

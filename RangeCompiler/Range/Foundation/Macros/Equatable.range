@@ -16,7 +16,8 @@
     @return(value: true)
 }
 
-@macro(name: "equatable"): Construct { target, diagnostics in
+@construct
+@macro(name: "equatable") { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
             function ==(lhs: Self, rhs: Self): Bool {

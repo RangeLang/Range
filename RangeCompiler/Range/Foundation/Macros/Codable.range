@@ -71,7 +71,8 @@
     })
 }
 
-@macro(name: "codable"): @construct {
+@construct
+@macro(name: "codable") {
     @generic(name: "shape") {
         @value(type: "CodingShape", current: "CodingShape.object")
     }

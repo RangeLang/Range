@@ -1,2 +1,3 @@
-@macro(name: "init", result: "Void"): Function{
+@function
+@macro(name: "init", result: "Void"){
 }

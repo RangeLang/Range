@@ -1,4 +1,5 @@
-@macro(name: "integer", result: "String"): Construct{
+@construct
+@macro(name: "integer", result: "String"){
     @state(name: "bits", value: String())
     @state(name: "signedness", value: String())
     @state(name: "hasBits", value: false)

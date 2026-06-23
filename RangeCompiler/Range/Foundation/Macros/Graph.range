@@ -1,4 +1,5 @@
-@macro(name: "graph", result: "Identity")(role: GraphRole): Construct{ target, diagnostics in
+@construct
+@macro(name: "graph", result: "Identity")(role: GraphRole){ target, diagnostics in
     @let(
         name: "rewrittenIdentifier",
         value: Identifier(name: "\(target.declaration.identifier.name)\(role == .application ? ".Application" : ".Declaration")")

@@ -1,4 +1,5 @@
-@macro(name: "autoclosure"): Parameter { target, diagnostics in
+@parameter
+@macro(name: "autoclosure"){ target, diagnostics in
     target.declaration.type.replace(replacement:
         FunctionTypeReference(
             parameters: [],

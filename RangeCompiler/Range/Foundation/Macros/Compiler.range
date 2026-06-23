@@ -1,4 +1,6 @@
-@macro(name: "compiler"): Construct & @syntax {
+@construct
+@syntax
+@macro(name: "compiler"){
     @let(name: "compilerMacros", value: graph.macros(named: declaration.identifier.name))
 
     @if(compilerMacros.count > 1) {

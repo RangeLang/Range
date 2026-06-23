@@ -1,4 +1,5 @@
-@macro(name: "access")(accessTarget: AccessTarget): Construct { target, diagnostics in
+@construct
+@macro(name: "access")(accessTarget: AccessTarget){ target, diagnostics in
     @let(
         name: "accessibleFields",
         value: Enum(

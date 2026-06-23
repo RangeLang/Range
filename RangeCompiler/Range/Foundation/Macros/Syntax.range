@@ -5,11 +5,13 @@ construct SplicedSyntax {
     @let description: String
 }
 
-@macro(name: "syntax", result: "String")(body: String): Construct{ target, diagnostics, graph in
+@construct
+@macro(name: "syntax", result: "String")(body: String){ target, diagnostics, graph in
     @return(value: body)
 }
 
-@macro(name: "syntaxCapture")(@literal @spliced(delimiter: "") syntax: @syntax): Construct { target, diagnostics, graph in
+@construct
+@macro(name: "syntaxCapture")(@literal @spliced(delimiter: "") syntax: @syntax){ target, diagnostics, graph in
     @let(
         name: "splicedParameters",
         value: target.declaration.parameters.filter { parameter in
@@ -36,7 +38,8 @@ construct SplicedSyntax {
     }
 }
 
-@macro(name: "spliced", result: "@syntax")(delimiter: String = ""): @parameter{ target, diagnostics in
+@parameter
+@macro(name: "spliced", result: "@syntax")(delimiter: String = ""){ target, diagnostics in
     @return(value: SplicedSyntax(
         delimiter: delimiter,
         syntax: target.application.syntax,
@@ -44,11 +47,13 @@ construct SplicedSyntax {
     ))
 }
 
-@macro(name: "splice")(@spliced syntax: @syntax): @syntax { target, diagnostics in
+@syntax
+@macro(name: "splice")(@spliced syntax: @syntax){ target, diagnostics in
     @return(value: syntax)
 }
 
-@macro(name: "map")(collection: Array<T>, @spliced syntax: @syntax): @syntax {
+@syntax
+@macro(name: "map")(collection: Array<T>, @spliced syntax: @syntax){
     @generic(name: "T")
     @return(value: syntax)
 }

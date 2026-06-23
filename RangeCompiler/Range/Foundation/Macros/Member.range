@@ -1,4 +1,5 @@
-@macro(name: "member", result: "Void"): Construct | @macro{
+@construct
+@macro(name: "member", result: "Void"){
 }
 
 @macro(name: "member.declaration.bodyText", result: "String"){

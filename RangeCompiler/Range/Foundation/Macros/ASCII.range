@@ -1,3 +1,4 @@
-@macro(name: "ASCII", result: "String")(@capture<Expression> value: Expression): Expression{ target, diagnostics in
+@expression
+@macro(name: "ASCII", result: "String")(@capture<Expression> value: Expression){ target, diagnostics in
     target.replace(replacement: "\(value)")
 }

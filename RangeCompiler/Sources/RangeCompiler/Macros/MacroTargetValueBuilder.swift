@@ -497,7 +497,7 @@ struct MacroTargetValueBuilder {
         ]
 
         if let declaration = macroDeclarationsByName[application.name] {
-            fields["declaration"] = value(for: declaration)
+            fields["declaration"] = value(for: declaration, includeAttachedMacros: false)
         }
         if let metadata = macroMetadataByName[application.name] {
             fields["valueType"] = typeReferenceValue(metadata.valueType)
@@ -522,13 +522,20 @@ struct MacroTargetValueBuilder {
     }
 
     func value(for declaration: MacroDeclaration) -> CompileTimeValue {
+        value(for: declaration, includeAttachedMacros: true)
+    }
+
+    private func value(
+        for declaration: MacroDeclaration,
+        includeAttachedMacros: Bool
+    ) -> CompileTimeValue {
         let bodyText = renderStatements(declaration.body)
         return .object(
             typeName: "Macro.Declaration",
             fields: [
                 "name": .string(declaration.name),
                 "identifier": identifier(declaration.name),
-                "macros": .array(declaration.macros.map(value(for:))),
+                "macros": .array(includeAttachedMacros ? declaration.macros.map(value(for:)) : []),
                 "target": declaration.target.map(value(for:)) ?? .nilValue,
                 "expansionType": declaration.expansionType.map(typeReferenceValue) ?? .string(""),
                 "expansionTypeName": .string(declaration.expansionType?.displayName ?? ""),

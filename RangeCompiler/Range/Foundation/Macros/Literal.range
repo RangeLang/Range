@@ -1,2 +1,3 @@
-@macro(name: "literal"): Construct {
+@construct
+@macro(name: "literal"){
 }

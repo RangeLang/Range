@@ -1,7 +1,8 @@
+@syntax
 @macro(name: "expand", result: "Void")(
     expansionTarget: @syntax,
     @closure expansion: @syntax
-): @syntax{ target, diagnostics, graph in
+){ target, diagnostics, graph in
     expansionTarget.expand {
         expansion
     }
