@@ -1,14 +1,14 @@
-macro hashProperty(hasher: Hasher, value: Identifier) -> @statement {
+@macro(name: "hashProperty", result: "@statement")(hasher: Hasher, value: Identifier){
     hasher.combine(#(value))
 }
 
-macro hashableBody(hasher: Hasher, properties: Array<Let>) -> Array<@statement> {
+@macro(name: "hashableBody", result: "Array<@statement>")(hasher: Hasher, properties: Array<Let>){
     #(properties.map { property in
         @hashProperty(hasher: hasher, value: property.identifier)
     })
 }
 
-macro hash(algorithm: HashAlgorithm): Construct { target, diagnostics, graph in
+@macro(name: "hash")(algorithm: HashAlgorithm): Construct { target, diagnostics, graph in
     switch algorithm {
     case .sha256:
         target.declaration.expand {
@@ -20,7 +20,7 @@ macro hash(algorithm: HashAlgorithm): Construct { target, diagnostics, graph in
     }
 }
 
-macro hashable(): Construct { target, diagnostics in
+@macro(name: "hashable"): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
             function hash(hasher: Hasher) {

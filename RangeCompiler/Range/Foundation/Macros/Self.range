@@ -1,15 +1,15 @@
-macro self() -> GraphIdentity {
+@macro(name: "self", result: "GraphIdentity"){
     @return(value: context.current)
 }
 
-macro self.declaration() -> GraphEntry {
+@macro(name: "self.declaration", result: "GraphEntry"){
     @return(value: graph.declaration(context.current))
 }
 
-macro self.parent() -> Optional<GraphIdentity> {
+@macro(name: "self.parent", result: "Optional<GraphIdentity>"){
     @return(value: graph.parent(of: context.current))
 }
 
-macro self.members() -> Array<GraphIdentity> {
+@macro(name: "self.members", result: "Array<GraphIdentity>"){
     @return(value: graph.members(of: context.current))
 }

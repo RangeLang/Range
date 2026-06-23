@@ -1,11 +1,10 @@
-macro project(): Construct -> Void { target, diagnostics, graph in
-    let projectMacros: Array<Macro>(
-        graph.macros.where { entry in
-            entry.identifier.name == "project"
-        }
+@macro(name: "project", result: "Void"): Construct{ target, diagnostics, graph in
+    @let(
+        name: "projectMacros",
+        value: "Array<Macro>(graph.macros.where { entry in @return(value: entry.identifier.name == \"project\") })"
     )
 
-    if projectMacros.count > 1 {
+    @if(projectMacros.count > 1) {
         diagnostics.error("A second @project conflicts with the project already declared in this Range project.")
     }
 }

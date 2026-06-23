@@ -1,4 +1,4 @@
-macro function -> String {
+@macro(name: "function", result: "String"){
     @parameter(name: "name") {
         @value(type: "String")
     }

@@ -1,4 +1,4 @@
-macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: String) -> Switch {
+@macro(name: "encodeProperty", result: "Switch")(container: KeyedEncodingContainer, value: Identifier, key: String){
     switch container.encode(#(value), key: key) {
     case .success:
         break
@@ -7,7 +7,7 @@ macro encodeProperty(container: KeyedEncodingContainer, value: Identifier, key: 
     }
 }
 
-macro encodeBody(container: KeyedEncodingContainer, properties: Array<Let>) -> Array<Switch> {
+@macro(name: "encodeBody", result: "Array<Switch>")(container: KeyedEncodingContainer, properties: Array<Let>){
     #(properties.map { property in
         let codingMacros: Array<Macro>(
             property.macros.filter { application in
@@ -34,7 +34,7 @@ macro encodeBody(container: KeyedEncodingContainer, properties: Array<Let>) -> A
     })
 }
 
-macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, value: Identifier, key: String) -> Switch {
+@macro(name: "decodeProperty", result: "Switch")(container: KeyedDecodingContainer, type: TypeReference, value: Identifier, key: String){
     switch container.decode(#(type).self, key: key) {
     case .success(let #(value)):
         state self.#(value): #(value)
@@ -43,7 +43,7 @@ macro decodeProperty(container: KeyedDecodingContainer, type: TypeReference, val
     }
 }
 
-macro decodeBody(container: KeyedDecodingContainer, properties: Array<Let>) -> Array<Switch> {
+@macro(name: "decodeBody", result: "Array<Switch>")(container: KeyedDecodingContainer, properties: Array<Let>){
     #(properties.map { property in
         let codingMacros: Array<Macro>(
             property.macros.filter { application in
@@ -71,7 +71,7 @@ macro decodeBody(container: KeyedDecodingContainer, properties: Array<Let>) -> A
     })
 }
 
-macro codable: @construct {
+@macro(name: "codable"): @construct {
     @generic(name: "shape") {
         @value(type: "CodingShape", current: "CodingShape.object")
     }
@@ -80,21 +80,25 @@ macro codable: @construct {
         diagnostics.error("@codable currently supports object coding only.")
     }
 
-    let properties: Array<Let>(
-        target.declaration.lets.filter { property in
-            let codingMacros: Array<Macro>(
-                property.macros.filter { application in
-                application.identifier.name == "codable"
+    @let(
+        name: "properties",
+        value: target.declaration.lets.filter { property in
+            @let(
+                name: "codingMacros",
+                value: property.macros.filter { application in
+                    @return(value: application.identifier.name == "codable")
                 }
             )
-            let behaviors: Array<CodingBehavior>(
-                codingMacros.map { application in
-                application.value
+            @let(
+                name: "behaviors",
+                value: codingMacros.map { application in
+                    @return(value: application.value)
                 }
             )
-            let excluded: Array<CodingBehavior>(
-                behaviors.filter { behavior in
-                behavior.exclude
+            @let(
+                name: "excluded",
+                value: behaviors.filter { behavior in
+                    @return(value: behavior.exclude)
                 }
             )
             @return(value: excluded.count == 0)

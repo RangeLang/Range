@@ -1,4 +1,4 @@
 @statement
-macro else -> String {
+@macro(name: "else", result: "String"){
     @return(value: "statement|kind=else|projection=" + @statement.projection)
 }

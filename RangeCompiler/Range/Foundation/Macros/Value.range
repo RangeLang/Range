@@ -1,5 +1,5 @@
 @member
-macro value -> String {
+@macro(name: "value", result: "String"){
     @parameter(name: "type") {
         @value(type: "String")
     }

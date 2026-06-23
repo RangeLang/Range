@@ -1,2 +1,2 @@
-macro property(): Construct -> Void {
+@macro(name: "property", result: "Void"): Construct{
 }

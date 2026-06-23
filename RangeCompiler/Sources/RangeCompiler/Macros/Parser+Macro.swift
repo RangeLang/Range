@@ -227,6 +227,11 @@ extension Parser {
             throw ParseError("@macro declarations require the bootstrap @macro declaration.")
         }
         var arguments = try parseInvocationArgumentsIfPresent()
+        if bootstrap.parameters.contains(where: { $0.localName == "result" }),
+            !arguments.contains(where: { $0.label == "result" })
+        {
+            arguments.append(CallArgument(label: "result", value: .string("")))
+        }
         if bootstrap.parameters.contains(where: { $0.localName == "body" }),
             !arguments.contains(where: { $0.label == "body" })
         {
@@ -246,17 +251,37 @@ extension Parser {
             in: argumentBindings,
             declarationName: "@macro"
         )
-        let expansionType = try resultName.map(parseMacroMemberTypeReference)
+        let declaredGenericParameters = try parseGenericParameterClauseIfPresent()
+        let declaredParameters =
+            peek() == .leftParen
+            ? try parseFunctionParameters(allowSyntaxCapture: true) : []
+        let target: MacroTarget?
+        if peek() == .colon {
+            try consume(.colon)
+            target = try parseMacroTarget()
+        } else {
+            target = nil
+        }
+        let expansionType: TypeReference?
+        if let resultName {
+            expansionType = try parseMacroMemberTypeReference(resultName)
+        } else if peek() == .arrow {
+            try consume(.arrow)
+            expansionType = try parseTypeReferenceNode()
+        } else {
+            expansionType = nil
+        }
         let bindings: MacroBindings?
         let body: [Statement]
+        let syntaxBody: EmittedCodeBlock?
         let parameters: [RangeFunctionParameter]
         let genericParameters: [GenericParameter]
 
         if signatureOnly {
             if peek() == .leftBrace {
                 try consume(.leftBrace)
-                genericParameters = try parseMacroMemberGenerics()
-                parameters = try parseMacroMemberParameters()
+                genericParameters = declaredGenericParameters + (try parseMacroMemberGenerics())
+                parameters = declaredParameters + (try parseMacroMemberParameters())
                 bindings = macroBodyStartsWithBindings() ? try parseMacroBodyBindings() : nil
                 try skipUnknownBlockBody()
                 try consume(.rightBrace)
@@ -264,10 +289,15 @@ extension Parser {
                 throw ParseError("Expected macro body.")
             }
             body = []
+            syntaxBody = nil
         } else {
-            let parsedBody = try parseHostedMacroValueBody()
+            let parsedBody = try parseHostedMacroBody(
+                declaredParameters: declaredParameters,
+                declaredGenericParameters: declaredGenericParameters
+            )
             bindings = parsedBody.bindings
             body = parsedBody.body
+            syntaxBody = parsedBody.syntaxBody
             parameters = parsedBody.parameters
             genericParameters = parsedBody.genericParameters
         }
@@ -277,15 +307,55 @@ extension Parser {
             name: macroName,
             genericParameters: genericParameters,
             parameters: parameters,
-            target: nil,
+            target: target,
             expansionType: expansionType,
             bindings: bindings,
             body: body,
-            syntaxBody: nil
+            syntaxBody: syntaxBody
         )
     }
 
-    private mutating func parseHostedMacroValueBody() throws
+    private mutating func parseHostedMacroBody(
+        declaredParameters: [RangeFunctionParameter],
+        declaredGenericParameters: [GenericParameter]
+    ) throws
+        -> (
+            bindings: MacroBindings?,
+            body: [Statement],
+            syntaxBody: EmittedCodeBlock?,
+            parameters: [RangeFunctionParameter],
+            genericParameters: [GenericParameter]
+        )
+    {
+        try consume(.leftBrace)
+        let genericParameters = declaredGenericParameters + (try parseMacroMemberGenerics())
+        let parameters = declaredParameters + (try parseMacroMemberParameters())
+
+        if macroBodyStartsWithBindings() {
+            let parsedBindings = try parseMacroBodyBindings()
+            let body = try parseFreestandingMacroValueBody(
+                parameters: parameters,
+                bindings: parsedBindings
+            )
+            return (parsedBindings, body, nil, parameters, genericParameters)
+        }
+
+        if macroBodyStartsWithMacroStatement() {
+            let body = try parseFreestandingMacroValueBody(
+                parameters: parameters,
+                bindings: nil
+            )
+            return (nil, body, nil, parameters, genericParameters)
+        }
+
+        let syntaxBody = try parseEmittedCodeBlock()
+        return (nil, [], syntaxBody, parameters, genericParameters)
+    }
+
+    private mutating func parseHostedMacroValueBody(
+        declaredParameters: [RangeFunctionParameter] = [],
+        declaredGenericParameters: [GenericParameter] = []
+    ) throws
         -> (
             bindings: MacroBindings?,
             body: [Statement],
@@ -294,8 +364,8 @@ extension Parser {
         )
     {
         try consume(.leftBrace)
-        let genericParameters = try parseMacroMemberGenerics()
-        let parameters = try parseMacroMemberParameters()
+        let genericParameters = declaredGenericParameters + (try parseMacroMemberGenerics())
+        let parameters = declaredParameters + (try parseMacroMemberParameters())
         let bindings: MacroBindings?
         let body: [Statement]
 

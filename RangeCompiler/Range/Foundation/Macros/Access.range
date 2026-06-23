@@ -1,24 +1,33 @@
-macro access(accessTarget: AccessTarget): Construct { target, diagnostics in
-    let accessibleFields: Enum(
-        self: NamedTypeReference(name: "AccessibleFields"),
-        generics: [],
-        cases: target.declaration.lets.map { field in
-            EnumCase(identifier: field.identifier, associatedValues: [])
-        }
+@macro(name: "access")(accessTarget: AccessTarget): Construct { target, diagnostics in
+    @let(
+        name: "accessibleFields",
+        value: Enum(
+            self: NamedTypeReference(name: "AccessibleFields"),
+            generics: [],
+            cases: target.declaration.lets.map { field in
+                EnumCase(identifier: field.identifier, associatedValues: [])
+            }
+        )
     )
-    let accessibleMacros: Enum(
-        self: NamedTypeReference(name: "AccessibleMacros"),
-        generics: [],
-        cases: target.declaration.macros.map { macro in
-            EnumCase(identifier: macro.identifier, associatedValues: [])
-        }
+    @let(
+        name: "accessibleMacros",
+        value: Enum(
+            self: NamedTypeReference(name: "AccessibleMacros"),
+            generics: [],
+            cases: target.declaration.macros.map { macro in
+                EnumCase(identifier: macro.identifier, associatedValues: [])
+            }
+        )
     )
-    let accessibleConstructs: Enum(
-        self: NamedTypeReference(name: "AccessibleConstructs"),
-        generics: [],
-        cases: target.declaration.constructs.map { construct in
-            EnumCase(identifier: construct.identifier, associatedValues: [])
-        }
+    @let(
+        name: "accessibleConstructs",
+        value: Enum(
+            self: NamedTypeReference(name: "AccessibleConstructs"),
+            generics: [],
+            cases: target.declaration.constructs.map { construct in
+                EnumCase(identifier: construct.identifier, associatedValues: [])
+            }
+        )
     )
 
     target.declaration.expand {

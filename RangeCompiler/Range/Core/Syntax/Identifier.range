@@ -1,4 +1,4 @@
-macro identifierSyntaxName(): Init { target, diagnostics in
+@macro(name: "identifierSyntaxName"): Init { target, diagnostics in
     target.application.replace(replacement:
         target.declaration.expression(arguments: [
             String(target.application.arguments[0].expression)

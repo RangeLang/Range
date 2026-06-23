@@ -1,5 +1,5 @@
 @statement
-macro assignment -> String {
+@macro(name: "assignment", result: "String"){
     @parameter(name: "target") {
         @value(type: "String", current: "String()")
     }

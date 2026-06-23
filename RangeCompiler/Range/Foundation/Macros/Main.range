@@ -1,5 +1,5 @@
-macro main(): @block -> String {
-    let mainMacros: Array<Macro>(graph.macros(named: declaration.identifier.name))
+@macro(name: "main", result: "String"): @block{
+    @let(name: "mainMacros", value: graph.macros(named: declaration.identifier.name))
 
     @if(mainMacros.count > 1) {
         diagnostics.error("A second @main conflicts with the main block already declared in this Range project.")

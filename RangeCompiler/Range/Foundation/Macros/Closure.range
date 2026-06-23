@@ -5,7 +5,7 @@ construct ClosureSyntax {
     @let delimiter: String
 }
 
-macro closure(delimiter: String = "\n"): @parameter -> @syntax {
+@macro(name: "closure", result: "@syntax")(delimiter: String = "\n"): @parameter{
     @return(value: ClosureSyntax(
         syntax: application.syntax,
         description: application.syntax.description,

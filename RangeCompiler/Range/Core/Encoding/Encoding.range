@@ -1,4 +1,4 @@
-macro encoding(): Construct -> Void {
+@macro(name: "encoding", result: "Void"): Construct{
 }
 
 @encoding

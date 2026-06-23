@@ -1,12 +1,12 @@
-macro compiler(): Construct & @syntax {
-    let compilerMacros: Array<Macro>(graph.macros(named: declaration.identifier.name))
+@macro(name: "compiler"): Construct & @syntax {
+    @let(name: "compilerMacros", value: graph.macros(named: declaration.identifier.name))
 
     @if(compilerMacros.count > 1) {
         diagnostics.error("A second @compiler conflicts with the compiler already declared in this Range project.")
     }
 
-    let sourceDirectory: String(graph.sourceDirectory(identity: identity))
-    let rangeFiles: Array<String>(FileTree.rangeFiles(path: sourceDirectory))
+    @let(name: "sourceDirectory", value: graph.sourceDirectory(identity: identity))
+    @let(name: "rangeFiles", value: FileTree.rangeFiles(path: sourceDirectory))
 
     @if(rangeFiles.count == 0) {
         diagnostics.error("@compiler could not find any .range files in its source directory.")

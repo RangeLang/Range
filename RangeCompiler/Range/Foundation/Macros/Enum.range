@@ -1,4 +1,4 @@
-macro enum: @syntax -> String {
+@macro(name: "enum", result: "String"): @syntax{
     @parameter(name: "name") {
         @value(type: "String")
     }

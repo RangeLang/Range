@@ -1,5 +1,5 @@
-macro tuple(): Construct { target, diagnostics in
-    let bindings: Array<Binding>(target.declaration.bindings)
+@macro(name: "tuple"): Construct { target, diagnostics in
+    @let(name: "bindings", value: target.declaration.bindings)
 
     @if(bindings.count != 2) {
         diagnostics.error("@tuple expects exactly two binding fields.")

@@ -1,10 +1,10 @@
-macro member(): Construct | @macro -> Void {
+@macro(name: "member", result: "Void"): Construct | @macro{
 }
 
-macro member.declaration.bodyText -> String {
+@macro(name: "member.declaration.bodyText", result: "String"){
     @return(value: declaration.bodyText)
 }
 
-macro member.ordinal -> String {
+@macro(name: "member.ordinal", result: "String"){
     @return(value: "\(ordinal)")
 }

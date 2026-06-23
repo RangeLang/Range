@@ -1,14 +1,18 @@
-macro float(): Construct -> String {
-    state precision: String("64")
-    state hasPrecision: false
+@macro(name: "float", result: "String"): Construct{
+    @state(name: "precision", value: String("64"))
+    @state(name: "hasPrecision", value: false)
+    @state(name: "index", value: 0)
 
-    for generic in declaration.generics {
-        let name: String(generic.identifier.name)
+    @while(index < declaration.generics.count) {
+        @let(name: "generic", value: declaration.generics.element(index: index))
+        @let(name: "name", value: generic.identifier.name)
 
         @if(name == "precision") {
             hasPrecision: true
             precision: generic.value
         }
+
+        index: index + 1
     }
 
     @if(declaration.generics.count > 0 && !hasPrecision) {

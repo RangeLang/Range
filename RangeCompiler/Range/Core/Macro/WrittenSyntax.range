@@ -1,4 +1,4 @@
-macro WrittenSyntax(text: Foreign<ASCII>): @syntax -> WrittenSyntax {
+@macro(name: "WrittenSyntax", result: "WrittenSyntax")(text: Foreign<ASCII>): @syntax{
     return WrittenSyntax(
         text: text,
         range: SourceRange(

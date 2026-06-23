@@ -1,5 +1,5 @@
 @statement
-macro switch -> String {
+@macro(name: "switch", result: "String"){
     @parameter(name: "value") {
         @value(type: "String", current: "String()")
     }

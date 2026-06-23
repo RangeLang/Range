@@ -1,4 +1,4 @@
-macro compareProperty(lhs: T, rhs: T, value: Identifier) -> If {
+@macro(name: "compareProperty", result: "If")(lhs: T, rhs: T, value: Identifier){
     @generic(name: "T")
 
     if lhs.#(value) != rhs.#(value) {
@@ -6,7 +6,7 @@ macro compareProperty(lhs: T, rhs: T, value: Identifier) -> If {
     }
 }
 
-macro equatableBody(lhs: T, rhs: T, properties: Array<Let>) -> Array<@statement> {
+@macro(name: "equatableBody", result: "Array<@statement>")(lhs: T, rhs: T, properties: Array<Let>){
     @generic(name: "T")
 
     #(properties.map { property in
@@ -16,7 +16,7 @@ macro equatableBody(lhs: T, rhs: T, properties: Array<Let>) -> Array<@statement>
     @return(value: true)
 }
 
-macro equatable(): Construct { target, diagnostics in
+@macro(name: "equatable"): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
             function ==(lhs: Self, rhs: Self): Bool {

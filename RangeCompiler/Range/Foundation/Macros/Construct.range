@@ -26,11 +26,11 @@ function constructLLVMType(line: String): String {
     @return(value: "")
 }
 
-macro construct.application.rawBodyText -> String {
+@macro(name: "construct.application.rawBodyText", result: "String"){
     @return(value: application.rawBodyText)
 }
 
-macro construct: @syntax -> String {
+@macro(name: "construct", result: "String"): @syntax{
     @parameter(name: "name") {
         @value(type: "String")
     }

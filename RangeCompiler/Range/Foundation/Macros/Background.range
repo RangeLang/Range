@@ -1,8 +1,8 @@
-macro block(statements: Array<@statement>) -> Array<@statement> {
+@macro(name: "block", result: "Array<@statement>")(statements: Array<@statement>){
     #(statements)
 }
 
-macro background(): @block & @syntax { target, diagnostics, graph in
+@macro(name: "background"): @block & @syntax { target, diagnostics, graph in
     @if(target.declaration.statements.count == 0) {
         diagnostics.error("@background block must not be empty.")
     }

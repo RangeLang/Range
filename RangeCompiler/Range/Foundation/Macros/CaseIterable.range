@@ -1,12 +1,15 @@
-macro caseIterable(): Enum { target, diagnostics in
-    let casesArray: ArrayExpression(
-        type: ArrayTypeReference(element: NamedTypeReference(name: "Self")),
-        elements: target.declaration.cases.map { enumCase in
-            EnumCaseExpression(
-                type: NamedTypeReference(name: "Self"),
-                identifier: enumCase.identifier
-            )
-        }
+@macro(name: "caseIterable"): Enum { target, diagnostics in
+    @let(
+        name: "casesArray",
+        value: ArrayExpression(
+            type: ArrayTypeReference(element: NamedTypeReference(name: "Self")),
+            elements: target.declaration.cases.map { enumCase in
+                EnumCaseExpression(
+                    type: NamedTypeReference(name: "Self"),
+                    identifier: enumCase.identifier
+                )
+            }
+        )
     )
 
     target.declaration.expand {

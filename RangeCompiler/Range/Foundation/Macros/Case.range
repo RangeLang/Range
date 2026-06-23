@@ -1,5 +1,5 @@
 @statement
-macro case -> String {
+@macro(name: "case", result: "String"){
     @parameter(name: "name") {
         @value(type: "String", current: "String()")
     }

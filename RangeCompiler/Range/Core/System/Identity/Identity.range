@@ -2,6 +2,6 @@ construct Identity {
     @let uuid: UUID
 }
 
-macro identity(): Construct -> Identity {
-    return Identity(uuid: UUID(storage: UUIDStorage()))
+@macro(name: "identity", result: "Identity"): Construct{
+    @return(value: Identity(uuid: UUID(storage: UUIDStorage())))
 }

@@ -1,11 +1,13 @@
-macro integer(): Construct -> String {
-    state bits: String()
-    state signedness: String()
-    state hasBits: false
-    state hasSignedness: false
+@macro(name: "integer", result: "String"): Construct{
+    @state(name: "bits", value: String())
+    @state(name: "signedness", value: String())
+    @state(name: "hasBits", value: false)
+    @state(name: "hasSignedness", value: false)
+    @state(name: "index", value: 0)
 
-    for generic in declaration.generics {
-        let name: String(generic.identifier.name)
+    @while(index < declaration.generics.count) {
+        @let(name: "generic", value: declaration.generics.element(index: index))
+        @let(name: "name", value: generic.identifier.name)
 
         @if(name == "bits") {
             hasBits: true
@@ -16,6 +18,8 @@ macro integer(): Construct -> String {
             hasSignedness: true
             signedness: generic.value
         }
+
+        index: index + 1
     }
 
     @if(declaration.generics.count > 0 && !hasBits) {

@@ -1,7 +1,7 @@
-macro expand(
+@macro(name: "expand", result: "Void")(
     expansionTarget: @syntax,
     @closure expansion: @syntax
-): @syntax -> Void { target, diagnostics, graph in
+): @syntax{ target, diagnostics, graph in
     expansionTarget.expand {
         expansion
     }

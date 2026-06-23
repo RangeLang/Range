@@ -1,5 +1,5 @@
 @statement
-macro break -> String {
+@macro(name: "break", result: "String"){
     @return(value: "statement|kind=break|projection="
         + @statement.declarationProjection
         + "|llvm=br label %loop.end")

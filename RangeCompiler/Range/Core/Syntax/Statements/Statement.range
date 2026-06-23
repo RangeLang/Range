@@ -1,20 +1,20 @@
 @expression
-macro statement() -> String {
-    return "statement|kind=expression|projection=target.declaration"
+@macro(name: "statement", result: "String"){
+    @return(value: "statement|kind=expression|projection=target.declaration")
 }
 
-macro statement.bodyText -> String {
+@macro(name: "statement.bodyText", result: "String"){
     @return(value: declaration.bodyText)
 }
 
-macro statement.ordinal -> String {
+@macro(name: "statement.ordinal", result: "String"){
     @return(value: "\(ordinal)")
 }
 
-macro statement.projection -> String {
+@macro(name: "statement.projection", result: "String"){
     @return(value: "target.declaration.statements")
 }
 
-macro statement.declarationProjection -> String {
+@macro(name: "statement.declarationProjection", result: "String"){
     @return(value: "target.declaration")
 }

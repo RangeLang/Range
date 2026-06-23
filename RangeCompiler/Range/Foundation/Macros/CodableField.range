@@ -3,7 +3,7 @@ construct CodingBehavior {
     @let exclude: Bool
 }
 
-macro codable(key: Optional<String> = nil, exclude: Bool = false): @property -> CodingBehavior {
+@macro(name: "codable", result: "CodingBehavior")(key: Optional<String> = nil, exclude: Bool = false): @property{
     @generic(name: "T")
     target, diagnostics in
     @return(value: CodingBehavior(key: key, exclude: exclude))

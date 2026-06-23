@@ -1,4 +1,4 @@
-macro compareOrderingProperty(lhs: T, rhs: T, value: Identifier) -> Array<If> {
+@macro(name: "compareOrderingProperty", result: "Array<If>")(lhs: T, rhs: T, value: Identifier){
     @generic(name: "T")
 
     if lhs.#(value) < rhs.#(value) {
@@ -10,7 +10,7 @@ macro compareOrderingProperty(lhs: T, rhs: T, value: Identifier) -> Array<If> {
     }
 }
 
-macro comparableBody(lhs: T, rhs: T, properties: Array<Let>) -> Array<@statement> {
+@macro(name: "comparableBody", result: "Array<@statement>")(lhs: T, rhs: T, properties: Array<Let>){
     @generic(name: "T")
 
     #(properties.map { property in
@@ -20,7 +20,7 @@ macro comparableBody(lhs: T, rhs: T, properties: Array<Let>) -> Array<@statement
     @return(value: false)
 }
 
-macro comparable(): Construct { target, diagnostics in
+@macro(name: "comparable"): Construct { target, diagnostics in
     target.declaration.expand {
         extension #(target.declaration.self) {
             function ==(lhs: Self, rhs: Self): Bool {
