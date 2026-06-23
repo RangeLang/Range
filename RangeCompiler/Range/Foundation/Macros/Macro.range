@@ -1,10 +1,20 @@
-@macro() -> String {
+@macro -> String {
+    @parameter(name: "name") {
+        @value(type: "String")
+    }
+    @parameter(name: "result") {
+        @value(type: "String")
+    }
+    @parameter(name: "body") {
+        @value(type: "String")
+    }
+
     @return(value: "macro"
         + "|name="
-        + declaration.name
+        + name
         + "|result="
-        + declaration.expansionTypeName
+        + result
         + "\n"
-        + declaration.body
+        + body
     )
 }
