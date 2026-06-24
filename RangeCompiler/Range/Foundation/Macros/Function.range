@@ -17,7 +17,7 @@
     @state(name: "instructionIndex", value: "0")
 
     @if(body.contains(value: "statement|")) {
-        @set(name: "bodyField", value: String("records"))
+        @assignment(target: "bodyField", value: String("records"))
     }
 
     @while(index < body.count(of: "\n") + 1) {
@@ -25,28 +25,28 @@
         @state(name: "lineLLVM", value: "String(\"\")")
 
         @if(line.contains(value: "|llvm=")) {
-            @set(name: "lineLLVM", value: line.segment(index: 1, delimiter: "|llvm="))
+            @assignment(target: "lineLLVM", value: line.segment(index: 1, delimiter: "|llvm="))
         }
 
         @if(!lineLLVM.isEmpty) {
             @if(instructionIndex > 0) {
-                @set(name: "llvm", value: llvm + "; ")
+                @assignment(target: "llvm", value: llvm + "; ")
             }
 
-            @set(name: "llvm", value: llvm + lineLLVM)
-            @set(name: "instructionIndex", value: instructionIndex + 1)
+            @assignment(target: "llvm", value: llvm + lineLLVM)
+            @assignment(target: "instructionIndex", value: instructionIndex + 1)
         }
 
         @if(body.contains(value: "statement|")) {
             @if(!line.isEmpty) {
-                @set(name: "records", value: records + "\n" + line)
+                @assignment(target: "records", value: records + "\n" + line)
             }
         }
 
-        @set(name: "index", value: index + 1)
+        @assignment(target: "index", value: index + 1)
     }
 
-    @set(name: "index", value: 0)
+    @assignment(target: "index", value: 0)
     @while(index < memberBodyText.count(of: "\n") + 1) {
         @state(
             name: "memberLine",
@@ -54,10 +54,10 @@
         )
 
         @if(!memberLine.isEmpty) {
-            @set(name: "members", value: members + "\n" + memberLine)
+            @assignment(target: "members", value: members + "\n" + memberLine)
         }
 
-        @set(name: "index", value: index + 1)
+        @assignment(target: "index", value: index + 1)
     }
 
     @if(llvm.isEmpty) {

@@ -77,7 +77,7 @@ struct CompileTimeValueEvaluator {
                     continue
                 }
                 locals[binding.name] = binding.expression
-            case .macroApplication(let name, let arguments) where name == "assignment" || name == "set":
+            case .macroApplication(let name, let arguments) where name == "assignment":
                 guard let assignment = macroLocalAssignment(arguments: arguments, locals: locals) else {
                     continue
                 }
@@ -155,8 +155,7 @@ struct CompileTimeValueEvaluator {
         arguments: [CallArgument],
         locals: [String: Expression]
     ) -> (name: String, expression: Expression)? {
-        guard let targetArgument = arguments.first(where: { $0.label == "target" })
-            ?? arguments.first(where: { $0.label == "name" }),
+        guard let targetArgument = arguments.first(where: { $0.label == "target" }),
             let valueArgument = arguments.first(where: { $0.label == "value" }),
             case .string(let name) = evaluate(targetArgument.value, locals: locals),
             !name.isEmpty

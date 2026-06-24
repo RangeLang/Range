@@ -10,7 +10,7 @@
     @state(name: "children", value: "String(\"\")")
 
     @if(!bodyText.isEmpty) {
-        @set(name: "children", value: "\n" + bodyText)
+        @assignment(target: "children", value: "\n" + bodyText)
     }
 
     @return(value: "statement|kind=for|binding="

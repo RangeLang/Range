@@ -14,10 +14,10 @@
         )
 
         @if(!line.isEmpty) {
-            @set(name: "members", value: members + "\n" + line)
+            @assignment(target: "members", value: members + "\n" + line)
         }
 
-        @set(name: "index", value: index + 1)
+        @assignment(target: "index", value: index + 1)
     }
 
     @return(value: "enum|name=" + name + members)

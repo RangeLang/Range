@@ -15,10 +15,10 @@
         )
 
         @if(!memberLine.isEmpty) {
-            @set(name: "members", value: members + "\n" + memberLine)
+            @assignment(target: "members", value: members + "\n" + memberLine)
         }
 
-        @set(name: "index", value: index + 1)
+        @assignment(target: "index", value: index + 1)
     }
 
     @return(value: "member|kind=state|name="
