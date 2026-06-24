@@ -1,7 +1,0 @@
-@statement
-@syntax
-@construct(name: "ExpressionStatement") {
-    @let(name: "expression") {
-        @value(type: "Expression")
-    }
-}

@@ -278,7 +278,6 @@ public struct DeclarationSyntaxResolver {
         "Defer",
         "EnumCaseExpression",
         "Expression",
-        "ExpressionStatement",
         "For",
         "Identifier",
         "If",
