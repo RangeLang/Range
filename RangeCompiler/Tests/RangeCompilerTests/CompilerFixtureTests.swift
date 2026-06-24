@@ -822,6 +822,28 @@ struct CompilerFixtureTests {
         }
     }
 
+    @Test("Macro body assignment remains a macro application at parse time")
+    func macroBodyAssignmentRemainsMacroApplicationAtParseTime() throws {
+        var parser = try Parser(source: """
+            @macro -> String {
+                @state(name: "value", value: "String()")
+                @assignment(target: "value", value: "updated")
+                @return(value: value)
+            }
+            """)
+        let sourceFile = try parser.parseSourceFile()
+        guard case .macro(let declaration) = sourceFile,
+            declaration.body.count >= 2,
+            case .macroApplication(let name, let arguments) = declaration.body[1]
+        else {
+            Issue.record("Expected @assignment to remain a macro application.")
+            return
+        }
+
+        #expect(name == "assignment")
+        #expect(arguments.map(\.label) == ["target", "value"])
+    }
+
     @Test("@macro entrypoint lowers macro declarations to stringy records")
     func macroEntrypointLowersMacroDeclarationsToStringyRecords() throws {
         let program = try CompilerPipeline().build(inputs: rangeFoundationMacroInputs())
