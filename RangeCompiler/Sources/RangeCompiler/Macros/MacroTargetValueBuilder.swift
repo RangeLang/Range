@@ -711,13 +711,7 @@ struct MacroTargetValueBuilder {
                 ]
             )
         case .expression(let expression):
-            return .object(
-                typeName: "ExpressionStatement",
-                fields: [
-                    "expression": writtenSyntax(
-                        MacroExpander.renderExpressionForStringify(expression))
-                ]
-            )
+            return writtenSyntax(MacroExpander.renderExpressionForStringify(expression))
         case .background(let background):
             return .object(
                 typeName: "Background", fields: ["body": blockValue(for: background.body)])

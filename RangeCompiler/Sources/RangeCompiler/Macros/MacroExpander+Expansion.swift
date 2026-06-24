@@ -390,12 +390,7 @@ extension MacroExpander {
                 ]
             )
         case .expression(let expression):
-            return .object(
-                typeName: "ExpressionStatement",
-                fields: [
-                    "expression": expressionValue(expression)
-                ]
-            )
+            return .string(MacroExpander.renderExpressionForStringify(expression))
         default:
             return .object(
                 typeName: "UnsupportedStatement",
@@ -4524,10 +4519,7 @@ extension MacroExpander {
                 ]
             )
         case .expression(let expression):
-            return .object(
-                typeName: "ExpressionStatement",
-                fields: ["expression": expressionSyntaxValue(expression)]
-            )
+            return expressionSyntaxValue(expression)
         default:
             throw ParseError("Unsupported statement in syntax macro output.")
         }

@@ -16,8 +16,7 @@ struct MacroSyntaxRenderer {
         case .object(let typeName, _) where typeName == "Block":
             return renderBlock(value)
         case .object(let typeName, _) where typeName == "Switch" || typeName == "If" || typeName == "Return"
-            || typeName == "Break" || typeName == "Assignment"
-            || typeName == "ExpressionStatement":
+            || typeName == "Break" || typeName == "Assignment":
             return renderStatement(value)
         case .object(let typeName, _) where typeName == "Identifier":
             return renderIdentifier(value)
@@ -385,11 +384,6 @@ struct MacroSyntaxRenderer {
                 return nil
             }
             return "state \(renderExpressionForSyntax(target)): \(renderExpressionForSyntax(expression))"
-        case .object(let typeName, let fields) where typeName == "ExpressionStatement":
-            guard let expression = fields["expression"] else {
-                return nil
-            }
-            return renderExpressionForSyntax(expression)
         case .string(let expression):
             return expression
         default:
@@ -439,11 +433,6 @@ struct MacroSyntaxRenderer {
                 return nil
             }
             return "state \(renderExpressionForSyntax(target)): \(renderExpressionForSyntax(assignmentExpression))"
-        case .call(let name, let arguments) where name == "ExpressionStatement":
-            guard let statementExpression = argument("expression", in: arguments) else {
-                return nil
-            }
-            return renderExpressionForSyntax(statementExpression)
         default:
             return renderExpressionForSyntax(expression)
         }

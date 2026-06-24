@@ -888,7 +888,7 @@ struct CompileTimeValueEvaluator {
         "Macro.Application", "Macro.Declaration", "Macro.Target", "CodingBehavior",
         "ValueGeneric", "Parameter.Declaration",
         "Void", "Identity", "UUID", "UUIDStorage", "RangeGraphIdentity", "GraphRole", "GraphEntry", "WrittenSyntax", "Parsed", "Block", "LocalBinding", "Switch",
-        "SwitchCase", "Return", "Break", "Assignment", "ExpressionStatement",
+        "SwitchCase", "Return", "Break", "Assignment",
         "ProgramSourceFile", "ProgramArtifact", "ProgramResult", "RangeProgram", "RangeGraph", "RangeProject",
         "WrittenExpression",
         "ArrayExpression", "EnumCaseExpression", "CompilerPipelineRuntimeContext", "CompilerPipelineRuntimeResult", "CompilerPipelineRuntimeHook",
@@ -1577,10 +1577,6 @@ private struct LLVMMainBuilder {
             lines.append("  \(truncated) = trunc i64 \(operand) to i3")
             lines.append("  ret i3 \(truncated)")
             didReturn = true
-        case "ExpressionStatement":
-            if let expression = fields["expression"] {
-                _ = emitExpression(expression)
-            }
         default:
             return
         }
