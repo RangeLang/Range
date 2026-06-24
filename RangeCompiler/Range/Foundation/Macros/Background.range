@@ -5,7 +5,7 @@
 @block
 @syntax
 @macro(name: "background"){ target, diagnostics, graph in
-    @if(target.declaration.statements.count == 0) {
+    @if("target.declaration.statements.count == Int(0)") {
         diagnostics.error("@background block must not be empty.")
     }
 

@@ -5,7 +5,7 @@
         value: "Array<Macro>(graph.macros.where { entry in @return(value: entry.identifier.name == \"project\") })"
     )
 
-    @if(projectMacros.count > 1) {
+    @if("projectMacros.count > Int(1)") {
         diagnostics.error("A second @project conflicts with the project already declared in this Range project.")
     }
 }

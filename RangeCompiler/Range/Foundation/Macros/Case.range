@@ -6,7 +6,7 @@
     @parameter(name: "value") {
         @value(type: "String", current: "String()")
     }
-    @if(!name.isEmpty) {
+    @if("!name.isEmpty") {
         @return(value: "member|kind=case|name="
             + name
             + "|value="

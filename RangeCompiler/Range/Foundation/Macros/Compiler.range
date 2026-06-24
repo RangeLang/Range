@@ -1,16 +1,16 @@
 @construct
 @syntax
 @macro(name: "compiler"){
-    @let(name: "compilerMacros", value: graph.macros(named: declaration.identifier.name))
+    @let(name: "compilerMacros", value: "graph.macros(named: declaration.identifier.name)")
 
-    @if(compilerMacros.count > 1) {
+    @if("compilerMacros.count > Int(1)") {
         diagnostics.error("A second @compiler conflicts with the compiler already declared in this Range project.")
     }
 
-    @let(name: "sourceDirectory", value: graph.sourceDirectory(identity: identity))
-    @let(name: "rangeFiles", value: FileTree.rangeFiles(path: sourceDirectory))
+    @let(name: "sourceDirectory", value: "graph.sourceDirectory(identity: identity)")
+    @let(name: "rangeFiles", value: "FileTree.rangeFiles(path: sourceDirectory)")
 
-    @if(rangeFiles.count == 0) {
+    @if("rangeFiles.count == Int(0)") {
         diagnostics.error("@compiler could not find any .range files in its source directory.")
     }
 }

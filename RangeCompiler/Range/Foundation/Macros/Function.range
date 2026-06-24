@@ -12,55 +12,55 @@
     @state(name: "records", value: "String(\"\")")
     @state(name: "members", value: "String(\"\")")
     @state(name: "bodyField", value: "body")
-    @state(name: "index", value: "0")
+    @state(name: "index", value: "Int(0)")
     @state(name: "memberBodyText", value: "target.declaration.bodyText")
-    @state(name: "instructionIndex", value: "0")
+    @state(name: "instructionIndex", value: "Int(0)")
 
-    @if(body.contains(value: "statement|")) {
-        @assignment(target: "bodyField", value: String("records"))
+    @if("body.contains(value: \"statement|\")") {
+        @assignment(target: "bodyField", value: "String(\"records\")")
     }
 
-    @while(index < body.count(of: "\n") + 1) {
-        @state(name: "line", value: body.segment(index: index, delimiter: "\n"))
+    @while("index < body.count(of: \"\\n\") + Int(1)") {
+        @state(name: "line", value: "body.segment(index: index, delimiter: \"\\n\")")
         @state(name: "lineLLVM", value: "String(\"\")")
 
-        @if(line.contains(value: "|llvm=")) {
-            @assignment(target: "lineLLVM", value: line.segment(index: 1, delimiter: "|llvm="))
+        @if("line.contains(value: \"|llvm=\")") {
+            @assignment(target: "lineLLVM", value: "line.segment(index: Int(1), delimiter: \"|llvm=\")")
         }
 
-        @if(!lineLLVM.isEmpty) {
-            @if(instructionIndex > 0) {
-                @assignment(target: "llvm", value: llvm + "; ")
+        @if("!lineLLVM.isEmpty") {
+            @if("instructionIndex > Int(0)") {
+                @assignment(target: "llvm", value: "llvm + \"; \"")
             }
 
-            @assignment(target: "llvm", value: llvm + lineLLVM)
-            @assignment(target: "instructionIndex", value: instructionIndex + 1)
+            @assignment(target: "llvm", value: "llvm + lineLLVM")
+            @assignment(target: "instructionIndex", value: "instructionIndex + Int(1)")
         }
 
-        @if(body.contains(value: "statement|")) {
-            @if(!line.isEmpty) {
-                @assignment(target: "records", value: records + "\n" + line)
+        @if("body.contains(value: \"statement|\")") {
+            @if("!line.isEmpty") {
+                @assignment(target: "records", value: "records + \"\\n\" + line")
             }
         }
 
-        @assignment(target: "index", value: index + 1)
+        @assignment(target: "index", value: "index + Int(1)")
     }
 
-    @assignment(target: "index", value: 0)
-    @while(index < memberBodyText.count(of: "\n") + 1) {
+    @assignment(target: "index", value: "Int(0)")
+    @while("index < memberBodyText.count(of: \"\\n\") + Int(1)") {
         @state(
             name: "memberLine",
             value: "memberBodyText.segment(index: index, delimiter: \"\n\")"
         )
 
-        @if(!memberLine.isEmpty) {
-            @assignment(target: "members", value: members + "\n" + memberLine)
+        @if("!memberLine.isEmpty") {
+            @assignment(target: "members", value: "members + \"\\n\" + memberLine")
         }
 
-        @assignment(target: "index", value: index + 1)
+        @assignment(target: "index", value: "index + Int(1)")
     }
 
-    @if(llvm.isEmpty) {
+    @if("llvm.isEmpty") {
         @return(value: "member|kind=function|name="
             + name
             + "|result="

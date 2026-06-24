@@ -1,26 +1,26 @@
 @construct
 @macro(name: "float", result: "String"){
-    @state(name: "precision", value: String("64"))
-    @state(name: "hasPrecision", value: false)
-    @state(name: "index", value: 0)
+    @state(name: "precision", value: "String(\"64\")")
+    @state(name: "hasPrecision", value: "Bool(false)")
+    @state(name: "index", value: "Int(0)")
 
-    @while(index < declaration.generics.count) {
-        @let(name: "generic", value: declaration.generics.element(index: index))
-        @let(name: "name", value: generic.identifier.name)
+    @while("index < declaration.generics.count") {
+        @let(name: "generic", value: "declaration.generics.element(index: index)")
+        @let(name: "name", value: "generic.identifier.name")
 
-        @if(name == "precision") {
-            @assignment(target: "hasPrecision", value: true)
-            @assignment(target: "precision", value: generic.value)
+        @if("name == \"precision\"") {
+            @assignment(target: "hasPrecision", value: "Bool(true)")
+            @assignment(target: "precision", value: "generic.value")
         }
 
-        @assignment(target: "index", value: index + 1)
+        @assignment(target: "index", value: "index + Int(1)")
     }
 
-    @if(declaration.generics.count > 0 && !hasPrecision) {
+    @if("declaration.generics.count > Int(0) && !hasPrecision") {
         diagnostics.error("@float requires a value generic named precision.")
     }
 
-    @if(precision == "32") {
+    @if("precision == \"32\"") {
         @return(value: "float")
     }
 

@@ -3,12 +3,10 @@
 @macro(name: "addable"){ target, diagnostics in
     @let(
         name: "additions",
-        value: target.declaration.functions.filter { function in
-            @return(value: function.identifier.name == "+")
-        }
+        value: "target.declaration.functions.filter { function in @return(value: function.identifier.name == \"+\") }"
     )
 
-    @if(additions.count == 0) {
+    @if("additions.count == Int(0)") {
         diagnostics.error("@addable requires a function identified as + to be declared.")
     }
 }

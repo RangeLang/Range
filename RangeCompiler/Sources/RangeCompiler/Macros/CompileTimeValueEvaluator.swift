@@ -71,7 +71,7 @@ struct CompileTimeValueEvaluator {
                 guard let valueArgument = arguments.first(where: { $0.label == "value" }) else {
                     return .object(typeName: "Void", fields: [:])
                 }
-                return evaluate(valueArgument.value, locals: locals)
+                return macroReturnValue(valueArgument.value, locals: locals)
             case .macroApplication(let name, let arguments) where name == "state" || name == "let":
                 guard let binding = macroLocalBinding(arguments: arguments, locals: locals) else {
                     continue
@@ -163,7 +163,7 @@ struct CompileTimeValueEvaluator {
             return nil
         }
 
-        return (name, boundExpression(valueArgument.value, locals: locals))
+        return (name, macroLocalValueExpression(valueArgument.value, locals: locals))
     }
 
     private func emittedMacroLocalAssignment(
@@ -204,6 +204,19 @@ struct CompileTimeValueEvaluator {
         return boundExpression(expression, locals: locals)
     }
 
+    private func macroReturnValue(
+        _ expression: Expression,
+        locals: [String: Expression]
+    ) -> CompileTimeValue? {
+        if case .string(let source) = expression,
+            let parsed = try? parseMacroLocalValueSource(source),
+            let value = evaluate(parsed, locals: locals)
+        {
+            return value
+        }
+        return evaluate(expression, locals: locals)
+    }
+
     private func parseMacroLocalValueSource(_ source: String) throws -> Expression {
         var parser = try Parser(source: StringLiteral.decodeEscapes(source))
         let expression = try parser.parseExpression()
@@ -220,10 +233,10 @@ struct CompileTimeValueEvaluator {
         }
 
         if let condition = arguments.first(where: { $0.label == "condition" }) {
-            return condition.value
+            return macroLocalValueExpression(condition.value, locals: [:])
         }
 
-        return arguments.first?.value
+        return arguments.first.map { macroLocalValueExpression($0.value, locals: [:]) }
     }
 
     // Resolves an expression to a bound expression: if it evaluates to a concrete

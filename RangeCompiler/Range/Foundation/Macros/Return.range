@@ -5,20 +5,20 @@
     }
     @state(name: "llvm", value: "\"ret \" + value")
 
-    @if(value.isEmpty) {
+    @if("value.isEmpty") {
         @assignment(target: "llvm", value: "ret void")
     }
 
-    @if(value.contains(value: "Int(")) {
+    @if("value.contains(value: \"Int(\")") {
         @state(name: "suffix", value: "value.segment(index: 1, delimiter: \"Int(\")")
-        @assignment(target: "llvm", value: "ret i64 " + suffix.segment(index: 0, delimiter: ")"))
+        @assignment(target: "llvm", value: "\"ret i64 \" + suffix.segment(index: Int(0), delimiter: \")\")")
     }
 
-    @if(value.contains(value: "Bool(true)")) {
+    @if("value.contains(value: \"Bool(true)\")") {
         @assignment(target: "llvm", value: "ret i1 1")
     }
 
-    @if(value.contains(value: "Bool(false)")) {
+    @if("value.contains(value: \"Bool(false)\")") {
         @assignment(target: "llvm", value: "ret i1 0")
     }
 

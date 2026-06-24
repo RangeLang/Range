@@ -1,15 +1,15 @@
 @macro(name: "self", result: "GraphIdentity"){
-    @return(value: context.current)
+    @return(value: "context.current")
 }
 
 @macro(name: "self.declaration", result: "GraphEntry"){
-    @return(value: graph.declaration(context.current))
+    @return(value: "graph.declaration(context.current)")
 }
 
 @macro(name: "self.parent", result: "Optional<GraphIdentity>"){
-    @return(value: graph.parent(of: context.current))
+    @return(value: "graph.parent(of: context.current)")
 }
 
 @macro(name: "self.members", result: "Array<GraphIdentity>"){
-    @return(value: graph.members(of: context.current))
+    @return(value: "graph.members(of: context.current)")
 }

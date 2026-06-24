@@ -1,35 +1,35 @@
 @construct
 @macro(name: "integer", result: "String"){
-    @state(name: "bits", value: String())
-    @state(name: "signedness", value: String())
-    @state(name: "hasBits", value: false)
-    @state(name: "hasSignedness", value: false)
-    @state(name: "index", value: 0)
+    @state(name: "bits", value: "String()")
+    @state(name: "signedness", value: "String()")
+    @state(name: "hasBits", value: "Bool(false)")
+    @state(name: "hasSignedness", value: "Bool(false)")
+    @state(name: "index", value: "Int(0)")
 
-    @while(index < declaration.generics.count) {
-        @let(name: "generic", value: declaration.generics.element(index: index))
-        @let(name: "name", value: generic.identifier.name)
+    @while("index < declaration.generics.count") {
+        @let(name: "generic", value: "declaration.generics.element(index: index)")
+        @let(name: "name", value: "generic.identifier.name")
 
-        @if(name == "bits") {
-            @assignment(target: "hasBits", value: true)
-            @assignment(target: "bits", value: generic.value)
+        @if("name == \"bits\"") {
+            @assignment(target: "hasBits", value: "Bool(true)")
+            @assignment(target: "bits", value: "generic.value")
         }
 
-        @if(name == "signedness") {
-            @assignment(target: "hasSignedness", value: true)
-            @assignment(target: "signedness", value: generic.value)
+        @if("name == \"signedness\"") {
+            @assignment(target: "hasSignedness", value: "Bool(true)")
+            @assignment(target: "signedness", value: "generic.value")
         }
 
-        @assignment(target: "index", value: index + 1)
+        @assignment(target: "index", value: "index + Int(1)")
     }
 
-    @if(declaration.generics.count > 0 && !hasBits) {
+    @if("declaration.generics.count > Int(0) && !hasBits") {
         diagnostics.error("@integer requires a value generic named bits.")
     }
 
-    @if(declaration.generics.count > 0 && !hasSignedness) {
+    @if("declaration.generics.count > Int(0) && !hasSignedness") {
         diagnostics.error("@integer requires a value generic named signedness.")
     }
 
-    @return(value: String("i" + bits))
+    @return(value: "String(\"i\" + bits)")
 }

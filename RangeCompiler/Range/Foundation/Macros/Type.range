@@ -1,4 +1,4 @@
 @construct
 @macro(name: "type", result: "Identity")(role: TypeRole){
-    @return(value: Identity(uuid: UUID(storage: UUIDStorage())))
+    @return(value: "Identity(uuid: UUID(storage: UUIDStorage()))")
 }

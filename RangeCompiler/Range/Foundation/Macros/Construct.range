@@ -1,25 +1,25 @@
 function constructLLVMType(line: String): String {
-    @if(line.contains(value: "|type=Int")) {
+    @if("line.contains(value: \"|type=Int\")") {
         @return(value: "i64")
     }
 
-    @if(line.contains(value: "|current=Int(")) {
+    @if("line.contains(value: \"|current=Int(\")") {
         @return(value: "i64")
     }
 
-    @if(line.contains(value: "|type=Bool")) {
+    @if("line.contains(value: \"|type=Bool\")") {
         @return(value: "i1")
     }
 
-    @if(line.contains(value: "|current=Bool(")) {
+    @if("line.contains(value: \"|current=Bool(\")") {
         @return(value: "i1")
     }
 
-    @if(line.contains(value: "|type=String")) {
+    @if("line.contains(value: \"|type=String\")") {
         @return(value: "%Range.String")
     }
 
-    @if(line.contains(value: "|current=String(")) {
+    @if("line.contains(value: \"|current=String(\")") {
         @return(value: "%Range.String")
     }
 
@@ -33,12 +33,12 @@ function constructLLVMType(line: String): String {
     }
     @state(name: "fields", value: "String(\"\")")
     @state(name: "members", value: "String(\"\")")
-    @state(name: "index", value: "0")
-    @state(name: "fieldIndex", value: "0")
+    @state(name: "index", value: "Int(0)")
+    @state(name: "fieldIndex", value: "Int(0)")
     @state(name: "pendingState", value: "String(\"false\")")
     @state(name: "source", value: "target.application.rawBodyText")
 
-    @while(index < source.count(of: "\n") + 1) {
+    @while("index < source.count(of: \"\\n\") + Int(1)") {
         @state(
             name: "line",
             value: "source.segment(index: index, delimiter: \"\n\")"
@@ -46,36 +46,36 @@ function constructLLVMType(line: String): String {
         @state(name: "lineLLVM", value: "String(\"\")")
         @state(name: "wasPendingState", value: "pendingState")
 
-        @if(line.contains(value: "member|kind=state")) {
-            @if(line.contains(value: "|llvm=")) {
-                @assignment(target: "lineLLVM", value: line.segment(index: 1, delimiter: "|llvm="))
+        @if("line.contains(value: \"member|kind=state\")") {
+            @if("line.contains(value: \"|llvm=\")") {
+                @assignment(target: "lineLLVM", value: "line.segment(index: Int(1), delimiter: \"|llvm=\")")
             }
 
-            @assignment(target: "pendingState", value: String("true"))
+            @assignment(target: "pendingState", value: "String(\"true\")")
         }
 
-        @if(wasPendingState == "true") {
-            @if(line.contains(value: "member|kind=value")) {
-                @assignment(target: "lineLLVM", value: constructLLVMType(line: line))
+        @if("wasPendingState == \"true\"") {
+            @if("line.contains(value: \"member|kind=value\")") {
+                @assignment(target: "lineLLVM", value: "constructLLVMType(line: line)")
             }
 
-            @assignment(target: "pendingState", value: String("false"))
+            @assignment(target: "pendingState", value: "String(\"false\")")
         }
 
-        @if(!lineLLVM.isEmpty) {
-            @if(fieldIndex > 0) {
-                @assignment(target: "fields", value: fields + ", ")
+        @if("!lineLLVM.isEmpty") {
+            @if("fieldIndex > Int(0)") {
+                @assignment(target: "fields", value: "fields + \", \"")
             }
 
-            @assignment(target: "fields", value: fields + lineLLVM)
-            @assignment(target: "fieldIndex", value: fieldIndex + 1)
+            @assignment(target: "fields", value: "fields + lineLLVM")
+            @assignment(target: "fieldIndex", value: "fieldIndex + Int(1)")
         }
 
-        @if(!line.isEmpty) {
-            @assignment(target: "members", value: members + "\n" + line)
+        @if("!line.isEmpty") {
+            @assignment(target: "members", value: "members + \"\\n\" + line")
         }
 
-        @assignment(target: "index", value: index + 1)
+        @assignment(target: "index", value: "index + Int(1)")
     }
 
     @return(value: "construct|name="

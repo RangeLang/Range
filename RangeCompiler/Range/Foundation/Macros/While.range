@@ -6,8 +6,8 @@
     @state(name: "bodyText", value: "target.declaration.bodyText")
     @state(name: "children", value: "String(\"\")")
 
-    @if(!bodyText.isEmpty) {
-        @assignment(target: "children", value: "\n" + bodyText)
+    @if("!bodyText.isEmpty") {
+        @assignment(target: "children", value: "\"\\n\" + bodyText")
     }
 
     @return(value: "statement|kind=while|condition="

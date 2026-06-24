@@ -1,4 +1,4 @@
 @parameter
 @macro(name: "capture", result: "String"){
-    @return(value: application.syntax.description)
+    @return(value: "application.syntax.description")
 }

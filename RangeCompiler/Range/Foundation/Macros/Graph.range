@@ -17,5 +17,5 @@
         }
     }
 
-    @return(value: Identity(uuid: UUID(storage: UUIDStorage())))
+    @return(value: "Identity(uuid: UUID(storage: UUIDStorage()))")
 }

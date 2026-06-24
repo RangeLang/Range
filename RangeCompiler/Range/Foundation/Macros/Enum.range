@@ -7,17 +7,17 @@
     @state(name: "index", value: "0")
     @state(name: "source", value: "target.application.rawBodyText")
 
-    @while(index < source.count(of: "\n") + 1) {
+    @while("index < source.count(of: \"\\n\") + Int(1)") {
         @state(
             name: "line",
             value: "source.segment(index: index, delimiter: \"\n\")"
         )
 
-        @if(!line.isEmpty) {
-            @assignment(target: "members", value: members + "\n" + line)
+        @if("!line.isEmpty") {
+            @assignment(target: "members", value: "members + \"\\n\" + line")
         }
 
-        @assignment(target: "index", value: index + 1)
+        @assignment(target: "index", value: "index + Int(1)")
     }
 
     @return(value: "enum|name=" + name + members)
