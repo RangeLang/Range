@@ -1,4 +1,4 @@
 @statement
 @macro(name: "else", result: "String"){
-    @return(value: "statement|kind=else|projection=" + @statement.projection)
+    @return(value: "statement|kind=else|projection=" + "target.declaration.statements")
 }

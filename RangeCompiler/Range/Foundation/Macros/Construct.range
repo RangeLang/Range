@@ -26,10 +26,6 @@ function constructLLVMType(line: String): String {
     @return(value: "")
 }
 
-@macro(name: "construct.application.rawBodyText", result: "String"){
-    @return(value: application.rawBodyText)
-}
-
 @syntax
 @macro(name: "construct", result: "String"){
     @parameter(name: "name") {
@@ -40,7 +36,7 @@ function constructLLVMType(line: String): String {
     @state(name: "index", value: "0")
     @state(name: "fieldIndex", value: "0")
     @state(name: "pendingState", value: "String(\"false\")")
-    @state(name: "source", value: "@construct.application.rawBodyText")
+    @state(name: "source", value: "target.application.rawBodyText")
 
     @while(index < source.count(of: "\n") + 1) {
         @state(

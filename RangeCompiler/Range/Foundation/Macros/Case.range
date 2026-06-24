@@ -12,11 +12,11 @@
             + "|value="
             + value
             + "|ordinal="
-            + @statement.ordinal)
+            + "\(target.ordinal)")
     }
 
     @return(value: "statement|kind=case|value="
         + value
         + "|projection="
-        + @statement.projection)
+        + "target.declaration.statements")
 }

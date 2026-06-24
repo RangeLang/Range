@@ -6,7 +6,7 @@
     @parameter(name: "sequence") {
         @value(type: "String", current: "String()")
     }
-    @state(name: "bodyText", value: "@statement.bodyText")
+    @state(name: "bodyText", value: "target.declaration.bodyText")
     @state(name: "children", value: "String(\"\")")
 
     @if(!bodyText.isEmpty) {
@@ -18,6 +18,6 @@
         + "|sequence="
         + sequence
         + "|projection="
-        + @statement.projection
+        + "target.declaration.statements"
         + children)
 }

@@ -5,7 +5,7 @@
     }
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
-    @state(name: "source", value: "@construct.application.rawBodyText")
+    @state(name: "source", value: "target.application.rawBodyText")
 
     @while(index < source.count(of: "\n") + 1) {
         @state(

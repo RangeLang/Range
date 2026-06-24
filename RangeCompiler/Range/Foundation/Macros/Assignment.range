@@ -12,5 +12,5 @@
         + "|value="
         + value
         + "|projection="
-        + @statement.declarationProjection)
+        + "target.declaration")
 }

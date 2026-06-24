@@ -3,18 +3,3 @@
     @return(value: "statement|kind=expression|projection=target.declaration")
 }
 
-@macro(name: "statement.bodyText", result: "String"){
-    @return(value: declaration.bodyText)
-}
-
-@macro(name: "statement.ordinal", result: "String"){
-    @return(value: "\(ordinal)")
-}
-
-@macro(name: "statement.projection", result: "String"){
-    @return(value: "target.declaration.statements")
-}
-
-@macro(name: "statement.declarationProjection", result: "String"){
-    @return(value: "target.declaration")
-}

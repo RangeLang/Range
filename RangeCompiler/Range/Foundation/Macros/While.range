@@ -3,7 +3,7 @@
     @parameter(name: "condition") {
         @value(type: "String", current: "true")
     }
-    @state(name: "bodyText", value: "@statement.bodyText")
+    @state(name: "bodyText", value: "target.declaration.bodyText")
     @state(name: "children", value: "String(\"\")")
 
     @if(!bodyText.isEmpty) {
@@ -13,6 +13,6 @@
     @return(value: "statement|kind=while|condition="
         + condition
         + "|projection="
-        + @statement.projection
+        + "target.declaration.statements"
         + children)
 }

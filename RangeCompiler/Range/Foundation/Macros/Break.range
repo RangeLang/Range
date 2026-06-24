@@ -1,6 +1,6 @@
 @statement
 @macro(name: "break", result: "String"){
     @return(value: "statement|kind=break|projection="
-        + @statement.declarationProjection
+        + "target.declaration"
         + "|llvm=br label %loop.end")
 }

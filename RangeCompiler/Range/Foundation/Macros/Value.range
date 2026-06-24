@@ -11,5 +11,5 @@
         + "|current="
         + current
         + "|ordinal="
-        + @member.ordinal)
+        + "\(target.ordinal)")
 }

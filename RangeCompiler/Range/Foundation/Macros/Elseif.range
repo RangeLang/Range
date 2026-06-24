@@ -7,5 +7,5 @@
     @return(value: "statement|kind=elseif|condition="
         + condition
         + "|projection="
-        + @statement.projection)
+        + "target.declaration.statements")
 }

@@ -25,7 +25,7 @@
     @return(value: "statement|kind=return|value="
         + value
         + "|projection="
-        + @statement.declarationProjection
+        + "target.declaration"
         + "|llvm="
         + llvm)
 }

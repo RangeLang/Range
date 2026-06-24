@@ -6,7 +6,7 @@
     }
     @state(name: "members", value: "String(\"\")")
     @state(name: "index", value: "0")
-    @state(name: "memberBodyText", value: "@member.declaration.bodyText")
+    @state(name: "memberBodyText", value: "target.declaration.bodyText")
 
     @while(index < memberBodyText.count(of: "\n") + 1) {
         @state(
@@ -24,6 +24,6 @@
     @return(value: "member|kind=let|name="
         + name
         + "|ordinal="
-        + @member.ordinal
+        + "\(target.ordinal)"
         + members)
 }
