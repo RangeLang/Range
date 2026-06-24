@@ -1,4 +1,4 @@
 @construct
 @macro(name: "bool", result: "String"){
-    @return(value: "i1")
+    @return(value: "bool")
 }

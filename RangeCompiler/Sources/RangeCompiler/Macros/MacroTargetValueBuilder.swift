@@ -494,6 +494,7 @@ struct MacroTargetValueBuilder {
             "rawBody": writtenSyntax(rawBody),
             "rawBodyText": .string(rawBody),
             "arguments": .array(argumentValues(for: application)),
+            "evaluatedStringValue": .string(application.evaluatedStringValue ?? ""),
         ]
 
         if let declaration = macroDeclarationsByName[application.name] {

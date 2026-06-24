@@ -193,10 +193,31 @@ extension MacroExpander {
             context: context
         ).joined(separator: "\n")
         let rawBody = memberText.isEmpty ? blockMacro.rawBody : memberText
-        let applications = blockMacro.macros.map {
-            attachingEvaluatedStringValue(
+        let preEvaluatedApplications = blockMacro.macros.map {
+            guard $0.name != "construct" else {
+                return $0
+            }
+            return attachingEvaluatedStringValue(
                 to: $0,
                 rawBody: rawBody,
+                macros: macros,
+                context: context
+            )
+        }
+        let attachmentRecords = preEvaluatedApplications.compactMap { application in
+            guard application.name != "construct" else {
+                return nil
+            }
+            return application.evaluatedStringValue
+        }.filter { !$0.isEmpty }.joined(separator: "\n")
+        let constructRawBody =
+            attachmentRecords.isEmpty
+            ? rawBody
+            : rawBody.isEmpty ? attachmentRecords : attachmentRecords + "\n" + rawBody
+        let applications = preEvaluatedApplications.map {
+            attachingEvaluatedStringValue(
+                to: $0,
+                rawBody: $0.name == "construct" ? constructRawBody : rawBody,
                 macros: macros,
                 context: context
             )
@@ -501,29 +522,26 @@ extension MacroExpander {
         return extensionDeclaration
     }
 
-    // Evaluates a construct-attached metadata macro and, when it returns a
-    // string, carries that processed result on the application so emission can
-    // consume the macro's Range-authored output instead of the raw argument.
+    // Evaluates a construct-attached macro and, when it returns a string,
+    // carries that processed result on the application so Range-authored
+    // construct macros can consume sibling attachment records.
     static func attachingEvaluatedStringValue(
         to application: MacroApplication,
         construct: ConstructDeclaration,
         context: MacroExpansionContext
     ) -> MacroApplication {
-        // Any construct-targeting macro that returns a String has its evaluated
-        // output carried here, so emission consumes the macro's processed result.
-        // Not bound to specific macro names.
-        guard let metadata = context.macroMetadataByName[application.name],
-            !metadata.valueType.isMacroMetadataEffect,
-            metadata.valueType == .named("String")
-        else {
-            return application
-        }
-        let targetValue = MacroTargetValueBuilder(
+        let targetValueBuilder = MacroTargetValueBuilder(
+            macroDeclarationsByName: context.macroDeclarationsByName,
             macroMetadataByName: context.macroMetadataByName,
             constructsByName: context.graphContext.constructsByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
             extensionsByTargetName: context.graphContext.extensionsByTargetName
-        ).targetValue(for: construct)
-        guard
+        )
+        let targetValue = targetValueBuilder.targetValue(for: construct)
+
+        if let metadata = context.macroMetadataByName[application.name],
+            !metadata.valueType.isMacroMetadataEffect,
+            metadata.valueType == .named("String"),
             let value = try? MacroTargetValueBuilder.evaluateMacroMetadataValue(
                 for: application,
                 metadata: metadata,
@@ -532,6 +550,34 @@ extension MacroExpander {
                 context: context
             ),
             case .string(let processed) = value
+        {
+            var updated = application
+            updated.evaluatedStringValue = processed
+            return updated
+        }
+
+        guard let macro = context.macroDeclarationsByName[application.name],
+            macro.expansionType == .named("String"),
+            let argumentBindings = try? parseMacroArgumentBindings(
+                for: macro,
+                argumentClause: application.argumentClause
+            )
+        else {
+            return application
+        }
+        let evaluator = CompileTimeValueEvaluator(
+            targetBinding: macro.bindings?.target ?? "target",
+            targetValue: targetValue,
+            graphBinding: macro.bindings?.graph,
+            selfValue: targetValueBuilder.value(for: macro),
+            localBindings: argumentBindings,
+            macroDeclarationsByName: context.macroDeclarationsByName,
+            callableDeclarationsByName: context.callableDeclarationsByName,
+            knownObjectTypeNames: context.graphContext.knownObjectTypeNames,
+            context: context
+        )
+        var locals = argumentBindings
+        guard case .string(let processed)? = evaluator.evaluateStatements(macro.body, locals: &locals)
         else {
             return application
         }
@@ -582,6 +628,7 @@ extension MacroExpander {
             updated.evaluatedStringValue = processed
             return updated
         }
+
     }
 
     static func attachingEvaluatedStringValue(
@@ -1126,10 +1173,37 @@ extension MacroExpander {
             context: context
         )
 
-        let macrosWithValues = construct.macros.map { application in
-            attachingEvaluatedStringValue(
+        let preEvaluatedMacros = construct.macros.map { application in
+            guard application.name != "construct" else {
+                return application
+            }
+            return attachingEvaluatedStringValue(
                 to: application,
                 construct: construct,
+                context: context
+            )
+        }
+        let constructForConstructMacroEvaluation = ConstructDeclaration(
+            macros: preEvaluatedMacros,
+            kind: construct.kind,
+            attribute: construct.attribute,
+            name: construct.name,
+            genericParameters: construct.genericParameters,
+            conformances: construct.conformances,
+            states: construct.states,
+            bindings: construct.bindings,
+            deriveds: construct.deriveds,
+            values: construct.values,
+            initializers: construct.initializers,
+            callables: construct.callables,
+            constructs: construct.constructs
+        )
+        let macrosWithValues = preEvaluatedMacros.map { application in
+            attachingEvaluatedStringValue(
+                to: application,
+                construct: application.name == "construct"
+                    ? constructForConstructMacroEvaluation
+                    : construct,
                 context: context
             )
         }

@@ -1,0 +1,14 @@
+@integer(bits: "64", signedness: "signed")
+@construct(name: "Int") {
+}
+
+@bool
+@construct(name: "Bool") {
+}
+
+@string
+@construct(name: "String") {
+}
+
+@construct(name: "Void") {
+}

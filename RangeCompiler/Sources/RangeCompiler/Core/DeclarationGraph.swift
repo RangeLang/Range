@@ -654,14 +654,19 @@ public struct DeclarationGraph {
                 guard let payload = application.evaluatedStringValue else {
                     return nil
                 }
-                return emittedConstruct(from: payload, application: application)
+                return emittedConstruct(
+                    from: payload,
+                    application: application,
+                    applications: blockMacro.macros
+                )
             }
         }
     }
 
     private static func emittedConstruct(
         from payload: String,
-        application: MacroApplication
+        application: MacroApplication,
+        applications: [MacroApplication]
     ) -> ConstructDeclaration? {
         let lines = payload.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
         guard let header = lines.first else {
@@ -689,8 +694,12 @@ public struct DeclarationGraph {
             evaluatedStringValue: payload
         )
 
+        let constructMacros = applications.map { existing in
+            existing.name == application.name ? macro : existing
+        }
+
         return ConstructDeclaration(
-            macros: [macro],
+            macros: constructMacros,
             kind: .declaration,
             attribute: nil,
             name: name,

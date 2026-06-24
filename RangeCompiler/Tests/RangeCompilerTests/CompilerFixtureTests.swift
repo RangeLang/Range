@@ -1390,13 +1390,19 @@ struct CompilerFixtureTests {
         #expect(stringConstruct.name == "String")
     }
 
-    @Test("Core Int construct carries an llvm lowering body")
-    func coreIntConstructCarriesLLVMBody() throws {
+    @Test("Core Int construct carries attached integer lowering behavior")
+    func coreIntConstructCarriesAttachedIntegerLoweringBehavior() throws {
         let inputs = try rangeCoreInputs()
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let intConstruct = try #require(program.declarationGraph.constructsByName["Int"])
-        let llvm = try #require(intConstruct.macros.first(where: { $0.name == "llvm" }))
-        #expect(llvm.argumentClause?.contains("i$bits") == true)
+        let construct = try #require(intConstruct.macros.first(where: { $0.name == "construct" }))
+        #expect(
+            construct.evaluatedStringValue
+                == """
+                construct|name=Int|llvm=%Range.Int = type { i64 }
+                integer|bits=64|signedness=signed
+                """
+        )
     }
 
     @Test("WrittenSyntax macro isolates raw ASCII body")
