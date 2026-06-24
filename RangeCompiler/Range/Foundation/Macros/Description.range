@@ -1,4 +1,8 @@
 @construct
-@macro(name: "Description", result: "String")(markdown: String){
+@macro(name: "Description", result: "String"){
+    @parameter(name: "markdown") {
+        @value(type: "String")
+    }
+
     @return(value: "markdown")
 }

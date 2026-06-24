@@ -49,10 +49,6 @@ extension Parser {
             )
         }
 
-        if isExpressionStatementStart() {
-            return .expression(try parseExpression())
-        }
-
         throw ParseError("Expected statement, found \(peek()).")
     }
 
@@ -346,18 +342,6 @@ extension Parser {
             offset += 2
         }
         return peek(offset: offset) == .colon
-    }
-
-    func isExpressionStatementStart() -> Bool {
-        switch peek() {
-        case .identifier, .integer, .double, .stringLiteral, .leftBracket,
-            .leftParen, .dollar, .dot, .bang:
-            return true
-        case .hash where peek(offset: 1) == .leftParen:
-            return true
-        default:
-            return false
-        }
     }
 
     mutating func parseLocalDeclaration(
@@ -843,7 +827,7 @@ extension Parser {
             return true
         }
 
-        return isExpressionStatementStart()
+        return false
     }
 
     func accessibleLocalTypes(_ localBindings: [String: LocalBindingSymbol]) -> [String:

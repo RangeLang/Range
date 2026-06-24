@@ -1,4 +1,8 @@
 @construct
-@macro(name: "type", result: "Identity")(role: TypeRole){
+@macro(name: "type", result: "Identity"){
+    @parameter(name: "role") {
+        @value(type: "TypeRole")
+    }
+
     @return(value: "Identity(uuid: UUID(storage: UUIDStorage()))")
 }
