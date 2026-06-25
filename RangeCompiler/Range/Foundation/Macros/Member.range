@@ -1,3 +1,2 @@
-@construct
-@macro(name: "member", result: "Void"){
+@macro(name: "member", result: "Void", target: "@construct"){
 }

@@ -5,6 +5,9 @@
     @parameter(name: "result") {
         @value(type: "String")
     }
+    @parameter(name: "target") {
+        @value(type: "String")
+    }
     @parameter(name: "body") {
         @value(type: "String")
     }
@@ -14,6 +17,8 @@
         + name
         + "|result="
         + result
+        + "|target="
+        + target
         + "\n"
         + body
     )

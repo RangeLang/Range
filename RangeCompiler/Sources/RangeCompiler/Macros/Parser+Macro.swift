@@ -106,6 +106,11 @@ extension Parser {
         {
             arguments.append(CallArgument(label: "result", value: .string("")))
         }
+        if bootstrap.parameters.contains(where: { $0.localName == "target" }),
+            !arguments.contains(where: { $0.label == "target" })
+        {
+            arguments.append(CallArgument(label: "target", value: .string("")))
+        }
         if bootstrap.parameters.contains(where: { $0.localName == "body" }),
             !arguments.contains(where: { $0.label == "body" })
         {
@@ -125,7 +130,15 @@ extension Parser {
             in: argumentBindings,
             declarationName: "@macro"
         )
-        let target = attachedMacroTarget(from: attachedMacros)
+        let targetName = try optionalStringMacroDeclarationField(
+            "target",
+            in: argumentBindings,
+            declarationName: "@macro"
+        )
+        let target = try macroDeclarationTarget(
+            explicitTargetName: targetName,
+            attachedMacros: attachedMacros
+        )
         let expansionType: TypeReference?
         if let resultName {
             expansionType = try parseMacroMemberTypeReference(resultName)
@@ -265,6 +278,55 @@ extension Parser {
             throw ParseError("\(declarationName) field \(name) must be String.")
         }
         return value.isEmpty ? nil : value
+    }
+
+    private func macroDeclarationTarget(
+        explicitTargetName: String?,
+        attachedMacros: [MacroApplication]
+    ) throws -> MacroTarget? {
+        let attachedTarget = attachedMacroTarget(from: attachedMacros)
+        guard let explicitTargetName else {
+            return attachedTarget
+        }
+        let explicitTarget = try macroDeclarationTarget(from: explicitTargetName)
+        guard let attachedTarget else {
+            return explicitTarget
+        }
+        return .allOf([attachedTarget, explicitTarget])
+    }
+
+    private func macroDeclarationTarget(from name: String) throws -> MacroTarget {
+        let names = name.split(separator: ",").map {
+            String($0).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if names.count > 1 {
+            return .anyOf(try names.map(macroDeclarationTarget))
+        }
+
+        switch name {
+        case "@block", "@syntax", "@statement", "@member", "@property", "@macro":
+            return .macroSurface(String(name.dropFirst()))
+        case "@construct":
+            return .syntax(.named("Construct"))
+        case "@extension":
+            return .syntax(.named("Extension"))
+        case "@enum":
+            return .syntax(.named("Enum"))
+        case "@function":
+            return .syntax(.named("Function"))
+        case "@init":
+            return .syntax(.named("Init"))
+        case "@parameter":
+            return .syntax(.named("Parameter"))
+        case "@let":
+            return .syntax(.named("Let"))
+        case "@state":
+            return .syntax(.named("State"))
+        case "@expression":
+            return .syntax(.named("Expression"))
+        default:
+            throw ParseError("@macro target \(name) is not supported.")
+        }
     }
 
     private func attachedMacroTarget(from macros: [MacroApplication]) -> MacroTarget? {

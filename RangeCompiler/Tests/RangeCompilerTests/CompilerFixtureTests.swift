@@ -1405,6 +1405,21 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Core Void construct carries attached void behavior")
+    func coreVoidConstructCarriesAttachedVoidBehavior() throws {
+        let inputs = try rangeCoreInputs()
+        let program = try CompilerPipeline().buildValidated(inputs: inputs)
+        let voidConstruct = try #require(program.declarationGraph.constructsByName["Void"])
+        let construct = try #require(voidConstruct.macros.first(where: { $0.name == "construct" }))
+        #expect(
+            construct.evaluatedStringValue
+                == """
+                construct|name=Void|llvm=%Range.Void = type {  }
+                void
+                """
+        )
+    }
+
     @Test("WrittenSyntax macro isolates raw ASCII body")
     func writtenSyntaxMacroIsolatesRawASCIIBody() throws {
         var inputs = try rangeCoreInputs()

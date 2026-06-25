@@ -1,6 +1,4 @@
-@statement
-@member
-@macro(name: "state", result: "String"){
+@macro(name: "state", result: "String", target: "@statement,@member"){
     @parameter(name: "name") {
         @value(type: "String")
     }

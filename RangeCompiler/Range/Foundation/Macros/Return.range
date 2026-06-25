@@ -1,5 +1,4 @@
-@statement
-@macro(name: "return", result: "String"){
+@macro(name: "return", result: "String", target: "@statement"){
     @parameter(name: "value") {
         @value(type: "String", current: "String()")
     }

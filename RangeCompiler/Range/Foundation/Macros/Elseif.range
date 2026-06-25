@@ -1,5 +1,4 @@
-@statement
-@macro(name: "elseif", result: "String"){
+@macro(name: "elseif", result: "String", target: "@statement"){
     @parameter(name: "condition") {
         @value(type: "String", current: "true")
     }

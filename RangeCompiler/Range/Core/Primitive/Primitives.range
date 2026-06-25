@@ -10,5 +10,6 @@
 @construct(name: "String") {
 }
 
+@void
 @construct(name: "Void") {
 }

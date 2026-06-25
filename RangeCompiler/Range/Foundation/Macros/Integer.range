@@ -1,5 +1,4 @@
-@construct
-@macro(name: "integer", result: "String"){
+@macro(name: "integer", result: "String", target: "@construct"){
     @parameter(name: "bits") {
         @value(type: "String", current: "64")
     }

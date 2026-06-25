@@ -1,4 +1,3 @@
-@statement
-@macro(name: "default", result: "String"){
+@macro(name: "default", result: "String", target: "@statement"){
     @return(value: "statement|kind=default|projection=" + "target.declaration.statements")
 }

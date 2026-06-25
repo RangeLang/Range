@@ -1,3 +1,2 @@
-@construct
-@macro(name: "literal"){
+@macro(name: "literal", target: "@construct"){
 }

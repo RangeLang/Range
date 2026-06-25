@@ -11,6 +11,10 @@ function constructLLVMType(line: String): String {
         @return(value: "%Range.String")
     }
 
+    @if("line.contains(value: \"void\")") {
+        @return(value: "")
+    }
+
     @if("line.contains(value: \"|type=Int\")") {
         @return(value: "i64")
     }
@@ -38,8 +42,7 @@ function constructLLVMType(line: String): String {
     @return(value: "")
 }
 
-@syntax
-@macro(name: "construct", result: "String"){
+@macro(name: "construct", result: "String", target: "@syntax"){
     @parameter(name: "name") {
         @value(type: "String")
     }
@@ -94,6 +97,10 @@ function constructLLVMType(line: String): String {
         }
 
         @if("line.contains(value: \"string\")") {
+            @assignment(target: "lineLLVM", value: "constructLLVMType(line: line)")
+        }
+
+        @if("line.contains(value: \"void\")") {
             @assignment(target: "lineLLVM", value: "constructLLVMType(line: line)")
         }
 

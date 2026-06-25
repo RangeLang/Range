@@ -2,8 +2,7 @@ enum Delimiter {
     case comma
 }
 
-@parameter
-@macro(name: "variadic"){
+@macro(name: "variadic", target: "@parameter"){
     @generic(name: "delimiter") {
         @value(type: "Delimiter", current: "Delimiter.comma")
     }

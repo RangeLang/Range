@@ -1,5 +1,4 @@
-@construct
-@macro(name: "Description", result: "String"){
+@macro(name: "Description", result: "String", target: "@construct"){
     @parameter(name: "markdown") {
         @value(type: "String")
     }

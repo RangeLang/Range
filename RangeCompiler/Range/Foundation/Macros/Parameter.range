@@ -1,5 +1,4 @@
-@member
-@macro(name: "parameter", result: "String"){
+@macro(name: "parameter", result: "String", target: "@member"){
     @parameter(name: "name") {
         @value(type: "String")
     }

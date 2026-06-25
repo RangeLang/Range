@@ -1,5 +1,4 @@
-@construct
-@macro(name: "type", result: "Identity"){
+@macro(name: "type", result: "Identity", target: "@construct"){
     @parameter(name: "role") {
         @value(type: "TypeRole")
     }

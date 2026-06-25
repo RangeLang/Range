@@ -1,5 +1,4 @@
-@syntax
-@macro(name: "extension", result: "String"){
+@macro(name: "extension", result: "String", target: "@syntax"){
     @parameter(name: "name") {
         @value(type: "String")
     }
