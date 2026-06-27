@@ -124,6 +124,28 @@ struct CompilerFixtureTests {
         )
     }
 
+    @Test("Construct root starts as top-level macro block")
+    func constructRootStartsAsTopLevelMacroBlock() throws {
+        let source = """
+            @construct(name: "Counter") {
+                @state(name: "count") {
+                    @value(type: "Int", current: "0")
+                }
+            }
+            """
+
+        var parser = try Parser(source: source)
+        let parsed = try parser.parseSourceFile()
+        guard case .module(let module) = parsed else {
+            Issue.record("Expected @construct source to parse as a module with a block macro.")
+            return
+        }
+
+        #expect(module.constructs.isEmpty)
+        #expect(module.blockMacros.count == 1)
+        #expect(module.blockMacros.first?.macros.map(\.name) == ["construct"])
+    }
+
     @Test("Extension macro accepts positional target name")
     func extensionMacroAcceptsPositionalTargetName() throws {
         var inputs = try rangeFoundationMacroInputs()
