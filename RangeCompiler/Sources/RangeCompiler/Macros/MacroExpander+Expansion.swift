@@ -927,7 +927,26 @@ extension MacroExpander {
         _ name: String,
         in macros: [String: MacroDeclaration]
     ) -> Bool {
-        macros[name]?.macros.contains(where: { $0.name == "statement" }) == true
+        guard let macro = macros[name] else { return false }
+        return macroTargetsStatementSurface(macro)
+    }
+
+    private static func macroTargetsStatementSurface(_ macro: MacroDeclaration) -> Bool {
+        if macro.macros.contains(where: { $0.name == "statement" }) {
+            return true
+        }
+        return macro.target.map(macroTargetIncludesStatementSurface) ?? false
+    }
+
+    private static func macroTargetIncludesStatementSurface(_ target: MacroTarget) -> Bool {
+        switch target {
+        case .macroSurface(let name):
+            return name == "statement"
+        case .anyOf(let targets), .allOf(let targets):
+            return targets.contains(where: macroTargetIncludesStatementSurface)
+        case .syntax:
+            return false
+        }
     }
 
     private static func quotedStatementMacroArgument(_ value: String) -> String {
@@ -1993,7 +2012,7 @@ extension MacroExpander {
             return []
         case .macroInvocation(let name, let argumentClause, let body):
             if preserveStatementMacroApplications,
-                macros[name]?.macros.contains(where: { $0.name == "statement" }) == true
+                macros[name].map(macroTargetsStatementSurface) == true
             {
                 return [statement]
             }
@@ -2020,11 +2039,11 @@ extension MacroExpander {
             ]
         case .macroApplication(let name, let arguments):
             if preserveStatementMacroApplications,
-                macros[name]?.macros.contains(where: { $0.name == "statement" }) == true
+                macros[name].map(macroTargetsStatementSurface) == true
             {
                 return [statement]
             }
-            if macros[name]?.macros.contains(where: { $0.name == "statement" }) == true {
+            if macros[name].map(macroTargetsStatementSurface) == true {
                 return [
                     .emitted(
                         evaluatedStringStatementMacro(

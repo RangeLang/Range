@@ -248,7 +248,7 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let whileMacro = try #require(program.declarationGraph.macrosByName["while"])
         #expect(whileMacro.target?.displayName == "@statement")
-        #expect(whileMacro.macros.map(\.name) == ["statement"])
+        #expect(whileMacro.macros.isEmpty)
 
         let projectFile = try #require(program.projectExpandedFiles.first)
         guard case .module(let module) = projectFile.sourceFile,
@@ -293,8 +293,8 @@ struct CompilerFixtureTests {
 
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let ifMacro = try #require(program.declarationGraph.macrosByName["if"])
-        #expect(ifMacro.target == nil)
-        #expect(ifMacro.macros.map(\.name) == ["statement"])
+        #expect(ifMacro.target?.displayName == "@statement")
+        #expect(ifMacro.macros.isEmpty)
 
         let projectFile = try #require(program.projectExpandedFiles.first)
         guard case .module(let module) = projectFile.sourceFile,

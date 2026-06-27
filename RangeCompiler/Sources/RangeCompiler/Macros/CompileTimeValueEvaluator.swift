@@ -41,32 +41,17 @@ struct CompileTimeValueEvaluator {
         evaluate(expression, locals: locals)
     }
 
-    // Unified statement-sequence evaluator. A macro body or a closure body is
-    // ordinary Range syntax: bindings, assignments, conditionals, loops, returns,
-    // expressions. This is the single place statements are executed at compile
-    // time so macro bodies and closures don't each re-implement control flow.
-    // Returns the produced value (from a `return` or value-producing expression),
-    // or nil if the body produced none. `locals` is threaded mutably so
-    // assignments and loop accumulation persist across statements.
+    // Macro bodies execute through the explicit statement macro surface. The
+    // parser may still model legacy statement records for older compatibility
+    // paths, but macro-local execution should not give those records meaning.
+    // Returns the produced value from @return or a value-producing expression.
+    // `locals` is threaded mutably so @assignment and loop accumulation persist.
     func evaluateStatements(
         _ statements: [Statement],
         locals: inout [String: Expression]
     ) -> CompileTimeValue? {
         for statement in statements {
             switch statement {
-            case .localBinding(let declaration):
-                locals[declaration.name] = boundExpression(declaration.expression, locals: locals)
-            case .assignment(let target, let expression):
-                if let name = Self.assignmentTargetName(target) {
-                    locals[name] = boundExpression(expression, locals: locals)
-                }
-            case .emitted(let text):
-                guard let assignment = emittedMacroLocalAssignment(text, locals: locals) else {
-                    continue
-                }
-                locals[assignment.name] = assignment.expression
-            case .return(let expression?):
-                return evaluate(expression, locals: locals)
             case .macroApplication(let name, let arguments) where name == "return":
                 guard let valueArgument = arguments.first(where: { $0.label == "value" }) else {
                     return .object(typeName: "Void", fields: [:])
@@ -104,33 +89,6 @@ struct CompileTimeValueEvaluator {
                 if let value = evaluate(expression, locals: locals) {
                     return value
                 }
-            case .switchStatement:
-                if let value = try? MacroExpander.statementSyntaxValue(statement) {
-                    return value
-                }
-            case .conditional(let branches):
-                for branch in branches {
-                    if let condition = branch.condition {
-                        guard case .boolean(true) = evaluate(condition, locals: locals) else {
-                            continue
-                        }
-                    }
-                    if let value = evaluateStatements(branch.body, locals: &locals) {
-                        return value
-                    }
-                    break
-                }
-            case .forEach(let name, let sequence, let body):
-                guard case .array(let elements)? = evaluate(sequence, locals: locals) else {
-                    continue
-                }
-                for element in elements {
-                    guard let elementExpression = element.expression else { continue }
-                    locals[name] = elementExpression
-                    if let value = evaluateStatements(body, locals: &locals) {
-                        return value
-                    }
-                }
             default:
                 continue
             }
@@ -164,32 +122,6 @@ struct CompileTimeValueEvaluator {
         }
 
         return (name, macroLocalValueExpression(valueArgument.value, locals: locals))
-    }
-
-    private func emittedMacroLocalAssignment(
-        _ text: String,
-        locals: [String: Expression]
-    ) -> (name: String, expression: Expression)? {
-        guard text.hasPrefix("statement|kind=assign|") else {
-            return nil
-        }
-
-        let fields = Dictionary(
-            uniqueKeysWithValues: text.split(separator: "|").compactMap { part -> (String, String)? in
-                let pieces = part.split(separator: "=", maxSplits: 1).map(String.init)
-                guard pieces.count == 2 else { return nil }
-                return (pieces[0], pieces[1])
-            }
-        )
-        guard let name = fields["target"],
-            let value = fields["value"],
-            !name.isEmpty,
-            let expression = try? parseMacroLocalValueSource(value)
-        else {
-            return nil
-        }
-
-        return (name, boundExpression(expression, locals: locals))
     }
 
     private func macroLocalValueExpression(
@@ -250,15 +182,6 @@ struct CompileTimeValueEvaluator {
             return resolved
         }
         return expression
-    }
-
-    static func assignmentTargetName(_ target: AssignmentTarget) -> String? {
-        switch target {
-        case .state(let name), .binding(let name), .local(let name):
-            return name
-        case .member:
-            return nil
-        }
     }
 
     private func evaluate(
