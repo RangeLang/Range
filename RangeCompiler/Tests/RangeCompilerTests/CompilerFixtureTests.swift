@@ -596,10 +596,10 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let breakMacro = try #require(program.declarationGraph.macrosByName["break"])
         let continueMacro = try #require(program.declarationGraph.macrosByName["continue"])
-        #expect(breakMacro.target == nil)
-        #expect(continueMacro.target == nil)
-        #expect(breakMacro.macros.map(\.name) == ["statement"])
-        #expect(continueMacro.macros.map(\.name) == ["statement"])
+        #expect(breakMacro.target?.displayName == "@statement")
+        #expect(continueMacro.target?.displayName == "@statement")
+        #expect(breakMacro.macros.isEmpty)
+        #expect(continueMacro.macros.isEmpty)
 
         let projectFile = try #require(program.projectExpandedFiles.first)
         guard case .module(let module) = projectFile.sourceFile,
@@ -649,8 +649,10 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let elseMacro = try #require(program.declarationGraph.macrosByName["else"])
         let elseifMacro = try #require(program.declarationGraph.macrosByName["elseif"])
-        #expect(elseMacro.macros.map(\.name) == ["statement"])
-        #expect(elseifMacro.macros.map(\.name) == ["statement"])
+        #expect(elseMacro.target?.displayName == "@statement")
+        #expect(elseifMacro.target?.displayName == "@statement")
+        #expect(elseMacro.macros.isEmpty)
+        #expect(elseifMacro.macros.isEmpty)
 
         let projectFile = try #require(program.projectExpandedFiles.first)
         guard case .module(let module) = projectFile.sourceFile,
@@ -692,8 +694,10 @@ struct CompilerFixtureTests {
         let program = try CompilerPipeline().buildValidated(inputs: inputs)
         let caseMacro = try #require(program.declarationGraph.macrosByName["case"])
         let defaultMacro = try #require(program.declarationGraph.macrosByName["default"])
-        #expect(caseMacro.macros.map(\.name) == ["statement"])
-        #expect(defaultMacro.macros.map(\.name) == ["statement"])
+        #expect(caseMacro.target?.displayName == "@statement")
+        #expect(defaultMacro.target?.displayName == "@statement")
+        #expect(caseMacro.macros.isEmpty)
+        #expect(defaultMacro.macros.isEmpty)
 
         let projectFile = try #require(program.projectExpandedFiles.first)
         guard case .module(let module) = projectFile.sourceFile,

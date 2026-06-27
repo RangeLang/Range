@@ -4170,7 +4170,7 @@ extension MacroExpander {
                 allowedIdentifiers: allowedIdentifiers,
                 localIdentifiers: []
             )
-        case "Statement", "Switch", "If":
+        case "Statement":
             var parser = try Parser(source: source)
             parser.currentSelfAvailable = true
             var localBindings: [String: LocalBindingSymbol] = [:]
@@ -4481,11 +4481,7 @@ extension MacroExpander {
                     values.append(expressionSyntaxValue(try parser.parseExpression()))
                 } else {
                     let statement = try parser.parseStatement(localBindings: &localBindings)
-                    if elementName == "Switch", case .switchStatement = statement {
-                        values.append(try statementSyntaxValue(statement))
-                    } else if elementName == "If", case .conditional = statement {
-                        values.append(try statementSyntaxValue(statement))
-                    } else if elementName == "Statement" {
+                    if elementName == "Statement" {
                         values.append(try statementSyntaxValue(statement))
                     } else {
                         throw ParseError(
@@ -4507,26 +4503,6 @@ extension MacroExpander {
             parser.currentSelfAvailable = true
             var localBindings: [String: LocalBindingSymbol] = [:]
             let statement = try parser.parseStatement(localBindings: &localBindings)
-            try parser.consume(.eof)
-            return try statementSyntaxValue(statement)
-        case "Switch":
-            var parser = try Parser(source: source)
-            parser.currentSelfAvailable = true
-            var localBindings: [String: LocalBindingSymbol] = [:]
-            let statement = try parser.parseStatement(localBindings: &localBindings)
-            guard case .switchStatement = statement else {
-                throw ParseError("Syntax macro expected Switch output.")
-            }
-            try parser.consume(.eof)
-            return try statementSyntaxValue(statement)
-        case "If":
-            var parser = try Parser(source: source)
-            parser.currentSelfAvailable = true
-            var localBindings: [String: LocalBindingSymbol] = [:]
-            let statement = try parser.parseStatement(localBindings: &localBindings)
-            guard case .conditional = statement else {
-                throw ParseError("Syntax macro expected If output.")
-            }
             try parser.consume(.eof)
             return try statementSyntaxValue(statement)
         case "Block":
@@ -4560,12 +4536,8 @@ extension MacroExpander {
             return "Block"
         case "expression":
             return "Expression"
-        case "if":
-            return "If"
         case "statement":
             return "Statement"
-        case "switch":
-            return "Switch"
         default:
             return surfaceName
         }
@@ -4573,28 +4545,6 @@ extension MacroExpander {
 
     static func statementSyntaxValue(_ statement: Statement) throws -> CompileTimeValue {
         switch statement {
-        case .switchStatement(let expression, let cases, nil):
-            return .object(
-                typeName: "Switch",
-                fields: [
-                    "expression": expressionSyntaxValue(expression),
-                    "cases": .array(try cases.map(switchCaseSyntaxValue)),
-                ]
-            )
-        case .conditional(let branches):
-            guard let first = branches.first, let condition = first.condition else {
-                throw ParseError("Syntax macro expected If output.")
-            }
-            var fields: [String: CompileTimeValue] = [
-                "condition": expressionSyntaxValue(condition),
-                "thenBody": try blockSyntaxValue(first.body),
-            ]
-            if branches.count == 2, branches[1].condition == nil {
-                fields["elseBody"] = try blockSyntaxValue(branches[1].body)
-            } else if branches.count > 1 {
-                throw ParseError("Unsupported if statement in syntax macro output.")
-            }
-            return .object(typeName: "If", fields: fields)
         case .return(let expression):
             var fields: [String: CompileTimeValue] = [:]
             if let expression {
@@ -4618,38 +4568,8 @@ extension MacroExpander {
         }
     }
 
-    static func blockSyntaxValue(_ statements: [Statement]) throws -> CompileTimeValue {
-        .object(
-            typeName: "Block",
-            fields: ["statements": .array(try statements.map(statementSyntaxValue))]
-        )
-    }
-
-    static func switchCaseSyntaxValue(_ switchCase: SwitchCase) throws -> CompileTimeValue {
-        .object(
-            typeName: "SwitchCase",
-            fields: [
-                "pattern": .string(renderSwitchCasePattern(switchCase.pattern)),
-                "body": try blockSyntaxValue(switchCase.body),
-            ]
-        )
-    }
-
     static func expressionSyntaxValue(_ expression: Expression) -> CompileTimeValue {
         .string(renderExpressionForStringify(expression))
-    }
-
-    static func renderSwitchCasePattern(_ pattern: SwitchCasePattern) -> String {
-        switch pattern {
-        case .expression(let expression):
-            return renderExpressionForStringify(expression)
-        case .enumCase(let name, nil):
-            return name.hasPrefix(".") ? name : ".\(name)"
-        case .enumCase(let name, let binding?):
-            let keyword = binding.kind == .mutable ? "var" : "let"
-            let caseName = name.hasPrefix(".") ? name : ".\(name)"
-            return "\(caseName)(\(keyword) \(binding.name))"
-        }
     }
 
     static func renderAssignmentTarget(_ target: AssignmentTarget) -> String {
