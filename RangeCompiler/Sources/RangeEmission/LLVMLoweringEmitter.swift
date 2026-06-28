@@ -121,7 +121,7 @@ struct LLVMLoweringEmitter {
             constructLayouts: constructLayouts,
             scalarTypes: scalarTypes
         )
-        try function.emitBody(body)
+        try function.emitBody(body.map(LLVMStatement.init(source:)))
         let parameterList = zip(callable.parameters, signature.parameters)
             .map { parameter, type in "\(type.llvmType) %\(parameter.name)" }
             .joined(separator: ", ")
@@ -474,7 +474,7 @@ private struct LLVMFunctionEmitter {
         self.scalarTypes = scalarTypes
     }
 
-    mutating func emitBody(_ body: [Statement]) throws {
+    mutating func emitBody(_ body: [LLVMStatement]) throws {
         for statement in body {
             try emitStatement(statement)
             if blockTerminated {
@@ -487,7 +487,7 @@ private struct LLVMFunctionEmitter {
         }
     }
 
-    private mutating func emitStatement(_ statement: Statement) throws {
+    private mutating func emitStatement(_ statement: LLVMStatement) throws {
         switch statement {
         case .emitted(let text):
             for record in StringyStatementRecord.records(in: text) {
@@ -497,7 +497,7 @@ private struct LLVMFunctionEmitter {
                 }
             }
             return
-        case .macroApplication:
+        case .ignored:
             return
         case .localBinding(let declaration):
             try emitLocalBinding(declaration)
@@ -516,7 +516,7 @@ private struct LLVMFunctionEmitter {
             try emitOwnedLocalArrayFrees()
             emit("ret \(returnType.llvmType) \(converted.representation)")
             blockTerminated = true
-        case .return(nil), .macroInvocation:
+        case .return(nil):
             throw LLVMLoweringError("LLVM lowering does not support statement \(statement).")
         case .expression(let expression):
             guard try emitLowerableSideEffectExpression(expression) else {
@@ -549,18 +549,22 @@ private struct LLVMFunctionEmitter {
             try emitOwnedLocalArrayFrees()
             emit(llvm)
             blockTerminated = true
-        case .member(let kind, let name, let typeName, let value):
+        case .member(let kind, let name, let type, let value):
             try emitLocalBinding(
                 LocalBindingDeclaration(
                     kind: kind == "state" ? .mutable : .constant,
                     name: name,
                     hasExplicitTypeAnnotation: true,
-                    type: .named(typeName),
+                    type: type,
                     expression: value
                 )
             )
         case .assignment(let target, let value):
             try emitAssignment(target: .local(target), expression: value)
+        case .expression(let expression):
+            guard try emitLowerableSideEffectExpression(expression) else {
+                throw LLVMLoweringError("LLVM lowering does not support expression record \(expression).")
+            }
         case .whileLoop(let condition, let body):
             try emitStringyWhileLoop(condition: condition, body: body)
         case .conditional(let condition, let body):
@@ -636,7 +640,7 @@ private struct LLVMFunctionEmitter {
 
     private mutating func emitWhileLoop(
         condition: RangeCompiler.Expression,
-        body: [Statement]
+        body: [LLVMStatement]
     ) throws {
         let labelID = freshLabelID()
         let conditionLabel = "while.cond.\(labelID)"
@@ -706,7 +710,7 @@ private struct LLVMFunctionEmitter {
         emitLabel(endLabel)
     }
 
-    private mutating func emitConditional(_ branches: [StatementConditionalBranch]) throws {
+    private mutating func emitConditional(_ branches: [LLVMConditionalBranch]) throws {
         guard !branches.isEmpty else {
             throw LLVMLoweringError("LLVM conditional requires at least one branch.")
         }
@@ -792,7 +796,7 @@ private struct LLVMFunctionEmitter {
         emitLabel(endLabel)
     }
 
-    private mutating func emitStatements(_ statements: [Statement]) throws {
+    private mutating func emitStatements(_ statements: [LLVMStatement]) throws {
         for statement in statements {
             try emitStatement(statement)
             if blockTerminated {

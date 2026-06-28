@@ -328,8 +328,12 @@ enum LLVMLowerability {
         for (parameter, type) in zip(callable.parameters, signature.parameters) {
             locals[parameter.name] = type
         }
+        guard let llvmBody = llvmStatements(from: body) else {
+            return false
+        }
+
         return canLower(
-            body,
+            llvmBody,
             returnType: signature.returnType,
             locals: &locals,
             lowerableFunctionSignatures: lowerableFunctionSignatures,
@@ -400,8 +404,12 @@ enum LLVMLowerability {
         ) {
             locals[parameter.name] = type
         }
+        guard let llvmBody = llvmStatements(from: body) else {
+            return "uses unsupported LLVM statements"
+        }
+
         return statementRejectionReason(
-            body,
+            llvmBody,
             returnType: scalarReturnType,
             locals: &locals,
             lowerableFunctionSignatures: lowerableFunctionSignatures,
@@ -462,7 +470,7 @@ enum LLVMLowerability {
     }
 
     private static func canLower(
-        _ statements: [Statement],
+        _ statements: [LLVMStatement],
         returnType: ScalarType,
         locals: inout [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
@@ -492,7 +500,7 @@ enum LLVMLowerability {
                     continue
                 }
                 sawReturn = recordReturn
-            case .macroApplication:
+            case .ignored:
                 continue
             case .localBinding(let declaration):
                 guard canLowerLocalBinding(
@@ -573,12 +581,16 @@ enum LLVMLowerability {
                     return false
                 }
                 sawReturn = true
-            case .return(nil), .macroInvocation:
+            case .return(nil):
                 return false
             }
         }
 
         return sawReturn
+    }
+
+    private static func llvmStatements(from statements: [Statement]) -> [LLVMStatement]? {
+        try? statements.map(LLVMStatement.init(source:))
     }
 
     private static func canLowerStringyRecords(
@@ -622,9 +634,9 @@ enum LLVMLowerability {
                     return nil
                 }
                 sawReturn = true
-            case .member(_, let name, let typeName, let value):
+            case .member(_, let name, let typeReference, let value):
                 let type = ScalarType(
-                    typeReference: .named(typeName),
+                    typeReference: typeReference,
                     constructLayouts: constructLayouts,
                     scalarTypes: scalarTypes
                 )
@@ -654,6 +666,15 @@ enum LLVMLowerability {
                         to: type
                     )
                 else {
+                    return nil
+                }
+            case .expression(let expression):
+                guard canLowerSideEffectExpression(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
+                ) else {
                     return nil
                 }
             case .whileLoop(let condition, let body):
@@ -712,9 +733,9 @@ enum LLVMLowerability {
             switch record {
             case .returnStatement:
                 return false
-            case .member(_, let name, let typeName, let value):
+            case .member(_, let name, let typeReference, let value):
                 guard let type = ScalarType(
-                    typeReference: .named(typeName),
+                    typeReference: typeReference,
                     constructLayouts: constructLayouts,
                     scalarTypes: scalarTypes
                 ),
@@ -743,6 +764,15 @@ enum LLVMLowerability {
                         to: type
                     )
                 else {
+                    return false
+                }
+            case .expression(let expression):
+                guard canLowerSideEffectExpression(
+                    expression,
+                    locals: locals,
+                    lowerableFunctionSignatures: lowerableFunctionSignatures,
+                    constructLayouts: constructLayouts
+                ) else {
                     return false
                 }
             case .whileLoop(let condition, let body):
@@ -819,7 +849,7 @@ enum LLVMLowerability {
     }
 
     private static func statementRejectionReason(
-        _ statements: [Statement],
+        _ statements: [LLVMStatement],
         returnType: ScalarType,
         locals: inout [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
@@ -832,7 +862,7 @@ enum LLVMLowerability {
                 return "has statements after return"
             }
             switch statement {
-            case .emitted, .macroApplication:
+            case .emitted, .ignored:
                 continue
             case .localBinding(let declaration):
                 guard let type = ScalarType(typeReference: declaration.type) else {
@@ -915,7 +945,7 @@ enum LLVMLowerability {
                     return "return expression is \(expressionType), expected \(returnType)"
                 }
                 sawReturn = true
-            case .return(nil), .macroInvocation:
+            case .return(nil):
                 return "uses an unsupported statement"
             case .expression(let expression):
                 guard canLowerSideEffectExpression(
@@ -931,7 +961,7 @@ enum LLVMLowerability {
     }
 
     private static func loopBodyRejectionReason(
-        _ statements: [Statement],
+        _ statements: [LLVMStatement],
         locals: inout [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
         constructLayouts: [String: ConstructLayout] = [:]
@@ -1069,14 +1099,14 @@ enum LLVMLowerability {
     }
 
     private static func canLowerLoopBody(
-        _ statements: [Statement],
+        _ statements: [LLVMStatement],
         locals: inout [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
         constructLayouts: [String: ConstructLayout] = [:]
     ) -> Bool {
         for statement in statements {
             switch statement {
-            case .emitted, .macroApplication:
+            case .emitted, .ignored:
                 continue
             case .localBinding(let declaration):
                 guard canLowerLocalBinding(
@@ -1128,7 +1158,7 @@ enum LLVMLowerability {
                 ) else {
                     return false
                 }
-            case .macroInvocation, .return:
+            case .return:
                 return false
             }
         }
@@ -1190,7 +1220,7 @@ enum LLVMLowerability {
     }
 
     private static func canLowerConditional(
-        _ branches: [StatementConditionalBranch],
+        _ branches: [LLVMConditionalBranch],
         returnType: ScalarType,
         locals: [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],
@@ -1232,7 +1262,7 @@ enum LLVMLowerability {
     }
 
     private static func conditionalAlwaysReturns(
-        _ branches: [StatementConditionalBranch],
+        _ branches: [LLVMConditionalBranch],
         returnType: ScalarType,
         locals: [String: ScalarType],
         lowerableFunctionSignatures: [String: ScalarSignature],

@@ -209,13 +209,13 @@ struct LLVMLoweringEmitterTests {
                     ret(id("label.text"))
                 ]
             ),
-            callable(
-                "make",
-                returnType: .named("Point"),
-                body: [
-                    ret(call("Point", argument("x", .integer(2)), argument("y", .integer(3))))
-                ]
-            ),
+	            callable(
+	                "make",
+	                returnType: .named("Point"),
+	                body: [
+	                    astRet(call("Point", argument("x", .integer(2)), argument("y", .integer(3))))
+	                ]
+	            ),
             callable(
                 "makeSum",
                 returnType: .named("Int"),
@@ -798,9 +798,9 @@ struct LLVMLoweringEmitterTests {
                 .conditional([
                     StatementConditionalBranch(
                         condition: binary(id("lhs"), .less, id("rhs")),
-                        body: [ret(id("rhs"))]
+                        body: [astRet(id("rhs"))]
                     ),
-                    StatementConditionalBranch(condition: nil, body: [ret(id("adjusted"))]),
+                    StatementConditionalBranch(condition: nil, body: [astRet(id("adjusted"))]),
                 ]),
             ]
         )
@@ -858,7 +858,7 @@ struct LLVMLoweringEmitterTests {
                             rhs: .integer(10)
                         ),
                         body: [
-                            .return(
+                            astRet(
                                 .binary(
                                     lhs: .identifier("incremented"),
                                     operatorSymbol: .multiplication,
@@ -870,7 +870,7 @@ struct LLVMLoweringEmitterTests {
                     StatementConditionalBranch(
                         condition: nil,
                         body: [
-                            .return(
+                            astRet(
                                 .binary(
                                     lhs: .integer(10),
                                     operatorSymbol: .subtraction,
@@ -1250,8 +1250,8 @@ struct LLVMLoweringEmitterTests {
             returnType: .named("Int"),
             body: [
                 .conditional([
-                    StatementConditionalBranch(condition: id("flag"), body: [ret(id("value"))]),
-                    StatementConditionalBranch(condition: nil, body: [ret(.integer(0))]),
+                    StatementConditionalBranch(condition: id("flag"), body: [astRet(id("value"))]),
+                    StatementConditionalBranch(condition: nil, body: [astRet(.integer(0))]),
                 ])
             ]
         )
@@ -1825,13 +1825,13 @@ struct LLVMLoweringEmitterTests {
                 ]
             ),
             callable(
-                "score",
-                returnType: .named("Int"),
-                body: [
-                    local("point", typeName: "Point", expression: call("make")),
-                    ret(binary(id("point.x"), .addition, id("point.y"))),
-                ]
-            ),
+	                "score",
+	                returnType: .named("Int"),
+	                body: [
+	                    astLocal("point", typeName: "Point", expression: call("make")),
+	                    astRet(binary(id("point.x"), .addition, id("point.y"))),
+	                ]
+	            ),
         ]
         let mainBlockNode = mainBlock([
             .expression(call("score"))
@@ -2560,10 +2560,68 @@ struct LLVMLoweringEmitterTests {
     }
 
     private func ret(_ expression: RangeExpression) -> Statement {
-        .return(expression)
+        .emitted("statement|kind=return|value=\(expressionSource(expression))|llvm=ret value")
     }
 
     private func local(
+        _ name: String,
+        typeName: String,
+        expression: RangeExpression
+    ) -> Statement {
+        .emitted(
+            "member|kind=let|name=\(name)|type=\(typeName)|value=\(expressionSource(expression))"
+        )
+    }
+
+    private func state(
+        _ name: String,
+        type: TypeReference,
+        expression: RangeExpression
+    ) -> Statement {
+        .emitted(
+            "member|kind=state|name=\(name)|type=\(type.displayName)|value=\(expressionSource(expression))"
+        )
+    }
+
+    private func assign(_ name: String, _ expression: RangeExpression) -> Statement {
+        .emitted("statement|kind=assign|target=\(name)|value=\(expressionSource(expression))")
+    }
+
+    private func whileLoop(
+        _ condition: RangeExpression,
+        _ body: [Statement]
+    ) -> Statement {
+        .emitted(
+            (["statement|kind=while|condition=\(expressionSource(condition))"]
+                + body.map(statementRecordSource))
+                .joined(separator: "\n")
+        )
+    }
+
+    private func ifStatement(
+        _ condition: RangeExpression,
+        _ body: [Statement]
+    ) -> Statement {
+        .emitted(
+            (["statement|kind=if|condition=\(expressionSource(condition))"]
+                + body.map(statementRecordSource))
+                .joined(separator: "\n")
+        )
+    }
+
+    private func breakStatement() -> Statement {
+        .emitted("statement|kind=break")
+    }
+
+    private func continueStatement() -> Statement {
+        .emitted("statement|kind=continue")
+    }
+
+    private func astRet(_ expression: RangeExpression) -> Statement {
+        .return(expression)
+    }
+
+    private func astLocal(
         _ name: String,
         typeName: String,
         expression: RangeExpression
@@ -2579,7 +2637,7 @@ struct LLVMLoweringEmitterTests {
         )
     }
 
-    private func state(
+    private func astState(
         _ name: String,
         type: TypeReference,
         expression: RangeExpression
@@ -2595,32 +2653,78 @@ struct LLVMLoweringEmitterTests {
         )
     }
 
-    private func assign(_ name: String, _ expression: RangeExpression) -> Statement {
+    private func astAssign(_ name: String, _ expression: RangeExpression) -> Statement {
         .assignment(target: .local(name), expression: expression)
     }
 
-    private func whileLoop(
+    private func astWhileLoop(
         _ condition: RangeExpression,
         _ body: [Statement]
     ) -> Statement {
         .whileLoop(condition: condition, body: body)
     }
 
-    private func ifStatement(
-        _ condition: RangeExpression,
-        _ body: [Statement]
-    ) -> Statement {
-        .conditional([
-            StatementConditionalBranch(condition: condition, body: body)
-        ])
+    private func statementRecordSource(_ statement: Statement) -> String {
+        if case .emitted(let text) = statement {
+            return text
+        }
+        if case .expression(let expression) = statement {
+            return "statement|kind=expression|value=\(expressionSource(expression))"
+        }
+        else {
+            Issue.record("Expected stringy statement record, got \(statement).")
+            return ""
+        }
     }
 
-    private func breakStatement() -> Statement {
-        .emitted("statement|kind=break")
+    private func expressionSource(_ expression: RangeExpression) -> String {
+        switch expression {
+        case .integer(let value):
+            return "\(value)"
+        case .double(let value):
+            return "\(value)"
+        case .string(let value):
+            return "\"\(escapedString(value))\""
+        case .boolean(let value):
+            return value ? "true" : "false"
+        case .nilLiteral:
+            return "nil"
+        case .identifier(let name):
+            return name
+        case .bindingReference(let name):
+            return "$\(name)"
+        case .call(let name, let arguments):
+            let renderedArguments = arguments.map { argument in
+                if let label = argument.label {
+                    return "\(label): \(expressionSource(argument.value))"
+                }
+                return expressionSource(argument.value)
+            }.joined(separator: ", ")
+            return "\(name)(\(renderedArguments))"
+        case .array(let elements):
+            return "[\(elements.map(expressionSource).joined(separator: ", "))]"
+        case .dictionary(let elements):
+            return "[\(elements.map { "\(expressionSource($0.key)): \(expressionSource($0.value))" }.joined(separator: ", "))]"
+        case .ternary(let condition, let trueExpression, let falseExpression):
+            return
+                "(\(expressionSource(condition)) ? \(expressionSource(trueExpression)) : \(expressionSource(falseExpression)))"
+        case .unary(let operatorSymbol, let nested):
+            return "\(operatorSymbol.rawValue)\(expressionSource(nested))"
+        case .binary(let lhs, let operatorSymbol, let rhs):
+            return "(\(expressionSource(lhs)) \(operatorSymbol.rawValue) \(expressionSource(rhs)))"
+        case .block, .macroInvocation:
+            Issue.record("Unsupported expression in stringy LLVM fixture: \(expression).")
+            return ""
+        }
     }
 
-    private func continueStatement() -> Statement {
-        .emitted("statement|kind=continue")
+    private func escapedString(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+            .replacingOccurrences(of: "\t", with: "\\t")
     }
 
     private func id(_ name: String) -> RangeExpression {
@@ -2662,16 +2766,16 @@ struct LLVMLoweringEmitterTests {
             ],
             returnType: .named("Int"),
             body: [
-                state("outer", type: .named("Int"), expression: .integer(0)),
-                state("total", type: .named("Int"), expression: .integer(0)),
-                whileLoop(
+                astState("outer", type: .named("Int"), expression: .integer(0)),
+                astState("total", type: .named("Int"), expression: .integer(0)),
+                astWhileLoop(
                     binary(id("outer"), .less, id("limit")),
                     [
-                        state("inner", type: .named("Int"), expression: .integer(0)),
-                        whileLoop(
+                        astState("inner", type: .named("Int"), expression: .integer(0)),
+                        astWhileLoop(
                             binary(id("inner"), .less, id("limit")),
                             [
-                                assign(
+                                astAssign(
                                     "total",
                                     binary(
                                         binary(id("total"), .addition, id("outer")),
@@ -2679,13 +2783,13 @@ struct LLVMLoweringEmitterTests {
                                         id("inner")
                                     )
                                 ),
-                                assign("inner", binary(id("inner"), .addition, .integer(1))),
+                                astAssign("inner", binary(id("inner"), .addition, .integer(1))),
                             ]
                         ),
-                        assign("outer", binary(id("outer"), .addition, .integer(1))),
+                        astAssign("outer", binary(id("outer"), .addition, .integer(1))),
                     ]
                 ),
-                ret(id("total")),
+                astRet(id("total")),
             ]
         )
     }
@@ -2729,8 +2833,8 @@ struct LLVMLoweringEmitterTests {
             returnType: .named("Int"),
             body: [
                 .conditional([
-                    StatementConditionalBranch(condition: id("flag"), body: [ret(id("value"))]),
-                    StatementConditionalBranch(condition: nil, body: [ret(.integer(0))]),
+                    StatementConditionalBranch(condition: id("flag"), body: [astRet(id("value"))]),
+                    StatementConditionalBranch(condition: nil, body: [astRet(.integer(0))]),
                 ])
             ]
         )
@@ -2844,8 +2948,8 @@ struct LLVMLoweringEmitterTests {
                 returnType: .named("Int"),
                 body: [
                     .conditional([
-                        StatementConditionalBranch(condition: id("flag"), body: [ret(id("value"))]),
-                        StatementConditionalBranch(condition: nil, body: [ret(.integer(0))]),
+                        StatementConditionalBranch(condition: id("flag"), body: [astRet(id("value"))]),
+                        StatementConditionalBranch(condition: nil, body: [astRet(.integer(0))]),
                     ])
                 ]
             ),
@@ -2865,7 +2969,7 @@ struct LLVMLoweringEmitterTests {
                                 argument("rhs", id("rhs"))
                             ),
                             body: [
-                                ret(
+                                astRet(
                                     call(
                                         "choose",
                                         argument(
@@ -2880,7 +2984,7 @@ struct LLVMLoweringEmitterTests {
                         StatementConditionalBranch(
                             condition: nil,
                             body: [
-                                ret(
+                                astRet(
                                     call(
                                         "choose",
                                         argument("flag", .boolean(false)),

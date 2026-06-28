@@ -450,9 +450,17 @@ struct SwiftBackendEmitter {
             }
 
             func record(_ statements: [Statement]) {
+                guard let statements = try? statements.map(SwiftEmissionStatement.init(source:))
+                else {
+                    return
+                }
+                record(statements)
+            }
+
+            func record(_ statements: [SwiftEmissionStatement]) {
                 for statement in statements {
                     switch statement {
-                    case .emitted, .macroApplication:
+                    case .emitted, .ignored:
                         continue
                     case .localBinding(let declaration):
                         record(declaration.expression)
@@ -472,8 +480,6 @@ struct SwiftBackendEmitter {
                         }
                     case .whileLoop(let condition, let body):
                         record(condition)
-                        record(body)
-                    case .macroInvocation(_, _, let body):
                         record(body)
                     case .return(nil):
                         break
@@ -977,7 +983,10 @@ struct SwiftBackendEmitter {
 
     private func emitMain(_ mainBlock: BlockMacroNode) throws -> String {
         let body = try emitStatements(
-            mainBlock.body, indent: 2, enclosingReturnType: .named("Void"))
+            swiftEmissionStatements(from: mainBlock.body),
+            indent: 2,
+            enclosingReturnType: .named("Void")
+        )
 
         return """
             @main
@@ -1005,7 +1014,7 @@ struct SwiftBackendEmitter {
             genericParameterNames: genericParameterNames
         )
         let functionBody = try emitStatements(
-            body,
+            swiftEmissionStatements(from: body),
             indent: 1,
             enclosingReturnType: callable.returnType ?? .named("Void"),
             scope: EmissionScope(genericParameters: callable.genericParameters)
@@ -1641,13 +1650,14 @@ struct SwiftBackendEmitter {
                 "var \(derived.name): \(emitDeclaredTypeName(derived.typeName, genericParameterNames: genericParameterNames))"
         }
 
-        if body.count == 1, case .expression(let expression) = body[0] {
+        let emissionBody = try swiftEmissionStatements(from: body)
+        if emissionBody.count == 1, case .expression(let expression) = emissionBody[0] {
             return
                 "var \(derived.name): \(emitDeclaredTypeName(derived.typeName, genericParameterNames: genericParameterNames)) { \(try emitExpression(expression)) }"
         }
 
         let bodyText = try emitStatements(
-            body,
+            emissionBody,
             indent: 2,
             enclosingReturnType: .named(derived.typeName)
         )
@@ -1673,7 +1683,7 @@ struct SwiftBackendEmitter {
 
         let bindingParameterNames = Set(initializer.parameters.filter(\.isBinding).map(\.name))
         let functionBody = try emitInitializerStatements(
-            body,
+            swiftEmissionStatements(from: body),
             indent: 2,
             bindingNames: bindingNames,
             bindingParameterNames: bindingParameterNames,
@@ -1736,7 +1746,7 @@ struct SwiftBackendEmitter {
             )
         } else {
             functionBody = try emitStatements(
-                body,
+                swiftEmissionStatements(from: body),
                 indent: 2,
                 enclosingReturnType: callable.returnType ?? .named("Void"),
                 scope: scope
@@ -1767,6 +1777,9 @@ struct SwiftBackendEmitter {
         }
 
         if let body = callable.body {
+            guard let body = try? swiftEmissionStatements(from: body) else {
+                return false
+            }
             return callableSignatureMentionsSelf(callable)
                 && !statementsReferenceInstanceSelf(body)
         }
@@ -1812,11 +1825,11 @@ struct SwiftBackendEmitter {
         }
     }
 
-    private func statementsReferenceInstanceSelf(_ statements: [RangeStatement]) -> Bool {
+    private func statementsReferenceInstanceSelf(_ statements: [SwiftEmissionStatement]) -> Bool {
         statements.contains(where: statementReferencesInstanceSelf)
     }
 
-    private func statementReferencesInstanceSelf(_ statement: RangeStatement) -> Bool {
+    private func statementReferencesInstanceSelf(_ statement: SwiftEmissionStatement) -> Bool {
         switch statement {
         case .localBinding(let declaration):
             return expressionReferencesInstanceSelf(declaration.expression)
@@ -1838,9 +1851,7 @@ struct SwiftBackendEmitter {
         case .whileLoop(let condition, let body):
             return expressionReferencesInstanceSelf(condition)
                 || statementsReferenceInstanceSelf(body)
-        case .macroInvocation(_, _, let body):
-            return statementsReferenceInstanceSelf(body)
-        case .emitted, .macroApplication:
+        case .emitted, .ignored:
             return false
         }
     }
@@ -1853,6 +1864,9 @@ struct SwiftBackendEmitter {
             return name == "self" || name.hasPrefix("self.")
                 || arguments.contains { expressionReferencesInstanceSelf($0.value) }
         case .block(let body):
+            guard let body = try? swiftEmissionStatements(from: body) else {
+                return false
+            }
             return statementsReferenceInstanceSelf(body)
         case .array(let elements):
             return elements.contains(where: expressionReferencesInstanceSelf)
@@ -1889,21 +1903,21 @@ struct SwiftBackendEmitter {
 
     private func methodNeedsMutation(_ callable: CallableDeclaration) -> Bool {
         guard let body = callable.body else { return false }
+        guard let body = try? swiftEmissionStatements(from: body) else { return false }
         return statementsMutateInstanceSelf(body)
             || statementsCallKnownMutatingMemberOnInstanceSelf(body)
     }
 
-    private func statementsMutateInstanceSelf(_ statements: [RangeStatement]) -> Bool {
+    private func statementsMutateInstanceSelf(_ statements: [SwiftEmissionStatement]) -> Bool {
         for statement in statements {
             switch statement {
             case .assignment(let target, _):
                 if assignmentTargetReferencesInstanceSelf(target) {
                     return true
                 }
-            case .emitted, .macroApplication:
+            case .emitted, .ignored:
                 continue
-            case .macroInvocation(_, _, let body),
-                .whileLoop(_, let body):
+            case .whileLoop(_, let body):
                 if statementsMutateInstanceSelf(body) {
                     return true
                 }
@@ -1919,7 +1933,9 @@ struct SwiftBackendEmitter {
         return false
     }
 
-    private func statementsCallKnownMutatingMemberOnInstanceSelf(_ statements: [RangeStatement]) -> Bool {
+    private func statementsCallKnownMutatingMemberOnInstanceSelf(
+        _ statements: [SwiftEmissionStatement]
+    ) -> Bool {
         for statement in statements {
             switch statement {
             case .expression(let expression), .return(let expression?):
@@ -1946,7 +1962,7 @@ struct SwiftBackendEmitter {
                 {
                     return true
                 }
-            case .emitted, .macroApplication, .macroInvocation, .return(nil):
+            case .emitted, .ignored, .return(nil):
                 continue
             }
         }
@@ -1964,6 +1980,9 @@ struct SwiftBackendEmitter {
             }
             return arguments.contains { expressionCallsKnownMutatingMemberOnInstanceSelf($0.value) }
         case .block(let statements):
+            guard let statements = try? swiftEmissionStatements(from: statements) else {
+                return false
+            }
             return statementsCallKnownMutatingMemberOnInstanceSelf(statements)
         case .array(let elements):
             return elements.contains(where: expressionCallsKnownMutatingMemberOnInstanceSelf)
@@ -1996,8 +2015,14 @@ struct SwiftBackendEmitter {
             .joined(separator: "\n")
     }
 
+    private func swiftEmissionStatements(
+        from statements: [RangeStatement]
+    ) throws -> [SwiftEmissionStatement] {
+        try statements.map(SwiftEmissionStatement.init(source:))
+    }
+
     private func emitStatements(
-        _ statements: [RangeStatement],
+        _ statements: [SwiftEmissionStatement],
         indent: Int,
         enclosingReturnType: TypeReference? = nil,
         scope: EmissionScope = .empty
@@ -2015,7 +2040,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitInitializerStatements(
-        _ statements: [RangeStatement],
+        _ statements: [SwiftEmissionStatement],
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
@@ -2037,7 +2062,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitInitializerStatement(
-        _ statement: RangeStatement,
+        _ statement: SwiftEmissionStatement,
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
@@ -2089,7 +2114,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitInitializerConditional(
-        _ branches: [StatementConditionalBranch],
+        _ branches: [SwiftEmissionConditionalBranch],
         indent: Int,
         bindingNames: Set<String>,
         bindingParameterNames: Set<String>,
@@ -2135,7 +2160,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitStatement(
-        _ statement: RangeStatement,
+        _ statement: SwiftEmissionStatement,
         indent: Int,
         enclosingReturnType: TypeReference? = nil,
         scope: EmissionScope = .empty
@@ -2143,10 +2168,8 @@ struct SwiftBackendEmitter {
         let prefix = String(repeating: "    ", count: indent)
 
         switch statement {
-        case .emitted, .macroApplication:
+        case .emitted, .ignored:
             return ""
-        case .macroInvocation:
-            throw SwiftBackendError("Macro invocations must be expanded before Swift emission.")
         case .localBinding(let declaration):
             let keyword = declaration.kind == .constant ? "let" : "var"
             let typeAnnotation =
@@ -2183,7 +2206,7 @@ struct SwiftBackendEmitter {
     }
 
     private func emitConditional(
-        _ branches: [StatementConditionalBranch],
+        _ branches: [SwiftEmissionConditionalBranch],
         indent: Int,
         enclosingReturnType: TypeReference? = nil,
         scope: EmissionScope = .empty
@@ -2454,13 +2477,14 @@ struct SwiftBackendEmitter {
             return nil
         }
 
-        if statements.count == 1, case .expression(let expression) = statements[0] {
+        let emissionStatements = try swiftEmissionStatements(from: statements)
+        if emissionStatements.count == 1, case .expression(let expression) = emissionStatements[0] {
             return
                 "{ \(parameterNames.joined(separator: ", ")) in \(try emitExpression(expression, scope: scope)) }"
         }
 
         let bodyText = try emitStatements(
-            statements,
+            emissionStatements,
             indent: 1,
             enclosingReturnType: nil,
             scope: scope
@@ -2637,12 +2661,13 @@ struct SwiftBackendEmitter {
         _ body: [RangeStatement],
         scope: EmissionScope = .empty
     ) throws -> String {
-        if body.count == 1, case .expression(let expression) = body[0] {
+        let emissionBody = try swiftEmissionStatements(from: body)
+        if emissionBody.count == 1, case .expression(let expression) = emissionBody[0] {
             return "{ \(try emitExpression(expression, scope: scope)) }"
         }
 
         let bodyText = try emitStatements(
-            body,
+            emissionBody,
             indent: 1,
             enclosingReturnType: nil,
             scope: scope
